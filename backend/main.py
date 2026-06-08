@@ -5,6 +5,9 @@ from app.content.db_models import ContentRecordDB
 from app.content.router import router as content_router
 from app.content.service import create_demo_content_if_empty
 
+from app.campaigns.db_models import CampaignDB
+from app.campaigns.router import router as campaigns_router
+
 
 app = FastAPI(
     title="Newsletter Reference Architecture API",
@@ -20,6 +23,7 @@ with SessionLocal() as db:
 
 
 app.include_router(content_router)
+app.include_router(campaigns_router)
 
 
 @app.get("/")
