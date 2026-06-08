@@ -8,12 +8,16 @@ from app.campaigns.models import (
     CampaignWithVariants,
     Variant,
     VariantCreate,
+    ModuleInstance,
+    ModuleInstanceCreate,
 )
 from app.campaigns.service import (
     create_campaign,
     create_variant_for_campaign,
     list_campaigns,
     list_variants_for_campaign,
+    create_module_for_variant,
+    list_modules_for_variant,
 )
 
 
@@ -60,4 +64,31 @@ def create_campaign_variant(
         campaign_id=campaign_id,
         name=payload.name,
         status=payload.status,
+    )
+
+
+@router.get("/variants/{variant_id}/modules", response_model=list[ModuleInstance])
+def get_variant_modules(
+    variant_id: int,
+    db: Session = Depends(get_db),
+):
+    return list_modules_for_variant(
+        db=db,
+        variant_id=variant_id,
+    )
+
+
+@router.post("/variants/{variant_id}/modules", response_model=ModuleInstance)
+def create_variant_module(
+    variant_id: int,
+    payload: ModuleInstanceCreate,
+    db: Session = Depends(get_db),
+):
+    return create_module_for_variant(
+        db=db,
+        variant_id=variant_id,
+        module_type=payload.module_type,
+        position=payload.position,
+        content_record_id=payload.content_record_id,
+        module_data=payload.module_data,
     )

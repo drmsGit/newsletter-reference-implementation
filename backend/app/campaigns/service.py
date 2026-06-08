@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
-from app.campaigns.db_models import CampaignDB, VariantDB
-from app.campaigns.models import Campaign, CampaignWithVariants, Variant
+from app.campaigns.db_models import CampaignDB, VariantDB, ModuleInstanceDB
+from app.campaigns.models import Campaign, CampaignWithVariants, Variant, ModuleInstance
 
 
 def to_campaign(record: CampaignDB) -> Campaign:
@@ -91,3 +91,53 @@ def create_variant_for_campaign(
     db.refresh(variant)
 
     return to_variant(variant)
+
+
+def to_module_instance(record: ModuleInstanceDB) -> ModuleInstance:
+    return ModuleInstance(
+        id=record.id,
+        variant_id=record.variant_id,
+        module_type=record.module_type,
+        position=record.position,
+        content_record_id=record.content_record_id,
+        module_data=record.module_data,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+    )
+
+
+def list_modules_for_variant(
+    db: Session,
+    variant_id: int,
+) -> list[ModuleInstance]:
+    records = (
+        db.query(ModuleInstanceDB)
+        .filter(ModuleInstanceDB.variant_id == variant_id)
+        .order_by(ModuleInstanceDB.position)
+        .all()
+    )
+
+    return [to_module_instance(record) for record in records]
+
+
+def create_module_for_variant(
+    db: Session,
+    variant_id: int,
+    module_type: str,
+    position: int,
+    content_record_id: int | None = None,
+    module_data: dict | None = None,
+) -> ModuleInstance:
+    module = ModuleInstanceDB(
+        variant_id=variant_id,
+        module_type=module_type,
+        position=position,
+        content_record_id=content_record_id,
+        module_data=module_data,
+    )
+
+    db.add(module)
+    db.commit()
+    db.refresh(module)
+
+    return to_module_instance(module)
