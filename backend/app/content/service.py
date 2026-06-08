@@ -94,3 +94,26 @@ def create_demo_content_if_empty(db: Session) -> None:
 
     db.add_all(assignments)
     db.commit()
+
+def create_content(
+    db: Session,
+    title: str,
+    body: str,
+) -> ContentRecord:
+
+    record = ContentRecordDB(
+        title=title,
+        body=body,
+        status="active",
+    )
+
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+
+    return ContentRecord(
+        id=record.id,
+        title=record.title,
+        body=record.body,
+        status=record.status,
+    )

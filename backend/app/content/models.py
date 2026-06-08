@@ -15,6 +15,11 @@ class Category(BaseModel):
 
 
 class ContentCategoryAssignment(BaseModel):
+    id: int
     content_id: int
     category_id: int
     score: int = 10
+
+class ContentCreate(BaseModel):
+    title: str
+    body: str

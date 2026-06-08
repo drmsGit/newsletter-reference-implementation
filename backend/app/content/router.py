@@ -2,11 +2,16 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.content.models import ContentRecord, Category
+from app.content.models import (
+    ContentRecord,
+    Category,
+    ContentCreate,
+)
 from app.content.service import (
     list_content_records,
     list_categories,
     list_categories_for_content,
+    create_content,
 )
 
 
@@ -26,3 +31,14 @@ def get_categories(db: Session = Depends(get_db)):
 @router.get("/{content_id}/categories", response_model=list[Category])
 def get_content_categories(content_id: int, db: Session = Depends(get_db)):
     return list_categories_for_content(db, content_id)
+
+@router.post("/", response_model=ContentRecord)
+def create_content_record(
+    payload: ContentCreate,
+    db: Session = Depends(get_db),
+):
+    return create_content(
+        db=db,
+        title=payload.title,
+        body=payload.body,
+    )
