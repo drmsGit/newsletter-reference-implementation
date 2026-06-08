@@ -42,6 +42,7 @@ class ModuleInstance(BaseModel):
     position: int
     content_record_id: int | None = None
     module_data: dict[str, Any] | None = None
+    decision_slot_id: int | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -51,3 +52,26 @@ class ModuleInstanceCreate(BaseModel):
     position: int
     content_record_id: int | None = None
     module_data: dict[str, Any] | None = None
+    decision_slot_id: int | None = None
+
+
+class DecisionSlot(BaseModel):
+    id: int
+    variant_id: int
+    name: str
+    decision_type: str
+    decision_strategy: str
+    candidate_filter: dict[str, Any] | None = None
+    strategy_config: dict[str, Any] | None = None
+    max_results: int = 1
+    created_at: datetime
+    updated_at: datetime
+
+
+class DecisionSlotCreate(BaseModel):
+    name: str
+    decision_type: str = "content_recommendation"
+    decision_strategy: str = "top_score"
+    candidate_filter: dict[str, Any] | None = None
+    strategy_config: dict[str, Any] | None = None
+    max_results: int = 1

@@ -10,6 +10,8 @@ from app.campaigns.models import (
     VariantCreate,
     ModuleInstance,
     ModuleInstanceCreate,
+    DecisionSlot,
+    DecisionSlotCreate,
 )
 from app.campaigns.service import (
     create_campaign,
@@ -18,6 +20,8 @@ from app.campaigns.service import (
     list_variants_for_campaign,
     create_module_for_variant,
     list_modules_for_variant,
+    create_decision_slot_for_variant,
+    list_decision_slots_for_variant,
 )
 
 
@@ -90,5 +94,35 @@ def create_variant_module(
         module_type=payload.module_type,
         position=payload.position,
         content_record_id=payload.content_record_id,
+        decision_slot_id=payload.decision_slot_id,
         module_data=payload.module_data,
+    )
+
+
+@router.get("/variants/{variant_id}/decision-slots", response_model=list[DecisionSlot])
+def get_variant_decision_slots(
+    variant_id: int,
+    db: Session = Depends(get_db),
+):
+    return list_decision_slots_for_variant(
+        db=db,
+        variant_id=variant_id,
+    )
+
+
+@router.post("/variants/{variant_id}/decision-slots", response_model=DecisionSlot)
+def create_variant_decision_slot(
+    variant_id: int,
+    payload: DecisionSlotCreate,
+    db: Session = Depends(get_db),
+):
+    return create_decision_slot_for_variant(
+        db=db,
+        variant_id=variant_id,
+        name=payload.name,
+        decision_type=payload.decision_type,
+        decision_strategy=payload.decision_strategy,
+        candidate_filter=payload.candidate_filter,
+        strategy_config=payload.strategy_config,
+        max_results=payload.max_results,
     )
