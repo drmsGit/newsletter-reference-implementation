@@ -5,7 +5,7 @@ from app.content.db_models import ContentRecordDB
 from app.content.router import router as content_router
 from app.content.service import create_demo_content_if_empty
 
-from app.campaigns.db_models import CampaignDB
+from app.campaigns.db_models import CampaignDB, VariantDB
 from app.campaigns.router import router as campaigns_router
 
 
