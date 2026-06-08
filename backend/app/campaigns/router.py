@@ -12,6 +12,8 @@ from app.campaigns.models import (
     ModuleInstanceCreate,
     DecisionSlot,
     DecisionSlotCreate,
+    DecisionResolution,
+    DecisionResolutionCreate,
 )
 from app.campaigns.service import (
     create_campaign,
@@ -22,6 +24,8 @@ from app.campaigns.service import (
     list_modules_for_variant,
     create_decision_slot_for_variant,
     list_decision_slots_for_variant,
+    create_decision_resolution,
+    list_resolutions_for_decision_slot,
 )
 
 
@@ -125,4 +129,30 @@ def create_variant_decision_slot(
         candidate_filter=payload.candidate_filter,
         strategy_config=payload.strategy_config,
         max_results=payload.max_results,
+    )
+
+
+@router.get("/decision-slots/{decision_slot_id}/resolutions", response_model=list[DecisionResolution])
+def get_decision_slot_resolutions(
+    decision_slot_id: int,
+    db: Session = Depends(get_db),
+):
+    return list_resolutions_for_decision_slot(
+        db=db,
+        decision_slot_id=decision_slot_id,
+    )
+
+
+@router.post("/decision-slots/{decision_slot_id}/resolutions", response_model=DecisionResolution)
+def create_decision_slot_resolution(
+    decision_slot_id: int,
+    payload: DecisionResolutionCreate,
+    db: Session = Depends(get_db),
+):
+    return create_decision_resolution(
+        db=db,
+        decision_slot_id=decision_slot_id,
+        content_record_id=payload.content_record_id,
+        reason=payload.reason,
+        score=payload.score,
     )

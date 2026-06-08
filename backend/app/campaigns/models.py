@@ -75,3 +75,18 @@ class DecisionSlotCreate(BaseModel):
     candidate_filter: dict[str, Any] | None = None
     strategy_config: dict[str, Any] | None = None
     max_results: int = 1
+
+
+class DecisionResolution(BaseModel):
+    id: int
+    decision_slot_id: int
+    content_record_id: int
+    reason: str | None = None
+    score: int | None = None
+    created_at: datetime
+
+
+class DecisionResolutionCreate(BaseModel):
+    content_record_id: int
+    reason: str | None = None
+    score: int | None = None

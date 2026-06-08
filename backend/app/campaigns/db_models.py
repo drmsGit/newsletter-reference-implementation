@@ -71,3 +71,14 @@ class DecisionSlotDB(Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+
+class DecisionResolutionDB(Base):
+    __tablename__ = "decision_resolutions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    decision_slot_id = Column(Integer, ForeignKey("decision_slots.id"), nullable=False)
+    content_record_id = Column(Integer, ForeignKey("content_records.id"), nullable=False)
+    reason = Column(String(255), nullable=True)
+    score = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

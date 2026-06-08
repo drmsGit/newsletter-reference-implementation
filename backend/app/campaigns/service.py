@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
-from app.campaigns.db_models import CampaignDB, VariantDB, ModuleInstanceDB, DecisionSlotDB
-from app.campaigns.models import Campaign, CampaignWithVariants, Variant, ModuleInstance, DecisionSlot
+from app.campaigns.db_models import CampaignDB, VariantDB, ModuleInstanceDB, DecisionSlotDB, DecisionResolutionDB
+from app.campaigns.models import Campaign, CampaignWithVariants, Variant, ModuleInstance, DecisionSlot, DecisionResolution
 
 
 def to_campaign(record: CampaignDB) -> Campaign:
@@ -199,3 +199,48 @@ def create_decision_slot_for_variant(
     db.refresh(slot)
 
     return to_decision_slot(slot)
+
+
+def to_decision_resolution(record: DecisionResolutionDB) -> DecisionResolution:
+    return DecisionResolution(
+        id=record.id,
+        decision_slot_id=record.decision_slot_id,
+        content_record_id=record.content_record_id,
+        reason=record.reason,
+        score=record.score,
+        created_at=record.created_at,
+    )
+
+
+def create_decision_resolution(
+    db: Session,
+    decision_slot_id: int,
+    content_record_id: int,
+    reason: str | None = None,
+    score: int | None = None,
+) -> DecisionResolution:
+    resolution = DecisionResolutionDB(
+        decision_slot_id=decision_slot_id,
+        content_record_id=content_record_id,
+        reason=reason,
+        score=score,
+    )
+
+    db.add(resolution)
+    db.commit()
+    db.refresh(resolution)
+
+    return to_decision_resolution(resolution)
+
+
+def list_resolutions_for_decision_slot(
+    db: Session,
+    decision_slot_id: int,
+) -> list[DecisionResolution]:
+    records = (
+        db.query(DecisionResolutionDB)
+        .filter(DecisionResolutionDB.decision_slot_id == decision_slot_id)
+        .all()
+    )
+
+    return [to_decision_resolution(record) for record in records]
