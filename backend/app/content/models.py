@@ -8,10 +8,22 @@ class ContentRecord(BaseModel):
     status: str = "active"
 
 
+class ContentCreate(BaseModel):
+    title: str
+    body: str
+
+
 class Category(BaseModel):
     id: int
     name: str
     type: str = "main"
+    parent_category_id: int | None = None
+
+
+class CategoryCreate(BaseModel):
+    name: str
+    type: str = "main"
+    parent_category_id: int | None = None
 
 
 class ContentCategoryAssignment(BaseModel):
@@ -20,6 +32,7 @@ class ContentCategoryAssignment(BaseModel):
     category_id: int
     score: int = 10
 
-class ContentCreate(BaseModel):
-    title: str
-    body: str
+
+class ContentCategoryAssignmentCreate(BaseModel):
+    category_id: int
+    score: int = 10

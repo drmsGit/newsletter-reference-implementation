@@ -117,3 +117,45 @@ def create_content(
         body=record.body,
         status=record.status,
     )
+
+def create_category(
+    db: Session,
+    name: str,
+    type: str = "main",
+    parent_category_id: int | None = None,
+) -> Category:
+    category = CategoryDB(
+        name=name,
+        type=type,
+        parent_category_id=parent_category_id,
+    )
+
+    db.add(category)
+    db.commit()
+    db.refresh(category)
+
+    return Category(
+        id=category.id,
+        name=category.name,
+        type=category.type,
+        parent_category_id=category.parent_category_id,
+    )
+
+
+def assign_category_to_content(
+    db: Session,
+    content_id: int,
+    category_id: int,
+    score: int = 10,
+) -> ContentCategoryAssignmentDB:
+    assignment = ContentCategoryAssignmentDB(
+        content_id=content_id,
+        category_id=category_id,
+        score=score,
+    )
+
+    db.add(assignment)
+    db.commit()
+    db.refresh(assignment)
+
+    return assignment
