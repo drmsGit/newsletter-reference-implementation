@@ -13,6 +13,9 @@ from app.rendering.router import router as rendering_router
 from app.snapshots.db_models import SnapshotDB
 from app.snapshots.router import router as snapshots_router
 
+from app.delivery.db_models import DeliveryExecutionDB
+from app.delivery.router import router as delivery_router
+
 
 app = FastAPI(
     title="Newsletter Reference Architecture API",
@@ -31,6 +34,7 @@ app.include_router(content_router)
 app.include_router(campaigns_router)
 app.include_router(rendering_router)
 app.include_router(snapshots_router)
+app.include_router(delivery_router)
 
 
 @app.get("/")
