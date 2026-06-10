@@ -13,7 +13,7 @@ from app.rendering.router import router as rendering_router
 from app.snapshots.db_models import SnapshotDB
 from app.snapshots.router import router as snapshots_router
 
-from app.delivery.db_models import DeliveryExecutionDB
+from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
 from app.delivery.router import router as delivery_router
 
 
