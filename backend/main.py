@@ -21,6 +21,9 @@ from app.insight.router import router as insight_router
 
 from app.decision.router import router as decision_router
 
+from app.recipients.db_models import RecipientDB
+from app.recipients.router import router as recipients_router
+
 
 app = FastAPI(
     title="Newsletter Reference Architecture API",
@@ -42,6 +45,7 @@ app.include_router(snapshots_router)
 app.include_router(delivery_router)
 app.include_router(insight_router)
 app.include_router(decision_router)
+app.include_router(recipients_router)
 
 
 @app.get("/")
