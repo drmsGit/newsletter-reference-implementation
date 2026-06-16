@@ -13,5 +13,6 @@ class DecisionStrategy(ABC):
         self,
         db: Session,
         slot: DecisionSlotDB,
+        recipient_id: int | None = None,
     ) -> DecisionResolution:
         pass

@@ -8,6 +8,7 @@ from app.decision.strategies.registry import get_strategy
 def execute_decision_slot(
     db: Session,
     decision_slot_id: int,
+    recipient_id: int | None = None,
 ) -> DecisionResolution:
     slot = (
         db.query(DecisionSlotDB)
@@ -23,4 +24,5 @@ def execute_decision_slot(
     return strategy.execute(
         db=db,
         slot=slot,
+        recipient_id=recipient_id,
     )

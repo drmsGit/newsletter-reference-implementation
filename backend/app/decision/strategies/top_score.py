@@ -16,6 +16,7 @@ class TopScoreStrategy(DecisionStrategy):
         self,
         db: Session,
         slot: DecisionSlotDB,
+        recipient_id: int | None = None,
     ) -> DecisionResolution:
         candidate_filter = slot.candidate_filter or {}
         category_ids = candidate_filter.get("category_ids", [])
