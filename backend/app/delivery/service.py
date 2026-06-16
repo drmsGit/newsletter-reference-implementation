@@ -1,7 +1,11 @@
 from sqlalchemy.orm import Session
+from pathlib import Path
 
 from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
 from app.delivery.models import DeliveryExecution, SendInstance
+
+from app.delivery.providers.factory import get_provider
+from app.snapshots.db_models import SnapshotDB
 
 
 def to_delivery_execution(record: DeliveryExecutionDB) -> DeliveryExecution:
@@ -38,20 +42,6 @@ def create_delivery_execution(
     db.refresh(execution)
 
     return to_delivery_execution(execution)
-
-
-def list_delivery_executions_for_send_instance(
-    db: Session,
-    send_instance_id: int,
-) -> list[DeliveryExecution]:
-    records = (
-        db.query(DeliveryExecutionDB)
-        .filter(DeliveryExecutionDB.send_instance_id == send_instance_id)
-        .order_by(DeliveryExecutionDB.created_at.desc())
-        .all()
-    )
-
-    return [to_delivery_execution(record) for record in records]
 
 
 def list_delivery_executions_for_send_instance(
@@ -116,3 +106,68 @@ def list_send_instances_for_snapshot(
     )
 
     return [to_send_instance(record) for record in records]
+
+
+def send_send_instance(
+    db: Session,
+    send_instance_id: int,
+):
+    send_instance = (
+        db.query(SendInstanceDB)
+        .filter(
+            SendInstanceDB.id == send_instance_id
+        )
+        .first()
+    )
+
+    if send_instance is None:
+        raise ValueError(
+            f"SendInstance {send_instance_id} not found"
+        )
+
+    snapshot = (
+        db.query(SnapshotDB)
+        .filter(
+            SnapshotDB.id == send_instance.snapshot_id
+        )
+        .first()
+    )
+
+    if snapshot is None:
+        raise ValueError(
+            f"Snapshot {send_instance.snapshot_id} not found"
+        )
+
+    html = Path(
+        snapshot.html_location
+    ).read_text(
+        encoding="utf-8"
+    )
+
+    provider = get_provider(
+        send_instance.provider or "mock"
+    )
+
+    executions = (
+        db.query(DeliveryExecutionDB)
+        .filter(
+            DeliveryExecutionDB.send_instance_id
+            == send_instance_id
+        )
+        .all()
+    )
+
+    for execution in executions:
+
+        result = provider.send(
+            recipient_id=execution.recipient_id,
+            subject=send_instance.name,
+            html=html,
+        )
+
+        execution.status = "sent"
+        execution.provider_message_id = (
+            result.provider_message_id
+        )
+
+    db.commit()

@@ -19,6 +19,8 @@ from app.delivery.router import router as delivery_router
 from app.insight.db_models import EngagementEventDB
 from app.insight.router import router as insight_router
 
+from app.decision.router import router as decision_router
+
 
 app = FastAPI(
     title="Newsletter Reference Architecture API",
@@ -39,6 +41,7 @@ app.include_router(rendering_router)
 app.include_router(snapshots_router)
 app.include_router(delivery_router)
 app.include_router(insight_router)
+app.include_router(decision_router)
 
 
 @app.get("/")

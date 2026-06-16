@@ -13,6 +13,7 @@ from app.delivery.service import (
     create_send_instance,
     list_delivery_executions_for_send_instance,
     list_send_instances_for_snapshot,
+    send_send_instance,
 )
 
 
@@ -69,3 +70,20 @@ def get_executions_for_send_instance(
         db=db,
         send_instance_id=send_instance_id,
     )
+
+
+@router.post(
+    "/send-instances/{send_instance_id}/send"
+)
+def send_instance(
+    send_instance_id: int,
+    db: Session = Depends(get_db),
+):
+    send_send_instance(
+        db=db,
+        send_instance_id=send_instance_id,
+    )
+
+    return {
+        "status": "sent"
+    }
