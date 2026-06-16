@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Integer, JSON, String, func
+from sqlalchemy import Column, DateTime, Integer, JSON, String, func, Float, ForeignKey
 
 from app.database import Base
 
@@ -18,5 +18,37 @@ class RecipientDB(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class RecipientPreferenceDB(Base):
+    __tablename__ = "recipient_preferences"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    recipient_id = Column(
+        Integer,
+        ForeignKey("recipients.id"),
+        nullable=False,
+    )
+
+    category_id = Column(
+        Integer,
+        ForeignKey("categories.id"),
+        nullable=False,
+    )
+
+    score = Column(Float, nullable=False)
+
+    source = Column(
+        String(50),
+        nullable=False,
+        default="manual",
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
         nullable=False,
     )

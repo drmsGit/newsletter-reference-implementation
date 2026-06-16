@@ -23,3 +23,19 @@ class RecipientCreate(BaseModel):
     preferred_airport: str | None = None
     attributes: dict[str, Any] | None = None
     status: str = "active"
+
+
+class RecipientPreference(BaseModel):
+    id: int
+    recipient_id: int
+    category_id: int
+    score: float
+    source: str
+    created_at: datetime
+
+
+class RecipientPreferenceCreate(BaseModel):
+    recipient_id: int
+    category_id: int
+    score: float
+    source: str = "manual"

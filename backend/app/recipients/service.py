@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
-from app.recipients.db_models import RecipientDB
-from app.recipients.models import Recipient
+from app.recipients.db_models import RecipientDB, RecipientPreferenceDB
+from app.recipients.models import Recipient, RecipientPreference
 
 
 def to_recipient(record: RecipientDB) -> Recipient:
@@ -62,3 +62,64 @@ def get_recipient_by_external_id(
         return None
 
     return to_recipient(record)
+
+
+def to_recipient_preference(
+    record: RecipientPreferenceDB,
+) -> RecipientPreference:
+
+    return RecipientPreference(
+        id=record.id,
+        recipient_id=record.recipient_id,
+        category_id=record.category_id,
+        score=record.score,
+        source=record.source,
+        created_at=record.created_at,
+    )
+
+
+def create_recipient_preference(
+    db: Session,
+    recipient_id: int,
+    category_id: int,
+    score: float,
+    source: str = "manual",
+):
+    preference = RecipientPreferenceDB(
+        recipient_id=recipient_id,
+        category_id=category_id,
+        score=score,
+        source=source,
+    )
+
+    db.add(preference)
+    db.commit()
+    db.refresh(preference)
+
+    return to_recipient_preference(
+        preference
+    )
+
+
+def list_preferences_for_recipient(
+    db: Session,
+    recipient_id: int,
+):
+    records = (
+        db.query(
+            RecipientPreferenceDB
+        )
+        .filter(
+            RecipientPreferenceDB.recipient_id
+            == recipient_id
+        )
+        .order_by(
+            RecipientPreferenceDB.score.desc()
+        )
+        .all()
+    )
+
+    return [
+        to_recipient_preference(r)
+        for r in records
+    ]

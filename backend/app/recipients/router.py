@@ -2,11 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.recipients.models import Recipient, RecipientCreate
+from app.recipients.models import Recipient, RecipientCreate, RecipientPreference, RecipientPreferenceCreate
 from app.recipients.service import (
     create_recipient,
     get_recipient_by_external_id,
     list_recipients,
+    create_recipient_preference,
+    list_preferences_for_recipient,
 )
 
 
@@ -51,3 +53,34 @@ def get_recipient(
         )
 
     return recipient
+
+
+@router.get(
+    "/{recipient_id}/preferences",
+    response_model=list[RecipientPreference],
+)
+def get_preferences(
+    recipient_id: int,
+    db: Session = Depends(get_db),
+):
+    return list_preferences_for_recipient(
+        db=db,
+        recipient_id=recipient_id,
+    )
+
+
+@router.post(
+    "/preferences",
+    response_model=RecipientPreference,
+)
+def create_preference(
+    payload: RecipientPreferenceCreate,
+    db: Session = Depends(get_db),
+):
+    return create_recipient_preference(
+        db=db,
+        recipient_id=payload.recipient_id,
+        category_id=payload.category_id,
+        score=payload.score,
+        source=payload.source,
+    )
