@@ -10,6 +10,7 @@ from app.content.db_models import ContentRecordDB
 def render_variant_html(
     db: Session,
     variant_id: int,
+    recipient_id: int | None = None,
 ) -> str:
     modules = (
         db.query(ModuleInstanceDB)
@@ -19,9 +20,13 @@ def render_variant_html(
     )
 
     rendered_modules = [
-        render_module(db=db, module=module)
-        for module in modules
-    ]
+    render_module(
+        db=db,
+        module=module,
+        recipient_id=recipient_id,
+    )
+    for module in modules
+]
 
     return """
 <!doctype html>
@@ -40,12 +45,17 @@ def render_variant_html(
 def render_module(
     db: Session,
     module: ModuleInstanceDB,
+    recipient_id: int | None = None,
 ) -> str:
     if module.module_type == "hero":
         return render_hero(module)
 
     if module.module_type == "content_card":
-        return render_content_card(db=db, module=module)
+        return render_content_card(
+            db=db,
+            module=module,
+            recipient_id=recipient_id,
+        )
 
     if module.module_type == "cta":
         return render_cta(module)
@@ -70,10 +80,12 @@ def render_hero(module: ModuleInstanceDB) -> str:
 def render_content_card(
     db: Session,
     module: ModuleInstanceDB,
+    recipient_id: int | None = None,
 ) -> str:
     content_record = resolve_content_record_for_module(
         db=db,
         module=module,
+        recipient_id=recipient_id,
     )
 
     if content_record is None:
@@ -120,6 +132,7 @@ def render_unknown_module(module: ModuleInstanceDB) -> str:
 def resolve_content_record_for_module(
     db: Session,
     module: ModuleInstanceDB,
+    recipient_id: int | None = None,
 ) -> ContentRecordDB | None:
     if module.content_record_id is not None:
         return (
@@ -129,12 +142,35 @@ def resolve_content_record_for_module(
         )
 
     if module.decision_slot_id is not None:
-        resolution = (
+        resolution_query = (
             db.query(DecisionResolutionDB)
-            .filter(DecisionResolutionDB.decision_slot_id == module.decision_slot_id)
-            .order_by(DecisionResolutionDB.created_at.desc())
-            .first()
+            .filter(
+                DecisionResolutionDB.decision_slot_id == module.decision_slot_id
+            )
         )
+
+        if recipient_id is not None:
+            resolution = (
+                resolution_query
+                .filter(DecisionResolutionDB.recipient_id == recipient_id)
+                .order_by(DecisionResolutionDB.created_at.desc())
+                .first()
+            )
+
+            if resolution is None:
+                resolution = (
+                    resolution_query
+                    .filter(DecisionResolutionDB.recipient_id.is_(None))
+                    .order_by(DecisionResolutionDB.created_at.desc())
+                    .first()
+                )
+        else:
+            resolution = (
+                resolution_query
+                .filter(DecisionResolutionDB.recipient_id.is_(None))
+                .order_by(DecisionResolutionDB.created_at.desc())
+                .first()
+            )
 
         if resolution is None:
             return None

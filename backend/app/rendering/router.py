@@ -17,11 +17,13 @@ router = APIRouter(prefix="/rendering", tags=["rendering"])
 @router.get("/variants/{variant_id}", response_model=RenderedVariant)
 def render_variant(
     variant_id: int,
+    recipient_id: int | None = None,
     db: Session = Depends(get_db),
 ):
     html = render_variant_html(
         db=db,
         variant_id=variant_id,
+        recipient_id=recipient_id,
     )
 
     return RenderedVariant(
