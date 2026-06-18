@@ -9,6 +9,7 @@ from app.content.db_models import (
 )
 from app.decision.strategies.base import DecisionStrategy
 from app.recipients.db_models import RecipientPreferenceDB
+from app.content.service import get_latest_version_for_content
 
 
 class RecipientTopScoreStrategy(DecisionStrategy):
@@ -69,11 +70,17 @@ class RecipientTopScoreStrategy(DecisionStrategy):
         preference_score = best_candidate[2]
         combined_score = int(content_score * preference_score)
 
+        latest_version = get_latest_version_for_content(
+            db=db,
+            content_record_id=content_record.id,
+        )
+
         return create_decision_resolution(
             db=db,
             decision_slot_id=slot.id,
             recipient_id=recipient_id,
             content_record_id=content_record.id,
+            content_version_id=latest_version.id if latest_version else None,
             reason=(
                 "Selected by recipient_top_score strategy "
                 f"for recipient_id={recipient_id}, "

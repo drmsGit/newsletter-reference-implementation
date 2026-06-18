@@ -80,6 +80,7 @@ class DecisionResolutionDB(Base):
     decision_slot_id = Column(Integer, ForeignKey("decision_slots.id"), nullable=False)
     recipient_id = Column(Integer, ForeignKey("recipients.id"), nullable=True)
     content_record_id = Column(Integer, ForeignKey("content_records.id"), nullable=False)
+    content_version_id = Column(Integer, ForeignKey("content_versions.id"), nullable=True)
     reason = Column(String(255), nullable=True)
     score = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

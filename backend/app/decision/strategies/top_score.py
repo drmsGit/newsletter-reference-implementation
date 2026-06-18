@@ -8,6 +8,7 @@ from app.content.db_models import (
     ContentRecordDB,
 )
 from app.decision.strategies.base import DecisionStrategy
+from app.content.service import get_latest_version_for_content
 
 
 class TopScoreStrategy(DecisionStrategy):
@@ -48,10 +49,16 @@ class TopScoreStrategy(DecisionStrategy):
 
         content_record, score = result
 
+        latest_version = get_latest_version_for_content(
+            db=db,
+            content_record_id=content_record.id,
+        )
+
         return create_decision_resolution(
             db=db,
             decision_slot_id=slot.id,
             content_record_id=content_record.id,
+            content_version_id=latest_version.id if latest_version else None,
             reason=f"Selected by top_score strategy for category_ids={category_ids}",
             score=score,
         )

@@ -218,3 +218,20 @@ def list_versions_for_content(
     )
 
     return [to_content_version(record) for record in records]
+
+
+def get_latest_version_for_content(
+    db: Session,
+    content_record_id: int,
+) -> ContentVersion | None:
+    record = (
+        db.query(ContentVersionDB)
+        .filter(ContentVersionDB.content_record_id == content_record_id)
+        .order_by(ContentVersionDB.version_number.desc())
+        .first()
+    )
+
+    if record is None:
+        return None
+
+    return to_content_version(record)

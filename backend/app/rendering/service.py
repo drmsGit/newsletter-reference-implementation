@@ -4,7 +4,7 @@ from app.campaigns.db_models import (
     ModuleInstanceDB,
     DecisionResolutionDB,
 )
-from app.content.db_models import ContentRecordDB
+from app.content.db_models import ContentRecordDB, ContentVersionDB
 
 
 def render_variant_html(
@@ -20,13 +20,13 @@ def render_variant_html(
     )
 
     rendered_modules = [
-    render_module(
-        db=db,
-        module=module,
-        recipient_id=recipient_id,
-    )
-    for module in modules
-]
+        render_module(
+            db=db,
+            module=module,
+            recipient_id=recipient_id,
+        )
+        for module in modules
+    ]
 
     return """
 <!doctype html>
@@ -82,13 +82,13 @@ def render_content_card(
     module: ModuleInstanceDB,
     recipient_id: int | None = None,
 ) -> str:
-    content_record = resolve_content_record_for_module(
+    content = resolve_content_for_module(
         db=db,
         module=module,
         recipient_id=recipient_id,
     )
 
-    if content_record is None:
+    if content is None:
         return f"""
 <section data-module-id="{module.id}" data-module-type="content_card">
   <p>No content resolved.</p>
@@ -97,11 +97,11 @@ def render_content_card(
 
     data = module.module_data or {}
 
-    title = data.get("headline_override") or content_record.title
-    body = data.get("body_override") or content_record.body
+    title = data.get("headline_override") or content["title"]
+    body = data.get("body_override") or content["body"]
 
     return f"""
-<article data-module-id="{module.id}" data-module-type="content_card" data-content-record-id="{content_record.id}">
+<article data-module-id="{module.id}" data-module-type="content_card" data-content-record-id="{content['id']}">
   <h2>{title}</h2>
   <p>{body}</p>
 </article>
@@ -129,23 +129,71 @@ def render_unknown_module(module: ModuleInstanceDB) -> str:
 """
 
 
-def resolve_content_record_for_module(
+def resolve_renderable_content(
+    db: Session,
+    content_record_id: int,
+    content_version_id: int | None = None,
+) -> dict | None:
+    if content_version_id is not None:
+        version = (
+            db.query(ContentVersionDB)
+            .filter(ContentVersionDB.id == content_version_id)
+            .first()
+        )
+
+        if version is not None:
+            content = version.content or {}
+
+            return {
+                "id": content_record_id,
+                "title": (
+                    content.get("headline_medium")
+                    or content.get("headline_short")
+                    or content.get("headline")
+                    or "Untitled"
+                ),
+                "body": (
+                    content.get("text_medium")
+                    or content.get("text_short")
+                    or content.get("text")
+                    or ""
+                ),
+            }
+
+    record = (
+        db.query(ContentRecordDB)
+        .filter(ContentRecordDB.id == content_record_id)
+        .first()
+    )
+
+    if record is None:
+        return None
+
+    return {
+        "id": record.id,
+        "title": record.title,
+        "body": record.body,
+    }
+
+
+def resolve_content_for_module(
     db: Session,
     module: ModuleInstanceDB,
     recipient_id: int | None = None,
-) -> ContentRecordDB | None:
+) -> dict | None:
     if module.content_record_id is not None:
-        return (
-            db.query(ContentRecordDB)
-            .filter(ContentRecordDB.id == module.content_record_id)
-            .first()
+        return resolve_renderable_content(
+            db=db,
+            content_record_id=module.content_record_id,
+            content_version_id=None,
         )
 
     if module.decision_slot_id is not None:
         resolution_query = (
             db.query(DecisionResolutionDB)
             .filter(
-                DecisionResolutionDB.decision_slot_id == module.decision_slot_id
+                DecisionResolutionDB.decision_slot_id
+                == module.decision_slot_id
             )
         )
 
@@ -175,10 +223,10 @@ def resolve_content_record_for_module(
         if resolution is None:
             return None
 
-        return (
-            db.query(ContentRecordDB)
-            .filter(ContentRecordDB.id == resolution.content_record_id)
-            .first()
+        return resolve_renderable_content(
+            db=db,
+            content_record_id=resolution.content_record_id,
+            content_version_id=resolution.content_version_id,
         )
 
     return None

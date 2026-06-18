@@ -82,6 +82,7 @@ class DecisionResolution(BaseModel):
     decision_slot_id: int
     recipient_id: int | None = None
     content_record_id: int
+    content_version_id: int | None = None
     reason: str | None = None
     score: int | None = None
     created_at: datetime
@@ -90,5 +91,6 @@ class DecisionResolution(BaseModel):
 class DecisionResolutionCreate(BaseModel):
     recipient_id: int | None = None
     content_record_id: int
+    content_version_id: int | None = None
     reason: str | None = None
     score: int | None = None
