@@ -78,6 +78,7 @@ class DecisionResolutionDB(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     decision_slot_id = Column(Integer, ForeignKey("decision_slots.id"), nullable=False)
+    recipient_id = Column(Integer, ForeignKey("recipients.id"), nullable=True)
     content_record_id = Column(Integer, ForeignKey("content_records.id"), nullable=False)
     reason = Column(String(255), nullable=True)
     score = Column(Integer, nullable=True)

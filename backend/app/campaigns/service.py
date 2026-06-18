@@ -205,6 +205,7 @@ def to_decision_resolution(record: DecisionResolutionDB) -> DecisionResolution:
     return DecisionResolution(
         id=record.id,
         decision_slot_id=record.decision_slot_id,
+        recipient_id=record.recipient_id,
         content_record_id=record.content_record_id,
         reason=record.reason,
         score=record.score,
@@ -215,12 +216,14 @@ def to_decision_resolution(record: DecisionResolutionDB) -> DecisionResolution:
 def create_decision_resolution(
     db: Session,
     decision_slot_id: int,
+    recipient_id: int | None,
     content_record_id: int,
     reason: str | None = None,
     score: int | None = None,
 ) -> DecisionResolution:
     resolution = DecisionResolutionDB(
         decision_slot_id=decision_slot_id,
+        recipient_id=recipient_id,
         content_record_id=content_record_id,
         reason=reason,
         score=score,

@@ -72,6 +72,7 @@ class RecipientTopScoreStrategy(DecisionStrategy):
         return create_decision_resolution(
             db=db,
             decision_slot_id=slot.id,
+            recipient_id=recipient_id,
             content_record_id=content_record.id,
             reason=(
                 "Selected by recipient_top_score strategy "
