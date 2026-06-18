@@ -4,8 +4,9 @@ from app.content.db_models import (
     ContentRecordDB,
     CategoryDB,
     ContentCategoryAssignmentDB,
+    ContentVersionDB,
 )
-from app.content.models import ContentRecord, Category
+from app.content.models import ContentRecord, Category, ContentVersion
 
 
 def list_content_records(db: Session) -> list[ContentRecord]:
@@ -159,3 +160,61 @@ def assign_category_to_content(
     db.refresh(assignment)
 
     return assignment
+
+
+def to_content_version(record: ContentVersionDB) -> ContentVersion:
+    return ContentVersion(
+        id=record.id,
+        content_record_id=record.content_record_id,
+        version_number=record.version_number,
+        content=record.content,
+        created_by=record.created_by,
+        created_at=record.created_at,
+    )
+
+
+def create_content_version(
+    db: Session,
+    content_record_id: int,
+    content: dict,
+    created_by: str | None = None,
+) -> ContentVersion:
+    latest_version = (
+        db.query(ContentVersionDB)
+        .filter(ContentVersionDB.content_record_id == content_record_id)
+        .order_by(ContentVersionDB.version_number.desc())
+        .first()
+    )
+
+    next_version_number = (
+        latest_version.version_number + 1
+        if latest_version
+        else 1
+    )
+
+    version = ContentVersionDB(
+        content_record_id=content_record_id,
+        version_number=next_version_number,
+        content=content,
+        created_by=created_by,
+    )
+
+    db.add(version)
+    db.commit()
+    db.refresh(version)
+
+    return to_content_version(version)
+
+
+def list_versions_for_content(
+    db: Session,
+    content_record_id: int,
+) -> list[ContentVersion]:
+    records = (
+        db.query(ContentVersionDB)
+        .filter(ContentVersionDB.content_record_id == content_record_id)
+        .order_by(ContentVersionDB.version_number.desc())
+        .all()
+    )
+
+    return [to_content_version(record) for record in records]

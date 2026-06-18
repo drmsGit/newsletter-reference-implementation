@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, JSON, func
 
 from app.database import Base
 
@@ -28,3 +28,14 @@ class ContentCategoryAssignmentDB(Base):
     content_id = Column(Integer, ForeignKey("content_records.id"), nullable=False)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=False)
     score = Column(Integer, nullable=False, default=10)
+
+
+class ContentVersionDB(Base):
+    __tablename__ = "content_versions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    content_record_id = Column(Integer, ForeignKey("content_records.id"), nullable=False)
+    version_number = Column(Integer, nullable=False)
+    content = Column(JSON, nullable=False)
+    created_by = Column(String(255), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

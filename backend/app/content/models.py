@@ -1,4 +1,6 @@
 from pydantic import BaseModel
+from datetime import datetime
+from typing import Any
 
 
 class ContentRecord(BaseModel):
@@ -36,3 +38,18 @@ class ContentCategoryAssignment(BaseModel):
 class ContentCategoryAssignmentCreate(BaseModel):
     category_id: int
     score: int = 10
+
+
+class ContentVersion(BaseModel):
+    id: int
+    content_record_id: int
+    version_number: int
+    content: dict[str, Any]
+    created_by: str | None = None
+    created_at: datetime
+
+
+class ContentVersionCreate(BaseModel):
+    content_record_id: int
+    content: dict[str, Any]
+    created_by: str | None = None

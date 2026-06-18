@@ -9,6 +9,8 @@ from app.content.models import (
     CategoryCreate,
     ContentCategoryAssignment,
     ContentCategoryAssignmentCreate,
+    ContentVersion,
+    ContentVersionCreate,
 )
 from app.content.service import (
     list_content_records,
@@ -17,6 +19,8 @@ from app.content.service import (
     create_content,
     create_category,
     assign_category_to_content,
+    create_content_version,
+    list_versions_for_content,
 )
 
 
@@ -79,4 +83,28 @@ def assign_category(
         content_id=assignment.content_id,
         category_id=assignment.category_id,
         score=assignment.score,
+    )
+
+
+@router.post("/versions", response_model=ContentVersion)
+def create_version(
+    payload: ContentVersionCreate,
+    db: Session = Depends(get_db),
+):
+    return create_content_version(
+        db=db,
+        content_record_id=payload.content_record_id,
+        content=payload.content,
+        created_by=payload.created_by,
+    )
+
+
+@router.get("/{content_record_id}/versions", response_model=list[ContentVersion])
+def get_content_versions(
+    content_record_id: int,
+    db: Session = Depends(get_db),
+):
+    return list_versions_for_content(
+        db=db,
+        content_record_id=content_record_id,
     )

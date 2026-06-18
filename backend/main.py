@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from app.database import Base, engine, SessionLocal
-from app.content.db_models import ContentRecordDB
+from app.content.db_models import ContentRecordDB, CategoryDB, ContentCategoryAssignmentDB, ContentVersionDB
 from app.content.router import router as content_router
 from app.content.service import create_demo_content_if_empty
 
