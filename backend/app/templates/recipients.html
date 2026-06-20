@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="mb-4">Recipients</h1>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>External ID</th>
+            <th>Email</th>
+            <th>Language</th>
+            <th>Preferred Airport</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+
+    <tbody>
+        {% for recipient in recipients %}
+        <tr>
+            <td>{{ recipient.id }}</td>
+            <td>
+                <a href="/ui/recipients/{{ recipient.id }}">
+                    {{ recipient.external_id }}
+                </a>
+            </td>
+            <td>{{ recipient.email }}</td>
+            <td>{{ recipient.language }}</td>
+            <td>{{ recipient.preferred_airport }}</td>
+            <td>{{ recipient.status }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}

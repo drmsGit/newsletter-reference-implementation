@@ -34,3 +34,24 @@ def dashboard(
             "event_count": db.query(EngagementEventDB).count(),
         },
     )
+
+
+@router.get("/ui/recipients")
+def recipients_list(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    recipients = (
+        db.query(RecipientDB)
+        .order_by(RecipientDB.id.asc())
+        .all()
+    )
+
+    return templates.TemplateResponse(
+        request,
+        "recipients.html",
+        {
+            "title": "Recipients",
+            "recipients": recipients,
+        },
+    )
