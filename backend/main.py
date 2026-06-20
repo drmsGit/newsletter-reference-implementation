@@ -26,6 +26,8 @@ from app.recipients.router import router as recipients_router
 
 from app.providers.router import router as provider_router
 
+from app.frontend.router import router as frontend_router
+
 app = FastAPI(
     title="Newsletter Reference Architecture API",
     version="0.1.0",
@@ -39,6 +41,7 @@ with SessionLocal() as db:
     create_demo_content_if_empty(db)
 
 
+app.include_router(frontend_router)
 app.include_router(content_router)
 app.include_router(campaigns_router)
 app.include_router(rendering_router)

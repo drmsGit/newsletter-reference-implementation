@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="mb-4">
+    Architecture Dashboard
+</h1>
+
+<div class="row">
+
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5>Content Records</h5>
+                <h2>{{ content_count }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5>Campaigns</h5>
+                <h2>{{ campaign_count }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5>Recipients</h5>
+                <h2>{{ recipient_count }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5>Snapshots</h5>
+                <h2>{{ snapshot_count }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5>Deliveries</h5>
+                <h2>{{ delivery_count }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <h5>Events</h5>
+                <h2>{{ event_count }}</h2>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
