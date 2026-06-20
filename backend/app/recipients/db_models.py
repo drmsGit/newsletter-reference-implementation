@@ -52,3 +52,53 @@ class RecipientPreferenceDB(Base):
         server_default=func.now(),
         nullable=False,
     )
+
+
+class PreferenceUpdateLogDB(Base):
+    __tablename__ = "preference_update_logs"
+
+    id = Column(Integer, primary_key=True)
+
+    recipient_id = Column(
+        Integer,
+        ForeignKey("recipients.id"),
+        nullable=False,
+    )
+
+    category_id = Column(
+        Integer,
+        ForeignKey("categories.id"),
+        nullable=False,
+    )
+
+    event_id = Column(
+        Integer,
+        ForeignKey("engagement_events.id"),
+        nullable=False,
+    )
+
+    previous_score = Column(
+        Float,
+        nullable=False,
+    )
+
+    delta = Column(
+        Float,
+        nullable=False,
+    )
+
+    new_score = Column(
+        Float,
+        nullable=False,
+    )
+
+    reason = Column(
+        String,
+        nullable=False,
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )

@@ -3,13 +3,15 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.insight.db_models import EngagementEventDB
-from app.insight.models import EngagementEvent
+from app.insight.models import EngagementEvent, PreferenceUpdateResult
 
 from app.delivery.db_models import DeliveryExecutionDB
 from app.content.db_models import ContentCategoryAssignmentDB
-from app.recipients.db_models import RecipientPreferenceDB
-from app.insight.models import EngagementEvent, PreferenceUpdateResult
+from app.recipients.db_models import RecipientPreferenceDB, PreferenceUpdateLogDB
 
+EVENT_PREFERENCE_DELTAS = {
+        "click": 5.0,
+    }
 
 def to_engagement_event(record: EngagementEventDB) -> EngagementEvent:
     return EngagementEvent(
@@ -76,9 +78,6 @@ def apply_event_to_preferences(
     if event is None:
         raise ValueError(f"EngagementEvent {event_id} not found")
 
-    EVENT_PREFERENCE_DELTAS = {
-        "click": 5.0,
-    }
     base_delta = EVENT_PREFERENCE_DELTAS.get(event.event_type)
 
     if base_delta is None:
@@ -143,16 +142,36 @@ def apply_event_to_preferences(
             .first()
         )
 
+        previous_score = (
+            preference.score
+            if preference is not None
+            else 0
+        )
+        
+        new_score = previous_score + category_delta
+
+        log_entry = PreferenceUpdateLogDB(
+            recipient_id=recipient.id,
+            category_id=assignment.category_id,
+            event_id=event.id,
+            previous_score=previous_score,
+            delta=category_delta,
+            new_score=new_score,
+            reason=event.event_type,
+        )
+
+        db.add(log_entry)
+
         if preference is None:
             preference = RecipientPreferenceDB(
                 recipient_id=recipient.id,
                 category_id=assignment.category_id,
-                score=category_delta,
+                score=new_score,
                 source="engagement",
             )
             db.add(preference)
         else:
-            preference.score = preference.score + category_delta
+            preference.score = new_score
             preference.source = "engagement"
 
         updated_categories.append(assignment.category_id)

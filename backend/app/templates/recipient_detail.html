@@ -129,16 +129,32 @@
                             <th>ID</th>
                             <th>Type</th>
                             <th>Provider Event ID</th>
+                            <th>Preference Updates</th>
                             <th>Created</th>
                         </tr>
                     </thead>
-
+                
                     <tbody>
                         {% for event in delivery.events %}
                         <tr>
                             <td>{{ event.id }}</td>
                             <td>{{ event.event_type }}</td>
                             <td>{{ event.provider_event_id }}</td>
+                            <td>
+                                {% if event.preference_updates %}
+                                    {% for update in event.preference_updates %}
+                                        <div>
+                                            <strong>{{ update.category_name }}</strong>:
+                                            {{ update.previous_score }}
+                                            →
+                                            {{ update.new_score }}
+                                            (+{{ update.delta }})
+                                        </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="text-muted">No preference update</span>
+                                {% endif %}
+                            </td>
                             <td>{{ event.created_at }}</td>
                         </tr>
                         {% endfor %}
