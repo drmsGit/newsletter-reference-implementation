@@ -85,27 +85,112 @@
 
     <div class="card-body">
 
-        <h5>Recent Events</h5>
+        <h5>Recent Deliveries</h5>
+
+        {% for delivery in deliveries %}
+
+        <div class="border rounded p-3 mb-3">
+
+            <div class="row">
+                <div class="col-md-2">
+                    <strong>Delivery</strong><br>
+                    #{{ delivery.id }}
+                </div>
+
+                <div class="col-md-2">
+                    <strong>Send</strong><br>
+                    {{ delivery.send_instance_name }}
+                </div>
+
+                <div class="col-md-2">
+                    <strong>Status</strong><br>
+                    {{ delivery.status }}
+                </div>
+
+                <div class="col-md-2">
+                    <strong>Provider</strong><br>
+                    {{ delivery.provider }}
+                </div>
+
+                <div class="col-md-4">
+                    <strong>Provider Message ID</strong><br>
+                    <small>{{ delivery.provider_message_id }}</small>
+                </div>
+            </div>
+
+            <div class="mt-3">
+                <strong>Events</strong>
+
+                {% if delivery.events %}
+
+                <table class="table table-sm mt-2">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Type</th>
+                            <th>Provider Event ID</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for event in delivery.events %}
+                        <tr>
+                            <td>{{ event.id }}</td>
+                            <td>{{ event.event_type }}</td>
+                            <td>{{ event.provider_event_id }}</td>
+                            <td>{{ event.created_at }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                {% else %}
+
+                <p class="text-muted mt-2 mb-0">
+                    No events for this delivery.
+                </p>
+
+                {% endif %}
+            </div>
+
+        </div>
+
+        {% endfor %}
+
+    </div>
+
+</div>
+
+<div class="card mt-4">
+
+    <div class="card-body">
+
+        <h5>Recent Decisions</h5>
 
         <table class="table">
 
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>Type</th>
-                    <th>Provider</th>
+                    <th>Slot</th>
+                    <th>Content</th>
+                    <th>Version</th>
+                    <th>Score</th>
                     <th>Created</th>
                 </tr>
             </thead>
 
             <tbody>
 
-                {% for event in events %}
+                {% for decision in decisions %}
                 <tr>
-                    <td>{{ event.id }}</td>
-                    <td>{{ event.event_type }}</td>
-                    <td>{{ event.provider }}</td>
-                    <td>{{ event.created_at }}</td>
+                    <td>{{ decision.id }}</td>
+                    <td>{{ decision.decision_slot_id }}</td>
+                    <td>{{ decision.content_title }}</td>
+                    <td>{{ decision.content_version }}</td>
+                    <td>{{ decision.score }}</td>
+                    <td>{{ decision.created_at }}</td>
                 </tr>
                 {% endfor %}
 
