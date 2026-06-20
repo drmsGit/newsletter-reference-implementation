@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.insight.models import EngagementEvent, EngagementEventCreate
+from app.insight.models import EngagementEvent, EngagementEventCreate, PreferenceUpdateResult
 from app.insight.service import (
     create_engagement_event,
     list_events_for_delivery_execution,
+    apply_event_to_preferences,
 )
 
 
@@ -37,3 +38,20 @@ def get_events_for_delivery_execution(
         db=db,
         delivery_execution_id=delivery_execution_id,
     )
+
+
+@router.post("/events/{event_id}/apply-preferences", response_model=PreferenceUpdateResult)
+def apply_preferences_from_event(
+    event_id: int,
+    db: Session = Depends(get_db),
+):
+    try:
+        return apply_event_to_preferences(
+            db=db,
+            event_id=event_id,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        )
