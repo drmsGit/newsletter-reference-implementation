@@ -17,11 +17,13 @@ router = APIRouter(prefix="/snapshots", tags=["snapshots"])
 @router.post("/variants/{variant_id}", response_model=Snapshot)
 def create_variant_snapshot(
     variant_id: int,
+    recipient_id: int | None = None,
     db: Session = Depends(get_db),
 ):
     return create_snapshot_for_variant(
         db=db,
         variant_id=variant_id,
+        recipient_id=recipient_id,
     )
 
 

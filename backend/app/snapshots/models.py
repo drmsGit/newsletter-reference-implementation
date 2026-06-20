@@ -5,6 +5,7 @@ from pydantic import BaseModel
 class Snapshot(BaseModel):
     id: int
     variant_id: int
+    recipient_id: int | None = None
     html_storage_type: str
     html_location: str
     html_size: int

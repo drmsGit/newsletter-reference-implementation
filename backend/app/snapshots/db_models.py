@@ -8,6 +8,7 @@ class SnapshotDB(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     variant_id = Column(Integer, ForeignKey("variants.id"), nullable=False)
+    recipient_id = Column(Integer, ForeignKey("recipients.id"), nullable=True)
     html_storage_type = Column(String(50), nullable=False, default="file")
     html_location = Column(String(500), nullable=False)
     html_size = Column(Integer, nullable=False)

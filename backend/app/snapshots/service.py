@@ -14,6 +14,7 @@ def to_snapshot(record: SnapshotDB) -> Snapshot:
     return Snapshot(
         id=record.id,
         variant_id=record.variant_id,
+        recipient_id=record.recipient_id,
         html_storage_type=record.html_storage_type,
         html_location=record.html_location,
         html_size=record.html_size,
@@ -21,13 +22,14 @@ def to_snapshot(record: SnapshotDB) -> Snapshot:
     )
 
 
-def create_snapshot_for_variant(db: Session, variant_id: int) -> Snapshot:
-    html = render_variant_html(db=db, variant_id=variant_id)
+def create_snapshot_for_variant(db: Session, variant_id: int, recipient_id: int | None = None) -> Snapshot:
+    html = render_variant_html(db=db, variant_id=variant_id, recipient_id=recipient_id,)
 
     SNAPSHOT_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 
     snapshot = SnapshotDB(
         variant_id=variant_id,
+        recipient_id=recipient_id,
         html_storage_type="file",
         html_location="pending",
         html_size=len(html.encode("utf-8")),
@@ -36,8 +38,14 @@ def create_snapshot_for_variant(db: Session, variant_id: int) -> Snapshot:
     db.add(snapshot)
     db.commit()
     db.refresh(snapshot)
+    
+    recipient_part = (
+        f"recipient-{recipient_id}"
+        if recipient_id is not None
+        else "global"
+    )
 
-    file_name = f"variant-{variant_id}-snapshot-{snapshot.id}.html"
+    file_name = f"variant-{variant_id}-{recipient_part}-snapshot-{snapshot.id}.html"
     file_path = SNAPSHOT_STORAGE_DIR / file_name
     file_path.write_text(html, encoding="utf-8")
 
