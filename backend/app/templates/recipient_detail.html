@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="mb-4">
+    Recipient {{ recipient.id }}
+</h1>
+
+<div class="card mb-4">
+    <div class="card-body">
+
+        <h5>Recipient</h5>
+
+        <table class="table">
+            <tr>
+                <th>ID</th>
+                <td>{{ recipient.id }}</td>
+            </tr>
+
+            <tr>
+                <th>External ID</th>
+                <td>{{ recipient.external_id }}</td>
+            </tr>
+
+            <tr>
+                <th>Email</th>
+                <td>{{ recipient.email }}</td>
+            </tr>
+
+            <tr>
+                <th>Language</th>
+                <td>{{ recipient.language }}</td>
+            </tr>
+
+            <tr>
+                <th>Preferred Airport</th>
+                <td>{{ recipient.preferred_airport }}</td>
+            </tr>
+
+            <tr>
+                <th>Status</th>
+                <td>{{ recipient.status }}</td>
+            </tr>
+
+        </table>
+
+    </div>
+</div>
+
+<div class="card">
+
+    <div class="card-body">
+
+        <h5>Preferences</h5>
+
+        <table class="table">
+
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Score</th>
+                    <th>Source</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for pref in preferences %}
+                <tr>
+                    <td>{{ pref.category_name }}</td>
+                    <td>{{ pref.score }}</td>
+                    <td>{{ pref.source }}</td>
+                </tr>
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+{% endblock %}
