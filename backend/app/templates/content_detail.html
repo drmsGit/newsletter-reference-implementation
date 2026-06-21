@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="mb-4">Content {{ record.id }}</h1>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5>Base Record</h5>
+
+        <table class="table">
+            <tr>
+                <th>ID</th>
+                <td>{{ record.id }}</td>
+            </tr>
+            <tr>
+                <th>Title</th>
+                <td>{{ record.title }}</td>
+            </tr>
+            <tr>
+                <th>Body</th>
+                <td>{{ record.body }}</td>
+            </tr>
+            <tr>
+                <th>Status</th>
+                <td>{{ record.status }}</td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5>Categories</h5>
+
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Type</th>
+                    <th>Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for category in categories %}
+                <tr>
+                    <td>{{ category.name }}</td>
+                    <td>{{ category.type }}</td>
+                    <td>{{ category.score }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5>Versions</h5>
+
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Version</th>
+                    <th>Created By</th>
+                    <th>Created</th>
+                    <th>Headline</th>
+                    <th>Text</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for version in versions %}
+                <tr>
+                    <td>{{ version.version_number }}</td>
+                    <td>{{ version.created_by }}</td>
+                    <td>{{ version.created_at }}</td>
+                    <td>{{ version.headline }}</td>
+                    <td>{{ version.text }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5>Decision Usage</h5>
+
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Resolution ID</th>
+                    <th>Decision Slot</th>
+                    <th>Recipient</th>
+                    <th>Version</th>
+                    <th>Score</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for usage in decision_usage %}
+                <tr>
+                    <td>{{ usage.id }}</td>
+                    <td>{{ usage.decision_slot_id }}</td>
+                    <td>{{ usage.recipient_id }}</td>
+                    <td>{{ usage.content_version_id }}</td>
+                    <td>{{ usage.score }}</td>
+                    <td>{{ usage.created_at }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5>Preference Signals</h5>
+
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Recipient</th>
+                    <th>Category</th>
+                    <th>Previous</th>
+                    <th>Delta</th>
+                    <th>New</th>
+                    <th>Reason</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for signal in preference_signals %}
+                <tr>
+                    <td>{{ signal.recipient_id }}</td>
+                    <td>{{ signal.category_name }}</td>
+                    <td>{{ signal.previous_score }}</td>
+                    <td>{{ signal.delta }}</td>
+                    <td>{{ signal.new_score }}</td>
+                    <td>{{ signal.reason }}</td>
+                    <td>{{ signal.created_at }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

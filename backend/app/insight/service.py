@@ -133,14 +133,6 @@ def apply_event_to_preferences(
 
     for assignment in assignments:
         category_delta = base_delta * (assignment.score / 10)
-        preference = (
-            db.query(RecipientPreferenceDB)
-            .filter(
-                RecipientPreferenceDB.recipient_id == recipient.id,
-                RecipientPreferenceDB.category_id == assignment.category_id,
-            )
-            .first()
-        )
 
         existing_update = (
             db.query(PreferenceUpdateLogDB)
@@ -159,6 +151,15 @@ def apply_event_to_preferences(
 
         if existing_update is not None:
             continue
+
+        preference = (
+            db.query(RecipientPreferenceDB)
+            .filter(
+                RecipientPreferenceDB.recipient_id == recipient.id,
+                RecipientPreferenceDB.category_id == assignment.category_id,
+            )
+            .first()
+        )
 
         previous_score = (
             preference.score
