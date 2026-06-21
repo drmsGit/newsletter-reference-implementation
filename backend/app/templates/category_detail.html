@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="mb-4">Category {{ category.id }}</h1>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5>Category</h5>
+
+        <table class="table">
+            <tr>
+                <th>ID</th>
+                <td>{{ category.id }}</td>
+            </tr>
+            <tr>
+                <th>Name</th>
+                <td>{{ category.name }}</td>
+            </tr>
+            <tr>
+                <th>Type</th>
+                <td>{{ category.type }}</td>
+            </tr>
+            <tr>
+                <th>Parent</th>
+                <td>{{ category.parent_category_id }}</td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5>Assigned Content</h5>
+
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Content</th>
+                    <th>Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in assigned_content %}
+                <tr>
+                    <td>
+                        <a href="/ui/content/{{ item.content_id }}">
+                            {{ item.title }}
+                        </a>
+                    </td>
+                    <td>{{ item.score }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5>Recipient Preferences</h5>
+
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Recipient</th>
+                    <th>Score</th>
+                    <th>Source</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pref in recipient_preferences %}
+                <tr>
+                    <td>
+                        <a href="/ui/recipients/{{ pref.recipient_id }}">
+                            {{ pref.recipient_external_id }}
+                        </a>
+                    </td>
+                    <td>{{ pref.score }}</td>
+                    <td>{{ pref.source }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5>Preference Impact Summary</h5>
+
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Updates</th>
+                    <th>Total Delta</th>
+                    <th>Average Delta</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>{{ impact_summary.update_count }}</td>
+                    <td>{{ impact_summary.total_delta }}</td>
+                    <td>{{ impact_summary.avg_delta }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
