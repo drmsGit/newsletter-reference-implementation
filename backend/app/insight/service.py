@@ -142,6 +142,24 @@ def apply_event_to_preferences(
             .first()
         )
 
+        existing_update = (
+            db.query(PreferenceUpdateLogDB)
+            .join(
+                EngagementEventDB,
+                PreferenceUpdateLogDB.event_id == EngagementEventDB.id,
+            )
+            .filter(
+                PreferenceUpdateLogDB.recipient_id == recipient.id,
+                PreferenceUpdateLogDB.category_id == assignment.category_id,
+                PreferenceUpdateLogDB.reason == event.event_type,
+                EngagementEventDB.delivery_execution_id == delivery_execution.id,
+            )
+            .first()
+        )
+
+        if existing_update is not None:
+            continue
+
         previous_score = (
             preference.score
             if preference is not None
