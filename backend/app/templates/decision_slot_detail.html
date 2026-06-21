@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+{% if not slot %}
+
+<h1>Decision Slot not found</h1>
+
+{% else %}
+
+<h1 class="mb-4">Decision Slot {{ slot.id }}</h1>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5>Context</h5>
+
+        <table class="table">
+            <tr>
+                <th>Campaign</th>
+                <td>
+                    <a href="/ui/campaigns/{{ slot.campaign_id }}">
+                        {{ slot.campaign_name }}
+                    </a>
+                </td>
+            </tr>
+            <tr>
+                <th>Variant</th>
+                <td>{{ slot.variant_name }}</td>
+            </tr>
+            <tr>
+                <th>Slot</th>
+                <td>{{ slot.name }}</td>
+            </tr>
+            <tr>
+                <th>Decision Type</th>
+                <td>{{ slot.decision_type }}</td>
+            </tr>
+            <tr>
+                <th>Strategy</th>
+                <td>{{ slot.decision_strategy }}</td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5>Strategy Configuration</h5>
+
+        <p class="mb-0">
+            {{ slot.decision_strategy }}
+        </p>
+
+        <p class="text-muted mt-2 mb-0">
+            Candidate filters are not persisted yet.
+        </p>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5>Resolution Summary</h5>
+
+        <div class="row">
+            <div class="col-md-2">
+                <strong>Total</strong><br>
+                {{ summary.resolution_count }}
+            </div>
+
+            <div class="col-md-2">
+                <strong>Recipients</strong><br>
+                {{ summary.unique_recipient_count }}
+            </div>
+
+            <div class="col-md-2">
+                <strong>Content</strong><br>
+                {{ summary.unique_content_count }}
+            </div>
+
+            <div class="col-md-2">
+                <strong>Avg Score</strong><br>
+                {{ summary.avg_score }}
+            </div>
+
+            <div class="col-md-2">
+                <strong>Min / Max</strong><br>
+                {{ summary.min_score }} / {{ summary.max_score }}
+            </div>
+
+            <div class="col-md-2">
+                <strong>Latest</strong><br>
+                {{ summary.last_resolution_at }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5>Top Selected Content</h5>
+
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Content ID</th>
+                    <th>Title</th>
+                    <th>Version</th>
+                    <th>Selections</th>
+                    <th>Share</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for item in top_content %}
+                <tr>
+                    <td>
+                        <a href="/ui/content/{{ item.content_id }}">
+                            {{ item.content_id }}
+                        </a>
+                    </td>
+                    <td>{{ item.title }}</td>
+                    <td>{{ item.version_number }}</td>
+                    <td>{{ item.selection_count }}</td>
+                    <td>{{ item.share }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <h5>Latest Resolutions</h5>
+
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Recipient</th>
+                    <th>Content</th>
+                    <th>Version</th>
+                    <th>Score</th>
+                    <th>Reason</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for resolution in latest_resolutions %}
+                <tr>
+                    <td>{{ resolution.id }}</td>
+                    <td>
+                        <a href="/ui/recipients/{{ resolution.recipient_id }}">
+                            {{ resolution.recipient_id }}
+                        </a>
+                    </td>
+                    <td>
+                        <a href="/ui/content/{{ resolution.content_record_id }}">
+                            {{ resolution.content_title }}
+                        </a>
+                    </td>
+                    <td>{{ resolution.content_version }}</td>
+                    <td>{{ resolution.score }}</td>
+                    <td>{{ resolution.reason }}</td>
+                    <td>{{ resolution.created_at }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endif %}
+
+{% endblock %}

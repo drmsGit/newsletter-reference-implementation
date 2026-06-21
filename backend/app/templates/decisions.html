@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="mb-4">Decision Monitoring</h1>
+
+<table class="table table-striped table-sm">
+    <thead>
+        <tr>
+            <th>Slot ID</th>
+            <th>Campaign</th>
+            <th>Variant</th>
+            <th>Slot</th>
+            <th>Type</th>
+            <th>Strategy</th>
+            <th>Resolutions</th>
+            <th>Unique Content</th>
+            <th>Last Resolution</th>
+        </tr>
+    </thead>
+
+    <tbody>
+        {% for slot in slots %}
+        <tr>
+            <td>
+                <a href="/ui/decisions/slots/{{ slot.id }}">
+                    {{ slot.id }}
+                </a>
+            </td>
+            <td>
+                <a href="/ui/decisions/slots/{{ slot.id }}">
+                    {{ slot.campaign_name }}
+                </a>
+            </td>
+            <td>{{ slot.variant_name }}</td>
+            <td>{{ slot.name }}</td>
+            <td>{{ slot.decision_type }}</td>
+            <td>{{ slot.decision_strategy }}</td>
+            <td>{{ slot.resolution_count }}</td>
+            <td>{{ slot.unique_content_count }}</td>
+            <td>{{ slot.last_resolution_at }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}
