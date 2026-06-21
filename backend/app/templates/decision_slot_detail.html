@@ -45,15 +45,33 @@
 
 <div class="card mb-4">
     <div class="card-body">
-        <h5>Strategy Configuration</h5>
+        <h5>Strategy & Candidate Filter</h5>
 
-        <p class="mb-0">
-            {{ slot.decision_strategy }}
-        </p>
+        <div class="row">
+            <div class="col-md-4">
+                <strong>Current Strategy</strong><br>
+                <code>{{ slot.decision_strategy }}</code>
+            </div>
 
-        <p class="text-muted mt-2 mb-0">
-            Candidate filters are not persisted yet.
-        </p>
+            <div class="col-md-8">
+                <strong>Supported Strategies</strong><br>
+                {% for strategy in slot.supported_strategies %}
+                    {% if strategy == slot.decision_strategy %}
+                        <span class="badge bg-primary">{{ strategy }}</span>
+                    {% else %}
+                        <span class="badge bg-secondary">{{ strategy }}</span>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <hr>
+
+        <h6>Strategy Config</h6>
+        <pre class="bg-light border rounded p-3"><code>{{ slot.strategy_config_pretty }}</code></pre>
+
+        <h6>Candidate Filter</h6>
+        <pre class="bg-light border rounded p-3 mb-0"><code>{{ slot.candidate_filter_pretty }}</code></pre>
     </div>
 </div>
 
@@ -122,6 +140,30 @@
                     <td>{{ item.version_number }}</td>
                     <td>{{ item.selection_count }}</td>
                     <td>{{ item.share }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5>Reason Summary</h5>
+
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Reason</th>
+                    <th>Count</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for item in reason_summary %}
+                <tr>
+                    <td><code>{{ item.reason }}</code></td>
+                    <td>{{ item.count }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
