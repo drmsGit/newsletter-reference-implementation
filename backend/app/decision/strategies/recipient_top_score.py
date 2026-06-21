@@ -11,6 +11,10 @@ from app.decision.strategies.base import DecisionStrategy
 from app.recipients.db_models import RecipientPreferenceDB
 from app.content.service import get_latest_version_for_content
 
+DEFAULT_STRATEGY_CONFIG = {
+    "content_score_weight": 1,
+    "preference_score_weight": 10,
+}
 
 class RecipientTopScoreStrategy(DecisionStrategy):
 
@@ -28,6 +32,21 @@ class RecipientTopScoreStrategy(DecisionStrategy):
 
         candidate_filter = slot.candidate_filter or {}
         category_ids = candidate_filter.get("category_ids", [])
+
+        strategy_config = {
+            **DEFAULT_STRATEGY_CONFIG,
+            **(slot.strategy_config or {}),
+        }
+
+        content_score_weight = strategy_config.get(
+            "content_score_weight",
+            1,
+        )
+
+        preference_score_weight = strategy_config.get(
+            "preference_score_weight",
+            10,
+        )
 
         query = (
             db.query(
@@ -62,13 +81,19 @@ class RecipientTopScoreStrategy(DecisionStrategy):
 
         best_candidate = max(
             candidates,
-            key=lambda row: row[1] * row[2],
+            key=lambda row: (
+                row[1] * content_score_weight
+                + row[2] * preference_score_weight
+            ),
         )
 
         content_record = best_candidate[0]
         content_score = best_candidate[1]
         preference_score = best_candidate[2]
-        combined_score = int(content_score * preference_score)
+        combined_score = int(
+            content_score * content_score_weight
+            + preference_score * preference_score_weight
+        )
 
         latest_version = get_latest_version_for_content(
             db=db,
@@ -86,7 +111,10 @@ class RecipientTopScoreStrategy(DecisionStrategy):
                 f"for recipient_id={recipient_id}, "
                 f"category_ids={category_ids}, "
                 f"content_score={content_score}, "
-                f"preference_score={preference_score}"
+                f"content_score_weight={content_score_weight}, "
+                f"preference_score={preference_score}, "
+                f"preference_score_weight={preference_score_weight}, "
+                f"combined_score={combined_score}"
             ),
             score=combined_score,
         )

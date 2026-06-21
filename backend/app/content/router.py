@@ -7,6 +7,8 @@ from app.content.models import (
     ContentCreate,
     Category,
     CategoryCreate,
+    CategoryRelation,
+    CategoryRelationCreate,
     ContentCategoryAssignment,
     ContentCategoryAssignmentCreate,
     ContentVersion,
@@ -18,6 +20,10 @@ from app.content.service import (
     list_categories_for_content,
     create_content,
     create_category,
+    create_category_relation,
+    list_category_relations,
+    list_parent_relations_for_category,
+    list_child_relations_for_category,
     assign_category_to_content,
     create_content_version,
     list_versions_for_content,
@@ -107,4 +113,50 @@ def get_content_versions(
     return list_versions_for_content(
         db=db,
         content_record_id=content_record_id,
+    )
+
+
+@router.get("/category-relations", response_model=list[CategoryRelation])
+def get_category_relations(db: Session = Depends(get_db)):
+    return list_category_relations(db)
+
+
+@router.post("/category-relations", response_model=CategoryRelation)
+def create_category_relation_record(
+    payload: CategoryRelationCreate,
+    db: Session = Depends(get_db),
+):
+    return create_category_relation(
+        db=db,
+        parent_category_id=payload.parent_category_id,
+        child_category_id=payload.child_category_id,
+        relation_type=payload.relation_type,
+    )
+
+
+@router.get(
+    "/categories/{category_id}/parents",
+    response_model=list[CategoryRelation],
+)
+def get_parent_relations_for_category(
+    category_id: int,
+    db: Session = Depends(get_db),
+):
+    return list_parent_relations_for_category(
+        db=db,
+        child_category_id=category_id,
+    )
+
+
+@router.get(
+    "/categories/{category_id}/children",
+    response_model=list[CategoryRelation],
+)
+def get_child_relations_for_category(
+    category_id: int,
+    db: Session = Depends(get_db),
+):
+    return list_child_relations_for_category(
+        db=db,
+        parent_category_id=category_id,
     )

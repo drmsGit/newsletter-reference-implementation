@@ -53,3 +53,17 @@ class ContentVersionCreate(BaseModel):
     content_record_id: int
     content: dict[str, Any]
     created_by: str | None = None
+
+
+class CategoryRelation(BaseModel):
+    id: int
+    parent_category_id: int
+    child_category_id: int
+    relation_type: str = "parent_child"
+    created_at: datetime
+
+
+class CategoryRelationCreate(BaseModel):
+    parent_category_id: int
+    child_category_id: int
+    relation_type: str = "parent_child"

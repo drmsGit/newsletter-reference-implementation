@@ -21,6 +21,16 @@ class CategoryDB(Base):
     parent_category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
 
 
+class CategoryRelationDB(Base):
+    __tablename__ = "category_relations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    parent_category_id = Column(Integer, ForeignKey("categories.id"), nullable=False)
+    child_category_id = Column(Integer, ForeignKey("categories.id"), nullable=False)
+    relation_type = Column(String(50), nullable=False, default="parent_child")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    
+
 class ContentCategoryAssignmentDB(Base):
     __tablename__ = "content_category_assignments"
 

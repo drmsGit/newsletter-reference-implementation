@@ -5,9 +5,13 @@ from sqlalchemy import func, desc
 
 from app.database import get_db
 
+import json
+
 from app.content.db_models import ContentRecordDB, ContentVersionDB, CategoryDB, ContentCategoryAssignmentDB
+from app.content.db_models import ContentRecordDB, CategoryDB, ContentCategoryAssignmentDB
 from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB, ModuleInstanceDB, DecisionSlotDB
 from app.recipients.db_models import RecipientDB, RecipientPreferenceDB, PreferenceUpdateLogDB
+from app.decision.strategies.registry import STRATEGIES
 from app.snapshots.db_models import SnapshotDB
 from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
 from app.insight.db_models import EngagementEventDB
@@ -535,5 +539,424 @@ def content_detail(
             "versions": version_rows,
             "decision_usage": decision_usage,
             "preference_signals": signal_rows,
+        },
+    )
+
+
+@router.get("/ui/categories")
+def categories_list(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    categories = (
+        db.query(CategoryDB)
+        .order_by(CategoryDB.type.asc(), CategoryDB.name.asc())
+        .all()
+    )
+
+    return templates.TemplateResponse(
+        request,
+        "categories.html",
+        {
+            "title": "Categories",
+            "categories": categories,
+        },
+    )
+
+
+@router.get("/ui/categories/{category_id}")
+def category_detail(
+    category_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    category = (
+        db.query(CategoryDB)
+        .filter(CategoryDB.id == category_id)
+        .first()
+    )
+
+    assigned_content = (
+        db.query(
+            ContentRecordDB.id,
+            ContentRecordDB.title,
+            ContentCategoryAssignmentDB.score,
+        )
+        .join(
+            ContentCategoryAssignmentDB,
+            ContentCategoryAssignmentDB.content_id == ContentRecordDB.id,
+        )
+        .filter(
+            ContentCategoryAssignmentDB.category_id == category_id
+        )
+        .order_by(
+            ContentCategoryAssignmentDB.score.desc()
+        )
+        .all()
+    )
+
+    assigned_content_rows = [
+        {
+            "content_id": content_id,
+            "title": title,
+            "score": score,
+        }
+        for content_id, title, score in assigned_content
+    ]
+
+    recipient_preferences = (
+        db.query(
+            RecipientDB.id,
+            RecipientDB.external_id,
+            RecipientPreferenceDB.score,
+            RecipientPreferenceDB.source,
+        )
+        .join(
+            RecipientPreferenceDB,
+            RecipientPreferenceDB.recipient_id == RecipientDB.id,
+        )
+        .filter(
+            RecipientPreferenceDB.category_id == category_id
+        )
+        .order_by(
+            RecipientPreferenceDB.score.desc()
+        )
+        .limit(50)
+        .all()
+    )
+
+    recipient_preference_rows = [
+        {
+            "recipient_id": recipient_id,
+            "recipient_external_id": external_id,
+            "score": score,
+            "source": source,
+        }
+        for recipient_id, external_id, score, source in recipient_preferences
+    ]
+
+    impact = (
+        db.query(
+            func.count(PreferenceUpdateLogDB.id),
+            func.coalesce(func.sum(PreferenceUpdateLogDB.delta), 0),
+            func.coalesce(func.avg(PreferenceUpdateLogDB.delta), 0),
+        )
+        .filter(
+            PreferenceUpdateLogDB.category_id == category_id
+        )
+        .first()
+    )
+
+    impact_summary = {
+        "update_count": impact[0],
+        "total_delta": round(float(impact[1]), 2),
+        "avg_delta": round(float(impact[2]), 2),
+    }
+
+    return templates.TemplateResponse(
+        request,
+        "category_detail.html",
+        {
+            "title": f"Category {category_id}",
+            "category": category,
+            "assigned_content": assigned_content_rows,
+            "recipient_preferences": recipient_preference_rows,
+            "impact_summary": impact_summary,
+        },
+    )
+
+
+@router.get("/ui/decisions")
+def decisions_list(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    slots = (
+        db.query(
+            DecisionSlotDB,
+            VariantDB.id.label("variant_id"),
+            VariantDB.name.label("variant_name"),
+            CampaignDB.id.label("campaign_id"),
+            CampaignDB.name.label("campaign_name"),
+            func.count(DecisionResolutionDB.id).label("resolution_count"),
+            func.count(func.distinct(DecisionResolutionDB.content_record_id)).label("unique_content_count"),
+            func.max(DecisionResolutionDB.created_at).label("last_resolution_at"),
+        )
+        .join(
+            VariantDB,
+            DecisionSlotDB.variant_id == VariantDB.id,
+        )
+        .join(
+            CampaignDB,
+            VariantDB.campaign_id == CampaignDB.id,
+        )
+        .outerjoin(
+            DecisionResolutionDB,
+            DecisionResolutionDB.decision_slot_id == DecisionSlotDB.id,
+        )
+        .group_by(
+            DecisionSlotDB.id,
+            VariantDB.id,
+            VariantDB.name,
+            CampaignDB.id,
+            CampaignDB.name,
+        )
+        .order_by(
+            CampaignDB.id.asc(),
+            VariantDB.id.asc(),
+            DecisionSlotDB.id.asc(),
+        )
+        .all()
+    )
+
+    slot_rows = [
+        {
+            "id": slot.id,
+            "name": slot.name,
+            "decision_type": slot.decision_type,
+            "decision_strategy": slot.decision_strategy,
+            "variant_id": variant_id,
+            "variant_name": variant_name,
+            "campaign_id": campaign_id,
+            "campaign_name": campaign_name,
+            "resolution_count": resolution_count,
+            "unique_content_count": unique_content_count,
+            "last_resolution_at": last_resolution_at,
+        }
+        for (
+            slot,
+            variant_id,
+            variant_name,
+            campaign_id,
+            campaign_name,
+            resolution_count,
+            unique_content_count,
+            last_resolution_at,
+        ) in slots
+    ]
+
+    return templates.TemplateResponse(
+        request,
+        "decisions.html",
+        {
+            "title": "Decisions",
+            "slots": slot_rows,
+        },
+    )
+
+
+@router.get("/ui/decisions/slots/{decision_slot_id}")
+def decision_slot_detail(
+    decision_slot_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    slot_context = (
+        db.query(
+            DecisionSlotDB,
+            VariantDB.id.label("variant_id"),
+            VariantDB.name.label("variant_name"),
+            CampaignDB.id.label("campaign_id"),
+            CampaignDB.name.label("campaign_name"),
+        )
+        .join(
+            VariantDB,
+            DecisionSlotDB.variant_id == VariantDB.id,
+        )
+        .join(
+            CampaignDB,
+            VariantDB.campaign_id == CampaignDB.id,
+        )
+        .filter(
+            DecisionSlotDB.id == decision_slot_id
+        )
+        .first()
+    )
+
+    if not slot_context:
+        return templates.TemplateResponse(
+            request,
+            "decision_slot_detail.html",
+            {
+                "title": f"Decision Slot {decision_slot_id}",
+                "slot": None,
+            },
+        )
+
+    slot, variant_id, variant_name, campaign_id, campaign_name = slot_context
+
+    summary = (
+        db.query(
+            func.count(DecisionResolutionDB.id),
+            func.count(func.distinct(DecisionResolutionDB.recipient_id)),
+            func.count(func.distinct(DecisionResolutionDB.content_record_id)),
+            func.coalesce(func.avg(DecisionResolutionDB.score), 0),
+            func.coalesce(func.min(DecisionResolutionDB.score), 0),
+            func.coalesce(func.max(DecisionResolutionDB.score), 0),
+            func.max(DecisionResolutionDB.created_at),
+        )
+        .filter(
+            DecisionResolutionDB.decision_slot_id == decision_slot_id
+        )
+        .first()
+    )
+
+    resolution_summary = {
+        "resolution_count": summary[0],
+        "unique_recipient_count": summary[1],
+        "unique_content_count": summary[2],
+        "avg_score": round(float(summary[3]), 2),
+        "min_score": round(float(summary[4]), 2),
+        "max_score": round(float(summary[5]), 2),
+        "last_resolution_at": summary[6],
+    }
+
+    top_content = (
+        db.query(
+            ContentRecordDB.id,
+            ContentRecordDB.title,
+            ContentVersionDB.version_number,
+            func.count(DecisionResolutionDB.id).label("selection_count"),
+        )
+        .join(
+            ContentRecordDB,
+            DecisionResolutionDB.content_record_id == ContentRecordDB.id,
+        )
+        .outerjoin(
+            ContentVersionDB,
+            DecisionResolutionDB.content_version_id == ContentVersionDB.id,
+        )
+        .filter(
+            DecisionResolutionDB.decision_slot_id == decision_slot_id
+        )
+        .group_by(
+            ContentRecordDB.id,
+            ContentRecordDB.title,
+            ContentVersionDB.version_number,
+        )
+        .order_by(
+            desc("selection_count")
+        )
+        .limit(20)
+        .all()
+    )
+
+    total_resolutions = resolution_summary["resolution_count"] or 0
+
+    top_content_rows = [
+        {
+            "content_id": content_id,
+            "title": title,
+            "version_number": version_number,
+            "selection_count": selection_count,
+            "share": round((selection_count / total_resolutions) * 100, 2)
+            if total_resolutions
+            else 0,
+        }
+        for content_id, title, version_number, selection_count in top_content
+    ]
+
+    latest_resolutions = (
+        db.query(
+            DecisionResolutionDB,
+            ContentRecordDB.title,
+            ContentVersionDB.version_number,
+        )
+        .join(
+            ContentRecordDB,
+            DecisionResolutionDB.content_record_id == ContentRecordDB.id,
+        )
+        .outerjoin(
+            ContentVersionDB,
+            DecisionResolutionDB.content_version_id == ContentVersionDB.id,
+        )
+        .filter(
+            DecisionResolutionDB.decision_slot_id == decision_slot_id
+        )
+        .order_by(
+            DecisionResolutionDB.created_at.desc()
+        )
+        .limit(50)
+        .all()
+    )
+
+    latest_resolution_rows = [
+        {
+            "id": resolution.id,
+            "recipient_id": resolution.recipient_id,
+            "content_record_id": resolution.content_record_id,
+            "content_title": content_title,
+            "content_version": version_number,
+            "score": resolution.score,
+            "reason": resolution.reason,
+            "created_at": resolution.created_at,
+        }
+        for resolution, content_title, version_number in latest_resolutions
+    ]
+
+    reason_summary = (
+        db.query(
+            DecisionResolutionDB.reason,
+            func.count(DecisionResolutionDB.id).label("count"),
+        )
+        .filter(
+            DecisionResolutionDB.decision_slot_id == decision_slot_id
+        )
+        .group_by(
+            DecisionResolutionDB.reason
+        )
+        .order_by(
+            desc("count")
+        )
+        .limit(20)
+        .all()
+    )
+
+    reason_summary_rows = [
+        {
+            "reason": reason,
+            "count": count,
+        }
+        for reason, count in reason_summary
+    ]
+
+    supported_strategies = sorted(STRATEGIES.keys())
+
+    candidate_filter_pretty = json.dumps(
+        slot.candidate_filter or {},
+        indent=2,
+        ensure_ascii=False,
+    )
+
+    strategy_config_pretty = json.dumps(
+        slot.strategy_config or {},
+        indent=2,
+        ensure_ascii=False,
+    )
+
+    return templates.TemplateResponse(
+        request,
+        "decision_slot_detail.html",
+        {
+            "title": f"Decision Slot {decision_slot_id}",
+            "slot": {
+                "id": slot.id,
+                "name": slot.name,
+                "decision_type": slot.decision_type,
+                "decision_strategy": slot.decision_strategy,
+                "variant_id": variant_id,
+                "variant_name": variant_name,
+                "campaign_id": campaign_id,
+                "campaign_name": campaign_name,
+                "candidate_filter": slot.candidate_filter,
+                "candidate_filter_pretty": candidate_filter_pretty,
+                "strategy_config": slot.strategy_config,
+                "strategy_config_pretty": strategy_config_pretty,
+                "supported_strategies": supported_strategies,
+            },
+            "summary": resolution_summary,
+            "reason_summary": reason_summary_rows,
+            "top_content": top_content_rows,
+            "latest_resolutions": latest_resolution_rows,
         },
     )

@@ -3,10 +3,11 @@ from sqlalchemy.orm import Session
 from app.content.db_models import (
     ContentRecordDB,
     CategoryDB,
+    CategoryRelationDB,
     ContentCategoryAssignmentDB,
     ContentVersionDB,
 )
-from app.content.models import ContentRecord, Category, ContentVersion
+from app.content.models import ContentRecord, Category, CategoryRelation, ContentVersion
 
 
 def list_content_records(db: Session) -> list[ContentRecord]:
@@ -141,6 +142,67 @@ def create_category(
         type=category.type,
         parent_category_id=category.parent_category_id,
     )
+
+
+def to_category_relation(record: CategoryRelationDB) -> CategoryRelation:
+    return CategoryRelation(
+        id=record.id,
+        parent_category_id=record.parent_category_id,
+        child_category_id=record.child_category_id,
+        relation_type=record.relation_type,
+        created_at=record.created_at,
+    )
+
+
+def create_category_relation(
+    db: Session,
+    parent_category_id: int,
+    child_category_id: int,
+    relation_type: str = "parent_child",
+) -> CategoryRelation:
+    relation = CategoryRelationDB(
+        parent_category_id=parent_category_id,
+        child_category_id=child_category_id,
+        relation_type=relation_type,
+    )
+
+    db.add(relation)
+    db.commit()
+    db.refresh(relation)
+
+    return to_category_relation(relation)
+
+
+def list_category_relations(db: Session) -> list[CategoryRelation]:
+    records = db.query(CategoryRelationDB).all()
+
+    return [to_category_relation(record) for record in records]
+
+
+def list_parent_relations_for_category(
+    db: Session,
+    child_category_id: int,
+) -> list[CategoryRelation]:
+    records = (
+        db.query(CategoryRelationDB)
+        .filter(CategoryRelationDB.child_category_id == child_category_id)
+        .all()
+    )
+
+    return [to_category_relation(record) for record in records]
+
+
+def list_child_relations_for_category(
+    db: Session,
+    parent_category_id: int,
+) -> list[CategoryRelation]:
+    records = (
+        db.query(CategoryRelationDB)
+        .filter(CategoryRelationDB.parent_category_id == parent_category_id)
+        .all()
+    )
+
+    return [to_category_relation(record) for record in records]
 
 
 def assign_category_to_content(
