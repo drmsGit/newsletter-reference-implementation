@@ -10,7 +10,8 @@
             <th>ID</th>
             <th>Name</th>
             <th>Type</th>
-            <th>Parent</th>
+            <th>Parent Categories</th>
+            <th>Child Categories</th>
         </tr>
     </thead>
 
@@ -24,7 +25,8 @@
                 </a>
             </td>
             <td>{{ category.type }}</td>
-            <td>{{ category.parent_category_id }}</td>
+            <td>{{ category.parent_count }}</td>
+            <td>{{ category.child_count }}</td>
         </tr>
         {% endfor %}
     </tbody>

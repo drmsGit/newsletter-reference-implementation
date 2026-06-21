@@ -22,8 +22,32 @@
                 <td>{{ category.type }}</td>
             </tr>
             <tr>
-                <th>Parent</th>
-                <td>{{ category.parent_category_id }}</td>
+                <th>Parent Categories</th>
+                <td>
+                    {% if parent_categories %}
+                        {% for parent in parent_categories %}
+                            <a href="/ui/categories/{{ parent.id }}" class="badge bg-secondary text-decoration-none">
+                                {{ parent.name }}
+                            </a>
+                        {% endfor %}
+                    {% else %}
+                        <span class="text-muted">None</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <th>Child Categories</th>
+                <td>
+                    {% if child_categories %}
+                        {% for child in child_categories %}
+                            <a href="/ui/categories/{{ child.id }}" class="badge bg-secondary text-decoration-none">
+                                {{ child.name }}
+                            </a>
+                        {% endfor %}
+                    {% else %}
+                        <span class="text-muted">None</span>
+                    {% endif %}
+                </td>
             </tr>
         </table>
     </div>

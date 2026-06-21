@@ -7,8 +7,7 @@ from app.database import get_db
 
 import json
 
-from app.content.db_models import ContentRecordDB, ContentVersionDB, CategoryDB, ContentCategoryAssignmentDB
-from app.content.db_models import ContentRecordDB, CategoryDB, ContentCategoryAssignmentDB
+from app.content.db_models import ContentRecordDB, ContentVersionDB, CategoryDB, ContentCategoryAssignmentDB, CategoryRelationDB
 from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB, ModuleInstanceDB, DecisionSlotDB
 from app.recipients.db_models import RecipientDB, RecipientPreferenceDB, PreferenceUpdateLogDB
 from app.decision.strategies.registry import STRATEGIES
@@ -554,12 +553,37 @@ def categories_list(
         .all()
     )
 
+    category_rows = []
+
+    for category in categories:
+        parent_count = (
+            db.query(func.count(CategoryRelationDB.id))
+            .filter(CategoryRelationDB.child_category_id == category.id)
+            .scalar()
+        )
+
+        child_count = (
+            db.query(func.count(CategoryRelationDB.id))
+            .filter(CategoryRelationDB.parent_category_id == category.id)
+            .scalar()
+        )
+
+        category_rows.append(
+            {
+                "id": category.id,
+                "name": category.name,
+                "type": category.type,
+                "parent_count": parent_count,
+                "child_count": child_count,
+            }
+        )
+
     return templates.TemplateResponse(
         request,
         "categories.html",
         {
             "title": "Categories",
-            "categories": categories,
+            "categories": category_rows,
         },
     )
 
@@ -574,6 +598,32 @@ def category_detail(
         db.query(CategoryDB)
         .filter(CategoryDB.id == category_id)
         .first()
+    )
+
+    parent_categories = (
+        db.query(CategoryDB)
+        .join(
+            CategoryRelationDB,
+            CategoryRelationDB.parent_category_id == CategoryDB.id,
+        )
+        .filter(
+            CategoryRelationDB.child_category_id == category_id
+        )
+        .order_by(CategoryDB.name.asc())
+        .all()
+    )
+
+    child_categories = (
+        db.query(CategoryDB)
+        .join(
+            CategoryRelationDB,
+            CategoryRelationDB.child_category_id == CategoryDB.id,
+        )
+        .filter(
+            CategoryRelationDB.parent_category_id == category_id
+        )
+        .order_by(CategoryDB.name.asc())
+        .all()
     )
 
     assigned_content = (
@@ -659,6 +709,8 @@ def category_detail(
         {
             "title": f"Category {category_id}",
             "category": category,
+            "parent_categories": parent_categories,
+            "child_categories": child_categories,
             "assigned_content": assigned_content_rows,
             "recipient_preferences": recipient_preference_rows,
             "impact_summary": impact_summary,
