@@ -16,3 +16,6 @@ venv/
 
 # Logs
 *.log
+
+# Generated snapshot files
+storage/snapshots/*.html
