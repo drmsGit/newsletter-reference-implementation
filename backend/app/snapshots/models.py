@@ -10,3 +10,4 @@ class Snapshot(BaseModel):
     html_location: str
     html_size: int
     created_at: datetime
+    render_context: dict | None = None
