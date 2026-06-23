@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="mb-4">Delivery Monitoring</h1>
+
+<table class="table table-striped table-sm">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Send Instance</th>
+            <th>Status</th>
+            <th>Provider</th>
+            <th>Campaign</th>
+            <th>Variant</th>
+            <th>Recipient</th>
+            <th>Executions</th>
+            <th>Sent</th>
+            <th>Events</th>
+            <th>Created</th>
+        </tr>
+    </thead>
+
+    <tbody>
+        {% for send in send_instances %}
+        <tr>
+            <td>
+                <a href="/ui/deliveries/send-instances/{{ send.id }}">
+                    {{ send.id }}
+                </a>
+            </td>
+            <td>
+                <a href="/ui/deliveries/send-instances/{{ send.id }}">
+                    {{ send.name }}
+                </a>
+            </td>
+            <td>{{ send.status }}</td>
+            <td>{{ send.provider }}</td>
+            <td>
+                {% if send.campaign_id %}
+                    <a href="/ui/campaigns/{{ send.campaign_id }}">
+                        {{ send.campaign_name }}
+                    </a>
+                {% else %}
+                    <span class="text-muted">None</span>
+                {% endif %}
+            </td>
+            <td>{{ send.variant_name }}</td>
+            <td>{{ send.recipient_id }}</td>
+            <td>{{ send.execution_count }}</td>
+            <td>{{ send.sent_count }}</td>
+            <td>{{ send.event_count }}</td>
+            <td>{{ send.created_at }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}

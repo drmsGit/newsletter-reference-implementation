@@ -1028,3 +1028,218 @@ def decision_slot_detail(
             "latest_resolutions": latest_resolution_rows,
         },
     )
+
+
+@router.get("/ui/deliveries")
+def deliveries_list(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    send_instances = (
+        db.query(SendInstanceDB)
+        .order_by(SendInstanceDB.created_at.desc())
+        .all()
+    )
+
+    rows = []
+
+    for send_instance in send_instances:
+        snapshot = (
+            db.query(SnapshotDB)
+            .filter(SnapshotDB.id == send_instance.snapshot_id)
+            .first()
+        )
+
+        variant = None
+        campaign = None
+
+        if snapshot:
+            variant = (
+                db.query(VariantDB)
+                .filter(VariantDB.id == snapshot.variant_id)
+                .first()
+            )
+
+            if variant:
+                campaign = (
+                    db.query(CampaignDB)
+                    .filter(CampaignDB.id == variant.campaign_id)
+                    .first()
+                )
+
+        execution_count = (
+            db.query(DeliveryExecutionDB)
+            .filter(DeliveryExecutionDB.send_instance_id == send_instance.id)
+            .count()
+        )
+
+        sent_count = (
+            db.query(DeliveryExecutionDB)
+            .filter(
+                DeliveryExecutionDB.send_instance_id == send_instance.id,
+                DeliveryExecutionDB.status == "sent",
+            )
+            .count()
+        )
+
+        event_count = (
+            db.query(EngagementEventDB)
+            .join(
+                DeliveryExecutionDB,
+                EngagementEventDB.delivery_execution_id == DeliveryExecutionDB.id,
+            )
+            .filter(
+                DeliveryExecutionDB.send_instance_id == send_instance.id
+            )
+            .count()
+        )
+
+        rows.append(
+            {
+                "id": send_instance.id,
+                "name": send_instance.name,
+                "status": send_instance.status,
+                "provider": send_instance.provider,
+                "scheduled_at": send_instance.scheduled_at,
+                "created_at": send_instance.created_at,
+                "snapshot_id": send_instance.snapshot_id,
+                "campaign_id": campaign.id if campaign else None,
+                "campaign_name": campaign.name if campaign else None,
+                "variant_id": variant.id if variant else None,
+                "variant_name": variant.name if variant else None,
+                "recipient_id": snapshot.recipient_id if snapshot else None,
+                "execution_count": execution_count,
+                "sent_count": sent_count,
+                "event_count": event_count,
+            }
+        )
+
+    return templates.TemplateResponse(
+        request,
+        "deliveries.html",
+        {
+            "title": "Deliveries",
+            "send_instances": rows,
+        },
+    )
+
+
+@router.get("/ui/deliveries/send-instances/{send_instance_id}")
+def delivery_detail(
+    send_instance_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    send_instance = (
+        db.query(SendInstanceDB)
+        .filter(SendInstanceDB.id == send_instance_id)
+        .first()
+    )
+
+    if send_instance is None:
+        return templates.TemplateResponse(
+            request,
+            "delivery_detail.html",
+            {
+                "title": f"Delivery {send_instance_id}",
+                "send_instance": None,
+            },
+        )
+
+    snapshot = (
+        db.query(SnapshotDB)
+        .filter(SnapshotDB.id == send_instance.snapshot_id)
+        .first()
+    )
+
+    executions = (
+        db.query(DeliveryExecutionDB)
+        .filter(DeliveryExecutionDB.send_instance_id == send_instance_id)
+        .order_by(DeliveryExecutionDB.created_at.desc())
+        .all()
+    )
+
+    execution_rows = []
+
+    for execution in executions:
+        recipient = (
+            db.query(RecipientDB)
+            .filter(RecipientDB.external_id == execution.recipient_id)
+            .first()
+        )
+
+        events = (
+            db.query(EngagementEventDB)
+            .filter(EngagementEventDB.delivery_execution_id == execution.id)
+            .order_by(EngagementEventDB.created_at.desc())
+            .all()
+        )
+
+        event_rows = []
+
+        for event in events:
+            preference_updates = (
+                db.query(
+                    PreferenceUpdateLogDB,
+                    CategoryDB.name,
+                )
+                .join(
+                    CategoryDB,
+                    PreferenceUpdateLogDB.category_id == CategoryDB.id,
+                )
+                .filter(
+                    PreferenceUpdateLogDB.event_id == event.id
+                )
+                .all()
+            )
+
+            event_rows.append(
+                {
+                    "id": event.id,
+                    "event_type": event.event_type,
+                    "provider": event.provider,
+                    "provider_event_id": event.provider_event_id,
+                    "event_data_pretty": json.dumps(
+                        event.event_data or {},
+                        indent=2,
+                        ensure_ascii=False,
+                    ),
+                    "occurred_at": event.occurred_at,
+                    "created_at": event.created_at,
+                    "preference_updates": [
+                        {
+                            "category_name": category_name,
+                            "previous_score": update.previous_score,
+                            "delta": update.delta,
+                            "new_score": update.new_score,
+                            "reason": update.reason,
+                        }
+                        for update, category_name in preference_updates
+                    ],
+                }
+            )
+
+        execution_rows.append(
+            {
+                "id": execution.id,
+                "recipient_external_id": execution.recipient_id,
+                "recipient_id": recipient.id if recipient else None,
+                "status": execution.status,
+                "provider": execution.provider,
+                "provider_message_id": execution.provider_message_id,
+                "created_at": execution.created_at,
+                "updated_at": execution.updated_at,
+                "events": event_rows,
+            }
+        )
+
+    return templates.TemplateResponse(
+        request,
+        "delivery_detail.html",
+        {
+            "title": f"Delivery {send_instance_id}",
+            "send_instance": send_instance,
+            "snapshot": snapshot,
+            "executions": execution_rows,
+        },
+    )
