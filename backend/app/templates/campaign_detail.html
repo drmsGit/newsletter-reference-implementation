@@ -140,9 +140,9 @@
 
             </table>
 
-            </div>
+        </div>
 
-            {% endfor %}
+        {% endfor %}
 
         <h6 class="mt-4">Snapshots</h6>
 
@@ -154,6 +154,7 @@
                     <th>HTML Size</th>
                     <th>Created</th>
                     <th>Preview</th>
+                    <th>Render Context</th>
                 </tr>
             </thead>
             <tbody>
@@ -167,6 +168,17 @@
                         <a href="/snapshots/{{ snapshot.id }}/html" target="_blank">
                             Open HTML
                         </a>
+                    </td>
+                    <td>
+                        {% if snapshot.render_context %}
+                        <details>
+                            <summary>Show</summary>
+                            <pre
+                                class="bg-light border rounded p-2 mt-2"><code>{{ snapshot.render_context_pretty }}</code></pre>
+                        </details>
+                        {% else %}
+                        <span class="text-muted">None</span>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}

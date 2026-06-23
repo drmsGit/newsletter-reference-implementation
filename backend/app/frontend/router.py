@@ -363,12 +363,28 @@ def campaign_detail(
                 }
             )
 
-        snapshots = (
+        snapshot_records = (
             db.query(SnapshotDB)
             .filter(SnapshotDB.variant_id == variant.id)
             .order_by(SnapshotDB.created_at.desc())
             .all()
         )
+
+        snapshots = [
+            {
+                "id": snapshot.id,
+                "recipient_id": snapshot.recipient_id,
+                "html_size": snapshot.html_size,
+                "created_at": snapshot.created_at,
+                "render_context": snapshot.render_context,
+                "render_context_pretty": json.dumps(
+                    snapshot.render_context or {},
+                    indent=2,
+                    ensure_ascii=False,
+                ),
+            }
+            for snapshot in snapshot_records
+        ]
 
         variant_rows.append(
             {
