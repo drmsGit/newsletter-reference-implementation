@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
+from itertools import combinations
+import math
 
 from app.database import get_db
 
@@ -1241,5 +1243,403 @@ def delivery_detail(
             "send_instance": send_instance,
             "snapshot": snapshot,
             "executions": execution_rows,
+        },
+    )
+
+
+@router.get("/ui/graph")
+def category_graph(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    categories = (
+        db.query(CategoryDB)
+        .order_by(CategoryDB.type.asc(), CategoryDB.name.asc())
+        .all()
+    )
+
+    category_lookup = {
+        category.id: category
+        for category in categories
+    }
+
+    # ---------------------------------------------------------
+    # Node metrics
+    # ---------------------------------------------------------
+
+    selection_rows = (
+        db.query(
+            ContentCategoryAssignmentDB.category_id,
+            func.count(DecisionResolutionDB.id),
+        )
+        .join(
+            DecisionResolutionDB,
+            DecisionResolutionDB.content_record_id
+            == ContentCategoryAssignmentDB.content_id,
+        )
+        .group_by(ContentCategoryAssignmentDB.category_id)
+        .all()
+    )
+
+    selections_by_category = {
+        category_id: count
+        for category_id, count in selection_rows
+    }
+
+    content_rows = (
+        db.query(
+            ContentCategoryAssignmentDB.category_id,
+            func.count(func.distinct(ContentCategoryAssignmentDB.content_id)),
+        )
+        .group_by(ContentCategoryAssignmentDB.category_id)
+        .all()
+    )
+
+    content_count_by_category = {
+        category_id: count
+        for category_id, count in content_rows
+    }
+
+    impact_rows = (
+        db.query(
+            PreferenceUpdateLogDB.category_id,
+            func.count(PreferenceUpdateLogDB.id),
+            func.coalesce(func.sum(PreferenceUpdateLogDB.delta), 0),
+            func.coalesce(func.avg(PreferenceUpdateLogDB.delta), 0),
+            func.count(func.distinct(PreferenceUpdateLogDB.event_id)),
+        )
+        .group_by(PreferenceUpdateLogDB.category_id)
+        .all()
+    )
+
+    impact_by_category = {
+        category_id: {
+            "update_count": update_count,
+            "total_delta": round(float(total_delta), 2),
+            "avg_delta": round(float(avg_delta), 2),
+            "event_count": event_count,
+        }
+        for (
+            category_id,
+            update_count,
+            total_delta,
+            avg_delta,
+            event_count,
+        ) in impact_rows
+    }
+
+    parent_count_rows = (
+        db.query(
+            CategoryRelationDB.child_category_id,
+            func.count(CategoryRelationDB.id),
+        )
+        .group_by(CategoryRelationDB.child_category_id)
+        .all()
+    )
+
+    parent_count_by_category = {
+        category_id: count
+        for category_id, count in parent_count_rows
+    }
+
+    child_count_rows = (
+        db.query(
+            CategoryRelationDB.parent_category_id,
+            func.count(CategoryRelationDB.id),
+        )
+        .group_by(CategoryRelationDB.parent_category_id)
+        .all()
+    )
+
+    child_count_by_category = {
+        category_id: count
+        for category_id, count in child_count_rows
+    }
+
+    # ---------------------------------------------------------
+    # Content-category map for co-occurrence and combination impact
+    # ---------------------------------------------------------
+
+    assignments = db.query(ContentCategoryAssignmentDB).all()
+
+    content_to_categories = {}
+
+    for assignment in assignments:
+        content_to_categories.setdefault(
+            assignment.content_id,
+            set(),
+        ).add(assignment.category_id)
+
+    # ---------------------------------------------------------
+    # Edge metrics: category relations
+    # ---------------------------------------------------------
+
+    edge_map = {}
+
+    relations = db.query(CategoryRelationDB).all()
+
+    for relation in relations:
+        key = tuple(
+            sorted(
+                [
+                    relation.parent_category_id,
+                    relation.child_category_id,
+                ]
+            )
+        )
+
+        edge_map[key] = {
+            "source": relation.parent_category_id,
+            "target": relation.child_category_id,
+            "type": "relation",
+            "cooccurrence_count": 0,
+            "event_count": 0,
+            "total_delta": 0,
+            "strength": 1,
+        }
+
+    # ---------------------------------------------------------
+    # Edge metrics: category co-occurrence on content
+    # ---------------------------------------------------------
+
+    for category_ids in content_to_categories.values():
+        for source_id, target_id in combinations(
+            sorted(category_ids),
+            2,
+        ):
+            key = (source_id, target_id)
+
+            if key not in edge_map:
+                edge_map[key] = {
+                    "source": source_id,
+                    "target": target_id,
+                    "type": "cooccurrence",
+                    "cooccurrence_count": 0,
+                    "event_count": 0,
+                    "total_delta": 0,
+                    "strength": 0,
+                }
+
+            edge_map[key]["cooccurrence_count"] += 1
+            edge_map[key]["strength"] += 1
+
+    # ---------------------------------------------------------
+    # Edge impact: preference updates by content/category pair
+    # ---------------------------------------------------------
+
+    update_events = (
+        db.query(
+            PreferenceUpdateLogDB,
+            EngagementEventDB,
+        )
+        .join(
+            EngagementEventDB,
+            PreferenceUpdateLogDB.event_id == EngagementEventDB.id,
+        )
+        .all()
+    )
+
+    edge_event_ids = {
+        key: set()
+        for key in edge_map.keys()
+    }
+
+    for update, event in update_events:
+        event_data = event.event_data or {}
+        content_id = event_data.get("content_record_id")
+
+        if not content_id:
+            continue
+
+        category_ids = content_to_categories.get(content_id, set())
+
+        for source_id, target_id in combinations(
+            sorted(category_ids),
+            2,
+        ):
+            key = (source_id, target_id)
+
+            if key not in edge_map:
+                continue
+
+            edge_map[key]["total_delta"] += float(update.delta)
+            edge_event_ids[key].add(event.id)
+
+    for key, event_ids in edge_event_ids.items():
+        edge_map[key]["event_count"] = len(event_ids)
+        edge_map[key]["total_delta"] = round(
+            edge_map[key]["total_delta"],
+            2,
+        )
+
+    # ---------------------------------------------------------
+    # Layout
+    # ---------------------------------------------------------
+
+    width = 900
+    height = 620
+    center_x = width / 2
+    center_y = height / 2
+
+    main_categories = [
+        category
+        for category in categories
+        if category.type == "main"
+    ]
+
+    sub_categories = [
+        category
+        for category in categories
+        if category.type != "main"
+    ]
+
+    positions = {}
+
+    for index, category in enumerate(main_categories):
+        angle = 2 * math.pi * index / max(len(main_categories), 1)
+
+        positions[category.id] = {
+            "x": center_x + math.cos(angle) * 150,
+            "y": center_y + math.sin(angle) * 150,
+        }
+
+    for index, category in enumerate(sub_categories):
+        angle = 2 * math.pi * index / max(len(sub_categories), 1)
+
+        positions[category.id] = {
+            "x": center_x + math.cos(angle) * 260,
+            "y": center_y + math.sin(angle) * 230,
+        }
+
+    nodes = []
+
+    for category in categories:
+        impact = impact_by_category.get(
+            category.id,
+            {
+                "update_count": 0,
+                "total_delta": 0,
+                "avg_delta": 0,
+                "event_count": 0,
+            },
+        )
+
+        selected_count = selections_by_category.get(category.id, 0)
+        total_delta = impact["total_delta"]
+        avg_delta = impact["avg_delta"]
+
+        radius = 16 + min(
+            34,
+            (selected_count * 4) + abs(total_delta) * 0.4,
+        )
+
+        if avg_delta > 0:
+            color = "#198754"
+        elif avg_delta < 0:
+            color = "#dc3545"
+        else:
+            color = "#6c757d"
+
+        nodes.append(
+            {
+                "id": category.id,
+                "name": category.name,
+                "type": category.type,
+                "x": round(positions[category.id]["x"], 2),
+                "y": round(positions[category.id]["y"], 2),
+                "radius": round(radius, 2),
+                "color": color,
+                "selected_count": selected_count,
+                "content_count": content_count_by_category.get(category.id, 0),
+                "update_count": impact["update_count"],
+                "event_count": impact["event_count"],
+                "total_delta": total_delta,
+                "avg_delta": avg_delta,
+                "parent_count": parent_count_by_category.get(category.id, 0),
+                "child_count": child_count_by_category.get(category.id, 0),
+            }
+        )
+
+    node_lookup = {
+        node["id"]: node
+        for node in nodes
+    }
+
+    edges = []
+
+    for edge in edge_map.values():
+        source = node_lookup.get(edge["source"])
+        target = node_lookup.get(edge["target"])
+
+        if not source or not target:
+            continue
+
+        thickness = 1 + min(
+            8,
+            edge["strength"] + abs(edge["total_delta"]) * 0.2,
+        )
+
+        edges.append(
+            {
+                "source": edge["source"],
+                "target": edge["target"],
+                "source_name": category_lookup[edge["source"]].name,
+                "target_name": category_lookup[edge["target"]].name,
+                "x1": source["x"],
+                "y1": source["y"],
+                "x2": target["x"],
+                "y2": target["y"],
+                "type": edge["type"],
+                "cooccurrence_count": edge["cooccurrence_count"],
+                "event_count": edge["event_count"],
+                "total_delta": edge["total_delta"],
+                "strength": edge["strength"],
+                "thickness": round(thickness, 2),
+            }
+        )
+
+    top_nodes = sorted(
+        nodes,
+        key=lambda item: item["total_delta"],
+        reverse=True,
+    )
+
+    top_edges = sorted(
+        edges,
+        key=lambda item: (
+            item["total_delta"],
+            item["cooccurrence_count"],
+        ),
+        reverse=True,
+    )
+
+    return templates.TemplateResponse(
+        request,
+        "graph.html",
+        {
+            "title": "Category Graph",
+            "width": width,
+            "height": height,
+            "nodes": nodes,
+            "edges": edges,
+            "top_nodes": top_nodes[:10],
+            "top_edges": top_edges[:10],
+            "total_categories": len(nodes),
+            "total_edges": len(edges),
+            "total_selections": sum(
+                node["selected_count"]
+                for node in nodes
+            ),
+            "total_events": sum(
+                node["event_count"]
+                for node in nodes
+            ),
+            "total_delta": round(
+                sum(
+                    node["total_delta"]
+                    for node in nodes
+                ),
+                2,
+            ),
         },
     )

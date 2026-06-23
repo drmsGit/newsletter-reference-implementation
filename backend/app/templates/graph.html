@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="mb-1">Category Graph</h1>
+<p class="text-muted mb-4">
+    Visual impact map based on category relations, content co-occurrence, selections and preference updates.
+</p>
+
+<div class="row">
+    <div class="col-md-3">
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5>How to read</h5>
+
+                <p class="mb-2">
+                    <strong>Node size</strong><br>
+                    Selection count and preference impact.
+                </p>
+
+                <p class="mb-2">
+                    <strong>Node color</strong><br>
+                    Green = positive average delta.<br>
+                    Red = negative average delta.<br>
+                    Grey = no measured impact.
+                </p>
+
+                <p class="mb-0">
+                    <strong>Edge thickness</strong><br>
+                    Category relation strength and shared content impact.
+                </p>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5>Totals</h5>
+
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <th>Categories</th>
+                        <td>{{ total_categories }}</td>
+                    </tr>
+                    <tr>
+                        <th>Connections</th>
+                        <td>{{ total_edges }}</td>
+                    </tr>
+                    <tr>
+                        <th>Selections</th>
+                        <td>{{ total_selections }}</td>
+                    </tr>
+                    <tr>
+                        <th>Events</th>
+                        <td>{{ total_events }}</td>
+                    </tr>
+                    <tr>
+                        <th>Total Delta</th>
+                        <td>{{ total_delta }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="col-md-6">
+
+        <div class="card">
+            <div class="card-body">
+
+                <svg
+                    width="100%"
+                    viewBox="0 0 {{ width }} {{ height }}"
+                    role="img"
+                    style="border:1px solid #dee2e6; border-radius:8px; background:#fbfbfb;"
+                >
+
+                    {% for edge in edges %}
+                    <line
+                        x1="{{ edge.x1 }}"
+                        y1="{{ edge.y1 }}"
+                        x2="{{ edge.x2 }}"
+                        y2="{{ edge.y2 }}"
+                        stroke="{% if edge.type == 'relation' %}#212529{% else %}#adb5bd{% endif %}"
+                        stroke-width="{{ edge.thickness }}"
+                        stroke-opacity="{% if edge.type == 'relation' %}0.35{% else %}0.25{% endif %}"
+                    >
+                        <title>
+                            {{ edge.source_name }} → {{ edge.target_name }}
+                            Type: {{ edge.type }}
+                            Co-occurrence: {{ edge.cooccurrence_count }}
+                            Events: {{ edge.event_count }}
+                            Delta: {{ edge.total_delta }}
+                        </title>
+                    </line>
+                    {% endfor %}
+
+                    {% for node in nodes %}
+                    <g
+                        class="category-node"
+                        data-name="{{ node.name }}"
+                        data-type="{{ node.type }}"
+                        data-selected="{{ node.selected_count }}"
+                        data-content="{{ node.content_count }}"
+                        data-events="{{ node.event_count }}"
+                        data-updates="{{ node.update_count }}"
+                        data-total-delta="{{ node.total_delta }}"
+                        data-avg-delta="{{ node.avg_delta }}"
+                        data-parents="{{ node.parent_count }}"
+                        data-children="{{ node.child_count }}"
+                        style="cursor:pointer;"
+                    >
+                        <circle
+                            cx="{{ node.x }}"
+                            cy="{{ node.y }}"
+                            r="{{ node.radius }}"
+                            fill="{{ node.color }}"
+                            fill-opacity="0.85"
+                            stroke="#212529"
+                            stroke-opacity="0.2"
+                            stroke-width="1"
+                        >
+                            <title>
+                                {{ node.name }}
+                                Delta: {{ node.total_delta }}
+                                Events: {{ node.event_count }}
+                                Selections: {{ node.selected_count }}
+                            </title>
+                        </circle>
+
+                        <text
+                            x="{{ node.x + node.radius + 6 }}"
+                            y="{{ node.y - 4 }}"
+                            font-size="14"
+                            font-weight="600"
+                            fill="#212529"
+                        >
+                            {{ node.name }}
+                        </text>
+
+                        <text
+                            x="{{ node.x + node.radius + 6 }}"
+                            y="{{ node.y + 13 }}"
+                            font-size="11"
+                            fill="#6c757d"
+                        >
+                            Δ {{ node.total_delta }} · Events {{ node.event_count }}
+                        </text>
+                    </g>
+                    {% endfor %}
+
+                </svg>
+
+            </div>
+        </div>
+
+    </div>
+
+    <div class="col-md-3">
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5>Selected Category</h5>
+
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <th>Name</th>
+                        <td id="detail-name">Select node</td>
+                    </tr>
+                    <tr>
+                        <th>Type</th>
+                        <td id="detail-type">-</td>
+                    </tr>
+                    <tr>
+                        <th>Selections</th>
+                        <td id="detail-selected">-</td>
+                    </tr>
+                    <tr>
+                        <th>Content</th>
+                        <td id="detail-content">-</td>
+                    </tr>
+                    <tr>
+                        <th>Events</th>
+                        <td id="detail-events">-</td>
+                    </tr>
+                    <tr>
+                        <th>Updates</th>
+                        <td id="detail-updates">-</td>
+                    </tr>
+                    <tr>
+                        <th>Total Delta</th>
+                        <td id="detail-total-delta">-</td>
+                    </tr>
+                    <tr>
+                        <th>Avg Delta</th>
+                        <td id="detail-avg-delta">-</td>
+                    </tr>
+                    <tr>
+                        <th>Parents</th>
+                        <td id="detail-parents">-</td>
+                    </tr>
+                    <tr>
+                        <th>Children</th>
+                        <td id="detail-children">-</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5>Top Categories</h5>
+
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Δ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for node in top_nodes %}
+                        <tr>
+                            <td>{{ node.name }}</td>
+                            <td>{{ node.total_delta }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="card mt-4">
+    <div class="card-body">
+        <h5>Top Category Connections</h5>
+
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Connection</th>
+                    <th>Type</th>
+                    <th>Co-occurrence</th>
+                    <th>Events</th>
+                    <th>Total Delta</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for edge in top_edges %}
+                <tr>
+                    <td>{{ edge.source_name }} → {{ edge.target_name }}</td>
+                    <td>{{ edge.type }}</td>
+                    <td>{{ edge.cooccurrence_count }}</td>
+                    <td>{{ edge.event_count }}</td>
+                    <td>{{ edge.total_delta }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.querySelectorAll(".category-node").forEach(function (node) {
+    node.addEventListener("click", function () {
+        document.getElementById("detail-name").innerText =
+            node.dataset.name;
+        document.getElementById("detail-type").innerText =
+            node.dataset.type;
+        document.getElementById("detail-selected").innerText =
+            node.dataset.selected;
+        document.getElementById("detail-content").innerText =
+            node.dataset.content;
+        document.getElementById("detail-events").innerText =
+            node.dataset.events;
+        document.getElementById("detail-updates").innerText =
+            node.dataset.updates;
+        document.getElementById("detail-total-delta").innerText =
+            node.dataset.totalDelta;
+        document.getElementById("detail-avg-delta").innerText =
+            node.dataset.avgDelta;
+        document.getElementById("detail-parents").innerText =
+            node.dataset.parents;
+        document.getElementById("detail-children").innerText =
+            node.dataset.children;
+    });
+});
+</script>
+
+{% endblock %}
