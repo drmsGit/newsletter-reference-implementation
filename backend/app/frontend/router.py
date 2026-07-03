@@ -13,7 +13,7 @@ import json
 from app.content.db_models import ContentRecordDB, ContentVersionDB, CategoryDB, ContentCategoryAssignmentDB, CategoryRelationDB
 from app.content.service import create_content, update_content_record, assign_category_to_content, create_content_version
 from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB, ModuleInstanceDB, DecisionSlotDB
-from app.campaigns.service import create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant
+from app.campaigns.service import create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant, update_decision_slot
 from app.snapshots.service import create_snapshot_for_variant
 from app.delivery.service import create_send_instance, send_send_instance
 from app.recipients.db_models import RecipientDB, RecipientPreferenceDB, PreferenceUpdateLogDB
@@ -498,6 +498,25 @@ def send_instance_create(
 ):
     send_instance = create_send_instance(db, snapshot_id=snapshot_id, name=name, provider="mock")
     return RedirectResponse(url=f"/ui/deliveries/send-instances/{send_instance.id}", status_code=303)
+
+
+@router.post("/ui/decisions/slots/{slot_id}/edit")
+def decision_slot_edit(
+    slot_id: int,
+    decision_strategy: str = Form(...),
+    candidate_filter_json: str = Form("{}"),
+    strategy_config_json: str = Form("{}"),
+    db: Session = Depends(get_db),
+):
+    import json as _json
+    try:
+        candidate_filter = _json.loads(candidate_filter_json) or None
+        strategy_config = _json.loads(strategy_config_json) or None
+    except ValueError:
+        candidate_filter = None
+        strategy_config = None
+    update_decision_slot(db, slot_id, decision_strategy, candidate_filter, strategy_config)
+    return RedirectResponse(url=f"/ui/decisions/slots/{slot_id}", status_code=303)
 
 
 @router.post("/ui/send-instances/{send_instance_id}/send")

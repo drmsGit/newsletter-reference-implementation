@@ -44,17 +44,18 @@
 </div>
 
 <div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Strategy & configuration</strong>
+        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#form-edit-slot">Edit</button>
+    </div>
     <div class="card-body">
-        <h5>Strategy & Candidate Filter</h5>
-
-        <div class="row">
+        <div class="row mb-3">
             <div class="col-md-4">
-                <strong>Current Strategy</strong><br>
+                <strong>Current strategy</strong><br>
                 <code>{{ slot.decision_strategy }}</code>
             </div>
-
             <div class="col-md-8">
-                <strong>Supported Strategies</strong><br>
+                <strong>Available strategies</strong><br>
                 {% for strategy in slot.supported_strategies %}
                     {% if strategy == slot.decision_strategy %}
                         <span class="badge bg-primary">{{ strategy }}</span>
@@ -64,14 +65,47 @@
                 {% endfor %}
             </div>
         </div>
-
-        <hr>
-
-        <h6>Strategy Config</h6>
-        <pre class="bg-light border rounded p-3"><code>{{ slot.strategy_config_pretty }}</code></pre>
-
-        <h6>Candidate Filter</h6>
-        <pre class="bg-light border rounded p-3 mb-0"><code>{{ slot.candidate_filter_pretty }}</code></pre>
+        <div class="row">
+            <div class="col-md-6">
+                <strong>Strategy config</strong>
+                <pre class="bg-light border rounded p-3 mt-1"><code>{{ slot.strategy_config_pretty }}</code></pre>
+            </div>
+            <div class="col-md-6">
+                <strong>Candidate filter</strong>
+                <pre class="bg-light border rounded p-3 mt-1"><code>{{ slot.candidate_filter_pretty }}</code></pre>
+            </div>
+        </div>
+    </div>
+    <div class="collapse" id="form-edit-slot">
+        <div class="card-body border-top">
+            <form method="post" action="/ui/decisions/slots/{{ slot.id }}/edit">
+                <div class="mb-3">
+                    <label class="form-label">Strategy</label>
+                    <select name="decision_strategy" class="form-select">
+                        {% for strategy in slot.supported_strategies %}
+                        <option value="{{ strategy }}" {% if strategy == slot.decision_strategy %}selected{% endif %}>
+                            {{ strategy }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">
+                        Strategy config
+                        <span class="text-muted small">(JSON)</span>
+                    </label>
+                    <textarea name="strategy_config_json" class="form-control font-monospace" rows="4">{{ slot.strategy_config_pretty }}</textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">
+                        Candidate filter
+                        <span class="text-muted small">(JSON — e.g. {"category_ids": [1, 2, 3]})</span>
+                    </label>
+                    <textarea name="candidate_filter_json" class="form-control font-monospace" rows="4">{{ slot.candidate_filter_pretty }}</textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">Save configuration</button>
+            </form>
+        </div>
     </div>
 </div>
 

@@ -146,6 +146,24 @@ def create_module_for_variant(
     return to_module_instance(module)
 
 
+def update_decision_slot(
+    db: Session,
+    slot_id: int,
+    decision_strategy: str,
+    candidate_filter: dict | None,
+    strategy_config: dict | None,
+) -> DecisionSlotDB | None:
+    slot = db.query(DecisionSlotDB).filter(DecisionSlotDB.id == slot_id).first()
+    if slot is None:
+        return None
+    slot.decision_strategy = decision_strategy
+    slot.candidate_filter = candidate_filter
+    slot.strategy_config = strategy_config
+    db.commit()
+    db.refresh(slot)
+    return slot
+
+
 def to_decision_slot(record: DecisionSlotDB) -> DecisionSlot:
     return DecisionSlot(
         id=record.id,
