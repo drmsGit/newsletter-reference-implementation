@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <a href="/ui/audience-groups" class="text-muted small">← Audience Groups</a>
+        <h1 class="mb-0">{{ group.name }}</h1>
+        {% if group.description %}
+        <p class="text-muted mb-0">{{ group.description }}</p>
+        {% endif %}
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="collapse" data-bs-target="#form-edit-group">Edit</button>
+        <form method="post" action="/ui/audience-groups/{{ group.id }}/delete" onsubmit="return confirm('Delete this group?')">
+            <button type="submit" class="btn btn-outline-danger btn-sm">Delete group</button>
+        </form>
+    </div>
+</div>
+
+<div class="collapse mb-4" id="form-edit-group">
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Edit group</h5>
+            <form method="post" action="/ui/audience-groups/{{ group.id }}/edit">
+                <div class="mb-3">
+                    <label class="form-label">Name</label>
+                    <input type="text" name="name" class="form-control" value="{{ group.name }}" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <textarea name="description" class="form-control" rows="2">{{ group.description or "" }}</textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0">Members ({{ members | length }})</h5>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#form-bulk-add">+ Add by criteria</button>
+                {% if non_members %}
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#form-add-member">+ Add one</button>
+                {% endif %}
+            </div>
+        </div>
+
+        {# ── Criteria-based bulk add ──────────────────────────────────── #}
+        <div class="collapse mb-3" id="form-bulk-add">
+            <div class="border rounded p-3 bg-light">
+                <h6>Add recipients by criteria</h6>
+                <p class="text-muted small mb-3">
+                    All matching recipients not already in this group will be added.
+                    At least one criterion must be selected.
+                </p>
+                <form id="criteria-form" method="post" action="/ui/audience-groups/{{ group.id }}/bulk-add">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Language</label>
+                            <select name="language" id="c-language" class="form-select">
+                                <option value="">Any</option>
+                                {% for lang in languages %}
+                                <option value="{{ lang }}">{{ lang }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Status</label>
+                            <select name="status" id="c-status" class="form-select">
+                                <option value="">Any</option>
+                                {% for s in statuses %}
+                                <option value="{{ s }}">{{ s }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Preference category</label>
+                            <select name="preference_category_id" id="c-cat" class="form-select">
+                                <option value="">Any</option>
+                                {% for cat in categories %}
+                                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Min. preference score</label>
+                            <input type="number" name="min_preference_score" id="c-score"
+                                   class="form-control" min="0" max="10" step="0.1" placeholder="e.g. 1.5">
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 align-items-center">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-preview">Preview matches</button>
+                        <button type="submit" class="btn btn-primary btn-sm" id="btn-bulk-add" disabled>Add matching recipients</button>
+                        <span id="preview-result" class="text-muted small ms-2"></span>
+                    </div>
+                </form>
+
+                <div id="preview-list" class="mt-3" style="display:none">
+                    <table class="table table-sm mb-0">
+                        <thead><tr><th>Email</th><th>External ID</th><th>Language</th><th>Status</th></tr></thead>
+                        <tbody id="preview-rows"></tbody>
+                    </table>
+                    <p id="preview-more" class="text-muted small mt-1" style="display:none"></p>
+                </div>
+            </div>
+        </div>
+
+        {# ── Single recipient add ─────────────────────────────────────── #}
+        <div class="collapse mb-3" id="form-add-member">
+            <form method="post" action="/ui/audience-groups/{{ group.id }}/members">
+                <div class="row align-items-end">
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">Recipient</label>
+                        <select name="recipient_id" class="form-select" required>
+                            {% for r in non_members %}
+                            <option value="{{ r.id }}">{{ r.email }} ({{ r.external_id }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2 mb-2">
+                        <button type="submit" class="btn btn-primary w-100">Add</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        {% if members %}
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Recipient</th>
+                    <th>Email</th>
+                    <th>Status</th>
+                    <th>Added</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in members %}
+                <tr>
+                    <td>
+                        <a href="/ui/recipients/{{ m.recipient_id }}">{{ m.external_id }}</a>
+                    </td>
+                    <td>{{ m.email }}</td>
+                    <td>{{ m.status }}</td>
+                    <td>{{ m.added_at.strftime("%Y-%m-%d") }}</td>
+                    <td>
+                        <form method="post" action="/ui/audience-groups/{{ group.id }}/members/{{ m.recipient_id }}/remove">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted mb-0">No members yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+const groupId = {{ group.id }};
+
+document.getElementById('btn-preview').addEventListener('click', async () => {
+    const params = new URLSearchParams({
+        language: document.getElementById('c-language').value,
+        status: document.getElementById('c-status').value,
+        preference_category_id: document.getElementById('c-cat').value,
+        min_preference_score: document.getElementById('c-score').value,
+    });
+    const res = await fetch(`/ui/audience-groups/${groupId}/criteria-preview?${params}`);
+    const data = await res.json();
+
+    const result = document.getElementById('preview-result');
+    const addBtn = document.getElementById('btn-bulk-add');
+    const list = document.getElementById('preview-list');
+    const rows = document.getElementById('preview-rows');
+    const more = document.getElementById('preview-more');
+
+    result.textContent = `${data.count} recipient(s) match`;
+    addBtn.disabled = data.count === 0;
+
+    rows.innerHTML = data.recipients.map(r =>
+        `<tr><td>${r.email}</td><td>${r.external_id}</td><td>${r.language || ''}</td><td>${r.status}</td></tr>`
+    ).join('');
+
+    if (data.count > 20) {
+        more.textContent = `… and ${data.count - 20} more`;
+        more.style.display = '';
+    } else {
+        more.style.display = 'none';
+    }
+    list.style.display = data.recipients.length ? '' : 'none';
+});
+</script>
+
+{% endblock %}

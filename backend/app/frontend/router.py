@@ -18,6 +18,8 @@ from app.campaigns.service import create_campaign, create_variant_for_campaign, 
 from app.snapshots.service import create_snapshot_for_variant
 from app.delivery.service import create_send_instance, send_send_instance
 from app.recipients.db_models import RecipientDB, RecipientPreferenceDB, PreferenceUpdateLogDB
+from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB
+from app.audience import service as audience_service
 from app.decision.strategies.registry import list_strategies
 from app.email_modules.registry import list_manifests
 from app.snapshots.db_models import SnapshotDB
@@ -1870,3 +1872,153 @@ def category_graph(
             ),
         },
     )
+
+# ── Audience Groups ──────────────────────────────────────────────────────────
+
+@router.get("/ui/audience-groups")
+def audience_groups_list(request: Request, db: Session = Depends(get_db)):
+    groups = audience_service.list_groups(db)
+    rows = []
+    for g in groups:
+        count = db.query(AudienceGroupMemberDB).filter(AudienceGroupMemberDB.group_id == g.id).count()
+        rows.append({"id": g.id, "name": g.name, "description": g.description,
+                     "member_count": count, "created_at": g.created_at})
+    return templates.TemplateResponse(request, "audience_groups.html",
+                                      {"title": "Audience Groups", "groups": rows})
+
+
+@router.post("/ui/audience-groups")
+def audience_groups_create(
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    desc = description.strip() or None
+    group = audience_service.create_group(db, name.strip(), desc)
+    return RedirectResponse(f"/ui/audience-groups/{group.id}", status_code=303)
+
+
+@router.get("/ui/audience-groups/{group_id}")
+def audience_group_detail(group_id: int, request: Request, db: Session = Depends(get_db)):
+    group = audience_service.get_group(db, group_id)
+    if not group:
+        return RedirectResponse("/ui/audience-groups", status_code=303)
+
+    member_ids = audience_service.get_member_recipient_ids(db, group_id)
+    raw_members = audience_service.list_members(db, group_id)
+
+    members = []
+    for m in raw_members:
+        r = db.query(RecipientDB).filter(RecipientDB.id == m.recipient_id).first()
+        if r:
+            members.append({
+                "recipient_id": r.id,
+                "external_id": r.external_id,
+                "email": r.email,
+                "status": r.status,
+                "added_at": m.added_at,
+            })
+
+    all_recipients = db.query(RecipientDB).order_by(RecipientDB.email.asc()).all()
+    non_members = [r for r in all_recipients if r.id not in member_ids]
+
+    languages = sorted({r.language for r in all_recipients if r.language})
+    statuses = sorted({r.status for r in all_recipients if r.status})
+    categories = db.query(CategoryDB).order_by(CategoryDB.name.asc()).all()
+
+    return templates.TemplateResponse(request, "audience_group_detail.html", {
+        "title": f"Group: {group.name}",
+        "group": group,
+        "members": members,
+        "non_members": non_members,
+        "languages": languages,
+        "statuses": statuses,
+        "categories": categories,
+    })
+
+
+@router.post("/ui/audience-groups/{group_id}/edit")
+def audience_group_edit(
+    group_id: int,
+    name: str = Form(...),
+    description: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    desc = description.strip() or None
+    audience_service.update_group(db, group_id, name.strip(), desc)
+    return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
+
+
+@router.post("/ui/audience-groups/{group_id}/delete")
+def audience_group_delete(group_id: int, db: Session = Depends(get_db)):
+    audience_service.delete_group(db, group_id)
+    return RedirectResponse("/ui/audience-groups", status_code=303)
+
+
+@router.post("/ui/audience-groups/{group_id}/members")
+def audience_group_add_member(
+    group_id: int,
+    recipient_id: int = Form(...),
+    db: Session = Depends(get_db),
+):
+    audience_service.add_member(db, group_id, recipient_id)
+    return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
+
+
+@router.post("/ui/audience-groups/{group_id}/members/{recipient_id}/remove")
+def audience_group_remove_member(group_id: int, recipient_id: int, db: Session = Depends(get_db)):
+    audience_service.remove_member(db, group_id, recipient_id)
+    return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
+
+
+@router.get("/ui/audience-groups/{group_id}/criteria-preview")
+def audience_group_criteria_preview(
+    group_id: int,
+    request: Request,
+    language: str = "",
+    status: str = "",
+    preference_category_id: str = "",
+    min_preference_score: str = "",
+    db: Session = Depends(get_db),
+):
+    from fastapi.responses import JSONResponse
+    member_ids = audience_service.get_member_recipient_ids(db, group_id)
+    cat_id = int(preference_category_id) if preference_category_id else None
+    min_score = float(min_preference_score) if min_preference_score else None
+    matches = audience_service.find_by_criteria(
+        db,
+        language=language or None,
+        status=status or None,
+        preference_category_id=cat_id,
+        min_preference_score=min_score,
+        exclude_ids=member_ids,
+    )
+    return JSONResponse({"count": len(matches), "recipients": [
+        {"id": r.id, "email": r.email, "external_id": r.external_id, "language": r.language, "status": r.status}
+        for r in matches[:20]
+    ]})
+
+
+@router.post("/ui/audience-groups/{group_id}/bulk-add")
+def audience_group_bulk_add(
+    group_id: int,
+    language: str = Form(""),
+    status: str = Form(""),
+    preference_category_id: str = Form(""),
+    min_preference_score: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    member_ids = audience_service.get_member_recipient_ids(db, group_id)
+    cat_id = int(preference_category_id) if preference_category_id else None
+    min_score = float(min_preference_score) if min_preference_score else None
+    matches = audience_service.find_by_criteria(
+        db,
+        language=language or None,
+        status=status or None,
+        preference_category_id=cat_id,
+        min_preference_score=min_score,
+        exclude_ids=member_ids,
+    )
+    audience_service.bulk_add_members(db, group_id, [r.id for r in matches])
+    return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
