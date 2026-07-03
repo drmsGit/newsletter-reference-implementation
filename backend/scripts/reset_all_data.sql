@@ -8,8 +8,8 @@
 --   - Each variant has 3 module instances: hero, decision-slot card, CTA
 --   - 1 decision slot per variant (recipient_top_score strategy)
 --   - 3 recipients with distinct preferences (beach / city / nature)
---   - 1 send instance with delivery executions and engagement events
---   - 1 override event pending outcome + 1 with outcome already recorded
+--   - 2 override events (1 pending outcome, 1 resolved)
+--   - No snapshots/send/delivery seeded — create snapshots via UI after seeding
 
 BEGIN;
 
@@ -138,34 +138,15 @@ INSERT INTO module_instances (variant_id, module_type, position, content_record_
     (2, 'cta',          3, NULL, '{"button_label": "Explore cities"}',       NULL);
 
 -- =========================================================
--- SNAPSHOTS  (must come before send_instances)
+-- SNAPSHOTS / SEND / DELIVERY
 -- =========================================================
+-- Omitted from seed: snapshots require rendered HTML whose storage
+-- strategy is not yet decided (file vs DB vs object storage).
+-- Create snapshots through the UI after seeding.
 
-INSERT INTO snapshots (variant_id, recipient_id, html_storage_type, html_location, html_size) VALUES
-    (1, NULL, 'file', 'snapshots/variant_1_seed.html', 4096),
-    (2, NULL, 'file', 'snapshots/variant_2_seed.html', 4200);
-
--- =========================================================
--- SEND + DELIVERY
--- =========================================================
-
-INSERT INTO send_instances (snapshot_id, name, status, provider, scheduled_at) VALUES
-    (1, 'Main send — Summer 2026', 'sent', 'mock', NOW() - INTERVAL '3 days');
-
-INSERT INTO delivery_executions (send_instance_id, recipient_id, status, provider, provider_message_id) VALUES
-    (1, 'r-001', 'delivered', 'mock', 'mock-msg-001'),
-    (1, 'r-002', 'delivered', 'mock', 'mock-msg-002'),
-    (1, 'r-003', 'delivered', 'mock', 'mock-msg-003');
-
--- Anna opened + clicked; Jan opened only; Sophie no engagement
-INSERT INTO engagement_events (delivery_execution_id, event_type, provider, provider_event_id, event_data, occurred_at) VALUES
-    (1, 'open',  'mock', 'evt-001', '{"user_agent": "Mozilla/5.0"}',        NOW() - INTERVAL '2 days'),
-    (1, 'click', 'mock', 'evt-002', '{"url": "/trips/mallorca-beach-walk"}', NOW() - INTERVAL '2 days'),
-    (2, 'open',  'mock', 'evt-003', '{"user_agent": "AppleMail/16.0"}',      NOW() - INTERVAL '2 days');
-
--- Anna's beach preference bumped after her click
+-- Anna's beach preference bumped (no linked engagement event — delivery data omitted from seed)
 INSERT INTO preference_update_logs (recipient_id, category_id, event_id, previous_score, delta, new_score, reason)
-SELECT r.id, cat.id, 2, 90, 5, 95, 'click on beach content'
+SELECT r.id, cat.id, NULL, 90, 5, 95, 'click on beach content'
 FROM recipients r
 JOIN categories cat ON cat.name = 'Beach'
 WHERE r.external_id = 'r-001';
@@ -189,11 +170,11 @@ INSERT INTO override_events (
     overridden_by, reason, outcome_delta, created_at
 ) VALUES
     -- Pending: manager swapped content on slot 1, outcome not yet recorded
-    ('content', 2, 1, 1, 1, 2,
+    ('content', 2, 1, NULL, 1, 2,
      'manager@example.com', 'City weekend fits the spring campaign better',
      NULL, NOW() - INTERVAL '4 days'),
     -- Resolved: earlier override on slot 2, outcome shows system was better
-    ('content', 5, 2, 1, 3, 2,
+    ('content', 5, 2, NULL, 3, 2,
      'manager@example.com', NULL,
      '{"system_open_rate": 0.21, "override_open_rate": 0.18, "system_click_rate": 0.04, "override_click_rate": 0.03}',
      NOW() - INTERVAL '10 days');
