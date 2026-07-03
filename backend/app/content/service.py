@@ -220,6 +220,15 @@ def list_child_relations_for_category(
     return [to_category_relation(record) for record in records]
 
 
+def delete_category_assignment(db: Session, assignment_id: int) -> bool:
+    assignment = db.query(ContentCategoryAssignmentDB).filter(ContentCategoryAssignmentDB.id == assignment_id).first()
+    if assignment is None:
+        return False
+    db.delete(assignment)
+    db.commit()
+    return True
+
+
 def assign_category_to_content(
     db: Session,
     content_id: int,

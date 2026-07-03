@@ -2,33 +2,27 @@
 
 {% block content %}
 
-<h1 class="mb-4">Category {{ category.id }}</h1>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0">{{ category.name }}</h1>
+    <span class="badge bg-secondary fs-6">{{ category.type }}</span>
+</div>
 
 <div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Category</strong>
+        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#form-relation">+ Add relation</button>
+    </div>
     <div class="card-body">
-        <h5>Category</h5>
-
-        <table class="table">
+        <table class="table table-sm mb-0">
+            <tr><th style="width:160px">ID</th><td>{{ category.id }}</td></tr>
+            <tr><th>Name</th><td>{{ category.name }}</td></tr>
+            <tr><th>Type</th><td>{{ category.type }}</td></tr>
             <tr>
-                <th>ID</th>
-                <td>{{ category.id }}</td>
-            </tr>
-            <tr>
-                <th>Name</th>
-                <td>{{ category.name }}</td>
-            </tr>
-            <tr>
-                <th>Type</th>
-                <td>{{ category.type }}</td>
-            </tr>
-            <tr>
-                <th>Parent Categories</th>
+                <th>Parent categories</th>
                 <td>
                     {% if parent_categories %}
                         {% for parent in parent_categories %}
-                            <a href="/ui/categories/{{ parent.id }}" class="badge bg-secondary text-decoration-none">
-                                {{ parent.name }}
-                            </a>
+                            <a href="/ui/categories/{{ parent.id }}" class="badge bg-secondary text-decoration-none me-1">{{ parent.name }}</a>
                         {% endfor %}
                     {% else %}
                         <span class="text-muted">None</span>
@@ -36,13 +30,11 @@
                 </td>
             </tr>
             <tr>
-                <th>Child Categories</th>
+                <th>Child categories</th>
                 <td>
                     {% if child_categories %}
                         {% for child in child_categories %}
-                            <a href="/ui/categories/{{ child.id }}" class="badge bg-secondary text-decoration-none">
-                                {{ child.name }}
-                            </a>
+                            <a href="/ui/categories/{{ child.id }}" class="badge bg-secondary text-decoration-none me-1">{{ child.name }}</a>
                         {% endfor %}
                     {% else %}
                         <span class="text-muted">None</span>
@@ -50,6 +42,33 @@
                 </td>
             </tr>
         </table>
+    </div>
+    <div class="collapse" id="form-relation">
+        <div class="card-body border-top">
+            <form method="post" action="/ui/categories/relations">
+                <div class="row align-items-end">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Parent</label>
+                        <select name="parent_category_id" class="form-select" required>
+                            {% for cat in all_categories %}
+                            <option value="{{ cat.id }}" {% if cat.id == category.id %}selected{% endif %}>{{ cat.name }} ({{ cat.type }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Child</label>
+                        <select name="child_category_id" class="form-select" required>
+                            {% for cat in all_categories %}
+                            <option value="{{ cat.id }}">{{ cat.name }} ({{ cat.type }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <button type="submit" class="btn btn-primary w-100">Add</button>
+                    </div>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 

@@ -11,7 +11,8 @@ from app.database import get_db
 import json
 
 from app.content.db_models import ContentRecordDB, ContentVersionDB, CategoryDB, ContentCategoryAssignmentDB, CategoryRelationDB
-from app.content.service import create_content, update_content_record, assign_category_to_content, create_content_version
+from app.content.service import create_content, update_content_record, assign_category_to_content, create_content_version, delete_category_assignment
+from app.content.service import create_category, create_category_relation
 from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB, ModuleInstanceDB, DecisionSlotDB
 from app.campaigns.service import create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant, update_decision_slot
 from app.snapshots.service import create_snapshot_for_variant
@@ -406,7 +407,7 @@ def campaign_detail(
 
     content_records = db.query(ContentRecordDB).order_by(ContentRecordDB.title.asc()).all()
     module_templates = list_manifests()
-    strategies = list_strategies()
+    strategies = sorted(s.name for s in list_strategies())
 
     return templates.TemplateResponse(
         request,
@@ -420,6 +421,16 @@ def campaign_detail(
             "strategies": strategies,
         },
     )
+
+
+@router.post("/ui/content/{content_record_id}/categories/{assignment_id}/delete")
+def content_category_delete(
+    content_record_id: int,
+    assignment_id: int,
+    db: Session = Depends(get_db),
+):
+    delete_category_assignment(db, assignment_id)
+    return RedirectResponse(url=f"/ui/content/{content_record_id}", status_code=303)
 
 
 @router.post("/ui/campaigns")
@@ -563,6 +574,7 @@ def content_detail(
 
     categories = (
         db.query(
+            ContentCategoryAssignmentDB.id,
             CategoryDB.name,
             CategoryDB.type,
             ContentCategoryAssignmentDB.score,
@@ -579,11 +591,12 @@ def content_detail(
 
     category_rows = [
         {
+            "assignment_id": assignment_id,
             "name": name,
             "type": category_type,
             "score": score,
         }
-        for name, category_type, score in categories
+        for assignment_id, name, category_type, score in categories
     ]
 
     versions = (
@@ -782,6 +795,7 @@ def categories_list(
         {
             "title": "Categories",
             "categories": category_rows,
+            "all_categories": categories,
         },
     )
 
@@ -901,6 +915,8 @@ def category_detail(
         "avg_delta": round(float(impact[2]), 2),
     }
 
+    all_categories = db.query(CategoryDB).order_by(CategoryDB.name.asc()).all()
+
     return templates.TemplateResponse(
         request,
         "category_detail.html",
@@ -912,8 +928,29 @@ def category_detail(
             "assigned_content": assigned_content_rows,
             "recipient_preferences": recipient_preference_rows,
             "impact_summary": impact_summary,
+            "all_categories": all_categories,
         },
     )
+
+
+@router.post("/ui/categories")
+def category_create(
+    name: str = Form(...),
+    type: str = Form("main"),
+    db: Session = Depends(get_db),
+):
+    create_category(db, name=name, type=type)
+    return RedirectResponse(url="/ui/categories", status_code=303)
+
+
+@router.post("/ui/categories/relations")
+def category_relation_create(
+    parent_category_id: int = Form(...),
+    child_category_id: int = Form(...),
+    db: Session = Depends(get_db),
+):
+    create_category_relation(db, parent_category_id=parent_category_id, child_category_id=child_category_id)
+    return RedirectResponse(url="/ui/categories", status_code=303)
 
 
 @router.get("/ui/decisions")

@@ -95,10 +95,7 @@
                         <input type="text" name="image_url" class="form-control" placeholder="/static/img/example.jpg">
                     </div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Published by</label>
-                    <input type="text" name="created_by" class="form-control" placeholder="your@email.com">
-                </div>
+                <input type="hidden" name="created_by" value="">
                 <button type="submit" class="btn btn-primary btn-sm">Publish version</button>
             </form>
         </div>
@@ -115,7 +112,7 @@
         {% if categories %}
         <table class="table table-sm mb-0">
             <thead>
-                <tr><th>Category</th><th>Type</th><th>Score</th></tr>
+                <tr><th>Category</th><th>Type</th><th>Score</th><th></th></tr>
             </thead>
             <tbody>
                 {% for category in categories %}
@@ -123,6 +120,11 @@
                     <td>{{ category.name }}</td>
                     <td>{{ category.type }}</td>
                     <td>{{ category.score }}</td>
+                    <td>
+                        <form method="post" action="/ui/content/{{ record.id }}/categories/{{ category.assignment_id }}/delete">
+                            <button type="submit" class="btn btn-sm btn-link text-danger p-0">Remove</button>
+                        </form>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
