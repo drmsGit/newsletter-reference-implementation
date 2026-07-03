@@ -1,0 +1,13 @@
+{
+  "label": "Image Right",
+  "description": "Headline, body text and button on the left, image on the right. Mirrors Image Left for visual variety.",
+  "cms": true,
+  "variables": [
+    { "name": "image_url", "required": false },
+    { "name": "image_alt", "required": false },
+    { "name": "headline_medium", "required": true },
+    { "name": "body_medium", "required": false },
+    { "name": "button_label", "required": false },
+    { "name": "button_url", "required": false }
+  ]
+}

@@ -1,10 +1,25 @@
+from pathlib import Path
+
+import css_inline
+from jinja2 import BaseLoader, Environment
 from sqlalchemy.orm import Session
 
-from app.campaigns.db_models import (
-    ModuleInstanceDB,
-    DecisionResolutionDB,
-)
+from app.campaigns.db_models import ModuleInstanceDB, DecisionResolutionDB
 from app.content.db_models import ContentRecordDB, ContentVersionDB
+from app.email_modules.registry import ModuleManifest, get_manifest, get_template_html
+
+_jinja = Environment(loader=BaseLoader())
+_inliner = css_inline.CSSInliner()
+
+_BRAND_CSS_PATH = (
+    Path(__file__).parent.parent.parent.parent / "storage" / "email_modules" / "brand.css"
+)
+
+
+def _load_brand_css() -> str:
+    if _BRAND_CSS_PATH.exists():
+        return _BRAND_CSS_PATH.read_text()
+    return ""
 
 
 def render_variant_html(
@@ -20,26 +35,25 @@ def render_variant_html(
     )
 
     rendered_modules = [
-        render_module(
-            db=db,
-            module=module,
-            recipient_id=recipient_id,
-        )
+        render_module(db=db, module=module, recipient_id=recipient_id)
         for module in modules
     ]
 
-    return """
-<!doctype html>
+    brand_css = _load_brand_css()
+
+    raw_html = f"""<!doctype html>
 <html>
   <head>
     <meta charset="utf-8">
     <title>Newsletter Preview</title>
+    <style>{brand_css}</style>
   </head>
   <body>
-    {content}
+    {"".join(rendered_modules)}
   </body>
-</html>
-""".replace("{content}", "\n".join(rendered_modules))
+</html>"""
+
+    return _inliner.inline(raw_html)
 
 
 def render_module(
@@ -47,125 +61,108 @@ def render_module(
     module: ModuleInstanceDB,
     recipient_id: int | None = None,
 ) -> str:
-    if module.module_type == "hero":
-        return render_hero(module)
+    manifest = get_manifest(module.module_type)
 
-    if module.module_type == "content_card":
-        return render_content_card(
-            db=db,
-            module=module,
-            recipient_id=recipient_id,
-        )
+    if manifest is None:
+        return render_unknown_module(module)
 
-    if module.module_type == "cta":
-        return render_cta(module)
+    if manifest.cms:
+        return render_cms_module(db=db, module=module, manifest=manifest, recipient_id=recipient_id)
 
-    return render_unknown_module(module)
+    return render_static_module(module=module, manifest=manifest)
 
 
-def render_hero(module: ModuleInstanceDB) -> str:
-    data = module.module_data or {}
-
-    headline = data.get("headline", "Hero")
-    text = data.get("text", "")
-
-    return f"""
-<section data-module-id="{module.id}" data-module-type="hero">
-  <h1>{headline}</h1>
-  <p>{text}</p>
-</section>
-"""
-
-
-def render_content_card(
+def render_cms_module(
     db: Session,
     module: ModuleInstanceDB,
+    manifest: ModuleManifest,
     recipient_id: int | None = None,
 ) -> str:
-    content = resolve_content_for_module(
-        db=db,
-        module=module,
-        recipient_id=recipient_id,
-    )
+    content = resolve_content_for_module(db=db, module=module, recipient_id=recipient_id)
 
     if content is None:
-        return f"""
-<section data-module-id="{module.id}" data-module-type="content_card">
-  <p>No content resolved.</p>
-</section>
-"""
+        # ADR-086: no content resolved — hide the slot rather than show a placeholder
+        return f"<!-- module {module.id} ({module.module_type}): no content resolved, slot hidden -->"
 
     data = module.module_data or {}
+    variables: dict = {}
 
-    title = data.get("headline_override") or content["title"]
-    body = data.get("body_override") or content["body"]
+    for var in manifest.variables:
+        # Convention: template variable name = CMS field name exactly.
+        # Override in module_data (stored as {name}_override) takes priority.
+        override = data.get(f"{var.name}_override")
+        variables[var.name] = override if override else content.get(var.name, "")
 
-    return f"""
-<article data-module-id="{module.id}" data-module-type="content_card" data-content-record-id="{content['id']}">
-  <h2>{title}</h2>
-  <p>{body}</p>
-</article>
-"""
+    html_source = get_template_html(module.module_type)
+    if html_source is None:
+        return render_unknown_module(module)
+
+    rendered = _jinja.from_string(html_source).render(**variables)
+
+    return (
+        f'<div data-module-id="{module.id}" data-module-type="{module.module_type}"'
+        f' data-content-id="{content["id"]}">\n'
+        f"{rendered}\n"
+        f"</div>"
+    )
 
 
-def render_cta(module: ModuleInstanceDB) -> str:
-    data = module.module_data or {}
+def render_static_module(
+    module: ModuleInstanceDB,
+    manifest: ModuleManifest,
+) -> str:
+    html_source = get_template_html(module.module_type)
+    if html_source is None:
+        return render_unknown_module(module)
 
-    label = data.get("label", "Click here")
-    url = data.get("url", "#")
+    variables = module.module_data or {}
+    rendered = _jinja.from_string(html_source).render(**variables)
 
-    return f"""
-<section data-module-id="{module.id}" data-module-type="cta">
-  <a href="{url}">{label}</a>
-</section>
-"""
+    return (
+        f'<div data-module-id="{module.id}" data-module-type="{module.module_type}">\n'
+        f"{rendered}\n"
+        f"</div>"
+    )
 
 
 def render_unknown_module(module: ModuleInstanceDB) -> str:
-    return f"""
-<section data-module-id="{module.id}" data-module-type="{module.module_type}">
-  <p>Unknown module type: {module.module_type}</p>
-</section>
-"""
+    return (
+        f'<div data-module-id="{module.id}" data-module-type="{module.module_type}">'
+        f"<!-- unknown module type: {module.module_type} -->"
+        f"</div>"
+    )
 
+
+# ---------------------------------------------------------------------------
+# Content resolution
+# ---------------------------------------------------------------------------
 
 def resolve_renderable_content(
     db: Session,
     content_record_id: int,
     content_version_id: int | None = None,
 ) -> dict | None:
+    """
+    Returns the raw content fields as a flat dict keyed by their CMS field names.
+    Template variables must match these names exactly — no mapping layer.
+    If a pinned version exists, its full JSON is returned.
+    Falls back to the live ContentRecord columns (title → title, body → body).
+    """
     if content_version_id is not None:
         version = (
             db.query(ContentVersionDB)
             .filter(ContentVersionDB.id == content_version_id)
             .first()
         )
-
         if version is not None:
             content = version.content or {}
-
-            return {
-                "id": content_record_id,
-                "title": (
-                    content.get("headline_medium")
-                    or content.get("headline_short")
-                    or content.get("headline")
-                    or "Untitled"
-                ),
-                "body": (
-                    content.get("text_medium")
-                    or content.get("text_short")
-                    or content.get("text")
-                    or ""
-                ),
-            }
+            return {"id": content_record_id, **content}
 
     record = (
         db.query(ContentRecordDB)
         .filter(ContentRecordDB.id == content_record_id)
         .first()
     )
-
     if record is None:
         return None
 
@@ -185,16 +182,12 @@ def resolve_content_for_module(
         return resolve_renderable_content(
             db=db,
             content_record_id=module.content_record_id,
-            content_version_id=None,
         )
 
     if module.decision_slot_id is not None:
         resolution_query = (
             db.query(DecisionResolutionDB)
-            .filter(
-                DecisionResolutionDB.decision_slot_id
-                == module.decision_slot_id
-            )
+            .filter(DecisionResolutionDB.decision_slot_id == module.decision_slot_id)
         )
 
         if recipient_id is not None:
@@ -204,7 +197,6 @@ def resolve_content_for_module(
                 .order_by(DecisionResolutionDB.created_at.desc())
                 .first()
             )
-
             if resolution is None:
                 resolution = (
                     resolution_query

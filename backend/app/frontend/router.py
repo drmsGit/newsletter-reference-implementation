@@ -12,7 +12,7 @@ import json
 from app.content.db_models import ContentRecordDB, ContentVersionDB, CategoryDB, ContentCategoryAssignmentDB, CategoryRelationDB
 from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB, ModuleInstanceDB, DecisionSlotDB
 from app.recipients.db_models import RecipientDB, RecipientPreferenceDB, PreferenceUpdateLogDB
-from app.decision.strategies.registry import STRATEGIES
+from app.decision.strategies.registry import list_strategies
 from app.snapshots.db_models import SnapshotDB
 from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
 from app.insight.db_models import EngagementEventDB
@@ -990,7 +990,7 @@ def decision_slot_detail(
         for reason, count in reason_summary
     ]
 
-    supported_strategies = sorted(STRATEGIES.keys())
+    supported_strategies = sorted(s.name for s in list_strategies())
 
     candidate_filter_pretty = json.dumps(
         slot.candidate_filter or {},

@@ -1,0 +1,9 @@
+{
+  "label": "Hero Banner",
+  "description": "Full-width opening section with a headline and supporting text. Use as the first block of any newsletter.",
+  "cms": false,
+  "variables": [
+    { "name": "headline", "required": true },
+    { "name": "text", "required": false }
+  ]
+}

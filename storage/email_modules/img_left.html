@@ -1,0 +1,16 @@
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" class="module-wrapper">
+  <tr>
+    {% if image_url %}
+    <td width="40%" class="module-image-cell">
+      <img src="{{ image_url }}" alt="{{ image_alt }}" class="module-image" />
+    </td>
+    {% endif %}
+    <td class="module-content-cell">
+      <h2 class="module-headline">{{ headline_medium }}</h2>
+      {% if body_medium %}<p class="module-body">{{ body_medium }}</p>{% endif %}
+      {% if button_label and button_url %}
+      <a href="{{ button_url }}" class="module-button">{{ button_label }}</a>
+      {% endif %}
+    </td>
+  </tr>
+</table>

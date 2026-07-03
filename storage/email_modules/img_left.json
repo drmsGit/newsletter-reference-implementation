@@ -1,0 +1,13 @@
+{
+  "label": "Image Left",
+  "description": "Image on the left, headline, body text and button on the right. Use for content where the visual supports the text.",
+  "cms": true,
+  "variables": [
+    { "name": "image_url", "required": false },
+    { "name": "image_alt", "required": false },
+    { "name": "headline_medium", "required": true },
+    { "name": "body_medium", "required": false },
+    { "name": "button_label", "required": false },
+    { "name": "button_url", "required": false }
+  ]
+}
