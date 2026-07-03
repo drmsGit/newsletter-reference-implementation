@@ -77,10 +77,99 @@ Design principles adopted:
 
 ---
 
-## 6. Open Questions / Next Steps
+## 6. Roadmap
 
-- [ ] Design the override/guideline layer to balance "psychological need for control" against "governed AI" pillar — in progress, see Decision Log 2026-06-24
-- [ ] Define the decision-strategy plugin contract (inputs, outputs, required graceful-failure behavior per ADR-086, explainability reporting per ADR-085)
-- [ ] Decide which 2-3 real client cases best illustrate each of the three pillars
-- [ ] Design template/HTML module manifest format (how a dropped-in `.html` file declares its variables to the frontend)
-- [ ] Eventually revisit drift report items not yet addressed: Merge Context (ADR-005), Snapshot completeness (ADR-062), Signal layer (ADR-110–113)
+### What exists today (baseline)
+- Backend: FastAPI modular monolith with modules for campaigns, content, decision engine, delivery, insight, providers, recipients, rendering, snapshots
+- Decision strategies: `top_score`, `recipient_top_score` — with a registry + base class already in place (good plugin foundation)
+- Frontend: server-side Jinja HTML templates — read-only views exist for campaigns, content, decisions, delivery, recipients, categories, dashboard
+- Recipients: basic model + event/preference tracking, no audience groups
+- Everything is created via API or direct SQL — no editing UI exists
+
+---
+
+### Phase 1 — Architecture Contracts (foundation, unblocks everything else)
+
+These are decisions and small implementations that other phases depend on. Mostly design + light code, no big features.
+
+**1A. Plugin contract: decision strategies**
+The registry + base class already exist — good. What's missing: an enforced contract on graceful failure (strategies must return `None`, never raise — ADR-086) and explainability (strategies must return a `reason` and `score` alongside the resolved content — ADR-085). Every new `.py` strategy file drops into `decision/strategies/` and auto-registers. Document the contract clearly — this is the "BI hands you a file and it works" promise.
+
+**1B. Plugin contract: HTML email templates**
+Decide on a manifest format: each email module template (e.g. `2col_product.html`) has a sidecar or frontmatter block declaring its variables (`{{ headline }}`, `{{ image_url }}`, etc.) and a human-readable label. Drop a file into the right folder, it appears in the campaign builder. Decision needed: frontmatter in the HTML itself (like Jekyll) or a companion `.json` file?
+
+**1C. Override-event data model**
+New DB table: `OverrideEventDB` — records what was overridden, the system's original recommendation, who did it, optional reason, timestamp. Relations to `ModuleInstanceDB` (content overrides) and eventually `AudienceGroupDB` (segmentation overrides). This is the trust-building audit trail. Small, well-scoped, do it before building any editing UI so overrides are logged from day one.
+
+---
+
+### Phase 2 — Editing Frontends (make it demonstrable to a manager)
+
+All views currently exist as read-only Jinja templates. Extend them into forms. Priority order:
+
+**2A. Content management** — create/edit content records and versions. Foundational: nothing else has real data without this.
+
+**2B. Campaign + variant builder** — create campaigns, variants, module instances, assign content or decision slots to modules. This is the core "email building" flow.
+
+**2C. Send preparation** — create send instances, assign audience (manual for now), trigger snapshot + send. This is the end-to-end demo path.
+
+**2D. Decision slot configuration** — pick a strategy from dropdown (auto-populated from strategy registry), set parameters, preview what it would resolve. Depends on Phase 1A.
+
+---
+
+### Phase 3 — Audience / Segmentation Layer (the AI story starts here)
+
+Currently: recipients exist, events and preferences are tracked, nothing else.
+
+**3A. Manual audience groups** — create a named group, add recipients by criteria (tag, preference, explicit list). This is the "manager wants control" surface. Needed before any send can be meaningfully targeted.
+
+**3B. System-suggested audience** — based on existing preference/event data, the system proposes a recipient set for a given campaign/variant. Manager sees the suggestion, can override (logged via 1C). This is the first visible expression of the trust-building loop.
+
+**3C. Signal layer (ADR-110–113)** — transform raw engagement events into typed, time-decaying signals. Prerequisite for any serious AI-based segmentation. This is the biggest architectural gap in the codebase right now, and also the most complex. Design before building.
+
+**3D. AI-based audience selection** — uses signals (not raw events) to propose recipient sets. Depends on 3C.
+
+---
+
+### Phase 4 — Playbook Production (parallel track, can start anytime)
+
+Not blocked by code — can be worked on alongside other phases.
+
+**4A. Decide playbook structure and communication style** — who is the reader per chapter (manager, developer, BI), what does each chapter promise, how are "Ausblick" extension points presented so they read as intentional, not unfinished.
+
+**4B. Map 2–3 real client cases to the three pillars** — which client illustrates "I can't see what the system does," which illustrates "I need devs for everything," which illustrates "standards don't fit my workflow."
+
+**4C. Write and publish** — website and/or ebook.
+
+---
+
+### Drift report items (address during relevant phases, not separately)
+
+| Gap | Address in |
+|---|---|
+| Override layer (ADR-040/041) | Phase 1C |
+| Decision slot graceful failure (ADR-086) | Phase 1A |
+| Provider capabilities + bounce/complaint (ADR-101, ADR-106) | Phase 2C (alongside send prep) |
+| Signal layer (ADR-110–113) | Phase 3C |
+| Snapshot completeness (ADR-062) | Phase 2C (alongside send prep) |
+| Merge context (ADR-005) | Phase 3 (per-recipient rendering is tied to segmentation) |
+| Content versioning (ADR-128) | Phase 2A (alongside content management) |
+
+---
+
+### Suggested next steps (immediate)
+
+1. **Phase 1A — decision strategy contract** — small, high-leverage, already have the registry structure. Good first session.
+2. **Phase 1B — HTML template manifest format** — decision only, no code yet. One focused conversation.
+3. **Phase 1C — override-event model** — design is settled (see Decision Log), just needs implementation.
+
+After that, Phase 2 (editing frontends) unblocks the demo path and makes everything showable to clients.
+
+---
+
+## 7. Open Questions
+
+- [ ] Phase 1B: frontmatter-in-HTML vs. companion `.json` for template variable declarations?
+- [ ] Phase 3C: design the signal layer before building — what are the signal types, decay model, storage?
+- [ ] Phase 4A: playbook structure and communication style decisions
+- [ ] Which 2–3 real client cases map best to the three pillars?
