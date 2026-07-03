@@ -10,6 +10,21 @@ from app.content.db_models import (
 from app.content.models import ContentRecord, Category, CategoryRelation, ContentVersion
 
 
+def get_content_record(db: Session, content_id: int) -> ContentRecordDB | None:
+    return db.query(ContentRecordDB).filter(ContentRecordDB.id == content_id).first()
+
+
+def update_content_record(db: Session, content_id: int, title: str, body: str) -> ContentRecord | None:
+    record = get_content_record(db, content_id)
+    if record is None:
+        return None
+    record.title = title
+    record.body = body
+    db.commit()
+    db.refresh(record)
+    return ContentRecord(id=record.id, title=record.title, body=record.body, status=record.status)
+
+
 def list_content_records(db: Session) -> list[ContentRecord]:
     records = db.query(ContentRecordDB).all()
 

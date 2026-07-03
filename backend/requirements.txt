@@ -3,5 +3,7 @@ uvicorn
 psycopg2-binary
 sqlalchemy
 jinja2
-css-inlinepytest
+css-inline
+pytest
 httpx2
+python-multipart

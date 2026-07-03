@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Form
+from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
@@ -10,6 +11,7 @@ from app.database import get_db
 import json
 
 from app.content.db_models import ContentRecordDB, ContentVersionDB, CategoryDB, ContentCategoryAssignmentDB, CategoryRelationDB
+from app.content.service import create_content, update_content_record, assign_category_to_content, create_content_version
 from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB, ModuleInstanceDB, DecisionSlotDB
 from app.recipients.db_models import RecipientDB, RecipientPreferenceDB, PreferenceUpdateLogDB
 from app.decision.strategies.registry import list_strategies
@@ -485,10 +487,12 @@ def content_detail(
                 or (version.content or {}).get("headline")
             ),
             "text": (
-                (version.content or {}).get("text_medium")
+                (version.content or {}).get("body_medium")
+                or (version.content or {}).get("text_medium")
                 or (version.content or {}).get("text_short")
                 or (version.content or {}).get("text")
             ),
+            "button_label": (version.content or {}).get("button_label"),
         }
         for version in versions
     ]
@@ -546,6 +550,8 @@ def content_detail(
             }
         )
 
+    all_categories = db.query(CategoryDB).order_by(CategoryDB.name.asc()).all()
+
     return templates.TemplateResponse(
         request,
         "content_detail.html",
@@ -556,8 +562,65 @@ def content_detail(
             "versions": version_rows,
             "decision_usage": decision_usage,
             "preference_signals": signal_rows,
+            "all_categories": all_categories,
         },
     )
+
+
+@router.post("/ui/content")
+def content_create(
+    title: str = Form(...),
+    body: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    record = create_content(db, title=title, body=body)
+    return RedirectResponse(url=f"/ui/content/{record.id}", status_code=303)
+
+
+@router.post("/ui/content/{content_record_id}/edit")
+def content_edit(
+    content_record_id: int,
+    title: str = Form(...),
+    body: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    update_content_record(db, content_record_id, title=title, body=body)
+    return RedirectResponse(url=f"/ui/content/{content_record_id}", status_code=303)
+
+
+@router.post("/ui/content/{content_record_id}/publish-version")
+def content_publish_version(
+    content_record_id: int,
+    headline_medium: str = Form(...),
+    body_medium: str = Form(...),
+    button_label: str = Form("Read more"),
+    image_url: str = Form(""),
+    created_by: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    create_content_version(
+        db,
+        content_record_id=content_record_id,
+        content={
+            "headline_medium": headline_medium,
+            "body_medium": body_medium,
+            "button_label": button_label,
+            "image_url": image_url or None,
+        },
+        created_by=created_by or None,
+    )
+    return RedirectResponse(url=f"/ui/content/{content_record_id}", status_code=303)
+
+
+@router.post("/ui/content/{content_record_id}/assign-category")
+def content_assign_category(
+    content_record_id: int,
+    category_id: int = Form(...),
+    score: int = Form(10),
+    db: Session = Depends(get_db),
+):
+    assign_category_to_content(db, content_id=content_record_id, category_id=category_id, score=score)
+    return RedirectResponse(url=f"/ui/content/{content_record_id}", status_code=303)
 
 
 @router.get("/ui/categories")

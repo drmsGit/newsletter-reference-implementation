@@ -2,44 +2,120 @@
 
 {% block content %}
 
-<h1 class="mb-4">Content {{ record.id }}</h1>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0">{{ record.title }}</h1>
+    <span class="badge bg-secondary fs-6">{{ record.status }}</span>
+</div>
 
+<!-- Edit record -->
 <div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Base record</strong>
+        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#form-edit">Edit</button>
+    </div>
     <div class="card-body">
-        <h5>Base Record</h5>
-
-        <table class="table">
-            <tr>
-                <th>ID</th>
-                <td>{{ record.id }}</td>
-            </tr>
-            <tr>
-                <th>Title</th>
-                <td>{{ record.title }}</td>
-            </tr>
-            <tr>
-                <th>Body</th>
-                <td>{{ record.body }}</td>
-            </tr>
-            <tr>
-                <th>Status</th>
-                <td>{{ record.status }}</td>
-            </tr>
+        <table class="table table-sm mb-0">
+            <tr><th style="width:120px">ID</th><td>{{ record.id }}</td></tr>
+            <tr><th>Title</th><td>{{ record.title }}</td></tr>
+            <tr><th>Body</th><td>{{ record.body }}</td></tr>
         </table>
+    </div>
+    <div class="collapse" id="form-edit">
+        <div class="card-body border-top">
+            <form method="post" action="/ui/content/{{ record.id }}/edit">
+                <div class="mb-3">
+                    <label class="form-label">Title</label>
+                    <input type="text" name="title" class="form-control" value="{{ record.title }}" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Body</label>
+                    <textarea name="body" class="form-control" rows="3" required>{{ record.body }}</textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">Save changes</button>
+            </form>
+        </div>
     </div>
 </div>
 
+<!-- Publish version -->
 <div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Versions</strong>
+        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#form-publish">+ Publish version</button>
+    </div>
     <div class="card-body">
-        <h5>Categories</h5>
-
-        <table class="table table-sm">
+        {% if versions %}
+        <table class="table table-sm mb-0">
             <thead>
                 <tr>
-                    <th>Category</th>
-                    <th>Type</th>
-                    <th>Score</th>
+                    <th>Version</th>
+                    <th>Headline</th>
+                    <th>Body</th>
+                    <th>Button</th>
+                    <th>Created by</th>
+                    <th>Created</th>
                 </tr>
+            </thead>
+            <tbody>
+                {% for version in versions %}
+                <tr>
+                    <td>v{{ version.version_number }}</td>
+                    <td>{{ version.headline }}</td>
+                    <td>{{ version.text }}</td>
+                    <td>{{ version.button_label or "—" }}</td>
+                    <td>{{ version.created_by or "—" }}</td>
+                    <td>{{ version.created_at.strftime("%Y-%m-%d %H:%M") if version.created_at else "—" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted mb-0">No versions published yet.</p>
+        {% endif %}
+    </div>
+    <div class="collapse" id="form-publish">
+        <div class="card-body border-top">
+            <p class="text-muted small">Publishing a version creates an immutable snapshot of the content fields at this point in time.</p>
+            <form method="post" action="/ui/content/{{ record.id }}/publish-version">
+                <div class="mb-3">
+                    <label class="form-label">Headline <span class="text-muted">(headline_medium)</span></label>
+                    <input type="text" name="headline_medium" class="form-control" value="{{ record.title }}" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Body text <span class="text-muted">(body_medium)</span></label>
+                    <textarea name="body_medium" class="form-control" rows="3" required>{{ record.body }}</textarea>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Button label</label>
+                        <input type="text" name="button_label" class="form-control" value="Read more">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Image URL <span class="text-muted">(optional)</span></label>
+                        <input type="text" name="image_url" class="form-control" placeholder="/static/img/example.jpg">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Published by</label>
+                    <input type="text" name="created_by" class="form-control" placeholder="your@email.com">
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">Publish version</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Categories -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Categories</strong>
+        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#form-assign-category">+ Assign category</button>
+    </div>
+    <div class="card-body">
+        {% if categories %}
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr><th>Category</th><th>Type</th><th>Score</th></tr>
             </thead>
             <tbody>
                 {% for category in categories %}
@@ -51,84 +127,70 @@
                 {% endfor %}
             </tbody>
         </table>
+        {% else %}
+        <p class="text-muted mb-0">No categories assigned.</p>
+        {% endif %}
+    </div>
+    <div class="collapse" id="form-assign-category">
+        <div class="card-body border-top">
+            <form method="post" action="/ui/content/{{ record.id }}/assign-category">
+                <div class="row align-items-end">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Category</label>
+                        <select name="category_id" class="form-select" required>
+                            {% for cat in all_categories %}
+                            <option value="{{ cat.id }}">{{ cat.name }} ({{ cat.type }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Score</label>
+                        <input type="number" name="score" class="form-control" value="10" min="1" max="100">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <button type="submit" class="btn btn-primary w-100">Assign</button>
+                    </div>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
+<!-- Decision usage -->
 <div class="card mb-4">
+    <div class="card-header"><strong>Decision usage</strong></div>
     <div class="card-body">
-        <h5>Versions</h5>
-
-        <table class="table table-sm">
+        {% if decision_usage %}
+        <table class="table table-sm mb-0">
             <thead>
-                <tr>
-                    <th>Version</th>
-                    <th>Created By</th>
-                    <th>Created</th>
-                    <th>Headline</th>
-                    <th>Text</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for version in versions %}
-                <tr>
-                    <td>{{ version.version_number }}</td>
-                    <td>{{ version.created_by }}</td>
-                    <td>{{ version.created_at }}</td>
-                    <td>{{ version.headline }}</td>
-                    <td>{{ version.text }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<div class="card mb-4">
-    <div class="card-body">
-        <h5>Decision Usage</h5>
-
-        <table class="table table-sm">
-            <thead>
-                <tr>
-                    <th>Resolution ID</th>
-                    <th>Decision Slot</th>
-                    <th>Recipient</th>
-                    <th>Version</th>
-                    <th>Score</th>
-                    <th>Created</th>
-                </tr>
+                <tr><th>Resolution ID</th><th>Decision slot</th><th>Recipient</th><th>Score</th><th>Created</th></tr>
             </thead>
             <tbody>
                 {% for usage in decision_usage %}
                 <tr>
                     <td>{{ usage.id }}</td>
                     <td>{{ usage.decision_slot_id }}</td>
-                    <td>{{ usage.recipient_id }}</td>
-                    <td>{{ usage.content_version_id }}</td>
+                    <td>{{ usage.recipient_id or "—" }}</td>
                     <td>{{ usage.score }}</td>
-                    <td>{{ usage.created_at }}</td>
+                    <td>{{ usage.created_at.strftime("%Y-%m-%d %H:%M") if usage.created_at else "—" }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+        {% else %}
+        <p class="text-muted mb-0">Not yet used in any decision resolution.</p>
+        {% endif %}
     </div>
 </div>
 
+<!-- Preference signals -->
 <div class="card mb-4">
+    <div class="card-header"><strong>Preference signals</strong></div>
     <div class="card-body">
-        <h5>Preference Signals</h5>
-
-        <table class="table table-sm">
+        {% if preference_signals %}
+        <table class="table table-sm mb-0">
             <thead>
-                <tr>
-                    <th>Recipient</th>
-                    <th>Category</th>
-                    <th>Previous</th>
-                    <th>Delta</th>
-                    <th>New</th>
-                    <th>Reason</th>
-                    <th>Created</th>
-                </tr>
+                <tr><th>Recipient</th><th>Category</th><th>Previous</th><th>Delta</th><th>New</th><th>Reason</th><th>Created</th></tr>
             </thead>
             <tbody>
                 {% for signal in preference_signals %}
@@ -139,12 +201,17 @@
                     <td>{{ signal.delta }}</td>
                     <td>{{ signal.new_score }}</td>
                     <td>{{ signal.reason }}</td>
-                    <td>{{ signal.created_at }}</td>
+                    <td>{{ signal.created_at.strftime("%Y-%m-%d %H:%M") if signal.created_at else "—" }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+        {% else %}
+        <p class="text-muted mb-0">No preference signals recorded for this content.</p>
+        {% endif %}
     </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
 
 {% endblock %}

@@ -2,7 +2,31 @@
 
 {% block content %}
 
-<h1 class="mb-4">Content</h1>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0">Content</h1>
+    <button class="btn btn-primary" data-bs-toggle="collapse" data-bs-target="#form-new-content">
+        + New content record
+    </button>
+</div>
+
+<div class="collapse mb-4" id="form-new-content">
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">New content record</h5>
+            <form method="post" action="/ui/content">
+                <div class="mb-3">
+                    <label class="form-label">Title</label>
+                    <input type="text" name="title" class="form-control" required placeholder="e.g. Mallorca Beach Walk">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Body</label>
+                    <textarea name="body" class="form-control" rows="3" required placeholder="Short description of the content record"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Create</button>
+            </form>
+        </div>
+    </div>
+</div>
 
 <table class="table table-striped">
     <thead>
@@ -12,20 +36,19 @@
             <th>Status</th>
         </tr>
     </thead>
-
     <tbody>
         {% for record in records %}
         <tr>
             <td>{{ record.id }}</td>
             <td>
-                <a href="/ui/content/{{ record.id }}">
-                    {{ record.title }}
-                </a>
+                <a href="/ui/content/{{ record.id }}">{{ record.title }}</a>
             </td>
             <td>{{ record.status }}</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
 
 {% endblock %}
