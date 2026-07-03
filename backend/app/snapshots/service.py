@@ -9,7 +9,7 @@ from app.campaigns.db_models import ModuleInstanceDB, DecisionResolutionDB
 from app.content.service import get_latest_version_for_content
 
 
-SNAPSHOT_STORAGE_DIR = Path("../storage/snapshots")
+SNAPSHOT_STORAGE_DIR = (Path(__file__).parent.parent.parent.parent / "storage" / "snapshots").resolve()
 
 
 def to_snapshot(record: SnapshotDB) -> Snapshot:

@@ -69,7 +69,7 @@ def render_module(
     if manifest.cms:
         return render_cms_module(db=db, module=module, manifest=manifest, recipient_id=recipient_id)
 
-    return render_static_module(module=module, manifest=manifest)
+    return render_static_module(db=db, module=module, manifest=manifest)
 
 
 def render_cms_module(
@@ -108,6 +108,7 @@ def render_cms_module(
 
 
 def render_static_module(
+    db: Session,
     module: ModuleInstanceDB,
     manifest: ModuleManifest,
 ) -> str:
@@ -115,7 +116,17 @@ def render_static_module(
     if html_source is None:
         return render_unknown_module(module)
 
-    variables = module.module_data or {}
+    variables = dict(module.module_data or {})
+
+    # If module_data is sparse, fill missing required variables from the
+    # linked content record so static modules render something useful.
+    if module.content_record_id is not None:
+        content = resolve_renderable_content(db=db, content_record_id=module.content_record_id)
+        if content:
+            for var in manifest.variables:
+                if var.name not in variables or not variables[var.name]:
+                    variables[var.name] = content.get(var.name, "")
+
     rendered = _jinja.from_string(html_source).render(**variables)
 
     return (
@@ -170,6 +181,10 @@ def resolve_renderable_content(
         "id": record.id,
         "title": record.title,
         "body": record.body,
+        # Aliases for standard CMS template variable names so unpublished
+        # content still renders without requiring a pinned version.
+        "headline_medium": record.title,
+        "body_medium": record.body,
     }
 
 
