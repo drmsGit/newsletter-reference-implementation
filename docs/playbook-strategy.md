@@ -95,8 +95,8 @@ These are decisions and small implementations that other phases depend on. Mostl
 **1A. Plugin contract: decision strategies**
 The registry + base class already exist — good. What's missing: an enforced contract on graceful failure (strategies must return `None`, never raise — ADR-086) and explainability (strategies must return a `reason` and `score` alongside the resolved content — ADR-085). Every new `.py` strategy file drops into `decision/strategies/` and auto-registers. Document the contract clearly — this is the "BI hands you a file and it works" promise.
 
-**1B. Plugin contract: HTML email templates**
-Decide on a manifest format: each email module template (e.g. `2col_product.html`) has a sidecar or frontmatter block declaring its variables (`{{ headline }}`, `{{ image_url }}`, etc.) and a human-readable label. Drop a file into the right folder, it appears in the campaign builder. Decision needed: frontmatter in the HTML itself (like Jekyll) or a companion `.json` file?
+**1B. Plugin contract: HTML email templates** ✓
+Template format decided: MJML (MIT, self-hosted, no GDPR exposure). Templates are authored in MJML by designers, compiled to HTML in the Node/React frontend layer at send/preview time. Python backend receives compiled HTML — never invokes MJML directly. Raw HTML permitted as escape hatch. Manifest format (frontmatter in file) implemented. See ADR-131.
 
 **1C. Override-event data model**
 New DB table: `OverrideEventDB` — records what was overridden, the system's original recommendation, who did it, optional reason, timestamp. Relations to `ModuleInstanceDB` (content overrides) and eventually `AudienceGroupDB` (segmentation overrides). This is the trust-building audit trail. Small, well-scoped, do it before building any editing UI so overrides are logged from day one.
@@ -169,7 +169,7 @@ After that, Phase 2 (editing frontends) unblocks the demo path and makes everyth
 
 ## 7. Open Questions
 
-- [ ] Phase 1B: frontmatter-in-HTML vs. companion `.json` for template variable declarations?
+- [x] Phase 1B: MJML as template format, frontmatter in file, compiled in frontend layer (ADR-131)
 - [ ] Phase 3C: design the signal layer before building — what are the signal types, decay model, storage?
 - [ ] Phase 4A: playbook structure and communication style decisions
 - [ ] Which 2–3 real client cases map best to the three pillars?

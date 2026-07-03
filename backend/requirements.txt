@@ -3,4 +3,5 @@ uvicorn
 psycopg2-binary
 sqlalchemy
 jinja2
-css-inline
+css-inlinepytest
+httpx2

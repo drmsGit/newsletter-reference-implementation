@@ -28,6 +28,9 @@ from app.providers.router import router as provider_router
 
 from app.email_modules.router import router as email_modules_router
 
+from app.overrides.db_models import OverrideEventDB
+from app.overrides.router import router as overrides_router
+
 from app.frontend.router import router as frontend_router
 
 app = FastAPI(
@@ -54,6 +57,7 @@ app.include_router(decision_router)
 app.include_router(recipients_router)
 app.include_router(provider_router)
 app.include_router(email_modules_router)
+app.include_router(overrides_router)
 
 
 @app.get("/")
