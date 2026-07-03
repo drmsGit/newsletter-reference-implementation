@@ -2,7 +2,27 @@
 
 {% block content %}
 
-<h1 class="mb-4">Campaigns</h1>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0">Campaigns</h1>
+    <button class="btn btn-primary" data-bs-toggle="collapse" data-bs-target="#form-new-campaign">
+        + New campaign
+    </button>
+</div>
+
+<div class="collapse mb-4" id="form-new-campaign">
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">New campaign</h5>
+            <form method="post" action="/ui/campaigns">
+                <div class="mb-3">
+                    <label class="form-label">Name</label>
+                    <input type="text" name="name" class="form-control" required placeholder="e.g. Summer 2026 Newsletter">
+                </div>
+                <button type="submit" class="btn btn-primary">Create</button>
+            </form>
+        </div>
+    </div>
+</div>
 
 <table class="table table-striped">
     <thead>
@@ -13,21 +33,20 @@
             <th>Created</th>
         </tr>
     </thead>
-
     <tbody>
         {% for campaign in campaigns %}
         <tr>
             <td>{{ campaign.id }}</td>
             <td>
-                <a href="/ui/campaigns/{{ campaign.id }}">
-                    {{ campaign.name }}
-                </a>
+                <a href="/ui/campaigns/{{ campaign.id }}">{{ campaign.name }}</a>
             </td>
             <td>{{ campaign.status }}</td>
-            <td>{{ campaign.created_at }}</td>
+            <td>{{ campaign.created_at.strftime("%Y-%m-%d") if campaign.created_at else "—" }}</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
 
 {% endblock %}

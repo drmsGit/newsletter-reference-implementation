@@ -13,8 +13,10 @@ import json
 from app.content.db_models import ContentRecordDB, ContentVersionDB, CategoryDB, ContentCategoryAssignmentDB, CategoryRelationDB
 from app.content.service import create_content, update_content_record, assign_category_to_content, create_content_version
 from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB, ModuleInstanceDB, DecisionSlotDB
+from app.campaigns.service import create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant
 from app.recipients.db_models import RecipientDB, RecipientPreferenceDB, PreferenceUpdateLogDB
 from app.decision.strategies.registry import list_strategies
+from app.email_modules.registry import list_manifests
 from app.snapshots.db_models import SnapshotDB
 from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
 from app.insight.db_models import EngagementEventDB
@@ -400,6 +402,10 @@ def campaign_detail(
             }
         )
 
+    content_records = db.query(ContentRecordDB).order_by(ContentRecordDB.title.asc()).all()
+    module_templates = list_manifests()
+    strategies = list_strategies()
+
     return templates.TemplateResponse(
         request,
         "campaign_detail.html",
@@ -407,8 +413,68 @@ def campaign_detail(
             "title": f"Campaign {campaign_id}",
             "campaign": campaign,
             "variants": variant_rows,
+            "content_records": content_records,
+            "module_templates": module_templates,
+            "strategies": strategies,
         },
     )
+
+
+@router.post("/ui/campaigns")
+def campaign_create(
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    campaign = create_campaign(db, name=name)
+    return RedirectResponse(url=f"/ui/campaigns/{campaign.id}", status_code=303)
+
+
+@router.post("/ui/campaigns/{campaign_id}/variants")
+def variant_create(
+    campaign_id: int,
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    create_variant_for_campaign(db, campaign_id=campaign_id, name=name)
+    return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
+
+
+@router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/modules")
+def module_create(
+    campaign_id: int,
+    variant_id: int,
+    module_type: str = Form(...),
+    position: int = Form(...),
+    content_record_id: int | None = Form(None),
+    decision_slot_id: int | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    create_module_for_variant(
+        db,
+        variant_id=variant_id,
+        module_type=module_type,
+        position=position,
+        content_record_id=content_record_id or None,
+        decision_slot_id=decision_slot_id or None,
+    )
+    return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
+
+
+@router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/decision-slots")
+def decision_slot_create(
+    campaign_id: int,
+    variant_id: int,
+    name: str = Form(...),
+    decision_strategy: str = Form("top_score"),
+    db: Session = Depends(get_db),
+):
+    create_decision_slot_for_variant(
+        db,
+        variant_id=variant_id,
+        name=name,
+        decision_strategy=decision_strategy,
+    )
+    return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
 @router.get("/ui/content")

@@ -2,191 +2,231 @@
 
 {% block content %}
 
-<h1 class="mb-4">Campaign {{ campaign.id }}</h1>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0">{{ campaign.name }}</h1>
+    <span class="badge bg-secondary fs-6">{{ campaign.status }}</span>
+</div>
 
+<!-- Campaign info -->
 <div class="card mb-4">
     <div class="card-body">
-        <h5>Campaign</h5>
-
-        <table class="table">
-            <tr>
-                <th>ID</th>
-                <td>{{ campaign.id }}</td>
-            </tr>
-            <tr>
-                <th>Name</th>
-                <td>{{ campaign.name }}</td>
-            </tr>
-            <tr>
-                <th>Status</th>
-                <td>{{ campaign.status }}</td>
-            </tr>
-            <tr>
-                <th>Created</th>
-                <td>{{ campaign.created_at }}</td>
-            </tr>
+        <table class="table table-sm mb-0">
+            <tr><th style="width:120px">ID</th><td>{{ campaign.id }}</td></tr>
+            <tr><th>Name</th><td>{{ campaign.name }}</td></tr>
+            <tr><th>Status</th><td>{{ campaign.status }}</td></tr>
+            <tr><th>Created</th><td>{{ campaign.created_at.strftime("%Y-%m-%d %H:%M") if campaign.created_at else "—" }}</td></tr>
         </table>
     </div>
 </div>
 
-<h3 class="mb-3">Variants</h3>
+<!-- Add variant -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Variants</h3>
+    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#form-new-variant">
+        + Add variant
+    </button>
+</div>
 
+<div class="collapse mb-4" id="form-new-variant">
+    <div class="card">
+        <div class="card-body">
+            <form method="post" action="/ui/campaigns/{{ campaign.id }}/variants">
+                <div class="mb-3">
+                    <label class="form-label">Variant name</label>
+                    <input type="text" name="name" class="form-control" required placeholder="e.g. Variant B — City Focus">
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">Add variant</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Variants -->
 {% for variant in variants %}
-<div class="card mb-4">
+<div class="card mb-5">
+    <div class="card-header">
+        <strong>Variant {{ variant.id }} — {{ variant.name }}</strong>
+    </div>
     <div class="card-body">
 
-        <h5>
-            Variant {{ variant.id }} — {{ variant.name }}
-        </h5>
+        <!-- Modules table -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0">Modules</h6>
+            <button class="btn btn-sm btn-outline-secondary"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#form-module-{{ variant.id }}">
+                + Add module
+            </button>
+        </div>
 
-        <h6 class="mt-4">Modules</h6>
-
-        <table class="table table-sm">
+        <table class="table table-sm mb-3">
             <thead>
                 <tr>
                     <th>Position</th>
                     <th>Type</th>
-                    <th>Content Record</th>
-                    <th>Decision Slot</th>
+                    <th>Content record</th>
+                    <th>Decision slot</th>
                 </tr>
             </thead>
             <tbody>
                 {% for module in variant.modules %}
                 <tr>
                     <td>{{ module.position }}</td>
-                    <td>{{ module.module_type }}</td>
-                    <td>{{ module.content_record_id }}</td>
-                    <td>{{ module.decision_slot_id }}</td>
+                    <td><code>{{ module.module_type }}</code></td>
+                    <td>
+                        {% if module.content_record_id %}
+                        <a href="/ui/content/{{ module.content_record_id }}">{{ module.content_record_id }}</a>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>{{ module.decision_slot_id or "—" }}</td>
                 </tr>
                 {% endfor %}
+                {% if not variant.modules %}
+                <tr><td colspan="4" class="text-muted">No modules yet.</td></tr>
+                {% endif %}
             </tbody>
         </table>
 
-        <h6 class="mt-4">Decision Slots</h6>
-
-        {% for slot in variant.decision_slots %}
-
-        <div class="border rounded p-3 mb-3">
-
-            <h6>
-                <a href="/ui/decisions/slots/{{ slot.id }}">
-                    {{ slot.name }}
-                </a>
-            </h6>
-
-            <p>
-                {{ slot.decision_strategy }}
-            </p>
-
-            <div class="row mb-3">
-
-                <div class="col-md-3">
-                    <strong>Total Resolutions</strong><br>
-                    {{ slot.resolution_count }}
+        <!-- Add module form -->
+        <div class="collapse mb-4" id="form-module-{{ variant.id }}">
+            <div class="card">
+                <div class="card-body">
+                    <form method="post" action="/ui/campaigns/{{ campaign.id }}/variants/{{ variant.id }}/modules">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Module type</label>
+                                <select name="module_type" class="form-select" required>
+                                    {% for tpl in module_templates %}
+                                    <option value="{{ tpl.name }}">{{ tpl.label }} ({{ tpl.name }})</option>
+                                    {% endfor %}
+                                    <option value="hero">hero</option>
+                                    <option value="content_card">content_card</option>
+                                    <option value="cta">cta</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2 mb-3">
+                                <label class="form-label">Position</label>
+                                <input type="number" name="position" class="form-control" value="{{ variant.modules|length + 1 }}" min="1" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-5 mb-3">
+                                <label class="form-label">Content record <span class="text-muted">(leave blank for decision slot)</span></label>
+                                <select name="content_record_id" class="form-select">
+                                    <option value="">— none —</option>
+                                    {% for cr in content_records %}
+                                    <option value="{{ cr.id }}">{{ cr.title }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-5 mb-3">
+                                <label class="form-label">Decision slot <span class="text-muted">(leave blank for fixed content)</span></label>
+                                <select name="decision_slot_id" class="form-select">
+                                    <option value="">— none —</option>
+                                    {% for slot in variant.decision_slots %}
+                                    <option value="{{ slot.id }}">{{ slot.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm">Add module</button>
+                    </form>
                 </div>
-
-                <div class="col-md-3">
-                    <strong>Unique Content</strong><br>
-                    {{ slot.unique_content_count }}
-                </div>
-
             </div>
-            <h6>Top Content</h6>
-
-            <table class="table table-sm">
-
-                <thead>
-                    <tr>
-                        <th>Content</th>
-                        <th>Selections</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-
-                    {% for title, count in slot.top_content %}
-                    <tr>
-                        <td>{{ title }}</td>
-                        <td>{{ count }}</td>
-                    </tr>
-                    {% endfor %}
-
-                </tbody>
-
-            </table>
-            <h6>Latest Resolutions</h6>
-
-            <table class="table table-sm">
-
-                <thead>
-                    <tr>
-                        <th>Recipient</th>
-                        <th>Content</th>
-                        <th>Score</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-
-                    {% for resolution, content_title in slot.latest_resolutions %}
-                    <tr>
-                        <td>{{ resolution.recipient_id }}</td>
-                        <td>{{ content_title }}</td>
-                        <td>{{ resolution.score }}</td>
-                    </tr>
-                    {% endfor %}
-
-                </tbody>
-
-            </table>
-
         </div>
 
+        <!-- Decision slots -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0">Decision slots</h6>
+            <button class="btn btn-sm btn-outline-secondary"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#form-slot-{{ variant.id }}">
+                + Add decision slot
+            </button>
+        </div>
+
+        {% for slot in variant.decision_slots %}
+        <div class="border rounded p-3 mb-3">
+            <div class="d-flex justify-content-between">
+                <strong><a href="/ui/decisions/slots/{{ slot.id }}">{{ slot.name }}</a></strong>
+                <span class="badge bg-light text-dark">{{ slot.decision_strategy }}</span>
+            </div>
+            <div class="row mt-2 text-muted small">
+                <div class="col-md-3">Resolutions: {{ slot.resolution_count }}</div>
+                <div class="col-md-3">Unique content: {{ slot.unique_content_count }}</div>
+            </div>
+            {% if slot.top_content %}
+            <table class="table table-sm mt-2 mb-0">
+                <thead><tr><th>Top content</th><th>Selections</th></tr></thead>
+                <tbody>
+                    {% for title, count in slot.top_content %}
+                    <tr><td>{{ title }}</td><td>{{ count }}</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
         {% endfor %}
+        {% if not variant.decision_slots %}
+        <p class="text-muted small">No decision slots yet.</p>
+        {% endif %}
 
-        <h6 class="mt-4">Snapshots</h6>
+        <!-- Add decision slot form -->
+        <div class="collapse mb-3" id="form-slot-{{ variant.id }}">
+            <div class="card">
+                <div class="card-body">
+                    <form method="post" action="/ui/campaigns/{{ campaign.id }}/variants/{{ variant.id }}/decision-slots">
+                        <div class="row">
+                            <div class="col-md-5 mb-3">
+                                <label class="form-label">Slot name</label>
+                                <input type="text" name="name" class="form-control" required placeholder="e.g. Main Content Slot">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Strategy</label>
+                                <select name="decision_strategy" class="form-select">
+                                    {% for strategy in strategies %}
+                                    <option value="{{ strategy }}">{{ strategy }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm">Add slot</button>
+                    </form>
+                </div>
+            </div>
+        </div>
 
+        <!-- Snapshots -->
+        <h6 class="mt-3">Snapshots</h6>
+        {% if variant.snapshots %}
         <table class="table table-sm">
             <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Recipient</th>
-                    <th>HTML Size</th>
-                    <th>Created</th>
-                    <th>Preview</th>
-                    <th>Render Context</th>
-                </tr>
+                <tr><th>ID</th><th>Recipient</th><th>Size</th><th>Created</th><th>Preview</th></tr>
             </thead>
             <tbody>
                 {% for snapshot in variant.snapshots %}
                 <tr>
                     <td>{{ snapshot.id }}</td>
-                    <td>{{ snapshot.recipient_id }}</td>
-                    <td>{{ snapshot.html_size }}</td>
-                    <td>{{ snapshot.created_at }}</td>
-                    <td>
-                        <a href="/snapshots/{{ snapshot.id }}/html" target="_blank">
-                            Open HTML
-                        </a>
-                    </td>
-                    <td>
-                        {% if snapshot.render_context %}
-                        <details>
-                            <summary>Show</summary>
-                            <pre
-                                class="bg-light border rounded p-2 mt-2"><code>{{ snapshot.render_context_pretty }}</code></pre>
-                        </details>
-                        {% else %}
-                        <span class="text-muted">None</span>
-                        {% endif %}
-                    </td>
+                    <td>{{ snapshot.recipient_id or "—" }}</td>
+                    <td>{{ snapshot.html_size }} bytes</td>
+                    <td>{{ snapshot.created_at.strftime("%Y-%m-%d %H:%M") if snapshot.created_at else "—" }}</td>
+                    <td><a href="/snapshots/{{ snapshot.id }}/html" target="_blank">Open HTML</a></td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+        {% else %}
+        <p class="text-muted small">No snapshots yet.</p>
+        {% endif %}
 
     </div>
 </div>
 {% endfor %}
+
+{% if not variants %}
+<p class="text-muted">No variants yet. Add one above.</p>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
 
 {% endblock %}
