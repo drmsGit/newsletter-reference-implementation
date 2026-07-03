@@ -1,52 +1,47 @@
 from sqlalchemy.orm import Session
 
 from app.campaigns.db_models import DecisionSlotDB
-from app.campaigns.models import DecisionResolution
-from app.campaigns.service import create_decision_resolution
-from app.content.db_models import (
-    ContentCategoryAssignmentDB,
-    ContentRecordDB,
-)
-from app.decision.strategies.base import DecisionStrategy
-from app.recipients.db_models import RecipientPreferenceDB
+from app.content.db_models import ContentCategoryAssignmentDB, ContentRecordDB
 from app.content.service import get_latest_version_for_content
+from app.decision.strategies.base import DecisionStrategy, StrategyMeta, StrategyResult
+from app.recipients.db_models import RecipientPreferenceDB
 
-DEFAULT_STRATEGY_CONFIG = {
+DEFAULT_CONFIG = {
     "content_score_weight": 1,
     "preference_score_weight": 10,
 }
 
+
 class RecipientTopScoreStrategy(DecisionStrategy):
+
+    @property
+    def meta(self) -> StrategyMeta:
+        return StrategyMeta(
+            name="recipient_top_score",
+            label="Recipient Top Score",
+            description=(
+                "Combines content score and recipient preference score to pick "
+                "the best match per recipient. Weights are configurable via "
+                "strategy_config (content_score_weight, preference_score_weight)."
+            ),
+            requires_recipient=True,
+        )
 
     def execute(
         self,
         db: Session,
         slot: DecisionSlotDB,
         recipient_id: int | None = None,
-    ) -> DecisionResolution:
-
+    ) -> StrategyResult | None:
         if recipient_id is None:
-            raise ValueError(
-                "recipient_top_score requires recipient_id"
-            )
+            return None
 
         candidate_filter = slot.candidate_filter or {}
         category_ids = candidate_filter.get("category_ids", [])
 
-        strategy_config = {
-            **DEFAULT_STRATEGY_CONFIG,
-            **(slot.strategy_config or {}),
-        }
-
-        content_score_weight = strategy_config.get(
-            "content_score_weight",
-            1,
-        )
-
-        preference_score_weight = strategy_config.get(
-            "preference_score_weight",
-            10,
-        )
+        config = {**DEFAULT_CONFIG, **(slot.strategy_config or {})}
+        content_weight = config["content_score_weight"]
+        preference_weight = config["preference_score_weight"]
 
         query = (
             db.query(
@@ -60,8 +55,7 @@ class RecipientTopScoreStrategy(DecisionStrategy):
             )
             .join(
                 RecipientPreferenceDB,
-                RecipientPreferenceDB.category_id
-                == ContentCategoryAssignmentDB.category_id,
+                RecipientPreferenceDB.category_id == ContentCategoryAssignmentDB.category_id,
             )
             .filter(ContentRecordDB.status == "active")
             .filter(RecipientPreferenceDB.recipient_id == recipient_id)
@@ -73,48 +67,32 @@ class RecipientTopScoreStrategy(DecisionStrategy):
             )
 
         candidates = query.all()
-
         if not candidates:
-            raise ValueError(
-                "No matching content record found for recipient"
-            )
+            return None
 
-        best_candidate = max(
+        best = max(
             candidates,
-            key=lambda row: (
-                row[1] * content_score_weight
-                + row[2] * preference_score_weight
-            ),
+            key=lambda row: row[1] * content_weight + row[2] * preference_weight,
         )
 
-        content_record = best_candidate[0]
-        content_score = best_candidate[1]
-        preference_score = best_candidate[2]
-        combined_score = int(
-            content_score * content_score_weight
-            + preference_score * preference_score_weight
+        content_record, content_score, preference_score = best
+        combined = float(
+            content_score * content_weight + preference_score * preference_weight
         )
 
         latest_version = get_latest_version_for_content(
-            db=db,
-            content_record_id=content_record.id,
+            db=db, content_record_id=content_record.id
         )
 
-        return create_decision_resolution(
-            db=db,
-            decision_slot_id=slot.id,
-            recipient_id=recipient_id,
+        return StrategyResult(
             content_record_id=content_record.id,
             content_version_id=latest_version.id if latest_version else None,
+            score=combined,
             reason=(
-                "Selected by recipient_top_score strategy "
-                f"for recipient_id={recipient_id}, "
+                f"recipient_top_score: recipient={recipient_id}, "
                 f"category_ids={category_ids}, "
-                f"content_score={content_score}, "
-                f"content_score_weight={content_score_weight}, "
-                f"preference_score={preference_score}, "
-                f"preference_score_weight={preference_score_weight}, "
-                f"combined_score={combined_score}"
+                f"content_score={content_score}×{content_weight} + "
+                f"preference_score={preference_score}×{preference_weight} "
+                f"= {combined}"
             ),
-            score=combined_score,
         )

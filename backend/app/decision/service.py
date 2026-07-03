@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.campaigns.db_models import DecisionSlotDB
 from app.campaigns.models import DecisionResolution
+from app.campaigns.service import create_decision_resolution
 from app.decision.strategies.registry import get_strategy
 
 
@@ -9,7 +10,7 @@ def execute_decision_slot(
     db: Session,
     decision_slot_id: int,
     recipient_id: int | None = None,
-) -> DecisionResolution:
+) -> DecisionResolution | None:
     slot = (
         db.query(DecisionSlotDB)
         .filter(DecisionSlotDB.id == decision_slot_id)
@@ -21,8 +22,22 @@ def execute_decision_slot(
 
     strategy = get_strategy(slot.decision_strategy)
 
-    return strategy.execute(
+    if strategy.meta.requires_recipient and recipient_id is None:
+        raise ValueError(
+            f"Strategy '{slot.decision_strategy}' requires a recipient_id"
+        )
+
+    result = strategy.execute(db=db, slot=slot, recipient_id=recipient_id)
+
+    if result is None:
+        return None
+
+    return create_decision_resolution(
         db=db,
-        slot=slot,
+        decision_slot_id=slot.id,
         recipient_id=recipient_id,
+        content_record_id=result.content_record_id,
+        content_version_id=result.content_version_id,
+        reason=result.reason,
+        score=int(result.score),
     )
