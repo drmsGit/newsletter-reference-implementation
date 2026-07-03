@@ -14,6 +14,8 @@ from app.content.db_models import ContentRecordDB, ContentVersionDB, CategoryDB,
 from app.content.service import create_content, update_content_record, assign_category_to_content, create_content_version
 from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB, ModuleInstanceDB, DecisionSlotDB
 from app.campaigns.service import create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant
+from app.snapshots.service import create_snapshot_for_variant
+from app.delivery.service import create_send_instance, send_send_instance
 from app.recipients.db_models import RecipientDB, RecipientPreferenceDB, PreferenceUpdateLogDB
 from app.decision.strategies.registry import list_strategies
 from app.email_modules.registry import list_manifests
@@ -475,6 +477,36 @@ def decision_slot_create(
         decision_strategy=decision_strategy,
     )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
+
+
+@router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/snapshots")
+def snapshot_create(
+    campaign_id: int,
+    variant_id: int,
+    db: Session = Depends(get_db),
+):
+    create_snapshot_for_variant(db, variant_id=variant_id)
+    return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
+
+
+@router.post("/ui/campaigns/{campaign_id}/snapshots/{snapshot_id}/send-instances")
+def send_instance_create(
+    campaign_id: int,
+    snapshot_id: int,
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    send_instance = create_send_instance(db, snapshot_id=snapshot_id, name=name, provider="mock")
+    return RedirectResponse(url=f"/ui/deliveries/send-instances/{send_instance.id}", status_code=303)
+
+
+@router.post("/ui/send-instances/{send_instance_id}/send")
+def send_instance_trigger(
+    send_instance_id: int,
+    db: Session = Depends(get_db),
+):
+    send_send_instance(db, send_instance_id=send_instance_id)
+    return RedirectResponse(url=f"/ui/deliveries/send-instances/{send_instance_id}", status_code=303)
 
 
 @router.get("/ui/content")

@@ -8,49 +8,47 @@
 
 {% else %}
 
-<h1 class="mb-4">Send Instance {{ send_instance.id }}</h1>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0">{{ send_instance.name }}</h1>
+    {% if send_instance.status == "draft" %}
+    <form method="post" action="/ui/send-instances/{{ send_instance.id }}/send">
+        <button type="submit" class="btn btn-success">Trigger send</button>
+    </form>
+    {% else %}
+    <span class="badge bg-success fs-6">{{ send_instance.status }}</span>
+    {% endif %}
+</div>
 
 <div class="card mb-4">
     <div class="card-body">
-        <h5>Send Instance</h5>
-
-        <table class="table">
-            <tr>
-                <th>ID</th>
-                <td>{{ send_instance.id }}</td>
-            </tr>
-            <tr>
-                <th>Name</th>
-                <td>{{ send_instance.name }}</td>
-            </tr>
+        <table class="table table-sm mb-0">
+            <tr><th style="width:120px">ID</th><td>{{ send_instance.id }}</td></tr>
+            <tr><th>Name</th><td>{{ send_instance.name }}</td></tr>
             <tr>
                 <th>Status</th>
-                <td>{{ send_instance.status }}</td>
+                <td>
+                    {% if send_instance.status == "sent" %}
+                    <span class="badge bg-success">{{ send_instance.status }}</span>
+                    {% elif send_instance.status == "draft" %}
+                    <span class="badge bg-secondary">{{ send_instance.status }}</span>
+                    {% else %}
+                    <span class="badge bg-warning text-dark">{{ send_instance.status }}</span>
+                    {% endif %}
+                </td>
             </tr>
-            <tr>
-                <th>Provider</th>
-                <td>{{ send_instance.provider }}</td>
-            </tr>
+            <tr><th>Provider</th><td>{{ send_instance.provider or "—" }}</td></tr>
             <tr>
                 <th>Snapshot</th>
                 <td>
                     {% if snapshot %}
-                        <a href="/snapshots/{{ snapshot.id }}/html" target="_blank">
-                            Snapshot {{ snapshot.id }}
-                        </a>
+                    <a href="/snapshots/{{ snapshot.id }}/html" target="_blank">Snapshot {{ snapshot.id }}</a>
                     {% else %}
-                        <span class="text-muted">None</span>
+                    <span class="text-muted">—</span>
                     {% endif %}
                 </td>
             </tr>
-            <tr>
-                <th>Scheduled</th>
-                <td>{{ send_instance.scheduled_at }}</td>
-            </tr>
-            <tr>
-                <th>Created</th>
-                <td>{{ send_instance.created_at }}</td>
-            </tr>
+            <tr><th>Scheduled</th><td>{{ send_instance.scheduled_at or "—" }}</td></tr>
+            <tr><th>Created</th><td>{{ send_instance.created_at.strftime("%Y-%m-%d %H:%M") if send_instance.created_at else "—" }}</td></tr>
         </table>
     </div>
 </div>
