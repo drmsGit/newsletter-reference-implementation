@@ -21,8 +21,13 @@
                 <th>Parent categories</th>
                 <td>
                     {% if parent_categories %}
-                        {% for parent in parent_categories %}
-                            <a href="/ui/categories/{{ parent.id }}" class="badge bg-secondary text-decoration-none me-1">{{ parent.name }}</a>
+                        {% for row in parent_categories %}
+                            <span class="d-inline-flex align-items-center gap-1 me-1 mb-1">
+                                <a href="/ui/categories/{{ row[0].id }}" class="badge bg-secondary text-decoration-none">{{ row[0].name }}</a>
+                                <form method="post" action="/ui/categories/{{ category.id }}/relations/{{ row[1] }}/delete" class="d-inline">
+                                    <button type="submit" class="btn btn-link p-0 text-danger" style="font-size:.75rem;line-height:1" title="Unlink">×</button>
+                                </form>
+                            </span>
                         {% endfor %}
                     {% else %}
                         <span class="text-muted">None</span>
@@ -33,8 +38,13 @@
                 <th>Child categories</th>
                 <td>
                     {% if child_categories %}
-                        {% for child in child_categories %}
-                            <a href="/ui/categories/{{ child.id }}" class="badge bg-secondary text-decoration-none me-1">{{ child.name }}</a>
+                        {% for row in child_categories %}
+                            <span class="d-inline-flex align-items-center gap-1 me-1 mb-1">
+                                <a href="/ui/categories/{{ row[0].id }}" class="badge bg-secondary text-decoration-none">{{ row[0].name }}</a>
+                                <form method="post" action="/ui/categories/{{ category.id }}/relations/{{ row[1] }}/delete" class="d-inline">
+                                    <button type="submit" class="btn btn-link p-0 text-danger" style="font-size:.75rem;line-height:1" title="Unlink">×</button>
+                                </form>
+                            </span>
                         {% endfor %}
                     {% else %}
                         <span class="text-muted">None</span>

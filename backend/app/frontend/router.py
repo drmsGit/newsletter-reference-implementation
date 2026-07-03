@@ -11,7 +11,7 @@ from app.database import get_db
 import json
 
 from app.content.db_models import ContentRecordDB, ContentVersionDB, CategoryDB, ContentCategoryAssignmentDB, CategoryRelationDB
-from app.content.service import create_content, update_content_record, assign_category_to_content, create_content_version, delete_category_assignment
+from app.content.service import create_content, update_content_record, assign_category_to_content, create_content_version, delete_category_assignment, delete_category_relation
 from app.content.service import create_category, create_category_relation
 from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB, ModuleInstanceDB, DecisionSlotDB
 from app.campaigns.service import create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant, update_decision_slot
@@ -813,7 +813,7 @@ def category_detail(
     )
 
     parent_categories = (
-        db.query(CategoryDB)
+        db.query(CategoryDB, CategoryRelationDB.id.label("relation_id"))
         .join(
             CategoryRelationDB,
             CategoryRelationDB.parent_category_id == CategoryDB.id,
@@ -826,7 +826,7 @@ def category_detail(
     )
 
     child_categories = (
-        db.query(CategoryDB)
+        db.query(CategoryDB, CategoryRelationDB.id.label("relation_id"))
         .join(
             CategoryRelationDB,
             CategoryRelationDB.child_category_id == CategoryDB.id,
@@ -951,6 +951,16 @@ def category_relation_create(
 ):
     create_category_relation(db, parent_category_id=parent_category_id, child_category_id=child_category_id)
     return RedirectResponse(url="/ui/categories", status_code=303)
+
+
+@router.post("/ui/categories/{category_id}/relations/{relation_id}/delete")
+def category_relation_delete(
+    category_id: int,
+    relation_id: int,
+    db: Session = Depends(get_db),
+):
+    delete_category_relation(db, relation_id)
+    return RedirectResponse(url=f"/ui/categories/{category_id}", status_code=303)
 
 
 @router.get("/ui/decisions")
