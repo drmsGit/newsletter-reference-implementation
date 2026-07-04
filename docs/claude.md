@@ -16,4 +16,4 @@ Before implementing anything, check relevant ADRs for prior decisions.
 When reviewing code or suggesting implementations:
 1. Check ADRs for relevant decisions
 2. Flag any implementation that contradicts an ADR
-3. Do not suggest fixes — only flag drift
+3. Suggest fixes – don't implement without approval

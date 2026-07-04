@@ -11,6 +11,9 @@ venv/
 # VS Code
 .vscode/
 
+# Obsidian
+.obsidian/
+
 # Environment Files
 .env
 

@@ -4,6 +4,8 @@
 
 This note tracks the current implementation state of the Newsletter Reference Architecture.
 
+See also: [[MOC - Interview Prep Baseline]] — living log of interview-style review questions (why this approach, edge cases, ADR drift) generated against this implementation.
+
 It separates:
 
 - implemented

@@ -79,6 +79,8 @@ Design principles adopted:
 
 ## 6. Roadmap
 
+*Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*
+
 ### What exists today (baseline)
 - Backend: FastAPI modular monolith with modules for campaigns, content, decision engine, delivery, insight, providers, recipients, rendering, snapshots
 - Decision strategies: `top_score`, `recipient_top_score` — with a registry + base class already in place (good plugin foundation)
@@ -170,6 +172,6 @@ After that, Phase 2 (editing frontends) unblocks the demo path and makes everyth
 ## 7. Open Questions
 
 - [x] Phase 1B: MJML as template format, frontmatter in file, compiled in frontend layer (ADR-131)
-- [ ] Phase 3C: design the signal layer before building — what are the signal types, decay model, storage?
+- [ ] Phase 3C: design the signal layer before building — what are the signal types, decay model, storage? Also needs to cover: category/content deletion vs. archival policy — archived categories stop contributing new preference scoring, existing influence decays via the same time-based decay mechanism rather than being force-zeroed (see `docs/backlog.md` § Needs ADR).
 - [ ] Phase 4A: playbook structure and communication style decisions
 - [ ] Which 2–3 real client cases map best to the three pillars?
