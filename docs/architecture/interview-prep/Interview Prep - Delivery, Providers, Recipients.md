@@ -26,29 +26,29 @@ Baseline review generated 2026-07-04. Check off each item once discussed, and re
 
 ## Delivery
 
-- [ ] **Q1.** `DeliveryExecutionDB.recipient_id` is a bare `String(255)` populated with the recipient's `external_id` (e.g. `"r-001"`), with no FK to `recipients.id` — how does this square with [[ADR-054 — Use Internal Recipient Identifiers]]?
+- [x] **Q1.** `DeliveryExecutionDB.recipient_id` is a bare `String(255)` populated with the recipient's `external_id` (e.g. `"r-001"`), with no FK to `recipients.id` — how does this square with [[ADR-054 — Use Internal Recipient Identifiers]]?
     **A:** Confirmed drift from ADR-054/126. No referential integrity is enforced; joins to `RecipientDB` require an `external_id` lookup. Also inconsistent with `decision`/`insight`, which use the internal integer PK — **the same recipient is addressed by two different ID types across modules.** `delivery/db_models.py:29`.
-    **Resolution:**
+    **Resolution:** act/fix. Same finding as [[Interview Prep - Decision, Overrides, Insight]] → Insight Q5 — already logged to [[backlog]] (Bugs), no separate entry needed.
 
-- [ ] **Q2.** `send_send_instance` sends identical HTML from one variant-level snapshot to every recipient — where's the personalization [[ADR-051 — Delivery Package Includes More Than HTML]] calls for?
+- [x] **Q2.** `send_send_instance` sends identical HTML from one variant-level snapshot to every recipient — where's the personalization [[ADR-051 — Delivery Package Includes More Than HTML]] calls for?
     **A:** Not implemented. `DeliveryProvider.send()` only takes `recipient_id, subject, html` — no campaignId/variantId/snapshotId/preheader/audience metadata, and `subject=send_instance.name` conflates an internal label with the actual subject line. `service.py:111-172`, `providers/base.py:14-19`.
-    **Resolution:**
+    **Resolution:** act/fix, narrowed. Providers don't need campaignId/variantId/snapshotId at all — internal-only bookkeeping. Same variantId across recipients within one send is correct (personalization stays inside the variant via decision slots, ADR-083); it would only legitimately differ per recipient for true split-delivery/A/B, which is the separate Needs-ADR "shadow variant" item. Real gap: resolve per-recipient HTML instead of reusing one shared snapshot. Logged to [[backlog]] (Bugs).
 
-- [ ] **Q3.** No retry or per-recipient exception handling in the send loop — what happens if `provider.send()` raises mid-batch (e.g. execution 5 of 100)?
+- [x] **Q3.** No retry or per-recipient exception handling in the send loop — what happens if `provider.send()` raises mid-batch (e.g. execution 5 of 100)?
     **A:** The whole function aborts before the single end-of-loop `db.commit()` — so already-"sent" executions 1–4 roll back their DB status despite the emails having actually gone out. No idempotency check (skip already-`"sent"` executions) exists for a safe retry. `service.py:160-173`.
-    **Resolution:**
+    **Resolution:** act/fix (partial). Stop-on-failure stays the safe default (provider-dependent whether skip-and-continue is even safe) — but completed executions before the stop must still get persisted, not silently lost. Safe-retry reconciliation against the provider's send log is fine to keep as an IT/ops issue for now. Logged to [[backlog]]: the commit-persistence gap as a Bug, and the "proactive reconciliation" idea as a parked future Feature.
 
-- [ ] **Q4.** Why did commit 380ebe1 remove seeded snapshot/send/delivery rows instead of fixing the snapshot storage path directly?
+- [x] **Q4.** Why did commit 380ebe1 remove seeded snapshot/send/delivery rows instead of fixing the snapshot storage path directly?
     **A:** Seeded `html_location` values pointed to nonexistent files, breaking delivery-detail rendering. Rather than commit to a snapshot storage strategy (file vs. DB vs. object storage — still open, see project notes) just to unblock seeding, the fake rows were dropped. Side effect: `PreferenceUpdateLogDB.event_id` (declared `nullable=False`) now gets a NULL inserted by the seed — a schema/seed mismatch that would only surface via strict ORM loading or a future NOT NULL migration.
-    **Resolution:**
+    **Resolution:** act, but needs a final decision first — not a quick fix. The per-recipient personalization fix (Delivery Q2) raises the stakes on the already-open snapshot-storage question (do we need to persist full HTML at all vs. re-render on demand, and in what medium, with historical per-recipient access from the service). Logged to [[backlog]] § Needs ADR.
 
-- [ ] **Q5.** What stops two concurrent calls to send the same send instance twice?
+- [x] **Q5.** What stops two concurrent calls to send the same send instance twice?
     **A:** Nothing — no status guard before the loop runs, no unique constraint or row lock. Would produce duplicate sends and `provider_message_id` last-write-wins on the same row.
-    **Resolution:**
+    **Resolution:** act/fix. Add a status guard + row lock/unique constraint for this specific case (logged to [[backlog]] Bugs). Also surfaces a systemic gap — the project needs a general concurrency-guard pattern across write endpoints (including "two managers editing the same object simultaneously"), not per-issue fixes; logged as a separate Feature, cross-referenced with the Overrides Q4 race.
 
-- [ ] **Q6.** The mock provider's `send()` always returns `success=True`, and the result is never checked — what does that mean for failure-handling coverage?
+- [x] **Q6.** The mock provider's `send()` always returns `success=True`, and the result is never checked — what does that mean for failure-handling coverage?
     **A:** Execution status is unconditionally set to `"sent"` regardless of `result.success` (`service.py:168`) — failure paths (status="failed", retry) are both unimplemented and untested since the mock never exercises them.
-    **Resolution:**
+    **Resolution:** act/fix (partial) + keep in poc (partial). Consult `result.success` and log every attempt's result now (small, low-risk). Defer designing reactions to varied real-provider failure modes until real providers exist. Logged to [[backlog]] (Bugs).
 
 ## Providers
 
