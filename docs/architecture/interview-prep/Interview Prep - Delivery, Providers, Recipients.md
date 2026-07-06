@@ -52,51 +52,51 @@ Baseline review generated 2026-07-04. Check off each item once discussed, and re
 
 ## Providers
 
-- [ ] **Q1.** Two separate "provider" concepts exist — `delivery/providers/` (send-side) and `providers/adapters/` (feedback-side, whose mock file is empty) — intentional per [[ADR-100 — Provider Layer as Send and Feedback Adapter]], or incomplete?
+- [x] **Q1.** Two separate "provider" concepts exist — `delivery/providers/` (send-side) and `providers/adapters/` (feedback-side, whose mock file is empty) — intentional per [[ADR-100 — Provider Layer as Send and Feedback Adapter]], or incomplete?
     **A:** Looks incomplete — the inbound webhook-translation adapter layer was scaffolded but never implemented. `ingest_provider_event` currently accepts an already-normalized payload directly rather than translating a raw provider webhook.
-    **Resolution:**
+    **Resolution:** act/fix. Build the adapter contract (analogous to `DeliveryProvider`), not a vendor-specific plugin — consistent with the earlier decision to stay architecture + one worked example, not ship maintained ESP/CRM plugins. Logged to [[backlog]] (Features).
 
-- [ ] **Q2.** What happens when `ingest_provider_event` finds no matching `DeliveryExecutionDB` via `provider_message_id`?
+- [x] **Q2.** What happens when `ingest_provider_event` finds no matching `DeliveryExecutionDB` via `provider_message_id`?
     **A:** Raises `ValueError` → HTTP 400, and the event is lost — no quarantine/retry table. Violates [[ADR-129 — Correlate Provider Events to Delivery Executions]]'s "must not be silently discarded" requirement. `providers/service.py:15-27`.
-    **Resolution:**
+    **Resolution:** act/fix. Store unmatched events in a quarantine/dead-letter table for later reconciliation instead of losing them. Logged to [[backlog]] (Bugs).
 
-- [ ] **Q3.** Correlation is keyed solely on `provider_message_id` with no secondary/fallback strategy — is that column indexed or unique?
+- [x] **Q3.** Correlation is keyed solely on `provider_message_id` with no secondary/fallback strategy — is that column indexed or unique?
     **A:** Matches ADR-129's primary correlation strategy, but the column has no unique constraint or index (`delivery/db_models.py:32`) — collisions would silently pick the wrong execution, and the lookup (the hot path for every inbound webhook) degrades linearly with volume.
-    **Resolution:**
+    **Resolution:** act/fix. Add a unique constraint + index. Logged to [[backlog]] (Bugs).
 
-- [ ] **Q4.** `ProviderEventCreate.event_type` is unconstrained free text — how is "normalize into internal events" actually enforced?
+- [x] **Q4.** `ProviderEventCreate.event_type` is unconstrained free text — how is "normalize into internal events" actually enforced?
     **A:** It isn't, at the schema level. Only `insight`'s hardcoded `"click"` check gives any event type real downstream meaning; bounce/complaint (mandatory per [[ADR-106 — Bounce and Complaint Feedback Is Mandatory]]) are accepted into storage but have no defined handling.
-    **Resolution:**
+    **Resolution:** act/fix. Centralize event-type normalization in the provider adapter layer (Providers Q1), not a single hardcoded enum, since valid event types vary per provider. Folded into that same [[backlog]] Feature entry.
 
-- [ ] **Q5.** Does the system dedupe a webhook delivered twice?
+- [x] **Q5.** Does the system dedupe a webhook delivered twice?
     **A:** No uniqueness check on `provider_event_id` at ingestion — a duplicate webhook creates a second `EngagementEventDB` row unconditionally. Dedup only exists one layer downstream in `apply_event_to_preferences`, which isn't auto-invoked from ingestion.
-    **Resolution:**
+    **Resolution:** act/fix. Add a uniqueness check/constraint on `provider_event_id` at ingestion — a distinct, earlier-layer gap from the Insight Q3 fix. Logged to [[backlog]] (Bugs).
 
 ## Recipients
 
-- [ ] **Q1.** [[ADR-122 — Minimal Consent Model Required]] requires a consent model gating delivery eligibility — where is it, and is it checked before sending?
+- [x] **Q1.** [[ADR-122 — Minimal Consent Model Required]] requires a consent model gating delivery eligibility — where is it, and is it checked before sending?
     **A:** It doesn't exist. `RecipientDB.status` is a free-form string never consulted by `send_send_instance`. **Direct compliance gap** — highest-priority item in this cluster.
-    **Resolution:**
+    **Resolution:** keep in poc — unresolved deeper question, not settled. Real tension: consent/CRM/provider integration is company-specific enough that owning a consent model in this architecture may be more than warranted (per ADR-126, recipient projection must not become a customer profile duplicate; consent may belong entirely to the CRM — companies dislike double consent tracking). But someone wanting to use this architecture standalone, before any CRM/provider integration exists, has no safety net at all today. Not answerable right now — deferred, matches the existing "consent enforcement" Intentionally Deferred note in `MOC - Reference Implementation.md`. Revisit later with more thought, not delegated to a formal ADR yet.
 
-- [ ] **Q2.** `email` has no unique constraint — intentional?
+- [x] **Q2.** `email` has no unique constraint — intentional?
     **A:** Consistent with [[ADR-126 — Maintain Local Recipient Projection]] (email shouldn't be the identity key) — but means duplicate-email rows are possible from a bad import, with nothing catching it.
-    **Resolution:**
+    **Resolution:** small fix, act. Whether email must be unique is a business decision, deferred (config-layer territory). For now: deduplicate by email before send and when calculating segments. Logged to [[backlog]] (Bugs).
 
-- [ ] **Q3.** No unique constraint on `(recipient_id, category_id)` for preferences, and `create_recipient_preference` always inserts rather than upserts — how does `apply_event_to_preferences` cope with duplicates?
+- [x] **Q3.** No unique constraint on `(recipient_id, category_id)` for preferences, and `create_recipient_preference` always inserts rather than upserts — how does `apply_event_to_preferences` cope with duplicates?
     **A:** It doesn't fully — `.first()` picks one non-deterministically when duplicates exist; the other becomes a stale, inconsistent score with no defined resolution order.
-    **Resolution:**
+    **Resolution:** act/fix. `RecipientPreferenceDB` is the current/aggregate score (distinct from `PreferenceUpdateLogDB`'s append-only log, which correctly has no such constraint) — add a unique constraint and switch to upsert. Logged to [[backlog]] (Bugs).
 
-- [ ] **Q4.** Confirmed: is `recipient_id` a consistent concept across modules?
+- [x] **Q4.** Confirmed: is `recipient_id` a consistent concept across modules?
     **A:** No — `recipients`/`decision` use the internal integer PK; `delivery` uses the string `external_id`. Any new caller must know which flavor a given function expects, disambiguated only by type hints, not validation. Same finding as Delivery Q1.
-    **Resolution:**
+    **Resolution:** act/fix. Same backlog entry as Delivery Q1 / Insight Q5 — no new entry needed.
 
-- [ ] **Q5.** No duplicate check before insert in `create_recipient` — what happens on a repeat CRM sync?
+- [x] **Q5.** No duplicate check before insert in `create_recipient` — what happens on a repeat CRM sync?
     **A:** Unhandled `IntegrityError` → raw 500, rather than a clean upsert keyed on `external_id` — a realistic operational path (re-running a sync) that isn't handled gracefully.
-    **Resolution:**
+    **Resolution:** act/fix. Upsert keyed on `external_id`. Logged to [[backlog]] (Bugs).
 
-- [ ] **Q6.** `attributes` is an open JSON blob alongside first-class `language`/`preferred_airport` columns — doesn't this risk becoming the de facto customer profile ADR-126 warns against?
+- [x] **Q6.** `attributes` is an open JSON blob alongside first-class `language`/`preferred_airport` columns — doesn't this risk becoming the de facto customer profile ADR-126 warns against?
     **A:** Yes — nothing bounds what goes into `attributes` today; it's an extensibility escape hatch that could silently grow into an unmanaged profile store.
-    **Resolution:**
+    **Resolution:** act/fix, two items. (1) `attributes` needs documented/validated bounds — a rich profile over time is fine per ADR-126's Allowed Responsibilities, the actual line is engagement/personalization data vs. forbidden CRM-scope data (service cases, addresses, invoices). (2) Also flagged: `preferred_airport` is a domain-specific example wrongly hardcoded as a first-class column in the generalized schema — should be removed and folded into a generalized preferences structure instead. Both logged to [[backlog]] (Bugs).
 
 ---
 ## Related
