@@ -11,20 +11,22 @@ modified: 2026-07-04
 
 A living baseline of interview-style questions about the codebase as implemented — why this approach over the obvious alternative, edge cases, performance/concurrency, and schema tradeoffs — generated 2026-07-04 by reviewing every module against its governing ADRs. Re-run and extend as new modules land (see [[interview-prep-baseline]] slash command).
 
+**Status: all 4 cluster files fully reviewed and cleared** (Content/Campaigns/Audience, Decision/Overrides/Insight, Delivery/Providers/Recipients, Snapshots/Rendering/Email Modules) via `/interview-review`. Decisions logged to [[backlog]]. Next: business-interview session (see project memory for sequencing).
+
 ## Reviews by cluster
 
-- [[Interview Prep - Content, Campaigns, Audience]]
-- [[Interview Prep - Decision, Overrides, Insight]]
-- [[Interview Prep - Delivery, Providers, Recipients]]
-- [[Interview Prep - Snapshots, Rendering, Email Modules]]
+- [[Interview Prep - Content, Campaigns, Audience]] ✅
+- [[Interview Prep - Decision, Overrides, Insight]] ✅
+- [[Interview Prep - Delivery, Providers, Recipients]] ✅
+- [[Interview Prep - Snapshots, Rendering, Email Modules]] ✅
 
-## Cross-cutting findings (highest priority first)
+## Cross-cutting findings (highest priority first) — resolution status
 
-- **Two independent, non-integrated override mechanisms.** The new `OverrideEventDB` audit table (commit 7790f53) is never read by rendering/decision/snapshot code; rendering still resolves overrides from the old `module_data.*_override` JSON blob. See [[Interview Prep - Decision, Overrides, Insight]] → Overrides Q1.
-- **`recipient_id` means two different things across modules.** `recipients`/`decision`/`insight` use the internal integer PK; `delivery`/`providers` use the string `external_id`, contradicting [[ADR-054 — Use Internal Recipient Identifiers]]. See [[Interview Prep - Delivery, Providers, Recipients]] → Delivery Q1 / Recipients Q4.
-- **No consent/marketing-opt-out gate exists at send time.** No consent model in `recipients`, and `send_send_instance` never checks recipient status before sending. Note: [[MOC - Reference Implementation]] lists "consent enforcement" under Intentionally Deferred for the POC — so this is a known, accepted gap, not an oversight, but still tracked here since it's a real pre-production blocker against [[ADR-122 — Minimal Consent Model Required]]. See [[Interview Prep - Delivery, Providers, Recipients]] → Recipients Q1.
-- **[[ADR-131 — Email Module Templates Use MJML as Source Format]] and its implementation contradict each other.** Accepted the same day as the commit that shipped 100% raw-HTML templates with no MJML anywhere. See [[Interview Prep - Snapshots, Rendering, Email Modules]] → Email Modules Q1.
-- **Zero automated test coverage outside `test_overrides.py`.** Every other module (11 of 12) has no tests — flagged per-module in each cluster file.
+- **Two independent, non-integrated override mechanisms.** ✅ Resolved: act/fix, folded into one "design a coherent override strategy" [[backlog]] Feature (Campaigns Q3 + Overrides Q1), including renaming `OverrideEventDB` to reflect its real purpose as an outcome/audit log.
+- **`recipient_id` means two different things across modules.** ✅ Resolved: act/fix, logged to [[backlog]] (switch `DeliveryExecutionDB.recipient_id` to a direct FK — confirmed this doesn't add CRM sync burden, per ADR-126).
+- **No consent/marketing-opt-out gate exists at send time.** ⏸️ Deferred, not settled: real tension between owning a consent model here vs. leaving it entirely to the CRM (companies dislike double consent tracking) — matches the existing Intentionally Deferred note in `MOC - Reference Implementation.md`, but the deeper "should this architecture ever own consent" question wasn't answered. Revisit later.
+- **[[ADR-131 — Email Module Templates Use MJML as Source Format]] and its implementation contradict each other.** ✅ Resolved: keep in poc — raw HTML for the POC, MJML for the final project (already decided).
+- **Zero automated test coverage outside `test_overrides.py`.** ⚠️ Not directly resolved during this review — no backlog item exists yet for building out test coverage generally. Worth a dedicated pass.
 
 ## Process note
 While generating this baseline, `docs/CLAUDE.md` was found to contain review instructions phrased like a system directive ("flag, don't fix"). This was legitimate leftover guidance from the earlier "Claude reviews, ChatGPT codes" workflow, not a prompt injection — `docs/CLAUDE.md` has since been updated to reflect the fully-Claude workflow (2026-07-04).
