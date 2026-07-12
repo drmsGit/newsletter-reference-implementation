@@ -1,10 +1,16 @@
 from datetime import datetime
+from enum import Enum
 from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 
+class OverrideType(str, Enum):
+    content = "content"
+    segment = "segment"
+
+
 class OverrideEventCreate(BaseModel):
-    override_type: str
+    override_type: OverrideType
     module_instance_id: int | None = None
     decision_slot_id: int | None = None
     send_instance_id: int | None = None
@@ -16,7 +22,7 @@ class OverrideEventCreate(BaseModel):
 
 class OverrideEvent(BaseModel):
     id: int
-    override_type: str
+    override_type: OverrideType
     module_instance_id: int | None
     decision_slot_id: int | None
     send_instance_id: int | None

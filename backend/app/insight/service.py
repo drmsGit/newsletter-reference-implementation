@@ -102,20 +102,9 @@ def apply_event_to_preferences(
             f"DeliveryExecution {event.delivery_execution_id} not found"
         )
 
-    recipient_external_id = delivery_execution.recipient_id
-
-    from app.recipients.db_models import RecipientDB
-
-    recipient = (
-        db.query(RecipientDB)
-        .filter(RecipientDB.external_id == recipient_external_id)
-        .first()
-    )
-
-    if recipient is None:
-        raise ValueError(
-            f"Recipient with external_id {recipient_external_id} not found"
-        )
+    # delivery_execution.recipient_id is a direct FK to RecipientDB.id
+    # (ADR-054), so no external_id lookup/translation is needed here.
+    recipient_id = delivery_execution.recipient_id
 
     assignments = (
         db.query(ContentCategoryAssignmentDB)
@@ -134,17 +123,17 @@ def apply_event_to_preferences(
     for assignment in assignments:
         category_delta = base_delta * (assignment.score / 10)
 
+        # Dedupe on the specific event, not "any event of this type on this
+        # delivery execution" — two distinct legitimate engagements (e.g.
+        # clicks on two different links in the same email) must each get
+        # their own scoring decision. This only guards against re-applying
+        # the *same* event_id twice, not against a second real event.
         existing_update = (
             db.query(PreferenceUpdateLogDB)
-            .join(
-                EngagementEventDB,
-                PreferenceUpdateLogDB.event_id == EngagementEventDB.id,
-            )
             .filter(
-                PreferenceUpdateLogDB.recipient_id == recipient.id,
+                PreferenceUpdateLogDB.recipient_id == recipient_id,
                 PreferenceUpdateLogDB.category_id == assignment.category_id,
-                PreferenceUpdateLogDB.reason == event.event_type,
-                EngagementEventDB.delivery_execution_id == delivery_execution.id,
+                PreferenceUpdateLogDB.event_id == event.id,
             )
             .first()
         )
@@ -155,7 +144,7 @@ def apply_event_to_preferences(
         preference = (
             db.query(RecipientPreferenceDB)
             .filter(
-                RecipientPreferenceDB.recipient_id == recipient.id,
+                RecipientPreferenceDB.recipient_id == recipient_id,
                 RecipientPreferenceDB.category_id == assignment.category_id,
             )
             .first()
@@ -170,7 +159,7 @@ def apply_event_to_preferences(
         new_score = previous_score + category_delta
 
         log_entry = PreferenceUpdateLogDB(
-            recipient_id=recipient.id,
+            recipient_id=recipient_id,
             category_id=assignment.category_id,
             event_id=event.id,
             previous_score=previous_score,
@@ -183,7 +172,7 @@ def apply_event_to_preferences(
 
         if preference is None:
             preference = RecipientPreferenceDB(
-                recipient_id=recipient.id,
+                recipient_id=recipient_id,
                 category_id=assignment.category_id,
                 score=new_score,
                 source="engagement",
@@ -200,7 +189,7 @@ def apply_event_to_preferences(
 
     return PreferenceUpdateResult(
         event_id=event.id,
-        recipient_id=recipient.id,
+        recipient_id=recipient_id,
         content_record_id=content_record_id,
         updated_categories=updated_categories,
         applied_deltas=applied_deltas,

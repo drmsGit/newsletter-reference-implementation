@@ -6,7 +6,7 @@ from pydantic import BaseModel
 class DeliveryExecution(BaseModel):
     id: int
     send_instance_id: int
-    recipient_id: str
+    recipient_id: int
     status: str
     provider: str | None = None
     provider_message_id: str | None = None
@@ -16,7 +16,7 @@ class DeliveryExecution(BaseModel):
 
 class DeliveryExecutionCreate(BaseModel):
     send_instance_id: int
-    recipient_id: str
+    recipient_id: int
     status: str = "created"
     provider: str | None = None
     provider_message_id: str | None = None

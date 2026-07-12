@@ -7,6 +7,10 @@
     <span class="badge bg-secondary fs-6">{{ record.status }}</span>
 </div>
 
+{% if error %}
+<div class="alert alert-danger" role="alert">{{ error }}</div>
+{% endif %}
+
 <!-- Edit record -->
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">

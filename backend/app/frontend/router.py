@@ -157,7 +157,7 @@ def recipient_detail(
             DeliveryExecutionDB.send_instance_id == SendInstanceDB.id,
         )
         .filter(
-            DeliveryExecutionDB.recipient_id == recipient.external_id
+            DeliveryExecutionDB.recipient_id == recipient.id
         )
         .order_by(
             DeliveryExecutionDB.created_at.desc()
@@ -467,13 +467,19 @@ def module_create(
     decision_slot_id: int | None = Form(None),
     db: Session = Depends(get_db),
 ):
-    create_module_for_variant(
-        db,
-        variant_id=variant_id,
-        module_type=module_type,
-        content_record_id=content_record_id or None,
-        decision_slot_id=decision_slot_id or None,
-    )
+    try:
+        create_module_for_variant(
+            db,
+            variant_id=variant_id,
+            module_type=module_type,
+            content_record_id=content_record_id or None,
+            decision_slot_id=decision_slot_id or None,
+        )
+    except ValueError as error:
+        return RedirectResponse(
+            url=f"/ui/campaigns/{campaign_id}?error={quote(str(error))}",
+            status_code=303,
+        )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
@@ -574,6 +580,7 @@ def content_list(
 def content_detail(
     content_record_id: int,
     request: Request,
+    error: str | None = None,
     db: Session = Depends(get_db),
 ):
     record = (
@@ -703,6 +710,7 @@ def content_detail(
             "decision_usage": decision_usage,
             "preference_signals": signal_rows,
             "all_categories": all_categories,
+            "error": error,
         },
     )
 
@@ -786,13 +794,20 @@ def content_assign_category(
     score: int = Form(10),
     db: Session = Depends(get_db),
 ):
-    assign_category_to_content(db, content_id=content_record_id, category_id=category_id, score=score)
+    try:
+        assign_category_to_content(db, content_id=content_record_id, category_id=category_id, score=score)
+    except ValueError as error:
+        return RedirectResponse(
+            url=f"/ui/content/{content_record_id}?error={quote(str(error))}",
+            status_code=303,
+        )
     return RedirectResponse(url=f"/ui/content/{content_record_id}", status_code=303)
 
 
 @router.get("/ui/categories")
 def categories_list(
     request: Request,
+    error: str | None = None,
     db: Session = Depends(get_db),
 ):
     categories = (
@@ -833,6 +848,7 @@ def categories_list(
             "title": "Categories",
             "categories": category_rows,
             "all_categories": categories,
+            "error": error,
         },
     )
 
@@ -986,7 +1002,10 @@ def category_relation_create(
     child_category_id: int = Form(...),
     db: Session = Depends(get_db),
 ):
-    create_category_relation(db, parent_category_id=parent_category_id, child_category_id=child_category_id)
+    try:
+        create_category_relation(db, parent_category_id=parent_category_id, child_category_id=child_category_id)
+    except ValueError as error:
+        return RedirectResponse(url=f"/ui/categories?error={quote(str(error))}", status_code=303)
     return RedirectResponse(url="/ui/categories", status_code=303)
 
 
@@ -1430,7 +1449,7 @@ def delivery_detail(
     for execution in executions:
         recipient = (
             db.query(RecipientDB)
-            .filter(RecipientDB.external_id == execution.recipient_id)
+            .filter(RecipientDB.id == execution.recipient_id)
             .first()
         )
 
@@ -1488,8 +1507,8 @@ def delivery_detail(
         execution_rows.append(
             {
                 "id": execution.id,
-                "recipient_external_id": execution.recipient_id,
-                "recipient_id": recipient.id if recipient else None,
+                "recipient_external_id": recipient.external_id if recipient else None,
+                "recipient_id": execution.recipient_id,
                 "status": execution.status,
                 "provider": execution.provider,
                 "provider_message_id": execution.provider_message_id,

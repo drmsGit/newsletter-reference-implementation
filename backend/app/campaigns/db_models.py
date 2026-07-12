@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, UniqueConstraint, func, JSON
+from sqlalchemy import CheckConstraint, Column, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, func, JSON
 
 from app.database import Base
 
@@ -54,6 +54,15 @@ class ModuleInstanceDB(Base):
 
     __table_args__ = (
         UniqueConstraint("variant_id", "position", name="uq_module_instances_variant_position"),
+        # Mutual exclusivity, not "exactly one required" — non-CMS static
+        # modules (e.g. a module_data-only cta/hero) legitimately leave both
+        # null. What must never happen is BOTH set at once, since rendering
+        # then silently prefers content_record_id and ignores the decision
+        # slot with no error (rendering/service.py resolve_content_for_module).
+        CheckConstraint(
+            "content_record_id IS NULL OR decision_slot_id IS NULL",
+            name="ck_module_instances_content_or_decision_slot",
+        ),
     )
 
 
@@ -86,5 +95,5 @@ class DecisionResolutionDB(Base):
     content_record_id = Column(Integer, ForeignKey("content_records.id"), nullable=False)
     content_version_id = Column(Integer, ForeignKey("content_versions.id"), nullable=True)
     reason = Column(String(255), nullable=True)
-    score = Column(Integer, nullable=True)
+    score = Column(Float, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

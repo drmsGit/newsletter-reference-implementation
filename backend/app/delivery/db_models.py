@@ -26,7 +26,7 @@ class DeliveryExecutionDB(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     send_instance_id = Column(Integer, ForeignKey("send_instances.id"), nullable=False)
-    recipient_id = Column(String(255), nullable=False)
+    recipient_id = Column(Integer, ForeignKey("recipients.id"), nullable=False)
     status = Column(String(50), nullable=False, default="created")
     provider = Column(String(100), nullable=True)
     provider_message_id = Column(String(255), nullable=True, unique=True, index=True)

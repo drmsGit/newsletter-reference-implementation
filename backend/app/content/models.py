@@ -21,13 +21,11 @@ class Category(BaseModel):
     id: int
     name: str
     type: str = "main"
-    parent_category_id: int | None = None
 
 
 class CategoryCreate(BaseModel):
     name: str
     type: str = "main"
-    parent_category_id: int | None = None
 
 
 class ContentCategoryAssignment(BaseModel):

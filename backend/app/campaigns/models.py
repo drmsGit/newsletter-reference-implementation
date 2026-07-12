@@ -83,7 +83,7 @@ class DecisionResolution(BaseModel):
     content_record_id: int
     content_version_id: int | None = None
     reason: str | None = None
-    score: int | None = None
+    score: float | None = None
     created_at: datetime
 
 
@@ -92,4 +92,4 @@ class DecisionResolutionCreate(BaseModel):
     content_record_id: int
     content_version_id: int | None = None
     reason: str | None = None
-    score: int | None = None
+    score: float | None = None

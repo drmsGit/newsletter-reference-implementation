@@ -10,7 +10,7 @@ class MockProvider(DeliveryProvider):
 
     def send(
         self,
-        recipient_id: str,
+        recipient_email: str,
         subject: str,
         html: str,
     ) -> SendResult:

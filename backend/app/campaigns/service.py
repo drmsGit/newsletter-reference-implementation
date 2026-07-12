@@ -130,6 +130,12 @@ def create_module_for_variant(
     module_data: dict | None = None,
     decision_slot_id: int | None = None,
 ) -> ModuleInstance:
+    if content_record_id is not None and decision_slot_id is not None:
+        raise ValueError(
+            "A module cannot have both content_record_id and decision_slot_id set — "
+            "rendering would silently prefer content_record_id and ignore the decision slot"
+        )
+
     max_position = (
         db.query(func.max(ModuleInstanceDB.position))
         .filter(ModuleInstanceDB.variant_id == variant_id)
@@ -246,7 +252,7 @@ def create_decision_resolution(
     content_version_id: int | None = None,
     recipient_id: int | None = None,
     reason: str | None = None,
-    score: int | None = None,
+    score: float | None = None,
 ) -> DecisionResolution:
     resolution = DecisionResolutionDB(
         decision_slot_id=decision_slot_id,

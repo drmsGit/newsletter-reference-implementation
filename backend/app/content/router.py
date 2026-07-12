@@ -41,6 +41,21 @@ def get_content_records(db: Session = Depends(get_db)):
     return list_content_records(db)
 
 
+# These fixed-path routes (/categories, /category-relations) must be
+# registered before /{content_id} below — FastAPI matches routes in
+# registration order, so a parameterized route registered first would
+# otherwise swallow these paths (e.g. "categories" parsed as content_id
+# and failing int validation) rather than ever reaching them.
+@router.get("/categories", response_model=list[Category])
+def get_categories(db: Session = Depends(get_db)):
+    return list_categories(db)
+
+
+@router.get("/category-relations", response_model=list[CategoryRelation])
+def get_category_relations(db: Session = Depends(get_db)):
+    return list_category_relations(db)
+
+
 @router.get("/{content_id}", response_model=ContentRecord)
 def get_content_record_by_id(content_id: int, db: Session = Depends(get_db)):
     record = get_content_record(db, content_id)
@@ -55,11 +70,6 @@ def update_content_record_by_id(content_id: int, payload: ContentCreate, db: Ses
     if record is None:
         raise HTTPException(status_code=404, detail="Content record not found")
     return record
-
-
-@router.get("/categories", response_model=list[Category])
-def get_categories(db: Session = Depends(get_db)):
-    return list_categories(db)
 
 
 @router.get("/{content_id}/categories", response_model=list[Category])
@@ -87,7 +97,6 @@ def create_category_record(
         db=db,
         name=payload.name,
         type=payload.type,
-        parent_category_id=payload.parent_category_id,
     )
 
 
@@ -97,12 +106,15 @@ def assign_category(
     payload: ContentCategoryAssignmentCreate,
     db: Session = Depends(get_db),
 ):
-    assignment = assign_category_to_content(
-        db=db,
-        content_id=content_id,
-        category_id=payload.category_id,
-        score=payload.score,
-    )
+    try:
+        assignment = assign_category_to_content(
+            db=db,
+            content_id=content_id,
+            category_id=payload.category_id,
+            score=payload.score,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
 
     if assignment is None:
         raise HTTPException(
@@ -144,22 +156,20 @@ def get_content_versions(
     )
 
 
-@router.get("/category-relations", response_model=list[CategoryRelation])
-def get_category_relations(db: Session = Depends(get_db)):
-    return list_category_relations(db)
-
-
 @router.post("/category-relations", response_model=CategoryRelation)
 def create_category_relation_record(
     payload: CategoryRelationCreate,
     db: Session = Depends(get_db),
 ):
-    return create_category_relation(
-        db=db,
-        parent_category_id=payload.parent_category_id,
-        child_category_id=payload.child_category_id,
-        relation_type=payload.relation_type,
-    )
+    try:
+        return create_category_relation(
+            db=db,
+            parent_category_id=payload.parent_category_id,
+            child_category_id=payload.child_category_id,
+            relation_type=payload.relation_type,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
 
 
 @router.get(

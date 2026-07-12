@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -25,14 +26,21 @@ def create_execution(
     payload: DeliveryExecutionCreate,
     db: Session = Depends(get_db),
 ):
-    return create_delivery_execution(
-        db=db,
-        send_instance_id=payload.send_instance_id,
-        recipient_id=payload.recipient_id,
-        status=payload.status,
-        provider=payload.provider,
-        provider_message_id=payload.provider_message_id,
-    )
+    try:
+        return create_delivery_execution(
+            db=db,
+            send_instance_id=payload.send_instance_id,
+            recipient_id=payload.recipient_id,
+            status=payload.status,
+            provider=payload.provider,
+            provider_message_id=payload.provider_message_id,
+        )
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"send_instance_id={payload.send_instance_id} or recipient_id={payload.recipient_id} does not exist",
+        )
 
 
 @router.post("/send-instances", response_model=SendInstance)

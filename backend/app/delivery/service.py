@@ -29,7 +29,7 @@ def to_delivery_execution(record: DeliveryExecutionDB) -> DeliveryExecution:
 def create_delivery_execution(
     db: Session,
     send_instance_id: int,
-    recipient_id: str,
+    recipient_id: int,
     status: str = "created",
     provider: str | None = None,
     provider_message_id: str | None = None,
@@ -173,27 +173,29 @@ def send_send_instance(
     try:
         for execution in executions:
 
+            # execution.recipient_id is a direct FK to RecipientDB.id, so no
+            # external_id translation is needed here (ADR-054).
+            recipient = (
+                db.query(RecipientDB)
+                .filter(RecipientDB.id == execution.recipient_id)
+                .first()
+            )
+
             # Resolve HTML per recipient rather than reusing one shared
             # variant-level snapshot — decision-slot personalization can
             # resolve different content per recipient within the same
             # variant (ADR-083), so every recipient must get their own
             # rendered HTML, not identical copies of whatever the snapshot
             # happened to freeze for a single (or no) recipient.
-            recipient = (
-                db.query(RecipientDB)
-                .filter(RecipientDB.external_id == execution.recipient_id)
-                .first()
-            )
-
             html = render_variant_html(
                 db=db,
                 variant_id=snapshot.variant_id,
-                recipient_id=recipient.id if recipient is not None else None,
+                recipient_id=execution.recipient_id,
                 mode="send",
             )
 
             result = provider.send(
-                recipient_id=execution.recipient_id,
+                recipient_email=recipient.email if recipient is not None else "",
                 subject=send_instance.name,
                 html=html,
             )

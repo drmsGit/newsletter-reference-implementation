@@ -39,7 +39,7 @@ def execute_decision_slot(
     # "no new signal, keep the last recommendation" — instead of
     # accumulating an unbounded, ever-growing per-person history.
     effective_recipient_id = recipient_id if strategy.meta.requires_recipient else None
-    new_score = int(result.score)
+    new_score = result.score
 
     latest = (
         db.query(DecisionResolutionDB)

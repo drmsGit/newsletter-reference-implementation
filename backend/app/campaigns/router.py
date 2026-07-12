@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -92,14 +92,17 @@ def create_variant_module(
     payload: ModuleInstanceCreate,
     db: Session = Depends(get_db),
 ):
-    return create_module_for_variant(
-        db=db,
-        variant_id=variant_id,
-        module_type=payload.module_type,
-        content_record_id=payload.content_record_id,
-        decision_slot_id=payload.decision_slot_id,
-        module_data=payload.module_data,
-    )
+    try:
+        return create_module_for_variant(
+            db=db,
+            variant_id=variant_id,
+            module_type=payload.module_type,
+            content_record_id=payload.content_record_id,
+            decision_slot_id=payload.decision_slot_id,
+            module_data=payload.module_data,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
 
 
 @router.get("/variants/{variant_id}/decision-slots", response_model=list[DecisionSlot])

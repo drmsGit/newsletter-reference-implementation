@@ -160,12 +160,10 @@ def create_category(
     db: Session,
     name: str,
     type: str = "main",
-    parent_category_id: int | None = None,
 ) -> Category:
     category = CategoryDB(
         name=name,
         type=type,
-        parent_category_id=parent_category_id,
     )
 
     db.add(category)
@@ -176,7 +174,6 @@ def create_category(
         id=category.id,
         name=category.name,
         type=category.type,
-        parent_category_id=category.parent_category_id,
     )
 
 
@@ -190,12 +187,50 @@ def to_category_relation(record: CategoryRelationDB) -> CategoryRelation:
     )
 
 
+def _would_create_cycle(db: Session, parent_category_id: int, child_category_id: int) -> bool:
+    """
+    True if adding parent_category_id -> child_category_id would close a
+    direct or transitive parent_child loop — i.e. parent_category_id is
+    already reachable by walking down existing child edges starting at
+    child_category_id. Multi-parent taxonomies stay fully allowed; only an
+    actual cycle is rejected.
+    """
+    if parent_category_id == child_category_id:
+        return True
+
+    visited: set[int] = set()
+    stack = [child_category_id]
+
+    while stack:
+        current = stack.pop()
+        if current == parent_category_id:
+            return True
+        if current in visited:
+            continue
+        visited.add(current)
+
+        children = (
+            db.query(CategoryRelationDB.child_category_id)
+            .filter(CategoryRelationDB.parent_category_id == current)
+            .all()
+        )
+        stack.extend(row[0] for row in children)
+
+    return False
+
+
 def create_category_relation(
     db: Session,
     parent_category_id: int,
     child_category_id: int,
     relation_type: str = "parent_child",
 ) -> CategoryRelation:
+    if relation_type == "parent_child" and _would_create_cycle(db, parent_category_id, child_category_id):
+        raise ValueError(
+            f"Relating category {parent_category_id} as parent of {child_category_id} "
+            "would create a parent_child cycle"
+        )
+
     relation = CategoryRelationDB(
         parent_category_id=parent_category_id,
         child_category_id=child_category_id,
@@ -265,6 +300,13 @@ def assign_category_to_content(
     category_id: int,
     score: int = 10,
 ) -> ContentCategoryAssignmentDB | None:
+    # A score of exactly zero is degenerate/meaningless — "no relevance"
+    # should mean no assignment row at all, not a stored zero. (The 0-10
+    # range itself is a POC-only convention, not enforced here — that's
+    # future config-layer work, Insight Q2.)
+    if score == 0:
+        raise ValueError("Category assignment score must not be zero — omit the assignment instead")
+
     existing = (
         db.query(ContentCategoryAssignmentDB)
         .filter(

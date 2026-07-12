@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, JSON, func
+from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, Integer, String, JSON, func
 
 from app.database import Base
 
@@ -7,7 +7,7 @@ class OverrideEventDB(Base):
     __tablename__ = "override_events"
 
     id = Column(Integer, primary_key=True, index=True)
-    override_type = Column(String(50), nullable=False)  # "content" | "segment"
+    override_type = Column(String(50), nullable=False)  # OverrideType: "content" | "segment"
 
     module_instance_id = Column(Integer, ForeignKey("module_instances.id"), nullable=True)
     decision_slot_id = Column(Integer, ForeignKey("decision_slots.id"), nullable=True)
@@ -23,3 +23,7 @@ class OverrideEventDB(Base):
     outcome_delta = Column(JSON, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("override_type IN ('content', 'segment')", name="ck_override_events_override_type"),
+    )
