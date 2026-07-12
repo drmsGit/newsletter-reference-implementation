@@ -119,7 +119,20 @@ def find_by_criteria(
     if exclude_ids:
         q = q.filter(RecipientDB.id.notin_(exclude_ids))
 
-    return q.order_by(RecipientDB.email.asc()).all()
+    records = q.order_by(RecipientDB.email.asc()).all()
+
+    # RecipientDB.email has no unique constraint (a hard-unique decision is
+    # deferred) — dedupe by email here so a bad import with duplicate-email
+    # rows doesn't inflate or double-count a segment preview.
+    seen_emails: set[str] = set()
+    deduplicated: list[RecipientDB] = []
+    for record in records:
+        if record.email in seen_emails:
+            continue
+        seen_emails.add(record.email)
+        deduplicated.append(record)
+
+    return deduplicated
 
 
 def bulk_add_members(db: Session, group_id: int, recipient_ids: list[int]) -> int:

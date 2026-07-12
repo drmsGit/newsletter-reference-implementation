@@ -1,7 +1,8 @@
 from sqlalchemy.orm import Session
 
 from app.delivery.db_models import DeliveryExecutionDB
-from app.insight.service import create_engagement_event
+from app.insight.db_models import EngagementEventDB
+from app.insight.service import create_engagement_event, to_engagement_event
 from app.providers.db_models import ProviderEventQuarantineDB
 from app.providers.models import ProviderEventIngestResult, ProviderEventQuarantine
 
@@ -55,6 +56,21 @@ def ingest_provider_event(
             status="quarantined",
             quarantine=to_provider_event_quarantine(quarantine),
         )
+
+    # A webhook delivered twice must not create a second EngagementEventDB
+    # row unconditionally — distinct from the later Insight-layer dedup
+    # (which governs whether a *scoring* update applies to an already-stored
+    # event), this is about not double-recording the raw event itself.
+    existing = (
+        db.query(EngagementEventDB)
+        .filter(
+            EngagementEventDB.provider == provider,
+            EngagementEventDB.provider_event_id == provider_event_id,
+        )
+        .first()
+    )
+    if existing is not None:
+        return ProviderEventIngestResult(status="duplicate", engagement_event=to_engagement_event(existing))
 
     engagement_event = create_engagement_event(
         db=db,

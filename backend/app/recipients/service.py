@@ -66,17 +66,25 @@ def create_recipient(
     attributes: dict | None = None,
     status: str = "active",
 ) -> Recipient:
+    """Upserts keyed on external_id — a repeat CRM sync updates in place
+    rather than hitting the unique constraint with a blind insert."""
     validate_recipient_attributes(attributes)
 
-    recipient = RecipientDB(
-        external_id=external_id,
-        email=email,
-        language=language,
-        attributes=attributes,
-        status=status,
+    recipient = (
+        db.query(RecipientDB)
+        .filter(RecipientDB.external_id == external_id)
+        .first()
     )
 
-    db.add(recipient)
+    if recipient is None:
+        recipient = RecipientDB(external_id=external_id)
+        db.add(recipient)
+
+    recipient.email = email
+    recipient.language = language
+    recipient.attributes = attributes
+    recipient.status = status
+
     db.commit()
     db.refresh(recipient)
 
@@ -125,14 +133,28 @@ def create_recipient_preference(
     score: float,
     source: str = "manual",
 ):
-    preference = RecipientPreferenceDB(
-        recipient_id=recipient_id,
-        category_id=category_id,
-        score=score,
-        source=source,
+    """Upserts on (recipient_id, category_id) — this is the current/aggregate
+    running-total score per pair, not an append-only log, so a repeat write
+    updates in place rather than creating a second, ambiguous "current" row."""
+    preference = (
+        db.query(RecipientPreferenceDB)
+        .filter(
+            RecipientPreferenceDB.recipient_id == recipient_id,
+            RecipientPreferenceDB.category_id == category_id,
+        )
+        .first()
     )
 
-    db.add(preference)
+    if preference is None:
+        preference = RecipientPreferenceDB(
+            recipient_id=recipient_id,
+            category_id=category_id,
+        )
+        db.add(preference)
+
+    preference.score = score
+    preference.source = source
+
     db.commit()
     db.refresh(preference)
 

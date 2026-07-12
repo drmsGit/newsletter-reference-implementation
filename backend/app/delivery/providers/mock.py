@@ -18,4 +18,5 @@ class MockProvider(DeliveryProvider):
         return SendResult(
             success=True,
             provider_message_id=f"mock-{uuid.uuid4()}",
+            message="accepted",
         )

@@ -1,4 +1,8 @@
+import logging
+
 from fastapi import FastAPI
+
+logging.basicConfig(level=logging.INFO)
 
 from app.database import Base, engine, SessionLocal
 from app.content.db_models import ContentRecordDB, CategoryDB, ContentCategoryAssignmentDB, ContentVersionDB

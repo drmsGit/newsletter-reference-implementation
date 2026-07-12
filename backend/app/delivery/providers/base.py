@@ -6,6 +6,7 @@ from pydantic import BaseModel
 class SendResult(BaseModel):
     success: bool
     provider_message_id: str
+    message: str | None = None
 
 
 class DeliveryProvider(ABC):

@@ -1,3 +1,5 @@
+import logging
+
 from sqlalchemy.orm import Session
 from pathlib import Path
 
@@ -6,6 +8,8 @@ from app.delivery.models import DeliveryExecution, SendInstance
 
 from app.delivery.providers.factory import get_provider
 from app.snapshots.db_models import SnapshotDB
+
+logger = logging.getLogger(__name__)
 
 
 def to_delivery_execution(record: DeliveryExecutionDB) -> DeliveryExecution:
@@ -165,9 +169,22 @@ def send_send_instance(
             html=html,
         )
 
-        execution.status = "sent"
+        logger.info(
+            "send result: execution_id=%s recipient_id=%s success=%s "
+            "provider_message_id=%s message=%s",
+            execution.id,
+            execution.recipient_id,
+            result.success,
+            result.provider_message_id,
+            result.message,
+        )
+
+        execution.status = "sent" if result.success else "failed"
         execution.provider_message_id = (
             result.provider_message_id
         )
 
-    db.commit()
+        # Commit after each execution — if provider.send() raises mid-batch,
+        # executions already sent must not lose their persisted status just
+        # because a later one in the loop failed.
+        db.commit()

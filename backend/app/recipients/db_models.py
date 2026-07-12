@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Integer, JSON, String, func, Float, ForeignKey
+from sqlalchemy import Column, DateTime, Integer, JSON, String, UniqueConstraint, func, Float, ForeignKey
 
 from app.database import Base
 
@@ -50,6 +50,10 @@ class RecipientPreferenceDB(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("recipient_id", "category_id", name="uq_recipient_preferences_recipient_category"),
     )
 
 

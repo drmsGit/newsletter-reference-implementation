@@ -26,6 +26,6 @@ class ProviderEventQuarantine(BaseModel):
 
 
 class ProviderEventIngestResult(BaseModel):
-    status: str  # "matched" | "quarantined"
+    status: str  # "matched" | "duplicate" | "quarantined"
     engagement_event: EngagementEvent | None = None
     quarantine: ProviderEventQuarantine | None = None

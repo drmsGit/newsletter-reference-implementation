@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -18,15 +19,22 @@ def create_event(
     payload: EngagementEventCreate,
     db: Session = Depends(get_db),
 ):
-    return create_engagement_event(
-        db=db,
-        delivery_execution_id=payload.delivery_execution_id,
-        event_type=payload.event_type,
-        provider=payload.provider,
-        provider_event_id=payload.provider_event_id,
-        event_data=payload.event_data,
-        occurred_at=payload.occurred_at,
-    )
+    try:
+        return create_engagement_event(
+            db=db,
+            delivery_execution_id=payload.delivery_execution_id,
+            event_type=payload.event_type,
+            provider=payload.provider,
+            provider_event_id=payload.provider_event_id,
+            event_data=payload.event_data,
+            occurred_at=payload.occurred_at,
+        )
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"Engagement event already recorded for provider={payload.provider!r}, provider_event_id={payload.provider_event_id!r}",
+        )
 
 
 @router.get("/delivery-executions/{delivery_execution_id}/events", response_model=list[EngagementEvent])
