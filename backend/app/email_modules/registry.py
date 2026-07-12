@@ -53,7 +53,15 @@ def _discover() -> dict[str, ModuleManifest]:
                 "Manifest %s has no matching .html file — skipping", json_path.name
             )
             continue
-        manifests[json_path.stem] = _load_manifest(json_path)
+        try:
+            manifests[json_path.stem] = _load_manifest(json_path)
+        except Exception:
+            # One malformed manifest (bad JSON, missing required key) must
+            # not take down the whole registry — log which file and keep
+            # going, same as the missing-counterpart-file case above.
+            logger.warning(
+                "Failed to load manifest '%s' — skipping", json_path.name, exc_info=True
+            )
 
     for html_path in EMAIL_MODULES_DIR.glob("*.html"):
         if html_path.stem not in manifests:

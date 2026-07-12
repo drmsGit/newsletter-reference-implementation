@@ -1,10 +1,13 @@
 import importlib
 import inspect
+import logging
 import pkgutil
 import sys
 from pathlib import Path
 
 from app.decision.strategies.base import DecisionStrategy, StrategyMeta
+
+logger = logging.getLogger(__name__)
 
 _EXCLUDED_MODULES = {"base", "registry"}
 
@@ -17,17 +20,27 @@ def _discover() -> dict[str, DecisionStrategy]:
         if module_name in _EXCLUDED_MODULES:
             continue
         full_name = f"app.decision.strategies.{module_name}"
-        # Reload (not just import) so code edits are picked up, not just
-        # the first-ever import — import_module alone is a no-op for a
-        # module already in sys.modules.
-        if full_name in sys.modules:
-            module = importlib.reload(sys.modules[full_name])
-        else:
-            module = importlib.import_module(full_name)
-        for _, obj in inspect.getmembers(module, inspect.isclass):
-            if issubclass(obj, DecisionStrategy) and obj is not DecisionStrategy:
-                instance = obj()
-                strategies[instance.meta.name] = instance
+        try:
+            # Reload (not just import) so code edits are picked up, not just
+            # the first-ever import — import_module alone is a no-op for a
+            # module already in sys.modules.
+            if full_name in sys.modules:
+                module = importlib.reload(sys.modules[full_name])
+            else:
+                module = importlib.import_module(full_name)
+            for _, obj in inspect.getmembers(module, inspect.isclass):
+                if issubclass(obj, DecisionStrategy) and obj is not DecisionStrategy:
+                    instance = obj()
+                    strategies[instance.meta.name] = instance
+        except Exception:
+            # One broken strategy file must not take down the whole
+            # registry (and the app, since this used to run at import
+            # time) — log which file and keep going.
+            logger.warning(
+                "Failed to load decision strategy module '%s' — skipping",
+                module_name,
+                exc_info=True,
+            )
 
     return strategies
 

@@ -1,3 +1,5 @@
+import random
+
 from sqlalchemy.orm import Session
 
 from app.campaigns.db_models import DecisionSlotDB
@@ -70,9 +72,21 @@ class RecipientTopScoreStrategy(DecisionStrategy):
         if not candidates:
             return None
 
-        best = max(
-            candidates,
-            key=lambda row: row[1] * content_weight + row[2] * preference_weight,
+        def candidate_score(row):
+            return row[1] * content_weight + row[2] * preference_weight
+
+        top_score = max(candidate_score(row) for row in candidates)
+        tied = [row for row in candidates if candidate_score(row) == top_score]
+
+        # Ties are broken by an explicit, disclosed random choice rather than
+        # silently taking whichever row the DB happened to return first
+        # (undisclosed bias toward lower content IDs) — the reason string
+        # says so, so the pick stays auditable (ADR-085).
+        best = random.choice(tied) if len(tied) > 1 else tied[0]
+        tie_note = (
+            f" (tied at score {top_score} between {len(tied)} candidates, selected randomly)"
+            if len(tied) > 1
+            else ""
         )
 
         content_record, content_score, preference_score = best
@@ -93,6 +107,6 @@ class RecipientTopScoreStrategy(DecisionStrategy):
                 f"category_ids={category_ids}, "
                 f"content_score={content_score}×{content_weight} + "
                 f"preference_score={preference_score}×{preference_weight} "
-                f"= {combined}"
+                f"= {combined}{tie_note}"
             ),
         )

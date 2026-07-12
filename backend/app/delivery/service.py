@@ -1,12 +1,13 @@
 import logging
 
 from sqlalchemy.orm import Session
-from pathlib import Path
 
 from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
 from app.delivery.models import DeliveryExecution, SendInstance
 
 from app.delivery.providers.factory import get_provider
+from app.recipients.db_models import RecipientDB
+from app.rendering.service import render_variant_html
 from app.snapshots.db_models import SnapshotDB
 
 logger = logging.getLogger(__name__)
@@ -116,11 +117,17 @@ def send_send_instance(
     db: Session,
     send_instance_id: int,
 ):
+    # Row lock + status guard: two concurrent calls both reading "draft"
+    # before either commits would otherwise both proceed to send. FOR UPDATE
+    # serializes the read-check-write of the status transition itself — the
+    # second caller blocks here, then re-reads the row (now "sending"/"sent")
+    # once the first commits, and gets rejected below instead of also sending.
     send_instance = (
         db.query(SendInstanceDB)
         .filter(
             SendInstanceDB.id == send_instance_id
         )
+        .with_for_update()
         .first()
     )
 
@@ -128,6 +135,14 @@ def send_send_instance(
         raise ValueError(
             f"SendInstance {send_instance_id} not found"
         )
+
+    if send_instance.status in ("sending", "sent"):
+        raise ValueError(
+            f"SendInstance {send_instance_id} is already {send_instance.status} — refusing to send again"
+        )
+
+    send_instance.status = "sending"
+    db.commit()
 
     snapshot = (
         db.query(SnapshotDB)
@@ -142,12 +157,6 @@ def send_send_instance(
             f"Snapshot {send_instance.snapshot_id} not found"
         )
 
-    html = Path(
-        snapshot.html_location
-    ).read_text(
-        encoding="utf-8"
-    )
-
     provider = get_provider(
         send_instance.provider or "mock"
     )
@@ -161,30 +170,57 @@ def send_send_instance(
         .all()
     )
 
-    for execution in executions:
+    try:
+        for execution in executions:
 
-        result = provider.send(
-            recipient_id=execution.recipient_id,
-            subject=send_instance.name,
-            html=html,
-        )
+            # Resolve HTML per recipient rather than reusing one shared
+            # variant-level snapshot — decision-slot personalization can
+            # resolve different content per recipient within the same
+            # variant (ADR-083), so every recipient must get their own
+            # rendered HTML, not identical copies of whatever the snapshot
+            # happened to freeze for a single (or no) recipient.
+            recipient = (
+                db.query(RecipientDB)
+                .filter(RecipientDB.external_id == execution.recipient_id)
+                .first()
+            )
 
-        logger.info(
-            "send result: execution_id=%s recipient_id=%s success=%s "
-            "provider_message_id=%s message=%s",
-            execution.id,
-            execution.recipient_id,
-            result.success,
-            result.provider_message_id,
-            result.message,
-        )
+            html = render_variant_html(
+                db=db,
+                variant_id=snapshot.variant_id,
+                recipient_id=recipient.id if recipient is not None else None,
+                mode="send",
+            )
 
-        execution.status = "sent" if result.success else "failed"
-        execution.provider_message_id = (
-            result.provider_message_id
-        )
+            result = provider.send(
+                recipient_id=execution.recipient_id,
+                subject=send_instance.name,
+                html=html,
+            )
 
-        # Commit after each execution — if provider.send() raises mid-batch,
-        # executions already sent must not lose their persisted status just
-        # because a later one in the loop failed.
+            logger.info(
+                "send result: execution_id=%s recipient_id=%s success=%s "
+                "provider_message_id=%s message=%s",
+                execution.id,
+                execution.recipient_id,
+                result.success,
+                result.provider_message_id,
+                result.message,
+            )
+
+            execution.status = "sent" if result.success else "failed"
+            execution.provider_message_id = (
+                result.provider_message_id
+            )
+
+            # Commit after each execution — if provider.send() raises mid-batch,
+            # executions already sent must not lose their persisted status just
+            # because a later one in the loop failed.
+            db.commit()
+    except Exception:
+        send_instance.status = "failed"
         db.commit()
+        raise
+
+    send_instance.status = "sent"
+    db.commit()

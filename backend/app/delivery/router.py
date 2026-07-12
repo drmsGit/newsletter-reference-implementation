@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -79,10 +79,13 @@ def send_instance(
     send_instance_id: int,
     db: Session = Depends(get_db),
 ):
-    send_send_instance(
-        db=db,
-        send_instance_id=send_instance_id,
-    )
+    try:
+        send_send_instance(
+            db=db,
+            send_instance_id=send_instance_id,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error))
 
     return {
         "status": "sent"
