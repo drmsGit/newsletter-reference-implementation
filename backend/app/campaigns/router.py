@@ -96,7 +96,6 @@ def create_variant_module(
         db=db,
         variant_id=variant_id,
         module_type=payload.module_type,
-        position=payload.position,
         content_record_id=payload.content_record_id,
         decision_slot_id=payload.decision_slot_id,
         module_data=payload.module_data,

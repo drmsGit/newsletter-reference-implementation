@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.campaigns.db_models import CampaignDB, VariantDB, ModuleInstanceDB, DecisionSlotDB, DecisionResolutionDB
@@ -125,15 +126,21 @@ def create_module_for_variant(
     db: Session,
     variant_id: int,
     module_type: str,
-    position: int,
     content_record_id: int | None = None,
     module_data: dict | None = None,
     decision_slot_id: int | None = None,
 ) -> ModuleInstance:
+    max_position = (
+        db.query(func.max(ModuleInstanceDB.position))
+        .filter(ModuleInstanceDB.variant_id == variant_id)
+        .scalar()
+    )
+    next_position = (max_position or 0) + 1
+
     module = ModuleInstanceDB(
         variant_id=variant_id,
         module_type=module_type,
-        position=position,
+        position=next_position,
         content_record_id=content_record_id,
         decision_slot_id=decision_slot_id,
         module_data=module_data,

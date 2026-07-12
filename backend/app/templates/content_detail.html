@@ -10,26 +10,61 @@
 <!-- Edit record -->
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <strong>Base record</strong>
+        <strong>Content</strong>
         <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#form-edit">Edit</button>
     </div>
     <div class="card-body">
         <table class="table table-sm mb-0">
-            <tr><th style="width:120px">ID</th><td>{{ record.id }}</td></tr>
+            <tr><th style="width:160px">ID</th><td>{{ record.id }}</td></tr>
             <tr><th>Title</th><td>{{ record.title }}</td></tr>
-            <tr><th>Body</th><td>{{ record.body }}</td></tr>
+            <tr><th>Description</th><td>{{ record.description or "—" }}</td></tr>
+            <tr><th>Headline <span class="text-muted">(headline_medium)</span></th><td>{{ record.content.headline_medium }}</td></tr>
+            <tr><th>Body <span class="text-muted">(body_medium)</span></th><td>{{ record.content.body_medium }}</td></tr>
+            <tr><th>Button</th><td>{{ record.content.button_label or "—" }} → {{ record.content.button_url or "—" }}</td></tr>
+            <tr><th>Image</th><td>{{ record.content.image_url or "—" }}</td></tr>
         </table>
     </div>
     <div class="collapse" id="form-edit">
         <div class="card-body border-top">
             <form method="post" action="/ui/content/{{ record.id }}/edit">
                 <div class="mb-3">
-                    <label class="form-label">Title</label>
+                    <label class="form-label">Title <span class="text-muted">(catalog label)</span></label>
                     <input type="text" name="title" class="form-control" value="{{ record.title }}" required>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Body</label>
-                    <textarea name="body" class="form-control" rows="3" required>{{ record.body }}</textarea>
+                    <label class="form-label">Description <span class="text-muted">(optional, catalog blurb)</span></label>
+                    <textarea name="description" class="form-control" rows="2">{{ record.description or "" }}</textarea>
+                </div>
+                <hr>
+                <p class="text-muted small">CMS fields — rendered directly into email modules. Editing here changes the live/draft record; existing frozen versions are unaffected.</p>
+                <div class="mb-3">
+                    <label class="form-label">Headline <span class="text-muted">(headline_medium)</span></label>
+                    <input type="text" name="headline_medium" class="form-control" value="{{ record.content.headline_medium }}" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Body text <span class="text-muted">(body_medium)</span></label>
+                    <textarea name="body_medium" class="form-control" rows="3">{{ record.content.body_medium }}</textarea>
+                    <div class="form-text">Supports <code>**bold**</code> and <code>[label](https://url)</code> links. Everything else is rendered as plain text.</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Button label</label>
+                        <input type="text" name="button_label" class="form-control" value="{{ record.content.button_label or '' }}">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Button URL</label>
+                        <input type="text" name="button_url" class="form-control" value="{{ record.content.button_url or '' }}">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Image URL</label>
+                        <input type="text" name="image_url" class="form-control" value="{{ record.content.image_url or '' }}">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Image alt text</label>
+                        <input type="text" name="image_alt" class="form-control" value="{{ record.content.image_alt or '' }}">
+                    </div>
                 </div>
                 <button type="submit" class="btn btn-primary btn-sm">Save changes</button>
             </form>
@@ -37,11 +72,11 @@
     </div>
 </div>
 
-<!-- Publish version -->
+<!-- Freeze version -->
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
         <strong>Versions</strong>
-        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#form-publish">+ Publish version</button>
+        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#form-publish">+ Freeze version</button>
     </div>
     <div class="card-body">
         {% if versions %}
@@ -70,33 +105,18 @@
             </tbody>
         </table>
         {% else %}
-        <p class="text-muted mb-0">No versions published yet.</p>
+        <p class="text-muted mb-0">No versions frozen yet.</p>
         {% endif %}
     </div>
     <div class="collapse" id="form-publish">
         <div class="card-body border-top">
-            <p class="text-muted small">Publishing a version creates an immutable snapshot of the content fields at this point in time.</p>
+            <p class="text-muted small">Freezing a version copies the record's current content fields (above) into an immutable snapshot for audit/rollback. Sends and snapshots resolve against the latest frozen version, not live edits.</p>
             <form method="post" action="/ui/content/{{ record.id }}/publish-version">
                 <div class="mb-3">
-                    <label class="form-label">Headline <span class="text-muted">(headline_medium)</span></label>
-                    <input type="text" name="headline_medium" class="form-control" value="{{ record.title }}" required>
+                    <label class="form-label">Created by <span class="text-muted">(optional)</span></label>
+                    <input type="text" name="created_by" class="form-control" placeholder="e.g. your name">
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Body text <span class="text-muted">(body_medium)</span></label>
-                    <textarea name="body_medium" class="form-control" rows="3" required>{{ record.body }}</textarea>
-                </div>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">Button label</label>
-                        <input type="text" name="button_label" class="form-control" value="Read more">
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">Image URL <span class="text-muted">(optional)</span></label>
-                        <input type="text" name="image_url" class="form-control" placeholder="/static/img/example.jpg">
-                    </div>
-                </div>
-                <input type="hidden" name="created_by" value="">
-                <button type="submit" class="btn btn-primary btn-sm">Publish version</button>
+                <button type="submit" class="btn btn-primary btn-sm">Freeze current content as new version</button>
             </form>
         </div>
     </div>

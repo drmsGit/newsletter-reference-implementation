@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.rendering.service import UnpublishedContentError
 from app.snapshots.models import Snapshot
 from app.snapshots.service import (
     create_snapshot_for_variant,
@@ -20,11 +21,14 @@ def create_variant_snapshot(
     recipient_id: int | None = None,
     db: Session = Depends(get_db),
 ):
-    return create_snapshot_for_variant(
-        db=db,
-        variant_id=variant_id,
-        recipient_id=recipient_id,
-    )
+    try:
+        return create_snapshot_for_variant(
+            db=db,
+            variant_id=variant_id,
+            recipient_id=recipient_id,
+        )
+    except UnpublishedContentError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
 
 
 @router.get("/variants/{variant_id}", response_model=list[Snapshot])

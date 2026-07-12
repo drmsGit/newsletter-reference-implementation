@@ -10,33 +10,42 @@ from app.content.db_models import (
 from app.content.models import ContentRecord, Category, CategoryRelation, ContentVersion
 
 
+def to_content_record(record: ContentRecordDB) -> ContentRecord:
+    return ContentRecord(
+        id=record.id,
+        title=record.title,
+        description=record.description,
+        content=record.content or {},
+        status=record.status,
+    )
+
+
 def get_content_record(db: Session, content_id: int) -> ContentRecordDB | None:
     return db.query(ContentRecordDB).filter(ContentRecordDB.id == content_id).first()
 
 
-def update_content_record(db: Session, content_id: int, title: str, body: str) -> ContentRecord | None:
+def update_content_record(
+    db: Session,
+    content_id: int,
+    title: str,
+    content: dict,
+    description: str | None = None,
+) -> ContentRecord | None:
     record = get_content_record(db, content_id)
     if record is None:
         return None
     record.title = title
-    record.body = body
+    record.description = description
+    record.content = content
     db.commit()
     db.refresh(record)
-    return ContentRecord(id=record.id, title=record.title, body=record.body, status=record.status)
+    return to_content_record(record)
 
 
 def list_content_records(db: Session) -> list[ContentRecord]:
     records = db.query(ContentRecordDB).all()
 
-    return [
-        ContentRecord(
-            id=record.id,
-            title=record.title,
-            body=record.body,
-            status=record.status,
-        )
-        for record in records
-    ]
+    return [to_content_record(record) for record in records]
 
 
 def list_categories(db: Session) -> list[Category]:
@@ -81,17 +90,32 @@ def create_demo_content_if_empty(db: Session) -> None:
 
     mallorca = ContentRecordDB(
         title="Mallorca Beach Walk",
-        body="A reusable content record about beach walks in Mallorca.",
+        description="A reusable content record about beach walks in Mallorca.",
+        content={
+            "headline_medium": "Mallorca Beach Walk",
+            "body_medium": "A reusable content record about beach walks in Mallorca.",
+            "button_label": "Read more",
+        },
         status="active",
     )
     rome = ContentRecordDB(
         title="Rome City Weekend",
-        body="A reusable content record about a cultural weekend in Rome.",
+        description="A reusable content record about a cultural weekend in Rome.",
+        content={
+            "headline_medium": "Rome City Weekend",
+            "body_medium": "A reusable content record about a cultural weekend in Rome.",
+            "button_label": "Read more",
+        },
         status="active",
     )
     tenerife = ContentRecordDB(
         title="Tenerife Nature Escape",
-        body="A reusable content record about nature experiences on Tenerife.",
+        description="A reusable content record about nature experiences on Tenerife.",
+        content={
+            "headline_medium": "Tenerife Nature Escape",
+            "body_medium": "A reusable content record about nature experiences on Tenerife.",
+            "button_label": "Read more",
+        },
         status="active",
     )
 
@@ -115,12 +139,14 @@ def create_demo_content_if_empty(db: Session) -> None:
 def create_content(
     db: Session,
     title: str,
-    body: str,
+    content: dict,
+    description: str | None = None,
 ) -> ContentRecord:
 
     record = ContentRecordDB(
         title=title,
-        body=body,
+        description=description,
+        content=content,
         status="active",
     )
 
@@ -128,12 +154,7 @@ def create_content(
     db.commit()
     db.refresh(record)
 
-    return ContentRecord(
-        id=record.id,
-        title=record.title,
-        body=record.body,
-        status=record.status,
-    )
+    return to_content_record(record)
 
 def create_category(
     db: Session,
@@ -243,7 +264,18 @@ def assign_category_to_content(
     content_id: int,
     category_id: int,
     score: int = 10,
-) -> ContentCategoryAssignmentDB:
+) -> ContentCategoryAssignmentDB | None:
+    existing = (
+        db.query(ContentCategoryAssignmentDB)
+        .filter(
+            ContentCategoryAssignmentDB.content_id == content_id,
+            ContentCategoryAssignmentDB.category_id == category_id,
+        )
+        .first()
+    )
+    if existing is not None:
+        return None
+
     assignment = ContentCategoryAssignmentDB(
         content_id=content_id,
         category_id=category_id,
@@ -271,9 +303,13 @@ def to_content_version(record: ContentVersionDB) -> ContentVersion:
 def create_content_version(
     db: Session,
     content_record_id: int,
-    content: dict,
     created_by: str | None = None,
-) -> ContentVersion:
+) -> ContentVersion | None:
+    """Freezes the record's current `content` into an immutable version (ADR-128)."""
+    record = get_content_record(db, content_record_id)
+    if record is None:
+        return None
+
     latest_version = (
         db.query(ContentVersionDB)
         .filter(ContentVersionDB.content_record_id == content_record_id)
@@ -290,7 +326,7 @@ def create_content_version(
     version = ContentVersionDB(
         content_record_id=content_record_id,
         version_number=next_version_number,
-        content=content,
+        content=record.content or {},
         created_by=created_by,
     )
 

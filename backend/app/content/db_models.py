@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, JSON, func
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, JSON, func
 
 from app.database import Base
 
@@ -8,7 +8,8 @@ class ContentRecordDB(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(255), nullable=False)
-    body = Column(Text, nullable=False)
+    description = Column(String(500), nullable=True)
+    content = Column(JSON, nullable=False, default=dict)
     status = Column(String(50), nullable=False, default="active")
 
 

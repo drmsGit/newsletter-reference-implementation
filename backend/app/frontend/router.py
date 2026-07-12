@@ -4,6 +4,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from itertools import combinations
+from urllib.parse import quote
 import math
 
 from app.database import get_db
@@ -15,6 +16,7 @@ from app.content.service import create_content, update_content_record, assign_ca
 from app.content.service import create_category, create_category_relation
 from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB, ModuleInstanceDB, DecisionSlotDB
 from app.campaigns.service import create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant, update_decision_slot
+from app.rendering.service import UnpublishedContentError
 from app.snapshots.service import create_snapshot_for_variant
 from app.delivery.service import create_send_instance, send_send_instance
 from app.recipients.db_models import RecipientDB, RecipientPreferenceDB, PreferenceUpdateLogDB
@@ -266,6 +268,7 @@ def campaigns_list(
 def campaign_detail(
     campaign_id: int,
     request: Request,
+    error: str | None = None,
     db: Session = Depends(get_db),
 ):
     campaign = (
@@ -421,6 +424,7 @@ def campaign_detail(
             "content_records": content_records,
             "module_templates": module_templates,
             "strategies": strategies,
+            "error": error,
         },
     )
 
@@ -459,7 +463,6 @@ def module_create(
     campaign_id: int,
     variant_id: int,
     module_type: str = Form(...),
-    position: int = Form(...),
     content_record_id: int | None = Form(None),
     decision_slot_id: int | None = Form(None),
     db: Session = Depends(get_db),
@@ -468,7 +471,6 @@ def module_create(
         db,
         variant_id=variant_id,
         module_type=module_type,
-        position=position,
         content_record_id=content_record_id or None,
         decision_slot_id=decision_slot_id or None,
     )
@@ -498,7 +500,13 @@ def snapshot_create(
     variant_id: int,
     db: Session = Depends(get_db),
 ):
-    create_snapshot_for_variant(db, variant_id=variant_id)
+    try:
+        create_snapshot_for_variant(db, variant_id=variant_id)
+    except UnpublishedContentError as exc:
+        return RedirectResponse(
+            url=f"/ui/campaigns/{campaign_id}?error={quote(str(exc))}",
+            status_code=303,
+        )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
@@ -702,10 +710,28 @@ def content_detail(
 @router.post("/ui/content")
 def content_create(
     title: str = Form(...),
-    body: str = Form(...),
+    description: str = Form(""),
+    headline_medium: str = Form(...),
+    body_medium: str = Form(""),
+    button_label: str = Form(""),
+    button_url: str = Form(""),
+    image_url: str = Form(""),
+    image_alt: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    record = create_content(db, title=title, body=body)
+    record = create_content(
+        db,
+        title=title,
+        description=description or None,
+        content={
+            "headline_medium": headline_medium,
+            "body_medium": body_medium,
+            "button_label": button_label,
+            "button_url": button_url,
+            "image_url": image_url,
+            "image_alt": image_alt,
+        },
+    )
     return RedirectResponse(url=f"/ui/content/{record.id}", status_code=303)
 
 
@@ -713,32 +739,41 @@ def content_create(
 def content_edit(
     content_record_id: int,
     title: str = Form(...),
-    body: str = Form(...),
+    description: str = Form(""),
+    headline_medium: str = Form(...),
+    body_medium: str = Form(""),
+    button_label: str = Form(""),
+    button_url: str = Form(""),
+    image_url: str = Form(""),
+    image_alt: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    update_content_record(db, content_record_id, title=title, body=body)
+    update_content_record(
+        db,
+        content_record_id,
+        title=title,
+        description=description or None,
+        content={
+            "headline_medium": headline_medium,
+            "body_medium": body_medium,
+            "button_label": button_label,
+            "button_url": button_url,
+            "image_url": image_url,
+            "image_alt": image_alt,
+        },
+    )
     return RedirectResponse(url=f"/ui/content/{content_record_id}", status_code=303)
 
 
 @router.post("/ui/content/{content_record_id}/publish-version")
 def content_publish_version(
     content_record_id: int,
-    headline_medium: str = Form(...),
-    body_medium: str = Form(...),
-    button_label: str = Form("Read more"),
-    image_url: str = Form(""),
     created_by: str = Form(""),
     db: Session = Depends(get_db),
 ):
     create_content_version(
         db,
         content_record_id=content_record_id,
-        content={
-            "headline_medium": headline_medium,
-            "body_medium": body_medium,
-            "button_label": button_label,
-            "image_url": image_url or None,
-        },
         created_by=created_by or None,
     )
     return RedirectResponse(url=f"/ui/content/{content_record_id}", status_code=303)

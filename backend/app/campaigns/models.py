@@ -49,7 +49,6 @@ class ModuleInstance(BaseModel):
 
 class ModuleInstanceCreate(BaseModel):
     module_type: str
-    position: int
     content_record_id: int | None = None
     module_data: dict[str, Any] | None = None
     decision_slot_id: int | None = None

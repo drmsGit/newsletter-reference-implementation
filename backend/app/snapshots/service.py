@@ -99,7 +99,7 @@ def create_snapshot_for_variant(db: Session, variant_id: int, recipient_id: int 
         "recipient_id": recipient_id,
     }
     
-    html = render_variant_html(db=db, variant_id=variant_id, recipient_id=recipient_id,)
+    html = render_variant_html(db=db, variant_id=variant_id, recipient_id=recipient_id, mode="send")
     render_context = build_render_context(
         db=db,
         variant_id=variant_id,

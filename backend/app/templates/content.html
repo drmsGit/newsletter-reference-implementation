@@ -15,12 +15,43 @@
             <h5 class="card-title">New content record</h5>
             <form method="post" action="/ui/content">
                 <div class="mb-3">
-                    <label class="form-label">Title</label>
+                    <label class="form-label">Title <span class="text-muted">(catalog label)</span></label>
                     <input type="text" name="title" class="form-control" required placeholder="e.g. Mallorca Beach Walk">
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Body</label>
-                    <textarea name="body" class="form-control" rows="3" required placeholder="Short description of the content record"></textarea>
+                    <label class="form-label">Description <span class="text-muted">(optional, catalog blurb)</span></label>
+                    <textarea name="description" class="form-control" rows="2" placeholder="Short description for catalog listing"></textarea>
+                </div>
+                <hr>
+                <p class="text-muted small">CMS fields — rendered directly into email modules.</p>
+                <div class="mb-3">
+                    <label class="form-label">Headline <span class="text-muted">(headline_medium)</span></label>
+                    <input type="text" name="headline_medium" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Body text <span class="text-muted">(body_medium)</span></label>
+                    <textarea name="body_medium" class="form-control" rows="3"></textarea>
+                    <div class="form-text">Supports <code>**bold**</code> and <code>[label](https://url)</code> links. Everything else is rendered as plain text.</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Button label</label>
+                        <input type="text" name="button_label" class="form-control" placeholder="Read more">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Button URL</label>
+                        <input type="text" name="button_url" class="form-control" placeholder="https://example.com">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Image URL</label>
+                        <input type="text" name="image_url" class="form-control" placeholder="/static/img/example.jpg">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Image alt text</label>
+                        <input type="text" name="image_alt" class="form-control">
+                    </div>
                 </div>
                 <button type="submit" class="btn btn-primary">Create</button>
             </form>

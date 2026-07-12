@@ -39,10 +39,13 @@ RESTART IDENTITY CASCADE;
 -- CONTENT
 -- =========================================================
 
-INSERT INTO content_records (title, body, status) VALUES
-    ('Mallorca Beach Walk',    'Discover the hidden coves of Mallorca''s northwest coast — a 12km walk between Port de Sóller and Sa Calobra.', 'active'),
-    ('Rome City Weekend',      'Three days in Rome without the tourist traps: neighbourhood trattorias, the Trastevere market, and a private tour of the Borghese Gallery.', 'active'),
-    ('Tenerife Nature Escape', 'Teide at sunrise, laurel forest hikes in Anaga, and the star-gazing plateau of El Médano — Tenerife beyond the resorts.', 'active');
+INSERT INTO content_records (title, description, content, status) VALUES
+    ('Mallorca Beach Walk',    'Discover the hidden coves of Mallorca''s northwest coast — a 12km walk between Port de Sóller and Sa Calobra.',
+     '{"headline_medium": "Mallorca Beach Walk", "body_medium": "Discover the hidden coves of Mallorca''s northwest coast.", "button_label": "Read more", "image_url": "/static/img/mallorca.jpg"}', 'active'),
+    ('Rome City Weekend',      'Three days in Rome without the tourist traps: neighbourhood trattorias, the Trastevere market, and a private tour of the Borghese Gallery.',
+     '{"headline_medium": "Rome City Weekend", "body_medium": "Three days in Rome without the tourist traps.", "button_label": "Read more", "image_url": "/static/img/rome.jpg"}', 'active'),
+    ('Tenerife Nature Escape', 'Teide at sunrise, laurel forest hikes in Anaga, and the star-gazing plateau of El Médano — Tenerife beyond the resorts.',
+     '{"headline_medium": "Tenerife Nature Escape", "body_medium": "Teide at sunrise, laurel forest hikes in Anaga.", "button_label": "Read more", "image_url": "/static/img/tenerife.jpg"}', 'active');
 
 INSERT INTO content_versions (content_record_id, version_number, content, created_by) VALUES
     (1, 1, '{"headline_medium": "Mallorca Beach Walk",    "body_medium": "Discover the hidden coves of Mallorca''s northwest coast.", "button_label": "Read more", "image_url": "/static/img/mallorca.jpg"}', 'seed'),
@@ -144,12 +147,10 @@ INSERT INTO module_instances (variant_id, module_type, position, content_record_
 -- strategy is not yet decided (file vs DB vs object storage).
 -- Create snapshots through the UI after seeding.
 
--- Anna's beach preference bumped (no linked engagement event — delivery data omitted from seed)
-INSERT INTO preference_update_logs (recipient_id, category_id, event_id, previous_score, delta, new_score, reason)
-SELECT r.id, cat.id, NULL, 90, 5, 95, 'click on beach content'
-FROM recipients r
-JOIN categories cat ON cat.name = 'Beach'
-WHERE r.external_id = 'r-001';
+-- Preference-bump seed row intentionally omitted: PreferenceUpdateLogDB.event_id is NOT NULL
+-- and always traces to a real EngagementEventDB row, which itself requires a delivery_execution
+-- (which requires a send_instance + snapshot) — a chain this seed deliberately doesn't build.
+-- See docs/backlog.md "Needs ADR" (snapshot/HTML storage strategy) for the full context.
 
 -- =========================================================
 -- DECISION RESOLUTIONS

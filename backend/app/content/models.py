@@ -6,13 +6,15 @@ from typing import Any
 class ContentRecord(BaseModel):
     id: int
     title: str
-    body: str
+    description: str | None = None
+    content: dict[str, Any]
     status: str = "active"
 
 
 class ContentCreate(BaseModel):
     title: str
-    body: str
+    description: str | None = None
+    content: dict[str, Any]
 
 
 class Category(BaseModel):
@@ -51,7 +53,6 @@ class ContentVersion(BaseModel):
 
 class ContentVersionCreate(BaseModel):
     content_record_id: int
-    content: dict[str, Any]
     created_by: str | None = None
 
 

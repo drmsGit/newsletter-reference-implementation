@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -17,6 +17,7 @@ from app.content.models import (
 from app.content.service import (
     list_content_records,
     get_content_record,
+    to_content_record,
     update_content_record,
     list_categories,
     list_categories_for_content,
@@ -45,13 +46,12 @@ def get_content_record_by_id(content_id: int, db: Session = Depends(get_db)):
     record = get_content_record(db, content_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Content record not found")
-    from app.content.models import ContentRecord as CR
-    return CR(id=record.id, title=record.title, body=record.body, status=record.status)
+    return to_content_record(record)
 
 
 @router.put("/{content_id}", response_model=ContentRecord)
 def update_content_record_by_id(content_id: int, payload: ContentCreate, db: Session = Depends(get_db)):
-    record = update_content_record(db, content_id, payload.title, payload.body)
+    record = update_content_record(db, content_id, payload.title, payload.content, payload.description)
     if record is None:
         raise HTTPException(status_code=404, detail="Content record not found")
     return record
@@ -74,7 +74,8 @@ def create_content_record(
     return create_content(
         db=db,
         title=payload.title,
-        body=payload.body,
+        content=payload.content,
+        description=payload.description,
     )
 
 @router.post("/categories", response_model=Category)
@@ -103,6 +104,12 @@ def assign_category(
         score=payload.score,
     )
 
+    if assignment is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Category already assigned to this content record",
+        )
+
     return ContentCategoryAssignment(
         id=assignment.id,
         content_id=assignment.content_id,
@@ -116,12 +123,14 @@ def create_version(
     payload: ContentVersionCreate,
     db: Session = Depends(get_db),
 ):
-    return create_content_version(
+    version = create_content_version(
         db=db,
         content_record_id=payload.content_record_id,
-        content=payload.content,
         created_by=payload.created_by,
     )
+    if version is None:
+        raise HTTPException(status_code=404, detail="Content record not found")
+    return version
 
 
 @router.get("/{content_record_id}/versions", response_model=list[ContentVersion])

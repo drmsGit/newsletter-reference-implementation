@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func, JSON
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, UniqueConstraint, func, JSON
 
 from app.database import Base
 
@@ -50,6 +50,10 @@ class ModuleInstanceDB(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("variant_id", "position", name="uq_module_instances_variant_position"),
     )
 
 
