@@ -30,6 +30,7 @@ def build_render_context(
     db: Session,
     variant_id: int,
     recipient_id: int | None = None,
+    resolutions_by_module_id: dict[int, DecisionResolutionDB] | None = None,
 ) -> dict:
     modules = (
         db.query(ModuleInstanceDB)
@@ -37,6 +38,8 @@ def build_render_context(
         .order_by(ModuleInstanceDB.position.asc())
         .all()
     )
+
+    resolutions_by_module_id = resolutions_by_module_id or {}
 
     context = {
         "variant_id": variant_id,
@@ -57,15 +60,13 @@ def build_render_context(
         }
 
         if module.decision_slot_id is not None and recipient_id is not None:
-            resolution = (
-                db.query(DecisionResolutionDB)
-                .filter(
-                    DecisionResolutionDB.decision_slot_id == module.decision_slot_id,
-                    DecisionResolutionDB.recipient_id == recipient_id,
-                )
-                .order_by(DecisionResolutionDB.created_at.desc())
-                .first()
-            )
+            # Reuse the resolution actually used during rendering (see
+            # render_variant_html's collect_resolutions) instead of
+            # re-querying DecisionResolutionDB here — a second, independent
+            # query could race against a new resolution being inserted
+            # between the two calls, making the snapshot's HTML and its
+            # recorded metadata describe different content (ADR-062).
+            resolution = resolutions_by_module_id.get(module.id)
 
             if resolution is not None:
                 module_context["content_record_id"] = resolution.content_record_id
@@ -94,16 +95,18 @@ def build_render_context(
     return context
 
 def create_snapshot_for_variant(db: Session, variant_id: int, recipient_id: int | None = None) -> Snapshot:
-    render_context = {
-        "variant_id": variant_id,
-        "recipient_id": recipient_id,
-    }
-    
-    html = render_variant_html(db=db, variant_id=variant_id, recipient_id=recipient_id, mode="send")
+    html, resolutions_by_module_id = render_variant_html(
+        db=db,
+        variant_id=variant_id,
+        recipient_id=recipient_id,
+        mode="send",
+        collect_resolutions=True,
+    )
     render_context = build_render_context(
         db=db,
         variant_id=variant_id,
         recipient_id=recipient_id,
+        resolutions_by_module_id=resolutions_by_module_id,
     )
 
     SNAPSHOT_STORAGE_DIR.mkdir(parents=True, exist_ok=True)

@@ -64,14 +64,34 @@ def _discover() -> dict[str, ModuleManifest]:
     return manifests
 
 
-_REGISTRY: dict[str, ModuleManifest] = _discover()
+def _dir_mtime() -> float:
+    if not EMAIL_MODULES_DIR.exists():
+        return 0.0
+    return max(
+        (p.stat().st_mtime for p in EMAIL_MODULES_DIR.glob("*")),
+        default=0.0,
+    )
+
+
+_REGISTRY: dict[str, ModuleManifest] = {}
+_registry_mtime: float | None = None
+
+
+def _ensure_fresh() -> None:
+    global _REGISTRY, _registry_mtime
+    current_mtime = _dir_mtime()
+    if _registry_mtime is None or current_mtime != _registry_mtime:
+        _REGISTRY = _discover()
+        _registry_mtime = current_mtime
 
 
 def get_manifest(name: str) -> ModuleManifest | None:
+    _ensure_fresh()
     return _REGISTRY.get(name)
 
 
 def list_manifests() -> list[ModuleManifest]:
+    _ensure_fresh()
     return list(_REGISTRY.values())
 
 

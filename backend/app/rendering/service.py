@@ -1,4 +1,5 @@
 import re
+from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
@@ -37,6 +38,7 @@ _RICH_TEXT_LINK = re.compile(r"\[([^\]]+)\]\((https?://[^\s)]+)\)")
 _RICH_TEXT_BOLD = re.compile(r"\*\*(.+?)\*\*")
 
 
+@lru_cache(maxsize=1)
 def _load_brand_css() -> str:
     if _BRAND_CSS_PATH.exists():
         return _BRAND_CSS_PATH.read_text()
@@ -62,7 +64,8 @@ def render_variant_html(
     variant_id: int,
     recipient_id: int | None = None,
     mode: RenderMode = "preview",
-) -> str:
+    collect_resolutions: bool = False,
+) -> str | tuple[str, dict[int, DecisionResolutionDB]]:
     modules = (
         db.query(ModuleInstanceDB)
         .filter(ModuleInstanceDB.variant_id == variant_id)
@@ -70,10 +73,14 @@ def render_variant_html(
         .all()
     )
 
-    rendered_modules = [
-        render_module(db=db, module=module, recipient_id=recipient_id, mode=mode)
-        for module in modules
-    ]
+    rendered_modules = []
+    resolutions_by_module_id: dict[int, DecisionResolutionDB] = {}
+
+    for module in modules:
+        html, resolution = render_module(db=db, module=module, recipient_id=recipient_id, mode=mode)
+        rendered_modules.append(html)
+        if resolution is not None:
+            resolutions_by_module_id[module.id] = resolution
 
     brand_css = _load_brand_css()
 
@@ -89,7 +96,11 @@ def render_variant_html(
   </body>
 </html>"""
 
-    return _inliner.inline(raw_html)
+    final_html = _inliner.inline(raw_html)
+
+    if collect_resolutions:
+        return final_html, resolutions_by_module_id
+    return final_html
 
 
 def render_module(
@@ -97,16 +108,16 @@ def render_module(
     module: ModuleInstanceDB,
     recipient_id: int | None = None,
     mode: RenderMode = "preview",
-) -> str:
+) -> tuple[str, DecisionResolutionDB | None]:
     manifest = get_manifest(module.module_type)
 
     if manifest is None:
-        return render_unknown_module(module)
+        return render_unknown_module(module), None
 
     if manifest.cms:
         return render_cms_module(db=db, module=module, manifest=manifest, recipient_id=recipient_id, mode=mode)
 
-    return render_static_module(db=db, module=module, manifest=manifest, mode=mode)
+    return render_static_module(db=db, module=module, manifest=manifest, mode=mode), None
 
 
 def render_cms_module(
@@ -115,12 +126,17 @@ def render_cms_module(
     manifest: ModuleManifest,
     recipient_id: int | None = None,
     mode: RenderMode = "preview",
-) -> str:
-    content = resolve_content_for_module(db=db, module=module, recipient_id=recipient_id, mode=mode)
+) -> tuple[str, DecisionResolutionDB | None]:
+    content, decision_resolution = resolve_content_for_module(
+        db=db, module=module, recipient_id=recipient_id, mode=mode
+    )
 
     if content is None:
         # ADR-086: no content resolved — hide the slot rather than show a placeholder
-        return f"<!-- module {module.id} ({module.module_type}): no content resolved, slot hidden -->"
+        return (
+            f"<!-- module {module.id} ({module.module_type}): no content resolved, slot hidden -->",
+            decision_resolution,
+        )
 
     data = module.module_data or {}
     variables: dict = {}
@@ -136,16 +152,17 @@ def render_cms_module(
 
     html_source = get_template_html(module.module_type)
     if html_source is None:
-        return render_unknown_module(module)
+        return render_unknown_module(module), decision_resolution
 
     rendered = _jinja.from_string(html_source).render(**variables)
 
-    return (
+    html = (
         f'<div data-module-id="{module.id}" data-module-type="{module.module_type}"'
         f' data-content-id="{content["id"]}">\n'
         f"{rendered}\n"
         f"</div>"
     )
+    return html, decision_resolution
 
 
 def render_static_module(
@@ -245,12 +262,22 @@ def resolve_content_for_module(
     module: ModuleInstanceDB,
     recipient_id: int | None = None,
     mode: RenderMode = "preview",
-) -> dict | None:
+) -> tuple[dict | None, DecisionResolutionDB | None]:
+    """
+    Returns (content, decision_resolution). decision_resolution is the
+    DecisionResolutionDB row actually used (set only for decision-slot-driven
+    modules) — callers building an audit/render_context should reuse this
+    rather than re-querying, so rendering and the recorded metadata can never
+    disagree about which resolution was used (ADR-062).
+    """
     if module.content_record_id is not None:
-        return resolve_renderable_content(
-            db=db,
-            content_record_id=module.content_record_id,
-            mode=mode,
+        return (
+            resolve_renderable_content(
+                db=db,
+                content_record_id=module.content_record_id,
+                mode=mode,
+            ),
+            None,
         )
 
     if module.decision_slot_id is not None:
@@ -282,13 +309,14 @@ def resolve_content_for_module(
             )
 
         if resolution is None:
-            return None
+            return None, None
 
-        return resolve_renderable_content(
+        content = resolve_renderable_content(
             db=db,
             content_record_id=resolution.content_record_id,
             content_version_id=resolution.content_version_id,
             mode=mode,
         )
+        return content, resolution
 
-    return None
+    return None, None

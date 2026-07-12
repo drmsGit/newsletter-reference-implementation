@@ -11,7 +11,7 @@
             <th>External ID</th>
             <th>Email</th>
             <th>Language</th>
-            <th>Preferred Airport</th>
+            <th>Attributes</th>
             <th>Status</th>
         </tr>
     </thead>
@@ -27,7 +27,11 @@
             </td>
             <td>{{ recipient.email }}</td>
             <td>{{ recipient.language }}</td>
-            <td>{{ recipient.preferred_airport }}</td>
+            <td>
+                {% for key, value in (recipient.attributes or {}).items() %}
+                <span class="badge bg-light text-dark border">{{ key }}: {{ value }}</span>
+                {% endfor %}
+            </td>
             <td>{{ recipient.status }}</td>
         </tr>
         {% endfor %}

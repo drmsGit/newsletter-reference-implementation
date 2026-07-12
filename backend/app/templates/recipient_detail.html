@@ -33,8 +33,12 @@
             </tr>
 
             <tr>
-                <th>Preferred Airport</th>
-                <td>{{ recipient.preferred_airport }}</td>
+                <th>Attributes</th>
+                <td>
+                    {% for key, value in (recipient.attributes or {}).items() %}
+                    <div><strong>{{ key }}</strong>: {{ value }}</div>
+                    {% endfor %}
+                </td>
             </tr>
 
             <tr>

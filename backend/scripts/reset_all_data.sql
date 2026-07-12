@@ -91,10 +91,10 @@ JOIN categories cat ON cat.name = v.category_name;
 -- RECIPIENTS
 -- =========================================================
 
-INSERT INTO recipients (external_id, email, language, preferred_airport, attributes, status) VALUES
-    ('r-001', 'anna.mueller@example.com',  'de', 'HAM', '{"firstname": "Anna",   "lastname": "Müller"}',   'active'),
-    ('r-002', 'jan.devries@example.com',   'nl', 'AMS', '{"firstname": "Jan",    "lastname": "de Vries"}', 'active'),
-    ('r-003', 'sophie.martin@example.com', 'fr', 'CDG', '{"firstname": "Sophie", "lastname": "Martin"}',   'active');
+INSERT INTO recipients (external_id, email, language, attributes, status) VALUES
+    ('r-001', 'anna.mueller@example.com',  'de', '{"firstname": "Anna",   "lastname": "Müller",   "preferred_airport": "HAM"}', 'active'),
+    ('r-002', 'jan.devries@example.com',   'nl', '{"firstname": "Jan",    "lastname": "de Vries", "preferred_airport": "AMS"}', 'active'),
+    ('r-003', 'sophie.martin@example.com', 'fr', '{"firstname": "Sophie", "lastname": "Martin",    "preferred_airport": "CDG"}', 'active');
 
 -- Anna: beach-leaning | Jan: city/culture | Sophie: nature/city
 INSERT INTO recipient_preferences (recipient_id, category_id, score, source)

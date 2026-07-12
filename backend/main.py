@@ -24,6 +24,7 @@ from app.decision.router import router as decision_router
 from app.recipients.db_models import RecipientDB, RecipientPreferenceDB
 from app.recipients.router import router as recipients_router
 
+from app.providers.db_models import ProviderEventQuarantineDB
 from app.providers.router import router as provider_router
 
 from app.email_modules.router import router as email_modules_router

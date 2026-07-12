@@ -9,7 +9,6 @@ class Recipient(BaseModel):
     external_id: str
     email: str
     language: str | None = None
-    preferred_airport: str | None = None
     attributes: dict[str, Any] | None = None
     status: str
     created_at: datetime
@@ -20,7 +19,6 @@ class RecipientCreate(BaseModel):
     external_id: str
     email: str
     language: str | None = None
-    preferred_airport: str | None = None
     attributes: dict[str, Any] | None = None
     status: str = "active"
 

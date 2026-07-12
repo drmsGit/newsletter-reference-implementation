@@ -20,15 +20,17 @@ def create_recipient_record(
     payload: RecipientCreate,
     db: Session = Depends(get_db),
 ):
-    return create_recipient(
-        db=db,
-        external_id=payload.external_id,
-        email=payload.email,
-        language=payload.language,
-        preferred_airport=payload.preferred_airport,
-        attributes=payload.attributes,
-        status=payload.status,
-    )
+    try:
+        return create_recipient(
+            db=db,
+            external_id=payload.external_id,
+            email=payload.email,
+            language=payload.language,
+            attributes=payload.attributes,
+            status=payload.status,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
 
 
 @router.get("/", response_model=list[Recipient])

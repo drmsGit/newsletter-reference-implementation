@@ -3,6 +3,47 @@ from sqlalchemy.orm import Session
 from app.recipients.db_models import RecipientDB, RecipientPreferenceDB
 from app.recipients.models import Recipient, RecipientPreference
 
+# RecipientDB.attributes is an open bag for engagement/personalization-relevant
+# data (e.g. firstname, preferred_airport, loyalty_tier) — it is allowed to
+# grow richer over time (including via AI/decisioning-driven enrichment), but
+# must never become a CRM-owned data store (ADR-126: the Recipient Projection
+# "must not become... a full customer profile repository... a system of
+# record for customer data"). Rather than enumerate every allowed key (the
+# allowed set is intentionally open-ended), reject the common CRM-only field
+# shapes by name.
+_FORBIDDEN_ATTRIBUTE_KEY_PATTERNS = (
+    "address",
+    "invoice",
+    "ssn",
+    "social_security",
+    "payment",
+    "billing",
+    "phone",
+    "service_case",
+    "ticket",
+    "passport",
+    "credit_card",
+    "iban",
+    "bank_account",
+    "tax_id",
+)
+
+
+def validate_recipient_attributes(attributes: dict | None) -> None:
+    if not attributes:
+        return
+
+    for key in attributes:
+        normalized = key.lower()
+        for forbidden in _FORBIDDEN_ATTRIBUTE_KEY_PATTERNS:
+            if forbidden in normalized:
+                raise ValueError(
+                    f"attributes key '{key}' looks like CRM-owned data (matches "
+                    f"forbidden pattern '{forbidden}') — the Recipient Projection "
+                    "must not become a customer profile repository (ADR-126). "
+                    "Keep this data in the CRM."
+                )
+
 
 def to_recipient(record: RecipientDB) -> Recipient:
     return Recipient(
@@ -10,7 +51,6 @@ def to_recipient(record: RecipientDB) -> Recipient:
         external_id=record.external_id,
         email=record.email,
         language=record.language,
-        preferred_airport=record.preferred_airport,
         attributes=record.attributes,
         status=record.status,
         created_at=record.created_at,
@@ -23,15 +63,15 @@ def create_recipient(
     external_id: str,
     email: str,
     language: str | None = None,
-    preferred_airport: str | None = None,
     attributes: dict | None = None,
     status: str = "active",
 ) -> Recipient:
+    validate_recipient_attributes(attributes)
+
     recipient = RecipientDB(
         external_id=external_id,
         email=email,
         language=language,
-        preferred_airport=preferred_airport,
         attributes=attributes,
         status=status,
     )
