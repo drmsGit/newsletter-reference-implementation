@@ -151,10 +151,13 @@ def create_decision_slot_resolution(
     payload: DecisionResolutionCreate,
     db: Session = Depends(get_db),
 ):
-    return create_decision_resolution(
-        db=db,
-        decision_slot_id=decision_slot_id,
-        content_record_id=payload.content_record_id,
-        reason=payload.reason,
-        score=payload.score,
-    )
+    try:
+        return create_decision_resolution(
+            db=db,
+            decision_slot_id=decision_slot_id,
+            content_record_id=payload.content_record_id,
+            reason=payload.reason,
+            score=payload.score,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))

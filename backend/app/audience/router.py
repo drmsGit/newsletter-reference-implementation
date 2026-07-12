@@ -15,7 +15,10 @@ def list_groups(db: Session = Depends(get_db)):
 
 @router.post("/", response_model=AudienceGroup, status_code=201)
 def create_group(payload: AudienceGroupCreate, db: Session = Depends(get_db)):
-    return service.create_group(db, payload.name, payload.description)
+    try:
+        return service.create_group(db, payload.name, payload.description)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error))
 
 
 @router.get("/{group_id}", response_model=AudienceGroup)
@@ -28,7 +31,10 @@ def get_group(group_id: int, db: Session = Depends(get_db)):
 
 @router.patch("/{group_id}", response_model=AudienceGroup)
 def update_group(group_id: int, payload: AudienceGroupCreate, db: Session = Depends(get_db)):
-    group = service.update_group(db, group_id, payload.name, payload.description)
+    try:
+        group = service.update_group(db, group_id, payload.name, payload.description)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error))
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
     return group

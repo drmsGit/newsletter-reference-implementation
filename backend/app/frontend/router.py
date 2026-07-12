@@ -14,6 +14,7 @@ import json
 from app.content.db_models import ContentRecordDB, ContentVersionDB, CategoryDB, ContentCategoryAssignmentDB, CategoryRelationDB
 from app.content.service import create_content, update_content_record, assign_category_to_content, create_content_version, delete_category_assignment, delete_category_relation
 from app.content.service import create_category, create_category_relation
+from app.content.service import delete_content_record, delete_category, ContentRecordHasHistoryError, HasRelationsError
 from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB, ModuleInstanceDB, DecisionSlotDB
 from app.campaigns.service import create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant, update_decision_slot
 from app.rendering.service import UnpublishedContentError
@@ -581,6 +582,7 @@ def content_detail(
     content_record_id: int,
     request: Request,
     error: str | None = None,
+    confirm_delete: bool = False,
     db: Session = Depends(get_db),
 ):
     record = (
@@ -711,8 +713,30 @@ def content_detail(
             "preference_signals": signal_rows,
             "all_categories": all_categories,
             "error": error,
+            "confirm_delete": confirm_delete,
         },
     )
+
+
+@router.post("/ui/content/{content_record_id}/delete")
+def content_delete(
+    content_record_id: int,
+    force: bool = Form(False),
+    db: Session = Depends(get_db),
+):
+    try:
+        delete_content_record(db, content_record_id, force=force)
+    except ContentRecordHasHistoryError as error:
+        return RedirectResponse(
+            url=f"/ui/content/{content_record_id}?error={quote(str(error))}",
+            status_code=303,
+        )
+    except HasRelationsError as error:
+        return RedirectResponse(
+            url=f"/ui/content/{content_record_id}?error={quote(str(error))}&confirm_delete=true",
+            status_code=303,
+        )
+    return RedirectResponse(url="/ui/content", status_code=303)
 
 
 @router.post("/ui/content")
@@ -857,6 +881,8 @@ def categories_list(
 def category_detail(
     category_id: int,
     request: Request,
+    error: str | None = None,
+    confirm_delete: bool = False,
     db: Session = Depends(get_db),
 ):
     category = (
@@ -982,8 +1008,26 @@ def category_detail(
             "recipient_preferences": recipient_preference_rows,
             "impact_summary": impact_summary,
             "all_categories": all_categories,
+            "error": error,
+            "confirm_delete": confirm_delete,
         },
     )
+
+
+@router.post("/ui/categories/{category_id}/delete")
+def category_delete(
+    category_id: int,
+    force: bool = Form(False),
+    db: Session = Depends(get_db),
+):
+    try:
+        delete_category(db, category_id, force=force)
+    except HasRelationsError as error:
+        return RedirectResponse(
+            url=f"/ui/categories/{category_id}?error={quote(str(error))}&confirm_delete=true",
+            status_code=303,
+        )
+    return RedirectResponse(url="/ui/categories", status_code=303)
 
 
 @router.post("/ui/categories")
@@ -1930,7 +1974,7 @@ def category_graph(
 # ── Audience Groups ──────────────────────────────────────────────────────────
 
 @router.get("/ui/audience-groups")
-def audience_groups_list(request: Request, db: Session = Depends(get_db)):
+def audience_groups_list(request: Request, error: str | None = None, db: Session = Depends(get_db)):
     groups = audience_service.list_groups(db)
     rows = []
     for g in groups:
@@ -1938,7 +1982,7 @@ def audience_groups_list(request: Request, db: Session = Depends(get_db)):
         rows.append({"id": g.id, "name": g.name, "description": g.description,
                      "member_count": count, "created_at": g.created_at})
     return templates.TemplateResponse(request, "audience_groups.html",
-                                      {"title": "Audience Groups", "groups": rows})
+                                      {"title": "Audience Groups", "groups": rows, "error": error})
 
 
 @router.post("/ui/audience-groups")
@@ -1949,12 +1993,15 @@ def audience_groups_create(
     db: Session = Depends(get_db),
 ):
     desc = description.strip() or None
-    group = audience_service.create_group(db, name.strip(), desc)
+    try:
+        group = audience_service.create_group(db, name.strip(), desc)
+    except ValueError as error:
+        return RedirectResponse(f"/ui/audience-groups?error={quote(str(error))}", status_code=303)
     return RedirectResponse(f"/ui/audience-groups/{group.id}", status_code=303)
 
 
 @router.get("/ui/audience-groups/{group_id}")
-def audience_group_detail(group_id: int, request: Request, db: Session = Depends(get_db)):
+def audience_group_detail(group_id: int, request: Request, error: str | None = None, db: Session = Depends(get_db)):
     group = audience_service.get_group(db, group_id)
     if not group:
         return RedirectResponse("/ui/audience-groups", status_code=303)
@@ -1989,6 +2036,7 @@ def audience_group_detail(group_id: int, request: Request, db: Session = Depends
         "languages": languages,
         "statuses": statuses,
         "categories": categories,
+        "error": error,
     })
 
 
@@ -2000,7 +2048,10 @@ def audience_group_edit(
     db: Session = Depends(get_db),
 ):
     desc = description.strip() or None
-    audience_service.update_group(db, group_id, name.strip(), desc)
+    try:
+        audience_service.update_group(db, group_id, name.strip(), desc)
+    except ValueError as error:
+        return RedirectResponse(f"/ui/audience-groups/{group_id}?error={quote(str(error))}", status_code=303)
     return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
 
 

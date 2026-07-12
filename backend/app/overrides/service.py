@@ -1,10 +1,31 @@
 from sqlalchemy.orm import Session
 
+from app.content.db_models import ContentRecordDB
 from app.overrides.db_models import OverrideEventDB
 from app.overrides.models import OverrideEventCreate, OutcomeDeltaUpdate
 
 
 def create_override_event(db: Session, data: OverrideEventCreate) -> OverrideEventDB:
+    if data.system_content_record_id == data.override_content_record_id:
+        raise ValueError(
+            "system_content_record_id and override_content_record_id must differ "
+            "— an override that picks the same content as the system isn't an override"
+        )
+
+    for field_name, content_record_id in (
+        ("system_content_record_id", data.system_content_record_id),
+        ("override_content_record_id", data.override_content_record_id),
+    ):
+        exists = (
+            db.query(ContentRecordDB.id)
+            .filter(ContentRecordDB.id == content_record_id)
+            .first()
+        )
+        if exists is None:
+            raise ValueError(
+                f"{field_name}={content_record_id} does not reference an existing content record"
+            )
+
     event = OverrideEventDB(**data.model_dump())
     db.add(event)
     db.commit()
@@ -30,10 +51,27 @@ def list_override_events(
 
 
 def record_outcome_delta(db: Session, override_id: int, data: OutcomeDeltaUpdate) -> OverrideEventDB | None:
-    event = get_override_event(db, override_id)
+    # Row lock: two concurrent PATCH calls computing outcome deltas for the
+    # same override (e.g. an open-rate job and a click-rate job overlapping)
+    # would otherwise both read the same starting outcome_delta and the
+    # second commit would silently clobber the first's write. Same pattern
+    # as the Delivery Q5 double-send guard.
+    event = (
+        db.query(OverrideEventDB)
+        .filter(OverrideEventDB.id == override_id)
+        .with_for_update()
+        .first()
+    )
     if event is None:
         return None
-    event.outcome_delta = data.outcome_delta
+
+    # Merge incoming keys into the existing dict instead of replacing it —
+    # outcome data arrives incrementally (e.g. open-rate today, click-rate
+    # a week later) and a wholesale replace would silently drop earlier keys.
+    merged = dict(event.outcome_delta or {})
+    merged.update(data.outcome_delta)
+    event.outcome_delta = merged
+
     db.commit()
     db.refresh(event)
     return event

@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 
+from app.campaigns.db_models import ModuleInstanceDB, DecisionResolutionDB
 from app.content.db_models import (
     ContentRecordDB,
     CategoryDB,
@@ -8,6 +9,25 @@ from app.content.db_models import (
     ContentVersionDB,
 )
 from app.content.models import ContentRecord, Category, CategoryRelation, ContentVersion
+from app.overrides.db_models import OverrideEventDB
+
+
+class ContentRecordHasHistoryError(Exception):
+    """
+    Hard block, never bypassable — the content record has real decision or
+    override history. Hard-deleting it would corrupt that audit trail, so
+    unlike the soft/reassignable relations below, no force flag overrides
+    this (consistent with the "never hard-delete anything with historical
+    usage" leaning in the still-open data-lifecycle Needs-ADR item).
+    """
+
+
+class HasRelationsError(Exception):
+    """Soft block — reassignable relations exist; force=True bypasses."""
+
+    def __init__(self, message: str, counts: dict[str, int]):
+        self.counts = counts
+        super().__init__(message)
 
 
 def to_content_record(record: ContentRecordDB) -> ContentRecord:
@@ -408,3 +428,131 @@ def get_latest_version_for_content(
         return None
 
     return to_content_version(record)
+
+
+def delete_content_record(db: Session, content_id: int, force: bool = False) -> bool:
+    """
+    Deleting a content record that still has relations must not silently
+    cascade. Decision-resolution / override history is a hard block (never
+    force-deletable — that data stays put, per the data-lifecycle Needs-ADR
+    leaning). Category assignments, versions, and module instances are
+    reassignable relations: without force, this raises HasRelationsError
+    with counts so a manager can re-parent/re-assign first; with force=True,
+    assignments and versions are cascade-deleted and any module instance
+    pointing at this record has content_record_id cleared (the module slot
+    survives as empty rather than campaign structure being destroyed).
+    """
+    record = get_content_record(db, content_id)
+    if record is None:
+        return False
+
+    resolution_count = (
+        db.query(DecisionResolutionDB)
+        .filter(DecisionResolutionDB.content_record_id == content_id)
+        .count()
+    )
+    override_count = (
+        db.query(OverrideEventDB)
+        .filter(
+            (OverrideEventDB.system_content_record_id == content_id)
+            | (OverrideEventDB.override_content_record_id == content_id)
+        )
+        .count()
+    )
+    if resolution_count or override_count:
+        raise ContentRecordHasHistoryError(
+            f"Content record {content_id} has real history — "
+            f"{resolution_count} decision resolution(s), {override_count} override event(s) "
+            "— and can never be deleted, only its future use prevented."
+        )
+
+    assignment_count = (
+        db.query(ContentCategoryAssignmentDB)
+        .filter(ContentCategoryAssignmentDB.content_id == content_id)
+        .count()
+    )
+    version_count = (
+        db.query(ContentVersionDB)
+        .filter(ContentVersionDB.content_record_id == content_id)
+        .count()
+    )
+    module_count = (
+        db.query(ModuleInstanceDB)
+        .filter(ModuleInstanceDB.content_record_id == content_id)
+        .count()
+    )
+
+    if (assignment_count or version_count or module_count) and not force:
+        raise HasRelationsError(
+            f"Content record {content_id} is related to {assignment_count} category "
+            f"assignment(s), {version_count} version(s), and used by {module_count} "
+            "module instance(s) — delete anyway?",
+            counts={
+                "category_assignments": assignment_count,
+                "versions": version_count,
+                "module_instances": module_count,
+            },
+        )
+
+    db.query(ContentCategoryAssignmentDB).filter(
+        ContentCategoryAssignmentDB.content_id == content_id
+    ).delete()
+    db.query(ContentVersionDB).filter(
+        ContentVersionDB.content_record_id == content_id
+    ).delete()
+    db.query(ModuleInstanceDB).filter(
+        ModuleInstanceDB.content_record_id == content_id
+    ).update({ModuleInstanceDB.content_record_id: None})
+
+    db.delete(record)
+    db.commit()
+    return True
+
+
+def delete_category(db: Session, category_id: int, force: bool = False) -> bool:
+    """
+    Same confirmation-guard shape as delete_content_record, scoped to a
+    category's relations: content assignments and parent/child hierarchy
+    edges. Categories have no direct decision/override history of their own
+    (that history references content records, not categories), so there's
+    no hard-block case here — force=True always suffices.
+    """
+    category = db.query(CategoryDB).filter(CategoryDB.id == category_id).first()
+    if category is None:
+        return False
+
+    assignment_count = (
+        db.query(ContentCategoryAssignmentDB)
+        .filter(ContentCategoryAssignmentDB.category_id == category_id)
+        .count()
+    )
+    relation_count = (
+        db.query(CategoryRelationDB)
+        .filter(
+            (CategoryRelationDB.parent_category_id == category_id)
+            | (CategoryRelationDB.child_category_id == category_id)
+        )
+        .count()
+    )
+
+    if (assignment_count or relation_count) and not force:
+        raise HasRelationsError(
+            f"Category {category_id} is related to {assignment_count} content "
+            f"assignment(s) and {relation_count} parent/child relation(s) — delete anyway?",
+            counts={
+                "content_assignments": assignment_count,
+                "category_relations": relation_count,
+            },
+        )
+
+    db.query(ContentCategoryAssignmentDB).filter(
+        ContentCategoryAssignmentDB.category_id == category_id
+    ).delete()
+    db.query(CategoryRelationDB).filter(
+        (CategoryRelationDB.parent_category_id == category_id)
+        | (CategoryRelationDB.child_category_id == category_id)
+    ).delete()
+
+    db.delete(category)
+    db.commit()
+    return True

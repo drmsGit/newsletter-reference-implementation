@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.campaigns.db_models import CampaignDB, VariantDB, ModuleInstanceDB, DecisionSlotDB, DecisionResolutionDB
 from app.campaigns.models import Campaign, CampaignWithVariants, Variant, ModuleInstance, DecisionSlot, DecisionResolution
+from app.content.db_models import ContentRecordDB, ContentVersionDB
+from app.recipients.db_models import RecipientDB
 
 
 def to_campaign(record: CampaignDB) -> Campaign:
@@ -37,14 +39,18 @@ def create_campaign(
     status: str = "draft",
     initial_variant_name: str = "Variant A",
 ) -> CampaignWithVariants:
+    # A campaign must always have a variant (invariant) — flush (not commit)
+    # after the campaign insert so campaign.id is assigned without ending
+    # the transaction, then commit both inserts atomically in one go. A
+    # failure between them can no longer leave a persisted campaign with
+    # zero variants.
     campaign = CampaignDB(
         name=name,
         status=status,
     )
 
     db.add(campaign)
-    db.commit()
-    db.refresh(campaign)
+    db.flush()
 
     initial_variant = VariantDB(
         campaign_id=campaign.id,
@@ -54,6 +60,7 @@ def create_campaign(
 
     db.add(initial_variant)
     db.commit()
+    db.refresh(campaign)
     db.refresh(initial_variant)
 
     return CampaignWithVariants(
@@ -254,6 +261,24 @@ def create_decision_resolution(
     reason: str | None = None,
     score: float | None = None,
 ) -> DecisionResolution:
+    # No orphan row should ever be silently accepted, regardless of whether
+    # the DB engine happens to enforce FK constraints — validate referenced
+    # IDs exist before insert rather than only failing later at rendering's
+    # join-based lookup.
+    if db.query(DecisionSlotDB.id).filter(DecisionSlotDB.id == decision_slot_id).first() is None:
+        raise ValueError(f"DecisionSlot {decision_slot_id} not found")
+
+    if db.query(ContentRecordDB.id).filter(ContentRecordDB.id == content_record_id).first() is None:
+        raise ValueError(f"ContentRecord {content_record_id} not found")
+
+    if content_version_id is not None:
+        if db.query(ContentVersionDB.id).filter(ContentVersionDB.id == content_version_id).first() is None:
+            raise ValueError(f"ContentVersion {content_version_id} not found")
+
+    if recipient_id is not None:
+        if db.query(RecipientDB.id).filter(RecipientDB.id == recipient_id).first() is None:
+            raise ValueError(f"Recipient {recipient_id} not found")
+
     resolution = DecisionResolutionDB(
         decision_slot_id=decision_slot_id,
         recipient_id=recipient_id,

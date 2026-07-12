@@ -4,11 +4,24 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="mb-0">{{ record.title }}</h1>
-    <span class="badge bg-secondary fs-6">{{ record.status }}</span>
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-secondary fs-6">{{ record.status }}</span>
+        <form method="post" action="/ui/content/{{ record.id }}/delete" onsubmit="return confirm('Delete this content record?')">
+            <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+        </form>
+    </div>
 </div>
 
 {% if error %}
-<div class="alert alert-danger" role="alert">{{ error }}</div>
+<div class="alert alert-danger" role="alert">
+    {{ error }}
+    {% if confirm_delete %}
+    <form method="post" action="/ui/content/{{ record.id }}/delete" class="d-inline" onsubmit="return confirm('This will remove the related category assignments and versions, and clear this content from any module that uses it. Continue?')">
+        <input type="hidden" name="force" value="true">
+        <button type="submit" class="btn btn-sm btn-danger ms-2">Yes, delete anyway</button>
+    </form>
+    {% endif %}
+</div>
 {% endif %}
 
 <!-- Edit record -->

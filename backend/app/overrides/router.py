@@ -15,7 +15,10 @@ router = APIRouter(prefix="/overrides", tags=["overrides"])
 
 @router.post("/", response_model=OverrideEvent)
 def create(data: OverrideEventCreate, db: Session = Depends(get_db)):
-    return create_override_event(db, data)
+    try:
+        return create_override_event(db, data)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
 
 
 @router.get("/", response_model=list[OverrideEvent])

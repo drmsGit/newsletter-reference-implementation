@@ -1,3 +1,4 @@
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB
@@ -15,7 +16,11 @@ def get_group(db: Session, group_id: int) -> AudienceGroupDB | None:
 def create_group(db: Session, name: str, description: str | None = None) -> AudienceGroupDB:
     group = AudienceGroupDB(name=name, description=description)
     db.add(group)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise ValueError(f"An audience group named '{name}' already exists")
     db.refresh(group)
     return group
 
@@ -28,7 +33,11 @@ def update_group(
         return None
     group.name = name
     group.description = description
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise ValueError(f"An audience group named '{name}' already exists")
     db.refresh(group)
     return group
 
@@ -64,7 +73,21 @@ def add_member(db: Session, group_id: int, recipient_id: int) -> AudienceGroupMe
         return existing
     member = AudienceGroupMemberDB(group_id=group_id, recipient_id=recipient_id)
     db.add(member)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # A concurrent call won the TOCTOU race between the check above and
+        # this insert — the unique constraint caught it; treat it the same
+        # as "already a member" rather than surfacing a raw 500.
+        db.rollback()
+        return (
+            db.query(AudienceGroupMemberDB)
+            .filter(
+                AudienceGroupMemberDB.group_id == group_id,
+                AudienceGroupMemberDB.recipient_id == recipient_id,
+            )
+            .first()
+        )
     db.refresh(member)
     return member
 
@@ -142,6 +165,26 @@ def bulk_add_members(db: Session, group_id: int, recipient_ids: list[int]) -> in
         if rid not in existing:
             db.add(AudienceGroupMemberDB(group_id=group_id, recipient_id=rid))
             added += 1
-    if added:
+    if not added:
+        return added
+
+    try:
         db.commit()
+    except IntegrityError:
+        # A concurrent call added one of these rows between the check above
+        # and this commit. Fall back to committing one at a time so a
+        # single conflicting row doesn't lose the rest of a legitimate
+        # batch — each conflicting insert is skipped, not fatal.
+        db.rollback()
+        added = 0
+        for rid in recipient_ids:
+            if rid in existing:
+                continue
+            db.add(AudienceGroupMemberDB(group_id=group_id, recipient_id=rid))
+            try:
+                db.commit()
+                added += 1
+            except IntegrityError:
+                db.rollback()
+
     return added

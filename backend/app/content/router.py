@@ -30,6 +30,10 @@ from app.content.service import (
     assign_category_to_content,
     create_content_version,
     list_versions_for_content,
+    delete_content_record,
+    delete_category,
+    ContentRecordHasHistoryError,
+    HasRelationsError,
 )
 
 
@@ -56,6 +60,23 @@ def get_category_relations(db: Session = Depends(get_db)):
     return list_category_relations(db)
 
 
+# Same route-ordering requirement as the GETs above: this must be registered
+# before DELETE /{content_id} or "categories" would be parsed as content_id.
+@router.delete("/categories/{category_id}")
+def delete_category_record(
+    category_id: int,
+    force: bool = False,
+    db: Session = Depends(get_db),
+):
+    try:
+        deleted = delete_category(db, category_id, force=force)
+    except HasRelationsError as error:
+        raise HTTPException(status_code=409, detail={"message": str(error), "counts": error.counts})
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return {"status": "deleted"}
+
+
 @router.get("/{content_id}", response_model=ContentRecord)
 def get_content_record_by_id(content_id: int, db: Session = Depends(get_db)):
     record = get_content_record(db, content_id)
@@ -70,6 +91,23 @@ def update_content_record_by_id(content_id: int, payload: ContentCreate, db: Ses
     if record is None:
         raise HTTPException(status_code=404, detail="Content record not found")
     return record
+
+
+@router.delete("/{content_id}")
+def delete_content_record_by_id(
+    content_id: int,
+    force: bool = False,
+    db: Session = Depends(get_db),
+):
+    try:
+        deleted = delete_content_record(db, content_id, force=force)
+    except ContentRecordHasHistoryError as error:
+        raise HTTPException(status_code=409, detail=str(error))
+    except HasRelationsError as error:
+        raise HTTPException(status_code=409, detail={"message": str(error), "counts": error.counts})
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Content record not found")
+    return {"status": "deleted"}
 
 
 @router.get("/{content_id}/categories", response_model=list[Category])
