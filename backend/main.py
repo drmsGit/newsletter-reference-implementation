@@ -25,7 +25,7 @@ from app.insight.router import router as insight_router
 
 from app.decision.router import router as decision_router
 
-from app.recipients.db_models import RecipientDB, RecipientPreferenceDB
+from app.recipients.db_models import RecipientDB, RecipientPreferenceDB, ConsentSyncLogDB
 from app.recipients.router import router as recipients_router
 
 from app.providers.db_models import ProviderEventQuarantineDB

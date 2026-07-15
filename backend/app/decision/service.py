@@ -4,6 +4,8 @@ from app.campaigns.db_models import DecisionSlotDB, DecisionResolutionDB
 from app.campaigns.models import DecisionResolution
 from app.campaigns.service import create_decision_resolution, to_decision_resolution
 from app.decision.strategies.registry import get_strategy
+from app.recipients.db_models import RecipientDB
+from app.recipients.service import CONSENTING_STATUS
 
 
 def execute_decision_slot(
@@ -19,6 +21,25 @@ def execute_decision_slot(
 
     if slot is None:
         raise ValueError(f"DecisionSlot {decision_slot_id} not found")
+
+    # Consent gate (belt-and-suspenders behind audience resolution): never run
+    # per-recipient decisioning for a non-consenting recipient. The primary
+    # gate keeps them out of the resolved audience in the first place, but a
+    # decision slot can also be executed directly by recipient_id, so refuse
+    # here too rather than spend AI/token budget on someone who can't be sent to.
+    if recipient_id is not None:
+        recipient = (
+            db.query(RecipientDB).filter(RecipientDB.id == recipient_id).first()
+        )
+        if recipient is None:
+            raise ValueError(f"Recipient {recipient_id} not found")
+        if recipient.consent_status != CONSENTING_STATUS:
+            raise ValueError(
+                f"Recipient {recipient_id} is not opted-in "
+                f"(consent_status='{recipient.consent_status}') — decisioning is "
+                "gated at audience-resolution time and must not run for "
+                "non-consenting recipients"
+            )
 
     strategy = get_strategy(slot.decision_strategy)
 

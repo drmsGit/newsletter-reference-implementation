@@ -20,6 +20,7 @@ TRUNCATE TABLE
     delivery_executions,
     override_events,
     decision_resolutions,
+    consent_sync_logs,
     recipient_preferences,
     snapshots,
     send_instances,
@@ -56,13 +57,15 @@ INSERT INTO content_versions (content_record_id, version_number, content, create
 -- CATEGORIES
 -- =========================================================
 
-INSERT INTO categories (name, type, parent_category_id) VALUES
-    ('Beach',   'main', NULL),
-    ('City',    'main', NULL),
-    ('Nature',  'main', NULL),
-    ('Hiking',  'sub',  NULL),
-    ('Family',  'sub',  NULL),
-    ('Culture', 'sub',  NULL);
+-- Hierarchy lives entirely in category_relations (below); CategoryDB.parent_category_id
+-- was dropped when the two competing hierarchy mechanisms were consolidated (Content Q5).
+INSERT INTO categories (name, type) VALUES
+    ('Beach',   'main'),
+    ('City',    'main'),
+    ('Nature',  'main'),
+    ('Hiking',  'sub'),
+    ('Family',  'sub'),
+    ('Culture', 'sub');
 
 INSERT INTO category_relations (parent_category_id, child_category_id, relation_type)
 SELECT p.id, c.id, 'parent_child'
@@ -91,10 +94,12 @@ JOIN categories cat ON cat.name = v.category_name;
 -- RECIPIENTS
 -- =========================================================
 
-INSERT INTO recipients (external_id, email, language, attributes, status) VALUES
-    ('r-001', 'anna.mueller@example.com',  'de', '{"firstname": "Anna",   "lastname": "Müller",   "preferred_airport": "HAM"}', 'active'),
-    ('r-002', 'jan.devries@example.com',   'nl', '{"firstname": "Jan",    "lastname": "de Vries", "preferred_airport": "AMS"}', 'active'),
-    ('r-003', 'sophie.martin@example.com', 'fr', '{"firstname": "Sophie", "lastname": "Martin",    "preferred_airport": "CDG"}', 'active');
+-- consent_status is CRM-sourced; seed recipients are opted_in so the
+-- end-to-end demo (audience resolution → decisioning → send) works out of the box.
+INSERT INTO recipients (external_id, email, language, attributes, status, consent_status) VALUES
+    ('r-001', 'anna.mueller@example.com',  'de', '{"firstname": "Anna",   "lastname": "Müller",   "preferred_airport": "HAM"}', 'active', 'opted_in'),
+    ('r-002', 'jan.devries@example.com',   'nl', '{"firstname": "Jan",    "lastname": "de Vries", "preferred_airport": "AMS"}', 'active', 'opted_in'),
+    ('r-003', 'sophie.martin@example.com', 'fr', '{"firstname": "Sophie", "lastname": "Martin",    "preferred_airport": "CDG"}', 'active', 'opted_in');
 
 -- Anna: beach-leaning | Jan: city/culture | Sophie: nature/city
 INSERT INTO recipient_preferences (recipient_id, category_id, score, source)

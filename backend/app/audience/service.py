@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB
 from app.recipients.db_models import RecipientDB, RecipientPreferenceDB
+from app.recipients.service import CONSENTING_STATUS
 
 
 def list_groups(db: Session) -> list[AudienceGroupDB]:
@@ -126,7 +127,14 @@ def find_by_criteria(
     min_preference_score: float | None = None,
     exclude_ids: set[int] | None = None,
 ) -> list[RecipientDB]:
-    q = db.query(RecipientDB)
+    # Consent gate: audiences are resolved only from consenting recipients.
+    # Filtering here — at audience-resolution time, before any decisioning or
+    # rendering runs — is deliberate (F1 in docs/backlog.md): it keeps
+    # non-consenting recipients out of the processing scope entirely, both for
+    # GDPR reasons (running the decision engine over their data is itself
+    # "processing") and cost reasons (no paid AI/token spend on people who will
+    # never receive anything). "pending" and "opted_out" are both excluded.
+    q = db.query(RecipientDB).filter(RecipientDB.consent_status == CONSENTING_STATUS)
 
     if language:
         q = q.filter(RecipientDB.language == language)

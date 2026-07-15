@@ -13,6 +13,7 @@
             <th>Language</th>
             <th>Attributes</th>
             <th>Status</th>
+            <th>Consent</th>
         </tr>
     </thead>
 
@@ -33,6 +34,15 @@
                 {% endfor %}
             </td>
             <td>{{ recipient.status }}</td>
+            <td>
+                {% if recipient.consent_status == "opted_in" %}
+                <span class="badge bg-success">opted&#8209;in</span>
+                {% elif recipient.consent_status == "opted_out" %}
+                <span class="badge bg-danger">opted&#8209;out</span>
+                {% else %}
+                <span class="badge bg-secondary">{{ recipient.consent_status }}</span>
+                {% endif %}
+            </td>
         </tr>
         {% endfor %}
     </tbody>
