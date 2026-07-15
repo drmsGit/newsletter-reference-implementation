@@ -16,7 +16,7 @@ from app.content.service import create_content, update_content_record, assign_ca
 from app.content.service import create_category, create_category_relation
 from app.content.service import delete_content_record, delete_category, ContentRecordHasHistoryError, HasRelationsError
 from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB, ModuleInstanceDB, DecisionSlotDB
-from app.campaigns.service import create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant, update_decision_slot, update_variant
+from app.campaigns.service import create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant, update_decision_slot, update_variant, delete_module, move_module
 from app.rendering.service import UnpublishedContentError
 from app.snapshots.service import create_snapshot_for_variant
 from app.delivery.service import create_send_instance, send_send_instance
@@ -551,6 +551,27 @@ def module_create(
             url=f"/ui/campaigns/{campaign_id}?error={quote(str(error))}",
             status_code=303,
         )
+    return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
+
+
+@router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/modules/{module_id}/delete")
+def module_delete(campaign_id: int, variant_id: int, module_id: int, db: Session = Depends(get_db)):
+    delete_module(db, module_id)
+    return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
+
+
+@router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/modules/{module_id}/move")
+def module_move(
+    campaign_id: int,
+    variant_id: int,
+    module_id: int,
+    direction: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    try:
+        move_module(db, module_id, direction)
+    except ValueError:
+        pass
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 

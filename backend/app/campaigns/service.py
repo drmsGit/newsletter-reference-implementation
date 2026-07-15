@@ -190,6 +190,70 @@ def create_module_for_variant(
     return to_module_instance(module)
 
 
+def delete_module(db: Session, module_id: int) -> bool:
+    """Remove a module from its variant. Positions of the remaining modules are
+    left as-is — the (variant_id, position) uniqueness only requires no
+    duplicates, not a contiguous sequence, and rendering orders by position, so
+    a gap is harmless. Any content overrides on the module go with it (they're
+    meaningless once the module is gone)."""
+    module = db.query(ModuleInstanceDB).filter(ModuleInstanceDB.id == module_id).first()
+    if module is None:
+        return False
+
+    from app.overrides.db_models import ContentOverrideDB
+
+    db.query(ContentOverrideDB).filter(
+        ContentOverrideDB.module_instance_id == module_id
+    ).delete()
+    db.delete(module)
+    db.commit()
+    return True
+
+
+def move_module(db: Session, module_id: int, direction: str) -> ModuleInstance | None:
+    """Move a module one step up or down within its variant by swapping its
+    position with the adjacent module. No-op if already at the top/bottom."""
+    if direction not in ("up", "down"):
+        raise ValueError("direction must be 'up' or 'down'")
+
+    module = db.query(ModuleInstanceDB).filter(ModuleInstanceDB.id == module_id).first()
+    if module is None:
+        return None
+
+    neighbors = db.query(ModuleInstanceDB).filter(
+        ModuleInstanceDB.variant_id == module.variant_id
+    )
+    if direction == "up":
+        neighbor = (
+            neighbors.filter(ModuleInstanceDB.position < module.position)
+            .order_by(ModuleInstanceDB.position.desc())
+            .first()
+        )
+    else:
+        neighbor = (
+            neighbors.filter(ModuleInstanceDB.position > module.position)
+            .order_by(ModuleInstanceDB.position.asc())
+            .first()
+        )
+
+    if neighbor is None:
+        # Already at the top (up) or bottom (down) — nothing to swap with.
+        return to_module_instance(module)
+
+    # Swap the two position values via a temporary slot, so the
+    # (variant_id, position) unique constraint doesn't trip on a transient
+    # duplicate mid-swap. Positions are always >= 1, so -1 is a safe temp.
+    module_pos, neighbor_pos = module.position, neighbor.position
+    module.position = -1
+    db.flush()
+    neighbor.position = module_pos
+    db.flush()
+    module.position = neighbor_pos
+    db.commit()
+    db.refresh(module)
+    return to_module_instance(module)
+
+
 def _normalize_for_strategy(
     decision_strategy: str,
     candidate_filter: dict | None,

@@ -22,6 +22,8 @@ from app.campaigns.service import (
     list_variants_for_campaign,
     create_module_for_variant,
     list_modules_for_variant,
+    delete_module,
+    move_module,
     create_decision_slot_for_variant,
     list_decision_slots_for_variant,
     create_decision_resolution,
@@ -103,6 +105,29 @@ def create_variant_module(
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
+
+
+@router.delete("/modules/{module_id}")
+def delete_variant_module(module_id: int, db: Session = Depends(get_db)):
+    if not delete_module(db, module_id):
+        raise HTTPException(status_code=404, detail="Module not found")
+    return {"status": "deleted", "module_id": module_id}
+
+
+@router.post("/modules/{module_id}/move", response_model=ModuleInstance)
+def move_variant_module(
+    module_id: int,
+    direction: str,
+    db: Session = Depends(get_db),
+):
+    """Move a module one step 'up' or 'down' within its variant."""
+    try:
+        result = move_module(db, module_id, direction)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    if result is None:
+        raise HTTPException(status_code=404, detail="Module not found")
+    return result
 
 
 @router.get("/variants/{variant_id}/decision-slots", response_model=list[DecisionSlot])

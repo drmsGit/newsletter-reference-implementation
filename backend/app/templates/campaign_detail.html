@@ -112,6 +112,7 @@
                     <th>Content record</th>
                     <th>Decision slot</th>
                     <th>Override</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -137,10 +138,24 @@
                         <span class="text-muted small">n/a</span>
                         {% endif %}
                     </td>
+                    <td class="text-nowrap">
+                        <form method="post" action="/ui/campaigns/{{ campaign.id }}/variants/{{ variant.id }}/modules/{{ module.id }}/move" class="d-inline">
+                            <input type="hidden" name="direction" value="up">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm py-0 px-1" title="Move up" {% if loop.first %}disabled{% endif %}>↑</button>
+                        </form>
+                        <form method="post" action="/ui/campaigns/{{ campaign.id }}/variants/{{ variant.id }}/modules/{{ module.id }}/move" class="d-inline">
+                            <input type="hidden" name="direction" value="down">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm py-0 px-1" title="Move down" {% if loop.last %}disabled{% endif %}>↓</button>
+                        </form>
+                        <form method="post" action="/ui/campaigns/{{ campaign.id }}/variants/{{ variant.id }}/modules/{{ module.id }}/delete" class="d-inline"
+                              onsubmit="return confirm('Delete this module{% if module.active_override %} and its override{% endif %}?');">
+                            <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-1" title="Delete">✕</button>
+                        </form>
+                    </td>
                 </tr>
                 {% endfor %}
                 {% if not variant.modules %}
-                <tr><td colspan="5" class="text-muted">No modules yet.</td></tr>
+                <tr><td colspan="6" class="text-muted">No modules yet.</td></tr>
                 {% endif %}
             </tbody>
         </table>
