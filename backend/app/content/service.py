@@ -453,10 +453,7 @@ def delete_content_record(db: Session, content_id: int, force: bool = False) -> 
     )
     override_count = (
         db.query(ContentOverrideDB)
-        .filter(
-            (ContentOverrideDB.system_content_record_id == content_id)
-            | (ContentOverrideDB.override_content_record_id == content_id)
-        )
+        .filter(ContentOverrideDB.system_content_record_id == content_id)
         .count()
     )
     if resolution_count or override_count:

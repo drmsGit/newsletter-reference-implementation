@@ -69,22 +69,6 @@ def create_content_override(db: Session, data: ContentOverrideCreate) -> Content
 
     manifest = _overrideable_manifest(module)
 
-    # Record-level swaps are only meaningful as a future category-scoped
-    # override on a decision slot (Case 2). Both current forms are rejected.
-    if data.override_content_record_id is not None:
-        if module.decision_slot_id is not None:
-            raise ValueError(
-                "swapping a decision slot's whole content record for ALL recipients "
-                "isn't meaningful — if everyone should see one record, place it as "
-                "static content instead of using a decision slot. Category-scoped "
-                "record overrides for a segment (e.g. beach recipients get a special "
-                "offer) are a planned feature, not available yet."
-            )
-        raise ValueError(
-            "this module already renders a fixed content record — change the content "
-            "record directly; only field overrides apply here"
-        )
-
     if not data.field_overrides:
         raise ValueError(
             "a content override must set field_overrides — the field(s) to change "

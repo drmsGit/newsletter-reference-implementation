@@ -17,18 +17,20 @@ from app.database import Base
 class ContentOverrideDB(Base):
     """A manager's intentional, logged deviation from what the system produced
     for one module — the *functional* override layer (ADR-040/041), not just an
-    audit record. Rendering reads the active override and it takes precedence
-    over the resolved/static content until it is reset.
+    audit record. Rendering reads the active override and its field values take
+    precedence over the resolved/static content until it is reset.
 
-    Two override kinds, either or both on one row:
-      - record pin  → `override_content_record_id` (render record B instead of
-        whatever the decision slot / static content_record_id would resolve)
-      - field edits → `field_overrides` (per-field text overrides, e.g. a
-        shorter headline for this send; keys are the module's manifest vars)
+    An override is **field edits only**: `field_overrides` = {manifest field
+    name: value}, e.g. a consistent headline across the personalized picks or a
+    shorter copy for this send. Swapping the whole content record is deliberately
+    NOT an override — for-all swaps mean "use static content, not a decision
+    slot", and segment-targeted swaps ("beach recipients get a special offer")
+    belong to the separate guaranteed-placement concept, which suppresses the
+    decision slot for matching recipients rather than overriding it here.
 
-    `system_content_record_id` captures what the system would have shown (the
-    trust-loop counterfactual), where unambiguous. `outcome_delta` is filled in
-    retroactively once engagement data exists ("did the override outperform?").
+    `system_content_record_id` captures which record the edited fields were
+    applied to (audit context). `outcome_delta` is filled in retroactively once
+    engagement data exists ("did the edited version outperform the original?").
 
     Deliberately shaped as a reusable spine: a future AudienceOverrideDB (once
     Phase 3B system-suggested audiences exist to deviate from) mirrors the same
@@ -46,26 +48,12 @@ class ContentOverrideDB(Base):
     module_instance_id = Column(Integer, ForeignKey("module_instances.id"), nullable=False, index=True)
 
     # Field-level overrides: {manifest_variable_name: value}. Validated at
-    # create time against the target module's manifest variables. This is the
-    # only override kind accepted today (Cases 1 & 3: unify/replace fields of
-    # the resolved content, for all recipients).
+    # create time against the target module's manifest variables.
     field_overrides = Column(JSON, nullable=True)
 
-    # --- Reserved for Case 2 (category-scoped record override), not yet built ---
-    # "recipients whose preferences match `condition_category_id` get
-    # `override_content_record_id` instead of the decision result" — e.g. beach
-    # recipients get a special beach offer. A for-all record swap is deliberately
-    # NOT allowed (place static content instead); a record swap on a static
-    # module is meaningless (change the content record). So both columns stay
-    # null under today's rules and are rejected at create time until Case 2 is
-    # designed (alongside the guaranteed-placement Needs-ADR item). Kept on the
-    # schema now so adding Case 2 later doesn't churn the table.
-    override_content_record_id = Column(Integer, ForeignKey("content_records.id"), nullable=True)
-    condition_category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
-
-    # What the system would have used — the trust-loop counterfactual. Nullable
-    # because it's only unambiguous for a static module or a non-personalized
-    # slot; the per-recipient personalized case is the open shadow-variant ADR.
+    # Which content record the edited fields were applied to / measured against
+    # (audit context for the trust loop). Nullable — for a per-recipient
+    # personalized module the resolved record varies, so it may be left unset.
     system_content_record_id = Column(Integer, ForeignKey("content_records.id"), nullable=True)
 
     # Optional: the send whose engagement the outcome_delta is measured against.
@@ -85,16 +73,14 @@ class ContentOverrideDB(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     __table_args__ = (
-        # An override must actually change something — a record pin, field
-        # edits, or both. An override that changes nothing isn't an override.
+        # An override must actually change something — it carries field edits.
+        # (The service also rejects an empty dict; this is the DB-level net.)
         CheckConstraint(
-            "override_content_record_id IS NOT NULL OR field_overrides IS NOT NULL",
+            "field_overrides IS NOT NULL",
             name="ck_content_overrides_changes_something",
         ),
         # At most one *active* override per module — a module has a single
-        # (for-all) override state today. History (reset rows) accumulates
-        # freely. NOTE: this will need to relax to one-active-per-(module,
-        # category) when Case 2 (category-scoped record overrides) lands.
+        # override state. History (reset rows) accumulates freely.
         Index(
             "ux_content_overrides_one_active_per_module",
             "module_instance_id",

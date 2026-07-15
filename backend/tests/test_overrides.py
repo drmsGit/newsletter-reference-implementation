@@ -9,8 +9,9 @@ Assumes the normal seed (reset_all_data.sql), which provides:
   - module id=3  = cta, no content record / no decision slot (not overrideable)
   - module id=2  = img_left, already carries the seed's one active override
 
-Today only *field* overrides are supported (Cases 1 & 3). Record-level swaps are
-rejected (Case 2, category-scoped, is deferred).
+Overrides are field edits only. Swapping the whole content record is not an
+override — for-all means "use static content"; segment-targeted content belongs
+to the separate guaranteed-placement concept.
 
 Run with: pytest tests/test_overrides.py -v
 """
@@ -26,7 +27,6 @@ client = TestClient(app)
 DECISION_MODULE = 5      # img_left via decision slot, no seed override
 STATIC_MODULE = 1        # hero, references content record 1
 NON_CONTENT_MODULE = 3   # cta, no content ref
-CONTENT_RECORD = 2       # Rome
 
 
 def _delete_override(override_id: int) -> None:
@@ -58,8 +58,6 @@ class TestCreateFieldOverride:
         data = field_override
         assert data["module_instance_id"] == DECISION_MODULE
         assert data["field_overrides"]["headline_medium"] == "This could interest you"
-        assert data["override_content_record_id"] is None
-        assert data["condition_category_id"] is None
         assert data["active"] is True
 
     def test_creates_on_static_content_module(self):
@@ -74,24 +72,6 @@ class TestCreateFieldOverride:
 
 
 class TestRejectedOverrides:
-    def test_record_swap_on_decision_module_rejected(self):
-        response = client.post("/overrides/", json={
-            "module_instance_id": DECISION_MODULE,
-            "override_content_record_id": CONTENT_RECORD,
-            "overridden_by": "test@example.com",
-        })
-        assert response.status_code == 400
-        assert "isn't meaningful" in response.json()["detail"]
-
-    def test_record_swap_on_static_module_rejected(self):
-        response = client.post("/overrides/", json={
-            "module_instance_id": STATIC_MODULE,
-            "override_content_record_id": CONTENT_RECORD,
-            "overridden_by": "test@example.com",
-        })
-        assert response.status_code == 400
-        assert "change the content record directly" in response.json()["detail"]
-
     def test_override_on_non_content_module_rejected(self):
         response = client.post("/overrides/", json={
             "module_instance_id": NON_CONTENT_MODULE,
