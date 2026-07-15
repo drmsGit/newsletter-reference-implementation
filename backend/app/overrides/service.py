@@ -22,17 +22,24 @@ def _validate_content_record_exists(db: Session, field_name: str, content_record
         )
 
 
-def _require_cms_manifest(module: ModuleInstanceDB):
-    """Content overrides are only honored on CMS-backed modules — rendering
-    consults them in render_cms_module, but a static (cms:false) module renders
-    straight from module_data and never looks at overrides. Reject up front
-    rather than accept an override that would silently do nothing."""
-    manifest = get_manifest(module.module_type)
-    if manifest is None or not manifest.cms:
+def _overrideable_manifest(module: ModuleInstanceDB):
+    """A content override needs (a) a module that actually resolves content — a
+    content record or a decision slot — and (b) a manifest, so its overridable
+    fields are known. A pure module_data module (no content reference) isn't
+    content-overridden; its values are edited directly. Applies regardless of
+    the manifest's cms flag — a hero/cta that references a content record is
+    overridable too."""
+    if module.content_record_id is None and module.decision_slot_id is None:
         raise ValueError(
-            f"module {module.id} (type '{module.module_type}') is not a CMS-backed "
-            "module — content overrides only apply where content is resolved from "
-            "the catalog/decision layer, so they can't be honored here"
+            f"module {module.id} doesn't render a content record or decision slot "
+            "— content overrides only apply to modules that resolve content; edit "
+            "its module_data directly instead"
+        )
+    manifest = get_manifest(module.module_type)
+    if manifest is None:
+        raise ValueError(
+            f"module {module.id} (type '{module.module_type}') has no manifest, so "
+            "its overridable fields aren't known"
         )
     return manifest
 
@@ -52,12 +59,6 @@ def _validate_field_overrides(manifest, module: ModuleInstanceDB, field_override
 
 
 def create_content_override(db: Session, data: ContentOverrideCreate) -> ContentOverrideDB:
-    if not data.override_content_record_id and not data.field_overrides:
-        raise ValueError(
-            "an override must change something — set override_content_record_id "
-            "(a record pin), field_overrides (field edits), or both"
-        )
-
     module = (
         db.query(ModuleInstanceDB)
         .filter(ModuleInstanceDB.id == data.module_instance_id)
@@ -66,26 +67,36 @@ def create_content_override(db: Session, data: ContentOverrideCreate) -> Content
     if module is None:
         raise ValueError(f"module_instance_id={data.module_instance_id} does not exist")
 
-    manifest = _require_cms_manifest(module)
+    manifest = _overrideable_manifest(module)
 
+    # Record-level swaps are only meaningful as a future category-scoped
+    # override on a decision slot (Case 2). Both current forms are rejected.
     if data.override_content_record_id is not None:
-        _validate_content_record_exists(db, "override_content_record_id", data.override_content_record_id)
+        if module.decision_slot_id is not None:
+            raise ValueError(
+                "swapping a decision slot's whole content record for ALL recipients "
+                "isn't meaningful — if everyone should see one record, place it as "
+                "static content instead of using a decision slot. Category-scoped "
+                "record overrides for a segment (e.g. beach recipients get a special "
+                "offer) are a planned feature, not available yet."
+            )
+        raise ValueError(
+            "this module already renders a fixed content record — change the content "
+            "record directly; only field overrides apply here"
+        )
+
+    if not data.field_overrides:
+        raise ValueError(
+            "a content override must set field_overrides — the field(s) to change "
+            "(e.g. a shorter headline for this send)"
+        )
+    _validate_field_overrides(manifest, module, data.field_overrides)
+
     if data.system_content_record_id is not None:
         _validate_content_record_exists(db, "system_content_record_id", data.system_content_record_id)
-    if (
-        data.override_content_record_id is not None
-        and data.override_content_record_id == data.system_content_record_id
-    ):
-        raise ValueError(
-            "override_content_record_id and system_content_record_id are the same "
-            "— pinning the system's own pick isn't an override"
-        )
-    if data.field_overrides:
-        _validate_field_overrides(manifest, module, data.field_overrides)
 
     override = ContentOverrideDB(
         module_instance_id=data.module_instance_id,
-        override_content_record_id=data.override_content_record_id,
         field_overrides=data.field_overrides,
         system_content_record_id=data.system_content_record_id,
         send_instance_id=data.send_instance_id,

@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 from app.campaigns.db_models import ModuleInstanceDB, DecisionResolutionDB, VariantDB
 from app.content.db_models import ContentRecordDB, ContentVersionDB
 from app.email_modules.registry import ModuleManifest, get_manifest, get_template_html
-from app.overrides.db_models import ContentOverrideDB
 from app.overrides.service import get_active_content_override
 
 RenderMode = Literal["preview", "send"]
@@ -144,13 +143,13 @@ def render_cms_module(
     recipient_id: int | None = None,
     mode: RenderMode = "preview",
 ) -> tuple[str, DecisionResolutionDB | None]:
-    # An active content override (ADR-040/041) takes precedence over what the
-    # system would resolve — a record pin swaps which content record fills the
-    # module, and/or field overrides replace individual fields — until reset.
+    # An active content override (ADR-040/041) replaces individual fields of
+    # the resolved content — a consistent headline across personalized picks,
+    # a shorter copy for this send — and takes precedence until reset.
     override = get_active_content_override(db, module.id)
 
     content, decision_resolution = resolve_content_for_module(
-        db=db, module=module, recipient_id=recipient_id, mode=mode, override=override
+        db=db, module=module, recipient_id=recipient_id, mode=mode
     )
 
     if content is None:
@@ -209,6 +208,14 @@ def render_static_module(
             for var in manifest.variables:
                 if var.name not in variables or not variables[var.name]:
                     variables[var.name] = content.get(var.name, "")
+
+    # A field override wins over both module_data and the content-record fill
+    # (ADR-041) — same treatment as the CMS path, so overrides work on any
+    # content-resolving module, not only cms:true ones.
+    override = get_active_content_override(db, module.id)
+    if override is not None and override.field_overrides:
+        for name, value in override.field_overrides.items():
+            variables[name] = value
 
     rendered = _jinja.from_string(html_source).render(**variables)
 
@@ -286,7 +293,6 @@ def resolve_content_for_module(
     module: ModuleInstanceDB,
     recipient_id: int | None = None,
     mode: RenderMode = "preview",
-    override: "ContentOverrideDB | None" = None,
 ) -> tuple[dict | None, DecisionResolutionDB | None]:
     """
     Returns (content, decision_resolution). decision_resolution is the
@@ -294,20 +300,10 @@ def resolve_content_for_module(
     modules) — callers building an audit/render_context should reuse this
     rather than re-querying, so rendering and the recorded metadata can never
     disagree about which resolution was used (ADR-062).
-    """
-    # Record-level override pin (ADR-041) wins over both static content and the
-    # decision slot: render the pinned record instead. No decision_resolution is
-    # returned — the decision wasn't what got used.
-    if override is not None and override.override_content_record_id is not None:
-        return (
-            resolve_renderable_content(
-                db=db,
-                content_record_id=override.override_content_record_id,
-                mode=mode,
-            ),
-            None,
-        )
 
+    Content-record *swaps* (Case 2, category-scoped) are not applied here yet —
+    only field overrides exist today, applied by the callers after resolution.
+    """
     if module.content_record_id is not None:
         return (
             resolve_renderable_content(

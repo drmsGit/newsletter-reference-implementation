@@ -3,10 +3,14 @@ Tests for the content overrides module (the functional override layer).
 
 Uses FastAPI TestClient against the real database — no mocks.
 Assumes the normal seed (reset_all_data.sql), which provides:
-  - content_records id=1 (Mallorca), id=2 (Rome), id=3 (Tenerife)
-  - module_instances: id=2 and id=5 are img_left (cms:true); id=1 is hero (cms:false)
-  - module id=2 already carries the seed's one active override, so tests use the
-    otherwise-clean cms module id=5.
+  - content_records id=1 (Mallorca), id=2 (Rome)
+  - module id=5  = img_left, decision-slot driven, no seed override (clean target)
+  - module id=1  = hero, references content_record 1 (static content, cms:false)
+  - module id=3  = cta, no content record / no decision slot (not overrideable)
+  - module id=2  = img_left, already carries the seed's one active override
+
+Today only *field* overrides are supported (Cases 1 & 3). Record-level swaps are
+rejected (Case 2, category-scoped, is deferred).
 
 Run with: pytest tests/test_overrides.py -v
 """
@@ -19,10 +23,10 @@ from app.overrides.db_models import ContentOverrideDB
 
 client = TestClient(app)
 
-CONTENT_SYSTEM = 1     # Mallorca — what the system would have chosen
-CONTENT_OVERRIDE = 2   # Rome — what the manager chose
-CMS_MODULE_ID = 5      # variant 2's img_left, no seed override on it
-STATIC_MODULE_ID = 1   # hero, cms:false — overrides must be refused here
+DECISION_MODULE = 5      # img_left via decision slot, no seed override
+STATIC_MODULE = 1        # hero, references content record 1
+NON_CONTENT_MODULE = 3   # cta, no content ref
+CONTENT_RECORD = 2       # Rome
 
 
 def _delete_override(override_id: int) -> None:
@@ -35,14 +39,13 @@ def _delete_override(override_id: int) -> None:
 
 
 @pytest.fixture
-def record_pin_override():
-    """Creates a record-pin override on the clean cms module, cleans up after."""
+def field_override():
+    """Case 1: a field override on the clean decision module. Cleans up after."""
     response = client.post("/overrides/", json={
-        "module_instance_id": CMS_MODULE_ID,
-        "override_content_record_id": CONTENT_OVERRIDE,
-        "system_content_record_id": CONTENT_SYSTEM,
+        "module_instance_id": DECISION_MODULE,
+        "field_overrides": {"headline_medium": "This could interest you"},
         "overridden_by": "test@example.com",
-        "reason": "City weekend fits the spring campaign better",
+        "reason": "Consistent headline across the personalized picks",
     })
     assert response.status_code == 200, response.text
     data = response.json()
@@ -50,132 +53,124 @@ def record_pin_override():
     _delete_override(data["id"])
 
 
-class TestCreateContentOverride:
-    def test_creates_record_pin(self, record_pin_override):
-        data = record_pin_override
-        assert data["module_instance_id"] == CMS_MODULE_ID
-        assert data["override_content_record_id"] == CONTENT_OVERRIDE
-        assert data["system_content_record_id"] == CONTENT_SYSTEM
-        assert data["field_overrides"] is None
+class TestCreateFieldOverride:
+    def test_creates_on_decision_module(self, field_override):
+        data = field_override
+        assert data["module_instance_id"] == DECISION_MODULE
+        assert data["field_overrides"]["headline_medium"] == "This could interest you"
+        assert data["override_content_record_id"] is None
+        assert data["condition_category_id"] is None
         assert data["active"] is True
-        assert data["reverted_at"] is None
-        assert data["outcome_delta"] is None
-        assert "id" in data and "created_at" in data
 
-    def test_creates_field_override(self):
+    def test_creates_on_static_content_module(self):
+        # Case 3: field override on a manually-selected content record (hero).
         response = client.post("/overrides/", json={
-            "module_instance_id": CMS_MODULE_ID,
-            "field_overrides": {"headline_medium": "A shorter headline"},
+            "module_instance_id": STATIC_MODULE,
+            "field_overrides": {"headline": "A tighter hero headline"},
             "overridden_by": "test@example.com",
         })
         assert response.status_code == 200, response.text
-        data = response.json()
-        assert data["field_overrides"]["headline_medium"] == "A shorter headline"
-        assert data["override_content_record_id"] is None
-        _delete_override(data["id"])
+        _delete_override(response.json()["id"])
 
-    def test_rejects_empty_override(self):
+
+class TestRejectedOverrides:
+    def test_record_swap_on_decision_module_rejected(self):
         response = client.post("/overrides/", json={
-            "module_instance_id": CMS_MODULE_ID,
+            "module_instance_id": DECISION_MODULE,
+            "override_content_record_id": CONTENT_RECORD,
             "overridden_by": "test@example.com",
         })
         assert response.status_code == 400
-        assert "change something" in response.json()["detail"]
+        assert "isn't meaningful" in response.json()["detail"]
 
-    def test_rejects_unknown_field_key(self):
+    def test_record_swap_on_static_module_rejected(self):
         response = client.post("/overrides/", json={
-            "module_instance_id": CMS_MODULE_ID,
+            "module_instance_id": STATIC_MODULE,
+            "override_content_record_id": CONTENT_RECORD,
+            "overridden_by": "test@example.com",
+        })
+        assert response.status_code == 400
+        assert "change the content record directly" in response.json()["detail"]
+
+    def test_override_on_non_content_module_rejected(self):
+        response = client.post("/overrides/", json={
+            "module_instance_id": NON_CONTENT_MODULE,
+            "field_overrides": {"label": "x"},
+            "overridden_by": "test@example.com",
+        })
+        assert response.status_code == 400
+        assert "doesn't render a content record or decision slot" in response.json()["detail"]
+
+    def test_empty_override_rejected(self):
+        response = client.post("/overrides/", json={
+            "module_instance_id": DECISION_MODULE,
+            "overridden_by": "test@example.com",
+        })
+        assert response.status_code == 400
+        assert "must set field_overrides" in response.json()["detail"]
+
+    def test_unknown_field_key_rejected(self):
+        response = client.post("/overrides/", json={
+            "module_instance_id": DECISION_MODULE,
             "field_overrides": {"not_a_real_field": "x"},
             "overridden_by": "test@example.com",
         })
         assert response.status_code == 400
         assert "not in the" in response.json()["detail"]
 
-    def test_rejects_non_cms_module(self):
+    def test_second_active_on_same_module_rejected(self, field_override):
         response = client.post("/overrides/", json={
-            "module_instance_id": STATIC_MODULE_ID,
-            "override_content_record_id": CONTENT_OVERRIDE,
-            "overridden_by": "test@example.com",
-        })
-        assert response.status_code == 400
-        assert "not a CMS-backed" in response.json()["detail"]
-
-    def test_rejects_second_active_on_same_module(self, record_pin_override):
-        response = client.post("/overrides/", json={
-            "module_instance_id": CMS_MODULE_ID,
-            "override_content_record_id": CONTENT_OVERRIDE,
+            "module_instance_id": DECISION_MODULE,
+            "field_overrides": {"body_medium": "another edit"},
             "overridden_by": "test@example.com",
         })
         assert response.status_code == 400
         assert "already has an active override" in response.json()["detail"]
 
 
-class TestGetContentOverride:
-    def test_get_existing(self, record_pin_override):
-        override_id = record_pin_override["id"]
-        response = client.get(f"/overrides/{override_id}")
+class TestGetAndList:
+    def test_get_existing(self, field_override):
+        response = client.get(f"/overrides/{field_override['id']}")
         assert response.status_code == 200
-        assert response.json()["id"] == override_id
+        assert response.json()["id"] == field_override["id"]
 
     def test_get_nonexistent_returns_404(self):
         assert client.get("/overrides/999999").status_code == 404
 
-
-class TestListContentOverrides:
-    def test_filter_by_module_instance(self, record_pin_override):
-        response = client.get(f"/overrides/?module_instance_id={CMS_MODULE_ID}")
+    def test_filter_by_module_and_active(self, field_override):
+        response = client.get(f"/overrides/?module_instance_id={DECISION_MODULE}&active=true")
         assert response.status_code == 200
         results = response.json()
-        assert all(r["module_instance_id"] == CMS_MODULE_ID for r in results)
-        assert any(r["id"] == record_pin_override["id"] for r in results)
-
-    def test_filter_by_active(self, record_pin_override):
-        response = client.get("/overrides/?active=true")
-        assert response.status_code == 200
-        assert all(r["active"] is True for r in response.json())
+        assert all(r["module_instance_id"] == DECISION_MODULE and r["active"] for r in results)
+        assert any(r["id"] == field_override["id"] for r in results)
 
 
-class TestResetContentOverride:
-    def test_reset_deactivates(self, record_pin_override):
-        override_id = record_pin_override["id"]
-        response = client.post(f"/overrides/{override_id}/reset")
+class TestResetAndOutcome:
+    def test_reset_deactivates(self, field_override):
+        response = client.post(f"/overrides/{field_override['id']}/reset")
         assert response.status_code == 200
         data = response.json()
         assert data["active"] is False
         assert data["reverted_at"] is not None
 
-    def test_reset_frees_the_module_for_a_new_override(self, record_pin_override):
-        # After reset, the one-active-per-module slot is free again.
-        client.post(f"/overrides/{record_pin_override['id']}/reset")
+    def test_reset_frees_the_module(self, field_override):
+        client.post(f"/overrides/{field_override['id']}/reset")
         response = client.post("/overrides/", json={
-            "module_instance_id": CMS_MODULE_ID,
-            "override_content_record_id": CONTENT_OVERRIDE,
+            "module_instance_id": DECISION_MODULE,
+            "field_overrides": {"headline_medium": "new one"},
             "overridden_by": "test@example.com",
         })
         assert response.status_code == 200, response.text
         _delete_override(response.json()["id"])
 
-    def test_reset_nonexistent_returns_404(self):
-        assert client.post("/overrides/999999/reset").status_code == 404
-
-
-class TestRecordOutcomeDelta:
-    def test_patch_outcome_merges(self, record_pin_override):
-        override_id = record_pin_override["id"]
-        client.patch(f"/overrides/{override_id}/outcome", json={
-            "outcome_delta": {"system_open_rate": 0.21}
-        })
-        response = client.patch(f"/overrides/{override_id}/outcome", json={
-            "outcome_delta": {"override_open_rate": 0.18}
-        })
+    def test_outcome_delta_merges(self, field_override):
+        oid = field_override["id"]
+        client.patch(f"/overrides/{oid}/outcome", json={"outcome_delta": {"system_open_rate": 0.21}})
+        response = client.patch(f"/overrides/{oid}/outcome", json={"outcome_delta": {"override_open_rate": 0.18}})
         assert response.status_code == 200
         delta = response.json()["outcome_delta"]
-        # Both keys survive — incremental merge, not wholesale replace.
-        assert delta["system_open_rate"] == 0.21
-        assert delta["override_open_rate"] == 0.18
+        assert delta["system_open_rate"] == 0.21 and delta["override_open_rate"] == 0.18
 
-    def test_patch_outcome_nonexistent_returns_404(self):
-        response = client.patch("/overrides/999999/outcome", json={
-            "outcome_delta": {"system_open_rate": 0.21}
-        })
+    def test_outcome_nonexistent_returns_404(self):
+        response = client.patch("/overrides/999999/outcome", json={"outcome_delta": {"x": 1}})
         assert response.status_code == 404

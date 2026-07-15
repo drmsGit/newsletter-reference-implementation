@@ -131,7 +131,7 @@
                         <form method="post" action="/ui/campaigns/{{ campaign.id }}/overrides/{{ module.active_override.id }}/reset" class="d-inline">
                             <button type="submit" class="btn btn-link btn-sm p-0 ms-1">reset</button>
                         </form>
-                        {% elif module.is_cms %}
+                        {% elif module.overrideable %}
                         <span class="text-muted small">none</span>
                         {% else %}
                         <span class="text-muted small">n/a</span>
@@ -145,7 +145,7 @@
             </tbody>
         </table>
 
-        {% if variant.cms_module_choices %}
+        {% if variant.override_module_choices %}
         <button class="btn btn-sm btn-outline-warning mb-3" data-bs-toggle="collapse" data-bs-target="#form-override-{{ variant.id }}">
             + Add content override
         </button>
@@ -153,30 +153,24 @@
             <div class="card border-warning">
                 <div class="card-body">
                     <p class="small text-muted mb-2">
-                        Override what the system resolved for a module — pin a different content record and/or
-                        edit fields. Takes precedence at render until reset (ADR-041). One active override per module.
+                        Override specific fields of the content a module resolves (e.g. a consistent headline
+                        across personalized picks). Takes precedence at render until reset (ADR-041), one active
+                        override per module. <em>(Dev affordance — the manager-facing editor with live preview
+                        comes later; this stays raw for now.)</em>
                     </p>
                     <form method="post" action="/ui/campaigns/{{ campaign.id }}/variants/{{ variant.id }}/overrides">
                         <div class="row g-2">
-                            <div class="col-md-4">
-                                <label class="form-label small">Module (CMS only)</label>
+                            <div class="col-md-5">
+                                <label class="form-label small">Module</label>
                                 <select name="module_instance_id" class="form-select form-select-sm" required>
-                                    {% for c in variant.cms_module_choices %}
-                                    <option value="{{ c.id }}">{{ c.label }}</option>
+                                    {% for c in variant.override_module_choices %}
+                                    <option value="{{ c.id }}" data-fields="{{ c.variables|join(', ') }}">{{ c.label }} — fields: {{ c.variables|join(', ') }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="col-md-4">
-                                <label class="form-label small">Pin content record id <span class="text-muted">(optional)</span></label>
-                                <input type="number" name="override_content_record_id" class="form-control form-control-sm" placeholder="e.g. 2">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label small">System's pick id <span class="text-muted">(optional, for audit)</span></label>
-                                <input type="number" name="system_content_record_id" class="form-control form-control-sm" placeholder="e.g. 1">
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label small">Field overrides <span class="text-muted">(JSON, e.g. {"headline_medium": "Shorter headline"})</span></label>
-                                <input type="text" name="field_overrides_json" class="form-control form-control-sm font-monospace" placeholder='{"headline_medium": "..."}'>
+                            <div class="col-md-7">
+                                <label class="form-label small">Field overrides <span class="text-muted">(JSON, keyed by the module's fields)</span></label>
+                                <input type="text" name="field_overrides_json" class="form-control form-control-sm font-monospace" placeholder='{"headline_medium": "Shorter headline"}' required>
                             </div>
                             <div class="col-12">
                                 <label class="form-label small">Reason</label>

@@ -6,10 +6,13 @@ from pydantic import BaseModel, ConfigDict
 
 class ContentOverrideCreate(BaseModel):
     module_instance_id: int
-    # At least one of these two must be set (enforced in the service): a
-    # record-level pin and/or field-level edits.
-    override_content_record_id: int | None = None
+    # The only accepted override kind today: field-level edits to the resolved
+    # content (Cases 1 & 3). Keys are validated against the module's manifest.
     field_overrides: dict[str, Any] | None = None
+    # Record swaps are reserved for Case 2 (category-scoped) and rejected for
+    # now — kept on the input shape so the error can explain why, rather than
+    # silently dropping the field.
+    override_content_record_id: int | None = None
     # The system's own pick, recorded for the trust-loop comparison.
     system_content_record_id: int | None = None
     send_instance_id: int | None = None
@@ -20,8 +23,9 @@ class ContentOverrideCreate(BaseModel):
 class ContentOverride(BaseModel):
     id: int
     module_instance_id: int
-    override_content_record_id: int | None
     field_overrides: dict[str, Any] | None
+    override_content_record_id: int | None
+    condition_category_id: int | None
     system_content_record_id: int | None
     send_instance_id: int | None
     overridden_by: str

@@ -175,27 +175,28 @@ SELECT 1, r.id, 3, 'top preference match: Nature', 750 FROM recipients r WHERE r
 -- =========================================================
 -- CONTENT OVERRIDES  (the functional override layer, ADR-040/041)
 -- =========================================================
--- Both target module 2 (variant 1's img_left, personalized via slot 1).
--- Row 1 is the ACTIVE override rendering honors; row 2 is reverted history.
+-- Field-level overrides (the only kind supported today — Cases 1 & 3). Both
+-- target module 2 (variant 1's img_left, personalized via slot 1): row 1 is the
+-- ACTIVE override rendering honors, row 2 is reverted history with an outcome.
 
 INSERT INTO content_overrides (
-    module_instance_id, override_content_record_id, field_overrides,
+    module_instance_id, field_overrides,
     system_content_record_id, send_instance_id,
     overridden_by, reason, active, reverted_at, outcome_delta, created_at
 ) VALUES
-    -- Active field-level override: unify the headline across the personalized
-    -- picks for this send (the common "the resolved headline is wrong/too long
-    -- for this newsletter" case). Body/image stay per-recipient.
-    (2, NULL, '{"headline_medium": "Editor''s pick of the week"}',
+    -- Active: unify the headline across the personalized picks for this send
+    -- (the common "the resolved headline is wrong/too long here" case). The
+    -- body/image stay per-recipient.
+    (2, '{"headline_medium": "Editor''s pick of the week"}',
      NULL, NULL,
      'manager@example.com', 'Consistent headline across this send''s personalized picks',
      true, NULL, NULL, NOW() - INTERVAL '4 days'),
-    -- Reverted record-pin (history): manager once forced Rome for everyone;
-    -- the outcome showed the system's personalization performed better, so it
-    -- was reset. This is the trust-loop artifact ("did the override outperform?").
-    (2, 2, NULL,
+    -- Reverted (history): manager tried a punchier headline; the outcome showed
+    -- the original performed better, so it was reset. The trust-loop artifact
+    -- ("did the override outperform?") — the row survives the reset.
+    (2, '{"headline_medium": "Rome in a Weekend"}',
      1, NULL,
-     'manager@example.com', 'Tried forcing Rome for all — reverted after review',
+     'manager@example.com', 'Tried a punchier headline — reverted, original did better',
      false, NOW() - INTERVAL '6 days',
      '{"system_open_rate": 0.21, "override_open_rate": 0.18, "system_click_rate": 0.04, "override_click_rate": 0.03}',
      NOW() - INTERVAL '10 days');

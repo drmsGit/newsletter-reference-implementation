@@ -303,17 +303,20 @@ def campaign_detail(
         )
 
         modules = []
-        cms_module_choices = []
+        override_module_choices = []
         for m in module_records:
             manifest = get_manifest(m.module_type)
-            is_cms = bool(manifest and manifest.cms)
-            active = get_active_content_override(db, m.id) if is_cms else None
+            # Overrideable = the module resolves content (a content record or a
+            # decision slot) and has a manifest so its fields are known. Not tied
+            # to the cms flag — a hero/cta referencing a content record qualifies.
+            resolves_content = m.content_record_id is not None or m.decision_slot_id is not None
+            overrideable = bool(manifest and resolves_content)
+            active = get_active_content_override(db, m.id) if overrideable else None
             if active is not None:
-                if active.override_content_record_id is not None:
-                    summary = f"pin → content #{active.override_content_record_id}"
-                else:
-                    summary = "field edits: " + ", ".join((active.field_overrides or {}).keys())
-                active_override = {"id": active.id, "summary": summary}
+                active_override = {
+                    "id": active.id,
+                    "summary": "fields: " + ", ".join((active.field_overrides or {}).keys()),
+                }
             else:
                 active_override = None
             modules.append({
@@ -322,11 +325,11 @@ def campaign_detail(
                 "module_type": m.module_type,
                 "content_record_id": m.content_record_id,
                 "decision_slot_id": m.decision_slot_id,
-                "is_cms": is_cms,
+                "overrideable": overrideable,
                 "active_override": active_override,
             })
-            if is_cms:
-                cms_module_choices.append({
+            if overrideable:
+                override_module_choices.append({
                     "id": m.id,
                     "label": f"#{m.id} {m.module_type} (pos {m.position})",
                     "variables": [v.name for v in manifest.variables],
@@ -445,7 +448,7 @@ def campaign_detail(
                 "subject": variant.subject,
                 "preheader": variant.preheader,
                 "modules": modules,
-                "cms_module_choices": cms_module_choices,
+                "override_module_choices": override_module_choices,
                 "decision_slots": decision_slot_rows,
                 "snapshots": snapshots,
             }
@@ -573,9 +576,7 @@ def content_override_create(
     campaign_id: int,
     variant_id: int,
     module_instance_id: int = Form(...),
-    override_content_record_id: str = Form(""),
     field_overrides_json: str = Form(""),
-    system_content_record_id: str = Form(""),
     reason: str = Form(""),
     db: Session = Depends(get_db),
 ):
@@ -593,9 +594,7 @@ def content_override_create(
             db,
             ContentOverrideCreate(
                 module_instance_id=module_instance_id,
-                override_content_record_id=int(override_content_record_id) if override_content_record_id.strip() else None,
                 field_overrides=field_overrides,
-                system_content_record_id=int(system_content_record_id) if system_content_record_id.strip() else None,
                 overridden_by="manager@example.com",
                 reason=reason.strip() or None,
             ),

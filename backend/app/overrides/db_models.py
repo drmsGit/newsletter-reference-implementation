@@ -45,12 +45,23 @@ class ContentOverrideDB(Base):
     # reachable via the module, so it isn't duplicated here.
     module_instance_id = Column(Integer, ForeignKey("module_instances.id"), nullable=False, index=True)
 
-    # Record-level pin (nullable: a field-only override leaves this null).
-    override_content_record_id = Column(Integer, ForeignKey("content_records.id"), nullable=True)
-
     # Field-level overrides: {manifest_variable_name: value}. Validated at
-    # create time against the target module's manifest variables.
+    # create time against the target module's manifest variables. This is the
+    # only override kind accepted today (Cases 1 & 3: unify/replace fields of
+    # the resolved content, for all recipients).
     field_overrides = Column(JSON, nullable=True)
+
+    # --- Reserved for Case 2 (category-scoped record override), not yet built ---
+    # "recipients whose preferences match `condition_category_id` get
+    # `override_content_record_id` instead of the decision result" — e.g. beach
+    # recipients get a special beach offer. A for-all record swap is deliberately
+    # NOT allowed (place static content instead); a record swap on a static
+    # module is meaningless (change the content record). So both columns stay
+    # null under today's rules and are rejected at create time until Case 2 is
+    # designed (alongside the guaranteed-placement Needs-ADR item). Kept on the
+    # schema now so adding Case 2 later doesn't churn the table.
+    override_content_record_id = Column(Integer, ForeignKey("content_records.id"), nullable=True)
+    condition_category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
 
     # What the system would have used — the trust-loop counterfactual. Nullable
     # because it's only unambiguous for a static module or a non-personalized
@@ -80,8 +91,10 @@ class ContentOverrideDB(Base):
             "override_content_record_id IS NOT NULL OR field_overrides IS NOT NULL",
             name="ck_content_overrides_changes_something",
         ),
-        # At most one *active* override per module — the module has a single
-        # override state. History (reset rows) can accumulate freely.
+        # At most one *active* override per module — a module has a single
+        # (for-all) override state today. History (reset rows) accumulates
+        # freely. NOTE: this will need to relax to one-active-per-(module,
+        # category) when Case 2 (category-scoped record overrides) lands.
         Index(
             "ux_content_overrides_one_active_per_module",
             "module_instance_id",
