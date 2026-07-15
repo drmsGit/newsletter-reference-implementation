@@ -122,16 +122,19 @@ def create_variant_decision_slot(
     payload: DecisionSlotCreate,
     db: Session = Depends(get_db),
 ):
-    return create_decision_slot_for_variant(
-        db=db,
-        variant_id=variant_id,
-        name=payload.name,
-        decision_type=payload.decision_type,
-        decision_strategy=payload.decision_strategy,
-        candidate_filter=payload.candidate_filter,
-        strategy_config=payload.strategy_config,
-        max_results=payload.max_results,
-    )
+    try:
+        return create_decision_slot_for_variant(
+            db=db,
+            variant_id=variant_id,
+            name=payload.name,
+            decision_type=payload.decision_type,
+            decision_strategy=payload.decision_strategy,
+            candidate_filter=payload.candidate_filter,
+            strategy_config=payload.strategy_config,
+            max_results=payload.max_results,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
 
 
 @router.get("/decision-slots/{decision_slot_id}/resolutions", response_model=list[DecisionResolution])

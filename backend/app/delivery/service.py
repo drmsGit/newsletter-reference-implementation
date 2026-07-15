@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
 from app.delivery.models import DeliveryExecution, SendInstance
 
+from app.campaigns.db_models import VariantDB
 from app.delivery.providers.factory import get_provider
 from app.recipients.db_models import RecipientDB
 from app.rendering.service import render_variant_html
@@ -157,6 +158,16 @@ def send_send_instance(
             f"Snapshot {send_instance.snapshot_id} not found"
         )
 
+    # Subject line comes from the variant (recipient-facing copy), not the
+    # send_instance.name (an internal label). Fall back to the send_instance
+    # name only if the variant has no subject set, so older data still sends.
+    variant = (
+        db.query(VariantDB)
+        .filter(VariantDB.id == snapshot.variant_id)
+        .first()
+    )
+    subject = (variant.subject if variant and variant.subject else send_instance.name)
+
     provider = get_provider(
         send_instance.provider or "mock"
     )
@@ -196,7 +207,7 @@ def send_send_instance(
 
             result = provider.send(
                 recipient_email=recipient.email if recipient is not None else "",
-                subject=send_instance.name,
+                subject=subject,
                 html=html,
             )
 

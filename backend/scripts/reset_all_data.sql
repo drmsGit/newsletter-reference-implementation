@@ -125,9 +125,11 @@ JOIN categories cat ON cat.name = v.category_name;
 INSERT INTO campaigns (name, status) VALUES
     ('Summer 2026 Newsletter', 'draft');
 
-INSERT INTO variants (campaign_id, name, status) VALUES
-    (1, 'Variant A — Beach Focus', 'draft'),
-    (1, 'Variant B — City Focus',  'draft');
+-- name is the internal label; subject/preheader are the recipient-facing copy
+-- used at send time (never the send_instance label).
+INSERT INTO variants (campaign_id, name, subject, preheader, status) VALUES
+    (1, 'Variant A — Beach Focus', 'Your summer beach escape awaits', 'Hidden coves, quiet walks, and warm water', 'draft'),
+    (1, 'Variant B — City Focus',  'City weekends made for wandering', 'Trattorias, markets, and backstreets',      'draft');
 
 INSERT INTO decision_slots (variant_id, name, decision_type, decision_strategy, candidate_filter, strategy_config, max_results) VALUES
     (1, 'Main Content Slot', 'content_recommendation', 'recipient_top_score',

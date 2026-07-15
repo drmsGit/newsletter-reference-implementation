@@ -10,6 +10,10 @@
 
 <h1 class="mb-4">Decision Slot {{ slot.id }}</h1>
 
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
 <div class="card mb-4">
     <div class="card-body">
         <h5>Context</h5>
@@ -89,6 +93,24 @@
                         {% endfor %}
                     </select>
                 </div>
+                {% for sname, manifest in strategy_manifests.items() %}
+                <div class="strategy-manifest small text-muted mb-2" data-strategy="{{ sname }}"
+                     {% if sname != slot.decision_strategy %}style="display:none"{% endif %}>
+                    <div><strong>{{ sname }}</strong> accepts only these keys (structure is locked to the strategy):</div>
+                    <div>
+                        strategy config:
+                        {% if manifest.config_fields %}
+                        {% for f in manifest.config_fields %}<code>{{ f.name }}</code> ({{ f.type }}){% if not loop.last %}, {% endif %}{% endfor %}
+                        {% else %}<em>none</em>{% endif %}
+                    </div>
+                    <div>
+                        candidate filter:
+                        {% if manifest.candidate_filter_fields %}
+                        {% for f in manifest.candidate_filter_fields %}<code>{{ f.name }}</code> ({{ f.type }}){% if not loop.last %}, {% endif %}{% endfor %}
+                        {% else %}<em>none</em>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
                 <div class="mb-3">
                     <label class="form-label">
                         Strategy config
@@ -104,6 +126,18 @@
                     <textarea name="candidate_filter_json" class="form-control font-monospace" rows="4">{{ slot.candidate_filter_pretty }}</textarea>
                 </div>
                 <button type="submit" class="btn btn-primary btn-sm">Save configuration</button>
+                <script>
+                (function () {
+                    var form = document.currentScript.closest('form');
+                    var select = form.querySelector('select[name="decision_strategy"]');
+                    if (!select) return;
+                    select.addEventListener('change', function () {
+                        form.querySelectorAll('.strategy-manifest').forEach(function (el) {
+                            el.style.display = (el.dataset.strategy === select.value) ? '' : 'none';
+                        });
+                    });
+                })();
+                </script>
             </form>
         </div>
     </div>

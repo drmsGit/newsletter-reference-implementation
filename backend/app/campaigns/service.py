@@ -22,6 +22,8 @@ def to_variant(record: VariantDB) -> Variant:
         id=record.id,
         campaign_id=record.campaign_id,
         name=record.name,
+        subject=record.subject,
+        preheader=record.preheader,
         status=record.status,
         created_at=record.created_at,
         updated_at=record.updated_at,
@@ -86,11 +88,15 @@ def create_variant_for_campaign(
     db: Session,
     campaign_id: int,
     name: str,
+    subject: str | None = None,
+    preheader: str | None = None,
     status: str = "draft",
 ) -> Variant:
     variant = VariantDB(
         campaign_id=campaign_id,
         name=name,
+        subject=subject,
+        preheader=preheader,
         status=status,
     )
 
@@ -98,6 +104,24 @@ def create_variant_for_campaign(
     db.commit()
     db.refresh(variant)
 
+    return to_variant(variant)
+
+
+def update_variant(
+    db: Session,
+    variant_id: int,
+    name: str,
+    subject: str | None = None,
+    preheader: str | None = None,
+) -> Variant | None:
+    variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
+    if variant is None:
+        return None
+    variant.name = name
+    variant.subject = subject
+    variant.preheader = preheader
+    db.commit()
+    db.refresh(variant)
     return to_variant(variant)
 
 
@@ -166,6 +190,22 @@ def create_module_for_variant(
     return to_module_instance(module)
 
 
+def _normalize_for_strategy(
+    decision_strategy: str,
+    candidate_filter: dict | None,
+    strategy_config: dict | None,
+) -> tuple[dict | None, dict | None]:
+    """Resolve the strategy and lock the config/filter to its declared shape.
+    Lazy imports keep the decision-strategy registry out of this module's
+    import graph. Raises ValueError for an unknown strategy or a config that
+    doesn't match the strategy's declared fields."""
+    from app.decision.strategies.base import normalize_slot_config
+    from app.decision.strategies.registry import get_strategy
+
+    strategy = get_strategy(decision_strategy)
+    return normalize_slot_config(strategy.meta, candidate_filter, strategy_config)
+
+
 def update_decision_slot(
     db: Session,
     slot_id: int,
@@ -176,6 +216,12 @@ def update_decision_slot(
     slot = db.query(DecisionSlotDB).filter(DecisionSlotDB.id == slot_id).first()
     if slot is None:
         return None
+    # Lock the config/filter structure to the (possibly newly-chosen) strategy
+    # before persisting — no more "accepts any shape for any strategy, only
+    # fails at resolution time". Switching strategies re-derives the structure.
+    candidate_filter, strategy_config = _normalize_for_strategy(
+        decision_strategy, candidate_filter, strategy_config
+    )
     slot.decision_strategy = decision_strategy
     slot.candidate_filter = candidate_filter
     slot.strategy_config = strategy_config
@@ -222,6 +268,9 @@ def create_decision_slot_for_variant(
     strategy_config: dict | None = None,
     max_results: int = 1,
 ) -> DecisionSlot:
+    candidate_filter, strategy_config = _normalize_for_strategy(
+        decision_strategy, candidate_filter, strategy_config
+    )
     slot = DecisionSlotDB(
         variant_id=variant_id,
         name=name,

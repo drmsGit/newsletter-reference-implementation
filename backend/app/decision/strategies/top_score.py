@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.campaigns.db_models import DecisionSlotDB
 from app.content.db_models import ContentCategoryAssignmentDB, ContentRecordDB
 from app.content.service import get_latest_version_for_content
-from app.decision.strategies.base import DecisionStrategy, StrategyMeta, StrategyResult
+from app.decision.strategies.base import ConfigField, DecisionStrategy, StrategyMeta, StrategyResult
 
 
 class TopScoreStrategy(DecisionStrategy):
@@ -18,6 +18,15 @@ class TopScoreStrategy(DecisionStrategy):
                 "candidates in the allowed categories. No recipient context needed."
             ),
             requires_recipient=False,
+            candidate_filter_fields=[
+                ConfigField(
+                    name="category_ids",
+                    type="list[int]",
+                    default=[],
+                    description="Restrict candidates to these category IDs (empty = all).",
+                ),
+            ],
+            config_fields=[],
         )
 
     def execute(

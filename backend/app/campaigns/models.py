@@ -7,6 +7,8 @@ class Variant(BaseModel):
     id: int
     campaign_id: int
     name: str
+    subject: str | None = None
+    preheader: str | None = None
     status: str = "draft"
     created_at: datetime
     updated_at: datetime
@@ -14,7 +16,15 @@ class Variant(BaseModel):
 
 class VariantCreate(BaseModel):
     name: str = "Variant A"
+    subject: str | None = None
+    preheader: str | None = None
     status: str = "draft"
+
+
+class VariantUpdate(BaseModel):
+    name: str
+    subject: str | None = None
+    preheader: str | None = None
 
 
 class Campaign(BaseModel):

@@ -8,7 +8,7 @@ from jinja2 import BaseLoader, Environment
 from markupsafe import Markup, escape
 from sqlalchemy.orm import Session
 
-from app.campaigns.db_models import ModuleInstanceDB, DecisionResolutionDB
+from app.campaigns.db_models import ModuleInstanceDB, DecisionResolutionDB, VariantDB
 from app.content.db_models import ContentRecordDB, ContentVersionDB
 from app.email_modules.registry import ModuleManifest, get_manifest, get_template_html
 
@@ -84,6 +84,20 @@ def render_variant_html(
 
     brand_css = _load_brand_css()
 
+    # Preheader: the inbox preview text shown after the subject line. It lives
+    # on the variant and is emitted as a hidden span at the very top of the
+    # body (the standard email technique) so clients pick it up without it
+    # showing in the rendered email. Escaped — it's recipient-facing copy.
+    variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
+    preheader_html = ""
+    if variant is not None and variant.preheader:
+        preheader_html = (
+            '<span class="preheader" '
+            'style="display:none!important;visibility:hidden;opacity:0;'
+            'color:transparent;height:0;width:0;overflow:hidden;">'
+            f"{escape(variant.preheader)}</span>"
+        )
+
     raw_html = f"""<!doctype html>
 <html>
   <head>
@@ -92,6 +106,7 @@ def render_variant_html(
     <style>{brand_css}</style>
   </head>
   <body>
+    {preheader_html}
     {"".join(rendered_modules)}
   </body>
 </html>"""

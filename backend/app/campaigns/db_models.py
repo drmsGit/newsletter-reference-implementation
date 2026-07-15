@@ -24,6 +24,13 @@ class VariantDB(Base):
     id = Column(Integer, primary_key=True, index=True)
     campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=False)
     name = Column(String(255), nullable=False)
+    # `name` is an internal label (e.g. "Variant A — Beach Focus"); the actual
+    # email subject line and inbox preview text are their own first-class
+    # fields, per-variant so A/B versions can differ. Historically the send
+    # path reused send_instance.name as the subject, conflating an internal
+    # label with recipient-facing copy — these fields end that.
+    subject = Column(String(255), nullable=True)
+    preheader = Column(String(255), nullable=True)
     status = Column(String(50), nullable=False, default="draft")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(

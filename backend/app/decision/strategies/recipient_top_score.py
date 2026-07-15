@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.campaigns.db_models import DecisionSlotDB
 from app.content.db_models import ContentCategoryAssignmentDB, ContentRecordDB
 from app.content.service import get_latest_version_for_content
-from app.decision.strategies.base import DecisionStrategy, StrategyMeta, StrategyResult
+from app.decision.strategies.base import ConfigField, DecisionStrategy, StrategyMeta, StrategyResult
 from app.recipients.db_models import RecipientPreferenceDB
 
 DEFAULT_CONFIG = {
@@ -27,6 +27,28 @@ class RecipientTopScoreStrategy(DecisionStrategy):
                 "strategy_config (content_score_weight, preference_score_weight)."
             ),
             requires_recipient=True,
+            candidate_filter_fields=[
+                ConfigField(
+                    name="category_ids",
+                    type="list[int]",
+                    default=[],
+                    description="Restrict candidates to these category IDs (empty = all).",
+                ),
+            ],
+            config_fields=[
+                ConfigField(
+                    name="content_score_weight",
+                    type="number",
+                    default=DEFAULT_CONFIG["content_score_weight"],
+                    description="Weight applied to the content's own category score.",
+                ),
+                ConfigField(
+                    name="preference_score_weight",
+                    type="number",
+                    default=DEFAULT_CONFIG["preference_score_weight"],
+                    description="Weight applied to the recipient's preference score.",
+                ),
+            ],
         )
 
     def execute(

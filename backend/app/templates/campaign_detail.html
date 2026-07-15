@@ -36,8 +36,16 @@
         <div class="card-body">
             <form method="post" action="/ui/campaigns/{{ campaign.id }}/variants">
                 <div class="mb-3">
-                    <label class="form-label">Variant name</label>
+                    <label class="form-label">Variant name <span class="text-muted">(internal label)</span></label>
                     <input type="text" name="name" class="form-control" required placeholder="e.g. Variant B — City Focus">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Subject line <span class="text-muted">(recipient-facing)</span></label>
+                    <input type="text" name="subject" class="form-control" maxlength="255" placeholder="e.g. Your summer city escape awaits">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Preheader <span class="text-muted">(inbox preview text)</span></label>
+                    <input type="text" name="preheader" class="form-control" maxlength="255" placeholder="Short preview shown after the subject">
                 </div>
                 <button type="submit" class="btn btn-primary btn-sm">Add variant</button>
             </form>
@@ -48,8 +56,41 @@
 <!-- Variants -->
 {% for variant in variants %}
 <div class="card mb-5">
-    <div class="card-header">
-        <strong>Variant {{ variant.id }} — {{ variant.name }}</strong>
+    <div class="card-header d-flex justify-content-between align-items-start">
+        <div>
+            <strong>Variant {{ variant.id }} — {{ variant.name }}</strong>
+            <div class="small mt-1">
+                <span class="text-muted">Subject:</span>
+                {% if variant.subject %}{{ variant.subject }}{% else %}<em class="text-danger">not set — send would fall back to the send-instance label</em>{% endif %}
+            </div>
+            {% if variant.preheader %}
+            <div class="small"><span class="text-muted">Preheader:</span> {{ variant.preheader }}</div>
+            {% endif %}
+        </div>
+        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#form-edit-variant-{{ variant.id }}">
+            Edit
+        </button>
+    </div>
+    <div class="collapse" id="form-edit-variant-{{ variant.id }}">
+        <div class="card-body border-bottom bg-light">
+            <form method="post" action="/ui/campaigns/{{ campaign.id }}/variants/{{ variant.id }}/edit">
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <label class="form-label small">Name (internal)</label>
+                        <input type="text" name="name" class="form-control form-control-sm" value="{{ variant.name }}" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Subject line</label>
+                        <input type="text" name="subject" class="form-control form-control-sm" maxlength="255" value="{{ variant.subject or '' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Preheader</label>
+                        <input type="text" name="preheader" class="form-control form-control-sm" maxlength="255" value="{{ variant.preheader or '' }}">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm mt-2">Save</button>
+            </form>
+        </div>
     </div>
     <div class="card-body">
 

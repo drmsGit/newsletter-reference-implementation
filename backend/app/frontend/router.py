@@ -16,7 +16,7 @@ from app.content.service import create_content, update_content_record, assign_ca
 from app.content.service import create_category, create_category_relation
 from app.content.service import delete_content_record, delete_category, ContentRecordHasHistoryError, HasRelationsError
 from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB, ModuleInstanceDB, DecisionSlotDB
-from app.campaigns.service import create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant, update_decision_slot
+from app.campaigns.service import create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant, update_decision_slot, update_variant
 from app.rendering.service import UnpublishedContentError
 from app.snapshots.service import create_snapshot_for_variant
 from app.delivery.service import create_send_instance, send_send_instance
@@ -405,6 +405,8 @@ def campaign_detail(
             {
                 "id": variant.id,
                 "name": variant.name,
+                "subject": variant.subject,
+                "preheader": variant.preheader,
                 "modules": modules,
                 "decision_slots": decision_slot_rows,
                 "snapshots": snapshots,
@@ -453,9 +455,36 @@ def campaign_create(
 def variant_create(
     campaign_id: int,
     name: str = Form(...),
+    subject: str = Form(""),
+    preheader: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    create_variant_for_campaign(db, campaign_id=campaign_id, name=name)
+    create_variant_for_campaign(
+        db,
+        campaign_id=campaign_id,
+        name=name,
+        subject=subject.strip() or None,
+        preheader=preheader.strip() or None,
+    )
+    return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
+
+
+@router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/edit")
+def variant_edit(
+    campaign_id: int,
+    variant_id: int,
+    name: str = Form(...),
+    subject: str = Form(""),
+    preheader: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    update_variant(
+        db,
+        variant_id=variant_id,
+        name=name,
+        subject=subject.strip() or None,
+        preheader=preheader.strip() or None,
+    )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
@@ -541,9 +570,19 @@ def decision_slot_edit(
         candidate_filter = _json.loads(candidate_filter_json) or None
         strategy_config = _json.loads(strategy_config_json) or None
     except ValueError:
-        candidate_filter = None
-        strategy_config = None
-    update_decision_slot(db, slot_id, decision_strategy, candidate_filter, strategy_config)
+        return RedirectResponse(
+            url=f"/ui/decisions/slots/{slot_id}?error={quote('Config/filter must be valid JSON')}",
+            status_code=303,
+        )
+    try:
+        update_decision_slot(db, slot_id, decision_strategy, candidate_filter, strategy_config)
+    except ValueError as error:
+        # The config/filter didn't match the chosen strategy's declared shape —
+        # surface it now instead of letting it crash later at resolution time.
+        return RedirectResponse(
+            url=f"/ui/decisions/slots/{slot_id}?error={quote(str(error))}",
+            status_code=303,
+        )
     return RedirectResponse(url=f"/ui/decisions/slots/{slot_id}", status_code=303)
 
 
@@ -1146,6 +1185,7 @@ def decisions_list(
 def decision_slot_detail(
     decision_slot_id: int,
     request: Request,
+    error: str | None = None,
     db: Session = Depends(get_db),
 ):
     slot_context = (
@@ -1317,7 +1357,24 @@ def decision_slot_detail(
         for reason, count in reason_summary
     ]
 
-    supported_strategies = sorted(s.name for s in list_strategies())
+    strategy_metas = list_strategies()
+    supported_strategies = sorted(s.name for s in strategy_metas)
+
+    # Declared config/filter shape per strategy, so the edit form can show
+    # which keys are valid (structure is locked to the chosen strategy).
+    strategy_manifests = {
+        meta.name: {
+            "candidate_filter_fields": [
+                {"name": f.name, "type": f.type, "default": f.default, "description": f.description}
+                for f in meta.candidate_filter_fields
+            ],
+            "config_fields": [
+                {"name": f.name, "type": f.type, "default": f.default, "description": f.description}
+                for f in meta.config_fields
+            ],
+        }
+        for meta in strategy_metas
+    }
 
     candidate_filter_pretty = json.dumps(
         slot.candidate_filter or {},
@@ -1351,6 +1408,8 @@ def decision_slot_detail(
                 "strategy_config_pretty": strategy_config_pretty,
                 "supported_strategies": supported_strategies,
             },
+            "strategy_manifests": strategy_manifests,
+            "error": error,
             "summary": resolution_summary,
             "reason_summary": reason_summary_rows,
             "top_content": top_content_rows,
