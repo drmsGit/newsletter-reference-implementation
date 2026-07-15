@@ -9,7 +9,7 @@ from app.content.db_models import (
     ContentVersionDB,
 )
 from app.content.models import ContentRecord, Category, CategoryRelation, ContentVersion
-from app.overrides.db_models import OverrideEventDB
+from app.overrides.db_models import ContentOverrideDB
 
 
 class ContentRecordHasHistoryError(Exception):
@@ -452,17 +452,17 @@ def delete_content_record(db: Session, content_id: int, force: bool = False) -> 
         .count()
     )
     override_count = (
-        db.query(OverrideEventDB)
+        db.query(ContentOverrideDB)
         .filter(
-            (OverrideEventDB.system_content_record_id == content_id)
-            | (OverrideEventDB.override_content_record_id == content_id)
+            (ContentOverrideDB.system_content_record_id == content_id)
+            | (ContentOverrideDB.override_content_record_id == content_id)
         )
         .count()
     )
     if resolution_count or override_count:
         raise ContentRecordHasHistoryError(
             f"Content record {content_id} has real history — "
-            f"{resolution_count} decision resolution(s), {override_count} override event(s) "
+            f"{resolution_count} decision resolution(s), {override_count} content override(s) "
             "— and can never be deleted, only its future use prevented."
         )
 

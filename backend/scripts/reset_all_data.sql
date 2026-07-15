@@ -18,7 +18,7 @@ TRUNCATE TABLE
     preference_update_logs,
     engagement_events,
     delivery_executions,
-    override_events,
+    content_overrides,
     decision_resolutions,
     consent_sync_logs,
     recipient_preferences,
@@ -139,13 +139,17 @@ INSERT INTO decision_slots (variant_id, name, decision_type, decision_strategy, 
      '{"category_ids": [1, 2, 3, 4, 5, 6]}',
      '{"content_score_weight": 1, "preference_score_weight": 10}', 1);
 
+-- The decision-driven module uses img_left (a real cms:true manifest that
+-- renders headline_medium/body_medium/image_url) so the per-recipient
+-- personalization — and any content override applied on top — is actually
+-- visible. (It was 'content_card', which has no manifest and renders nothing.)
 INSERT INTO module_instances (variant_id, module_type, position, content_record_id, module_data, decision_slot_id) VALUES
-    (1, 'hero',         1, 1,    '{"headline": "Your Summer Starts Here"}', NULL),
-    (1, 'content_card', 2, NULL, NULL,                                       1),
-    (1, 'cta',          3, NULL, '{"button_label": "Plan my trip"}',         NULL),
-    (2, 'hero',         1, 2,    '{"headline": "City Escapes 2026"}',        NULL),
-    (2, 'content_card', 2, NULL, NULL,                                       2),
-    (2, 'cta',          3, NULL, '{"button_label": "Explore cities"}',       NULL);
+    (1, 'hero',     1, 1,    '{"headline": "Your Summer Starts Here"}', NULL),
+    (1, 'img_left', 2, NULL, NULL,                                       1),
+    (1, 'cta',      3, NULL, '{"button_label": "Plan my trip"}',         NULL),
+    (2, 'hero',     1, 2,    '{"headline": "City Escapes 2026"}',        NULL),
+    (2, 'img_left', 2, NULL, NULL,                                       2),
+    (2, 'cta',      3, NULL, '{"button_label": "Explore cities"}',       NULL);
 
 -- =========================================================
 -- SNAPSHOTS / SEND / DELIVERY
@@ -169,21 +173,30 @@ SELECT 1, r.id, 2, 'top preference match: City',   850 FROM recipients r WHERE r
 SELECT 1, r.id, 3, 'top preference match: Nature', 750 FROM recipients r WHERE r.external_id = 'r-003';
 
 -- =========================================================
--- OVERRIDE EVENTS
+-- CONTENT OVERRIDES  (the functional override layer, ADR-040/041)
 -- =========================================================
+-- Both target module 2 (variant 1's img_left, personalized via slot 1).
+-- Row 1 is the ACTIVE override rendering honors; row 2 is reverted history.
 
-INSERT INTO override_events (
-    override_type, module_instance_id, decision_slot_id, send_instance_id,
-    system_content_record_id, override_content_record_id,
-    overridden_by, reason, outcome_delta, created_at
+INSERT INTO content_overrides (
+    module_instance_id, override_content_record_id, field_overrides,
+    system_content_record_id, send_instance_id,
+    overridden_by, reason, active, reverted_at, outcome_delta, created_at
 ) VALUES
-    -- Pending: manager swapped content on slot 1, outcome not yet recorded
-    ('content', 2, 1, NULL, 1, 2,
-     'manager@example.com', 'City weekend fits the spring campaign better',
-     NULL, NOW() - INTERVAL '4 days'),
-    -- Resolved: earlier override on slot 2, outcome shows system was better
-    ('content', 5, 2, NULL, 3, 2,
-     'manager@example.com', NULL,
+    -- Active field-level override: unify the headline across the personalized
+    -- picks for this send (the common "the resolved headline is wrong/too long
+    -- for this newsletter" case). Body/image stay per-recipient.
+    (2, NULL, '{"headline_medium": "Editor''s pick of the week"}',
+     NULL, NULL,
+     'manager@example.com', 'Consistent headline across this send''s personalized picks',
+     true, NULL, NULL, NOW() - INTERVAL '4 days'),
+    -- Reverted record-pin (history): manager once forced Rome for everyone;
+    -- the outcome showed the system's personalization performed better, so it
+    -- was reset. This is the trust-loop artifact ("did the override outperform?").
+    (2, 2, NULL,
+     1, NULL,
+     'manager@example.com', 'Tried forcing Rome for all — reverted after review',
+     false, NOW() - INTERVAL '6 days',
      '{"system_open_rate": 0.21, "override_open_rate": 0.18, "system_click_rate": 0.04, "override_click_rate": 0.03}',
      NOW() - INTERVAL '10 days');
 

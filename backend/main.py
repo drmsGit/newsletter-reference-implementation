@@ -33,7 +33,7 @@ from app.providers.router import router as provider_router
 
 from app.email_modules.router import router as email_modules_router
 
-from app.overrides.db_models import OverrideEventDB
+from app.overrides.db_models import ContentOverrideDB
 from app.overrides.router import router as overrides_router
 
 from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB

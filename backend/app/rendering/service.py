@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from app.campaigns.db_models import ModuleInstanceDB, DecisionResolutionDB, VariantDB
 from app.content.db_models import ContentRecordDB, ContentVersionDB
 from app.email_modules.registry import ModuleManifest, get_manifest, get_template_html
+from app.overrides.db_models import ContentOverrideDB
+from app.overrides.service import get_active_content_override
 
 RenderMode = Literal["preview", "send"]
 
@@ -142,8 +144,13 @@ def render_cms_module(
     recipient_id: int | None = None,
     mode: RenderMode = "preview",
 ) -> tuple[str, DecisionResolutionDB | None]:
+    # An active content override (ADR-040/041) takes precedence over what the
+    # system would resolve — a record pin swaps which content record fills the
+    # module, and/or field overrides replace individual fields — until reset.
+    override = get_active_content_override(db, module.id)
+
     content, decision_resolution = resolve_content_for_module(
-        db=db, module=module, recipient_id=recipient_id, mode=mode
+        db=db, module=module, recipient_id=recipient_id, mode=mode, override=override
     )
 
     if content is None:
@@ -153,14 +160,16 @@ def render_cms_module(
             decision_resolution,
         )
 
-    data = module.module_data or {}
+    field_overrides = (override.field_overrides if override else None) or {}
     variables: dict = {}
 
     for var in manifest.variables:
-        # Convention: template variable name = CMS field name exactly.
-        # Override in module_data (stored as {name}_override) takes priority.
-        override = data.get(f"{var.name}_override")
-        variables[var.name] = override if override else content.get(var.name, "")
+        # Convention: template variable name = CMS field name exactly. A
+        # field-level override wins over the resolved content value (ADR-041).
+        if var.name in field_overrides:
+            variables[var.name] = field_overrides[var.name]
+        else:
+            variables[var.name] = content.get(var.name, "")
 
     if variables.get(_RICH_TEXT_FIELD):
         variables[_RICH_TEXT_FIELD] = render_rich_text(variables[_RICH_TEXT_FIELD])
@@ -277,6 +286,7 @@ def resolve_content_for_module(
     module: ModuleInstanceDB,
     recipient_id: int | None = None,
     mode: RenderMode = "preview",
+    override: "ContentOverrideDB | None" = None,
 ) -> tuple[dict | None, DecisionResolutionDB | None]:
     """
     Returns (content, decision_resolution). decision_resolution is the
@@ -285,6 +295,19 @@ def resolve_content_for_module(
     rather than re-querying, so rendering and the recorded metadata can never
     disagree about which resolution was used (ADR-062).
     """
+    # Record-level override pin (ADR-041) wins over both static content and the
+    # decision slot: render the pinned record instead. No decision_resolution is
+    # returned — the decision wasn't what got used.
+    if override is not None and override.override_content_record_id is not None:
+        return (
+            resolve_renderable_content(
+                db=db,
+                content_record_id=override.override_content_record_id,
+                mode=mode,
+            ),
+            None,
+        )
+
     if module.content_record_id is not None:
         return (
             resolve_renderable_content(

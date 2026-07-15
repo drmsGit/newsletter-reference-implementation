@@ -24,7 +24,14 @@ from app.recipients.db_models import RecipientDB, RecipientPreferenceDB, Prefere
 from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB
 from app.audience import service as audience_service
 from app.decision.strategies.registry import list_strategies
-from app.email_modules.registry import list_manifests
+from app.email_modules.registry import list_manifests, get_manifest
+from app.overrides.service import (
+    create_content_override,
+    get_active_content_override,
+    list_content_overrides,
+    reset_content_override,
+)
+from app.overrides.models import ContentOverrideCreate
 from app.snapshots.db_models import SnapshotDB
 from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
 from app.insight.db_models import EngagementEventDB
@@ -288,12 +295,42 @@ def campaign_detail(
     variant_rows = []
 
     for variant in variants:
-        modules = (
+        module_records = (
             db.query(ModuleInstanceDB)
             .filter(ModuleInstanceDB.variant_id == variant.id)
             .order_by(ModuleInstanceDB.position.asc())
             .all()
         )
+
+        modules = []
+        cms_module_choices = []
+        for m in module_records:
+            manifest = get_manifest(m.module_type)
+            is_cms = bool(manifest and manifest.cms)
+            active = get_active_content_override(db, m.id) if is_cms else None
+            if active is not None:
+                if active.override_content_record_id is not None:
+                    summary = f"pin → content #{active.override_content_record_id}"
+                else:
+                    summary = "field edits: " + ", ".join((active.field_overrides or {}).keys())
+                active_override = {"id": active.id, "summary": summary}
+            else:
+                active_override = None
+            modules.append({
+                "id": m.id,
+                "position": m.position,
+                "module_type": m.module_type,
+                "content_record_id": m.content_record_id,
+                "decision_slot_id": m.decision_slot_id,
+                "is_cms": is_cms,
+                "active_override": active_override,
+            })
+            if is_cms:
+                cms_module_choices.append({
+                    "id": m.id,
+                    "label": f"#{m.id} {m.module_type} (pos {m.position})",
+                    "variables": [v.name for v in manifest.variables],
+                })
 
         decision_slots = (
             db.query(DecisionSlotDB)
@@ -408,6 +445,7 @@ def campaign_detail(
                 "subject": variant.subject,
                 "preheader": variant.preheader,
                 "modules": modules,
+                "cms_module_choices": cms_module_choices,
                 "decision_slots": decision_slot_rows,
                 "snapshots": snapshots,
             }
@@ -527,6 +565,56 @@ def decision_slot_create(
         name=name,
         decision_strategy=decision_strategy,
     )
+    return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
+
+
+@router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/overrides")
+def content_override_create(
+    campaign_id: int,
+    variant_id: int,
+    module_instance_id: int = Form(...),
+    override_content_record_id: str = Form(""),
+    field_overrides_json: str = Form(""),
+    system_content_record_id: str = Form(""),
+    reason: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    field_overrides = None
+    if field_overrides_json.strip():
+        try:
+            field_overrides = json.loads(field_overrides_json)
+        except ValueError:
+            return RedirectResponse(
+                url=f"/ui/campaigns/{campaign_id}?error={quote('field_overrides must be valid JSON')}",
+                status_code=303,
+            )
+    try:
+        create_content_override(
+            db,
+            ContentOverrideCreate(
+                module_instance_id=module_instance_id,
+                override_content_record_id=int(override_content_record_id) if override_content_record_id.strip() else None,
+                field_overrides=field_overrides,
+                system_content_record_id=int(system_content_record_id) if system_content_record_id.strip() else None,
+                overridden_by="manager@example.com",
+                reason=reason.strip() or None,
+            ),
+        )
+    except ValueError as error:
+        return RedirectResponse(
+            url=f"/ui/campaigns/{campaign_id}?error={quote(str(error))}",
+            status_code=303,
+        )
+    return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
+
+
+@router.post("/ui/campaigns/{campaign_id}/overrides/{override_id}/reset")
+def content_override_reset(
+    campaign_id: int,
+    override_id: int,
+    db: Session = Depends(get_db),
+):
+    reset_content_override(db, override_id)
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 

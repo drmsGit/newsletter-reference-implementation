@@ -111,26 +111,84 @@
                     <th>Type</th>
                     <th>Content record</th>
                     <th>Decision slot</th>
+                    <th>Override</th>
                 </tr>
             </thead>
             <tbody>
                 {% for module in variant.modules %}
                 <tr>
                     <td>{{ module.position }}</td>
-                    <td><code>{{ module.module_type }}</code></td>
+                    <td><code>{{ module.module_type }}</code> <span class="text-muted small">#{{ module.id }}</span></td>
                     <td>
                         {% if module.content_record_id %}
                         <a href="/ui/content/{{ module.content_record_id }}">{{ module.content_record_id }}</a>
                         {% else %}—{% endif %}
                     </td>
                     <td>{{ module.decision_slot_id or "—" }}</td>
+                    <td>
+                        {% if module.active_override %}
+                        <span class="badge bg-warning text-dark">{{ module.active_override.summary }}</span>
+                        <form method="post" action="/ui/campaigns/{{ campaign.id }}/overrides/{{ module.active_override.id }}/reset" class="d-inline">
+                            <button type="submit" class="btn btn-link btn-sm p-0 ms-1">reset</button>
+                        </form>
+                        {% elif module.is_cms %}
+                        <span class="text-muted small">none</span>
+                        {% else %}
+                        <span class="text-muted small">n/a</span>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
                 {% if not variant.modules %}
-                <tr><td colspan="4" class="text-muted">No modules yet.</td></tr>
+                <tr><td colspan="5" class="text-muted">No modules yet.</td></tr>
                 {% endif %}
             </tbody>
         </table>
+
+        {% if variant.cms_module_choices %}
+        <button class="btn btn-sm btn-outline-warning mb-3" data-bs-toggle="collapse" data-bs-target="#form-override-{{ variant.id }}">
+            + Add content override
+        </button>
+        <div class="collapse mb-4" id="form-override-{{ variant.id }}">
+            <div class="card border-warning">
+                <div class="card-body">
+                    <p class="small text-muted mb-2">
+                        Override what the system resolved for a module — pin a different content record and/or
+                        edit fields. Takes precedence at render until reset (ADR-041). One active override per module.
+                    </p>
+                    <form method="post" action="/ui/campaigns/{{ campaign.id }}/variants/{{ variant.id }}/overrides">
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label class="form-label small">Module (CMS only)</label>
+                                <select name="module_instance_id" class="form-select form-select-sm" required>
+                                    {% for c in variant.cms_module_choices %}
+                                    <option value="{{ c.id }}">{{ c.label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Pin content record id <span class="text-muted">(optional)</span></label>
+                                <input type="number" name="override_content_record_id" class="form-control form-control-sm" placeholder="e.g. 2">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">System's pick id <span class="text-muted">(optional, for audit)</span></label>
+                                <input type="number" name="system_content_record_id" class="form-control form-control-sm" placeholder="e.g. 1">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small">Field overrides <span class="text-muted">(JSON, e.g. {"headline_medium": "Shorter headline"})</span></label>
+                                <input type="text" name="field_overrides_json" class="form-control form-control-sm font-monospace" placeholder='{"headline_medium": "..."}'>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small">Reason</label>
+                                <input type="text" name="reason" class="form-control form-control-sm" placeholder="Why override?">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-warning btn-sm mt-2">Add override</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Add module form -->
         <div class="collapse mb-4" id="form-module-{{ variant.id }}">

@@ -2,45 +2,62 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.overrides.models import OverrideEvent, OverrideEventCreate, OutcomeDeltaUpdate
+from app.overrides.models import ContentOverride, ContentOverrideCreate, OutcomeDeltaUpdate
 from app.overrides.service import (
-    create_override_event,
-    get_override_event,
-    list_override_events,
+    create_content_override,
+    get_content_override,
+    list_content_overrides,
     record_outcome_delta,
+    reset_content_override,
 )
 
 router = APIRouter(prefix="/overrides", tags=["overrides"])
 
 
-@router.post("/", response_model=OverrideEvent)
-def create(data: OverrideEventCreate, db: Session = Depends(get_db)):
+@router.post("/", response_model=ContentOverride)
+def create(data: ContentOverrideCreate, db: Session = Depends(get_db)):
     try:
-        return create_override_event(db, data)
+        return create_content_override(db, data)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
 
 
-@router.get("/", response_model=list[OverrideEvent])
-def list_events(
+@router.get("/", response_model=list[ContentOverride])
+def list_overrides(
     module_instance_id: int | None = None,
     send_instance_id: int | None = None,
+    active: bool | None = None,
     db: Session = Depends(get_db),
 ):
-    return list_override_events(db, module_instance_id=module_instance_id, send_instance_id=send_instance_id)
+    return list_content_overrides(
+        db,
+        module_instance_id=module_instance_id,
+        send_instance_id=send_instance_id,
+        active=active,
+    )
 
 
-@router.get("/{override_id}", response_model=OverrideEvent)
+@router.get("/{override_id}", response_model=ContentOverride)
 def get(override_id: int, db: Session = Depends(get_db)):
-    event = get_override_event(db, override_id)
-    if event is None:
-        raise HTTPException(status_code=404, detail="Override event not found")
-    return event
+    override = get_content_override(db, override_id)
+    if override is None:
+        raise HTTPException(status_code=404, detail="Content override not found")
+    return override
 
 
-@router.patch("/{override_id}/outcome", response_model=OverrideEvent)
+@router.post("/{override_id}/reset", response_model=ContentOverride)
+def reset(override_id: int, db: Session = Depends(get_db)):
+    """Reset-to-original: deactivate the override, reverting the module to
+    system-governed content. Keeps the row as history."""
+    override = reset_content_override(db, override_id)
+    if override is None:
+        raise HTTPException(status_code=404, detail="Content override not found")
+    return override
+
+
+@router.patch("/{override_id}/outcome", response_model=ContentOverride)
 def update_outcome(override_id: int, data: OutcomeDeltaUpdate, db: Session = Depends(get_db)):
-    event = record_outcome_delta(db, override_id, data)
-    if event is None:
-        raise HTTPException(status_code=404, detail="Override event not found")
-    return event
+    override = record_outcome_delta(db, override_id, data)
+    if override is None:
+        raise HTTPException(status_code=404, detail="Content override not found")
+    return override
