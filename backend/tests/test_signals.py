@@ -87,3 +87,21 @@ class TestOperationalSignal:
             assert by_recipient.get(ANNA, 0.0) > 0
         finally:
             db.close()
+
+
+class TestConfigAffectsSignals:
+    def test_half_life_override_changes_signal(self):
+        from app.settings.service import set_config, HALF_LIFE_DAYS_KEY
+        db = SessionLocal()
+        try:
+            baseline = get_operational_signal(db, ANNA, BEACH)
+            # A tiny manual half-life makes even a fresh contribution decay hard.
+            set_config(db, HALF_LIFE_DAYS_KEY, {"manual": 0.001})
+            collapsed = get_operational_signal(db, ANNA, BEACH)
+            assert collapsed < baseline
+            # Clearing the override restores the code default.
+            set_config(db, HALF_LIFE_DAYS_KEY, {})
+            restored = get_operational_signal(db, ANNA, BEACH)
+            assert abs(restored - baseline) < 1.0
+        finally:
+            db.close()

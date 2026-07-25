@@ -39,6 +39,8 @@ from app.overrides.router import router as overrides_router
 from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB
 from app.audience.router import router as audience_router
 
+from app.settings.db_models import AppConfigDB
+
 from app.frontend.router import router as frontend_router
 
 app = FastAPI(

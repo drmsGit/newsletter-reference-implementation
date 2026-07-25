@@ -22,6 +22,7 @@ from app.snapshots.service import create_snapshot_for_variant
 from app.delivery.service import create_send_instance, send_send_instance
 from app.recipients.db_models import RecipientDB, SignalContributionDB
 from app.insight.signals import operational_signals_for_recipient, operational_signals_for_category
+from app.settings.service import get_signal_weights, get_half_lives, set_config, SIGNAL_WEIGHTS, HALF_LIFE_DAYS_KEY
 from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB
 from app.audience import service as audience_service
 from app.decision.strategies.registry import list_strategies
@@ -60,6 +61,54 @@ def dashboard(
             "event_count": db.query(EngagementEventDB).count(),
         },
     )
+
+
+@router.get("/ui/settings")
+def settings_page(request: Request, saved: bool = False, db: Session = Depends(get_db)):
+    """Parametric config an admin/BI person can retune without touching code
+    (ADR-132's "tunable weights/half-lives"). The decay *model* and scoring
+    logic stay in code — only these values are editable here."""
+    weights = get_signal_weights(db)
+    half_lives = get_half_lives(db)
+    # Show them together, one row per contribution type.
+    types = sorted(set(weights) | set(half_lives))
+    signal_rows = [
+        {
+            "type": t,
+            "weight": weights.get(t, 0.0),
+            "half_life": half_lives.get(t, None),
+        }
+        for t in types
+    ]
+    return templates.TemplateResponse(
+        request,
+        "settings.html",
+        {"title": "Settings", "signal_rows": signal_rows, "saved": saved},
+    )
+
+
+@router.post("/ui/settings")
+async def settings_save(request: Request, db: Session = Depends(get_db)):
+    """Persist weight / half-life overrides. Only keys that parse as numbers are
+    stored; blank fields fall back to the code defaults."""
+    form = await request.form()
+    weights: dict[str, float] = {}
+    half_lives: dict[str, float] = {}
+    for field, value in form.items():
+        value = (value or "").strip()
+        if not value:
+            continue
+        try:
+            num = float(value)
+        except ValueError:
+            continue
+        if field.startswith("weight__"):
+            weights[field[len("weight__"):]] = num
+        elif field.startswith("halflife__"):
+            half_lives[field[len("halflife__"):]] = num
+    set_config(db, SIGNAL_WEIGHTS, weights)
+    set_config(db, HALF_LIFE_DAYS_KEY, half_lives)
+    return RedirectResponse(url="/ui/settings?saved=true", status_code=303)
 
 
 @router.get("/ui/recipients")

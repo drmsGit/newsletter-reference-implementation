@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="mb-4">Settings</h1>
+
+{% if saved %}
+<div class="alert alert-success">Settings saved.</div>
+{% endif %}
+
+<p class="text-muted">
+    Parametric config a BI/admin person can retune without touching code. The decay
+    <em>model</em> (exponential half-life) and the scoring logic stay in code — only these
+    <strong>values</strong> are editable here. Blank = use the code default.
+</p>
+
+<div class="card">
+    <div class="card-header"><strong>Signal weights &amp; decay half-lives</strong> (ADR-132)</div>
+    <div class="card-body">
+        <form method="post" action="/ui/settings">
+            <table class="table table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th>Contribution type</th>
+                        <th>Base weight <span class="text-muted small">(before decay)</span></th>
+                        <th>Half-life <span class="text-muted small">(days — influence halves every…)</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in signal_rows %}
+                    <tr>
+                        <td><code>{{ row.type }}</code></td>
+                        <td>
+                            <input type="number" step="any" name="weight__{{ row.type }}"
+                                   value="{{ row.weight }}" class="form-control form-control-sm" style="max-width:140px">
+                        </td>
+                        <td>
+                            <input type="number" step="any" min="0.01" name="halflife__{{ row.type }}"
+                                   value="{{ row.half_life if row.half_life is not none else '' }}"
+                                   class="form-control form-control-sm" style="max-width:140px">
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <button type="submit" class="btn btn-primary btn-sm">Save settings</button>
+        </form>
+        <p class="small text-muted mt-3 mb-0">
+            e.g. set <code>click</code> weight higher to make clicks count more, or lower a
+            half-life to make interest fade faster. Changes apply immediately to computed signals.
+        </p>
+    </div>
+</div>
+
+{% endblock %}

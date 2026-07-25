@@ -39,10 +39,24 @@ HALF_LIFE_DAYS: dict[str, float] = {
 DEFAULT_HALF_LIFE_DAYS = 45.0
 
 
-def _decayed_weight(base_weight: float, occurred_at: datetime, contribution_type: str, now: datetime) -> float:
-    half_life = HALF_LIFE_DAYS.get(contribution_type, DEFAULT_HALF_LIFE_DAYS)
+def _decayed_weight(
+    base_weight: float,
+    occurred_at: datetime,
+    contribution_type: str,
+    now: datetime,
+    half_lives: dict[str, float] | None = None,
+) -> float:
+    hl = (half_lives or HALF_LIFE_DAYS).get(contribution_type, DEFAULT_HALF_LIFE_DAYS)
     age_days = max((now - occurred_at).total_seconds() / 86400.0, 0.0)
-    return base_weight * (0.5 ** (age_days / half_life))
+    return base_weight * (0.5 ** (age_days / hl))
+
+
+def _configured_half_lives(db: Session) -> dict[str, float]:
+    # Lazy import avoids a module-load cycle (settings.service imports the
+    # defaults from this module).
+    from app.settings.service import get_half_lives
+
+    return get_half_lives(db)
 
 
 def record_contribution(
@@ -59,10 +73,12 @@ def record_contribution(
     configured weight for the type; pass it explicitly to scale (e.g. by a
     content record's category relevance)."""
     if base_weight is None:
-        base_weight = CONTRIBUTION_WEIGHTS.get(contribution_type)
+        from app.settings.service import get_signal_weights
+
+        base_weight = get_signal_weights(db).get(contribution_type)
         if base_weight is None:
             raise ValueError(
-                f"no default weight for contribution_type '{contribution_type}'"
+                f"no configured weight for contribution_type '{contribution_type}'"
             )
     contribution = SignalContributionDB(
         recipient_id=recipient_id,
@@ -88,6 +104,7 @@ def get_operational_signal(
     """The current operational signal for one (recipient, category): the
     decay-weighted sum of its contributions."""
     now = now or datetime.now(timezone.utc)
+    half_lives = _configured_half_lives(db)
     rows = (
         db.query(SignalContributionDB)
         .filter(
@@ -96,7 +113,7 @@ def get_operational_signal(
         )
         .all()
     )
-    return sum(_decayed_weight(r.base_weight, r.occurred_at, r.contribution_type, now) for r in rows)
+    return sum(_decayed_weight(r.base_weight, r.occurred_at, r.contribution_type, now, half_lives) for r in rows)
 
 
 def operational_signals_for_recipient(
@@ -107,6 +124,7 @@ def operational_signals_for_recipient(
     """{category_id: signal} for one recipient — for the decision strategy and
     the recipient detail view."""
     now = now or datetime.now(timezone.utc)
+    half_lives = _configured_half_lives(db)
     rows = (
         db.query(SignalContributionDB)
         .filter(SignalContributionDB.recipient_id == recipient_id)
@@ -115,7 +133,7 @@ def operational_signals_for_recipient(
     signals: dict[int, float] = {}
     for r in rows:
         signals[r.category_id] = signals.get(r.category_id, 0.0) + _decayed_weight(
-            r.base_weight, r.occurred_at, r.contribution_type, now
+            r.base_weight, r.occurred_at, r.contribution_type, now, half_lives
         )
     return signals
 
@@ -128,6 +146,7 @@ def operational_signals_for_category(
     """{recipient_id: signal} for one category — for audience criteria
     resolution (find recipients whose signal for a category clears a threshold)."""
     now = now or datetime.now(timezone.utc)
+    half_lives = _configured_half_lives(db)
     rows = (
         db.query(SignalContributionDB)
         .filter(SignalContributionDB.category_id == category_id)
@@ -136,6 +155,6 @@ def operational_signals_for_category(
     signals: dict[int, float] = {}
     for r in rows:
         signals[r.recipient_id] = signals.get(r.recipient_id, 0.0) + _decayed_weight(
-            r.base_weight, r.occurred_at, r.contribution_type, now
+            r.base_weight, r.occurred_at, r.contribution_type, now, half_lives
         )
     return signals
