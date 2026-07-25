@@ -229,16 +229,14 @@
         {% if preference_signals %}
         <table class="table table-sm mb-0">
             <thead>
-                <tr><th>Recipient</th><th>Category</th><th>Previous</th><th>Delta</th><th>New</th><th>Reason</th><th>Created</th></tr>
+                <tr><th>Recipient</th><th>Category</th><th>Signal contribution</th><th>Type</th><th>Created</th></tr>
             </thead>
             <tbody>
                 {% for signal in preference_signals %}
                 <tr>
                     <td>{{ signal.recipient_id }}</td>
                     <td>{{ signal.category_name }}</td>
-                    <td>{{ signal.previous_score }}</td>
-                    <td>{{ signal.delta }}</td>
-                    <td>{{ signal.new_score }}</td>
+                    <td>{{ '+' if signal.delta >= 0 else '' }}{{ signal.delta }}</td>
                     <td>{{ signal.reason }}</td>
                     <td>{{ signal.created_at.strftime("%Y-%m-%d %H:%M") if signal.created_at else "—" }}</td>
                 </tr>

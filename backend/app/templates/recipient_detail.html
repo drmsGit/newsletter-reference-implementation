@@ -163,14 +163,12 @@
                                     {% for update in event.preference_updates %}
                                         <div>
                                             <strong>{{ update.category_name }}</strong>:
-                                            {{ update.previous_score }}
-                                            →
-                                            {{ update.new_score }}
-                                            (+{{ update.delta }})
+                                            {{ '+' if update.delta >= 0 else '' }}{{ update.delta }}
+                                            <span class="text-muted">signal ({{ update.reason }})</span>
                                         </div>
                                     {% endfor %}
                                 {% else %}
-                                    <span class="text-muted">No preference update</span>
+                                    <span class="text-muted">No signal contribution</span>
                                 {% endif %}
                             </td>
                             <td>{{ event.created_at }}</td>
