@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app.recipients.db_models import ConsentSyncLogDB, RecipientDB, RecipientPreferenceDB
+from app.recipients.db_models import ConsentSyncLogDB, RecipientDB
 from app.recipients.models import (
     ConsentDriftItem,
     ConsentStatus,
@@ -222,20 +222,6 @@ def get_recipient_by_external_id(
     return to_recipient(record)
 
 
-def to_recipient_preference(
-    record: RecipientPreferenceDB,
-) -> RecipientPreference:
-
-    return RecipientPreference(
-        id=record.id,
-        recipient_id=record.recipient_id,
-        category_id=record.category_id,
-        score=record.score,
-        source=record.source,
-        created_at=record.created_at,
-    )
-
-
 def create_recipient_preference(
     db: Session,
     recipient_id: int,
@@ -243,33 +229,24 @@ def create_recipient_preference(
     score: float,
     source: str = "manual",
 ):
-    """Upserts on (recipient_id, category_id) — this is the current/aggregate
-    running-total score per pair, not an append-only log, so a repeat write
-    updates in place rather than creating a second, ambiguous "current" row."""
-    preference = (
-        db.query(RecipientPreferenceDB)
-        .filter(
-            RecipientPreferenceDB.recipient_id == recipient_id,
-            RecipientPreferenceDB.category_id == category_id,
-        )
-        .first()
+    """A declared/manual preference is now a heavy, slowly-decaying *manual
+    contribution* to the signal log (ADR-132) — there is no stored running
+    total. `score` becomes the contribution's base weight, preserving the
+    declared magnitude. Returns the recipient's current signal for the category."""
+    from app.insight.signals import record_contribution, get_operational_signal
+
+    record_contribution(
+        db=db,
+        recipient_id=recipient_id,
+        category_id=category_id,
+        contribution_type="manual",
+        source=source,
+        base_weight=score,
     )
-
-    if preference is None:
-        preference = RecipientPreferenceDB(
-            recipient_id=recipient_id,
-            category_id=category_id,
-        )
-        db.add(preference)
-
-    preference.score = score
-    preference.source = source
-
-    db.commit()
-    db.refresh(preference)
-
-    return to_recipient_preference(
-        preference
+    return RecipientPreference(
+        recipient_id=recipient_id,
+        category_id=category_id,
+        score=get_operational_signal(db, recipient_id, category_id),
     )
 
 
@@ -277,21 +254,12 @@ def list_preferences_for_recipient(
     db: Session,
     recipient_id: int,
 ):
-    records = (
-        db.query(
-            RecipientPreferenceDB
-        )
-        .filter(
-            RecipientPreferenceDB.recipient_id
-            == recipient_id
-        )
-        .order_by(
-            RecipientPreferenceDB.score.desc()
-        )
-        .all()
-    )
+    """The recipient's current operational signal per category (decay-on-read),
+    highest first — replaces the old stored preference rows."""
+    from app.insight.signals import operational_signals_for_recipient
 
+    signals = operational_signals_for_recipient(db, recipient_id)
     return [
-        to_recipient_preference(r)
-        for r in records
+        RecipientPreference(recipient_id=recipient_id, category_id=category_id, score=score)
+        for category_id, score in sorted(signals.items(), key=lambda kv: kv[1], reverse=True)
     ]

@@ -7,11 +7,14 @@ from app.insight.models import EngagementEvent, PreferenceUpdateResult
 
 from app.delivery.db_models import DeliveryExecutionDB
 from app.content.db_models import ContentCategoryAssignmentDB
-from app.recipients.db_models import RecipientPreferenceDB, PreferenceUpdateLogDB
+from app.recipients.db_models import SignalContributionDB
+from app.insight.signals import CONTRIBUTION_WEIGHTS, record_contribution
 
-EVENT_PREFERENCE_DELTAS = {
-        "click": 5.0,
-    }
+# Engagement event types that map to per-category signal contributions (they
+# carry a content_record_id, whose category assignments locate the affinity).
+# Unsubscribe/complaint is handled on the consent path (opt-out), not as a
+# per-category signal. Conversion is a company-sourced extension (ADR-132).
+_CONTENT_TIED_EVENT_TYPES = {"click", "open"}
 
 def to_engagement_event(record: EngagementEventDB) -> EngagementEvent:
     return EngagementEvent(
@@ -65,10 +68,13 @@ def list_events_for_delivery_execution(
     return [to_engagement_event(record) for record in records]
 
 
-def apply_event_to_preferences(
+def apply_event_to_signals(
     db: Session,
     event_id: int,
 ) -> PreferenceUpdateResult:
+    """Turn a content-tied engagement event (click/open) into per-category
+    signal contributions (ADR-132). Appends to the contribution log; there is
+    no mutable running total — the current signal is computed on read."""
     event = (
         db.query(EngagementEventDB)
         .filter(EngagementEventDB.id == event_id)
@@ -78,12 +84,12 @@ def apply_event_to_preferences(
     if event is None:
         raise ValueError(f"EngagementEvent {event_id} not found")
 
-    base_delta = EVENT_PREFERENCE_DELTAS.get(event.event_type)
-
-    if base_delta is None:
+    if event.event_type not in _CONTENT_TIED_EVENT_TYPES:
         raise ValueError(
-            f"Event type {event.event_type} does not update preferences"
+            f"Event type {event.event_type} does not produce a content signal"
         )
+
+    base_weight = CONTRIBUTION_WEIGHTS[event.event_type]
 
     event_data = event.event_data or {}
     content_record_id = event_data.get("content_record_id")
@@ -121,71 +127,39 @@ def apply_event_to_preferences(
     applied_deltas: dict[int, float] = {}
 
     for assignment in assignments:
-        category_delta = base_delta * (assignment.score / 10)
+        # Scale the type's base weight by how strongly the content belongs to
+        # the category (the 0–10 assignment score).
+        category_weight = base_weight * (assignment.score / 10)
 
         # Dedupe on the specific event, not "any event of this type on this
         # delivery execution" — two distinct legitimate engagements (e.g.
-        # clicks on two different links in the same email) must each get
-        # their own scoring decision. This only guards against re-applying
-        # the *same* event_id twice, not against a second real event.
-        existing_update = (
-            db.query(PreferenceUpdateLogDB)
+        # clicks on two different links in the same email) must each get their
+        # own contribution. This only guards re-applying the *same* event twice.
+        existing = (
+            db.query(SignalContributionDB)
             .filter(
-                PreferenceUpdateLogDB.recipient_id == recipient_id,
-                PreferenceUpdateLogDB.category_id == assignment.category_id,
-                PreferenceUpdateLogDB.event_id == event.id,
+                SignalContributionDB.recipient_id == recipient_id,
+                SignalContributionDB.category_id == assignment.category_id,
+                SignalContributionDB.event_id == event.id,
             )
             .first()
         )
-
-        if existing_update is not None:
+        if existing is not None:
             continue
 
-        preference = (
-            db.query(RecipientPreferenceDB)
-            .filter(
-                RecipientPreferenceDB.recipient_id == recipient_id,
-                RecipientPreferenceDB.category_id == assignment.category_id,
-            )
-            .first()
-        )
-
-        previous_score = (
-            preference.score
-            if preference is not None
-            else 0
-        )
-        
-        new_score = previous_score + category_delta
-
-        log_entry = PreferenceUpdateLogDB(
+        record_contribution(
+            db=db,
             recipient_id=recipient_id,
             category_id=assignment.category_id,
+            contribution_type=event.event_type,
+            occurred_at=event.occurred_at,
             event_id=event.id,
-            previous_score=previous_score,
-            delta=category_delta,
-            new_score=new_score,
-            reason=event.event_type,
+            source="engagement",
+            base_weight=category_weight,
         )
 
-        db.add(log_entry)
-
-        if preference is None:
-            preference = RecipientPreferenceDB(
-                recipient_id=recipient_id,
-                category_id=assignment.category_id,
-                score=new_score,
-                source="engagement",
-            )
-            db.add(preference)
-        else:
-            preference.score = new_score
-            preference.source = "engagement"
-
         updated_categories.append(assignment.category_id)
-        applied_deltas[assignment.category_id] = category_delta
-
-    db.commit()
+        applied_deltas[assignment.category_id] = category_weight
 
     return PreferenceUpdateResult(
         event_id=event.id,

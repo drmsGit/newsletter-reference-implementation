@@ -7,7 +7,7 @@ from app.insight.models import EngagementEvent, EngagementEventCreate, Preferenc
 from app.insight.service import (
     create_engagement_event,
     list_events_for_delivery_execution,
-    apply_event_to_preferences,
+    apply_event_to_signals,
 )
 
 
@@ -48,13 +48,13 @@ def get_events_for_delivery_execution(
     )
 
 
-@router.post("/events/{event_id}/apply-preferences", response_model=PreferenceUpdateResult)
-def apply_preferences_from_event(
+@router.post("/events/{event_id}/apply-signals", response_model=PreferenceUpdateResult)
+def apply_signals_from_event(
     event_id: int,
     db: Session = Depends(get_db),
 ):
     try:
-        return apply_event_to_preferences(
+        return apply_event_to_signals(
             db=db,
             event_id=event_id,
         )

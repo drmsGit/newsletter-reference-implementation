@@ -2,8 +2,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB
-from app.recipients.db_models import RecipientDB, RecipientPreferenceDB
+from app.recipients.db_models import RecipientDB
 from app.recipients.service import CONSENTING_STATUS
+from app.insight.signals import operational_signals_for_category
 
 
 def list_groups(db: Session) -> list[AudienceGroupDB]:
@@ -140,17 +141,18 @@ def find_by_criteria(
         q = q.filter(RecipientDB.language == language)
     if status:
         q = q.filter(RecipientDB.status == status)
-    if preference_category_id is not None:
-        min_score = min_preference_score if min_preference_score is not None else 0.0
-        q = (
-            q.join(RecipientPreferenceDB, RecipientDB.id == RecipientPreferenceDB.recipient_id)
-            .filter(RecipientPreferenceDB.category_id == preference_category_id)
-            .filter(RecipientPreferenceDB.score >= min_score)
-        )
     if exclude_ids:
         q = q.filter(RecipientDB.id.notin_(exclude_ids))
 
     records = q.order_by(RecipientDB.email.asc()).all()
+
+    # Preference criterion: keep recipients whose *operational signal* for the
+    # category clears the threshold (ADR-132, decay-on-read). Computed rather
+    # than SQL-joined against a stored score, since there is no stored score.
+    if preference_category_id is not None:
+        min_score = min_preference_score if min_preference_score is not None else 0.0
+        signals = operational_signals_for_category(db, preference_category_id)
+        records = [r for r in records if signals.get(r.id, 0.0) >= min_score]
 
     # RecipientDB.email has no unique constraint (a hard-unique decision is
     # deferred) — dedupe by email here so a bad import with duplicate-email

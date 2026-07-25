@@ -6,7 +6,7 @@ from app.campaigns.db_models import DecisionSlotDB
 from app.content.db_models import ContentCategoryAssignmentDB, ContentRecordDB
 from app.content.service import get_latest_version_for_content
 from app.decision.strategies.base import ConfigField, DecisionStrategy, StrategyMeta, StrategyResult
-from app.recipients.db_models import RecipientPreferenceDB
+from app.insight.signals import operational_signals_for_recipient
 
 DEFAULT_CONFIG = {
     "content_score_weight": 1,
@@ -67,22 +67,22 @@ class RecipientTopScoreStrategy(DecisionStrategy):
         content_weight = config["content_score_weight"]
         preference_weight = config["preference_score_weight"]
 
+        # The recipient's operational preference signals (decay-weighted over the
+        # contribution log, ADR-132), keyed by category. The decision layer
+        # consumes signals, not raw events (ADR-111).
+        signals = operational_signals_for_recipient(db, recipient_id)
+
         query = (
             db.query(
                 ContentRecordDB,
                 ContentCategoryAssignmentDB.score,
-                RecipientPreferenceDB.score,
+                ContentCategoryAssignmentDB.category_id,
             )
             .join(
                 ContentCategoryAssignmentDB,
                 ContentRecordDB.id == ContentCategoryAssignmentDB.content_id,
             )
-            .join(
-                RecipientPreferenceDB,
-                RecipientPreferenceDB.category_id == ContentCategoryAssignmentDB.category_id,
-            )
             .filter(ContentRecordDB.status == "active")
-            .filter(RecipientPreferenceDB.recipient_id == recipient_id)
         )
 
         if category_ids:
@@ -90,7 +90,14 @@ class RecipientTopScoreStrategy(DecisionStrategy):
                 ContentCategoryAssignmentDB.category_id.in_(category_ids)
             )
 
-        candidates = query.all()
+        # Only categories the recipient actually has a signal for count — same
+        # as the old inner join against a preference row, but now the "score" is
+        # the decayed signal.
+        candidates = [
+            (content_record, content_score, signals[category_id])
+            for (content_record, content_score, category_id) in query.all()
+            if category_id in signals
+        ]
         if not candidates:
             return None
 

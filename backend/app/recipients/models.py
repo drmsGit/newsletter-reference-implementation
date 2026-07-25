@@ -69,12 +69,11 @@ class ConsentDriftItem(BaseModel):
 
 
 class RecipientPreference(BaseModel):
-    id: int
+    # A computed operational signal per category (ADR-132), not a stored row —
+    # so no id/source/created_at. `score` is the decay-weighted signal.
     recipient_id: int
     category_id: int
     score: float
-    source: str
-    created_at: datetime
 
 
 class RecipientPreferenceCreate(BaseModel):

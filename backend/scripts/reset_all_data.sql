@@ -15,13 +15,12 @@ BEGIN;
 
 -- CASCADE handles FK order automatically
 TRUNCATE TABLE
-    preference_update_logs,
+    signal_contributions,
     engagement_events,
     delivery_executions,
     content_overrides,
     decision_resolutions,
     consent_sync_logs,
-    recipient_preferences,
     snapshots,
     send_instances,
     content_category_assignments,
@@ -102,8 +101,11 @@ INSERT INTO recipients (external_id, email, language, attributes, status, consen
     ('r-003', 'sophie.martin@example.com', 'fr', '{"firstname": "Sophie", "lastname": "Martin",    "preferred_airport": "CDG"}', 'active', 'opted_in');
 
 -- Anna: beach-leaning | Jan: city/culture | Sophie: nature/city
-INSERT INTO recipient_preferences (recipient_id, category_id, score, source)
-SELECT r.id, cat.id, v.score, 'seed'
+-- Declared preferences are heavy, slowly-decaying "manual" contributions to the
+-- signal log (ADR-132) — base_weight preserves the declared magnitude, occurred_at
+-- = now so the fresh operational signal ≈ the declared score.
+INSERT INTO signal_contributions (recipient_id, category_id, contribution_type, base_weight, occurred_at, source)
+SELECT r.id, cat.id, 'manual', v.score, NOW(), 'seed'
 FROM (VALUES
     ('r-001', 'Beach',   90),
     ('r-001', 'Nature',  50),

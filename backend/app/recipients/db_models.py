@@ -52,87 +52,40 @@ class ConsentSyncLogDB(Base):
     synced_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
-class RecipientPreferenceDB(Base):
-    __tablename__ = "recipient_preferences"
+class SignalContributionDB(Base):
+    """Append-only signal-contribution log (ADR-132) — the source of truth for
+    the recipient-category affinity signal. Each row is one engagement's (or one
+    manual declaration's) contribution; the current signal is a decay-weighted
+    sum computed over these rows at read time, never a stored running total.
+
+    Evolves the old preference_update_logs: `base_weight` replaces the old
+    `delta` (there is no running total, so `previous_score`/`new_score` are
+    gone), `contribution_type` replaces `reason`, and `occurred_at` (when the
+    underlying engagement happened) is what decay is measured against.
+    """
+
+    __tablename__ = "signal_contributions"
 
     id = Column(Integer, primary_key=True, index=True)
 
-    recipient_id = Column(
-        Integer,
-        ForeignKey("recipients.id"),
-        nullable=False,
-    )
+    recipient_id = Column(Integer, ForeignKey("recipients.id"), nullable=False, index=True)
+    category_id = Column(Integer, ForeignKey("categories.id"), nullable=False, index=True)
 
-    category_id = Column(
-        Integer,
-        ForeignKey("categories.id"),
-        nullable=False,
-    )
+    # "manual" | "click" | "open" | "unsubscribe" | "conversion" (extension).
+    contribution_type = Column(String(50), nullable=False)
 
-    score = Column(Float, nullable=False)
+    # The signed weight this contribution adds *before* decay.
+    base_weight = Column(Float, nullable=False)
 
-    source = Column(
-        String(50),
-        nullable=False,
-        default="manual",
-    )
+    # When the underlying engagement occurred — decay is measured from here, not
+    # from created_at (which is just when we recorded it).
+    occurred_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    created_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
+    # The engagement event this came from, if any. Nullable: manual/declared
+    # contributions have no engagement event behind them.
+    event_id = Column(Integer, ForeignKey("engagement_events.id"), nullable=True)
 
-    __table_args__ = (
-        UniqueConstraint("recipient_id", "category_id", name="uq_recipient_preferences_recipient_category"),
-    )
+    # Provenance: "engagement", "manual", "import", ...
+    source = Column(String(50), nullable=False, default="engagement")
 
-
-class PreferenceUpdateLogDB(Base):
-    __tablename__ = "preference_update_logs"
-
-    id = Column(Integer, primary_key=True)
-
-    recipient_id = Column(
-        Integer,
-        ForeignKey("recipients.id"),
-        nullable=False,
-    )
-
-    category_id = Column(
-        Integer,
-        ForeignKey("categories.id"),
-        nullable=False,
-    )
-
-    event_id = Column(
-        Integer,
-        ForeignKey("engagement_events.id"),
-        nullable=False,
-    )
-
-    previous_score = Column(
-        Float,
-        nullable=False,
-    )
-
-    delta = Column(
-        Float,
-        nullable=False,
-    )
-
-    new_score = Column(
-        Float,
-        nullable=False,
-    )
-
-    reason = Column(
-        String,
-        nullable=False,
-    )
-
-    created_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

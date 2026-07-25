@@ -20,7 +20,8 @@ from app.campaigns.service import create_campaign, create_variant_for_campaign, 
 from app.rendering.service import UnpublishedContentError
 from app.snapshots.service import create_snapshot_for_variant
 from app.delivery.service import create_send_instance, send_send_instance
-from app.recipients.db_models import RecipientDB, RecipientPreferenceDB, PreferenceUpdateLogDB
+from app.recipients.db_models import RecipientDB, SignalContributionDB
+from app.insight.signals import operational_signals_for_recipient, operational_signals_for_category
 from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB
 from app.audience import service as audience_service
 from app.decision.strategies.registry import list_strategies
@@ -94,28 +95,21 @@ def recipient_detail(
         .first()
     )
 
-    preferences = (
-        db.query(
-            RecipientPreferenceDB,
-            CategoryDB.name,
-        )
-        .join(
-            CategoryDB,
-            RecipientPreferenceDB.category_id == CategoryDB.id,
-        )
-        .filter(
-            RecipientPreferenceDB.recipient_id == recipient_id
-        )
+    # Preferences are now computed operational signals (decay-on-read, ADR-132),
+    # not stored rows.
+    signals = operational_signals_for_recipient(db, recipient_id)
+    category_names = dict(
+        db.query(CategoryDB.id, CategoryDB.name)
+        .filter(CategoryDB.id.in_(signals.keys()))
         .all()
-    )
-
+    ) if signals else {}
     preference_rows = [
         {
-            "category_name": category_name,
-            "score": pref.score,
-            "source": pref.source,
+            "category_name": category_names.get(category_id, f"#{category_id}"),
+            "score": round(score, 1),
+            "source": "signal",
         }
-        for pref, category_name in preferences
+        for category_id, score in sorted(signals.items(), key=lambda kv: kv[1], reverse=True)
     ]
 
     decisions = (
@@ -193,15 +187,15 @@ def recipient_detail(
         for event in delivery_events:
             preference_updates = (
                 db.query(
-                    PreferenceUpdateLogDB,
+                    SignalContributionDB,
                     CategoryDB.name,
                 )
                 .join(
                     CategoryDB,
-                    PreferenceUpdateLogDB.category_id == CategoryDB.id,
+                    SignalContributionDB.category_id == CategoryDB.id,
                 )
                 .filter(
-                    PreferenceUpdateLogDB.event_id == event.id
+                    SignalContributionDB.event_id == event.id
                 )
                 .all()
             )
@@ -215,10 +209,10 @@ def recipient_detail(
                     "preference_updates": [
                         {
                             "category_name": category_name,
-                            "previous_score": update.previous_score,
-                            "delta": update.delta,
-                            "new_score": update.new_score,
-                            "reason": update.reason,
+                            "previous_score": None,
+                            "delta": update.base_weight,
+                            "new_score": None,
+                            "reason": update.contribution_type,
                         }
                         for update, category_name in preference_updates
                     ],
@@ -807,20 +801,20 @@ def content_detail(
 
     signals = (
         db.query(
-            PreferenceUpdateLogDB,
+            SignalContributionDB,
             CategoryDB.name,
             EngagementEventDB.event_data,
         )
         .join(
             CategoryDB,
-            PreferenceUpdateLogDB.category_id == CategoryDB.id,
+            SignalContributionDB.category_id == CategoryDB.id,
         )
         .join(
             EngagementEventDB,
-            PreferenceUpdateLogDB.event_id == EngagementEventDB.id,
+            SignalContributionDB.event_id == EngagementEventDB.id,
         )
         .order_by(
-            PreferenceUpdateLogDB.created_at.desc()
+            SignalContributionDB.created_at.desc()
         )
         .limit(100)
         .all()
@@ -838,10 +832,10 @@ def content_detail(
             {
                 "recipient_id": update.recipient_id,
                 "category_name": category_name,
-                "previous_score": update.previous_score,
-                "delta": update.delta,
-                "new_score": update.new_score,
-                "reason": update.reason,
+                "previous_score": None,
+                "delta": update.base_weight,
+                "new_score": None,
+                "reason": update.contribution_type,
                 "created_at": update.created_at,
             }
         )
@@ -1092,45 +1086,39 @@ def category_detail(
         for content_id, title, score in assigned_content
     ]
 
-    recipient_preferences = (
-        db.query(
-            RecipientDB.id,
-            RecipientDB.external_id,
-            RecipientPreferenceDB.score,
-            RecipientPreferenceDB.source,
+    # Recipients ranked by their operational signal for this category
+    # (decay-on-read, ADR-132), not a stored preference score.
+    category_signals = operational_signals_for_category(db, category_id)
+    if category_signals:
+        recip_lookup = dict(
+            db.query(RecipientDB.id, RecipientDB.external_id)
+            .filter(RecipientDB.id.in_(category_signals.keys()))
+            .all()
         )
-        .join(
-            RecipientPreferenceDB,
-            RecipientPreferenceDB.recipient_id == RecipientDB.id,
-        )
-        .filter(
-            RecipientPreferenceDB.category_id == category_id
-        )
-        .order_by(
-            RecipientPreferenceDB.score.desc()
-        )
-        .limit(50)
-        .all()
-    )
-
-    recipient_preference_rows = [
-        {
-            "recipient_id": recipient_id,
-            "recipient_external_id": external_id,
-            "score": score,
-            "source": source,
-        }
-        for recipient_id, external_id, score, source in recipient_preferences
-    ]
+        recipient_preference_rows = sorted(
+            [
+                {
+                    "recipient_id": rid,
+                    "recipient_external_id": recip_lookup.get(rid),
+                    "score": round(score, 1),
+                    "source": "signal",
+                }
+                for rid, score in category_signals.items()
+            ],
+            key=lambda r: r["score"],
+            reverse=True,
+        )[:50]
+    else:
+        recipient_preference_rows = []
 
     impact = (
         db.query(
-            func.count(PreferenceUpdateLogDB.id),
-            func.coalesce(func.sum(PreferenceUpdateLogDB.delta), 0),
-            func.coalesce(func.avg(PreferenceUpdateLogDB.delta), 0),
+            func.count(SignalContributionDB.id),
+            func.coalesce(func.sum(SignalContributionDB.base_weight), 0),
+            func.coalesce(func.avg(SignalContributionDB.base_weight), 0),
         )
         .filter(
-            PreferenceUpdateLogDB.category_id == category_id
+            SignalContributionDB.category_id == category_id
         )
         .first()
     )
@@ -1676,15 +1664,15 @@ def delivery_detail(
         for event in events:
             preference_updates = (
                 db.query(
-                    PreferenceUpdateLogDB,
+                    SignalContributionDB,
                     CategoryDB.name,
                 )
                 .join(
                     CategoryDB,
-                    PreferenceUpdateLogDB.category_id == CategoryDB.id,
+                    SignalContributionDB.category_id == CategoryDB.id,
                 )
                 .filter(
-                    PreferenceUpdateLogDB.event_id == event.id
+                    SignalContributionDB.event_id == event.id
                 )
                 .all()
             )
@@ -1705,10 +1693,10 @@ def delivery_detail(
                     "preference_updates": [
                         {
                             "category_name": category_name,
-                            "previous_score": update.previous_score,
-                            "delta": update.delta,
-                            "new_score": update.new_score,
-                            "reason": update.reason,
+                            "previous_score": None,
+                            "delta": update.base_weight,
+                            "new_score": None,
+                            "reason": update.contribution_type,
                         }
                         for update, category_name in preference_updates
                     ],
@@ -1796,13 +1784,13 @@ def category_graph(
 
     impact_rows = (
         db.query(
-            PreferenceUpdateLogDB.category_id,
-            func.count(PreferenceUpdateLogDB.id),
-            func.coalesce(func.sum(PreferenceUpdateLogDB.delta), 0),
-            func.coalesce(func.avg(PreferenceUpdateLogDB.delta), 0),
-            func.count(func.distinct(PreferenceUpdateLogDB.event_id)),
+            SignalContributionDB.category_id,
+            func.count(SignalContributionDB.id),
+            func.coalesce(func.sum(SignalContributionDB.base_weight), 0),
+            func.coalesce(func.avg(SignalContributionDB.base_weight), 0),
+            func.count(func.distinct(SignalContributionDB.event_id)),
         )
-        .group_by(PreferenceUpdateLogDB.category_id)
+        .group_by(SignalContributionDB.category_id)
         .all()
     )
 
@@ -1923,12 +1911,12 @@ def category_graph(
 
     update_events = (
         db.query(
-            PreferenceUpdateLogDB,
+            SignalContributionDB,
             EngagementEventDB,
         )
         .join(
             EngagementEventDB,
-            PreferenceUpdateLogDB.event_id == EngagementEventDB.id,
+            SignalContributionDB.event_id == EngagementEventDB.id,
         )
         .all()
     )
@@ -1956,7 +1944,7 @@ def category_graph(
             if key not in edge_map:
                 continue
 
-            edge_map[key]["total_delta"] += float(update.delta)
+            edge_map[key]["total_delta"] += float(update.base_weight)
             edge_event_ids[key].add(event.id)
 
     for key, event_ids in edge_event_ids.items():
