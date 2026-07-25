@@ -1,8 +1,29 @@
 import logging
+import os
+from pathlib import Path
 
 from fastapi import FastAPI
 
 logging.basicConfig(level=logging.INFO)
+
+
+def _load_local_env() -> None:
+    """Load backend/.env (gitignored) into the environment for local secrets
+    like RESEND_API_KEY — so credentials never live in code or the DB. A real
+    environment variable always wins (setdefault). No dependency; see
+    .env.example for the expected keys."""
+    env_path = Path(__file__).parent / ".env"
+    if not env_path.exists():
+        return
+    for line in env_path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+_load_local_env()
 
 from app.database import Base, engine, SessionLocal
 from app.content.db_models import ContentRecordDB, CategoryDB, ContentCategoryAssignmentDB, ContentVersionDB
