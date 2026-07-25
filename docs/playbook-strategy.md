@@ -210,6 +210,6 @@ After that, Phase 2 (editing frontends) unblocks the demo path and makes everyth
 ## 7. Open Questions
 
 - [x] Phase 1B: MJML as template format, frontmatter in file, compiled in frontend layer (ADR-131)
-- [ ] Phase 3C: design the signal layer before building — what are the signal types, decay model, storage? Also needs to cover: category/content deletion vs. archival policy — archived categories stop contributing new preference scoring, existing influence decays via the same time-based decay mechanism rather than being force-zeroed (see `docs/backlog.md` § Needs ADR).
+- [x] Phase 3C: signal layer design — **settled 2026-07-15 in [[ADR-132 — Signal Layer Implementation Event-Sourced Contributions with Decay-on-Read]]**: event-sourced contribution log, decay-on-read (exponential half-life), operational signals computed locally over a bounded window, historical retention + AI training offloaded to the adopter's DWH; clicks primary / opens noise (post-MPP) / unsubscribe negative / conversions a pluggable extension point; manual preferences are heavy, long-half-life contributions with no permanent floor (behavior wins over stale stated interest). Enables the category archive-vs-decay lifecycle (archived category stops adding contributions, influence decays naturally). Implementation follows.
 - [ ] Phase 4A: playbook structure and communication style decisions
 - [ ] Which 2–3 real client cases map best to the three pillars?
