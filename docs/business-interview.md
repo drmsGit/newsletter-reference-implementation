@@ -68,3 +68,39 @@ This is a project-level assessment, not per-feature — answering the three ques
 - People who want to *learn* how this is built — developers, technical marketers, agencies teaching clients — since Klaviyo+AI is a black box you operate, not a system you understand, and this project's monetization (playbook, workshops, consulting) was already built around teachability, not output speed.
 
 Net effect: this doesn't require a pivot in the existing target-audience framing — it sharpens it, and gives the existing "vendor lock-in" pitch a concrete, dated, real-world foil rather than a hypothetical one.
+
+---
+
+## Resend outbound provider adapter + UI live-send — 2026-07-26
+
+Feature: `ResendProvider` (`backend/app/delivery/providers/resend.py`), registered in `get_provider` (`backend/app/delivery/providers/factory.py`), plus the `/ui/send-test` page (`send_test_page` / `send_test_submit` in `backend/app/frontend/router.py`, `backend/app/templates/send_test.html`). Implements ADR-100 (provider layer as send/feedback adapter) and ADR-101 (provider capabilities are explicit) against one real vendor. Surface and classify only.
+
+### 1. Assumption about the user/adopter
+
+Assumes an adopter who is **technical enough to own credentials and infrastructure** (sets `RESEND_API_KEY`/`RESEND_FROM` in `backend/.env`, understands DNS/domain verification, reads a provider dashboard) but who wants a **worked, runnable proof rather than a spec**. The `/ui/send-test` page assumes a hands-on operator testing end-to-end from a browser, defaulting `to` to `delivered@resend.dev` — i.e. someone who understands sandbox-vs-production sending. Scale assumption is **low/demonstration**: single-recipient synchronous `httpx.post` with a 15s timeout, no batching, no rate-limit, no auth on the endpoint. This is a reference-build/local-operator assumption, not a production-ops one.
+
+### 2. Compete with / duplicate Sendy/Listmonk/Mautic, or fill a gap?
+
+The *feature itself* (send an email via an ESP) is fully commoditized — Sendy, Listmonk, Mautic, and Resend's own SDK all do it. What is **not** duplicated is the **`DeliveryProvider` contract boundary** it demonstrates: the adapter proves that a real vendor drops into the same interface the mock and campaign flow already use, with credentials strictly out of code/DB, and failures normalized to `SendResult(success=False)` rather than exceptions. Those tools bundle sending *into* their monolith; the gap this fills is showing sending as a **swappable adapter behind an owned contract** (the "no vendor lock-in" claim made concrete). The raw send is duplication; the seam is the gap.
+
+### 3. Opinionated core vs. tailorable surface
+
+**Mixed, and worth documenting as such:**
+- **Opinionated core (stays):** `SendResult` shape, the never-raise-on-failure discipline (`resend.py:11-14`), `provider_message_id` optional-on-failure to respect the nullable+unique column, and the `DeliveryProvider` ABC (`base.py`). These encode ADR-086/100/101 and should not drift per adopter.
+- **Tailorable surface (should be documented as an extension point):** `ResendProvider` is explicitly "one worked example" — the intended teaching move is *write your own provider against the same contract*. The `get_provider` factory is the extension seam. The `/ui/send-test` page is a **demo artifact**, not core: its broad `except Exception` render fallback (`router.py:157-159`), lack of auth/rate-limit, and single-recipient model are demo-grade and should be flagged as "not the production path" so adopters don't cargo-cult them.
+
+### 4. What you'd need to explain beyond the ADR
+
+- **Why never-raise, and the specific batch-failure mode it protects** — that a raised exception mid-loop aborts remaining recipients; the ADR states the contract but not this operational consequence.
+- **Why `provider_message_id` is `None` not `""`** — the nullable+unique DB collision on a second failure. This is a schema-coupling detail invisible in the ADR and non-obvious to a newcomer.
+- **The `status_code == 200` strictness** — that it is deliberately bound to the *observed* Resend contract, and the tradeoff vs. `2xx`-tolerant checking.
+- **Sandbox/domain-verification reality** — that with an unverified domain Resend only delivers to the account owner; the "it really sends" demo is conditional on DNS state, which the ADR doesn't cover because it's vendor-operational, not architectural.
+
+### 5. Klaviyo + Claude/MCP in one prompt — does this offer anything beyond speed?
+
+A Klaviyo+MCP user gets "send this email" in one prompt, faster, with zero setup. This feature does **not** compete on production speed and should not be sold as if it does. What it offers beyond speed is real and on the right axis:
+- **Portability / no lock-in** — the whole point: the send sits behind a contract you own, so Resend is swappable for any vendor. Klaviyo+MCP is single-vendor by construction.
+- **Transparency** — the failure path, credential handling, and message-id mapping are all visible and inspectable; the SaaS+agent path is a black box you operate.
+- **Teachability** — "here is a real ESP behind an abstract contract, now write your own" is a lesson; Klaviyo+MCP teaches nothing about how sending works.
+
+**Not flagged as wrong-axis.** The feature would only be competing on the wrong axis if it were pitched as "send emails easily/fast" — it is not; it is pitched (per the commit and docstring) as proving the vendor-agnostic contract. That aligns with the sharpened audience in the baseline entry (data-ownership/multi-provider/teaching personas), not the small-shop-wants-speed persona already ceded to Klaviyo+AI.
