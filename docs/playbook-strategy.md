@@ -197,6 +197,8 @@ Not blocked by code — can be worked on alongside other phases.
 
 **4C. Write and publish** — website and/or ebook.
 
+**4D. How a company works with — and evolves — the package** — beyond reading the playbook, define the adopting company's *ongoing* relationship with the architecture: how they run it, extend it, and evolve it over time. Includes a guide on **connecting the package to an AI coding assistant (e.g. Claude)** so the company — or us on their behalf — can develop and adapt it going forward. Envisioned direction: configure the package **"AI-open"** (structured so an AI agent can safely read the ADRs / plugin contracts / decision log / tests-as-guardrails and extend it at the seams), rather than a closed hand-off. **Keep the model open for now** — guide-first; a managed/dev-service offering is one option, self-serve AI-assisted evolution is another, both stay on the table. This is the "what happens after we hand it over" story, and it's a strong fit with the plugin-seam + ADR discipline the architecture already has.
+
 ---
 
 ### Drift report items (address during relevant phases, not separately)
