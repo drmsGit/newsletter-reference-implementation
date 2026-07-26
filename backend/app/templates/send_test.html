@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1 class="mb-4">Send test email</h1>
+
+{% if result %}
+    {% if result.success %}
+    <div class="alert alert-success">
+        <strong>Sent</strong> via <code>{{ result.provider }}</code> to <code>{{ result.to }}</code>.<br>
+        Provider message id: <code>{{ result.provider_message_id }}</code>
+        <div class="small mt-1">Check your Resend dashboard → Emails to see it.</div>
+    </div>
+    {% else %}
+    <div class="alert alert-danger">
+        <strong>Send failed</strong> via <code>{{ result.provider }}</code> to <code>{{ result.to }}</code>:
+        {{ result.message }}
+    </div>
+    {% endif %}
+    {% if result.render_note %}<div class="alert alert-warning small">{{ result.render_note }}</div>{% endif %}
+{% endif %}
+
+<p class="text-muted">
+    Sends a real email through the configured provider (the same <code>DeliveryProvider</code>
+    adapter the campaign send uses). For Resend, set <code>RESEND_API_KEY</code> in
+    <code>backend/.env</code>. Use a Resend sandbox address like
+    <code>delivered@resend.dev</code> for a safe test.
+</p>
+
+<div class="card" style="max-width: 640px;">
+    <div class="card-body">
+        <form method="post" action="/ui/send-test">
+            <div class="mb-3">
+                <label class="form-label">To</label>
+                <input type="email" name="to" class="form-control" required
+                       value="delivered@resend.dev">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Subject</label>
+                <input type="text" name="subject" class="form-control"
+                       value="Test from the newsletter reference build">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Provider</label>
+                <select name="provider" class="form-select">
+                    <option value="resend" selected>resend (real send)</option>
+                    <option value="mock">mock (no real send)</option>
+                </select>
+            </div>
+            <div class="row g-2 mb-3">
+                <div class="col">
+                    <label class="form-label small">Render campaign variant <span class="text-muted">(optional)</span></label>
+                    <select name="variant_id" class="form-select form-select-sm">
+                        <option value="">— plain test body —</option>
+                        {% for v in variant_choices %}
+                        <option value="{{ v.id }}">{{ v.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col">
+                    <label class="form-label small">…personalized for recipient <span class="text-muted">(optional)</span></label>
+                    <select name="recipient_id" class="form-select form-select-sm">
+                        <option value="">— none —</option>
+                        {% for r in recipient_choices %}
+                        <option value="{{ r.id }}">#{{ r.id }} {{ r.email }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Send</button>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

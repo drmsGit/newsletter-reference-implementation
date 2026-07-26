@@ -17,9 +17,10 @@ from app.content.service import create_category, create_category_relation
 from app.content.service import delete_content_record, delete_category, ContentRecordHasHistoryError, HasRelationsError
 from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB, ModuleInstanceDB, DecisionSlotDB
 from app.campaigns.service import create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant, update_decision_slot, update_variant, delete_module, move_module
-from app.rendering.service import UnpublishedContentError
+from app.rendering.service import UnpublishedContentError, render_variant_html
 from app.snapshots.service import create_snapshot_for_variant
 from app.delivery.service import create_send_instance, send_send_instance
+from app.delivery.providers.factory import get_provider
 from app.recipients.db_models import RecipientDB, SignalContributionDB
 from app.insight.signals import operational_signals_for_recipient, operational_signals_for_category
 from app.settings.service import get_signal_weights, get_half_lives, set_config, SIGNAL_WEIGHTS, HALF_LIFE_DAYS_KEY
@@ -109,6 +110,71 @@ async def settings_save(request: Request, db: Session = Depends(get_db)):
     set_config(db, SIGNAL_WEIGHTS, weights)
     set_config(db, HALF_LIFE_DAYS_KEY, half_lives)
     return RedirectResponse(url="/ui/settings?saved=true", status_code=303)
+
+
+def _send_test_context(db):
+    variants = (
+        db.query(VariantDB.id, VariantDB.name, CampaignDB.name)
+        .join(CampaignDB, VariantDB.campaign_id == CampaignDB.id)
+        .order_by(VariantDB.id.asc())
+        .all()
+    )
+    recipients = db.query(RecipientDB.id, RecipientDB.email).order_by(RecipientDB.id.asc()).limit(200).all()
+    return {
+        "variant_choices": [{"id": vid, "label": f"#{vid} {cname} — {vname}"} for vid, vname, cname in variants],
+        "recipient_choices": [{"id": rid, "email": email} for rid, email in recipients],
+    }
+
+
+@router.get("/ui/send-test")
+def send_test_page(request: Request, db: Session = Depends(get_db)):
+    ctx = {"title": "Send test email", "result": None, **_send_test_context(db)}
+    return templates.TemplateResponse(request, "send_test.html", ctx)
+
+
+@router.post("/ui/send-test")
+def send_test_submit(
+    request: Request,
+    to: str = Form(...),
+    subject: str = Form("Test from the newsletter reference build"),
+    provider: str = Form("resend"),
+    variant_id: str = Form(""),
+    recipient_id: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Trigger a real send through the configured provider — renders a variant
+    (if chosen) so a genuine personalized newsletter goes out, else a simple
+    test body. Shows the provider's result (message id or error) inline."""
+    render_note = None
+    if variant_id.strip():
+        try:
+            html = render_variant_html(
+                db,
+                int(variant_id),
+                recipient_id=int(recipient_id) if recipient_id.strip() else None,
+                mode="preview",
+            )
+        except Exception as error:  # never block the send on a render hiccup
+            render_note = f"Could not render variant ({error}); sent a plain test body instead."
+            html = f"<h1>{subject}</h1><p>Test email from the newsletter reference build.</p>"
+    else:
+        html = f"<h1>{subject}</h1><p>Test email from the newsletter reference build.</p>"
+
+    try:
+        send_result = get_provider(provider).send(to.strip(), subject, html)
+        result = {
+            "success": send_result.success,
+            "provider_message_id": send_result.provider_message_id,
+            "message": send_result.message,
+            "to": to.strip(),
+            "provider": provider,
+            "render_note": render_note,
+        }
+    except ValueError as error:  # unknown provider
+        result = {"success": False, "message": str(error), "to": to.strip(), "provider": provider, "render_note": render_note}
+
+    ctx = {"title": "Send test email", "result": result, **_send_test_context(db)}
+    return templates.TemplateResponse(request, "send_test.html", ctx)
 
 
 @router.get("/ui/recipients")
