@@ -111,9 +111,9 @@
             <span class="badge bg-dark fs-6">{{ resolved_count }} recipient(s) net</span>
         </div>
         <p class="text-muted small mb-3">
-            <strong>Include</strong> blocks combine with OR, <strong>exclude</strong> blocks are subtracted, and
-            manually added members (below) are always included. Non-consenting recipients are always excluded.
-            Each block shows how many recipients it matches on its own.
+            <strong>Include</strong> blocks combine with OR; <strong>exclude</strong> blocks are subtracted from them
+            (but never remove a manually added member below — a manual pin is always kept). Non-consenting recipients
+            are always excluded, even if pinned. Each block shows how many recipients it matches on its own.
         </p>
 
         {% if blocks %}

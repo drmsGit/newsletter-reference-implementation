@@ -313,9 +313,16 @@ def delete_block(db: Session, block_id: int) -> bool:
 
 def resolve_audience(db: Session, group_id: int) -> list[RecipientDB]:
     """The group's live audience:
-        (∪ include blocks) ∪ (manual member pins) − (∪ exclude blocks)
-    then re-gated to consenting recipients so a pin added before someone
-    opted out can never leak back in (the consent floor always applies)."""
+        ((∪ include blocks) − (∪ exclude blocks)) ∪ (manual member pins)
+    then re-gated to consenting recipients.
+
+    Precedence (decided 2026-07-26): a manual pin is a deliberate override and
+    is **always included** — exclude blocks shape the rule-driven audience but
+    never remove a hand-pinned recipient (pins are unioned *after* excludes are
+    subtracted). The **consent floor is the one exception**: a non-consenting
+    recipient is dropped even if pinned (legal, non-negotiable). Hard
+    suppression (bounces/opt-outs) belongs on the consent/suppression floor, not
+    in a regular exclude block, so it stays hard against pins too."""
     blocks = list_blocks(db, group_id)
 
     include_ids: set[int] = set()
@@ -327,11 +334,10 @@ def resolve_audience(db: Session, group_id: int) -> list[RecipientDB]:
         else:
             include_ids |= ids
 
-    # Manual pins (existing static membership) count as include pins — "keep
-    # both": hand-picked recipients survive alongside the live rules.
-    include_ids |= get_member_recipient_ids(db, group_id)
-
-    final_ids = include_ids - exclude_ids
+    # Excludes subtract from the rule-driven set only; manual pins are then
+    # unioned back in so they survive excludes ("always included", except
+    # consent below). "keep both" — hand-picked recipients alongside the rules.
+    final_ids = (include_ids - exclude_ids) | get_member_recipient_ids(db, group_id)
     if not final_ids:
         return []
 
