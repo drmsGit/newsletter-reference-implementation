@@ -6,6 +6,7 @@ from sqlalchemy import func, desc
 from itertools import combinations
 from urllib.parse import quote
 import math
+import os
 
 from app.database import get_db
 
@@ -19,7 +20,7 @@ from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB,
 from app.campaigns.service import create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant, update_decision_slot, update_variant, update_module, delete_module, move_module
 from app.rendering.service import UnpublishedContentError, render_variant_html
 from app.snapshots.service import create_snapshot_for_variant
-from app.delivery.service import create_send_instance, send_send_instance
+from app.delivery.service import create_send_instance, prepare_send_from_audience, send_send_instance
 from app.delivery.providers.factory import get_provider
 from app.recipients.db_models import RecipientDB, SignalContributionDB
 from app.insight.signals import operational_signals_for_recipient, operational_signals_for_category
@@ -568,6 +569,17 @@ def campaign_detail(
     module_templates = list_manifests()
     strategies = sorted(s.name for s in list_strategies())
 
+    # Audience choices for the prepare-send form, each with its live resolved
+    # (consent-gated) recipient count so a manager sees the reach before planning.
+    audience_choices = []
+    for group in audience_service.list_groups(db):
+        audience_choices.append({
+            "id": group.id,
+            "name": group.name,
+            "count": len(audience_service.resolve_audience(db, group.id)),
+        })
+    default_from = os.environ.get("RESEND_FROM", "onboarding@resend.dev")
+
     return templates.TemplateResponse(
         request,
         "campaign_detail.html",
@@ -578,6 +590,8 @@ def campaign_detail(
             "content_records": content_records,
             "module_templates": module_templates,
             "strategies": strategies,
+            "audience_choices": audience_choices,
+            "default_from": default_from,
             "error": error,
         },
     )
@@ -820,9 +834,33 @@ def send_instance_create(
     campaign_id: int,
     snapshot_id: int,
     name: str = Form(...),
+    audience_group_id: str = Form(""),
+    provider: str = Form("mock"),
+    from_address: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    send_instance = create_send_instance(db, snapshot_id=snapshot_id, name=name, provider="mock")
+    """Plan a delivery: pick an audience → provider / from address → materialize
+    the send instance and one execution per resolved recipient. Lands on the
+    delivery page in draft for an explicit Trigger send."""
+    if not audience_group_id.strip():
+        return RedirectResponse(
+            url=f"/ui/campaigns/{campaign_id}?error={quote('Select an audience to plan a send.')}",
+            status_code=303,
+        )
+    try:
+        send_instance = prepare_send_from_audience(
+            db,
+            snapshot_id=snapshot_id,
+            name=name,
+            audience_group_id=int(audience_group_id),
+            provider=provider,
+            from_address=from_address.strip() or None,
+        )
+    except ValueError as error:
+        return RedirectResponse(
+            url=f"/ui/campaigns/{campaign_id}?error={quote(str(error))}",
+            status_code=303,
+        )
     return RedirectResponse(url=f"/ui/deliveries/send-instances/{send_instance.id}", status_code=303)
 
 
@@ -1884,6 +1922,14 @@ def delivery_detail(
             }
         )
 
+    audience_group = None
+    if send_instance.audience_group_id:
+        audience_group = (
+            db.query(AudienceGroupDB)
+            .filter(AudienceGroupDB.id == send_instance.audience_group_id)
+            .first()
+        )
+
     return templates.TemplateResponse(
         request,
         "delivery_detail.html",
@@ -1892,6 +1938,8 @@ def delivery_detail(
             "send_instance": send_instance,
             "snapshot": snapshot,
             "executions": execution_rows,
+            "audience_group": audience_group,
+            "recipient_count": len(execution_rows),
         },
     )
 

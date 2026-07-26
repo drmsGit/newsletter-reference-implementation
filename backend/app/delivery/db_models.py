@@ -11,6 +11,13 @@ class SendInstanceDB(Base):
     name = Column(String(255), nullable=False)
     status = Column(String(50), nullable=False, default="draft")
     provider = Column(String(100), nullable=True)
+    # The audience this send targets. Recorded so we know who a send went to
+    # (its executions are materialized from the group at prepare time) and can
+    # show it on the delivery page. Nullable for legacy/ad-hoc send instances.
+    audience_group_id = Column(Integer, ForeignKey("audience_groups.id"), nullable=True)
+    # Verified sender for a real (Resend) send, e.g. "News <news@domain.com>".
+    # Null = the provider adapter falls back to its RESEND_FROM env default.
+    from_address = Column(String(255), nullable=True)
     scheduled_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(

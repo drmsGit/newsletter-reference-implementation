@@ -84,6 +84,8 @@ def create_send_instance(
     status: str = "draft",
     provider: str | None = None,
     scheduled_at=None,
+    audience_group_id: int | None = None,
+    from_address: str | None = None,
 ) -> SendInstance:
     send_instance = SendInstanceDB(
         snapshot_id=snapshot_id,
@@ -91,6 +93,8 @@ def create_send_instance(
         status=status,
         provider=provider,
         scheduled_at=scheduled_at,
+        audience_group_id=audience_group_id,
+        from_address=from_address,
     )
 
     db.add(send_instance)
@@ -98,6 +102,59 @@ def create_send_instance(
     db.refresh(send_instance)
 
     return to_send_instance(send_instance)
+
+
+def prepare_send_from_audience(
+    db: Session,
+    snapshot_id: int,
+    name: str,
+    audience_group_id: int,
+    provider: str,
+    from_address: str | None = None,
+) -> SendInstanceDB:
+    """Materialize a planned send: resolve the audience group to its live
+    recipient set (consent-gated) and create one DeliveryExecution per
+    recipient, all in status "created". Nothing is sent here — the send
+    instance lands in "draft" for an explicit Trigger send. Raises ValueError
+    if the audience resolves to nobody, so a manager can't plan an empty send.
+
+    Executions are frozen at prepare time (a snapshot of the audience), so a
+    later edit to the group's rules doesn't retroactively change who a planned
+    send goes to — recompute by preparing again."""
+    # Imported here rather than at module load to keep the delivery→audience
+    # dependency local (audience never imports delivery).
+    from app.audience.service import resolve_audience
+
+    recipients = resolve_audience(db, audience_group_id)
+    if not recipients:
+        raise ValueError(
+            "The selected audience resolves to 0 consenting recipients — nothing to send."
+        )
+
+    send_instance = SendInstanceDB(
+        snapshot_id=snapshot_id,
+        name=name,
+        status="draft",
+        provider=provider,
+        audience_group_id=audience_group_id,
+        from_address=from_address or None,
+    )
+    db.add(send_instance)
+    db.flush()  # assign send_instance.id before creating child executions
+
+    for recipient in recipients:
+        db.add(
+            DeliveryExecutionDB(
+                send_instance_id=send_instance.id,
+                recipient_id=recipient.id,
+                status="created",
+                provider=provider,
+            )
+        )
+
+    db.commit()
+    db.refresh(send_instance)
+    return send_instance
 
 
 def list_send_instances_for_snapshot(
@@ -169,7 +226,8 @@ def send_send_instance(
     subject = (variant.subject if variant and variant.subject else send_instance.name)
 
     provider = get_provider(
-        send_instance.provider or "mock"
+        send_instance.provider or "mock",
+        from_address=send_instance.from_address,
     )
 
     executions = (

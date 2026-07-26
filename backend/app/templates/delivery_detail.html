@@ -11,20 +11,27 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="mb-0">{{ send_instance.name }}</h1>
     {% if send_instance.status == "draft" %}
-    <form method="post" action="/ui/send-instances/{{ send_instance.id }}/send">
-        <button type="submit" class="btn btn-success">Trigger send</button>
+    <form method="post" action="/ui/send-instances/{{ send_instance.id }}/send"
+          onsubmit="return confirm('Send to {{ recipient_count }} recipient(s) via the {{ send_instance.provider or 'mock' }} provider?{% if send_instance.provider == 'resend' %}\n\nThis sends REAL email. Recipients whose address is not deliverable from your verified/sandbox sender will fail.{% endif %}\n\nThis cannot be undone.');">
+        <button type="submit" class="btn btn-success">Trigger send → {{ recipient_count }} recipient(s)</button>
     </form>
     {% else %}
     <span class="badge bg-success fs-6">{{ send_instance.status }}</span>
     {% endif %}
 </div>
 
-<div class="alert alert-info">
-    This campaign send uses the <strong>mock</strong> provider — no real email leaves the system.
-    To send a <strong>real</strong> email through Resend, use <a href="/ui/send-test">Send test</a>
-    (single recipient, safe for the sandbox address). A provider choice for the full campaign send
-    is a small follow-up.
+{% if send_instance.provider == "resend" %}
+<div class="alert alert-warning">
+    This send uses the <strong>resend</strong> provider — it sends <strong>real email</strong> to
+    {{ recipient_count }} recipient(s), from <code>{{ send_instance.from_address or "the RESEND_FROM default" }}</code>.
+    On the sandbox sender only your own account address actually receives; verify your domain for real delivery.
 </div>
+{% else %}
+<div class="alert alert-info">
+    This send uses the <strong>mock</strong> provider — no real email leaves the system
+    ({{ recipient_count }} recipient(s) will be marked sent). Re-plan with the <em>resend</em> provider to send real email.
+</div>
+{% endif %}
 
 <div class="card mb-4">
     <div class="card-body">
@@ -44,6 +51,20 @@
                 </td>
             </tr>
             <tr><th>Provider</th><td>{{ send_instance.provider or "—" }}</td></tr>
+            <tr>
+                <th>Audience</th>
+                <td>
+                    {% if audience_group %}
+                    <a href="/ui/audience-groups/{{ audience_group.id }}">{{ audience_group.name }}</a>
+                    <span class="text-muted">— {{ recipient_count }} recipient(s) at plan time</span>
+                    {% else %}
+                    <span class="text-muted">— ({{ recipient_count }} recipient(s))</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% if send_instance.provider == "resend" %}
+            <tr><th>From</th><td>{{ send_instance.from_address or "RESEND_FROM default" }}</td></tr>
+            {% endif %}
             <tr>
                 <th>Snapshot</th>
                 <td>
