@@ -4,12 +4,42 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="mb-0">Audience Groups</h1>
-    <button class="btn btn-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#form-new-group">+ New group</button>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-success btn-sm" data-bs-toggle="collapse" data-bs-target="#form-suggest">✨ Suggest from campaign</button>
+        <button class="btn btn-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#form-new-group">+ New group</button>
+    </div>
 </div>
 
 {% if error %}
 <div class="alert alert-danger" role="alert">{{ error }}</div>
 {% endif %}
+
+<div class="collapse mb-4" id="form-suggest">
+    <div class="card border-success">
+        <div class="card-body">
+            <h5 class="card-title">Suggest an audience from a campaign</h5>
+            <p class="text-muted small mb-3">
+                Pick a campaign; the system reads the categories its content covers and creates a new group
+                pre-filled with editable “interested in …” rules — one per top category. You can then tighten,
+                delete, or extend them.
+            </p>
+            <form method="post" action="/ui/campaigns/0/suggest-audience" id="suggest-form" class="row g-2 align-items-end">
+                <div class="col-md-8">
+                    <label class="form-label">Campaign</label>
+                    <select id="suggest-campaign" class="form-select" required>
+                        <option value="" disabled selected>Choose a campaign…</option>
+                        {% for c in campaigns %}
+                        <option value="{{ c.id }}">#{{ c.id }} — {{ c.name }} ({{ c.status }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-success w-100">✨ Suggest audience</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <div class="collapse mb-4" id="form-new-group">
     <div class="card">
@@ -56,5 +86,15 @@
 {% else %}
 <p class="text-muted">No audience groups yet. Create one above.</p>
 {% endif %}
+
+<script>
+// The suggestion route takes the campaign id in the path; point the form at the
+// chosen campaign on submit.
+document.getElementById('suggest-form')?.addEventListener('submit', function (e) {
+    const id = document.getElementById('suggest-campaign').value;
+    if (!id) { e.preventDefault(); return; }
+    this.action = `/ui/campaigns/${id}/suggest-audience`;
+});
+</script>
 
 {% endblock %}

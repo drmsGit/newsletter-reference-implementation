@@ -2303,8 +2303,10 @@ def audience_groups_list(request: Request, error: str | None = None, db: Session
         count = db.query(AudienceGroupMemberDB).filter(AudienceGroupMemberDB.group_id == g.id).count()
         rows.append({"id": g.id, "name": g.name, "description": g.description,
                      "member_count": count, "created_at": g.created_at})
+    campaigns = db.query(CampaignDB).order_by(CampaignDB.created_at.desc()).all()
     return templates.TemplateResponse(request, "audience_groups.html",
-                                      {"title": "Audience Groups", "groups": rows, "error": error})
+                                      {"title": "Audience Groups", "groups": rows,
+                                       "campaigns": campaigns, "error": error})
 
 
 @router.post("/ui/audience-groups")
@@ -2377,6 +2379,12 @@ def audience_group_detail(group_id: int, request: Request, error: str | None = N
 
     resolved = audience_service.resolve_audience(db, group_id)
 
+    # Source campaign (if this group was seeded by "Suggest audience") — enables
+    # the Recalculate button and a link back to the campaign.
+    source_campaign = None
+    if group.source_campaign_id:
+        source_campaign = db.query(CampaignDB).filter(CampaignDB.id == group.source_campaign_id).first()
+
     return templates.TemplateResponse(request, "audience_group_detail.html", {
         "title": f"Group: {group.name}",
         "group": group,
@@ -2388,6 +2396,7 @@ def audience_group_detail(group_id: int, request: Request, error: str | None = N
         "blocks": blocks,
         "resolved_count": len(resolved),
         "resolved_preview": resolved[:20],
+        "source_campaign": source_campaign,
         "error": error,
     })
 
@@ -2565,3 +2574,16 @@ def campaign_suggest_audience(campaign_id: int, db: Session = Depends(get_db)):
     except ValueError as error:
         return RedirectResponse(f"/ui/campaigns/{campaign_id}?error={quote(str(error))}", status_code=303)
     return RedirectResponse(f"/ui/audience-groups/{group.id}", status_code=303)
+
+
+@router.post("/ui/audience-groups/{group_id}/recalculate")
+def audience_group_recalculate(group_id: int, db: Session = Depends(get_db)):
+    """Re-derive the suggested blocks from the source campaign's current content
+    (after its slots/content changed). Manual blocks and pins are preserved."""
+    result = audience_service.recalculate_suggested_blocks(db, group_id)
+    if result is None:
+        return RedirectResponse(
+            f"/ui/audience-groups/{group_id}?error={quote('This group is not linked to a campaign, so there is nothing to recalculate.')}",
+            status_code=303,
+        )
+    return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)

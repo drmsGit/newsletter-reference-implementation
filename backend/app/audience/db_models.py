@@ -9,6 +9,10 @@ class AudienceGroupDB(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
+    # Set when the group was seeded by "Suggest audience" from a campaign.
+    # Lets "Recalculate" re-derive the suggested blocks from that campaign's
+    # current content after its slots/content change. Null for hand-made groups.
+    source_campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime(timezone=True),

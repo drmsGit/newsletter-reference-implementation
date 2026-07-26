@@ -61,8 +61,19 @@
         {% if group.description %}
         <p class="text-muted mb-0">{{ group.description }}</p>
         {% endif %}
+        {% if source_campaign %}
+        <p class="text-muted small mb-0">
+            Suggested from campaign <a href="/ui/campaigns/{{ source_campaign.id }}">#{{ source_campaign.id }} — {{ source_campaign.name }}</a>
+        </p>
+        {% endif %}
     </div>
     <div class="d-flex gap-2">
+        {% if source_campaign %}
+        <form method="post" action="/ui/audience-groups/{{ group.id }}/recalculate"
+              title="Re-derive the suggested rules from the campaign's current content (after changing its slots/content). Your manual rules and members are kept.">
+            <button type="submit" class="btn btn-outline-success btn-sm">↻ Recalculate from campaign</button>
+        </form>
+        {% endif %}
         <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="collapse" data-bs-target="#form-edit-group">Edit</button>
         <form method="post" action="/ui/audience-groups/{{ group.id }}/delete" onsubmit="return confirm('Delete this group?')">
             <button type="submit" class="btn btn-outline-danger btn-sm">Delete group</button>

@@ -24,8 +24,10 @@ def get_group(db: Session, group_id: int) -> AudienceGroupDB | None:
     return db.query(AudienceGroupDB).filter(AudienceGroupDB.id == group_id).first()
 
 
-def create_group(db: Session, name: str, description: str | None = None) -> AudienceGroupDB:
-    group = AudienceGroupDB(name=name, description=description)
+def create_group(
+    db: Session, name: str, description: str | None = None, source_campaign_id: int | None = None
+) -> AudienceGroupDB:
+    group = AudienceGroupDB(name=name, description=description, source_campaign_id=source_campaign_id)
     db.add(group)
     try:
         db.commit()
@@ -431,7 +433,12 @@ def create_suggested_group_for_campaign(db: Session, campaign_id: int, campaign_
         name = f"{base_name} ({suffix})"
         suffix += 1
 
-    group = create_group(db, name, description=f"System-suggested from campaign #{campaign_id} content categories.")
+    group = create_group(
+        db,
+        name,
+        description=f"System-suggested from campaign #{campaign_id} content categories.",
+        source_campaign_id=campaign_id,
+    )
     for suggestion in suggest_include_blocks_for_campaign(db, campaign_id):
         add_block(
             db,
@@ -441,4 +448,50 @@ def create_suggested_group_for_campaign(db: Session, campaign_id: int, campaign_
             label=suggestion["label"],
             source="suggested",
         )
+    return group
+
+
+def recalculate_suggested_blocks(db: Session, group_id: int) -> AudienceGroupDB | None:
+    """Re-derive a group's suggested include blocks from its source campaign's
+    *current* content — for after a manager adjusts slots/content. Applies only
+    the delta so nothing else is disturbed:
+      • categories the campaign no longer covers → their suggested block removed
+      • categories newly covered → a fresh suggested block added
+      • a surviving category's suggested block is left untouched, preserving any
+        threshold the manager already tuned on it
+    Manual blocks and manual member pins are never touched. Returns None if the
+    group has no source campaign to recalculate against."""
+    group = get_group(db, group_id)
+    if not group or not group.source_campaign_id:
+        return None
+
+    desired = suggest_include_blocks_for_campaign(db, group.source_campaign_id)
+    desired_by_cat = {s["criteria"]["category_id"]: s for s in desired}
+
+    existing_suggested = [b for b in list_blocks(db, group_id) if b.source == "suggested"]
+    existing_cats = {(b.criteria or {}).get("category_id") for b in existing_suggested}
+
+    # Remove suggested blocks whose category dropped out of the campaign.
+    removed = 0
+    for block in existing_suggested:
+        if (block.criteria or {}).get("category_id") not in desired_by_cat:
+            db.delete(block)
+            removed += 1
+    if removed:
+        db.commit()
+
+    # Add suggested blocks for newly-covered categories.
+    added = 0
+    for cat_id, suggestion in desired_by_cat.items():
+        if cat_id not in existing_cats:
+            add_block(
+                db,
+                group_id=group_id,
+                kind="include",
+                criteria=suggestion["criteria"],
+                label=suggestion["label"],
+                source="suggested",
+            )
+            added += 1
+
     return group
