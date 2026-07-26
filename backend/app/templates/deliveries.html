@@ -2,7 +2,20 @@
 
 {% block content %}
 
-<h1 class="mb-4">Delivery Monitoring</h1>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0">Delivery Monitoring</h1>
+    <form method="post" action="/ui/deliveries/process-due">
+        <button type="submit" class="btn btn-sm btn-outline-primary"
+                {% if not scheduled_count %}disabled{% endif %}
+                title="Fire scheduled sends whose time has arrived. In production a cron/worker/automation flow calls this on an interval.">
+            ⏱ Run due scheduled sends{% if scheduled_count %} ({{ scheduled_count }} scheduled){% endif %}
+        </button>
+    </form>
+</div>
+
+{% if notice %}
+<div class="alert alert-info" role="alert">{{ notice }}</div>
+{% endif %}
 
 <table class="table table-striped table-sm">
     <thead>
@@ -34,7 +47,12 @@
                     {{ send.name }}
                 </a>
             </td>
-            <td>{{ send.status }}</td>
+            <td>
+                {{ send.status }}
+                {% if send.status == "scheduled" and send.scheduled_at %}
+                <br><span class="text-muted small">{{ send.scheduled_at.strftime("%Y-%m-%d %H:%M") }}</span>
+                {% endif %}
+            </td>
             <td>{{ send.provider }}</td>
             <td>
                 {% if send.campaign_id %}

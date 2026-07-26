@@ -427,10 +427,30 @@
                                            value="{{ default_from }}" disabled>
                                 </div>
                             </div>
+                            <div class="row g-2 mt-1">
+                                <div class="col-md-5">
+                                    <label class="form-label small mb-1">Audience resolution</label>
+                                    <select name="audience_resolution_mode" class="form-select form-select-sm">
+                                        <option value="freeze" selected>Freeze now — lock recipients at plan time</option>
+                                        <option value="rerun">Re-run at send — re-resolve the audience just before sending</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small mb-1">Send timing</label>
+                                    <select name="send_timing" class="form-select form-select-sm prepare-timing">
+                                        <option value="now" selected>Send on manual trigger</option>
+                                        <option value="schedule">Schedule for…</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small mb-1">Scheduled time</label>
+                                    <input type="datetime-local" name="scheduled_at" class="form-control form-control-sm prepare-scheduled" disabled>
+                                </div>
+                            </div>
                             <div class="mt-2 d-flex align-items-center gap-2">
-                                <button type="submit" class="btn btn-sm btn-primary">4. Plan delivery →</button>
+                                <button type="submit" class="btn btn-sm btn-primary">Plan delivery →</button>
                                 <span class="text-muted small prepare-hint">
-                                    Materializes one delivery per recipient in the selected audience. Nothing is sent until you Trigger send.
+                                    Materializes one delivery per recipient. Nothing is sent until you Trigger send (or the scheduled time arrives).
                                 </span>
                             </div>
                         </form>
@@ -460,6 +480,14 @@ document.querySelectorAll('.prepare-provider').forEach(function (sel) {
     const form = sel.closest('form');
     const from = form.querySelector('.prepare-from');
     const sync = () => { from.disabled = (sel.value !== 'resend'); };
+    sel.addEventListener('change', sync);
+    sync();
+});
+// Enable the scheduled-time input only when "Schedule for…" is chosen.
+document.querySelectorAll('.prepare-timing').forEach(function (sel) {
+    const form = sel.closest('form');
+    const when = form.querySelector('.prepare-scheduled');
+    const sync = () => { when.disabled = (sel.value !== 'schedule'); when.required = (sel.value === 'schedule'); };
     sel.addEventListener('change', sync);
     sync();
 });

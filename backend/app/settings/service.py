@@ -13,6 +13,13 @@ from app.insight.signals import CONTRIBUTION_WEIGHTS, HALF_LIFE_DAYS
 # Config keys.
 SIGNAL_WEIGHTS = "signal_weights"
 HALF_LIFE_DAYS_KEY = "half_life_days"
+MAX_SEND_RECIPIENTS_KEY = "max_send_recipients"
+
+# Safety cap on how many recipients one send may target — a guardrail against an
+# accidental mass blast. Lives in settings (retunable) here in the POC; in a real
+# deployment this belongs in ops/dev config. Generous default so it never blocks
+# normal use, only catches obvious mistakes.
+DEFAULT_MAX_SEND_RECIPIENTS = 1000
 
 
 def get_config(db: Session, key: str, default=None):
@@ -42,3 +49,12 @@ def get_half_lives(db: Session) -> dict[str, float]:
     """Decay half-lives (days), code defaults overridden by any config row."""
     overrides = get_config(db, HALF_LIFE_DAYS_KEY, {}) or {}
     return {**HALF_LIFE_DAYS, **{k: float(v) for k, v in overrides.items()}}
+
+
+def get_max_send_recipients(db: Session) -> int:
+    """Recipient cap for a single send, code default overridden by config."""
+    value = get_config(db, MAX_SEND_RECIPIENTS_KEY, None)
+    try:
+        return int(value) if value is not None else DEFAULT_MAX_SEND_RECIPIENTS
+    except (TypeError, ValueError):
+        return DEFAULT_MAX_SEND_RECIPIENTS

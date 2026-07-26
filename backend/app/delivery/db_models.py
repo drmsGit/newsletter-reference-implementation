@@ -18,6 +18,16 @@ class SendInstanceDB(Base):
     # Verified sender for a real (Resend) send, e.g. "News <news@domain.com>".
     # Null = the provider adapter falls back to its RESEND_FROM env default.
     from_address = Column(String(255), nullable=True)
+    # How the audience is resolved into recipients:
+    #   "freeze" — executions are fixed at plan time (a snapshot of the group).
+    #   "rerun"  — the group is re-resolved immediately before the send fires and
+    #              executions are reconciled (add newly-matching, drop no-longer-
+    #              matching that haven't sent). Mirrors Salesforce's send-time
+    #              audience re-evaluation.
+    audience_resolution_mode = Column(String(20), nullable=False, default="freeze")
+    # Set when a send is scheduled for later (normal calendar-time newsletter
+    # scheduling, distinct from AI per-recipient send-time optimization). Status
+    # is "scheduled" until it fires. Null = send on manual Trigger.
     scheduled_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(

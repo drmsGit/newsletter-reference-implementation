@@ -43,6 +43,18 @@
                     {% endfor %}
                 </tbody>
             </table>
+
+            <hr>
+            <div class="mb-3" style="max-width:420px">
+                <label class="form-label"><strong>Max recipients per send</strong></label>
+                <input type="number" min="1" step="1" name="max_send_recipients"
+                       value="{{ max_send_recipients }}" class="form-control form-control-sm">
+                <div class="form-text">
+                    Safety cap: a prepared send with more recipients than this is refused (guards against an
+                    accidental mass blast). In the POC it lives here; in a real deployment this belongs in ops/dev config.
+                </div>
+            </div>
+
             <button type="submit" class="btn btn-primary btn-sm">Save settings</button>
         </form>
         <p class="small text-muted mt-3 mb-0">

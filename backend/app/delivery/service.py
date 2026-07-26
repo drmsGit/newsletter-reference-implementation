@@ -1,5 +1,6 @@
 import logging
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
@@ -111,19 +112,37 @@ def prepare_send_from_audience(
     audience_group_id: int,
     provider: str,
     from_address: str | None = None,
+    audience_resolution_mode: str = "freeze",
+    scheduled_at=None,
 ) -> SendInstanceDB:
     """Materialize a planned send: resolve the audience group to its live
     recipient set (consent-gated) and create one DeliveryExecution per
-    recipient, all in status "created". Nothing is sent here — the send
-    instance lands in "draft" for an explicit Trigger send. Raises ValueError
-    if the audience resolves to nobody, so a manager can't plan an empty send.
+    recipient, all in status "created". Nothing is sent here. Raises ValueError
+    on an empty audience or one exceeding the recipient cap.
 
-    Executions are frozen at prepare time (a snapshot of the audience), so a
-    later edit to the group's rules doesn't retroactively change who a planned
-    send goes to — recompute by preparing again."""
+    Two audience-resolution modes (`audience_resolution_mode`):
+      "freeze" — the executions created here are final; a later edit to the
+                 group's rules doesn't change who the send goes to.
+      "rerun"  — these executions are a preview; the group is re-resolved and
+                 reconciled immediately before the send fires (see
+                 reconcile_executions_to_audience).
+
+    `scheduled_at` set → status "scheduled" (fires later via
+    process_due_scheduled_sends); otherwise "draft" (fires on manual Trigger)."""
     # Imported here rather than at module load to keep the delivery→audience
     # dependency local (audience never imports delivery).
     from app.audience.service import resolve_audience
+    from app.settings.service import get_max_send_recipients
+
+    if audience_resolution_mode not in ("freeze", "rerun"):
+        raise ValueError("audience_resolution_mode must be 'freeze' or 'rerun'")
+
+    # A naive scheduled_at (e.g. from a datetime-local input, local wall-clock)
+    # must be made timezone-aware before it hits the timestamptz column —
+    # otherwise Postgres reinterprets it in the session TZ and the "<= now()"
+    # due-check drifts by the UTC offset. astimezone() attaches the local tz.
+    if scheduled_at is not None and scheduled_at.tzinfo is None:
+        scheduled_at = scheduled_at.astimezone()
 
     recipients = resolve_audience(db, audience_group_id)
     if not recipients:
@@ -131,13 +150,22 @@ def prepare_send_from_audience(
             "The selected audience resolves to 0 consenting recipients — nothing to send."
         )
 
+    cap = get_max_send_recipients(db)
+    if len(recipients) > cap:
+        raise ValueError(
+            f"The selected audience has {len(recipients)} recipients, over the send cap of {cap}. "
+            "Raise the cap in Settings or narrow the audience."
+        )
+
     send_instance = SendInstanceDB(
         snapshot_id=snapshot_id,
         name=name,
-        status="draft",
+        status="scheduled" if scheduled_at else "draft",
         provider=provider,
         audience_group_id=audience_group_id,
         from_address=from_address or None,
+        audience_resolution_mode=audience_resolution_mode,
+        scheduled_at=scheduled_at,
     )
     db.add(send_instance)
     db.flush()  # assign send_instance.id before creating child executions
@@ -155,6 +183,77 @@ def prepare_send_from_audience(
     db.commit()
     db.refresh(send_instance)
     return send_instance
+
+
+def reconcile_executions_to_audience(db: Session, send_instance: SendInstanceDB) -> None:
+    """For a "rerun" send: re-resolve the audience group right before firing and
+    reconcile executions — add one for each newly-matching recipient, and drop
+    executions for recipients who no longer match *and* haven't sent yet (an
+    already-sent execution is history and is left as-is). Enforces the recipient
+    cap on the freshly-resolved set. No-op if the send has no audience group."""
+    if not send_instance.audience_group_id:
+        return
+
+    from app.audience.service import resolve_audience
+    from app.settings.service import get_max_send_recipients
+
+    resolved_ids = {r.id for r in resolve_audience(db, send_instance.audience_group_id)}
+
+    cap = get_max_send_recipients(db)
+    if len(resolved_ids) > cap:
+        raise ValueError(
+            f"Re-resolved audience has {len(resolved_ids)} recipients, over the send cap of {cap}."
+        )
+
+    existing = (
+        db.query(DeliveryExecutionDB)
+        .filter(DeliveryExecutionDB.send_instance_id == send_instance.id)
+        .all()
+    )
+    existing_by_recipient = {e.recipient_id: e for e in existing}
+
+    # Drop no-longer-matching that haven't sent.
+    for execution in existing:
+        if execution.recipient_id not in resolved_ids and execution.status == "created":
+            db.delete(execution)
+
+    # Add newly-matching.
+    for recipient_id in resolved_ids:
+        if recipient_id not in existing_by_recipient:
+            db.add(
+                DeliveryExecutionDB(
+                    send_instance_id=send_instance.id,
+                    recipient_id=recipient_id,
+                    status="created",
+                    provider=send_instance.provider,
+                )
+            )
+
+    db.commit()
+
+
+def process_due_scheduled_sends(db: Session) -> list[int]:
+    """Fire every scheduled send whose time has arrived. This is the operation a
+    scheduler drives — a cron job, worker, or automation platform (n8n) calls it
+    on an interval; the architecture just exposes the seam rather than baking in
+    a specific scheduler. Returns the ids of the send instances it triggered."""
+    due = (
+        db.query(SendInstanceDB)
+        .filter(
+            SendInstanceDB.status == "scheduled",
+            SendInstanceDB.scheduled_at.isnot(None),
+            SendInstanceDB.scheduled_at <= func.now(),  # DB-side comparison avoids tz drift
+        )
+        .all()
+    )
+    triggered = []
+    for send_instance in due:
+        try:
+            send_send_instance(db, send_instance_id=send_instance.id)
+            triggered.append(send_instance.id)
+        except Exception:
+            logger.exception("scheduled send failed: send_instance_id=%s", send_instance.id)
+    return triggered
 
 
 def list_send_instances_for_snapshot(
@@ -201,6 +300,17 @@ def send_send_instance(
 
     send_instance.status = "sending"
     db.commit()
+
+    # "rerun" audiences are re-resolved against the group right now, just before
+    # sending, so a send reflects who matches at send time — not who matched when
+    # it was planned. "freeze" sends keep their planned executions untouched.
+    if send_instance.audience_resolution_mode == "rerun":
+        try:
+            reconcile_executions_to_audience(db, send_instance)
+        except ValueError:
+            send_instance.status = "failed"
+            db.commit()
+            raise
 
     snapshot = (
         db.query(SnapshotDB)

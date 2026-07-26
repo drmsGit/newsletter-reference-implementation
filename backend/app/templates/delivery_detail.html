@@ -10,15 +10,21 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="mb-0">{{ send_instance.name }}</h1>
-    {% if send_instance.status == "draft" %}
+    {% if send_instance.status in ["draft", "scheduled"] %}
     <form method="post" action="/ui/send-instances/{{ send_instance.id }}/send"
-          onsubmit="return confirm('Send to {{ recipient_count }} recipient(s) via the {{ send_instance.provider or 'mock' }} provider?{% if send_instance.provider == 'resend' %}\n\nThis sends REAL email. Recipients whose address is not deliverable from your verified/sandbox sender will fail.{% endif %}\n\nThis cannot be undone.');">
-        <button type="submit" class="btn btn-success">Trigger send → {{ recipient_count }} recipient(s)</button>
+          onsubmit="return confirm('Send{% if send_instance.audience_resolution_mode == 'rerun' %} (audience re-resolved now){% endif %} to {{ recipient_count }} recipient(s) via the {{ send_instance.provider or 'mock' }} provider?{% if send_instance.provider == 'resend' %}\n\nThis sends REAL email. Recipients whose address is not deliverable from your verified/sandbox sender will fail.{% endif %}\n\nThis cannot be undone.');">
+        <button type="submit" class="btn btn-success">
+            {% if send_instance.status == "scheduled" %}Send now (override schedule){% else %}Trigger send{% endif %} → {{ recipient_count }} recipient(s)
+        </button>
     </form>
     {% else %}
     <span class="badge bg-success fs-6">{{ send_instance.status }}</span>
     {% endif %}
 </div>
+
+{% if error %}
+<div class="alert alert-danger" role="alert">{{ error }}</div>
+{% endif %}
 
 {% if send_instance.provider == "resend" %}
 <div class="alert alert-warning">
@@ -65,6 +71,26 @@
             {% if send_instance.provider == "resend" %}
             <tr><th>From</th><td>{{ send_instance.from_address or "RESEND_FROM default" }}</td></tr>
             {% endif %}
+            <tr>
+                <th>Audience mode</th>
+                <td>
+                    {% if send_instance.audience_resolution_mode == "rerun" %}
+                    <span class="badge bg-info text-dark">re-run at send</span>
+                    <span class="text-muted small">audience re-resolved just before sending</span>
+                    {% else %}
+                    <span class="badge bg-secondary">frozen at plan time</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <th>Scheduled</th>
+                <td>
+                    {% if send_instance.scheduled_at %}
+                    {{ send_instance.scheduled_at.strftime("%Y-%m-%d %H:%M") }}
+                    {% if send_instance.status == "scheduled" %}<span class="text-muted small">— fires when a scheduler processes due sends</span>{% endif %}
+                    {% else %}<span class="text-muted">— (manual trigger)</span>{% endif %}
+                </td>
+            </tr>
             <tr>
                 <th>Snapshot</th>
                 <td>

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from itertools import combinations
 from urllib.parse import quote
+from datetime import datetime
 import math
 import os
 
@@ -20,11 +21,11 @@ from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB,
 from app.campaigns.service import create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant, update_decision_slot, update_variant, update_module, delete_module, move_module
 from app.rendering.service import UnpublishedContentError, render_variant_html
 from app.snapshots.service import create_snapshot_for_variant
-from app.delivery.service import create_send_instance, prepare_send_from_audience, send_send_instance
+from app.delivery.service import create_send_instance, prepare_send_from_audience, process_due_scheduled_sends, send_send_instance
 from app.delivery.providers.factory import get_provider
 from app.recipients.db_models import RecipientDB, SignalContributionDB
 from app.insight.signals import operational_signals_for_recipient, operational_signals_for_category
-from app.settings.service import get_signal_weights, get_half_lives, set_config, SIGNAL_WEIGHTS, HALF_LIFE_DAYS_KEY
+from app.settings.service import get_signal_weights, get_half_lives, get_max_send_recipients, set_config, SIGNAL_WEIGHTS, HALF_LIFE_DAYS_KEY, MAX_SEND_RECIPIENTS_KEY
 from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB
 from app.audience import service as audience_service
 from app.decision.strategies.registry import list_strategies
@@ -85,7 +86,12 @@ def settings_page(request: Request, saved: bool = False, db: Session = Depends(g
     return templates.TemplateResponse(
         request,
         "settings.html",
-        {"title": "Settings", "signal_rows": signal_rows, "saved": saved},
+        {
+            "title": "Settings",
+            "signal_rows": signal_rows,
+            "max_send_recipients": get_max_send_recipients(db),
+            "saved": saved,
+        },
     )
 
 
@@ -110,6 +116,18 @@ async def settings_save(request: Request, db: Session = Depends(get_db)):
             half_lives[field[len("halflife__"):]] = num
     set_config(db, SIGNAL_WEIGHTS, weights)
     set_config(db, HALF_LIFE_DAYS_KEY, half_lives)
+
+    # Recipient cap: a single scalar setting, stored only when it parses as a
+    # positive int (blank/invalid leaves the code default in place).
+    raw_cap = (form.get("max_send_recipients") or "").strip()
+    if raw_cap:
+        try:
+            cap = int(raw_cap)
+            if cap > 0:
+                set_config(db, MAX_SEND_RECIPIENTS_KEY, cap)
+        except ValueError:
+            pass
+
     return RedirectResponse(url="/ui/settings?saved=true", status_code=303)
 
 
@@ -837,16 +855,37 @@ def send_instance_create(
     audience_group_id: str = Form(""),
     provider: str = Form("mock"),
     from_address: str = Form(""),
+    audience_resolution_mode: str = Form("freeze"),
+    send_timing: str = Form("now"),
+    scheduled_at: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    """Plan a delivery: pick an audience → provider / from address → materialize
-    the send instance and one execution per resolved recipient. Lands on the
-    delivery page in draft for an explicit Trigger send."""
+    """Plan a delivery: pick an audience → provider / from address → resolution
+    mode → timing. Materializes the send instance and one execution per resolved
+    recipient. Lands on the delivery page (draft, or scheduled if a time is set)."""
     if not audience_group_id.strip():
         return RedirectResponse(
             url=f"/ui/campaigns/{campaign_id}?error={quote('Select an audience to plan a send.')}",
             status_code=303,
         )
+
+    scheduled = None
+    if send_timing == "schedule":
+        if not scheduled_at.strip():
+            return RedirectResponse(
+                url=f"/ui/campaigns/{campaign_id}?error={quote('Pick a date/time to schedule the send.')}",
+                status_code=303,
+            )
+        try:
+            # datetime-local gives "YYYY-MM-DDTHH:MM"; stored naive, compared
+            # DB-side in process_due_scheduled_sends.
+            scheduled = datetime.fromisoformat(scheduled_at)
+        except ValueError:
+            return RedirectResponse(
+                url=f"/ui/campaigns/{campaign_id}?error={quote('Invalid schedule date/time.')}",
+                status_code=303,
+            )
+
     try:
         send_instance = prepare_send_from_audience(
             db,
@@ -855,6 +894,8 @@ def send_instance_create(
             audience_group_id=int(audience_group_id),
             provider=provider,
             from_address=from_address.strip() or None,
+            audience_resolution_mode=audience_resolution_mode,
+            scheduled_at=scheduled,
         )
     except ValueError as error:
         return RedirectResponse(
@@ -898,8 +939,26 @@ def send_instance_trigger(
     send_instance_id: int,
     db: Session = Depends(get_db),
 ):
-    send_send_instance(db, send_instance_id=send_instance_id)
+    try:
+        send_send_instance(db, send_instance_id=send_instance_id)
+    except ValueError as error:
+        # e.g. re-resolved "rerun" audience exceeds the send cap, or already sent.
+        return RedirectResponse(
+            url=f"/ui/deliveries/send-instances/{send_instance_id}?error={quote(str(error))}",
+            status_code=303,
+        )
     return RedirectResponse(url=f"/ui/deliveries/send-instances/{send_instance_id}", status_code=303)
+
+
+@router.post("/ui/deliveries/process-due")
+def deliveries_process_due(db: Session = Depends(get_db)):
+    """Fire all scheduled sends that are due now. In the POC this is a manual
+    button; in a real deployment a cron/worker/automation platform calls this
+    same operation on an interval (the architecture exposes the seam, doesn't
+    bake in a scheduler)."""
+    triggered = process_due_scheduled_sends(db)
+    msg = f"Triggered {len(triggered)} due scheduled send(s)." if triggered else "No scheduled sends were due."
+    return RedirectResponse(url=f"/ui/deliveries?notice={quote(msg)}", status_code=303)
 
 
 @router.get("/ui/content")
@@ -1722,6 +1781,7 @@ def decision_slot_detail(
 @router.get("/ui/deliveries")
 def deliveries_list(
     request: Request,
+    notice: str | None = None,
     db: Session = Depends(get_db),
 ):
     send_instances = (
@@ -1809,6 +1869,8 @@ def deliveries_list(
         {
             "title": "Deliveries",
             "send_instances": rows,
+            "notice": notice,
+            "scheduled_count": sum(1 for r in rows if r["status"] == "scheduled"),
         },
     )
 
@@ -1817,6 +1879,7 @@ def deliveries_list(
 def delivery_detail(
     send_instance_id: int,
     request: Request,
+    error: str | None = None,
     db: Session = Depends(get_db),
 ):
     send_instance = (
@@ -1940,6 +2003,7 @@ def delivery_detail(
             "executions": execution_rows,
             "audience_group": audience_group,
             "recipient_count": len(execution_rows),
+            "error": error,
         },
     )
 
