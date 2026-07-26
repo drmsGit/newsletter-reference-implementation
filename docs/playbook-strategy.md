@@ -119,12 +119,28 @@ Design principles adopted:
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*
 
-### What exists today (baseline)
-- Backend: FastAPI modular monolith with modules for campaigns, content, decision engine, delivery, insight, providers, recipients, rendering, snapshots
-- Decision strategies: `top_score`, `recipient_top_score` — with a registry + base class already in place (good plugin foundation)
-- Frontend: server-side Jinja HTML templates — read-only views exist for campaigns, content, decisions, delivery, recipients, categories, dashboard
-- Recipients: basic model + event/preference tracking, no audience groups
-- Everything is created via API or direct SQL — no editing UI exists
+### Status at a glance — updated 2026-07-26
+
+| Phase | Item | Status |
+|---|---|---|
+| 1 | 1A strategy contract · 1B template contract (MJML, ADR-131) · 1C override model (`ContentOverrideDB`, field-edits) | ✅ done |
+| 2 | 2A content mgmt · 2B campaign+variant builder (module create/**edit**/delete/reorder, hero/CTA fields) · 2C send prep | ✅ done |
+| 2 | 2D decision-slot config — strategy dropdown + config-shape enforcement done; **category picker** still queued | 🟡 mostly |
+| 3 | 3A rule-block audiences (incl/excl, pins) · 3B content-driven system suggestion (+ recalculate) · 3C signal layer (ADR-132) | ✅ done |
+| 3 | 3D AI-based audience selection | ⛔ gated on Automation |
+| — | **Send path** (part of 2C, expanded): campaign→send audience link, freeze / re-run-at-send, calendar scheduling, provider + from-address select, recipient cap | ✅ done (this session) |
+| 4 | 4A structure · 4B client cases · 4C write & publish | ❌ not started |
+
+**Emergent theme — Automation** (the stated next focus): an AI-driven flow that picks + sends the right email at the right time to the right person, possibly orchestrated via n8n and/or AI. The umbrella that unblocks **3D**, engagement-driven audiences, and send-time optimization. Design conversation first; nothing built.
+
+**Deferred by design** — note the option now, implement in the **final MVP package** (not chased individually now): decision-content × audience resolution scope, batching / send-timing model, snapshot storage strategy, inbound provider adapter (bounce/complaint), and the other Needs-ADR items in `docs/backlog.md`.
+
+### What exists today (backend baseline)
+- Backend: FastAPI modular monolith — campaigns, content, decision engine, delivery, insight, providers, recipients, rendering, snapshots, **audience, settings**.
+- Decision strategies: `top_score`, `recipient_top_score` behind a registry + base class (graceful-fail + explainability contract, ADR-085/086).
+- Frontend: server-side Jinja — now **full editing UI** (campaigns/variants/modules, content, decision slots, audience groups, prepare-send, settings), not just read-only views.
+- Signals: event-sourced contributions with decay-on-read (ADR-132); `RecipientPreferenceDB` dropped.
+- Delivery: real outbound send via the Resend adapter (one worked example); mock provider default.
 
 ---
 
@@ -185,25 +201,27 @@ Not blocked by code — can be worked on alongside other phases.
 
 ### Drift report items (address during relevant phases, not separately)
 
-| Gap | Address in |
-|---|---|
-| Override layer (ADR-040/041) | Phase 1C |
-| Decision slot graceful failure (ADR-086) | Phase 1A |
-| Provider capabilities + bounce/complaint (ADR-101, ADR-106) | Phase 2C (alongside send prep) |
-| Signal layer (ADR-110–113) | Phase 3C |
-| Snapshot completeness (ADR-062) | Phase 2C (alongside send prep) |
-| Merge context (ADR-005) | Phase 3 (per-recipient rendering is tied to segmentation) |
-| Content versioning (ADR-128) | Phase 2A (alongside content management) |
+| Gap | Address in | Status |
+|---|---|---|
+| Override layer (ADR-040/041) | Phase 1C | ✅ done (field-edits) |
+| Decision slot graceful failure (ADR-086) | Phase 1A | ✅ done |
+| Signal layer (ADR-110–113 → ADR-132) | Phase 3C | ✅ done |
+| Content versioning (ADR-128) | Phase 2A | ✅ done (versions + freeze) |
+| Provider capabilities + bounce/complaint (ADR-101, ADR-106) | Phase 2C | 🟡 outbound adapter done; bounce/complaint (inbound) parked |
+| Snapshot completeness (ADR-062) | Phase 2C | 🟡 partial — storage strategy is an open Needs-ADR |
+| Merge context (ADR-005) | Phase 3 | ❌ not done (Needs-ADR) |
 
 ---
 
-### Suggested next steps (immediate)
+### Suggested next steps — updated 2026-07-26
 
-1. **Phase 1A — decision strategy contract** — small, high-leverage, already have the registry structure. Good first session.
-2. **Phase 1B — HTML template manifest format** — decision only, no code yet. One focused conversation.
-3. **Phase 1C — override-event model** — design is settled (see Decision Log), just needs implementation.
+The core end-to-end demo path is complete: **build campaign → editable modules (hero/CTA) → suggest/edit audience → prepare send (audience + provider + timing) → trigger or scheduled send**, with the signal layer feeding suggestions. Candidate next moves:
 
-After that, Phase 2 (editing frontends) unblocks the demo path and makes everything showable to clients.
+1. **Automation workstream (the stated next focus)** — a design conversation first: what orchestrates "right time / right person" (n8n vs an in-app scheduler vs external worker — the `process_due_scheduled_sends` seam already exists), how AI picks audience/content/timing, where the seams are. Unblocks 3D + engagement-driven audiences + send-time optimization. Biggest strategic move; nothing built yet.
+2. **Phase 4 — Playbook production** (parallel, unblocked by code) — structure, client cases, write/publish. The build is now demonstrable enough to write against.
+3. **Small un-gated polish**, if wanted before either — 2D category picker; the audience/segment override half of the override redesign. Both in `docs/backlog.md`.
+
+Working style (see project memory): open forks are **noted as options now and implemented in the final MVP package**, not chased one-by-one — and this stays "architecture + one worked example," not a full second ESP.
 
 ---
 
