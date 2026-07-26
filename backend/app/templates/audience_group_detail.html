@@ -1,5 +1,57 @@
 {% extends "base.html" %}
 
+{% macro block_form(action, b, submit_label) %}
+<form method="post" action="{{ action }}">
+    <div class="row g-2">
+        <div class="col-md-2">
+            <label class="form-label small mb-0">Type</label>
+            <select name="kind" class="form-select form-select-sm">
+                <option value="include" {% if not b or b.kind == 'include' %}selected{% endif %}>Include</option>
+                <option value="exclude" {% if b and b.kind == 'exclude' %}selected{% endif %}>Exclude</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small mb-0">Label</label>
+            <input name="label" class="form-control form-control-sm" value="{{ b.label if b and b.label else '' }}" placeholder="e.g. Hiking fans">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small mb-0">Category</label>
+            <select name="category_id" class="form-select form-select-sm">
+                <option value="">Any</option>
+                {% for cat in categories %}
+                <option value="{{ cat.id }}" {% if b and b.criteria.get('category_id') == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small mb-0">Min signal</label>
+            <input type="number" step="1" min="0" name="min_score" class="form-control form-control-sm"
+                   value="{{ b.criteria.get('min_score', '') if b else '' }}">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small mb-0 d-none d-md-block">&nbsp;</label>
+            <button type="submit" class="btn btn-primary btn-sm w-100">{{ submit_label }}</button>
+        </div>
+    </div>
+    <div class="row g-2 mt-1">
+        <div class="col-md-2">
+            <label class="form-label small mb-0">Language</label>
+            <select name="language" class="form-select form-select-sm">
+                <option value="">Any</option>
+                {% for lang in languages %}<option value="{{ lang }}" {% if b and b.criteria.get('language') == lang %}selected{% endif %}>{{ lang }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small mb-0">Status</label>
+            <select name="status" class="form-select form-select-sm">
+                <option value="">Any</option>
+                {% for s in statuses %}<option value="{{ s }}" {% if b and b.criteria.get('status') == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+            </select>
+        </div>
+    </div>
+</form>
+{% endmacro %}
+
 {% block content %}
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -41,10 +93,83 @@
     </div>
 </div>
 
+<div class="card mb-4 border-dark">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <h5 class="mb-0">Audience rules</h5>
+            <span class="badge bg-dark fs-6">{{ resolved_count }} recipient(s) net</span>
+        </div>
+        <p class="text-muted small mb-3">
+            <strong>Include</strong> blocks combine with OR, <strong>exclude</strong> blocks are subtracted, and
+            manually added members (below) are always included. Non-consenting recipients are always excluded.
+            Each block shows how many recipients it matches on its own.
+        </p>
+
+        {% if blocks %}
+        <table class="table table-sm align-middle mb-2">
+            <thead><tr><th>Type</th><th>Rule</th><th class="text-end">Matches</th><th></th></tr></thead>
+            <tbody>
+            {% for b in blocks %}
+                <tr>
+                    <td class="text-nowrap">
+                        {% if b.kind == 'include' %}<span class="badge bg-success">Include</span>
+                        {% else %}<span class="badge bg-danger">Exclude</span>{% endif %}
+                        {% if b.source == 'suggested' %}<span class="badge bg-info text-dark" title="System-suggested — edit or delete freely">suggested</span>{% endif %}
+                    </td>
+                    <td>
+                        {% if b.label %}<strong>{{ b.label }}</strong> — {% endif %}
+                        <span class="text-muted small">{{ b.summary }}</span>
+                    </td>
+                    <td class="text-end">{{ b.count }}</td>
+                    <td class="text-nowrap">
+                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Edit"
+                                data-bs-toggle="collapse" data-bs-target="#edit-block-{{ b.id }}">✎</button>
+                        <form method="post" action="/ui/audience-groups/{{ group.id }}/blocks/{{ b.id }}/delete" class="d-inline"
+                              onsubmit="return confirm('Delete this rule?')">
+                            <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete">✕</button>
+                        </form>
+                    </td>
+                </tr>
+                <tr class="collapse" id="edit-block-{{ b.id }}">
+                    <td colspan="4" class="bg-light">
+                        {{ block_form('/ui/audience-groups/' ~ group.id ~ '/blocks/' ~ b.id ~ '/edit', b, 'Save') }}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted">No rules yet — add one below, or use <em>“Suggest audience”</em> from a campaign to seed them from its content.</p>
+        {% endif %}
+
+        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#form-add-block">+ Add rule block</button>
+        <div class="collapse mt-3" id="form-add-block">
+            <div class="border rounded p-3 bg-light">
+                {{ block_form('/ui/audience-groups/' ~ group.id ~ '/blocks', none, 'Add rule') }}
+            </div>
+        </div>
+
+        {% if resolved_preview %}
+        <details class="mt-3">
+            <summary class="small text-muted" style="cursor:pointer">Preview net audience ({{ resolved_count }})</summary>
+            <table class="table table-sm mt-2 mb-0">
+                <thead><tr><th>Email</th><th>External ID</th><th>Status</th></tr></thead>
+                <tbody>
+                {% for r in resolved_preview %}
+                    <tr><td>{{ r.email }}</td><td>{{ r.external_id }}</td><td>{{ r.status }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% if resolved_count > resolved_preview | length %}<p class="text-muted small mt-1">… and {{ resolved_count - (resolved_preview | length) }} more</p>{% endif %}
+        </details>
+        {% endif %}
+    </div>
+</div>
+
 <div class="card mb-4">
     <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="mb-0">Members ({{ members | length }})</h5>
+            <h5 class="mb-0">Manually added — always included ({{ members | length }})</h5>
             <div class="d-flex gap-2">
                 <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#form-bulk-add">+ Add by criteria</button>
                 {% if non_members %}

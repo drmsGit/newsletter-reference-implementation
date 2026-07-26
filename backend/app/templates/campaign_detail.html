@@ -4,7 +4,13 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="mb-0">{{ campaign.name }}</h1>
-    <span class="badge bg-secondary fs-6">{{ campaign.status }}</span>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="post" action="/ui/campaigns/{{ campaign.id }}/suggest-audience"
+              title="Build a live, editable audience from this campaign's content categories">
+            <button type="submit" class="btn btn-sm btn-outline-success">✨ Suggest audience</button>
+        </form>
+        <span class="badge bg-secondary fs-6">{{ campaign.status }}</span>
+    </div>
 </div>
 
 {% if error %}

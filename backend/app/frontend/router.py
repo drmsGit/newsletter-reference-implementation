@@ -2349,6 +2349,33 @@ def audience_group_detail(group_id: int, request: Request, error: str | None = N
     languages = sorted({r.language for r in all_recipients if r.language})
     statuses = sorted({r.status for r in all_recipients if r.status})
     categories = db.query(CategoryDB).order_by(CategoryDB.name.asc()).all()
+    category_names = {c.id: c.name for c in categories}
+
+    # Rule blocks (live) shown on top, each with its own count so a manager sees
+    # the impact of every include/exclude before sending.
+    blocks = []
+    for b in audience_service.list_blocks(db, group_id):
+        crit = b.criteria or {}
+        parts = []
+        if crit.get("category_id"):
+            parts.append(f"interested in {category_names.get(crit['category_id'], 'category ' + str(crit['category_id']))}")
+        if crit.get("min_score") not in (None, ""):
+            parts.append(f"signal ≥ {crit['min_score']}")
+        if crit.get("language"):
+            parts.append(f"language {crit['language']}")
+        if crit.get("status"):
+            parts.append(f"status {crit['status']}")
+        blocks.append({
+            "id": b.id,
+            "kind": b.kind,
+            "label": b.label,
+            "source": b.source,
+            "criteria": crit,
+            "summary": ", ".join(parts) if parts else "everyone (no criteria)",
+            "count": audience_service.count_for_criteria(db, crit),
+        })
+
+    resolved = audience_service.resolve_audience(db, group_id)
 
     return templates.TemplateResponse(request, "audience_group_detail.html", {
         "title": f"Group: {group.name}",
@@ -2358,6 +2385,9 @@ def audience_group_detail(group_id: int, request: Request, error: str | None = N
         "languages": languages,
         "statuses": statuses,
         "categories": categories,
+        "blocks": blocks,
+        "resolved_count": len(resolved),
+        "resolved_preview": resolved[:20],
         "error": error,
     })
 
@@ -2449,3 +2479,89 @@ def audience_group_bulk_add(
     )
     audience_service.bulk_add_members(db, group_id, [r.id for r in matches])
     return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
+
+
+# ── Audience rule blocks (live include/exclude criteria) ──────────────────
+
+def _block_criteria_from_form(category_id: str, min_score: str, language: str, status: str) -> dict:
+    criteria: dict = {}
+    if category_id.strip():
+        criteria["category_id"] = int(category_id)
+    if min_score.strip():
+        criteria["min_score"] = float(min_score)
+    if language.strip():
+        criteria["language"] = language.strip()
+    if status.strip():
+        criteria["status"] = status.strip()
+    return criteria
+
+
+@router.post("/ui/audience-groups/{group_id}/blocks")
+def audience_block_add(
+    group_id: int,
+    kind: str = Form("include"),
+    label: str = Form(""),
+    category_id: str = Form(""),
+    min_score: str = Form(""),
+    language: str = Form(""),
+    status: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    try:
+        audience_service.add_block(
+            db,
+            group_id=group_id,
+            kind=kind,
+            criteria=_block_criteria_from_form(category_id, min_score, language, status),
+            label=label.strip() or None,
+            source="manual",
+        )
+    except ValueError as error:
+        return RedirectResponse(f"/ui/audience-groups/{group_id}?error={quote(str(error))}", status_code=303)
+    return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
+
+
+@router.post("/ui/audience-groups/{group_id}/blocks/{block_id}/edit")
+def audience_block_edit(
+    group_id: int,
+    block_id: int,
+    kind: str = Form("include"),
+    label: str = Form(""),
+    category_id: str = Form(""),
+    min_score: str = Form(""),
+    language: str = Form(""),
+    status: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    try:
+        audience_service.update_block(
+            db,
+            block_id=block_id,
+            kind=kind,
+            criteria=_block_criteria_from_form(category_id, min_score, language, status),
+            label=label.strip() or None,
+        )
+    except ValueError as error:
+        return RedirectResponse(f"/ui/audience-groups/{group_id}?error={quote(str(error))}", status_code=303)
+    return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
+
+
+@router.post("/ui/audience-groups/{group_id}/blocks/{block_id}/delete")
+def audience_block_delete(group_id: int, block_id: int, db: Session = Depends(get_db)):
+    audience_service.delete_block(db, block_id)
+    return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
+
+
+@router.post("/ui/campaigns/{campaign_id}/suggest-audience")
+def campaign_suggest_audience(campaign_id: int, db: Session = Depends(get_db)):
+    """Use case 1: turn the campaign's content categories into a live, editable
+    suggested audience (include blocks, one per top category), then drop the
+    manager on the group so they can tighten/extend/delete it."""
+    campaign = db.query(CampaignDB).filter(CampaignDB.id == campaign_id).first()
+    if campaign is None:
+        return RedirectResponse("/ui/campaigns", status_code=303)
+    try:
+        group = audience_service.create_suggested_group_for_campaign(db, campaign_id, campaign.name)
+    except ValueError as error:
+        return RedirectResponse(f"/ui/campaigns/{campaign_id}?error={quote(str(error))}", status_code=303)
+    return RedirectResponse(f"/ui/audience-groups/{group.id}", status_code=303)
