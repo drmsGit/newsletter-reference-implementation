@@ -16,7 +16,7 @@ from app.content.service import create_content, update_content_record, assign_ca
 from app.content.service import create_category, create_category_relation
 from app.content.service import delete_content_record, delete_category, ContentRecordHasHistoryError, HasRelationsError
 from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB, ModuleInstanceDB, DecisionSlotDB
-from app.campaigns.service import create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant, update_decision_slot, update_variant, delete_module, move_module
+from app.campaigns.service import create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant, update_decision_slot, update_variant, update_module, delete_module, move_module
 from app.rendering.service import UnpublishedContentError, render_variant_html
 from app.snapshots.service import create_snapshot_for_variant
 from app.delivery.service import create_send_instance, send_send_instance
@@ -434,6 +434,7 @@ def campaign_detail(
                 "module_type": m.module_type,
                 "content_record_id": m.content_record_id,
                 "decision_slot_id": m.decision_slot_id,
+                "module_data_json": json.dumps(m.module_data) if m.module_data else "",
                 "overrideable": overrideable,
                 "active_override": active_override,
             })
@@ -645,8 +646,21 @@ def module_create(
     module_type: str = Form(...),
     content_record_id: int | None = Form(None),
     decision_slot_id: int | None = Form(None),
+    module_data_json: str = Form(""),
     db: Session = Depends(get_db),
 ):
+    # Static modules (hero, cta, …) take their template variables from
+    # module_data. Without this the fields render empty. Parse the optional
+    # JSON here, same pattern as field_overrides_json on the override form.
+    module_data = None
+    if module_data_json.strip():
+        try:
+            module_data = json.loads(module_data_json)
+        except ValueError:
+            return RedirectResponse(
+                url=f"/ui/campaigns/{campaign_id}?error={quote('Module fields must be valid JSON')}",
+                status_code=303,
+            )
     try:
         create_module_for_variant(
             db,
@@ -654,6 +668,44 @@ def module_create(
             module_type=module_type,
             content_record_id=content_record_id or None,
             decision_slot_id=decision_slot_id or None,
+            module_data=module_data,
+        )
+    except ValueError as error:
+        return RedirectResponse(
+            url=f"/ui/campaigns/{campaign_id}?error={quote(str(error))}",
+            status_code=303,
+        )
+    return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
+
+
+@router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/modules/{module_id}/edit")
+def module_edit(
+    campaign_id: int,
+    variant_id: int,
+    module_id: int,
+    module_type: str = Form(...),
+    content_record_id: int | None = Form(None),
+    decision_slot_id: int | None = Form(None),
+    module_data_json: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    module_data = None
+    if module_data_json.strip():
+        try:
+            module_data = json.loads(module_data_json)
+        except ValueError:
+            return RedirectResponse(
+                url=f"/ui/campaigns/{campaign_id}?error={quote('Module fields must be valid JSON')}",
+                status_code=303,
+            )
+    try:
+        update_module(
+            db,
+            module_id=module_id,
+            module_type=module_type,
+            content_record_id=content_record_id or None,
+            decision_slot_id=decision_slot_id or None,
+            module_data=module_data,
         )
     except ValueError as error:
         return RedirectResponse(

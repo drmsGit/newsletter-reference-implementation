@@ -139,6 +139,8 @@
                         {% endif %}
                     </td>
                     <td class="text-nowrap">
+                        <button type="button" class="btn btn-outline-primary btn-sm py-0 px-1" title="Edit"
+                                data-bs-toggle="collapse" data-bs-target="#form-edit-module-{{ module.id }}">✎</button>
                         <form method="post" action="/ui/campaigns/{{ campaign.id }}/variants/{{ variant.id }}/modules/{{ module.id }}/move" class="d-inline">
                             <input type="hidden" name="direction" value="up">
                             <button type="submit" class="btn btn-outline-secondary btn-sm py-0 px-1" title="Move up" {% if loop.first %}disabled{% endif %}>↑</button>
@@ -150,6 +152,53 @@
                         <form method="post" action="/ui/campaigns/{{ campaign.id }}/variants/{{ variant.id }}/modules/{{ module.id }}/delete" class="d-inline"
                               onsubmit="return confirm('Delete this module{% if module.active_override %} and its override{% endif %}?');">
                             <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-1" title="Delete">✕</button>
+                        </form>
+                    </td>
+                </tr>
+                <tr class="collapse" id="form-edit-module-{{ module.id }}">
+                    <td colspan="6" class="bg-light">
+                        <form method="post" action="/ui/campaigns/{{ campaign.id }}/variants/{{ variant.id }}/modules/{{ module.id }}/edit">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-md-3">
+                                    <label class="form-label small mb-0">Module type</label>
+                                    <select name="module_type" class="form-select form-select-sm" required>
+                                        {% set types = [] %}
+                                        {% for tpl in module_templates %}
+                                        <option value="{{ tpl.name }}" {% if tpl.name == module.module_type %}selected{% endif %}>{{ tpl.label }} ({{ tpl.name }})</option>
+                                        {% set _ = types.append(tpl.name) %}
+                                        {% endfor %}
+                                        {% if module.module_type not in types %}
+                                        <option value="{{ module.module_type }}" selected>{{ module.module_type }}</option>
+                                        {% endif %}
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small mb-0">Content record</label>
+                                    <select name="content_record_id" class="form-select form-select-sm">
+                                        <option value="">— none —</option>
+                                        {% for cr in content_records %}
+                                        <option value="{{ cr.id }}" {% if cr.id == module.content_record_id %}selected{% endif %}>{{ cr.title }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small mb-0">Decision slot</label>
+                                    <select name="decision_slot_id" class="form-select form-select-sm">
+                                        <option value="">— none —</option>
+                                        {% for slot in variant.decision_slots %}
+                                        <option value="{{ slot.id }}" {% if slot.id == module.decision_slot_id %}selected{% endif %}>{{ slot.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small mb-0">Module fields <span class="text-muted">(JSON)</span></label>
+                                    <input type="text" name="module_data_json" class="form-control form-control-sm font-monospace"
+                                           value="{{ module.module_data_json }}" placeholder='{"headline": "…"}'>
+                                </div>
+                                <div class="col-md-1">
+                                    <button type="submit" class="btn btn-primary btn-sm w-100">Save</button>
+                                </div>
+                            </div>
                         </form>
                     </td>
                 </tr>
@@ -235,6 +284,12 @@
                                     <option value="{{ slot.id }}">{{ slot.name }}</option>
                                     {% endfor %}
                                 </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-10 mb-3">
+                                <label class="form-label">Module fields <span class="text-muted">(JSON — for static modules like hero / cta that aren't linked to a content record)</span></label>
+                                <input type="text" name="module_data_json" class="form-control form-control-sm font-monospace" placeholder='hero: {"headline": "Welcome", "text": "…"}  ·  cta: {"label": "Read more", "url": "https://…"}'>
                             </div>
                         </div>
                         <button type="submit" class="btn btn-primary btn-sm">Add module</button>

@@ -190,6 +190,38 @@ def create_module_for_variant(
     return to_module_instance(module)
 
 
+def update_module(
+    db: Session,
+    module_id: int,
+    module_type: str,
+    content_record_id: int | None = None,
+    module_data: dict | None = None,
+    decision_slot_id: int | None = None,
+) -> ModuleInstance | None:
+    """Update a module's type, content source and static field data in place.
+    Position is untouched (reorder via move_module). Same mutual-exclusion
+    guard as create — a module cannot bind both a content record and a
+    decision slot."""
+    if content_record_id is not None and decision_slot_id is not None:
+        raise ValueError(
+            "A module cannot have both content_record_id and decision_slot_id set — "
+            "rendering would silently prefer content_record_id and ignore the decision slot"
+        )
+
+    module = db.query(ModuleInstanceDB).filter(ModuleInstanceDB.id == module_id).first()
+    if module is None:
+        return None
+
+    module.module_type = module_type
+    module.content_record_id = content_record_id
+    module.decision_slot_id = decision_slot_id
+    module.module_data = module_data
+
+    db.commit()
+    db.refresh(module)
+    return to_module_instance(module)
+
+
 def delete_module(db: Session, module_id: int) -> bool:
     """Remove a module from its variant. Positions of the remaining modules are
     left as-is — the (variant_id, position) uniqueness only requires no
