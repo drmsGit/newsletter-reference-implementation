@@ -22,7 +22,7 @@ Order within each section is priority order: **top = do next.** New items are in
 
 ## Bugs
 
-- 🔴 **[Bug]** Audience Groups list shows **"0 members" for rule-block groups that actually have recipients** (e.g. system-suggested audiences). The list's "Members" column counts only `AudienceGroupMemberDB` rows (manual pins) — `audience_groups_list` in `frontend/router.py` does `db.query(AudienceGroupMemberDB).filter(group_id==g.id).count()`. A suggested group has include *rule blocks* but zero manual pins, so it reads 0 despite resolving to N recipients. Fix: show the **resolved** count (`len(audience_service.resolve_audience(db, g.id))`) instead of (or alongside) the raw member count — matching what the group-detail page and the prepare-send dropdown already show. Consider labelling the column "Recipients (net)" and keeping a separate "pinned" count if useful. Low risk, small fix. Source: user, 2026-07-26 (Phase 3 audience session).
+_(none open — all cleared 2026-07-12; a 2026-07-26 rule-block count bug fixed same day, see Done archive.)_
 
 ## Features
 
@@ -95,6 +95,8 @@ _(items moved here keep their original entry text plus a short reason and date)_
 ## Done (archive)
 
 _(items moved here keep their original entry text plus completion date)_
+
+- ✅ **[Bug]** Audience Groups list showed **"0 members" for rule-block groups that actually have recipients** (e.g. system-suggested audiences) — the list counted only manual pins (`AudienceGroupMemberDB`), so a suggested/rule-only group with 0 pins read 0 despite resolving to N recipients. **Fixed 2026-07-26 (same day):** `audience_groups_list` now shows the live resolved count (`len(resolve_audience(...))`); column renamed "Recipients (net)", with a secondary "(N pinned)" only when manual pins exist. Verified live: suggested groups #18/#22 went 0 → 31, #17 shows 17 (13 pinned). Source: user, 2026-07-26.
 
 - ✅ **[Feature]** Config / settings layer (first slice) — the "future config layer" referenced across several items (Insight Q2 score bounds, decision-strategy weights, E1 AI-governance-as-config, ADR-132's "tunable weights/half-lives"). **Done 2026-07-15.** Generic DB-backed `AppConfigDB` (key → JSON value; code holds defaults, a row overrides them) + `app/settings/service.py` typed accessors (`get_signal_weights`/`get_half_lives` merging code defaults). `app/insight/signals.py` now reads weights + decay half-lives from config (lazy import to avoid a cycle), so a change applies immediately to computed signals. A Jinja **Settings** page (`/ui/settings`, nav link) lets an admin/BI person edit per-contribution-type base weights + half-lives; blank = code default. **Deliberate line (answers the "should admins edit the decay formula?" question): only *values/toggles* are editable — the decay *model* (exponential half-life) and scoring *logic* stay in code; a different decay model is a plugin/code change, not a setting** (avoids expression-injection/footgun). Verified live: setting `manual` half-life to 0.001d collapsed Anna's Beach signal 90→0, clearing it restored 90. AI-governance guard toggles (read-only vs write; active on content vs campaigns) slot onto this same `AppConfigDB` once AI capabilities exist to consume them — not built now (they'd be inert). Source: user, 2026-07-15 (settings-area discussion).
 

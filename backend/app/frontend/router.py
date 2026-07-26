@@ -2412,9 +2412,13 @@ def audience_groups_list(request: Request, error: str | None = None, db: Session
     groups = audience_service.list_groups(db)
     rows = []
     for g in groups:
-        count = db.query(AudienceGroupMemberDB).filter(AudienceGroupMemberDB.group_id == g.id).count()
+        # "Recipients" = the live resolved audience (rule blocks ∪ pins − excludes,
+        # consent-gated), not just manual pins — a suggested/rule-only group has
+        # 0 pins but real recipients. "pinned" is kept as a secondary detail.
+        pinned = db.query(AudienceGroupMemberDB).filter(AudienceGroupMemberDB.group_id == g.id).count()
         rows.append({"id": g.id, "name": g.name, "description": g.description,
-                     "member_count": count, "created_at": g.created_at})
+                     "recipient_count": len(audience_service.resolve_audience(db, g.id)),
+                     "pinned_count": pinned, "created_at": g.created_at})
     campaigns = db.query(CampaignDB).order_by(CampaignDB.created_at.desc()).all()
     return templates.TemplateResponse(request, "audience_groups.html",
                                       {"title": "Audience Groups", "groups": rows,

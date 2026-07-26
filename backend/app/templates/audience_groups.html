@@ -67,7 +67,7 @@
             <th>ID</th>
             <th>Name</th>
             <th>Description</th>
-            <th>Members</th>
+            <th>Recipients <span class="text-muted fw-normal small">(net)</span></th>
             <th>Created</th>
         </tr>
     </thead>
@@ -77,7 +77,10 @@
             <td>{{ g.id }}</td>
             <td><a href="/ui/audience-groups/{{ g.id }}">{{ g.name }}</a></td>
             <td>{{ g.description or "—" }}</td>
-            <td>{{ g.member_count }}</td>
+            <td>
+                {{ g.recipient_count }}
+                {% if g.pinned_count %}<span class="text-muted small">({{ g.pinned_count }} pinned)</span>{% endif %}
+            </td>
             <td>{{ g.created_at.strftime("%Y-%m-%d") }}</td>
         </tr>
         {% endfor %}
