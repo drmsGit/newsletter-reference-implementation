@@ -340,6 +340,23 @@ def send_send_instance(
         from_address=send_instance.from_address,
     )
 
+    # Decision slots on this variant. Rendering only *looks up* an existing
+    # resolution per recipient (rendering/service.resolve_content_for_module),
+    # so without resolving here a recipient with no prior resolution would get
+    # the personalized module hidden — and engagement on it couldn't be
+    # attributed. Resolve per recipient at send so they receive their content
+    # and we record what they got (DecisionResolutionDB = the audit of it).
+    # Per-recipient scope reuses the strategies' existing behavior; the broader
+    # segment-vs-person resolution-scope question is the open Needs-ADR item.
+    from app.campaigns.db_models import DecisionSlotDB
+    from app.decision.service import execute_decision_slot
+
+    decision_slots = (
+        db.query(DecisionSlotDB)
+        .filter(DecisionSlotDB.variant_id == snapshot.variant_id)
+        .all()
+    )
+
     executions = (
         db.query(DeliveryExecutionDB)
         .filter(
@@ -359,6 +376,16 @@ def send_send_instance(
                 .filter(RecipientDB.id == execution.recipient_id)
                 .first()
             )
+
+            # Resolve + persist each decision slot for this recipient before
+            # rendering, so their personalized content is chosen and recorded.
+            for slot in decision_slots:
+                try:
+                    execute_decision_slot(db, slot.id, recipient_id=execution.recipient_id)
+                except ValueError:
+                    # Strategy resolved nothing (or a guard tripped) — the slot
+                    # renders hidden (ADR-086), the send continues.
+                    pass
 
             # Resolve HTML per recipient rather than reusing one shared
             # variant-level snapshot — decision-slot personalization can
