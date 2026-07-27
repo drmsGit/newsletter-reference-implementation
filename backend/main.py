@@ -64,9 +64,52 @@ from app.settings.db_models import AppConfigDB
 
 from app.frontend.router import router as frontend_router
 
+# --- OpenAPI / Swagger metadata -------------------------------------------
+# Swagger (/docs) is the *endpoint reference* tier of the docs (see
+# docs/architecture/Code/MOC - System Overview.md). It is generated from the
+# routes, so it can't drift. The prose below just frames it and orders/labels
+# the tag sections by architecture layer; the module & flow pages carry the
+# "how modules connect" tier, and docstrings carry function internals.
+API_DESCRIPTION = """
+Endpoint reference for the **Newsletter Blueprint** backend — a vendor-neutral
+reference architecture for email marketing systems.
+
+**This page documents HTTP routes only.** For how the ~14 modules connect, the
+end-to-end flows, and the internal service functions, see the Obsidian docs in
+`docs/architecture/Code/` (start at *MOC - System Overview*). Function internals
+live in the code's docstrings.
+
+Endpoints are grouped by module, following the data flow: **sources** (content,
+recipients) → **compose** (campaigns, email-modules) → **personalize** (decision,
+overrides) → **audience** → **render** (rendering, snapshots) → **deliver**
+(delivery, provider) → **learn** (insight). The **frontend** section at the end is
+the server-rendered HTML admin UI (post/redirect/get), not a JSON API — it is
+documented as a route index in `docs/architecture/Code/frontend.md`.
+""".strip()
+
+# Ordered by architecture layer; `frontend` (the /ui HTML routes) is deliberately
+# last so the JSON API reads as one block above it.
+TAGS_METADATA = [
+    {"name": "content", "description": "Content catalog: reusable records, the category taxonomy, and content versions. Source of truth for *what can be said*."},
+    {"name": "recipients", "description": "Local projection of CRM contacts + marketing consent + the signal-contribution log. Not a CRM."},
+    {"name": "campaigns", "description": "Composition: campaigns, variants, module instances, decision slots, and the decision-resolution audit. Structure, not content."},
+    {"name": "email-modules", "description": "The file-based email-module template registry (drop-a-file plugins). Read-only over `storage/email_modules/`."},
+    {"name": "decision", "description": "The personalization engine: resolve a decision slot to content via pluggable strategies."},
+    {"name": "overrides", "description": "Manager field-level edits on a module, logged against the system's original pick (trust loop)."},
+    {"name": "audience", "description": "Audience groups from live rule blocks + manual pins, resolved consent-gated. (Prefix `/api/audience-groups`.)"},
+    {"name": "rendering", "description": "Turn a variant's module stack into final, CSS-inlined HTML. Reads decisions, never executes them."},
+    {"name": "snapshots", "description": "Freeze the render state (context + HTML) for reproducible, auditable sends. A snapshot ≠ a send."},
+    {"name": "delivery", "description": "Plan and fire sends: send instances + per-recipient delivery executions, through a swappable provider."},
+    {"name": "provider", "description": "Inbound feedback boundary: normalize + correlate provider webhooks (opens/clicks/bounces) to deliveries."},
+    {"name": "insight", "description": "The learning loop: engagement → per-category signal contributions (decay-on-read)."},
+    {"name": "frontend", "description": "Server-rendered HTML admin UI (post/redirect/get) — **not a JSON API**. Documented as a route index in `docs/architecture/Code/frontend.md`."},
+]
+
 app = FastAPI(
     title="Newsletter Reference Architecture API",
     version="0.1.0",
+    description=API_DESCRIPTION,
+    openapi_tags=TAGS_METADATA,
 )
 
 

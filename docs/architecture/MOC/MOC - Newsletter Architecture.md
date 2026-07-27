@@ -22,6 +22,10 @@ modified: 2026-06-05
 - [[ADR-004 — Privacy Operations as a First-Class Architectural Concern]]
 - [[ADR-125 — Define a Minimal Reference Architecture]]
 
+## Code Map (onboarding)
+
+- [[MOC - System Overview]] — how the ~14 code modules connect, per-module & per-flow pages, and an auto-generated dependency map. The *how it's built* companion to the ADRs' *why*.
+
 ## Architecture Areas
 
 - [[MOC - Content Architecture]]
