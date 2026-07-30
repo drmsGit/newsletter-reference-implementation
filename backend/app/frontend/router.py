@@ -911,17 +911,30 @@ def decision_slot_edit(
     decision_strategy: str = Form(...),
     candidate_filter_json: str = Form("{}"),
     strategy_config_json: str = Form("{}"),
+    category_ids: list[str] = Form(default=[]),
     db: Session = Depends(get_db),
 ):
     import json as _json
     try:
-        candidate_filter = _json.loads(candidate_filter_json) or None
+        candidate_filter = _json.loads(candidate_filter_json) or {}
         strategy_config = _json.loads(strategy_config_json) or None
     except ValueError:
         return RedirectResponse(
             url=f"/ui/decisions/slots/{slot_id}?error={quote('Config/filter must be valid JSON')}",
             status_code=303,
         )
+
+    # The category picker (a name-based multi-select) is the friendly way to set
+    # candidate_filter.category_ids — it wins over whatever's in the raw JSON for
+    # that one key, so a manager never hand-types category IDs. Empty selection =
+    # remove the key = "consider every category" (the strategies' documented
+    # empty-means-all semantics). Other candidate_filter keys stay in the JSON.
+    selected = [int(c) for c in category_ids if str(c).strip()]
+    if selected:
+        candidate_filter["category_ids"] = selected
+    else:
+        candidate_filter.pop("category_ids", None)
+    candidate_filter = candidate_filter or None
     try:
         update_decision_slot(db, slot_id, decision_strategy, candidate_filter, strategy_config)
     except ValueError as error:
@@ -1767,7 +1780,9 @@ def decision_slot_detail(
                 "strategy_config": slot.strategy_config,
                 "strategy_config_pretty": strategy_config_pretty,
                 "supported_strategies": supported_strategies,
+                "selected_category_ids": (slot.candidate_filter or {}).get("category_ids") or [],
             },
+            "all_categories": db.query(CategoryDB).order_by(CategoryDB.name.asc()).all(),
             "strategy_manifests": strategy_manifests,
             "error": error,
             "summary": resolution_summary,

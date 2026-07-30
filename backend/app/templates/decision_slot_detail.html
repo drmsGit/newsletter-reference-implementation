@@ -119,12 +119,26 @@
                     <textarea name="strategy_config_json" class="form-control font-monospace" rows="4">{{ slot.strategy_config_pretty }}</textarea>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">
+                    <label class="form-label">Candidate categories</label>
+                    <select name="category_ids" class="form-select" multiple size="6">
+                        {% for cat in all_categories %}
+                        <option value="{{ cat.id }}" {% if cat.id in slot.selected_category_ids %}selected{% endif %}>{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">
+                        Restrict candidate content to these categories (Ctrl/Cmd-click to multi-select).
+                        <strong>Select none = consider every category.</strong> This sets
+                        <code>candidate_filter.category_ids</code> for you — no need to type IDs.
+                    </div>
+                </div>
+                <details class="mb-3">
+                    <summary class="text-muted small" style="cursor:pointer">Advanced: other candidate-filter keys (JSON)</summary>
+                    <label class="form-label mt-2">
                         Candidate filter
-                        <span class="text-muted small">(JSON — e.g. {"category_ids": [1, 2, 3]})</span>
+                        <span class="text-muted small">(JSON — <code>category_ids</code> is managed by the picker above and will be overwritten)</span>
                     </label>
                     <textarea name="candidate_filter_json" class="form-control font-monospace" rows="4">{{ slot.candidate_filter_pretty }}</textarea>
-                </div>
+                </details>
                 <button type="submit" class="btn btn-primary btn-sm">Save configuration</button>
                 <script>
                 (function () {
