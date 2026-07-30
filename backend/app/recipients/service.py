@@ -13,6 +13,29 @@ from app.recipients.models import (
 # and "opted_out" recipients are filtered out before decisioning/rendering.
 CONSENTING_STATUS = ConsentStatus.opted_in.value
 
+
+def suppress_recipient(db: Session, recipient_id: int, reason: str) -> bool:
+    """Opt a recipient out because of a delivery-feedback signal (hard bounce /
+    spam complaint) the provider reported. Idempotent — returns True only if the
+    status actually changed.
+
+    Deliberately does NOT write a ConsentSyncLogDB row: that log is the CRM's
+    assertion history, and detect_consent_drift compares the platform's status
+    to the CRM's latest value. A provider-driven opt-out is a *platform* action,
+    not a CRM one — leaving the CRM log untouched means drift detection will
+    correctly surface "provider suppressed someone the CRM still thinks is
+    opted-in" for reconciliation, instead of masking it. The audit of *why* is
+    the bounce/complaint EngagementEvent already recorded against the delivery.
+    Relaying the suppression back to the CRM is the separate parked piece."""
+    recipient = db.query(RecipientDB).filter(RecipientDB.id == recipient_id).first()
+    if recipient is None:
+        return False
+    if recipient.consent_status == ConsentStatus.opted_out.value:
+        return False  # already suppressed
+    recipient.consent_status = ConsentStatus.opted_out.value
+    db.commit()
+    return True
+
 # RecipientDB.attributes is an open bag for engagement/personalization-relevant
 # data (e.g. firstname, preferred_airport, loyalty_tier) — it is allowed to
 # grow richer over time (including via AI/decisioning-driven enrichment), but

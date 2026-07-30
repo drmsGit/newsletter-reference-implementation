@@ -58,7 +58,7 @@ quarantines the un-correlatable, and hands content-tied events to [[insight]].
 - **Adapters are small and provider-specific by design** — a new ESP copies the Resend adapter and changes three things (signature check, event-name map, field paths); we do **not** build a generic auto-fitting layer, and we do **not** ship a second maintained integration.
 - **Signature verify is skippable only for local dev** (no `RESEND_WEBHOOK_SECRET`) — with a warning; production must set the secret. Note the secret is read at startup, so it needs a full restart to take effect.
 - **Attribution is "what was shown", not link-parsing** — a click attributes to the recipient's resolved decision pick (or the variant's first fixed-content module); mapping specific links to content ids is a later refinement.
-- **Content-tied = open/click only** — bounce/complaint feed the consent/suppression path (parked), not per-category signals.
+- **Content-tied = open/click only** — those move per-category signals. **Bounce/complaint instead drive consent suppression**: a hard/permanent bounce or spam complaint calls [[recipients]]'s `suppress_recipient` (opt-out). A soft/transient bounce is spared. The Resend adapter decides suppression (`NormalizedEvent.suppresses_consent`), keeping the handler provider-agnostic. (ADR-106 — bounce/complaint feedback is mandatory.)
 
 ## ⚠️ Change-impact — if you touch this, also check…
 - **The correlation on `provider_message_id`** → depends entirely on [[delivery]] setting it uniquely; breaking that constraint mis-attributes or drops engagement.

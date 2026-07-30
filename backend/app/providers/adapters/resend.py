@@ -44,6 +44,22 @@ class NormalizedEvent:
     event_type: str
     provider_event_id: str
     event_data: dict
+    # True when this event means the recipient should be opted out (spam
+    # complaint, or a permanent/hard bounce). Computed here because deciding it
+    # needs Resend's payload shape — the generic handler stays provider-agnostic.
+    suppresses_consent: bool = False
+
+
+def _bounce_suppresses(data: dict) -> bool:
+    """A bounce opts the recipient out unless it's clearly transient/soft.
+    Resend (via SES) reports a bounce type; treat Permanent/hard as suppression,
+    Transient/soft as not, and an unknown/absent type conservatively as
+    suppression (a bounce with no 'try again' signal means a bad address)."""
+    bounce = data.get("bounce") or {}
+    kind = (bounce.get("type") or bounce.get("subType") or "").lower()
+    if any(s in kind for s in ("transient", "soft", "temporary", "delayed")):
+        return False
+    return True
 
 
 def verify_signature(raw_body: bytes, headers: dict) -> bool:
@@ -100,10 +116,18 @@ def parse_webhook(payload: dict) -> NormalizedEvent | None:
     # created_at is unique per real event.
     provider_event_id = f"{provider_message_id}:{resend_type}:{payload.get('created_at', '')}"
 
+    if event_type == "complaint":
+        suppresses_consent = True  # a spam complaint always opts out
+    elif event_type == "bounce":
+        suppresses_consent = _bounce_suppresses(data)
+    else:
+        suppresses_consent = False
+
     return NormalizedEvent(
         provider="resend",
         provider_message_id=provider_message_id,
         event_type=event_type,
         provider_event_id=provider_event_id,
         event_data=payload,
+        suppresses_consent=suppresses_consent,
     )

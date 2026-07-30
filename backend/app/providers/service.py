@@ -183,4 +183,27 @@ def process_provider_webhook_event(db: Session, normalized) -> ProviderEventInge
             # raw event is still recorded, it just moved no signal.
             logger.info("event %s recorded but produced no signal: %s", result.engagement_event.id, error)
 
+    # Delivery-feedback suppression: a hard bounce / spam complaint opts the
+    # recipient out so they're excluded from every future audience + send. Only
+    # acts on a matched event (we know who it was); the recorded event is the
+    # audit of why. ADR-106 (bounce/complaint feedback is mandatory).
+    if result.status == "matched" and normalized.suppresses_consent:
+        from app.recipients.service import suppress_recipient
+
+        delivery_execution = (
+            db.query(DeliveryExecutionDB)
+            .filter(DeliveryExecutionDB.provider_message_id == normalized.provider_message_id)
+            .first()
+        )
+        if delivery_execution is not None:
+            changed = suppress_recipient(
+                db, delivery_execution.recipient_id, reason=normalized.event_type
+            )
+            if changed:
+                logger.info(
+                    "recipient %s opted out via %s feedback",
+                    delivery_execution.recipient_id,
+                    normalized.event_type,
+                )
+
     return result
