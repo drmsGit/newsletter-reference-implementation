@@ -119,7 +119,7 @@ Design principles adopted:
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*
 
-### Status at a glance — updated 2026-07-26
+### Status at a glance — updated 2026-07-27
 
 | Phase | Item | Status |
 |---|---|---|
@@ -128,12 +128,14 @@ Design principles adopted:
 | 2 | 2D decision-slot config — strategy dropdown + config-shape enforcement done; **category picker** still queued | 🟡 mostly |
 | 3 | 3A rule-block audiences (incl/excl, pins) · 3B content-driven system suggestion (+ recalculate) · 3C signal layer (ADR-132) | ✅ done |
 | 3 | 3D AI-based audience selection | ⛔ gated on Automation |
-| — | **Send path** (part of 2C, expanded): campaign→send audience link, freeze / re-run-at-send, calendar scheduling, provider + from-address select, recipient cap | ✅ done (this session) |
-| 4 | 4A structure · 4B client cases · 4C write & publish | ❌ not started |
+| — | **Outbound send path**: campaign→send audience link, freeze / re-run-at-send, calendar scheduling, provider + from-address select, recipient cap. Real Resend delivery from a verified domain, live. | ✅ done |
+| — | **Inbound engagement (Resend webhooks)**: signed webhook → clicks/opens correlated → per-category signals update live. Proven end-to-end. | ✅ done (bounce/complaint→consent still parked) |
+| — | **Technical onboarding manual** (Obsidian module/flow map + FastAPI Swagger + code comments) | 🟡 pilot done; full rollout running in a separate session |
+| 4 | 4A structure · 4B client cases · 4C write & publish · 4D evolving-the-package / "AI-open" | ❌ not started |
 
 **Emergent theme — Automation** (the stated next focus): an AI-driven flow that picks + sends the right email at the right time to the right person, possibly orchestrated via n8n and/or AI. The umbrella that unblocks **3D**, engagement-driven audiences, and send-time optimization. Design conversation first; nothing built.
 
-**Deferred by design** — note the option now, implement in the **final MVP package** (not chased individually now): decision-content × audience resolution scope, batching / send-timing model, snapshot storage strategy, inbound provider adapter (bounce/complaint), and the other Needs-ADR items in `docs/backlog.md`.
+**Deferred by design** — note the option now, implement in the **final MVP package** (not chased individually now): decision-content × audience resolution scope, batching / send-timing model, snapshot storage strategy, **bounce/complaint → consent** (the inbound adapter now exists and records these; auto-opt-out not wired), brand/theming (email file + simple web palette, decided), and the other Needs-ADR items in `docs/backlog.md`.
 
 ### What exists today (backend baseline)
 - Backend: FastAPI modular monolith — campaigns, content, decision engine, delivery, insight, providers, recipients, rendering, snapshots, **audience, settings**.
