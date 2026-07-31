@@ -36,12 +36,20 @@ its model.
    audited + a human can interfere," not "everything is a pending proposal."**
    (Reconciles with Q1: auto-apply is the default; approval-gating is opt-in.)
    *→ This reframes the foundational ADR — worth a clear statement there.*
-3. **Audit shape.** *(needs clarification — background:)* Every AI action should
-   leave a record so a human can answer "what did it do, and why?" Open question
-   is *which fields*: minimum = inputs, model, output, timestamp, who approved (if
-   gated); richer = the exact prompt + prompt/model **version**, so behaviour is
-   reproducible and a prompt change is traceable. **Decision needed:** minimal log
-   vs full prompt/version capture (the latter costs storage, buys debuggability).
+3. **Audit shape.** → **Decided** (via Q3b — prompts are frontend-editable +
+   versioned): log the standard fields (inputs / model / output / timestamp /
+   approver-if-gated) **plus the published prompt-version id** used — the live
+   prompt lives in the DB, not git, so the version id is what makes a decision
+   reproducible. No need to copy the full prompt text per row; the id resolves it.
+3b. **Where prompts live / who edits them.** → **Decided: frontend-editable,
+   content-style versioned — prompts are the manager's (marketing/BI) domain.**
+   Rationale: a dev lacks the marketing/BI expertise to *evaluate* a prompt, so
+   "manager writes it, dev implements it (blind)" is backwards. Structure: **one
+   (or minimal) file per AI task** = the dev-owned technical **scaffold** (what it
+   reads, output shape, where the result lands); the **prompt + guards live in
+   frontend settings**, manager-owned and versioned/published like content.
+   Guardrails against a bad/unsafe prompt edit = the global "DON'T EVER" file (Q5)
+   + per-prompt guards in settings.
 4. **Kill switch / scoping.** → **Decided:** it's open-source — a company that
    doesn't want AI simply doesn't enable/implement it (how much is their call, per
    capability). **A global kill switch always exists** for emergencies (data
@@ -123,23 +131,22 @@ its model.
 25. **EU / residency warning flag?** → **Decided: no.** We're not data-protection
     experts and won't take on that liability. Provider + residency is the company's
     call; we default to data minimisation and stay out of the legal call.
-26. **PII line.** → **Decided (partial):** in-system AI (Mode A) may see more
-    (those deployments usually have extra contracts / DPAs); external (Mode B)
-    stays minimal. **Still open:** can PII exposure be set **per AI action**?
-    Nuances to resolve — first/last name may be fine *unless* combined with email;
-    a subject-line suggestion might need the name, *or* should use **merge
-    variables** (`{{first_name}}`) instead of the real value. → needs its own pass.
+26. **PII line.** → **Decided:** PII exposure is a **per-task setting**, default
+    **no raw PII to the model** — the AI works on IDs, signals, and content, and
+    personalizes via **merge variables** (`{{first_name}}`, reusing ADR-005 merge
+    context); the platform fills the real value locally at render, so identities
+    never leave. A task can be **explicitly opted up** to see raw fields (e.g. an
+    in-system Mode-A task under a DPA) — the company's call, logged. Safe by
+    construction; more exposure is a deliberate choice.
 27. **Cost governance.** → **Decided:** a **spend cap** is primary — **warn first,
     then hard stop** (like Claude's own usage) — ideally **per role/user**. A
     per-run cost estimate is nice-to-have *if feasible*, lower priority once a cap
     exists.
-28. **"One file per task" — v1 or nice-to-have?** *(needs clarification —
-    background:)* Should the clean "drop a file = new AI task" shape (like decision
-    strategies) be a **firm v1 contract**, or an **aspiration** we relax when a
-    task genuinely needs bespoke wiring (multi-step calls, model quirks, big
-    prompts don't always fit one tidy file)? *Lean: aspiration — aim for it, but
-    this is the one area where real complexity is acceptable, not forced into a
-    template.* **Decision needed:** contract vs aspiration.
+28. **"One file per task" — v1 or nice-to-have?** → **Decided (via Q3b):** the
+    task **file is a firm contract** for the *technical scaffold* (inputs / output
+    / where it writes) — and it stays clean precisely because the messy part (the
+    prompt + guards) is lifted OUT of the file into frontend-versioned settings.
+    So: **firm contract for the scaffold, config for the prompt.**
 
 ---
 
