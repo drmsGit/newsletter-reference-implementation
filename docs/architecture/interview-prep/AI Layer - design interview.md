@@ -26,23 +26,32 @@ its model.
 
 ## Cluster 1 — AI Capability Layer (foundational ADR)
 
-1. **Approval is universal, but is it uniform?** Does *every* AI action require
-   explicit human approval before it takes effect, or do low-risk actions
-   (translate, auto-tag) **auto-apply with undo**, while high-risk ones (send,
-   audience change, publish) require approval? *Lean: tiered by risk, not
-   one-size.*
-2. **Where do AI outputs land?** Always as **proposals in the existing trust
-   layer** (the override/suggestion mechanism), never a direct write? Is there a
-   single unified "AI proposal" record (like `ContentOverrideDB`) that all
-   suggestions flow through for audit/accept/reject — or per-capability records?
-3. **Audit shape.** What must every AI action log for the trust trail — inputs,
-   prompt, model, output, who approved, timestamp? Is the model/prompt version
-   part of the record?
-4. **Kill switch / scoping.** Can a company disable AI entirely, and per-
-   capability? Where does that live — the settings/`AppConfig` layer?
-5. **What is explicitly NOT AI.** Confirm the restraint line: rule-based
-   audiences, threshold scoring, calendar scheduling, consent gating stay
-   deterministic. Anything else that should be fenced off from AI on principle?
+1. **Approval — uniform or per-action?** → **Decided:** approval behaviour is a
+   **per-task setting** (auto-apply vs require-approval), declared in the task
+   file / prompt / settings — flexes by risk + implementation, not one global rule.
+2. **Where do AI outputs land?** → **Decided: direct write by default**, with an
+   *opt-in* override/proposal mode per company. Rationale: forcing every AI action
+   through the override layer would make it evaluate *all* campaigns rather than
+   one source — a token/performance cost. **The trust guarantee is "reversible +
+   audited + a human can interfere," not "everything is a pending proposal."**
+   (Reconciles with Q1: auto-apply is the default; approval-gating is opt-in.)
+   *→ This reframes the foundational ADR — worth a clear statement there.*
+3. **Audit shape.** *(needs clarification — background:)* Every AI action should
+   leave a record so a human can answer "what did it do, and why?" Open question
+   is *which fields*: minimum = inputs, model, output, timestamp, who approved (if
+   gated); richer = the exact prompt + prompt/model **version**, so behaviour is
+   reproducible and a prompt change is traceable. **Decision needed:** minimal log
+   vs full prompt/version capture (the latter costs storage, buys debuggability).
+4. **Kill switch / scoping.** → **Decided:** it's open-source — a company that
+   doesn't want AI simply doesn't enable/implement it (how much is their call, per
+   capability). **A global kill switch always exists** for emergencies (data
+   breach, a model behaving unexpectedly).
+5. **What is explicitly NOT AI.** → **Decided:** don't rule AI out on principle —
+   companies want full AI even if they add limits later. Instead of a fixed
+   "not-AI" list, a global, company-editable **"DON'T EVER" guardrail file** holds
+   negative constraints. (Context: Tuesday's client has AI in their new CDP and
+   doesn't want it in the architecture; our stance is AI still helps via different
+   approaches + the feedback loop — but it stays their choice.)
 
 ## Cluster 2 — In-app Assistive Actions (Mode A ADR)
 
@@ -104,25 +113,33 @@ its model.
 
 ## Cluster 5 — AI Data & Model Governance (cross-cutting ADR)
 
-23. **The model adapter.** Confirm an `AIProvider`-style adapter (like
-    `DeliveryProvider`): swap/add a model by changing a file. One worked example
-    shipped — which model as reference (Claude, given the project)?
-24. **Per-task model choice.** Can different tasks use different models (cheap
-    model for tagging, strong model for content), configured in settings? Or one
-    model per deployment to start?
-25. **Data residency = company's call.** We default to **data minimization**;
-    the company may point the adapter at any provider incl. US cloud, accepting
-    the residency implication. Do we surface a warning/《data leaves EU》flag when
-    they do?
-26. **PII line.** Do we ever send raw emails/names to a model, or always
-    minimized/pseudonymized (IDs + signals + content, not identities)? Where
-    exactly is the line, and does it differ Mode A vs B (in-system may see more)?
-27. **Cost governance.** Per-run estimate + a spend cap in settings (like the
-    recipient cap)? Hard stop or warn?
-28. **"One file per task" — v1 or nice-to-have?** If the clean plugin shape
-    fights the reality of prompts + model quirks, is complexity acceptable *here*
-    specifically (the one place expertise is warranted)? *Lean: nice-to-have;
-    don't force it.*
+23. **The model adapter.** → **Decided:** `AIProvider`-style adapter (swap/add a
+    model by a file). Ship **two worked examples — Claude + one EU model** — so
+    "GDPR-friendly is possible" is demonstrated, not just claimed.
+24. **Per-task model choice.** → **Decided (POC):** one model for the POC + a
+    "how to add & connect more models" guide (like the swap-send-provider guide).
+    Per-task/expert-model selection (creative vs coding vs workflow models) is
+    real — goes in the ADR as the direction, not the POC build.
+25. **EU / residency warning flag?** → **Decided: no.** We're not data-protection
+    experts and won't take on that liability. Provider + residency is the company's
+    call; we default to data minimisation and stay out of the legal call.
+26. **PII line.** → **Decided (partial):** in-system AI (Mode A) may see more
+    (those deployments usually have extra contracts / DPAs); external (Mode B)
+    stays minimal. **Still open:** can PII exposure be set **per AI action**?
+    Nuances to resolve — first/last name may be fine *unless* combined with email;
+    a subject-line suggestion might need the name, *or* should use **merge
+    variables** (`{{first_name}}`) instead of the real value. → needs its own pass.
+27. **Cost governance.** → **Decided:** a **spend cap** is primary — **warn first,
+    then hard stop** (like Claude's own usage) — ideally **per role/user**. A
+    per-run cost estimate is nice-to-have *if feasible*, lower priority once a cap
+    exists.
+28. **"One file per task" — v1 or nice-to-have?** *(needs clarification —
+    background:)* Should the clean "drop a file = new AI task" shape (like decision
+    strategies) be a **firm v1 contract**, or an **aspiration** we relax when a
+    task genuinely needs bespoke wiring (multi-step calls, model quirks, big
+    prompts don't always fit one tidy file)? *Lean: aspiration — aim for it, but
+    this is the one area where real complexity is acceptable, not forced into a
+    template.* **Decision needed:** contract vs aspiration.
 
 ---
 
