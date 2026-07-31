@@ -5,8 +5,14 @@ topic:
   - automation
   - design
 created: 2026-07-27
-status: open
+status: in-progress
 ---
+
+> **Progress (2026-07-31):** Clusters 1, 2, 5 are settled and written up as ADRs
+> — **[[ADR-140 — AI Capability Layer]]** (Cluster 1), **[[ADR-141 — In-App
+> Assistive AI Actions]]** (Cluster 2), **[[ADR-144 — AI Data and Model
+> Governance]]** (Cluster 5). Still open: **Cluster 3** (Mode B → ADR-142) and
+> **Cluster 4** (Mode C → ADR-143).
 
 # AI Layer — design interview (forward-looking)
 
@@ -24,7 +30,7 @@ its model.
 
 ---
 
-## Cluster 1 — AI Capability Layer (foundational ADR)
+## Cluster 1 — AI Capability Layer (foundational ADR) → ✅ [[ADR-140 — AI Capability Layer]]
 
 1. **Approval — uniform or per-action?** → **Decided:** approval behaviour is a
    **per-task setting** (auto-apply vs require-approval), declared in the task
@@ -61,25 +67,71 @@ its model.
    doesn't want it in the architecture; our stance is AI still helps via different
    approaches + the feedback loop — but it stays their choice.)
 
-## Cluster 2 — In-app Assistive Actions (Mode A ADR)
+## Cluster 2 — In-app Assistive Actions (Mode A ADR) → ✅ [[ADR-141 — In-App Assistive AI Actions]]
 
-6. **The task-plugin contract.** "One file per AI task" (like a decision
-   strategy): what's the declared shape — inputs it reads, the prompt, the
-   output type, and where the result lands (which proposal record)? *Lean:
-   mirror the decision-strategy registry.*
-7. **Build the registry now, or start hardcoded?** Ship 2–3 actions wired
-   directly first and extract the plugin pattern once we've seen a few, or design
-   the registry up front? *Lean: 2–3 first, then extract (same as how strategies
-   grew).*
-8. **First actions, in priority order.** Candidates: subject/preheader,
-   auto-tag, content-suggestion-with-reasons, translate, write-draft-content,
-   category-restructure-report, refine-segment. Which 2–3 lead?
-9. **Preview/approval UX.** Per-suggestion accept/reject **with a reason** (like
-   overrides), side-by-side diff, inline? Consistent across all actions?
-10. **Generated content = drafts.** Confirm AI-authored content records are
-    created **unpublished**, requiring a human publish (never auto-live).
-11. **Cost visibility.** Show an expected cost/token estimate before a run
-    (the backlog cost-feedback item)? Per-run, or just a running total?
+6. **The task-plugin contract.** → **Decided:** the task *file* (dev-owned
+   scaffold) declares — **name/id**, **inputs** (platform-gathered, filtered by
+   the Q26 PII policy), **output type** (subject / tag list / content-suggestions-
+   with-reasons / draft record…), **where it lands** (which record it writes),
+   **references** to the frontend-owned prompt id + model (Q24) + guards/PII policy
+   (Q26), and **approval mode** (Q1). Technical wiring + pointers; everything a
+   marketer touches (prompt, guards) is referenced, not embedded.
+7. **Build the registry now, or start hardcoded?** → **Decided:** wire **2–3
+   tasks directly first, then extract** the registry (as the decision strategies
+   grew). The Q6 contract is already designed, so extraction is light.
+8. **First actions, in priority order.** → **Decided: three, built in order
+   2 → 1 → 3:**
+   1. **Subject/preheader** (easiest — it's the email's own content; suggest 3
+      subject/preheader combos, manager approves). Showcases merge-variable PII.
+   2. **Auto-tag** (more complex input *and especially output* — the system must
+      route tags to the right places). ADR-080 propose-govern loop.
+   3. **Content-suggestion-with-reasons** (most important, most complex here).
+   Good enough for the POC / MVP package.
+   **Implementation note:** first model integrations for testing = **Claude
+   (Anthropic API)** + **ChatGPT (OpenAI — user has a Pro account)**, to prove the
+   model adapter across two providers. The Anthropic API is Claude-the-model (its
+   own key), distinct from Claude Code the coding assistant. The EU-model worked
+   example from Q23 (the GDPR "it's possible" proof) is the additional documented
+   one. API keys go in `.env`, added by the user; never touched by Claude Code.
+9. **Preview/approval UX.** → **Decided:** one **consistent accept/reject
+   component in a dedicated UI** (an AI-suggestions / approval inbox), reused
+   across tasks — shows output(s) + reason; accept/reject per item, pick-one for
+   options; logged either way. **Optional notifications** (desktop push and/or
+   email), configurable. This dedicated UI = the same **approval surface** Mode B
+   autonomous workflows use (Q13). **Watch item:** accept/reject is the slim
+   default, but some tasks may need a short **feedback/iteration flow** ("make it
+   punchier" → regenerate); log the need and see whether accept/reject stays
+   sufficient or a feedback loop is warranted.
+10. **Generated content = drafts.** → **Decided:** AI-authored content is
+    direct-written as an **unpublished draft**; going live is the publish step,
+    governed by the **per-task manual/auto setting (Q1)** — approval-first by
+    default, and a company may flip a task to **auto-publish** once it trusts it
+    (graduated trust *is* the point of the trust layer). **Architectural guard
+    against the "80 records to approve" problem:** AI generates a **bounded set of
+    *shared* variants/drafts, never per-recipient content on the fly** (cost, risk,
+    approval-scale) — per-recipient personalization stays with the **decision
+    engine + merge variables**, not generative AI. So the approval surface never
+    explodes and "always approve" stays practical.
+11. **Cost visibility.** → **Decided:** show **total cost/tokens against the cap**
+    in the AI UI; **drop per-run estimates** from the UI (a manager likely won't
+    use them; it's open code if a company wants them). → raised Q11b below.
+11b. **Cost-cap enforcement — what happens near the limit?** → **Decided:** a
+    **spend cap with a configurable safety buffer, enforced as a pre-call
+    gate.** The company sets its token limit; the buffer is **configurable**
+    (they're filling in the limit anyway) and **strictly bound to user
+    role/permission**. Each task declares its own `max_tokens` output ceiling,
+    so the platform computes the task's worst-case total (`count_tokens(input)`
+    + `max_tokens`) *before* running and **refuses to start** any task whose
+    worst-case wouldn't fit under the remaining cap — the stop always lands
+    *between* tasks, never mid-task, so nothing is spent on a task that can't
+    finish (no "paid, got nothing"). If a running task hits its own output
+    ceiling, the **partial result is still shown** (display ≠ commit), never
+    silently discarded. There is **no API "total budget" knob** — the worst-case
+    ceiling is computed by us, which is more reliable than a provider feature.
+    (`task_budget` — a *soft*, model-paced budget, 20k-token minimum,
+    agentic-loop-only — is noted as the **Mode-B direction**, not a stage-1
+    build.) **Phase-1 MVP stops here.** An opt-in **overage** mode ("keep going,
+    pay per token") + richer controls are a future **"AI extra package."**
 
 ## Cluster 3 — Autonomous Workflows & the Automation Boundary (Mode B ADR)
 
@@ -119,7 +171,7 @@ its model.
 22. **Same discipline.** AI-generated code held to the same ADR + tests-as-
     guardrails bar as human code (must pass tests, reference ADRs)? *Lean: yes.*
 
-## Cluster 5 — AI Data & Model Governance (cross-cutting ADR)
+## Cluster 5 — AI Data & Model Governance (cross-cutting ADR) → ✅ [[ADR-144 — AI Data and Model Governance]]
 
 23. **The model adapter.** → **Decided:** `AIProvider`-style adapter (swap/add a
     model by a file). Ship **two worked examples — Claude + one EU model** — so
@@ -139,9 +191,10 @@ its model.
     in-system Mode-A task under a DPA) — the company's call, logged. Safe by
     construction; more exposure is a deliberate choice.
 27. **Cost governance.** → **Decided:** a **spend cap** is primary — **warn first,
-    then hard stop** (like Claude's own usage) — ideally **per role/user**. A
-    per-run cost estimate is nice-to-have *if feasible*, lower priority once a cap
-    exists.
+    then hard stop**, **per role/user** (now firm via Q11b). Enforcement detail —
+    configurable buffer, pre-call gate so stops land *between* tasks, partial
+    results still shown — lives in **Q11b**. Per-run estimate is dropped from the
+    UI (Q11); overage / richer controls = future "AI extra package".
 28. **"One file per task" — v1 or nice-to-have?** → **Decided (via Q3b):** the
     task **file is a firm contract** for the *technical scaffold* (inputs / output
     / where it writes) — and it stays clean precisely because the messy part (the

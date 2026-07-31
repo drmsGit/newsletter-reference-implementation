@@ -1,17 +1,23 @@
 ---
 type: adr
-status: proposed
+status: accepted
 topic:
   - ai
   - marketing
   - automation
   - governance
 created: 2026-06-06
-modified: 2026-06-06
+modified: 2026-07-31
+source:
+  - "AI Layer design interview (interview-prep, 2026-07-27 – 31)"
+enables:
+  - "[[ADR-140 — AI Capability Layer]]"
+  - "[[ADR-141 — In-App Assistive AI Actions]]"
+  - "[[ADR-144 — AI Data and Model Governance]]"
 ---
 
 ## Status
-Proposed
+Accepted
 
 ## Context
 
@@ -81,6 +87,33 @@ Human marketers remain responsible for:
 - Fully autonomous campaign planning
 - Removal of human campaign ownership
 
+### How this philosophy is realized (2026-07-31 AI-layer interview)
+
+The intent above is made concrete by the AI-layer ADRs. Key refinements settled in
+the design interview:
+
+- **Trust = "reversible + audited + a human can interfere," not "everything is a
+  pending proposal."** "AI proposes, human governs" is realized as **direct write
+  by default** — actions are reversible via the Override Layer (ADR-040/041), fully
+  audited, and interruptible. **Approval is a per-task setting** (auto-apply vs
+  require-approval), not a global gate, giving **graduated trust**: a task can move
+  from approval-first to auto once a company trusts it. AI plugs in behind the
+  existing seams (provider-adapter + plugin-registry), stays **optional per
+  capability**, and always has a global kill switch. See
+  [[ADR-140 — AI Capability Layer]].
+- **AI works in three modes:** **A** — in-app assistive actions a marketer triggers
+  ([[ADR-141 — In-App Assistive AI Actions]]); **B** — autonomous workflows / the
+  automation boundary (mostly n8n, planned ADR-142); **C** — AI-assisted
+  *development*, never production (planned ADR-143).
+- **Governance is cross-cutting** ([[ADR-144 — AI Data and Model Governance]]): a
+  swappable model adapter (with an EU worked example), a "no raw PII by default"
+  line (personalise via merge variables, ADR-005), a per-role spend cap, a
+  company-editable "DON'T EVER" guardrail, and manager-owned, versioned prompts.
+- **Preferred vs Secondary above is a *value* ranking, not a build order.**
+  Subject-line generation is listed "Secondary" by value, yet it is the **first**
+  Mode-A action built (it is the easiest, lowest-risk starting point) — see
+  ADR-141. The two orderings are deliberately separate.
+
 ## Consequences
 
 ### Positive
@@ -111,6 +144,12 @@ Customer understanding, storytelling, creativity, and strategic planning remain 
 The system maximizes relevance and efficiency. Marketers maximize insight and creativity.
 
 ## Related ADRs
+
+### Enables
+
+- [[ADR-140 — AI Capability Layer]]
+- [[ADR-141 — In-App Assistive AI Actions]]
+- [[ADR-144 — AI Data and Model Governance]]
 
 ### Referenced By
 
