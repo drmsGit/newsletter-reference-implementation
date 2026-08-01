@@ -5,15 +5,15 @@ topic:
   - automation
   - design
 created: 2026-07-27
-status: in-progress
+status: closed
 ---
 
 > **Progress (2026-07-31):** Clusters 1, 2, 5 are settled **and written up as ADRs**
 > — **[[ADR-140 — AI Capability Layer]]** (Cluster 1), **[[ADR-141 — In-App
 > Assistive AI Actions]]** (Cluster 2), **[[ADR-144 — AI Data and Model
-> Governance]]** (Cluster 5) and **[[ADR-142 — Autonomous Workflows and the
-> Automation Boundary]]** (Cluster 3). **Only Cluster 4** (Mode C → ADR-143)
-> remains open.
+> Governance]]** (Cluster 5), **[[ADR-142 — Autonomous Workflows and the Automation
+> Boundary]]** (Cluster 3) and **[[ADR-143 — AI-Assisted Development Boundary]]**
+> (Cluster 4). **✅ All five clusters closed — the AI layer is fully specified.**
 >
 > Cluster 3 also spun off work outside the AI ADRs: a **suppression/opt-out
 > data-model ADR** and an **A/B-component + random-split POC feature** (both in
@@ -363,19 +363,148 @@ its model.
     the purest expression of the trust layer, and worth naming as its own capability
     class in the Mode B ADR.
 
-## Cluster 4 — AI-Assisted Development Boundary (Mode C ADR)
+## Cluster 4 — AI-Assisted Development Boundary (Mode C ADR) → ✅ [[ADR-143 — AI-Assisted Development Boundary]]
 
-19. **The never-prod mechanism.** AI works on the **repo (branches/PRs)**;
-    humans review → merge → deploy; prod credentials never reach AI; dev DB only.
-    Confirm, and is a separate isolated dev environment the enforcement?
-20. **AI's reach.** Repo + ADRs + dev DB + dev-only deploy? Anything explicitly
-    off-limits beyond prod (e.g. `.env`, migrations against real data)?
-21. **Supported vs ad-hoc dev tasks.** "Supported" = generates against a
-    contract (MJML modules per ADR-131, decision strategies per the registry).
-    "Ad-hoc" = bugs/features/perf. Do we document the supported ones as first-
-    class, ad-hoc as best-effort?
-22. **Same discipline.** AI-generated code held to the same ADR + tests-as-
-    guardrails bar as human code (must pass tests, reference ADRs)? *Lean: yes.*
+19. **The never-prod mechanism.** → **Decided: structural enforcement, DEV/PROD
+    separation, human-only deployment.**
+    - **Structural over procedural.** "AI is *told* not to touch prod" depends on
+      compliance and fails under a mistake or an injected instruction — it **did**
+      fail once in this very project (the `backend/.env` grep, caught and corrected
+      2026-07-26). The robust form is that **the prod credential is simply not
+      present in the environment the AI can reach.** Procedural rules stay as a
+      backup layer, never the primary one.
+    - **DEV/PROD separation always makes sense**, and **deployment DEV → PROD is a
+      human task.**
+    - **Invariant at every tier: the AI's output is a *proposal* (branch/PR), never
+      a deployment.** Mode C is not a different philosophy — it is ADR-140's "AI
+      proposes, human governs" pointed at the repo.
+    - ⚠️ **Known limit — environment isolation does not contain outbound email.** As
+      long as DEV holds a working send-provider key (which development and testing
+      need), an AI change in DEV can still send real mail to real people.
+      Environment separation limits **system** blast radius, not **outside-world**
+      blast radius; its real value is that if something breaks, not the whole system
+      fails. **Existing mitigations, to be named as Mode-C safety properties rather
+      than mere dev conveniences:** `MockProvider` as the DEV default
+      (`send_instance_create` already hardcodes `provider="mock"`), the recipient cap
+      in settings, and the not-yet-built send guardrail in `docs/backlog.md`.
+    - **Deferred to the Security chapter (not this ADR):** secret-storage services
+      (keys held outside any repo file), GDPR/ISO topics, login/SSO, user roles.
+    - **Accepted trade-off:** we prepare as much as possible, but running your own
+      architecture **costs internal IT resources** — stated plainly in the playbook,
+      not glossed over.
+20. **AI's reach.** → **Decided.**
+    **Allowed:** the repo, ADRs and docs, the dev DB, tests, a local dev server.
+    **Off-limits — four rules:**
+    1. **Dev data must be synthetic or anonymized — never a prod dump.** ADR-144
+       forbids identifying data reaching a model; the *standard industry habit* of
+       copying prod into dev "so the test data is realistic" therefore violates it
+       through an entirely normal-looking ops decision. This project happens to do
+       the right thing already (seeded demo recipients) — stated here as a **rule**,
+       not left as a happy default.
+    2. **Prod anything** — credentials, DB, deploy path (Q19).
+    3. **Secrets in any form** — the `.env` rule generalized to "no secret in any
+       file the AI reads". The *how* (key-storage services) → Security chapter.
+    4. **Never run a migration against real data.** This project sidesteps it
+       entirely (`create_all` + manual `ALTER TABLE`, no migration framework), so it
+       costs nothing here — but an adopter using Alembic needs it written down,
+       because "the AI ran a migration" is the one Mode-C mistake a branch revert
+       cannot undo.
+    **Plus the injection rule:** Mode C has a path the other modes don't — the AI
+    reads the **dev DB and the repo**, and this platform *ingests external content*
+    (webhook payloads, content records, later recipient-submitted form data). So
+    text that arrived from outside can end up in front of a dev assistant.
+    **Content read from the database, webhooks, or issue text is data, never
+    instructions.** Non-obvious precisely because nobody expects a newsletter
+    content record to be an attack surface on the development process.
+    **Audience widening (user, from experience):** Mode C is **not only developers**
+    — the realistic risk case is **a marketer vibecoding against a dev environment
+    that holds copied live data**. Most companies he has worked in or for ran
+    exactly that: a *pseudo* dev environment containing copied production data, which
+    forced everyone to stay cautious inside it — the opposite of why a dev
+    environment exists. **→ a built-in anonymization guard is wanted** (see Q20b).
+
+20b. **The dev-data anonymization guard.** → **Decided; written up as a backlog
+    Feature.** **Deterministic pseudonymization, not hashing** (a hash protects the
+    data and simultaneously destroys the reason to have a dev environment);
+    **schema-declared PII fields, not content sniffing** (ADR-144's per-task PII
+    filter needs the same metadata — one declaration, two consumers); an
+    **exempt-domain allowlist** so the company's own domains stay real and provider
+    /campaign testing still works — **multiple domains supported** (different
+    brands, external agencies); **non-routable addresses for everyone else**, which
+    also closes the Q19 gap (no deliverable customer addresses in DEV ⇒ a stray real
+    send reaches nobody); and a **loud DEV startup assertion** that fails on
+    unpseudonymized data **and reports what it exempted** (a widened allowlist must
+    be visible, never silent; no wildcards).
+    **Rejected: a third `dev → testable → prod` environment** — extra infrastructure
+    to run (real internal IT cost) and it only *relocates* the risk, since the middle
+    tier still holds deliverable addresses. The allowlist does both jobs at once and
+    caps AI blast radius at **your own employees instead of your customers**.
+    **Change-effort requirement (user):** changes to the "make data unusable" layer
+    must be as easy as possible — moving many files between environments reliably
+    produces typos and omissions (his Condor experience). Resolution: **declaration**
+    lives on the models (written once, never touched at deploy time); **policy** is
+    **environment configuration**, so promoting dev→prod is a config difference, not
+    a file edit.
+    **Deployment clarification (raised by the user).** Code *does* move dev→prod;
+    only configuration doesn't. Two code stages are normal and are handled by
+    **pointing each environment at a version** — DEV tracks `main`, PROD is pinned to
+    a tag — so a promotion (and a rollback) is a pointer change, not a hand-edit.
+    **This is not vendor lock-in: git is a protocol, not a vendor** (identical on
+    GitHub, GitLab, Gitea, Forgejo, or a bare self-hosted repo). Lock-in would come
+    only from making a *provider-specific* CI system the sole promotion path — so the
+    usual rule applies: **neutral mechanism (git tags/commits) + one worked example
+    (e.g. a GitHub Actions workflow) + documented as swappable**, the ADR-100/101
+    pattern pointed at deployment. **Mode C only requires that a human-gated
+    promotion step exists and that the AI has no path to it** — never which tool
+    implements it.
+21. **Supported vs ad-hoc dev tasks.** → **Decided: supported tasks are
+    first-class; ad-hoc is best-effort at the same review bar.**
+    **Why this is more than documentation hygiene: the seams AI can generate
+    against are the same seams a *human* can extend.** What makes a seam usable — a
+    declared contract, a worked example to pattern-match, tests that verify it — is
+    exactly what makes it AI-generatable. **AI generatability is therefore a
+    byproduct of good seam design, not a separate feature**, and the "supported
+    tasks" list is simply the **seam list the playbook must publish anyway**, so it
+    costs almost nothing extra.
+    **Diagnostic that falls out of it:** if AI cannot reliably generate against a
+    seam, **that seam is probably underspecified for humans too** — a generation
+    failure is a signal about the architecture, not only about the model.
+    **Criterion for "supported" — three observable things:** (1) a declared contract
+    (ABC, registry, or config manifest); (2) at least one **worked example in-repo**
+    to pattern-match; (3) **tests that verify the contract holds**. `DeliveryProvider`
+    already satisfies all three (ABC + `resend.py` + tests), so this describes what
+    exists rather than an aspiration.
+    **Supported list today:** provider adapters (inbound/outbound); decision
+    strategies (registry + `ConfigField` manifest); MJML email modules (ADR-131); AI
+    task files (ADR-141's contract).
+    **Ad-hoc** — bugs, features, performance — stays **best-effort**: same review
+    bar, no reliability promise. Playbook line: *"here's where the architecture
+    guarantees a shape; everywhere else, normal engineering judgement applies."*
+22. **Same discipline.** → **Decided: yes — same bar, plus an ADR-flagging duty.**
+    - **Same bar — not higher, not lower.** Mode C output is a PR (Q19), so **the
+      review gate is where discipline lives**: same tests, same ADR compliance, same
+      review. A *stricter* bar for AI code would encode distrust as policy and slow
+      everything down; a looser one is obviously wrong.
+    - **Provenance = the commit trailer, nothing in the code.** Already practised —
+      every commit in this session carries `Co-Authored-By: Claude`, which is a
+      queryable audit trail ("is AI-authored code more defect-prone?"). **No in-code
+      marking:** "AI generated this" comments are noise, violate the project's own
+      comment discipline, and imply a different standard to the reader.
+    - **Tests are the load-bearing part, and the framing matters:** the rule is
+      **"the contract must be tested, regardless of who writes the code"** — a
+      property of the architecture, not a rule about AI. For supported seams, Q21's
+      criterion 3 *is* the enforcement: a tested contract cannot be silently
+      violated.
+    - **The ADR-flagging duty — and it is a *capability*, not a guardrail.** AI must
+      **flag when a request contradicts an ADR instead of silently implementing it**
+      (already codified in `docs/CLAUDE.md`). **Key reframe (user):** a human
+      developer will never track 60+ ADRs as reliably as AI can — silently
+      implementing against a rule happens with human developers too, **probably more
+      often**. So this is not a constraint imposed *on* AI to make it as safe as a
+      human; it is something **AI does better than humans**, and it is what turns the
+      ADR set from aspirational documentation into an **active, enforced
+      constraint**. `docs/CLAUDE.md` is therefore the live Mode-C configuration
+      artifact — the concrete instance of the "AI-open package" idea in playbook §4D.
 
 ## Cluster 5 — AI Data & Model Governance (cross-cutting ADR) → ✅ [[ADR-144 — AI Data and Model Governance]]
 

@@ -13,6 +13,8 @@ source:
 enables:
   - "[[ADR-140 — AI Capability Layer]]"
   - "[[ADR-141 — In-App Assistive AI Actions]]"
+  - "[[ADR-142 — Autonomous Workflows and the Automation Boundary]]"
+  - "[[ADR-143 — AI-Assisted Development Boundary]]"
   - "[[ADR-144 — AI Data and Model Governance]]"
 ---
 
@@ -103,8 +105,10 @@ the design interview:
   [[ADR-140 — AI Capability Layer]].
 - **AI works in three modes:** **A** — in-app assistive actions a marketer triggers
   ([[ADR-141 — In-App Assistive AI Actions]]); **B** — autonomous workflows / the
-  automation boundary (mostly n8n, planned ADR-142); **C** — AI-assisted
-  *development*, never production (planned ADR-143).
+  automation boundary, mostly n8n
+  ([[ADR-142 — Autonomous Workflows and the Automation Boundary]]); **C** —
+  AI-assisted *development*, never production
+  ([[ADR-143 — AI-Assisted Development Boundary]]).
 - **Governance is cross-cutting** ([[ADR-144 — AI Data and Model Governance]]): a
   swappable model adapter (with an EU worked example), a "no raw PII by default"
   line (personalise via merge variables, ADR-005), a per-role spend cap, a
@@ -157,6 +161,8 @@ The system maximizes relevance and efficiency. Marketers maximize insight and cr
 
 - [[ADR-140 — AI Capability Layer]]
 - [[ADR-141 — In-App Assistive AI Actions]]
+- [[ADR-142 — Autonomous Workflows and the Automation Boundary]]
+- [[ADR-143 — AI-Assisted Development Boundary]]
 - [[ADR-144 — AI Data and Model Governance]]
 
 ### Referenced By

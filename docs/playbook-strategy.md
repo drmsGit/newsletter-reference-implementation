@@ -145,7 +145,27 @@ Design principles adopted:
 
 **Also spun off (`docs/backlog.md`):** a suppression / opt-out **data-model ADR**, and an **A/B component + random split** POC feature. **[[ADR-021 — Variants Are Human Created Versions]] clarified** — it constrains *granularity*, not *authorship*; it had been misread twice as forbidding AI-drafted variants.
 
-**Status:** Cluster 3 settled and written as ADR-142. **Cluster 4 (Mode C → ADR-143) is the last one open.**
+**Status:** Cluster 3 settled and written as ADR-142.
+
+### 2026-07-31 — AI Layer Design, Part 3 (Cluster 4 → ADR-143) — interview closed
+
+**Context:** Final cluster — Mode C, AI-assisted *development*. Unlike the other four this one is **evidence-based rather than speculative**: the architecture has been built this way for months, so the decisions come from lived practice (including a guardrail that was violated and corrected).
+
+1. **The audience is not only developers.** The realistic risk case is a **marketer vibecoding** against a dev environment. Any boundary assuming a disciplined engineer on the other side is designed for the wrong user.
+
+2. **Enforcement must be structural, not procedural.** "The AI is *told* not to touch prod" depends on compliance and fails under a mistake or an injected instruction — it *did* fail once here (a `backend/.env` grep, caught and corrected). The robust form is that **the production credential isn't present in the environment the AI can reach**; rules are the backup layer, never the primary one.
+
+3. **"Dev environment" usually means "a copy of production" — so a rule isn't enough, we build a guard.** Every company the user has worked in or for ran a *pseudo*-dev environment with copied live data, which forces permanent caution inside the environment that exists so nobody has to be cautious. Under Mode C that also silently breaches ADR-144. Decided: **deterministic pseudonymization** (not hashing — a hash protects the data and destroys the reason to have a dev environment), **schema-declared PII fields** (the same metadata ADR-144's per-task filter already needs — one declaration, two consumers), an **exempt-domain allowlist** (multiple domains, so provider and campaign testing still work) with **non-routable addresses for everyone else**, and a **loud DEV assertion that reports what it exempted**. Chosen over a third `dev → testable → prod` environment, which costs infrastructure and merely relocates the risk. Bonus: it also closes the gap that **environment separation cannot contain outbound email**, since DEV then holds no deliverable customer addresses.
+
+4. **Deployment stays vendor-neutral by the same rule as everything else.** Code moves dev→prod, configuration doesn't; two code stages are handled by **pointing each environment at a version** (DEV tracks `main`, PROD pinned to a tag), so promotion and rollback are pointer changes rather than hand-edits. **Git is a protocol, not a vendor** — lock-in would come only from making one provider's CI the sole promotion path, so: neutral mechanism + one worked example + documented as swappable. The ADR requires only that a **human-gated promotion exists and the AI has no path to it**.
+
+5. **Supported dev tasks are first-class; ad-hoc is best-effort** — where "supported" means a declared contract + a worked in-repo example + tests that verify it. The insight: **the seams AI can generate against are the same seams a human can extend**, so the supported list is just the seam list the playbook publishes anyway — and if AI can't generate against a seam, that seam is probably underspecified for humans too.
+
+6. **Same discipline as human code, plus an ADR-flagging duty — and that duty is a capability, not a guardrail.** AI must flag when a request contradicts an ADR rather than silently implementing it (already codified in `docs/CLAUDE.md`). **A human developer will never track 60+ ADRs as reliably as an assistant holding them all in context — silent violations happen with humans too, probably more often.** This is what turns the ADR set from aspirational documentation into an actively enforced constraint, and makes `docs/CLAUDE.md` the live artifact behind the "AI-open package" idea in §4D below.
+
+**Also spun off (`docs/backlog.md`):** the **dev-data pseudonymization guard**; and the existing send-guardrail item gained a second rationale (Mode-C containment, not just accident prevention). **Deferred to a separate Security chapter:** secret-storage services, GDPR/ISO, login/SSO, user roles.
+
+**Status: the AI-layer interview is closed.** All five clusters are decided and written up as **ADR-140 / 141 / 142 / 143 / 144**. Implementation is phased, starting with Mode A.
 
 ---
 

@@ -19,6 +19,7 @@ depends_on:
 enables:
   - "[[ADR-141 — In-App Assistive AI Actions]]"
   - "[[ADR-142 — Autonomous Workflows and the Automation Boundary]]"
+  - "[[ADR-143 — AI-Assisted Development Boundary]]"
   - "[[ADR-144 — AI Data and Model Governance]]"
 ---
 
@@ -134,7 +135,8 @@ model behaving unexpectedly).
   **A** — in-app assistive button actions ([[ADR-141 — In-App Assistive AI Actions]]);
   **B** — autonomous workflows / the automation boundary
   ([[ADR-142 — Autonomous Workflows and the Automation Boundary]], mostly n8n);
-  **C** — AI-assisted development, never prod (planned ADR-143). Cross-cutting data,
+  **C** — AI-assisted development, never prod
+  ([[ADR-143 — AI-Assisted Development Boundary]]). Cross-cutting data,
   model, cost, and PII governance is [[ADR-144 — AI Data and Model Governance]].
 - **Client stance.** For a company that wants no AI in its architecture, the honest
   answer is that AI still helps through *different approaches* (recommendations,
@@ -156,4 +158,5 @@ model behaving unexpectedly).
 ### Enables
 - [[ADR-141 — In-App Assistive AI Actions]]
 - [[ADR-142 — Autonomous Workflows and the Automation Boundary]]
+- [[ADR-143 — AI-Assisted Development Boundary]]
 - [[ADR-144 — AI Data and Model Governance]]

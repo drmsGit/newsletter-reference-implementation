@@ -131,7 +131,8 @@ scaffold, config for the prompt.**
 - Applies to all three AI modes. Mode A ([[ADR-141 — In-App Assistive AI Actions]])
   is the first consumer; Mode B
   ([[ADR-142 — Autonomous Workflows and the Automation Boundary]]) and Mode C
-  (planned ADR-143) inherit the same model adapter, PII line, and cost cap.
+  ([[ADR-143 — AI-Assisted Development Boundary]]) inherit the same model adapter,
+  PII line, and cost cap.
 - The cost-cap enforcement here is the governance rule; ADR-141 defines only the
   Mode-A **cost *visibility*** UI (total vs cap).
 - **Status.** Decided in the design interview; the model adapter, EU worked
