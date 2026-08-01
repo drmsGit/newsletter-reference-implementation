@@ -84,8 +84,15 @@ def main() -> int:
 
     path = Path(args[0])
     if not path.is_file():
-        print(f"No such file: {path}")
-        return 2
+        # Seed CSVs normally sit next to this script, so accept a bare filename
+        # regardless of which directory the command was run from.
+        beside_script = Path(__file__).resolve().parent / path.name
+        if beside_script.is_file():
+            path = beside_script
+        else:
+            print(f"No such file: {args[0]}")
+            print(f"  also looked in: {beside_script}")
+            return 2
 
     db = SessionLocal()
     try:
