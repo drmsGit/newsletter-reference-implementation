@@ -50,6 +50,21 @@ A Mode-A task *file* declares:
 It is technical wiring plus pointers. Everything a marketer touches — the prompt,
 the guards — is *referenced*, not embedded (ADR-140, point 4).
 
+**A task's input arrives in three layers, not two.** ADR-140 split "dev scaffold"
+from "manager-owned prompt"; a third layer is needed at *runtime*:
+
+| Layer | Owner | Contains | Changes |
+|---|---|---|---|
+| **Task file** | Dev | goal → where the result lands (e.g. "put the suggestion in a new variant") | Rarely |
+| **Settings prompt** | Manager, versioned | the general prompt: what shape to return (copy, images, header + content ids with layout key) | Occasionally, published like content |
+| **Runtime input** | Manager, ad hoc | the *specific* target/goal typed when clicking the button | Every invocation |
+
+**Anti-proliferation rule:** a minor, ad-hoc variation in intent is **runtime
+input**, not a reason to create a new task file + prompt setting. New task files
+are for genuinely new output types or landing places — not for "the same task,
+different goal this time." Without this rule the task registry grows one entry per
+phrasing.
+
 **2. Build concrete first, then extract the registry.**
 Wire **2–3 tasks directly**, then extract the plugin registry — exactly how the
 decision strategies grew. The contract (point 1) is already designed, so the
@@ -58,7 +73,12 @@ extraction is light.
 **3. First three actions, built in order 2 → 1 → 3.**
 1. **Subject / preheader** — easiest (it is the email's own content). Suggest a few
    subject/preheader combos; the manager approves. Showcases merge-variable PII
-   (ADR-005 / ADR-144).
+   (ADR-005 / ADR-144). Offers **two** accept paths: **"use suggestion"** and
+   **"test suggestions in A/B setup"** — *writing* a second subject line and
+   *testing* it are two different frictions, and Mode A should remove both. (The
+   A/B component itself is a separate POC feature, tracked in `docs/backlog.md`.)
+   **Watch item:** the **preheader may become irrelevant** as mail providers replace
+   it with AI-generated summaries — confirm before investing further in it.
 2. **Auto-tag** — harder on the *output* side: tags must be routed to the right
    places, under the human-governed taxonomy propose-govern loop (ADR-080).
 3. **Content-suggestion-with-reasons** — most important and most complex; AI ranks

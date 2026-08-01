@@ -113,6 +113,14 @@ the design interview:
   Subject-line generation is listed "Secondary" by value, yet it is the **first**
   Mode-A action built (it is the easiest, lowest-risk starting point) — see
   ADR-141. The two orderings are deliberately separate.
+- **"Variant suggestions" (Preferred AI Features, above) is narrowed.** AI does
+  *not* compose challenger email variants for a per-send "5% test" — that was
+  evaluated and **dropped** (2026-07-31): you cannot A/B a *rendering* when
+  personalization produces N renderings per send, so the unit of experimentation
+  moves up to the **strategy**. AI-assisted variation instead happens at two other
+  levels: **Mode-A content/subject suggestions** while composing (ADR-141), and
+  **strategy-level challenge campaigns** in Mode B. Plain A/B testing remains a
+  normal, human-driven product feature.
 
 ## Consequences
 

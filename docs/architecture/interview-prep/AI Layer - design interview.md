@@ -8,11 +8,16 @@ created: 2026-07-27
 status: in-progress
 ---
 
-> **Progress (2026-07-31):** Clusters 1, 2, 5 are settled and written up as ADRs
+> **Progress (2026-07-31):** Clusters 1, 2, 5 are settled **and written up as ADRs**
 > — **[[ADR-140 — AI Capability Layer]]** (Cluster 1), **[[ADR-141 — In-App
 > Assistive AI Actions]]** (Cluster 2), **[[ADR-144 — AI Data and Model
-> Governance]]** (Cluster 5). Still open: **Cluster 3** (Mode B → ADR-142) and
-> **Cluster 4** (Mode C → ADR-143).
+> Governance]]** (Cluster 5). **Cluster 3 (Mode B) is now settled too — ADR-142
+> still to be written.** Still open: **Cluster 4** (Mode C → ADR-143).
+>
+> Cluster 3 also spun off work outside the AI ADRs: a **suppression/opt-out
+> data-model ADR** and an **A/B-component + random-split POC feature** (both in
+> `docs/backlog.md`), and a **granularity-vs-authorship clarification** to
+> [[ADR-021 — Variants Are Human Created Versions]].
 
 # AI Layer — design interview (forward-looking)
 
@@ -76,6 +81,14 @@ its model.
    **references** to the frontend-owned prompt id + model (Q24) + guards/PII policy
    (Q26), and **approval mode** (Q1). Technical wiring + pointers; everything a
    marketer touches (prompt, guards) is referenced, not embedded.
+   **Refined 2026-07-31 (surfaced during Cluster 3):** input arrives in **three**
+   layers, not two — the **dev task file** (goal → where it lands, e.g. "put the
+   suggestion in a new variant"); the **manager-owned settings prompt** (general
+   output shape: copy, images, header + content ids with layout key); and **ad-hoc
+   runtime input** (the *specific* goal a manager types when clicking the button).
+   **Anti-proliferation rule:** a minor ad-hoc change of intent is **runtime
+   input**, *not* grounds for a new task file + prompt setting — otherwise the
+   registry grows one entry per phrasing. Recorded in ADR-141 §1.
 7. **Build the registry now, or start hardcoded?** → **Decided:** wire **2–3
    tasks directly first, then extract** the registry (as the decision strategies
    grew). The Q6 contract is already designed, so extraction is light.
@@ -133,29 +146,221 @@ its model.
     build.) **Phase-1 MVP stops here.** An opt-in **overage** mode ("keep going,
     pay per token") + richer controls are a future **"AI extra package."**
 
-## Cluster 3 — Autonomous Workflows & the Automation Boundary (Mode B ADR)
+## Cluster 3 — Autonomous Workflows & the Automation Boundary (Mode B ADR) → ✅ settled (ADR-142 to write)
 
-12. **The platform/n8n line.** Confirm: the platform exposes **triggerable-action
-    APIs** (build group, create campaign, send, precompute content) + an
-    **approval surface**; n8n (or any orchestrator) owns the flow logic. How much
-    do we ship as reference workflows vs just connector files?
-13. **Approval back into the system.** When an autonomous flow needs sign-off,
-    how? An in-app **approval queue** + an email with approve/reject links? What
-    does approving actually trigger (the held action runs)?
-14. **Minimal-data contract for external AI.** Does n8n operate on **IDs only**,
-    with the platform resolving PII internally? Define the minimum payload per
-    action. *Lean: yes — external stays ID-level.*
-15. **Reference workflows to ship.** Morning-campaign (build → approve → send),
-    fatigue → temporary exclusion, precompute "next content" into the decision
-    table, deliverability-anomaly alert. Which are in the starter library?
-16. **Temporary exclusion — new concept.** Time-boxed suppression distinct from
-    consent opt-out: modeled how — an exclude rule-block with an expiry, or a
-    recipient status with a "until" date?
-17. **Champion/challenger (the 5%).** AI composes a full variant → sends to a
-    slice → measures → rolls out the winner. Is rollout **auto or approval-
-    gated**? Reuse the hold-out/control-group mechanism for measurement?
-18. **Fatigue: deterministic first?** Start with a rule (>N sends in M days),
-    add AI prediction later? *Lean: yes — don't AI what a threshold solves.*
+12. **The platform/n8n line.** → **Confirmed + decided.** The platform exposes
+    **triggerable-action APIs** (build group, create campaign, send, precompute
+    content) + an **approval surface**; **n8n (or any orchestrator) owns the flow
+    logic**. (Confirmation only — already backed by [[ADR-091 — Automation Layer
+    Is Orchestration, Not a Workflow Engine]], [[ADR-092 — Automation Layer
+    Receives Triggers, It Does Not Own Trigger Sources]] and [[ADR-002 — API First
+    Architecture]].)
+    **Ship scope = one worked example, not a workflow library.** A starter library
+    of 4–5 flows would become a maintained integration surface *and* silently
+    bless n8n as the one orchestrator. Instead:
+    - **No custom n8n node** — the "connector" **is** the documented REST API
+      (n8n's generic HTTP node calls it). Publishing a community node would be a
+      maintained vendor integration, exactly what the provider layer refuses.
+    - The workflow is **documented vendor-neutrally** as a sequence of API calls;
+      the **n8n JSON is the one concrete instance** — same shape as the provider
+      layer (neutral contract + `resend.py` as the worked example). A company on
+      Make / Zapier / Logic Apps / plain cron reads the same doc.
+    - **If time allows, two examples:** a **"quick win"** (simple, immediately
+      demo-able) **plus one more complex — the automated audience suggestion**
+      ("here's a group of people we can send an email to"), i.e. the *autonomous*
+      counterpart of the existing in-app system-suggested audience, landing in the
+      approval surface.
+13. **Approval back into the system.** → **Decided.**
+    - **Surface:** the **same approval inbox as Mode A** (Q9) — not a second
+      mechanism.
+    - **The platform holds the pending action; approving executes it.** n8n calls
+      the action, gets "pending approval", and **finishes** — it does *not* park a
+      long-running execution on a Wait node. This reuses Mode A's draft→publish
+      mechanism (ADR-141) exactly: same object, same inbox, same audit trail, and
+      it survives orchestrator restarts.
+    - **Email/push is notification only — a link *into* the inbox, never one-click
+      approve/reject.** Project-specific reason: [[ADR-132 — Signal Layer
+      Implementation Event-Sourced Contributions with Decay-on-Read]] already
+      establishes that **security scanners and MPP prefetch links in email**. An
+      approve-link is a bearer credential in an inbox — a scanner could auto-trigger
+      it and approve a full-audience send with no human involved. (Also forwardable,
+      and logged by mail gateways.)
+    - **Pending actions expire** — a held "send the morning campaign" is worthless
+      three days later.
+    - **An action history/log is required** — approved, rejected *and* expired
+      requests stay inspectable so anyone can check older requests. Should **extend
+      the ADR-140 audit surface, not become a second log.**
+
+    **Ownership context (→ its own section in the Mode B ADR).** Automation is
+    typically **not marketing's department**. Two mirror-image expectations meet
+    here: the **automation/IT team owns the flows** and "just wants the system to
+    send the right email", while **marketing owns the platform** and "just wants the
+    platform to do the flow". Flows always need real expertise on the orchestrator
+    side, and there is **no way to "prompt" a flow into existence** from our
+    architecture — that's platform-specific and explicitly out of scope.
+    **Principle adopted: whatever lets the platform work independently wins.** Where
+    a capability could sit either side, it goes in the **platform**. The
+    orchestrator decides *when*; the platform owns the *actions* — so marketing is
+    never blocked on another department for routine work, and the platform stays
+    fully usable with **no orchestrator at all**. (Sharpens ADR-092/094: triggers
+    may come from anywhere, the actions are always ours.)
+14. **Minimal-data contract for external AI.** → **Decided: IDs + non-personal
+    metadata; never anything that helps identify the recipient.**
+    - **Generalized from ADR-144:** the rule is not "no raw PII *to the model*" but
+      **"no identifying data to anything outside the platform"** — models and
+      orchestrators are two cases of one rule. (Q13 established the orchestrator may
+      literally be *another department's* system, so it is external even when no AI
+      is involved at all.)
+    - **Non-personal metadata is fine and wanted** — campaign/group **labels,
+      counts, statuses** — so a flow's Slack/email notification is actually readable
+      ("Campaign *Autumn Hiking* — 1,240 recipients in *Hiking enthusiasts*"). The
+      test is simply: **does it help identify the recipient?** If yes, it stays home.
+    - Personalization stays with **merge variables resolved locally at render**
+      (ADR-005 / ADR-144).
+    - **Same opt-up mechanism** as ADR-144 — a flow that genuinely needs a raw field
+      (e.g. pushing a record into another system) is a deliberate, per-action,
+      **logged** opt-up, not a special orchestrator rule.
+    - **Hosting (self-hosted vs cloud n8n) stays the company's call** — ADR-144 §3;
+      no residency judgement from us.
+    - **Each triggerable action declares its own minimum payload**, mirroring
+      ADR-141's task-file contract (declared inputs, PII-filtered by default) — no
+      single global payload spec to maintain.
+    - ⚠️ **Wording caution for the playbook:** recipient IDs are **pseudonymous, not
+      anonymous** — they still point to a person for anyone holding the platform. So
+      the accurate claim is "**no directly identifying data leaves the platform**",
+      not "no personal data leaves the platform." (Accuracy note, not a legal call —
+      ADR-144 §3 stands.)
+15. **Reference workflows to ship.** → **Decided: two artifacts, chosen to prove
+    two *different* value stories.**
+    - **Quick win = deliverability-anomaly alert.** Read-only (schedule → read
+      stats → notify): no approval, no send, so nobody can break anything by
+      importing it, and it proves the platform→orchestrator direction in minutes.
+      **Value story = "it improves daily business too."** And it addresses a real
+      market gap: **not seeing deliverability issues for too long is a huge problem
+      with current platforms** — unless you build your own workaround, you simply
+      never learn there *is* an issue. (Fits pillar #1: "I can't see what the system
+      is doing and why.")
+    - **Complex = automated audience suggestion → approval inbox.** **Value story =
+      the marketer's** — this is where a marketing manager sees the value. It also
+      exercises the whole Q13 loop end-to-end: autonomous trigger → platform holds
+      the action → approval inbox → human approves → platform executes.
+    - **Everything else — fatigue, precompute "next content", morning campaign —
+      documented as vendor-neutral call sequences in the playbook, no shipped
+      JSON.** Prose costs nothing to keep current and still gives the "starter
+      library" feel, while the maintained artifact count stays at **two**.
+    - (Fatigue is additionally blocked on the temporary-exclusion concept — Q16.)
+16. **Temporary exclusion — new concept.** → **Decided (Cluster-3 scope); modeling
+    deferred to a data-model ADR.**
+    **Mechanism:** a **`suppressed_until`-style recipient-level gate**, checked at
+    audience resolution beside the consent floor — **one place, not several
+    tables/fields** — always paired with a **log of *why*** the recipient is being
+    held back.
+    **Deliberately broader than fatigue.** One gate, many reasons: **fatigue**
+    (system-set, short); **a manual or AI decision** — e.g. *"recipient is in cycle
+    XXX, shouldn't get any emails"*, especially useful for **reactivation** cycles;
+    and recipient-set **pause/snooze** (§M2 backlog). Only the reason/source differs.
+    **Not a consent value** — that would break `detect_consent_drift` (a
+    platform-only value reads as CRM divergence), the same reasoning that already
+    keeps `suppress_recipient` out of `ConsentSyncLogDB`. **Not a rule-block** — a
+    rule-block is per-*audience*, but suppression is a property of *the person* and
+    must hold across every campaign.
+    **Three-tier precedence (answers "how soft is soft"):**
+    1. **Consent** — hard floor, never overridable (legal).
+    2. **Suppression** — **soft**: not easy to overwrite, but overridable by an
+       **explicit, logged** act.
+    3. **Include/exclude rule-blocks** — normal audience logic.
+    **External systems must reach it (the Cluster-3-relevant part).** A website form
+    ("signed up for the masterclass") fires **"this recipient must get this"** — an
+    explicit, per-communication override of the soft suppression. That is a
+    **triggerable-action API** like any other, and it is the **pin** mechanism
+    already in `resolve_audience` (`… ∪ pins`), now callable from outside.
+    **What Cluster 3 actually needs is only:** flows and external systems can
+    **read**, **write**, and **explicitly override** this gate.
+    **→ Deferred to a data-model ADR (not AI/Mode B):** the concrete table/field
+    shape, and an **opt-out code / reason taxonomy** covering "opt-out because
+    bounce / active unsubscribe / block / …". The **GDPR-block case is just a
+    general opt-out**, with the GDPR information itself owned by the **CRM**
+    (ADR-120/122). Open modeling question for that ADR: a *cycle-scoped*
+    suppression ("while in cycle XXX") has no known end date, so it does not map
+    cleanly onto a plain `until` timestamp.
+17. **Champion/challenger (the 5%).** → **Decided: drop the per-email 5% feature;
+    move testing up to the *strategic* level.**
+    **Why it doesn't fit.** You cannot A/B a *rendering* when there are N
+    renderings — in a personalized send there is no "version B", there are 80. So
+    "how much system-generated content before it stops making sense — 25%? 50%?
+    75%?" has no answer **by construction**, which was itself the tell. The unit of
+    experimentation must move from **the email** to **the strategy** (which
+    categories, what cadence, which audience, how much exploration). It is also
+    strategically wrong to build: it only pays off for **fully manual content** —
+    the state the product exists to move companies *out of* — and every ESP already
+    ships A/B testing, so it is effort spent competing on a commodity feature in the
+    pre-personalization world.
+    **ADR-021 was *not* the blocker (correction).** [[ADR-021 — Variants Are Human
+    Created Versions]] constrains **granularity** (don't spawn one variant per
+    resolution — dynamic selection stays *inside* one variant), **not origin**. An
+    AI-drafted challenger variant reviewed by a human was always legitimate. But its
+    *Decision* wording ("a variant is a human-created version") overshoots its own
+    *Context* and has now misled **two independent readings** (this session, and the
+    shadow-variant backlog entry) → **small clarification worth making**: restate the
+    rule around granularity, not authorship.
+    **Considered and rejected:** materializing the N renderings as N real variants
+    (storage is no longer the constraint). Rejected because it needs a new level
+    (`Campaign → Variant → Version`) purely to distinguish "the human's version"
+    from "what each recipient got" — a distinction **variant vs.
+    resolution/snapshot already draws** (ADR-083). Complexity to re-express
+    something already expressed.
+    **What we build instead — three answers for three real needs:**
+    1. **Cold-start / first-time recipients** (no signal yet): managers build
+       **welcome cycles/emails** and use the **Mode-A suggestion button** — *"here's
+       what brings the **most diverse engagement** across other recipients."* Note
+       the optimization target is **information gain (data/engagement), not
+       conversion**. This is the parked **anti-bubble / exploration** concept
+       (ADR-132 Notes) surfacing as a concrete first use case, complemented by
+       capturing **subscription-form context** as the first *Anhaltspunkt*.
+    2. **Long-term strategic suggestions:** the **same Q15 "suggest audience +
+       content" workflow, re-aimed** — less *"here's an audience to reactivate / the
+       timing is perfect to sell category X"*, more **"history shows this needs a
+       shift in strategy — here's a campaign to challenge it."** Same flow,
+       **different goal + prompt**. → **Build the operational goal; document the
+       strategic goal** — which doubles as a live demonstration of ADR-140's
+       frontend-editable-prompt design (same dev scaffold, manager swaps the prompt,
+       different product capability).
+    3. **Managers who just want A/B:** ship a **simple A/B component + random
+       split** → new backlog Feature. Every marketer will ask for it, even if AI
+       flows make it redundant over time (**rebranding stays a genuine exception**).
+    **On significance (revised).** A significance gate is **optional when the output
+    is accumulated learning**, and **mandatory only when rollout is automated**. Not
+    every send needs a statistically significant result — it's a process over time.
+18. **Fatigue: deterministic first?** → **Decided: yes — deterministic,
+    engagement-*rate*-based, and relative to the recipient's *own* baseline.**
+    **Not an absolute threshold.** "Open/click rate below X%" punishes a recipient
+    whose *normal* is engaging with every 10th email. Fatigue is a **downward trend
+    against their personal engagement profile** — was every 3rd, now every 10th. Not
+    proof, but the asymmetry is decisive: sending less costs nothing, and nobody
+    sends *more* hoping to revive engagement.
+    **Computed from existing tables — no new table.** It does, however, need the
+    **denominator**: `SignalContributionDB` records *engagements*, not *sends*, so
+    "1 of 10" and "1 of 2" look identical, and a quiet sending month would flag the
+    entire list as fatigued. So: **rate = engagements (`SignalContributionDB`) ÷
+    sends (`DeliveryExecutionDB`)**, bucketed over a window.
+    **⚠️ Must use *undecayed* contribution counts, not the decayed signal score.**
+    ADR-132 decays on read — comparing "score now" against "score 90 days ago" would
+    let **decay itself manufacture a downward trend for every recipient**. Same
+    table, different read: raw counts per time bucket.
+    **Dependency (noted, not settled): the retention window.** ADR-132 bounds local
+    contributions to "a few operational half-lives", and the retention/prune policy
+    is still an open Needs-ADR item. The configured fatigue window (e.g. 90 days)
+    must fit inside whatever retention is chosen, or the trend silently cannot be
+    computed. **→ the two should be decided together.**
+    **Manager-adjustable in settings:** the trend threshold as a **relative %**
+    ("dropped 30% in the last X days"), the **time frame**, and **how many days a
+    fatigued recipient stays excluded**. Writes to the Q16 suppression gate.
+    **AI's role is tuning, not prediction — a third kind of AI action.** Over time
+    AI proposes threshold changes — *"try 20% instead of 30%"* — through the
+    **approval inbox**, writing to **settings**. That is neither content generation
+    nor audience suggestion but **AI tuning the system's own parameters**: arguably
+    the purest expression of the trust layer, and worth naming as its own capability
+    class in the Mode B ADR.
 
 ## Cluster 4 — AI-Assisted Development Boundary (Mode C ADR)
 
