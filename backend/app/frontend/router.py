@@ -14,7 +14,7 @@ from app.database import get_db
 import json
 
 from app.content.db_models import ContentRecordDB, ContentVersionDB, CategoryDB, ContentCategoryAssignmentDB, CategoryRelationDB
-from app.content.service import create_content, update_content_record, assign_category_to_content, create_content_version, delete_category_assignment, delete_category_relation
+from app.content.service import create_content, update_content_record, set_content_status, assign_category_to_content, create_content_version, delete_category_assignment, delete_category_relation
 from app.content.service import create_category, create_category_relation
 from app.content.service import delete_content_record, delete_category, ContentRecordHasHistoryError, HasRelationsError
 from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB, ModuleInstanceDB, DecisionSlotDB
@@ -583,7 +583,15 @@ def campaign_detail(
             }
         )
 
-    content_records = db.query(ContentRecordDB).order_by(ContentRecordDB.title.asc()).all()
+    # Only active records are offered in the module content picker — a deactivated
+    # record stays renderable where it is already used, but must not be newly
+    # selected (same rule the decision strategies apply to their candidate pool).
+    content_records = (
+        db.query(ContentRecordDB)
+        .filter(ContentRecordDB.status == "active")
+        .order_by(ContentRecordDB.title.asc())
+        .all()
+    )
     module_templates = list_manifests()
     strategies = sorted(s.name for s in list_strategies())
 
@@ -977,12 +985,18 @@ def deliveries_process_due(db: Session = Depends(get_db)):
 @router.get("/ui/content")
 def content_list(
     request: Request,
+    show_inactive: bool = False,
     db: Session = Depends(get_db),
 ):
-    records = (
+    query = db.query(ContentRecordDB)
+    if not show_inactive:
+        query = query.filter(ContentRecordDB.status == "active")
+    records = query.order_by(ContentRecordDB.id.asc()).all()
+
+    inactive_count = (
         db.query(ContentRecordDB)
-        .order_by(ContentRecordDB.id.asc())
-        .all()
+        .filter(ContentRecordDB.status != "active")
+        .count()
     )
 
     return templates.TemplateResponse(
@@ -991,6 +1005,8 @@ def content_list(
         {
             "title": "Content",
             "records": records,
+            "show_inactive": show_inactive,
+            "inactive_count": inactive_count,
         },
     )
 
@@ -1134,6 +1150,22 @@ def content_detail(
             "confirm_delete": confirm_delete,
         },
     )
+
+
+@router.post("/ui/content/{content_record_id}/set-status")
+def content_set_status(
+    content_record_id: int,
+    status: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    try:
+        set_content_status(db, content_record_id, status)
+    except ValueError as error:
+        return RedirectResponse(
+            url=f"/ui/content/{content_record_id}?error={quote(str(error))}",
+            status_code=303,
+        )
+    return RedirectResponse(url=f"/ui/content/{content_record_id}", status_code=303)
 
 
 @router.post("/ui/content/{content_record_id}/delete")

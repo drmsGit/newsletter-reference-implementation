@@ -44,6 +44,13 @@ def get_content_record(db: Session, content_id: int) -> ContentRecordDB | None:
     return db.query(ContentRecordDB).filter(ContentRecordDB.id == content_id).first()
 
 
+# Content lifecycle statuses. Deliberately only two: deactivation exists to stop a
+# record being *newly selected* without breaking anything that already references
+# it. A richer vocabulary (e.g. "archived") belongs to the general data-lifecycle
+# ADR rather than being invented here — see docs/backlog.md.
+CONTENT_STATUSES = ("active", "inactive")
+
+
 def update_content_record(
     db: Session,
     content_id: int,
@@ -51,12 +58,41 @@ def update_content_record(
     content: dict,
     description: str | None = None,
 ) -> ContentRecord | None:
+    # `status` is intentionally not updatable here — editing a record must not be
+    # able to silently reactivate it. Use set_content_status().
     record = get_content_record(db, content_id)
     if record is None:
         return None
     record.title = title
     record.description = description
     record.content = content
+    db.commit()
+    db.refresh(record)
+    return to_content_record(record)
+
+
+def set_content_status(
+    db: Session,
+    content_id: int,
+    status: str,
+) -> ContentRecord | None:
+    """Activate or deactivate a content record.
+
+    Deactivating is the safe alternative to deleting: the record keeps its id, so
+    module instances, decision resolutions and snapshots that already point at it
+    still render, while the decision strategies (which filter on
+    `status == "active"`) stop resolving to it and the module content picker stops
+    offering it.
+    """
+    if status not in CONTENT_STATUSES:
+        raise ValueError(
+            f"Unknown content status '{status}'. "
+            f"Expected one of: {', '.join(CONTENT_STATUSES)}"
+        )
+    record = get_content_record(db, content_id)
+    if record is None:
+        return None
+    record.status = status
     db.commit()
     db.refresh(record)
     return to_content_record(record)

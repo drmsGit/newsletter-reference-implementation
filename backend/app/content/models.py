@@ -17,6 +17,10 @@ class ContentCreate(BaseModel):
     content: dict[str, Any]
 
 
+class ContentStatusUpdate(BaseModel):
+    status: str
+
+
 class Category(BaseModel):
     id: int
     name: str

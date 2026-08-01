@@ -5,8 +5,19 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="mb-0">{{ record.title }}</h1>
     <div class="d-flex align-items-center gap-2">
-        <span class="badge bg-secondary fs-6">{{ record.status }}</span>
-        <form method="post" action="/ui/content/{{ record.id }}/delete" onsubmit="return confirm('Delete this content record?')">
+        <span class="badge fs-6 {% if record.status == 'active' %}bg-success{% else %}bg-secondary{% endif %}">{{ record.status }}</span>
+        {% if record.status == 'active' %}
+        <form method="post" action="/ui/content/{{ record.id }}/set-status" onsubmit="return confirm('Deactivate this content record? It stays visible wherever it is already used, but will no longer be offered for new modules or picked by the decision engine.')">
+            <input type="hidden" name="status" value="inactive">
+            <button type="submit" class="btn btn-outline-secondary btn-sm">Deactivate</button>
+        </form>
+        {% else %}
+        <form method="post" action="/ui/content/{{ record.id }}/set-status">
+            <input type="hidden" name="status" value="active">
+            <button type="submit" class="btn btn-outline-success btn-sm">Reactivate</button>
+        </form>
+        {% endif %}
+        <form method="post" action="/ui/content/{{ record.id }}/delete" onsubmit="return confirm('Delete this content record? Deactivating is usually the safer choice — it keeps historical sends intact.')">
             <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
         </form>
     </div>

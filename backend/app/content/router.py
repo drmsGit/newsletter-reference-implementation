@@ -13,12 +13,14 @@ from app.content.models import (
     ContentCategoryAssignmentCreate,
     ContentVersion,
     ContentVersionCreate,
+    ContentStatusUpdate,
 )
 from app.content.service import (
     list_content_records,
     get_content_record,
     to_content_record,
     update_content_record,
+    set_content_status,
     list_categories,
     list_categories_for_content,
     create_content,
@@ -88,6 +90,22 @@ def get_content_record_by_id(content_id: int, db: Session = Depends(get_db)):
 @router.put("/{content_id}", response_model=ContentRecord)
 def update_content_record_by_id(content_id: int, payload: ContentCreate, db: Session = Depends(get_db)):
     record = update_content_record(db, content_id, payload.title, payload.content, payload.description)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Content record not found")
+    return record
+
+
+@router.put("/{content_id}/status", response_model=ContentRecord)
+def set_content_record_status(
+    content_id: int,
+    payload: ContentStatusUpdate,
+    db: Session = Depends(get_db),
+):
+    """Activate/deactivate a content record — the safe alternative to deleting."""
+    try:
+        record = set_content_status(db, content_id, payload.status)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error))
     if record is None:
         raise HTTPException(status_code=404, detail="Content record not found")
     return record
