@@ -12,6 +12,7 @@ needs a real model; everything structural does not.
 """
 
 import hashlib
+import re
 
 from app.ai.adapters.base import (
     AIProvider,
@@ -21,15 +22,54 @@ from app.ai.adapters.base import (
 
 MODEL_ID = "mock-1"
 
-# Deterministic placeholder output. Shaped as a short list because the first
-# real tasks (subject/preheader, content suggestions) ask for a few options —
-# so the surrounding plumbing and the approval UI get something realistic to
-# render. It is a shape, not an opinion: pass canned_response to override.
+# Fallback when the prompt shows no example format to imitate.
 DEFAULT_RESPONSE = (
     "1. Mock option one\n"
     "2. Mock option two\n"
     "3. Mock option three"
 )
+
+# A prompt that specifies its output format usually demonstrates it with
+# angle-bracket placeholders, e.g. "SUBJECT: <subject>".
+_PLACEHOLDER = re.compile(r"<([a-z_ ]{2,30})>", re.IGNORECASE)
+
+
+def imitate_requested_format(prompt: str, options: int = 3) -> str | None:
+    """Reproduce the output shape the prompt asked for, with mock values.
+
+    A mock's job is to stand in *plausibly*: if a task's prompt demonstrates the
+    layout it wants, real parsing code should get something in that layout back,
+    or the pipeline can only ever be tested against a format nobody requested.
+    Doing it by reading the prompt keeps the adapter task-agnostic — it never
+    learns what a "subject line" is, so this works for future tasks too.
+
+    Returns None when the prompt shows no example to imitate.
+    """
+    template_lines = [
+        line for line in prompt.splitlines() if _PLACEHOLDER.search(line)
+    ]
+    if not template_lines:
+        return None
+
+    # Keep one cycle of the example (prompts usually repeat it 2-3 times).
+    seen: list[str] = []
+    for line in template_lines:
+        normalised = _PLACEHOLDER.sub("<>", line.strip().lstrip("0123456789. "))
+        if normalised in seen:
+            break
+        seen.append(normalised)
+    cycle = template_lines[: len(seen)]
+
+    blocks = []
+    for n in range(1, options + 1):
+        rendered = []
+        for line in cycle:
+            filled = _PLACEHOLDER.sub(
+                lambda m: f"Mock {m.group(1).strip().lower()} {n}", line
+            )
+            rendered.append(filled.strip().lstrip("0123456789. "))
+        blocks.append(f"{n}. " + "\n   ".join(rendered))
+    return "\n".join(blocks)
 
 
 def estimate_tokens(text: str) -> int:
@@ -75,7 +115,8 @@ class MockAIProvider(AIProvider):
         if text is None:
             # Same prompt in, same text out, so tests and previews are stable.
             digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:8]
-            text = f"{DEFAULT_RESPONSE}\n\n[mock:{digest}]"
+            body = imitate_requested_format(prompt) or DEFAULT_RESPONSE
+            text = f"{body}\n\n[mock:{digest}]"
 
         output_tokens = estimate_tokens(text)
         stop_reason = "end_turn"

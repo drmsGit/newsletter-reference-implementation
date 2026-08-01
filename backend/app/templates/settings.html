@@ -64,4 +64,104 @@
     </div>
 </div>
 
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">AI token budget</h5>
+        <p class="text-muted small">
+            Warn first, then hard stop (ADR-144). The gap between the two is the safety buffer:
+            because a task's worst case is known <em>before</em> it runs, anything that would not
+            fit under the hard stop is refused up front — so a stop always lands between tasks and
+            never mid-task, and nothing is spent on work that cannot finish.
+        </p>
+
+        <div class="mb-3">
+            <div class="d-flex justify-content-between small">
+                <span>{{ ai_tokens_used }} of {{ ai_cap.hard_stop_tokens }} tokens used</span>
+                <span class="text-muted">{{ ai_tokens_remaining }} remaining</span>
+            </div>
+            <div class="progress" role="progressbar" style="height:10px">
+                <div class="progress-bar {% if ai_over_warn %}bg-warning{% else %}bg-success{% endif %}"
+                     style="width: {{ ai_used_pct }}%"></div>
+            </div>
+            {% if ai_over_warn %}
+            <div class="form-text text-warning">Past the warn threshold.</div>
+            {% endif %}
+        </div>
+
+        <form method="post" action="/ui/settings/ai">
+            <div class="row" style="max-width:520px">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label"><strong>Warn at (tokens)</strong></label>
+                    <input type="number" min="1" step="1" name="ai_warn_tokens"
+                           value="{{ ai_cap.warn_tokens }}" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label"><strong>Hard stop at (tokens)</strong></label>
+                    <input type="number" min="1" step="1" name="ai_hard_stop_tokens"
+                           value="{{ ai_cap.hard_stop_tokens }}" class="form-control form-control-sm">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">Save AI budget</button>
+        </form>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">AI prompt — subject &amp; preheader</h5>
+        <p class="text-muted small">
+            The prompt is yours, not the developer's (ADR-140): a developer cannot judge marketing
+            copy. Saving publishes a <strong>new version</strong> — older versions are kept, never
+            overwritten, so an audit entry always resolves to the exact text that produced it.
+            Keep the <code>{{ '{content}' }}</code> placeholder; the edition's content is inserted there.
+        </p>
+
+        <form method="post" action="/ui/settings/ai-prompt">
+            <input type="hidden" name="task_key" value="{{ ai_prompt_task_key }}">
+            <div class="mb-2">
+                <textarea name="body" class="form-control font-monospace" rows="14"
+                          style="font-size:.8rem">{{ ai_prompt_body }}</textarea>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+                <button type="submit" class="btn btn-primary btn-sm">Publish new version</button>
+                <span class="small text-muted">
+                    {% if ai_prompt_version %}
+                        live: v{{ ai_prompt_version }}
+                    {% else %}
+                        not published yet — showing the built-in default
+                    {% endif %}
+                </span>
+            </div>
+        </form>
+
+        {% if ai_prompt_versions %}
+        <div class="mt-3 pt-3 border-top">
+            <div class="small text-muted mb-2">
+                <strong>Version history.</strong> Exactly one version is live at a time —
+                publishing a new one retires the previous, it does not delete it. Older versions
+                are kept so an audit entry always resolves to the exact text that produced it.
+            </div>
+            <table class="table table-sm mb-0 small">
+                <tbody>
+                    {% for v in ai_prompt_versions %}
+                    <tr>
+                        <td style="width:5rem">v{{ v.version }}</td>
+                        <td style="width:6rem">
+                            {% if v.is_published %}
+                            <span class="badge bg-success">live</span>
+                            {% else %}
+                            <span class="badge bg-secondary">retired</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted">{{ v.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td class="text-muted">{{ v.body[:70] }}{% if v.body|length > 70 %}…{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
 {% endblock %}

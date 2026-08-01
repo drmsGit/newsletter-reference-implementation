@@ -56,7 +56,14 @@ def dashboard(
         "dashboard.html",
         {
             "title": "Architecture Dashboard",
-            "content_count": db.query(ContentRecordDB).count(),
+            # Active only — a deactivated record still exists and still renders
+            # where it is already used, but it is not part of the catalogue a
+            # manager can compose with, so counting it here overstates the number.
+            "content_count": (
+                db.query(ContentRecordDB)
+                .filter(ContentRecordDB.status == "active")
+                .count()
+            ),
             "campaign_count": db.query(CampaignDB).count(),
             "recipient_count": db.query(RecipientDB).count(),
             "snapshot_count": db.query(SnapshotDB).count(),
@@ -83,6 +90,16 @@ def settings_page(request: Request, saved: bool = False, db: Session = Depends(g
         }
         for t in types
     ]
+    # AI budget + the manager-owned prompt (ADR-140/144).
+    from app.ai.service import get_published_prompt, list_prompt_versions, tokens_used
+    from app.ai.tasks import subject_preheader as subject_task
+    from app.settings.service import get_ai_spend_cap
+
+    ai_cap = get_ai_spend_cap(db)
+    ai_used = tokens_used(db)
+    published = get_published_prompt(db, subject_task.TASK_KEY)
+    ai_prompt_versions = list_prompt_versions(db, subject_task.TASK_KEY)
+
     return templates.TemplateResponse(
         request,
         "settings.html",
@@ -91,8 +108,53 @@ def settings_page(request: Request, saved: bool = False, db: Session = Depends(g
             "signal_rows": signal_rows,
             "max_send_recipients": get_max_send_recipients(db),
             "saved": saved,
+            "ai_cap": ai_cap,
+            "ai_tokens_used": ai_used,
+            "ai_tokens_remaining": max(0, ai_cap["hard_stop_tokens"] - ai_used),
+            "ai_used_pct": min(100, round(ai_used / max(1, ai_cap["hard_stop_tokens"]) * 100)),
+            "ai_over_warn": ai_used >= ai_cap["warn_tokens"],
+            "ai_prompt_task_key": subject_task.TASK_KEY,
+            "ai_prompt_body": published.body if published else subject_task.DEFAULT_PROMPT,
+            "ai_prompt_version": published.version if published else None,
+            "ai_prompt_versions": ai_prompt_versions,
         },
     )
+
+
+@router.post("/ui/settings/ai")
+async def settings_save_ai(request: Request, db: Session = Depends(get_db)):
+    """Persist the AI token budget. Blank/invalid values keep the code defaults."""
+    from app.settings.service import AI_SPEND_CAP_KEY, get_ai_spend_cap
+
+    form = await request.form()
+    current = get_ai_spend_cap(db)
+    values = dict(current)
+    for field, key in (("ai_warn_tokens", "warn_tokens"),
+                       ("ai_hard_stop_tokens", "hard_stop_tokens")):
+        raw = (form.get(field) or "").strip()
+        if not raw:
+            continue
+        try:
+            num = int(raw)
+        except ValueError:
+            continue
+        if num > 0:
+            values[key] = num
+    set_config(db, AI_SPEND_CAP_KEY, values)
+    return RedirectResponse(url="/ui/settings?saved=true", status_code=303)
+
+
+@router.post("/ui/settings/ai-prompt")
+async def settings_publish_ai_prompt(request: Request, db: Session = Depends(get_db)):
+    """Publish a new prompt version (never mutates an existing one — ADR-140 §3)."""
+    from app.ai.service import publish_prompt
+
+    form = await request.form()
+    task_key = (form.get("task_key") or "").strip()
+    body = (form.get("body") or "").strip()
+    if task_key and body:
+        publish_prompt(db, task_key, body)
+    return RedirectResponse(url="/ui/settings?saved=true", status_code=303)
 
 
 @router.post("/ui/settings")
@@ -405,6 +467,7 @@ def campaign_detail(
     campaign_id: int,
     request: Request,
     error: str | None = None,
+    ai_run: int | None = None,
     db: Session = Depends(get_db),
 ):
     campaign = (
@@ -606,6 +669,28 @@ def campaign_detail(
         })
     default_from = os.environ.get("RESEND_FROM", "onboarding@resend.dev")
 
+    # Read back an AI run from the redirect, if one just happened. The persisted
+    # run row is the source of truth for what was offered (ADR-140 §3), so no
+    # session state is needed and a refresh shows the same suggestions.
+    ai_suggestions: list[dict] = []
+    ai_suggestions_variant_id = None
+    ai_error = None
+    ai_run_tokens = 0
+    if ai_run is not None:
+        from app.ai.db_models import AIRunDB
+        from app.ai.tasks import subject_preheader as subject_task
+
+        row = db.query(AIRunDB).filter(AIRunDB.id == ai_run).first()
+        if row is not None:
+            ai_suggestions_variant_id = row.target_id
+            ai_run_tokens = (row.input_tokens or 0) + (row.output_tokens or 0)
+            if row.status == "ok":
+                ai_suggestions = subject_task.parse_options(row.output_text or "")
+                if not ai_suggestions:
+                    ai_error = "The model replied, but not in the requested format."
+            else:
+                ai_error = row.message or "The suggestion could not be generated."
+
     return templates.TemplateResponse(
         request,
         "campaign_detail.html",
@@ -619,6 +704,10 @@ def campaign_detail(
             "audience_choices": audience_choices,
             "default_from": default_from,
             "error": error,
+            "ai_suggestions": ai_suggestions,
+            "ai_suggestions_variant_id": ai_suggestions_variant_id,
+            "ai_error": ai_error,
+            "ai_run_tokens": ai_run_tokens,
         },
     )
 
@@ -676,6 +765,51 @@ def variant_edit(
         subject=subject.strip() or None,
         preheader=preheader.strip() or None,
     )
+    return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
+
+
+@router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/suggest-subject")
+def variant_suggest_subject(
+    campaign_id: int,
+    variant_id: int,
+    db: Session = Depends(get_db),
+):
+    """Run the Mode A subject/preheader task (ADR-141 §3).
+
+    Nothing is written to the variant here — AI output is a proposal until a
+    human picks one. The run id travels in the query string so the suggestions
+    survive the redirect without server-side session state; the persisted run
+    row is what the next GET reads back.
+    """
+    from app.ai.tasks import subject_preheader as subject_task
+
+    _, run = subject_task.suggest(db, variant_id)
+    if run is None:
+        return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
+    return RedirectResponse(
+        url=f"/ui/campaigns/{campaign_id}?ai_run={run.run_id}",
+        status_code=303,
+    )
+
+
+@router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/apply-subject")
+def variant_apply_subject(
+    campaign_id: int,
+    variant_id: int,
+    subject: str = Form(""),
+    preheader: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Apply a chosen suggestion — the human decision that turns it into content."""
+    variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
+    if variant is not None:
+        update_variant(
+            db,
+            variant_id=variant_id,
+            name=variant.name,
+            subject=subject.strip() or None,
+            preheader=preheader.strip() or None,
+        )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 

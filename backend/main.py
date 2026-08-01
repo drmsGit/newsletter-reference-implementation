@@ -50,6 +50,7 @@ from app.recipients.db_models import RecipientDB, SignalContributionDB, ConsentS
 from app.recipients.router import router as recipients_router
 
 from app.providers.db_models import ProviderEventQuarantineDB
+from app.ai.db_models import AIPromptDB, AIRunDB
 from app.providers.router import router as provider_router
 
 from app.email_modules.router import router as email_modules_router
