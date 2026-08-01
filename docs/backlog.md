@@ -22,7 +22,7 @@ Order within each section is priority order: **top = do next.** New items are in
 
 ## Bugs
 
-_(none open — all cleared 2026-07-12; a 2026-07-26 rule-block count bug fixed same day, see Done archive.)_
+- 🔴 **[Bug]** **No "deactivate" option for content records — `status` is write-once.** Noticed 2026-07-31 (user, while reviewing content). `ContentRecordDB.status` exists and defaults to `"active"`, but **no code path can ever change it**: `create_content` and `create_demo_content_if_empty` always write `"active"`, and `update_content_record` (`backend/app/content/service.py:47`) does not accept or touch `status` at all. The only way to remove a record is `delete_content_record` — a hard delete, with a `force` flag for the FK-referenced case. **Why this matters beyond a missing button:** the data-lifecycle Needs-ADR item below leans explicitly toward *"never hard-delete a content record that has historical usage — archive instead"*, and a deactivate/archive status is precisely the mechanism that position requires. It is also immediately practical: the 100 placeholder seed records need retiring once real content is imported, and hard-deleting them would break the module instances, decision resolutions and snapshots that reference them. **Fix:** let `update_content_record` (and a UI control) set `status`; make list/selection surfaces filter non-active records out of pickers while keeping them readable for historical views; settle the status vocabulary (`active` / `inactive` / `archived`?) together with the data-lifecycle item rather than inventing one here. Source: user, 2026-07-31.
 
 ## Features
 
