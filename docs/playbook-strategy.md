@@ -173,7 +173,7 @@ Design principles adopted:
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*
 
-### Status at a glance — updated 2026-07-27
+### Status at a glance — updated 2026-07-31
 
 | Phase | Item | Status |
 |---|---|---|
@@ -181,13 +181,14 @@ Design principles adopted:
 | 2 | 2A content mgmt · 2B campaign+variant builder (module create/**edit**/delete/reorder, hero/CTA fields) · 2C send prep | ✅ done |
 | 2 | 2D decision-slot config — strategy dropdown, config-shape enforcement, **category picker** (name-based multi-select) | ✅ done |
 | 3 | 3A rule-block audiences (incl/excl, pins) · 3B content-driven system suggestion (+ recalculate) · 3C signal layer (ADR-132) | ✅ done |
-| 3 | 3D AI-based audience selection | ⛔ gated on Automation |
+| 3 | 3D AI-based audience selection | 🟡 **unblocked** — automation now designed (ADR-140–144); not built |
+| — | **AI layer design** — five ADRs: [[ADR-140 — AI Capability Layer]] · [[ADR-141 — In-App Assistive AI Actions]] (Mode A) · [[ADR-142 — Autonomous Workflows and the Automation Boundary]] (Mode B) · [[ADR-143 — AI-Assisted Development Boundary]] (Mode C) · [[ADR-144 — AI Data and Model Governance]] | ✅ designed · ❌ not built |
 | — | **Outbound send path**: campaign→send audience link, freeze / re-run-at-send, calendar scheduling, provider + from-address select, recipient cap. Real Resend delivery from a verified domain, live. | ✅ done |
 | — | **Inbound engagement (Resend webhooks)**: signed webhook → clicks/opens → per-category signals; **hard bounce / complaint → auto opt-out**. Proven end-to-end. | ✅ done |
 | — | **Technical onboarding manual** (Obsidian module/flow map in `docs/architecture/Code/` + FastAPI Swagger + code comments) | ✅ done |
 | 4 | 4A structure · 4B client cases · 4C write & publish · 4D evolving-the-package / "AI-open" | ❌ not started |
 
-**Emergent theme — Automation** (the stated next focus): an AI-driven flow that picks + sends the right email at the right time to the right person, possibly orchestrated via n8n and/or AI. The umbrella that unblocks **3D**, engagement-driven audiences, and send-time optimization. Design conversation first; nothing built.
+**Emergent theme — Automation: design conversation ✅ done 2026-07-31.** The five-cluster AI-layer interview is closed and written up as **ADR-140–144** (see Decision Log, three entries dated 2026-07-31). This unblocks **3D**, engagement-driven audiences, and send-time optimization. **Nothing is built yet** — the AI layer is currently five ADRs deep and zero lines implemented, which is deliberately the next thing to fix (validate the design cheaply before building on top of it).
 
 **Deferred by design** — note the option now, implement in the **final MVP package** (not chased individually now): decision-content × audience resolution scope, batching / send-timing model, snapshot storage strategy, suppression-list + relaying provider opt-outs back to the CRM (the platform now opts out locally on bounce/complaint; CRM relay is the remaining piece), brand/theming (email file + simple web palette, decided), and the other Needs-ADR items in `docs/backlog.md`.
 
@@ -271,13 +272,13 @@ Not blocked by code — can be worked on alongside other phases.
 
 ---
 
-### Suggested next steps — updated 2026-07-26
+### Suggested next steps — updated 2026-07-31
 
-The core end-to-end demo path is complete: **build campaign → editable modules (hero/CTA) → suggest/edit audience → prepare send (audience + provider + timing) → trigger or scheduled send**, with the signal layer feeding suggestions. Candidate next moves:
+The core end-to-end demo path is complete: **build campaign → editable modules (hero/CTA) → suggest/edit audience → prepare send (audience + provider + timing) → trigger or scheduled send**, with the signal layer feeding suggestions. The **automation design conversation is now also done** (ADR-140–144), so the previous #1 item is closed. Decided direction (2026-07-31):
 
-1. **Automation workstream (the stated next focus)** — a design conversation first: what orchestrates "right time / right person" (n8n vs an in-app scheduler vs external worker — the `process_due_scheduled_sends` seam already exists), how AI picks audience/content/timing, where the seams are. Unblocks 3D + engagement-driven audiences + send-time optimization. Biggest strategic move; nothing built yet.
-2. **Phase 4 — Playbook production** (parallel, unblocked by code) — structure, client cases, write/publish. The build is now demonstrable enough to write against.
-3. **Small un-gated polish**, if wanted before either — 2D category picker; the audience/segment override half of the override redesign. Both in `docs/backlog.md`.
+1. **Build Mode A — first AI feature** *(chosen next)*. Subject/preheader suggestion + the shared approval inbox, against the Claude API as the first `AIProvider` (proving the adapter swap with a second model comes later). Rationale: the AI layer is five ADRs deep and unbuilt, and one small task exercises the model adapter, task scaffold, settings prompt, audit log and approval flow at once — **validating the design before anything expensive is built on top**. It also unblocks 3D, and it creates the approval-inbox UI that a future product frontend would otherwise have to design blind. **Prerequisite:** rework the placeholder seed content into realistic material (`docs/backlog.md`) — an AI feature tested against *"this is content about X"* yields a false negative.
+2. **Phase 4A in parallel** — playbook structure, per-chapter reader, communication style. Unblocked by code and being started in Claude Cowork. Note **4C (write & publish) stays blocked** until every part is designed, security included.
+3. **Product frontend (React/Node) — deliberately deferred** until the stage-1 base is complete. It is a whole new codebase, and sequencing it after Mode A avoids designing the manager UI around an approval surface that doesn't exist yet.
 
 Working style (see project memory): open forks are **noted as options now and implemented in the final MVP package**, not chased one-by-one — and this stays "architecture + one worked example," not a full second ESP.
 
