@@ -113,6 +113,32 @@
 
 ---
 
+### ADR-100 — Provider Layer as Send and Feedback Adapter
+
+*(added 2026-07-31, while starting the AI adapter — flagged rather than entrenched by copying one of the two existing conventions.)*
+
+**ADR says:** "A provider is treated as a **Send and Feedback Adapter**" — singular, with responsibilities *send email · return delivery feedback · return engagement feedback*.
+
+**Apparent drift:** one vendor is implemented as **two adapters in two modules**, under **two different folder conventions**:
+- `backend/app/delivery/providers/resend.py` — outbound send (69 lines, needs `httpx`)
+- `backend/app/providers/adapters/resend.py` — inbound webhook (133 lines, needs `hmac`/`hashlib`/`base64` for Svix verification)
+
+**Investigated 2026-07-31 — the code is right; the ADR and the docs are what drifted.** Consolidating into the single adapter ADR-100 describes was considered and **rejected on evidence**:
+1. **It would create a circular module dependency.** `providers/service.py` already imports `app.delivery.db_models` (it correlates events on `DeliveryExecutionDB.provider_message_id`), so `providers → delivery`. Moving the send adapter into `providers` and having `delivery` import it makes that cycle `delivery → providers → delivery`, and under [[ADR-130 — POC Uses Modular Monolith, Target Architecture Supports Service Separation]] neither module could then be extracted into a service cleanly.
+2. **The two halves share no code at all** — different third-party dependencies, opposite direction, different failure modes. Merging them produces one file with two unrelated dependency sets whose only commonality is the vendor name and an env-var prefix.
+
+**What to fix instead (Phase 4 packaging pass):**
+- **Naming:** the same kind of code sits in `delivery/providers/` and `providers/adapters/`. Standardise on **`adapters/`** — ADR-100's own word — so *provider* means the vendor and *adapter* means our translation code. (`app/ai/adapters/`, added 2026-07-31, already follows this.) Cost: 3 code references + ~7 doc files.
+- **ADR-100 wording:** say explicitly that the provider adapter has **two halves — send and feedback — deliberately living with their respective modules to keep the dependency acyclic**. Today the singular phrasing reads as a contradiction of a justified design.
+- **`docs/how-to-swap-send-provider.md`:** the promise is "copy the adapter and change three things", but an adopter must write **two** files in two modules. The guide should name both halves up front.
+
+**Files:**
+- `backend/app/delivery/providers/` — outbound adapter + factory
+- `backend/app/providers/adapters/` — inbound adapter
+- `docs/how-to-swap-send-provider.md` — the affected guide
+
+---
+
 ### ADR-106 — Bounce and Complaint Feedback Is Mandatory
 
 **ADR says:** Bounce and complaint feedback from providers is mandatory infrastructure.
@@ -190,6 +216,5 @@ The following ADRs appear structurally respected at the current implementation l
 | ADR-083 | Personalization Happens Inside Variants Through Decision Slots |
 | ADR-084 | Decision Slots May Resolve One or Multiple Content Records |
 | ADR-085 | Decision Resolution Should Be Optionally Explainable |
-| ADR-100 | Provider Layer as Send and Feedback Adapter |
 | ADR-103 | Provider Events Are Normalized Into Internal Events |
 | ADR-121 | Minimal Recipient Model |
