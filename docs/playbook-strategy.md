@@ -125,7 +125,27 @@ Design principles adopted:
 
 **Also:** [[ADR-003 — Human-Guided Marketing, AI-Optimized Delivery]] updated to reference this realization and moved proposed → accepted.
 
-**Status:** Clusters 1/2/5 decided and written as ADR-140/141/144 (accepted as design decisions; phased implementation with the Mode-A build). Clusters 3 (Mode B → ADR-142) and 4 (Mode C → ADR-143) still open — next interview session. Full question-by-question record in `docs/architecture/interview-prep/AI Layer - design interview.md`.
+**Status:** Clusters 1/2/5 decided and written as ADR-140/141/144 (accepted as design decisions; phased implementation with the Mode-A build). Full question-by-question record in `docs/architecture/interview-prep/AI Layer - design interview.md`.
+
+### 2026-07-31 — AI Layer Design, Part 2 (Cluster 3 → ADR-142)
+
+**Context:** Same-day continuation of the AI-layer interview — Mode B, autonomous workflows and the automation boundary — written up as [[ADR-142 — Autonomous Workflows and the Automation Boundary]].
+
+1. **The boundary is organisational before it is technical.** Automation is usually **not marketing's department**: the automation/IT team owns the flows and "just wants the system to send the right email", while marketing owns the platform and "just wants the platform to do the flow". Flows always need real orchestrator-side expertise, and there is no way to "prompt" a flow into existence from this architecture. **Principle adopted: whatever lets the platform work independently wins** — every orchestrator-triggerable action must also be triggerable in-app, and the platform stays fully usable with *no* orchestrator at all.
+
+2. **Approval: the platform holds the pending action; approving executes it.** The flow calls an action, receives "pending", and finishes — no long-running orchestrator state. Reuses Mode A's draft→publish and the same approval inbox. **Email/push notify only — never one-click approve links**, because scanners prefetch links in email (the same bot behaviour ADR-132 already accounts for), so a link could approve a full-audience send unattended. Pending actions expire; an action history (approved/rejected/expired) is required.
+
+3. **Ship one worked example, not a workflow library** — and **no custom n8n node** (the connector *is* the documented REST API). Two artifacts, two value stories: a **deliverability-anomaly alert** (read-only quick win — "it improves daily business too", and it addresses the real gap that with current platforms you often never learn a deliverability problem exists) and the **automated audience suggestion → approval inbox** (the marketer's value story). Everything else is documented as vendor-neutral call sequences.
+
+4. **Champion/challenger at the email level was evaluated and dropped.** You cannot A/B a *rendering* when personalization produces N renderings per send, so "how much system-generated content before the test stops making sense?" has no answer by construction. **Testing moves up to the strategy level** — the same audience-suggestion workflow with a different goal and prompt, which doubles as a live demonstration of ADR-140's frontend-editable prompts. Plain human-driven A/B testing stays a normal product feature (new backlog item). Consequence: the parked shadow-variant/counterfactual item lost its candidate solution — noted there so it isn't re-proposed.
+
+5. **Fatigue is deterministic, not predicted** — a downward trend in engagement **rate relative to the recipient's own baseline** (not an absolute "below X%", which punishes someone whose normal is every tenth email), computed from *undecayed* contribution counts and needing both the signal and delivery tables. Thresholds, window and exclusion duration are manager-adjustable settings.
+
+6. **New restraint principle — don't over-commit ADRs to unvalidated detail.** "AI tunes the system's own parameters" is named and documented but **deliberately not built**: a general capability claim needs no proof implementation, and committing an ADR to a detailed mechanism before 1.0 runs and a beta has happened risks locking in something a real deployment invalidates.
+
+**Also spun off (`docs/backlog.md`):** a suppression / opt-out **data-model ADR**, and an **A/B component + random split** POC feature. **[[ADR-021 — Variants Are Human Created Versions]] clarified** — it constrains *granularity*, not *authorship*; it had been misread twice as forbidding AI-drafted variants.
+
+**Status:** Cluster 3 settled and written as ADR-142. **Cluster 4 (Mode C → ADR-143) is the last one open.**
 
 ---
 

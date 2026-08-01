@@ -18,6 +18,7 @@ depends_on:
   - "[[ADR-085 — Decision Resolution Should Be Optionally Explainable]]"
 enables:
   - "[[ADR-141 — In-App Assistive AI Actions]]"
+  - "[[ADR-142 — Autonomous Workflows and the Automation Boundary]]"
   - "[[ADR-144 — AI Data and Model Governance]]"
 ---
 
@@ -131,7 +132,8 @@ model behaving unexpectedly).
 
 - **Three modes.** This foundational layer is shared by all three AI modes:
   **A** — in-app assistive button actions ([[ADR-141 — In-App Assistive AI Actions]]);
-  **B** — autonomous workflows / automation boundary (planned ADR-142, mostly n8n);
+  **B** — autonomous workflows / the automation boundary
+  ([[ADR-142 — Autonomous Workflows and the Automation Boundary]], mostly n8n);
   **C** — AI-assisted development, never prod (planned ADR-143). Cross-cutting data,
   model, cost, and PII governance is [[ADR-144 — AI Data and Model Governance]].
 - **Client stance.** For a company that wants no AI in its architecture, the honest
@@ -153,4 +155,5 @@ model behaving unexpectedly).
 
 ### Enables
 - [[ADR-141 — In-App Assistive AI Actions]]
+- [[ADR-142 — Autonomous Workflows and the Automation Boundary]]
 - [[ADR-144 — AI Data and Model Governance]]

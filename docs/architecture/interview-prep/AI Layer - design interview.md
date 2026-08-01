@@ -11,8 +11,9 @@ status: in-progress
 > **Progress (2026-07-31):** Clusters 1, 2, 5 are settled **and written up as ADRs**
 > — **[[ADR-140 — AI Capability Layer]]** (Cluster 1), **[[ADR-141 — In-App
 > Assistive AI Actions]]** (Cluster 2), **[[ADR-144 — AI Data and Model
-> Governance]]** (Cluster 5). **Cluster 3 (Mode B) is now settled too — ADR-142
-> still to be written.** Still open: **Cluster 4** (Mode C → ADR-143).
+> Governance]]** (Cluster 5) and **[[ADR-142 — Autonomous Workflows and the
+> Automation Boundary]]** (Cluster 3). **Only Cluster 4** (Mode C → ADR-143)
+> remains open.
 >
 > Cluster 3 also spun off work outside the AI ADRs: a **suppression/opt-out
 > data-model ADR** and an **A/B-component + random-split POC feature** (both in
@@ -146,7 +147,7 @@ its model.
     build.) **Phase-1 MVP stops here.** An opt-in **overage** mode ("keep going,
     pay per token") + richer controls are a future **"AI extra package."**
 
-## Cluster 3 — Autonomous Workflows & the Automation Boundary (Mode B ADR) → ✅ settled (ADR-142 to write)
+## Cluster 3 — Autonomous Workflows & the Automation Boundary (Mode B ADR) → ✅ [[ADR-142 — Autonomous Workflows and the Automation Boundary]]
 
 12. **The platform/n8n line.** → **Confirmed + decided.** The platform exposes
     **triggerable-action APIs** (build group, create campaign, send, precompute

@@ -95,8 +95,8 @@ A single **accept/reject component**, reused across tasks, lives in a dedicated
 **AI-suggestions / approval-inbox UI**: it shows the output(s) + reason,
 accept/reject per item, pick-one for options, and logs either way (ADR-140 audit).
 **Optional notifications** (desktop push and/or email), configurable. This
-dedicated UI is **the same approval surface Mode B autonomous workflows will use**
-(planned ADR-142). **Watch item:** accept/reject is the slim default, but some
+dedicated UI is **the same approval surface Mode B autonomous workflows use**
+([[ADR-142 — Autonomous Workflows and the Automation Boundary]]). **Watch item:** accept/reject is the slim default, but some
 tasks may want a short **feedback/iteration flow** ("make it punchier" →
 regenerate) — logged as a need to revisit, not built yet.
 
