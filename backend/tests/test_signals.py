@@ -1,8 +1,13 @@
 """
 Tests for the signal layer (ADR-132): decay-on-read over the contribution log.
 
-Assumes the normal seed (reset_all_data.sql): recipient id=1 (Anna) has manual
-contributions Beach=90, Family=60, Nature=50; category ids Beach=1, Family=5.
+Assertions are made against contributions these tests create and then remove,
+never against seeded values. Signals decay in real calendar time, so a test that
+asserts "the seed's Beach signal is 90" passes the week it is written and fails
+a month later without anything actually being broken.
+
+Recipient id=1 (Anna) and category id=1 (Beach) are stable handles for *where* to
+write, not a source of expected values.
 """
 from datetime import datetime, timezone, timedelta
 
@@ -16,6 +21,21 @@ from app.insight.signals import (
     HALF_LIFE_DAYS,
 )
 from app.recipients.db_models import SignalContributionDB
+
+# Registers every table in SQLAlchemy's metadata. Without it this module passes
+# only when another test file happens to import `main` first: run alone, the
+# signal_contributions -> categories foreign key cannot resolve and every test
+# touching the DB errors. Order-dependent suites hide real failures.
+import app.content.db_models  # noqa: F401
+import app.campaigns.db_models  # noqa: F401
+import app.delivery.db_models  # noqa: F401
+import app.audience.db_models  # noqa: F401
+import app.snapshots.db_models  # noqa: F401
+import app.providers.db_models  # noqa: F401
+import app.settings.db_models  # noqa: F401
+import app.insight.db_models  # noqa: F401
+import app.overrides.db_models  # noqa: F401
+import app.ai.db_models  # noqa: F401
 
 ANNA = 1
 BEACH = 1
@@ -52,22 +72,39 @@ class TestDecay:
 
 
 class TestOperationalSignal:
-    def test_seed_manual_preference(self):
+    def test_fresh_manual_contribution_counts_at_full_weight(self):
+        # A contribution recorded now should reach the signal essentially
+        # undecayed. Written against a contribution this test creates, because
+        # asserting on the seed's value silently rots: the seed ages in real
+        # calendar time, so "90" became 37 without anything being broken.
         db = SessionLocal()
+        c = None
         try:
-            # Fresh manual contribution decays only microscopically.
-            assert abs(get_operational_signal(db, ANNA, BEACH) - 90.0) < 1.0
+            before = get_operational_signal(db, ANNA, BEACH)
+            c = record_contribution(db, ANNA, BEACH, "manual", base_weight=90.0)
+            after = get_operational_signal(db, ANNA, BEACH)
+            assert abs((after - before) - 90.0) < 1.0
         finally:
             db.close()
+            if c is not None:
+                _cleanup(c.id)
 
     def test_signals_for_recipient_ranks_by_value(self):
+        # Ranking is asserted against a contribution large enough to dominate
+        # whatever else the database holds, rather than against a seeded
+        # category that later data can overtake.
         db = SessionLocal()
+        c = None
         try:
+            existing = operational_signals_for_recipient(db, ANNA)
+            dominant = max(existing.values(), default=0.0) + 100.0
+            c = record_contribution(db, ANNA, BEACH, "manual", base_weight=dominant)
             sigs = operational_signals_for_recipient(db, ANNA)
-            # Beach (90) is Anna's strongest of the seeded categories.
             assert max(sigs, key=sigs.get) == BEACH
         finally:
             db.close()
+            if c is not None:
+                _cleanup(c.id)
 
     def test_new_contribution_raises_signal(self):
         db = SessionLocal()
