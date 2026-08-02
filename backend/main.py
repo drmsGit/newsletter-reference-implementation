@@ -1,26 +1,91 @@
 import logging
 import os
+import re
 from pathlib import Path
 
 from fastapi import FastAPI
 
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# What a shell-style variable name may contain. Anything else — a stray space, a
+# zero-width character picked up from a paste — makes the name silently not the
+# name you meant, which is invisible in every editor.
+VALID_ENV_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def _load_local_env() -> None:
     """Load backend/.env (gitignored) into the environment for local secrets
     like RESEND_API_KEY — so credentials never live in code or the DB. A real
-    environment variable always wins (setdefault). No dependency; see
-    .env.example for the expected keys."""
+    environment variable always wins. No dependency; see .env.example for the
+    expected keys.
+
+    Three rules exist because the failure mode of this function is *silence*:
+    a key that is present but not loaded looks exactly like a bug in whatever
+    needed it, and the search starts in the wrong place.
+
+      - An empty value is ignored, never stored. The first occurrence of a key
+        wins, so a leftover `KEY=` line would otherwise quietly shadow the real
+        one further down the file.
+      - A name that isn't a plain variable name is reported, with its invisible
+        characters escaped — the one failure you cannot see by looking.
+      - What was loaded is logged by *name* (never value), so startup states
+        what it picked up instead of leaving you to infer it.
+
+    A real environment variable still wins over the file — but an *empty* one
+    does not, because an empty value is not a real value. That distinction
+    matters under `uvicorn --reload`: the reloader's parent process holds the
+    environment its children inherit, so a blank value read once at startup
+    would otherwise be pinned there for the life of the parent, and no edit to
+    this file could dislodge it without a full restart.
+    """
     env_path = Path(__file__).parent / ".env"
     if not env_path.exists():
         return
+
+    loaded: list[str] = []
+    empty: list[str] = []
+    malformed: list[str] = []
+    shadowed: list[str] = []
+
     for line in env_path.read_text().splitlines():
-        line = line.strip()
+        line = line.lstrip("﻿").strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
+
         key, _, value = line.partition("=")
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+
+        if not VALID_ENV_KEY.match(key):
+            malformed.append(repr(key))
+            continue
+        if not value:
+            empty.append(key)
+            continue
+        # A non-empty variable already in the environment wins. An empty one is
+        # treated as absent and replaced from the file.
+        if os.environ.get(key):
+            shadowed.append(key)
+            continue
+
+        os.environ[key] = value
+        loaded.append(key)
+
+    if loaded:
+        logger.info(".env loaded: %s", ", ".join(sorted(loaded)))
+    if shadowed:
+        logger.info(
+            ".env not applied (already set in the environment): %s",
+            ", ".join(sorted(shadowed)),
+        )
+    if empty:
+        logger.warning(".env ignored (no value): %s", ", ".join(sorted(empty)))
+    if malformed:
+        logger.warning(
+            ".env ignored (not a valid variable name — note the escapes): %s",
+            ", ".join(sorted(malformed)),
+        )
 
 
 _load_local_env()
