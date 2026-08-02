@@ -182,7 +182,8 @@ Design principles adopted:
 | 2 | 2D decision-slot config — strategy dropdown, config-shape enforcement, **category picker** (name-based multi-select) | ✅ done |
 | 3 | 3A rule-block audiences (incl/excl, pins) · 3B content-driven system suggestion (+ recalculate) · 3C signal layer (ADR-132) | ✅ done |
 | 3 | 3D AI-based audience selection | 🟡 **unblocked** — automation now designed (ADR-140–144); not built |
-| — | **AI layer design** — five ADRs: [[ADR-140 — AI Capability Layer]] · [[ADR-141 — In-App Assistive AI Actions]] (Mode A) · [[ADR-142 — Autonomous Workflows and the Automation Boundary]] (Mode B) · [[ADR-143 — AI-Assisted Development Boundary]] (Mode C) · [[ADR-144 — AI Data and Model Governance]] | ✅ designed · ❌ not built |
+| — | **AI layer design** — five ADRs: [[ADR-140 — AI Capability Layer]] · [[ADR-141 — In-App Assistive AI Actions]] (Mode A) · [[ADR-142 — Autonomous Workflows and the Automation Boundary]] (Mode B) · [[ADR-143 — AI-Assisted Development Boundary]] (Mode C) · [[ADR-144 — AI Data and Model Governance]] | ✅ designed |
+| — | **AI layer build — Mode A, first task.** `AIProvider` adapter + zero-cost mock · versioned manager-owned prompts · spend cap enforced as a pre-call gate · audit/cost ledger · "Suggest subject & preheader" on the variant with inline accept | ✅ working on the mock · ❌ no real model adapter yet |
 | — | **Outbound send path**: campaign→send audience link, freeze / re-run-at-send, calendar scheduling, provider + from-address select, recipient cap. Real Resend delivery from a verified domain, live. | ✅ done |
 | — | **Inbound engagement (Resend webhooks)**: signed webhook → clicks/opens → per-category signals; **hard bounce / complaint → auto opt-out**. Proven end-to-end. | ✅ done |
 | — | **Technical onboarding manual** (Obsidian module/flow map in `docs/architecture/Code/` + FastAPI Swagger + code comments) | ✅ done |
