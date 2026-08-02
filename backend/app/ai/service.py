@@ -17,9 +17,11 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
-from app.ai.adapters.factory import get_ai_provider, DEFAULT_AI_PROVIDER
+from app.ai.adapters.base import TokenCountUnavailable
+from app.ai.adapters.factory import get_ai_provider
 from app.ai.db_models import AIPromptDB, AIRunDB
-from app.settings.service import get_ai_spend_cap
+from app.ai.pricing import cost_usd, is_billable
+from app.settings.service import get_ai_provider_name, get_ai_spend_cap
 
 
 @dataclass
@@ -85,9 +87,50 @@ def publish_prompt(db: Session, task_key: str, body: str) -> AIPromptDB:
 
 
 def tokens_used(db: Session) -> int:
-    """Total tokens spent so far — the ledger the cap is measured against."""
-    rows = db.query(AIRunDB.input_tokens, AIRunDB.output_tokens).all()
-    return sum((r[0] or 0) + (r[1] or 0) for r in rows)
+    """Billable tokens spent so far — the ledger the cap is measured against.
+
+    Free adapters are excluded. The cap exists to bound *spend*, and mock runs
+    cost nothing, so counting them would let development and demo traffic
+    consume a budget only the real model draws on — which is not a rounding
+    error: after the first day of building, most rows in this table were mock.
+    """
+    rows = db.query(
+        AIRunDB.provider, AIRunDB.input_tokens, AIRunDB.output_tokens
+    ).all()
+    return sum(
+        (r.input_tokens or 0) + (r.output_tokens or 0)
+        for r in rows
+        if is_billable(r.provider)
+    )
+
+
+def spend_to_date(db: Session) -> dict:
+    """What the billable runs actually cost, in USD.
+
+    Reported next to the token ledger rather than replacing it: tokens are what
+    the cap enforces, money is what the manager budgeted. `unpriced_runs` is
+    surfaced rather than folded in — a model with no published price here would
+    otherwise quietly understate the total.
+    """
+    rows = db.query(
+        AIRunDB.provider, AIRunDB.model,
+        AIRunDB.input_tokens, AIRunDB.output_tokens,
+    ).all()
+
+    total, unpriced = 0.0, 0
+    for row in rows:
+        input_tokens, output_tokens = row.input_tokens or 0, row.output_tokens or 0
+        # A refused run spent nothing and has no model to price. It is not an
+        # unpriced run, it is a run that never happened.
+        if not is_billable(row.provider) or not (input_tokens or output_tokens):
+            continue
+        cost = cost_usd(row.model, input_tokens, output_tokens)
+        if cost is None:
+            unpriced += 1
+            continue
+        total += cost
+
+    return {"usd": total, "unpriced_runs": unpriced}
 
 
 def _record(db: Session, **kwargs) -> AIRunDB:
@@ -110,7 +153,7 @@ def run_task(
 ) -> TaskRun:
     """Execute one AI task, enforcing the cap before spending anything."""
 
-    provider_name = provider_name or DEFAULT_AI_PROVIDER
+    provider_name = provider_name or get_ai_provider_name(db)
     prompt_row = get_published_prompt(db, task_key)
 
     if prompt_row is None:
@@ -125,7 +168,22 @@ def run_task(
 
     # --- the pre-call gate (ADR-144 §5) ---------------------------------
     cap = get_ai_spend_cap(db)
-    input_tokens = provider.count_input_tokens(rendered_prompt, system)
+    try:
+        input_tokens = provider.count_input_tokens(rendered_prompt, system)
+    except TokenCountUnavailable as error:
+        # No verified input count means no verified worst case, and a gate built
+        # on an unverified number is not a gate. Refusing is the conservative
+        # branch and it is also the honest one — nothing was spent finding out.
+        run = _record(
+            db, task_key=task_key, prompt_id=prompt_row.id, provider=provider_name,
+            status="blocked", target_type=target_type, target_id=target_id,
+            message=(
+                f"Refused before running: the cost of this run could not be "
+                f"verified up front ({error}). Nothing was spent."
+            ),
+        )
+        return TaskRun(ok=False, run_id=run.id, message=run.message)
+
     worst_case = input_tokens + max_output_tokens
     used = tokens_used(db)
     # Clamped: once the cap is already exceeded the shortfall is not meaningful,

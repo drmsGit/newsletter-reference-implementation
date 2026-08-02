@@ -91,12 +91,17 @@ def settings_page(request: Request, saved: bool = False, db: Session = Depends(g
         for t in types
     ]
     # AI budget + the manager-owned prompt (ADR-140/144).
-    from app.ai.service import get_published_prompt, list_prompt_versions, tokens_used
+    from app.ai.service import (
+        get_published_prompt, list_prompt_versions, spend_to_date, tokens_used,
+    )
     from app.ai.tasks import subject_preheader as subject_task
-    from app.settings.service import get_ai_spend_cap
+    from app.ai.adapters.claude import DEFAULT_MODEL as CLAUDE_DEFAULT_MODEL
+    from app.ai.adapters.factory import AVAILABLE_AI_PROVIDERS
+    from app.settings.service import get_ai_provider_name, get_ai_spend_cap
 
     ai_cap = get_ai_spend_cap(db)
     ai_used = tokens_used(db)
+    ai_spend = spend_to_date(db)
     published = get_published_prompt(db, subject_task.TASK_KEY)
     ai_prompt_versions = list_prompt_versions(db, subject_task.TASK_KEY)
 
@@ -108,8 +113,17 @@ def settings_page(request: Request, saved: bool = False, db: Session = Depends(g
             "signal_rows": signal_rows,
             "max_send_recipients": get_max_send_recipients(db),
             "saved": saved,
+            "ai_provider": get_ai_provider_name(db),
+            "ai_providers": AVAILABLE_AI_PROVIDERS,
+            "ai_key_present": bool(os.environ.get("ANTHROPIC_API_KEY")),
+            # Which model id will actually be called — the adapter's default
+            # unless the environment overrides it. Worth showing: "claude" names
+            # the adapter, not the model, and the audit records the model.
+            "ai_model": os.environ.get("ANTHROPIC_MODEL") or CLAUDE_DEFAULT_MODEL,
+            "ai_model_from_env": bool(os.environ.get("ANTHROPIC_MODEL")),
             "ai_cap": ai_cap,
             "ai_tokens_used": ai_used,
+            "ai_spend": ai_spend,
             "ai_tokens_remaining": max(0, ai_cap["hard_stop_tokens"] - ai_used),
             "ai_used_pct": min(100, round(ai_used / max(1, ai_cap["hard_stop_tokens"]) * 100)),
             "ai_over_warn": ai_used >= ai_cap["warn_tokens"],
@@ -140,7 +154,34 @@ async def settings_save_ai(request: Request, db: Session = Depends(get_db)):
             continue
         if num > 0:
             values[key] = num
+
+    # Reference figure only, so 0/blank is meaningful here — it clears the
+    # denominator from the money readout rather than being rejected as invalid.
+    raw_budget = (form.get("ai_budget_usd") or "").strip().replace(",", ".")
+    try:
+        values["budget_usd"] = max(0.0, float(raw_budget))
+    except ValueError:
+        pass
+
     set_config(db, AI_SPEND_CAP_KEY, values)
+    return RedirectResponse(url="/ui/settings?saved=true", status_code=303)
+
+
+@router.post("/ui/settings/ai-provider")
+async def settings_save_ai_provider(request: Request, db: Session = Depends(get_db)):
+    """Choose which model the AI layer calls.
+
+    Validated against the factory's governed list, so an unknown name can never
+    be stored — every later run would otherwise fail on a value saved once
+    (ADR-140: enablement is a governed choice, not free text).
+    """
+    from app.ai.adapters.factory import AVAILABLE_AI_PROVIDERS
+    from app.settings.service import AI_PROVIDER_KEY
+
+    form = await request.form()
+    name = (form.get("ai_provider") or "").strip()
+    if name in AVAILABLE_AI_PROVIDERS:
+        set_config(db, AI_PROVIDER_KEY, name)
     return RedirectResponse(url="/ui/settings?saved=true", status_code=303)
 
 

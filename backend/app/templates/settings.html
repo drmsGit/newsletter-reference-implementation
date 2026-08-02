@@ -66,6 +66,44 @@
 
 <div class="card mb-4">
     <div class="card-body">
+        <h5 class="card-title">AI model</h5>
+        <p class="text-muted small">
+            Which model the assistive actions call. <code>mock</code> is the default and costs
+            nothing — it produces stand-in text so the whole flow can be used and demonstrated
+            without an account. Choosing a real model is a deliberate act, and reversible here at
+            any time (ADR-140). The API key itself lives in the environment, never in this database.
+        </p>
+
+        <form method="post" action="/ui/settings/ai-provider" class="d-flex gap-2 align-items-start">
+            <select name="ai_provider" class="form-select form-select-sm" style="max-width:220px">
+                {% for name in ai_providers %}
+                <option value="{{ name }}" {% if name == ai_provider %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary btn-sm">Save model</button>
+        </form>
+
+        {% if ai_provider != 'mock' and not ai_key_present %}
+        <div class="form-text text-warning mt-2">
+            <strong>{{ ai_provider }}</strong> is selected but <code>ANTHROPIC_API_KEY</code> is not
+            set in the environment. Runs will be refused before they start — nothing gets spent, but
+            nothing gets generated either.
+        </div>
+        {% elif ai_provider != 'mock' %}
+        <div class="form-text mt-2">Live model — runs draw on the token budget below.</div>
+        {% endif %}
+
+        {% if ai_provider != 'mock' %}
+        <div class="form-text">
+            Calling <code>{{ ai_model }}</code>
+            ({% if ai_model_from_env %}from <code>ANTHROPIC_MODEL</code>{% else %}adapter default{% endif %}).
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
         <h5 class="card-title">AI token budget</h5>
         <p class="text-muted small">
             Warn first, then hard stop (ADR-144). The gap between the two is the safety buffer:
@@ -86,6 +124,17 @@
             {% if ai_over_warn %}
             <div class="form-text text-warning">Past the warn threshold.</div>
             {% endif %}
+            <div class="form-text">
+                <strong>${{ '%.3f'|format(ai_spend.usd) }}</strong>{% if ai_cap.budget_usd %} of ${{ '%.2f'|format(ai_cap.budget_usd) }}{% endif %} spent.
+                Free <code>mock</code> runs are excluded — the bar and this figure both count
+                paid runs only.
+                {% if ai_spend.unpriced_runs %}
+                <span class="text-warning">
+                    {{ ai_spend.unpriced_runs }} run(s) used a model with no published price on
+                    file, so the amount above is lower than the real one.
+                </span>
+                {% endif %}
+            </div>
         </div>
 
         <form method="post" action="/ui/settings/ai">
@@ -99,6 +148,16 @@
                     <label class="form-label"><strong>Hard stop at (tokens)</strong></label>
                     <input type="number" min="1" step="1" name="ai_hard_stop_tokens"
                            value="{{ ai_cap.hard_stop_tokens }}" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label"><strong>Budget (USD)</strong></label>
+                    <input type="number" min="0" step="0.01" name="ai_budget_usd"
+                           value="{{ '%.2f'|format(ai_cap.budget_usd) if ai_cap.budget_usd else '' }}"
+                           placeholder="e.g. 5.00" class="form-control form-control-sm">
+                    <div class="form-text">
+                        What you topped up. Shown next to spend for context — the
+                        <em>cap</em> is the token pair, not this. Leave blank to hide it.
+                    </div>
                 </div>
             </div>
             <button type="submit" class="btn btn-primary btn-sm">Save AI budget</button>

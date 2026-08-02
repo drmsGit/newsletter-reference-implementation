@@ -7,11 +7,17 @@ something that should follow from a file appearing on disk.
 """
 
 from app.ai.adapters.base import AIProvider
+from app.ai.adapters.claude import ClaudeProvider
 from app.ai.adapters.mock import MockAIProvider
 
 # The DEV default. Same reasoning as provider="mock" for sends: the safe,
 # free, offline option is what you get unless a deployment opts into a real one.
 DEFAULT_AI_PROVIDER = "mock"
+
+# What a deployment is allowed to select, in UI order. The governed list itself
+# (ADR-140) — a name absent here cannot be chosen or saved, which is why the
+# settings form validates against it rather than accepting free text.
+AVAILABLE_AI_PROVIDERS = ("mock", "claude")
 
 
 def get_ai_provider(provider_name: str | None = None) -> AIProvider:
@@ -21,9 +27,8 @@ def get_ai_provider(provider_name: str | None = None) -> AIProvider:
     if name == "mock":
         return MockAIProvider()
 
-    # "claude" lands here next — a small adapter over the Anthropic API, using
-    # its token-counting endpoint for count_input_tokens() so the spend cap is
-    # computed from real numbers rather than an estimate.
+    if name == "claude":
+        return ClaudeProvider()
 
     raise ValueError(
         f"Unsupported AI provider: {name}"

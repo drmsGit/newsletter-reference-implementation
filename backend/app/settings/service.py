@@ -7,6 +7,7 @@ merge the two so callers always get a complete config. Only *values* live here
 """
 from sqlalchemy.orm import Session
 
+from app.ai.adapters.factory import AVAILABLE_AI_PROVIDERS, DEFAULT_AI_PROVIDER
 from app.settings.db_models import AppConfigDB
 from app.insight.signals import CONTRIBUTION_WEIGHTS, HALF_LIFE_DAYS
 
@@ -15,6 +16,7 @@ SIGNAL_WEIGHTS = "signal_weights"
 HALF_LIFE_DAYS_KEY = "half_life_days"
 MAX_SEND_RECIPIENTS_KEY = "max_send_recipients"
 AI_SPEND_CAP_KEY = "ai_spend_cap"
+AI_PROVIDER_KEY = "ai_provider"
 
 # AI token budget (ADR-144 §5). Two numbers, not one: warn first, then hard stop.
 # The buffer between them is the point — it is what lets the hard stop be a
@@ -22,6 +24,13 @@ AI_SPEND_CAP_KEY = "ai_spend_cap"
 # cutting one off mid-run. Configurable because the company sets its own limit.
 DEFAULT_AI_WARN_TOKENS = 80_000
 DEFAULT_AI_HARD_STOP_TOKENS = 100_000
+
+# What the company actually topped up, in USD. Purely a reference point for the
+# money readout — the *cap* is and stays the token pair above. A currency figure
+# cannot be the gate: what a token costs depends on the input/output mix of a
+# run that hasn't happened yet, so a dollar limit could only ever be enforced
+# after the fact. 0 means "not stated", and the readout simply omits it.
+DEFAULT_AI_BUDGET_USD = 0.0
 
 # Safety cap on how many recipients one send may target — a guardrail against an
 # accidental mass blast. Lives in settings (retunable) here in the POC; in a real
@@ -59,8 +68,30 @@ def get_half_lives(db: Session) -> dict[str, float]:
     return {**HALF_LIFE_DAYS, **{k: float(v) for k, v in overrides.items()}}
 
 
-def get_ai_spend_cap(db: Session) -> dict[str, int]:
-    """AI token cap: warn threshold and hard stop, code defaults overridden by config."""
+def get_ai_provider_name(db: Session) -> str:
+    """Which model the AI layer calls — mock unless a deployment opts in.
+
+    A setting rather than an env var because ADR-140 makes model enablement a
+    governed, visible choice: a manager should be able to see that real calls
+    are switched on, and switch them off again, without a redeploy. The key
+    itself stays in the environment (see the Claude adapter) — the same split
+    as sends, where the provider is chosen in the UI and RESEND_API_KEY is not.
+
+    An unrecognised stored value falls back to the safe default instead of
+    breaking every run; the form is what refuses to write one.
+    """
+    name = get_config(db, AI_PROVIDER_KEY, None)
+    if isinstance(name, str) and name in AVAILABLE_AI_PROVIDERS:
+        return name
+    return DEFAULT_AI_PROVIDER
+
+
+def get_ai_spend_cap(db: Session) -> dict:
+    """AI token cap: warn threshold and hard stop, code defaults overridden by config.
+
+    Also carries `budget_usd` — the company's stated top-up, reported next to
+    the token figures but never enforced (see DEFAULT_AI_BUDGET_USD).
+    """
     overrides = get_config(db, AI_SPEND_CAP_KEY, {}) or {}
     defaults = {
         "warn_tokens": DEFAULT_AI_WARN_TOKENS,
@@ -78,6 +109,15 @@ def get_ai_spend_cap(db: Session) -> dict[str, int]:
     # silently keeping a setting that cannot do its job.
     if merged["warn_tokens"] > merged["hard_stop_tokens"]:
         merged["warn_tokens"] = merged["hard_stop_tokens"]
+
+    merged["budget_usd"] = DEFAULT_AI_BUDGET_USD
+    try:
+        budget = float(overrides["budget_usd"])
+        if budget > 0:
+            merged["budget_usd"] = budget
+    except (KeyError, TypeError, ValueError):
+        pass
+
     return merged
 
 

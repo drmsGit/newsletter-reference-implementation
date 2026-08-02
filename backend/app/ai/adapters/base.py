@@ -10,6 +10,17 @@ from abc import ABC, abstractmethod
 from pydantic import BaseModel
 
 
+class TokenCountUnavailable(RuntimeError):
+    """Raised when an adapter cannot count a prompt's input tokens.
+
+    Deliberately an error rather than a fallback estimate. ADR-144's spend cap
+    is a *pre-call* gate, and a gate computed from a guess is not a gate — it
+    would let a run start on a number nobody verified. So an adapter that
+    cannot answer says so, and the caller refuses the run instead of spending
+    against arithmetic it cannot trust.
+    """
+
+
 class AIUsage(BaseModel):
     """Tokens actually consumed by one call — the input to cost accounting."""
 
