@@ -37,6 +37,8 @@ modified: 2026-06-05
 - [[MOC - Provider Architecture]]
 - [[MOC - Insight Architecture]]
 - [[MOC - Data Foundation]]
+- [[MOC - AI Architecture]]
+- [[MOC - Security Architecture]]
 
 ## Main Architecture Flow
 
