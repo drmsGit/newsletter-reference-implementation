@@ -104,3 +104,47 @@ A Klaviyo+MCP user gets "send this email" in one prompt, faster, with zero setup
 - **Teachability** — "here is a real ESP behind an abstract contract, now write your own" is a lesson; Klaviyo+MCP teaches nothing about how sending works.
 
 **Not flagged as wrong-axis.** The feature would only be competing on the wrong axis if it were pitched as "send emails easily/fast" — it is not; it is pitched (per the commit and docstring) as proving the vendor-agnostic contract. That aligns with the sharpened audience in the baseline entry (data-ownership/multi-provider/teaching personas), not the small-shop-wants-speed persona already ceded to Klaviyo+AI.
+
+---
+
+## AI layer — Claude adapter, token-based spend cap, Mode-A subject/preheader task — 2026-08-02
+
+Feature: the `backend/app/ai/` package — `AIProvider` contract (`adapters/base.py`), real `ClaudeProvider` (`adapters/claude.py`) + zero-cost `MockAIProvider`, `get_ai_provider` factory (`adapters/factory.py`), the pre-call spend gate + audit ledger in `run_task`/`tokens_used`/`spend_to_date` (`service.py`), token-price table (`pricing.py`), `AIPromptDB`/`AIRunDB` (`db_models.py`), and the first Mode-A task `suggest` (`tasks/subject_preheader.py`). Implements ADR-140 (audit + manager-owned prompts), ADR-141 (Mode A), ADR-144 (spend cap as pre-call gate). Surface and classify only.
+
+### 1. Assumption about the user/adopter
+
+Two distinct personas are assumed, split cleanly by the code's own ownership boundary:
+- **Manager/marketing/BI (non-technical)** owns the *prompt* — it lives in `AIPromptDB`, is versioned/published from Settings, and the dev-owned task file only references it (`subject_preheader.py:5-8`, `db_models.py:31-44`). Assumes someone who can judge marketing copy but shouldn't touch code, and who thinks in a *budget* (the USD figure in `spend_to_date`).
+- **Adopter/operator (technical)** owns credentials (`ANTHROPIC_API_KEY` from env, never DB), model enablement (the governed `AVAILABLE_AI_PROVIDERS` list), and the token cap value. Assumes someone who understands that AI spend must be bounded *before* the fact, not reconciled after.
+
+Scale assumption is **low-concurrency, single-operator**: `run_task` has a check-then-act gap (`tokens_used` → gate → `_record` with no lock, `service.py:188-203`) and `tokens_used` re-sums the whole ledger per run — both fine for a few sequential runs, neither built for fan-out. Use case assumed is **assistive, human-in-the-loop** (Mode A: suggest, manager commits), explicitly *not* autonomous generation.
+
+### 2. Compete with / duplicate Sendy/Listmonk/Mautic, or fill a gap?
+
+Sendy/Listmonk/Mautic have essentially **no AI layer** to duplicate — this isn't competing with them at all. The comparison that matters is the modern SaaS+AI stack (Klaviyo AI, Jasper, etc.). What is genuinely *not* found in either the open-source tools or the SaaS-AI products is the combination the code actually builds: **a governed, audited, pre-budgeted AI boundary** — every run (including *refused* ones) recorded with the published prompt-version id (`AIRunDB`, `run_task`'s `status="blocked"` rows), a spend cap enforced as a computable pre-call gate (`count_input_tokens + max_output_tokens`, `service.py:187`), and prompt ownership split from code. The AI *feature* (suggest subject lines) is commoditized; the **accountability envelope around it** is the gap.
+
+### 3. Opinionated core vs. tailorable surface
+
+**Mixed, and the split is unusually explicit in the code — worth documenting as the teaching centerpiece:**
+- **Opinionated core (stays):** the pre-call-gate ordering (prompt → gate → adapter → audit, `service.py:1-14`), `count_input_tokens` as a *required* contract method (`base.py:57-71`), the two opposite defaults (billable-unless-named-free vs. cost-unknown-unless-priced, `pricing.py:9-19`), never-mutate-a-published-prompt versioning (`publish_prompt`), and auditing blocked attempts. These encode ADR-140/144 and must not drift.
+- **Tailorable surface (document as extension points):** `AIProvider`/`get_ai_provider` is the "write your own model adapter" seam (same as `DeliveryProvider`); `MODEL_PRICING`/`FREE_PROVIDERS` are deployment-owned facts (a vendor table with a verification date, `pricing.py:22-37`); the **task file** (`subject_preheader.py`) is the scaffold pattern any new Mode-A task copies (declare inputs, output ceiling, target); and the **prompt** is adopter/manager-owned by construction, not a dev artifact. The 60s timeout, thinking-off default, and 400-token ceiling are per-task tunables, not core.
+
+### 4. What you'd need to explain beyond the ADR
+
+- **Why the gate needs a *second* network call before every generate** — the count endpoint round-trip is the price of a real pre-call cap; the ADR states the cap, not that it costs an extra request and adds a failure point.
+- **Why `TokenCountUnavailable` refuses instead of estimating** — that a gate built on a guess silently stops being a gate; non-obvious until you see that a blip on the *cheap* endpoint would otherwise disable the cap on the *expensive* one.
+- **Why thinking is off by default is a cost decision, not a quality one** — `max_tokens` bounds thinking+reply together, so reasoning can eat a small output budget and truncate (`claude.py:89-96`). Invisible in the ADR.
+- **The two opposite defaults in pricing** — that billability and cost round in *opposite* directions on purpose, each toward its own safe error. Reads like an inconsistency until explained.
+- **Why blocked runs are still written to `ai_runs`** — "refusing to spend is an event worth explaining later"; a newcomer would expect a refusal to be a no-op.
+- **The concurrency caveat** — the ADR presents the cap as a hard gate; the code's check-then-act gap means it's a hard gate *for sequential runs*. That boundary must be taught honestly.
+
+### 5. Klaviyo + Claude/MCP in one prompt — anything beyond speed?
+
+A Klaviyo-AI or Claude+MCP user gets "suggest 3 subject lines" instantly, no setup. This feature does **not** compete on that speed and must not be pitched as if it does. What it offers that the one-prompt path structurally cannot:
+- **Governed spend** — a *pre-call* budget cap with a real token count is not something a chat-with-an-agent flow gives you; the SaaS-AI path bills you after the fact.
+- **Auditability / reproducibility** — every run (and refusal) is tied to a published prompt version, so "why did we send this subject in March" resolves to a specific prompt text and model (`AIRunDB` + `publish_prompt`'s never-mutate rule). A black-box AI button reproduces nothing.
+- **Prompt ownership** — the manager owns and versions the prompt as a first-class governed asset, not a vendor-hidden system prompt.
+- **Portability** — the same `AIProvider` seam that swaps Claude for another model; the architecture never learns which vendor answered.
+- **PII posture** — the task deliberately sends only editorial content, no recipient identity (`subject_preheader.py:13-15`); a "sync everything to the vendor's AI" flow can't make that guarantee.
+
+**Not flagged as wrong-axis.** It would be wrong-axis only if sold as "generate marketing copy faster" — it isn't; it's sold (per the ADRs and docstrings) as *AI you can budget, audit, and reproduce, behind a swappable contract*. That squarely matches the sharpened governance/data-ownership/teaching audience, and directly answers the baseline's own worry about competing with Klaviyo+AI on production speed — this competes on the control axis instead, where the single-vendor agent is structurally weak. **One caveat to carry into positioning:** the "hard spend cap" claim is currently honest only for sequential runs (see interview-prep Q4); pitching it as concurrency-safe would overstate what the code guarantees today.
