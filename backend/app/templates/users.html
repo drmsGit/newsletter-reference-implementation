@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1 class="mb-4">Users &amp; access</h1>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Access control</h5>
+        {% if enforced %}
+        <p class="mb-2"><span class="badge bg-success">Enforced</span>
+            Routes check permissions; signing in is required.</p>
+        {% else %}
+        <p class="mb-2"><span class="badge bg-warning text-dark">Not enforced</span>
+            Sessions and roles work, but no route refuses anyone yet.</p>
+        <p class="text-muted small mb-2">
+            Turn this on once you have signed in successfully at least once. There is no
+            lockout risk while system mail uses the mock provider, because the sign-in
+            code appears on screen rather than depending on a mail path that might not
+            work — but confirm that before enforcing.
+        </p>
+        {% endif %}
+        <form method="post" action="/ui/users/enforcement" class="d-inline">
+            <input type="hidden" name="enforced" value="{{ '0' if enforced else '1' }}">
+            <button type="submit" class="btn btn-sm {{ 'btn-outline-secondary' if enforced else 'btn-primary' }}">
+                {{ 'Turn enforcement off' if enforced else 'Turn enforcement on' }}
+            </button>
+        </form>
+        {% if signed_in_as %}
+        <span class="ms-2 small text-muted">Signed in as {{ signed_in_as.email }}</span>
+        <form method="post" action="/ui/logout" class="d-inline ms-2">
+            <button type="submit" class="btn btn-link btn-sm p-0">Sign out</button>
+        </form>
+        {% else %}
+        <a href="/ui/login" class="btn btn-link btn-sm">Sign in</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Access list</h5>
+        <p class="text-muted small">
+            Nothing tells this system when an external operator leaves the agency
+            (ADR-151 §5), so this list <em>is</em> the offboarding control — review it,
+            and deactivate what should not still be here. Deactivating revokes live
+            sessions immediately.
+        </p>
+
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr>
+                    <th>Email</th><th>Access</th><th>Last login</th>
+                    <th>Live sessions</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in rows %}
+                <tr class="{{ '' if row.user.is_active else 'text-muted' }}">
+                    <td>
+                        {{ row.user.email }}
+                        {% if row.user.is_external %}
+                        <span class="badge bg-secondary">external</span>
+                        {% endif %}
+                        {% if not row.user.is_active %}
+                        <span class="badge bg-danger">deactivated</span>
+                        {% endif %}
+                        {% if row.user.display_name %}
+                        <div class="small text-muted">{{ row.user.display_name }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="small">
+                        {% for grant in row.grants %}
+                        <div>{{ grant.role }} <span class="text-muted">on {{ grant.brand }}</span></div>
+                        {% else %}
+                        <span class="text-muted">no roles</span>
+                        {% endfor %}
+                    </td>
+                    <td class="small">
+                        {{ row.user.last_login_at.strftime('%Y-%m-%d %H:%M') if row.user.last_login_at else '—' }}
+                    </td>
+                    <td class="small">{{ row.live_sessions }}</td>
+                    <td class="text-end">
+                        <form method="post" action="/ui/users/{{ row.user.id }}/active">
+                            <input type="hidden" name="active" value="{{ '0' if row.user.is_active else '1' }}">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                {{ 'Deactivate' if row.user.is_active else 'Reactivate' }}
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="5" class="text-muted">
+                    No users yet. Set <code>INITIAL_ADMIN_EMAIL</code> and restart to seed one.
+                </td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Add a user</h5>
+        <p class="text-muted small">
+            The three roles are a preset, not a model of your org chart — roles and
+            permissions are rows, so you can add your own without code (ADR-150 §5).
+            An agency operator is not a separate role: mark them <em>external</em> so the
+            access list shows it, and give them the role they actually need.
+        </p>
+        <form method="post" action="/ui/users" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small"><strong>Email</strong></label>
+                <input type="email" name="email" required class="form-control form-control-sm">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small"><strong>Name</strong></label>
+                <input type="text" name="display_name" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small"><strong>Role</strong></label>
+                <select name="role_key" class="form-select form-select-sm">
+                    {% for role in roles %}
+                    <option value="{{ role.key }}" {% if role.key == 'viewer' %}selected{% endif %}>
+                        {{ role.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="is_external" value="1" id="ext">
+                    <label class="form-check-label small" for="ext">External</label>
+                </div>
+            </div>
+            <div class="col-md-1">
+                <button type="submit" class="btn btn-primary btn-sm">Add</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

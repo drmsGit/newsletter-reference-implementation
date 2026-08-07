@@ -3,7 +3,8 @@ import os
 import re
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Request
+from fastapi.responses import JSONResponse, RedirectResponse
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -128,6 +129,14 @@ from app.audience.router import router as audience_router
 
 from app.settings.db_models import AppConfigDB
 
+from app.auth.db_models import (
+    BrandDB, LoginCodeDB, RoleAssignmentDB, RoleDB, RolePermissionDB, SessionDB, UserDB,
+)
+from app.auth.dependencies import NotAuthenticated, NotAuthorised, require_permission
+from app.auth.permissions import VIEW
+from app.auth.router import router as auth_router
+from app.auth.service import bootstrap as bootstrap_auth
+
 from app.frontend.router import router as frontend_router
 
 # --- OpenAPI / Swagger metadata -------------------------------------------
@@ -184,9 +193,50 @@ Base.metadata.create_all(bind=engine)
 
 with SessionLocal() as db:
     create_demo_content_if_empty(db)
+    # Seed the default brand, the three preset roles and — while the user table
+    # is empty — an initial Admin from INITIAL_ADMIN_EMAIL. Without that last
+    # step nobody could ever sign in (ADR-151).
+    bootstrap_auth(db)
+    from app.auth.dependencies import auth_enforced
+
+    if not auth_enforced(db):
+        logger.warning(
+            "auth: access control is NOT enforced — sessions and roles work, but no "
+            "route refuses anyone. Turn it on at /ui/users once sign-in is verified."
+        )
 
 
-app.include_router(frontend_router)
+@app.exception_handler(NotAuthenticated)
+def _not_authenticated(request: Request, exc: NotAuthenticated):
+    """Send a browser to the sign-in page; tell an API caller plainly."""
+    if request.url.path.startswith("/ui/"):
+        return RedirectResponse(url="/ui/login", status_code=303)
+    return JSONResponse({"detail": "Authentication required"}, status_code=401)
+
+
+@app.exception_handler(NotAuthorised)
+def _not_authorised(request: Request, exc: NotAuthorised):
+    return JSONResponse(
+        {"detail": f"This account lacks the '{exc.permission}' permission"},
+        status_code=403,
+    )
+
+
+app.include_router(auth_router)
+
+# Every UI page requires a signed-in user holding `view` — applied here rather
+# than inside app/frontend so that module stays ignorant of authentication, and
+# so the decision is visible in one place instead of 57 route decorators.
+# Sign-in itself lives in auth_router, above and deliberately unguarded.
+#
+# The JSON API routers below are NOT guarded yet. That is machine
+# authentication, a separately scoped concern and a Mode B prerequisite
+# (ADR-142) — see docs/backlog.md. Guarding them with a human session cookie
+# would be the wrong mechanism.
+app.include_router(
+    frontend_router,
+    dependencies=[Depends(require_permission(VIEW))],
+)
 app.include_router(content_router)
 app.include_router(campaigns_router)
 app.include_router(rendering_router)

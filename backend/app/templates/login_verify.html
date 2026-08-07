@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1 class="mb-4">Enter your code</h1>
+
+<div class="card" style="max-width:520px">
+    <div class="card-body">
+        {% if notice %}
+        <div class="alert alert-info py-2">{{ notice }}</div>
+        {% endif %}
+        {% if error %}
+        <div class="alert alert-danger py-2">{{ error }}</div>
+        {% endif %}
+
+        {% if dev_mode and prefilled %}
+        <div class="alert alert-warning py-2">
+            <strong>Development mode.</strong> Your code is
+            <code class="fs-5">{{ prefilled }}</code> — shown here and written to the
+            server log because no real send provider is configured.
+        </div>
+        {% endif %}
+
+        <form method="post" action="/ui/login/verify">
+            <input type="hidden" name="email" value="{{ email }}">
+            <div class="mb-3">
+                <label class="form-label"><strong>Code sent to {{ email }}</strong></label>
+                <input type="text" name="code" value="{{ prefilled }}" required
+                       inputmode="numeric" autocomplete="one-time-code" maxlength="6"
+                       class="form-control form-control-sm font-monospace"
+                       style="max-width:140px; letter-spacing:.25em">
+                <div class="form-text">
+                    Expires in 10 minutes, works once, and five wrong tries burn it.
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">Sign in</button>
+            <a href="/ui/login" class="btn btn-link btn-sm">Start over</a>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
