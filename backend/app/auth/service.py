@@ -52,6 +52,44 @@ def normalise_email(email: str) -> str:
     return (email or "").strip().lower()
 
 
+DEFAULT_LANDING = "/"
+
+
+def safe_next(target: str | None) -> str:
+    """Sanitise a post-login redirect target.
+
+    A `next` parameter that is echoed back into a redirect is an open-redirect
+    hole: an attacker sends a link to your own login page carrying
+    `next=https://evil.example`, the victim signs in for real, and lands
+    somewhere hostile still trusting the site they started on.
+
+    Only same-site absolute paths are allowed through. Anything else — a full
+    URL, a protocol-relative `//host`, a backslash that some clients normalise
+    to a slash — falls back to the dashboard.
+    """
+    value = (target or "").strip()
+    if not value.startswith("/"):
+        return DEFAULT_LANDING
+    if value.startswith("//") or "\\" in value:
+        return DEFAULT_LANDING
+    if any(ch in value for ch in ("\r", "\n")):
+        return DEFAULT_LANDING
+    return value
+
+
+def current_user_summary(db: Session, token: str | None) -> dict | None:
+    """Plain data about the signed-in user, safe to hand a template.
+
+    Returns a dict rather than the ORM object on purpose: the caller closes its
+    session immediately, and a committed instance would expire and raise on
+    first attribute access in the template.
+    """
+    user = user_for_token(db, token)
+    if user is None:
+        return None
+    return {"id": user.id, "email": user.email, "display_name": user.display_name}
+
+
 # --- seeding ---------------------------------------------------------------
 
 def ensure_default_brand(db: Session) -> BrandDB:

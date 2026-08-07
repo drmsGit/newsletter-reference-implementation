@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1 class="mb-4">Not allowed</h1>
+
+<div class="card" style="max-width:620px">
+    <div class="card-body">
+        <p>
+            Your account is signed in, but the role it holds does not include
+            <code>{{ permission }}</code>, which this page requires.
+        </p>
+        <p class="text-muted small">
+            Nothing is wrong with your session — this is the permission model doing its
+            job. An administrator can grant the role under <em>Users &amp; access</em>,
+            or you can carry on with the parts you do have access to.
+        </p>
+        <a href="/" class="btn btn-primary btn-sm">Back to the dashboard</a>
+    </div>
+</div>
+
+{% endblock %}

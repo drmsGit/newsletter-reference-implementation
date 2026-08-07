@@ -23,7 +23,7 @@ from app.auth.db_models import RoleDB
 from app.auth.service import (
     SESSION_COOKIE, SESSION_ABSOLUTE_HOURS, access_list, assign_role, create_role,
     create_user, delete_role, dev_code_visible, normalise_email, request_login_code,
-    revoke_assignment, revoke_token, roles_with_permissions, set_active,
+    revoke_assignment, revoke_token, roles_with_permissions, safe_next, set_active,
     set_role_permissions, user_for_token, verify_login_code,
 )
 from app.database import get_db
@@ -37,11 +37,14 @@ NEUTRAL_NOTICE = "If that address has an account, a sign-in code is on its way."
 
 
 @router.get("/ui/login")
-def login_form(request: Request, notice: str = "", error: str = "", email: str = ""):
+def login_form(
+    request: Request, notice: str = "", error: str = "",
+    email: str = "", next: str = "",
+):
     return templates.TemplateResponse(
         request, "login.html",
         {"title": "Sign in", "notice": notice, "error": error, "email": email,
-         "dev_mode": dev_code_visible(), "code": ""},
+         "dev_mode": dev_code_visible(), "code": "", "next": safe_next(next)},
     )
 
 
@@ -49,11 +52,13 @@ def login_form(request: Request, notice: str = "", error: str = "", email: str =
 def login_request(
     request: Request,
     email: str = Form(...),
+    next: str = Form(""),
     db: Session = Depends(get_db),
 ):
     """Issue a code. The response is the same whether or not the address exists."""
     code = request_login_code(db, email)
     address = normalise_email(email)
+    target = safe_next(next)
 
     if code:
         # Dev path only: request_login_code returns a code exclusively when it
@@ -66,18 +71,26 @@ def login_request(
         return templates.TemplateResponse(
             request, "login_verify.html",
             {"title": "Enter your code", "email": address, "prefilled": code,
-             "error": "", "notice": NEUTRAL_NOTICE, "dev_mode": True},
+             "error": "", "notice": NEUTRAL_NOTICE, "dev_mode": True,
+             "next": target},
         )
 
-    return RedirectResponse(url=f"/ui/login/verify?email={address}", status_code=303)
+    return RedirectResponse(
+        url=f"/ui/login/verify?email={address}&next={quote(target, safe='')}",
+        status_code=303,
+    )
 
 
 @router.get("/ui/login/verify")
-def verify_form(request: Request, email: str = "", code: str = "", error: str = ""):
+def verify_form(
+    request: Request, email: str = "", code: str = "",
+    error: str = "", next: str = "",
+):
     return templates.TemplateResponse(
         request, "login_verify.html",
         {"title": "Enter your code", "email": email, "prefilled": code,
-         "error": error, "notice": NEUTRAL_NOTICE, "dev_mode": dev_code_visible()},
+         "error": error, "notice": NEUTRAL_NOTICE,
+         "dev_mode": dev_code_visible(), "next": safe_next(next)},
     )
 
 
@@ -85,17 +98,23 @@ def verify_form(request: Request, email: str = "", code: str = "", error: str = 
 def verify_submit(
     email: str = Form(...),
     code: str = Form(...),
+    next: str = Form(""),
     db: Session = Depends(get_db),
 ):
+    target = safe_next(next)
     token = verify_login_code(db, email, code)
     if token is None:
         return RedirectResponse(
             url=f"/ui/login/verify?email={normalise_email(email)}"
+                f"&next={quote(target, safe='')}"
                 f"&error=That+code+is+not+valid+or+has+expired.",
             status_code=303,
         )
 
-    response = RedirectResponse(url="/ui/users", status_code=303)
+    # The dashboard by default, never /ui/users — a Viewer sent there lands on
+    # a 403 with no navigation, which is indistinguishable from being locked
+    # out of a system they just signed in to.
+    response = RedirectResponse(url=target, status_code=303)
     response.set_cookie(
         SESSION_COOKIE, token,
         max_age=SESSION_ABSOLUTE_HOURS * 3600,
@@ -106,6 +125,9 @@ def verify_submit(
 
 @router.post("/ui/logout")
 def logout(request: Request, db: Session = Depends(get_db)):
+    """Deliberately unguarded: signing out must work from any page, whatever
+    the account can or cannot reach. A Viewer previously had no route to it at
+    all, because the only control lived on a page their role was refused."""
     revoke_token(db, request.cookies.get(SESSION_COOKIE))
     response = RedirectResponse(url="/ui/login", status_code=303)
     response.delete_cookie(SESSION_COOKIE)

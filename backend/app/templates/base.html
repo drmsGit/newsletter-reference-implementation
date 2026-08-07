@@ -17,6 +17,19 @@
         <span class="navbar-brand">
             Newsletter Reference Architecture
         </span>
+        {# Sign-out must be reachable from every page. It used to live only on
+           Users & access, so an account whose role could not open that page had
+           no way out at all. #}
+        <div class="d-flex align-items-center gap-2">
+            {% if request.state.current_user %}
+            <span class="navbar-text small">{{ request.state.current_user.email }}</span>
+            <form method="post" action="/ui/logout" class="m-0">
+                <button type="submit" class="btn btn-sm btn-outline-light">Sign out</button>
+            </form>
+            {% else %}
+            <a href="/ui/login" class="btn btn-sm btn-outline-light">Sign in</a>
+            {% endif %}
+        </div>
     </div>
 </nav>
 

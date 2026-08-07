@@ -20,6 +20,7 @@
         {% endif %}
 
         <form method="post" action="/ui/login">
+            <input type="hidden" name="next" value="{{ next }}">
             <div class="mb-3">
                 <label class="form-label"><strong>Email address</strong></label>
                 <input type="email" name="email" value="{{ email }}" required

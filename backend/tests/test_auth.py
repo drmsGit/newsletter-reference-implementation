@@ -411,6 +411,42 @@ class TestRoleEditing:
         assert auth.delete_role(db, role.id) is None
 
 
+class TestPostLoginRedirect:
+    """Where a user lands after signing in.
+
+    Two bugs found in real use: sign-in sent everyone to /ui/users, so a Viewer
+    landed on a 403 with no navigation and was effectively locked out of a
+    system they had just authenticated to.
+    """
+
+    def test_no_target_lands_on_the_dashboard(self):
+        assert auth.safe_next(None) == "/"
+        assert auth.safe_next("") == "/"
+        assert auth.safe_next("   ") == "/"
+
+    def test_a_same_site_path_is_kept(self):
+        assert auth.safe_next("/ui/campaigns") == "/ui/campaigns"
+        assert auth.safe_next("/ui/content?status=draft") == "/ui/content?status=draft"
+
+    def test_an_absolute_url_is_refused(self):
+        # Open redirect: a link to our own login page carrying an attacker's
+        # host, so the victim signs in for real and lands somewhere hostile.
+        assert auth.safe_next("https://evil.example/phish") == "/"
+        assert auth.safe_next("http://evil.example") == "/"
+
+    def test_a_protocol_relative_url_is_refused(self):
+        # //host is a URL, not a path, and browsers treat it as one.
+        assert auth.safe_next("//evil.example/phish") == "/"
+
+    def test_backslashes_are_refused(self):
+        # Some clients normalise \ to /, turning this into //evil.example.
+        assert auth.safe_next("/\\evil.example") == "/"
+        assert auth.safe_next("\\\\evil.example") == "/"
+
+    def test_header_injection_attempts_are_refused(self):
+        assert auth.safe_next("/ui/x\r\nSet-Cookie: a=b") == "/"
+
+
 class TestDevCodePath:
 
     def test_mock_is_the_default_provider(self, monkeypatch):

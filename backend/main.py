@@ -2,9 +2,11 @@ import logging
 import os
 import re
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -134,7 +136,9 @@ from app.auth.db_models import (
 )
 from app.auth.dependencies import NotAuthenticated, NotAuthorised, enforce_policy
 from app.auth.router import router as auth_router
-from app.auth.service import bootstrap as bootstrap_auth
+from app.auth.service import (
+    SESSION_COOKIE, bootstrap as bootstrap_auth, current_user_summary,
+)
 
 from app.frontend.router import router as frontend_router
 
@@ -187,6 +191,8 @@ app = FastAPI(
 )
 
 
+templates = Jinja2Templates(directory="app/templates")
+
 Base.metadata.create_all(bind=engine)
 
 
@@ -205,25 +211,61 @@ with SessionLocal() as db:
         )
 
 
+@app.middleware("http")
+async def attach_current_user(request: Request, call_next):
+    """Make the signed-in user available to every template, including
+    unguarded ones.
+
+    Without this the base layout cannot render a sign-out control, and a user
+    whose role cannot reach `/ui/users` has no way to sign out at all — which
+    is exactly what happened: a Viewer had to use the browser back button.
+    """
+    db = SessionLocal()
+    try:
+        request.state.current_user = current_user_summary(
+            db, request.cookies.get(SESSION_COOKIE)
+        )
+    finally:
+        db.close()
+    return await call_next(request)
+
+
+def _wants_html(request: Request) -> bool:
+    return "text/html" in request.headers.get("accept", "")
+
+
 @app.exception_handler(NotAuthenticated)
 def _not_authenticated(request: Request, exc: NotAuthenticated):
-    """Send a browser to the sign-in page; tell an API caller plainly.
+    """Send a browser to sign-in, remembering where it was going.
 
-    Branches on what the client asked for, not on the URL. An earlier version
-    tested for a `/ui/` prefix and so handed the dashboard at `/` a raw JSON
-    401 instead of the login page — the one UI route that does not carry the
-    prefix. What distinguishes the two cases is the client, so that is what
-    gets asked.
+    Branches on what the client asked for, not on the URL: an earlier version
+    tested for a `/ui/` prefix and handed the dashboard at `/` a raw JSON 401,
+    that being the one UI route without the prefix.
     """
-    if "text/html" in request.headers.get("accept", ""):
-        return RedirectResponse(url="/ui/login", status_code=303)
-    return JSONResponse({"detail": "Authentication required"}, status_code=401)
+    if not _wants_html(request):
+        return JSONResponse({"detail": "Authentication required"}, status_code=401)
+
+    target = request.url.path
+    if request.url.query:
+        target = f"{target}?{request.url.query}"
+    return RedirectResponse(
+        url=f"/ui/login?next={quote(target, safe='')}", status_code=303
+    )
 
 
 @app.exception_handler(NotAuthorised)
 def _not_authorised(request: Request, exc: NotAuthorised):
-    return JSONResponse(
-        {"detail": f"This account lacks the '{exc.permission}' permission"},
+    """A browser gets a page it can navigate away from, not a dead end.
+
+    The JSON body left a signed-in user with no navigation and no way back —
+    effectively logged out of a system they were still authenticated to.
+    """
+    detail = f"This account lacks the '{exc.permission}' permission"
+    if not _wants_html(request):
+        return JSONResponse({"detail": detail}, status_code=403)
+    return templates.TemplateResponse(
+        request, "forbidden.html",
+        {"title": "Not allowed", "permission": exc.permission},
         status_code=403,
     )
 
