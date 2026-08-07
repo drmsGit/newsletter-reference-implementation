@@ -132,8 +132,7 @@ from app.settings.db_models import AppConfigDB
 from app.auth.db_models import (
     BrandDB, LoginCodeDB, RoleAssignmentDB, RoleDB, RolePermissionDB, SessionDB, UserDB,
 )
-from app.auth.dependencies import NotAuthenticated, NotAuthorised, require_permission
-from app.auth.permissions import VIEW
+from app.auth.dependencies import NotAuthenticated, NotAuthorised, enforce_policy
 from app.auth.router import router as auth_router
 from app.auth.service import bootstrap as bootstrap_auth
 
@@ -208,8 +207,15 @@ with SessionLocal() as db:
 
 @app.exception_handler(NotAuthenticated)
 def _not_authenticated(request: Request, exc: NotAuthenticated):
-    """Send a browser to the sign-in page; tell an API caller plainly."""
-    if request.url.path.startswith("/ui/"):
+    """Send a browser to the sign-in page; tell an API caller plainly.
+
+    Branches on what the client asked for, not on the URL. An earlier version
+    tested for a `/ui/` prefix and so handed the dashboard at `/` a raw JSON
+    401 instead of the login page — the one UI route that does not carry the
+    prefix. What distinguishes the two cases is the client, so that is what
+    gets asked.
+    """
+    if "text/html" in request.headers.get("accept", ""):
         return RedirectResponse(url="/ui/login", status_code=303)
     return JSONResponse({"detail": "Authentication required"}, status_code=401)
 
@@ -224,18 +230,21 @@ def _not_authorised(request: Request, exc: NotAuthorised):
 
 app.include_router(auth_router)
 
-# Every UI page requires a signed-in user holding `view` — applied here rather
-# than inside app/frontend so that module stays ignorant of authentication, and
-# so the decision is visible in one place instead of 57 route decorators.
-# Sign-in itself lives in auth_router, above and deliberately unguarded.
+# One guard over the whole UI, deriving the required permission from the route
+# via app/auth/policy.py: reads need `view`, writes are looked up in the policy
+# table, and a write with no policy entry is refused. Applied here rather than
+# inside app/frontend so that module stays ignorant of authentication, and so
+# the decision is visible in one place instead of 57 route decorators.
 #
-# The JSON API routers below are NOT guarded yet. That is machine
-# authentication, a separately scoped concern and a Mode B prerequisite
-# (ADR-142) — see docs/backlog.md. Guarding them with a human session cookie
-# would be the wrong mechanism.
+# Sign-in itself lives in auth_router, above, whose login routes are
+# deliberately open and whose /ui/users routes carry their own explicit guard.
+#
+# The JSON API routers below are NOT guarded. That is machine authentication, a
+# separately scoped concern and a Mode B prerequisite (ADR-142) — see
+# docs/backlog.md. A human session cookie would be the wrong mechanism.
 app.include_router(
     frontend_router,
-    dependencies=[Depends(require_permission(VIEW))],
+    dependencies=[Depends(enforce_policy)],
 )
 app.include_router(content_router)
 app.include_router(campaigns_router)

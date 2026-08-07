@@ -10,18 +10,21 @@ bearing rather than cosmetic:
     default is the mock provider, which sends nothing.
 """
 
+from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AUTH_ENFORCED_KEY, auth_enforced, require_permission
-from app.auth.permissions import BUILTIN_ROLES, USERS_MANAGE
+from app.auth.permissions import ALL_PERMISSIONS, BUILTIN_ROLES, USERS_MANAGE
 from app.auth.db_models import RoleDB
 from app.auth.service import (
-    SESSION_COOKIE, SESSION_ABSOLUTE_HOURS, access_list, create_user,
-    dev_code_visible, normalise_email, request_login_code, revoke_token,
-    set_active, user_for_token, verify_login_code,
+    SESSION_COOKIE, SESSION_ABSOLUTE_HOURS, access_list, assign_role, create_role,
+    create_user, delete_role, dev_code_visible, normalise_email, request_login_code,
+    revoke_assignment, revoke_token, roles_with_permissions, set_active,
+    set_role_permissions, user_for_token, verify_login_code,
 )
 from app.database import get_db
 from app.settings.service import set_config
@@ -155,6 +158,89 @@ def user_set_active(
 ):
     set_active(db, user_id, active == "1")
     return RedirectResponse(url="/ui/users", status_code=303)
+
+
+@router.post("/ui/users/{user_id}/roles")
+def user_assign_role(
+    user_id: int,
+    role_id: int = Form(...),
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission(USERS_MANAGE)),
+):
+    assign_role(db, user_id, role_id)
+    return RedirectResponse(url="/ui/users", status_code=303)
+
+
+@router.post("/ui/users/assignments/{assignment_id}/remove")
+def user_revoke_assignment(
+    assignment_id: int,
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission(USERS_MANAGE)),
+):
+    revoke_assignment(db, assignment_id)
+    return RedirectResponse(url="/ui/users", status_code=303)
+
+
+@router.get("/ui/roles")
+def roles_page(
+    request: Request,
+    error: str = "",
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission(USERS_MANAGE)),
+):
+    """Role × permission grid. The whole policy in one screen."""
+    return templates.TemplateResponse(
+        request, "roles.html",
+        {
+            "title": "Roles & permissions",
+            "rows": roles_with_permissions(db),
+            "all_permissions": ALL_PERMISSIONS,
+            "error": error,
+        },
+    )
+
+
+@router.post("/ui/roles")
+def role_create(
+    key: str = Form(...),
+    name: str = Form(""),
+    copy_from: str = Form(""),
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission(USERS_MANAGE)),
+):
+    """Create a role, optionally copying an existing one as the starting set."""
+    source = int(copy_from) if (copy_from or "").isdigit() else None
+    if create_role(db, key=key, name=name, copy_from_role_id=source) is None:
+        return RedirectResponse(
+            url="/ui/roles?error=That+role+key+is+already+in+use+or+invalid.",
+            status_code=303,
+        )
+    return RedirectResponse(url="/ui/roles", status_code=303)
+
+
+@router.post("/ui/roles/{role_id}/permissions")
+async def role_set_permissions(
+    role_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission(USERS_MANAGE)),
+):
+    """Save one role's permissions. Marks it customised, so the shipped preset
+    stops overwriting it at startup."""
+    form = await request.form()
+    set_role_permissions(db, role_id, form.getlist("permissions"))
+    return RedirectResponse(url="/ui/roles", status_code=303)
+
+
+@router.post("/ui/roles/{role_id}/delete")
+def role_delete(
+    role_id: int,
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission(USERS_MANAGE)),
+):
+    error = delete_role(db, role_id)
+    suffix = f"?error={quote(error)}" if error else ""
+    return RedirectResponse(url=f"/ui/roles{suffix}", status_code=303)
 
 
 @router.post("/ui/users/enforcement")

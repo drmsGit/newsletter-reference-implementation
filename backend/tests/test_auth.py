@@ -12,7 +12,7 @@ import pytest
 
 from app.auth import service as auth
 from app.auth.db_models import (
-    LoginCodeDB, RoleAssignmentDB, RoleDB, SessionDB, UserDB,
+    LoginCodeDB, RoleAssignmentDB, RoleDB, RolePermissionDB, SessionDB, UserDB,
 )
 from app.auth.permissions import (
     ADMIN, AI_RUN, CREDENTIALS_MANAGE, MANAGER, USERS_MANAGE, VIEW, VIEWER,
@@ -272,6 +272,143 @@ class TestUserAdministration:
         auth.verify_login_code(db, user.email, auth.request_login_code(db, user.email))
         row = next(r for r in auth.access_list(db) if r["user"].id == user.id)
         assert row["live_sessions"] == 1
+
+
+@pytest.fixture
+def temp_role(db):
+    """A throwaway role, removed even when the test fails.
+
+    Previously each test cleaned up its own role on the last line, so a failing
+    assertion leaked one into the shared database — which duly happened.
+    """
+    created: list[int] = []
+
+    def make(name: str = "Editor", copy_from_role_id: int | None = None):
+        role = auth.create_role(
+            db, key=f"tmp-{uuid.uuid4().hex[:8]}", name=name,
+            copy_from_role_id=copy_from_role_id,
+        )
+        created.append(role.id)
+        return role
+
+    yield make
+
+    for role_id in created:
+        db.query(RoleAssignmentDB).filter(RoleAssignmentDB.role_id == role_id).delete()
+        db.query(RolePermissionDB).filter(RolePermissionDB.role_id == role_id).delete()
+        db.query(RoleDB).filter(RoleDB.id == role_id).delete()
+    db.commit()
+
+
+class TestRoleAdministration:
+    """The gap this closes: a role used to be fixed at creation."""
+
+    def test_a_role_can_be_added_after_creation(self, db, temp_user):
+        user = temp_user(role_key=VIEWER)
+        admin_role = db.query(RoleDB).filter(RoleDB.key == ADMIN).first()
+        assert auth.assign_role(db, user.id, admin_role.id) is True
+        assert USERS_MANAGE in auth.permissions_for(db, user)
+
+    def test_assigning_twice_is_idempotent(self, db, temp_user):
+        user = temp_user(role_key=VIEWER)
+        role = db.query(RoleDB).filter(RoleDB.key == ADMIN).first()
+        assert auth.assign_role(db, user.id, role.id) is True
+        assert auth.assign_role(db, user.id, role.id) is False
+
+    def test_two_roles_resolve_in_the_users_favour(self, db, temp_user):
+        # Union, not intersection — and it falls out of the model rather than
+        # being a rule, because permissions are grants only with no DENY.
+        user = temp_user(role_key=VIEWER)
+        manager = db.query(RoleDB).filter(RoleDB.key == MANAGER).first()
+        auth.assign_role(db, user.id, manager.id)
+        held = auth.permissions_for(db, user)
+        assert VIEW in held and AI_RUN in held
+
+    def test_revoking_one_grant_leaves_the_others(self, db, temp_user):
+        user = temp_user(role_key=VIEWER)
+        manager = db.query(RoleDB).filter(RoleDB.key == MANAGER).first()
+        auth.assign_role(db, user.id, manager.id)
+        row = next(r for r in auth.access_list(db) if r["user"].id == user.id)
+        manager_grant = next(g for g in row["grants"] if g["role"] == "Manager")
+
+        assert auth.revoke_assignment(db, manager_grant["id"]) is True
+        assert auth.permissions_for(db, user) == {VIEW}
+
+    def test_revoking_a_role_does_not_end_the_session(self, db, temp_user, monkeypatch):
+        # Losing scope is not being thrown out mid-edit; the next request is
+        # checked against the new permissions anyway. Deactivation is the
+        # control that ends a session.
+        monkeypatch.setenv("AUTH_DEV_SHOW_CODE", "1")
+        user = temp_user(role_key=VIEWER)
+        token = auth.verify_login_code(db, user.email, auth.request_login_code(db, user.email))
+        row = next(r for r in auth.access_list(db) if r["user"].id == user.id)
+        auth.revoke_assignment(db, row["grants"][0]["id"])
+        assert auth.user_for_token(db, token) is not None
+
+
+class TestRoleEditing:
+
+    def _held(self, db, role):
+        return next(
+            r["permissions"] for r in auth.roles_with_permissions(db)
+            if r["role"].id == role.id
+        )
+
+    def test_a_role_can_be_created_from_a_preset(self, db, temp_role):
+        manager = db.query(RoleDB).filter(RoleDB.key == MANAGER).first()
+        role = temp_role(copy_from_role_id=manager.id)
+        assert AI_RUN in self._held(db, role)  # inherited from the preset it copied
+
+    def test_duplicate_key_is_refused(self, db):
+        assert auth.create_role(db, key=ADMIN, name="Nope") is None
+
+    def test_permissions_can_be_changed_individually(self, db, temp_role):
+        role = temp_role()
+        auth.set_role_permissions(db, role.id, [CREDENTIALS_MANAGE])
+        # VIEW is always implied, so it survives even when not requested.
+        assert self._held(db, role) == {CREDENTIALS_MANAGE, VIEW}
+
+    def test_unknown_permission_keys_are_dropped(self, db, temp_role):
+        # A key naming no code path grants nothing; storing it would imply it did.
+        role = temp_role()
+        auth.set_role_permissions(db, role.id, ["not.a.real.permission"])
+        assert self._held(db, role) == {VIEW}
+
+    def test_editing_a_shipped_role_stops_the_preset_overwriting_it(self, db):
+        # The trap this guards: without it, the next restart silently reverts a
+        # deliberate change.
+        viewer = db.query(RoleDB).filter(RoleDB.key == VIEWER).first()
+        original = {r.permission for r in db.query(RolePermissionDB)
+                    .filter(RolePermissionDB.role_id == viewer.id).all()}
+        try:
+            auth.set_role_permissions(db, viewer.id, [VIEW, AI_RUN])
+            assert viewer.is_customised is True
+
+            auth.ensure_builtin_roles(db)  # what startup does
+            held = {r.permission for r in db.query(RolePermissionDB)
+                    .filter(RolePermissionDB.role_id == viewer.id).all()}
+            assert AI_RUN in held, "startup reverted a customised role"
+        finally:
+            db.query(RolePermissionDB).filter(
+                RolePermissionDB.role_id == viewer.id).delete()
+            for p in original:
+                db.add(RolePermissionDB(role_id=viewer.id, permission=p))
+            viewer.is_customised = False
+            db.commit()
+
+    def test_shipped_roles_cannot_be_deleted(self, db):
+        admin = db.query(RoleDB).filter(RoleDB.key == ADMIN).first()
+        assert "cannot be deleted" in auth.delete_role(db, admin.id)
+
+    def test_a_role_someone_holds_cannot_be_deleted(self, db, temp_user, temp_role):
+        role = temp_role()
+        user = temp_user(role_key=VIEWER)
+        auth.assign_role(db, user.id, role.id)
+        assert "still hold" in auth.delete_role(db, role.id)
+        row = next(r for r in auth.access_list(db) if r["user"].id == user.id)
+        for g in row["grants"]:
+            auth.revoke_assignment(db, g["id"])
+        assert auth.delete_role(db, role.id) is None
 
 
 class TestDevCodePath:

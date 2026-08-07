@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1 class="mb-4">Roles &amp; permissions</h1>
+
+{% if error %}
+<div class="alert alert-danger py-2">{{ error }}</div>
+{% endif %}
+
+<div class="card mb-4">
+    <div class="card-body">
+        <p class="text-muted small">
+            The three shipped roles are a <strong>preset, not a model of your org chart</strong>
+            (ADR-150 §5) — start from one and change what you need. Permissions are rows, so
+            adding a role never requires code. The permission <em>names</em> stay in code,
+            because each one guards a specific code path.
+        </p>
+        <p class="text-muted small mb-0">
+            A user holding several roles gets the <strong>union</strong> of their permissions:
+            if any one role grants something, they can do it. There is no "deny" permission,
+            so two roles cannot contradict each other.
+            <strong>Editing a shipped role makes it yours</strong> — it stops being re-synced
+            from the preset when the server restarts.
+        </p>
+    </div>
+</div>
+
+{% for row in rows %}
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+            <div>
+                <h5 class="card-title mb-1">
+                    {{ row.role.name }}
+                    <code class="small text-muted">{{ row.role.key }}</code>
+                    {% if row.role.is_builtin %}<span class="badge bg-secondary">shipped</span>{% endif %}
+                    {% if row.role.is_customised %}<span class="badge bg-info text-dark">edited</span>{% endif %}
+                </h5>
+                <div class="small text-muted">
+                    {{ row.holders }} user(s) hold this role.
+                    {% if row.role.description %}{{ row.role.description }}{% endif %}
+                </div>
+            </div>
+            {% if not row.role.is_builtin %}
+            <form method="post" action="/ui/roles/{{ row.role.id }}/delete">
+                <button type="submit" class="btn btn-sm btn-outline-danger">Delete role</button>
+            </form>
+            {% endif %}
+        </div>
+
+        <form method="post" action="/ui/roles/{{ row.role.id }}/permissions">
+            <div class="row">
+                {% for key, description in all_permissions.items() %}
+                <div class="col-md-6 mb-1">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="permissions"
+                               value="{{ key }}" id="p-{{ row.role.id }}-{{ key }}"
+                               {% if key in row.permissions %}checked{% endif %}
+                               {% if key == 'view' %}disabled title="Every role can read"{% endif %}>
+                        <label class="form-check-label small" for="p-{{ row.role.id }}-{{ key }}">
+                            <code>{{ key }}</code> — {{ description }}
+                        </label>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm mt-2">Save {{ row.role.name }}</button>
+        </form>
+    </div>
+</div>
+{% endfor %}
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Add a role</h5>
+        <p class="text-muted small">
+            Copying an existing role gives you its permissions as a starting point, which you
+            then adjust one by one.
+        </p>
+        <form method="post" action="/ui/roles" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small"><strong>Key</strong></label>
+                <input type="text" name="key" required placeholder="editor"
+                       class="form-control form-control-sm">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small"><strong>Name</strong></label>
+                <input type="text" name="name" placeholder="Editor"
+                       class="form-control form-control-sm">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small"><strong>Start from</strong></label>
+                <select name="copy_from" class="form-select form-select-sm">
+                    <option value="">Nothing (read-only)</option>
+                    {% for row in rows %}
+                    <option value="{{ row.role.id }}">{{ row.role.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary btn-sm">Add role</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<p><a href="/ui/users">← Users &amp; access</a></p>
+
+{% endblock %}

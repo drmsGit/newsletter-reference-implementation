@@ -23,6 +23,7 @@ from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
 from app.auth.db_models import UserDB
+from app.auth.policy import UNMAPPED, required_permission
 from app.auth.service import SESSION_COOKIE, has_permission, user_for_token
 from app.database import get_db
 from app.settings.service import get_config
@@ -54,7 +55,10 @@ def current_user(request: Request, db: Session = Depends(get_db)) -> UserDB | No
 
 
 def require_permission(permission: str):
-    """Dependency factory: this route needs this permission.
+    """Dependency factory: this route needs this named permission.
+
+    For routes guarded individually. Most of the UI is covered by
+    `enforce_policy` instead, which derives the permission from the route.
 
     While enforcement is off the check is skipped, but a signed-in user is
     still resolved — so the UI can show who you are, and the audit trail
@@ -72,3 +76,38 @@ def require_permission(permission: str):
         return user
 
     return guard
+
+
+def enforce_policy(request: Request, db: Session = Depends(get_db)) -> UserDB | None:
+    """Derive the required permission from the route and check it.
+
+    Applied once over the whole UI router. Reads need `view`; writes are looked
+    up in the policy table, and a write nobody classified is **refused** — so a
+    new endpoint added without a policy entry fails closed and loudly, instead
+    of silently shipping unguarded.
+
+    A user holding several roles gets the **union** of their permissions: if any
+    one role grants it, access is allowed. That is not a rule implemented here,
+    it falls out of the model — permissions are grants only, with no DENY, so
+    two roles cannot contradict each other and there is nothing to resolve.
+    """
+    user = user_for_token(db, request.cookies.get(SESSION_COOKIE))
+    if not auth_enforced(db):
+        return user
+    if user is None:
+        raise NotAuthenticated()
+
+    route = request.scope.get("route")
+    template = getattr(route, "path", None) or request.url.path
+    permission = required_permission(request.method, template)
+
+    if permission == UNMAPPED:
+        logger.warning(
+            "auth: refused %s %s — no policy entry. Add one in app/auth/policy.py.",
+            request.method, template,
+        )
+        raise NotAuthorised(permission)
+
+    if not has_permission(db, user, permission):
+        raise NotAuthorised(permission)
+    return user

@@ -70,10 +70,16 @@ def ensure_builtin_roles(db: Session) -> None:
 
     Built-in permissions are re-synced on every startup so that adding a
     permission key in code reaches the shipped roles without a migration. A
-    company's *own* roles are never touched.
+    company's *own* roles are never touched — and neither is a built-in role
+    somebody has **edited**: the preset is a starting point, not a standing
+    instruction, so the moment a company changes one it becomes theirs and the
+    sync leaves it alone. Without that, the next restart would silently revert
+    a deliberate decision.
     """
     for key, spec in BUILTIN_ROLES.items():
         role = db.query(RoleDB).filter(RoleDB.key == key).first()
+        if role is not None and role.is_customised:
+            continue
         if role is None:
             role = RoleDB(
                 key=key, name=spec["name"],
@@ -424,13 +430,144 @@ def set_active(db: Session, user_id: int, active: bool) -> UserDB | None:
     return user
 
 
+# --- role administration ---------------------------------------------------
+
+def assign_role(db: Session, user_id: int, role_id: int, brand_id: int | None = None) -> bool:
+    """Grant a role on a brand. Idempotent.
+
+    The gap this fills: until now a role was fixed at creation, so a promotion
+    or a change of scope meant editing the database — a routine operation with
+    no route to it.
+    """
+    brand = brand_id or ensure_default_brand(db).id
+    exists = db.query(RoleAssignmentDB).filter(
+        RoleAssignmentDB.user_id == user_id,
+        RoleAssignmentDB.role_id == role_id,
+        RoleAssignmentDB.brand_id == brand,
+    ).first()
+    if exists:
+        return False
+    db.add(RoleAssignmentDB(user_id=user_id, role_id=role_id, brand_id=brand))
+    db.commit()
+    return True
+
+
+def revoke_assignment(db: Session, assignment_id: int) -> bool:
+    """Remove one grant.
+
+    Sessions are deliberately *not* revoked: losing a role is a change of
+    scope, not a reason to be thrown out mid-edit, and the next request is
+    checked against the new permissions anyway. Deactivation is the control
+    that ends a session (ADR-151 §5).
+    """
+    removed = db.query(RoleAssignmentDB).filter(
+        RoleAssignmentDB.id == assignment_id
+    ).delete()
+    db.commit()
+    return bool(removed)
+
+
+def create_role(db: Session, key: str, name: str, copy_from_role_id: int | None = None) -> RoleDB | None:
+    """Add a role, optionally starting from an existing one's permissions.
+
+    Copying is how "preset, then adjust individually" works: you begin from
+    something sensible rather than an empty grid, then change what you need.
+    """
+    key = (key or "").strip().lower().replace(" ", "-")
+    if not key or db.query(RoleDB).filter(RoleDB.key == key).first():
+        return None
+
+    role = RoleDB(key=key, name=(name or "").strip() or key, is_builtin=False)
+    db.add(role)
+    db.commit()
+    db.refresh(role)
+
+    if copy_from_role_id:
+        source = {
+            row.permission
+            for row in db.query(RolePermissionDB).filter(
+                RolePermissionDB.role_id == copy_from_role_id
+            ).all()
+        }
+        for permission in source | IMPLIED:
+            db.add(RolePermissionDB(role_id=role.id, permission=permission))
+        db.commit()
+    return role
+
+
+def set_role_permissions(db: Session, role_id: int, permissions: list[str]) -> RoleDB | None:
+    """Replace a role's permissions wholesale, and mark it customised.
+
+    Unknown keys are dropped rather than stored: a permission that names no
+    code path grants nothing, and keeping it would suggest otherwise. VIEW is
+    always included — a role that can edit but not read is not a case worth
+    modelling, and omitting it is a confusing way to lock someone out.
+    """
+    role = db.query(RoleDB).filter(RoleDB.id == role_id).first()
+    if role is None:
+        return None
+
+    wanted = {p for p in (permissions or []) if p in ALL_PERMISSIONS} | IMPLIED
+    db.query(RolePermissionDB).filter(RolePermissionDB.role_id == role_id).delete()
+    for permission in sorted(wanted):
+        db.add(RolePermissionDB(role_id=role_id, permission=permission))
+
+    role.is_customised = True
+    db.commit()
+    db.refresh(role)
+    return role
+
+
+def delete_role(db: Session, role_id: int) -> str | None:
+    """Remove a role. Returns an error message, or None on success.
+
+    Built-in roles and roles somebody still holds are refused — the first so a
+    company cannot delete the only role that can manage users, the second so a
+    grant never dangles.
+    """
+    role = db.query(RoleDB).filter(RoleDB.id == role_id).first()
+    if role is None:
+        return "That role no longer exists."
+    if role.is_builtin:
+        return f"{role.name} ships with the platform and cannot be deleted."
+
+    holders = db.query(RoleAssignmentDB).filter(RoleAssignmentDB.role_id == role_id).count()
+    if holders:
+        return f"{holders} user(s) still hold {role.name}. Remove those first."
+
+    db.query(RolePermissionDB).filter(RolePermissionDB.role_id == role_id).delete()
+    db.query(RoleDB).filter(RoleDB.id == role_id).delete()
+    db.commit()
+    return None
+
+
+def roles_with_permissions(db: Session) -> list[dict]:
+    """Every role and the permissions it holds — the editing grid's data."""
+    rows = []
+    for role in db.query(RoleDB).order_by(RoleDB.id.asc()).all():
+        held = {
+            r.permission
+            for r in db.query(RolePermissionDB).filter(
+                RolePermissionDB.role_id == role.id
+            ).all()
+        }
+        rows.append({
+            "role": role,
+            "permissions": held,
+            "holders": db.query(RoleAssignmentDB).filter(
+                RoleAssignmentDB.role_id == role.id
+            ).count(),
+        })
+    return rows
+
+
 def access_list(db: Session) -> list[dict]:
     """Every account with its grants and last login — the ADR-151 §5 review surface."""
     rows = []
     for user in db.query(UserDB).order_by(UserDB.email.asc()).all():
         grants = (
-            db.query(RoleDB.name, BrandDB.name)
-            .join(RoleAssignmentDB, RoleAssignmentDB.role_id == RoleDB.id)
+            db.query(RoleAssignmentDB.id, RoleDB.name, BrandDB.name)
+            .join(RoleDB, RoleDB.id == RoleAssignmentDB.role_id)
             .join(BrandDB, BrandDB.id == RoleAssignmentDB.brand_id)
             .filter(RoleAssignmentDB.user_id == user.id)
             .all()
@@ -442,7 +579,7 @@ def access_list(db: Session) -> list[dict]:
         ).count()
         rows.append({
             "user": user,
-            "grants": [{"role": r, "brand": b} for r, b in grants],
+            "grants": [{"id": i, "role": r, "brand": b} for i, r, b in grants],
             "live_sessions": live,
         })
     return rows

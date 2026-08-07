@@ -71,6 +71,12 @@ class RoleDB(Base):
     # Seeded roles are protected from deletion so a company cannot lock itself
     # out by removing the only role that can manage users.
     is_builtin = Column(Boolean, nullable=False, default=False)
+    # Set the first time somebody edits a built-in role's permissions, and it
+    # stops being re-synced from the shipped preset at startup. Without this the
+    # preset would silently revert a company's changes on the next restart — the
+    # sync exists so new permission keys reach shipped roles without a
+    # migration, not to overwrite decisions somebody made deliberately.
+    is_customised = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
