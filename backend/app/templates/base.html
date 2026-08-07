@@ -33,9 +33,16 @@
     </div>
 </nav>
 
+{# Hide the navigation from anonymous visitors: every link behind it redirects
+   to sign-in anyway, so showing it only advertises the shape of the system to
+   someone who cannot use any of it. Kept visible when enforcement is off,
+   because then nobody signs in and hiding it would hide it from everybody. #}
+{% set show_nav = request.state.current_user or not request.state.auth_enforced %}
+
 <div class="container-fluid">
     <div class="row">
 
+        {% if show_nav %}
         <aside class="col-md-2 bg-light min-vh-100 p-3">
             <h6 class="text-muted">Navigation</h6>
 
@@ -81,8 +88,9 @@
                 </li>
             </ul>
         </aside>
+        {% endif %}
 
-        <main class="col-md-10 p-4">
+        <main class="{{ 'col-md-10' if show_nav else 'col-12' }} p-4">
             {% block content %}
             {% endblock %}
         </main>

@@ -134,7 +134,9 @@ from app.settings.db_models import AppConfigDB
 from app.auth.db_models import (
     BrandDB, LoginCodeDB, RoleAssignmentDB, RoleDB, RolePermissionDB, SessionDB, UserDB,
 )
-from app.auth.dependencies import NotAuthenticated, NotAuthorised, enforce_policy
+from app.auth.dependencies import (
+    NotAuthenticated, NotAuthorised, auth_enforced, enforce_policy,
+)
 from app.auth.router import router as auth_router
 from app.auth.service import (
     SESSION_COOKIE, bootstrap as bootstrap_auth, current_user_summary,
@@ -225,6 +227,10 @@ async def attach_current_user(request: Request, call_next):
         request.state.current_user = current_user_summary(
             db, request.cookies.get(SESSION_COOKIE)
         )
+        # The layout needs this too: with enforcement off nobody signs in, so
+        # hiding the navigation from anonymous visitors would hide it from
+        # everybody and leave the app unusable.
+        request.state.auth_enforced = auth_enforced(db)
     finally:
         db.close()
     return await call_next(request)
