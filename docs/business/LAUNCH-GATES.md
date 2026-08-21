@@ -9,6 +9,7 @@ What must be true before public beta. Reviewed against commits and
 | 2 | P0 consent defect fixed | any public exposure (compliance) | ❌ open |
 | 3 | P0 inbound machine authentication | any public exposure | ❌ open |
 | 4 | Auth enforcement flag switched on | any public exposure | 🟡 built, ships off |
+| 4b | Sign-in code disclosure fixed (P0, security) | any public exposure | ❌ open — found 2026-08-21 |
 | 5 | Real provider integration proven | the "no lock-in" claim | ✅ done — Resend, live, verified domain |
 | 6 | Inbound engagement loop proven | the signal-layer claim | ✅ done — signed webhooks, end-to-end |
 | 7 | Security model designed + base built | Phase 4C | ✅ ADR-150–154; base built, proposed status |
@@ -30,6 +31,15 @@ apart. From the 2026-08-07 external review:
   it blocks public exposure, not just Mode B.
 - **Gate 4** — the enforcement mechanism covers every UI page but ships off
   until a deployment has signed in once. Fine locally, not for anything public.
+- **Gate 4b** — a failed sign-in-code delivery prints the live six-digit code
+  into the requester's browser, so an unauthenticated visitor who names an
+  Admin's address gets a working code whenever the mail provider fails
+  (`auth/service.py:310-311` → `auth/router.py:63-76`). Found by the
+  code-slimmer sweep 2026-08-21, missed by the external review, ~3 loc to fix
+  plus a decision about the admin lockout path. Two related auth defects are
+  logged with it: `+`-addressed accounts cannot sign in at all once a real
+  provider is configured, and the default configuration makes the login form an
+  account-enumeration oracle — the one property ADR-151 §2 makes load-bearing.
 
 ## Rules
 - A gate moves to ✅ only with something checkable behind it — a commit, a
