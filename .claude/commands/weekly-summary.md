@@ -19,3 +19,4 @@ What strategic or business decisions were made or logged, referencing the releva
 Keep it tight — this is a digest, not a report. Point to existing logged entries by file and date rather than re-explaining decisions already recorded in full elsewhere.
 
 Append the result to `docs/weekly-summary.md` under a new `## Week of <date>` heading, most recent entry first. Create the file with that heading if it doesn't exist yet.
+Delegate any full-set ADR or codebase sweep to a subagent; the summary is composed in the main session from what comes back, never from reading the sets directly.

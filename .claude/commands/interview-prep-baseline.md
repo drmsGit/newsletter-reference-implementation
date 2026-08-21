@@ -5,3 +5,7 @@ Review the current codebase as it stands (not just a recent diff). For each majo
 - data model / schema tradeoffs
 
 Group the questions by module/feature. Answer each concisely, referencing specific files/functions/line numbers.
+
+**Delegate the sweep.** This is a whole-codebase pass — do not read the modules into the main session. Fan out with the Explore agent, one call per module cluster, and compose the questions from what comes back. `docs/architecture/Code/` already holds a module page per module (Purpose / Key files / Public surface / Data model / Invariants) — read those first; they are cheaper than the source and were written for exactly this.
+
+Do not re-raise questions already cleared in `docs/architecture/interview-prep/` — all four baseline cluster files are fully reviewed. New questions only, or a specific claim that an earlier resolution no longer holds.

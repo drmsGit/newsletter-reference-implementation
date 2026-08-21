@@ -16,7 +16,7 @@ depends_on:
   - "[[ADR-054 — Use Internal Recipient Identifiers]]"
   - "[[ADR-126 — Maintain Local Recipient Projection]]"
 enables:
-  - "[[ADR-085 — Decision Resolution Must Be Explainable]]"
+  - "[[ADR-085 — Decision Resolution Should Be Optionally Explainable]]"
 ---
 
 ## Status
@@ -164,4 +164,4 @@ Explicitly out of scope for the first build (companion items, tracked in
 - [[ADR-126 — Maintain Local Recipient Projection]]
 
 ### Enables
-- [[ADR-085 — Decision Resolution Must Be Explainable]]
+- [[ADR-085 — Decision Resolution Should Be Optionally Explainable]]
