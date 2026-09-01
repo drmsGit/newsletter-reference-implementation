@@ -9,7 +9,7 @@ created: 2026-08-12
 status: open
 ---
 
-> **Status: interview CLOSED 2026-08-07 — all five clusters, 25/25 questions
+> **Status: interview CLOSED 2026-09-01 — all five clusters, 25/25 questions
 > answered.** Every question carries a **Resolution** line. Next step is writing
 > the ADRs (expected ~160 block); no code changes before then.
 
@@ -205,13 +205,13 @@ between `top_score` and `recipient_top_score`.
 Expected to produce roughly a **160-block** of ADRs. Nothing here is answered
 yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation.
 
-### Cluster 1 — Channel model & composition  ✅ CLOSED 2026-08-07
+### Cluster 1 — Channel model & composition  ✅ CLOSED 2026-08-15
 1. ✅ **Is channel a contract enforced at authoring time, or a transformation
    applied at rendering time?** Does picking "push" restrict the manager to
    push-legal modules and a short payload, or does the variant stay a free
    composition that the channel renderer degrades as best it can? *Email went the
    first way via MJML — does that generalise?*
-   **Resolution (2026-08-07): a contract at authoring time.** Email modules stay
+   **Resolution (2026-08-15): a contract at authoring time.** Email modules stay
    email-only. A manager who writes 600 characters and learns at send time that
    push truncated to 178 has been failed by the tool, and authoring-time
    constraints make "ready on push" a checkable fact rather than a hope.
@@ -237,7 +237,7 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
    than derived at send time.
 2. ✅ Channel on the variant, or a channel-plan level between campaign and variant?
    *Lean: on the variant.*
-   **Resolution (2026-08-07): a `channel` attribute on the variant.** A campaign
+   **Resolution (2026-08-15): a `channel` attribute on the variant.** A campaign
    ("Hiking") carries one or more email variants, push variants, paid-social
    variants. The rejected alternative — a channel-plan level between campaign and
    variant — would have made "which channels is this campaign running on" *stored
@@ -261,7 +261,7 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
    Relevant to Clusters 2 and 5; do not design it away here.
 3. ✅ What does "registering a channel" mean concretely — config, a manifest, a
    provider adapter, or all three?
-   **Resolution (2026-08-07): a channel manifest plus a provider adapter — two
+   **Resolution (2026-08-15): a channel manifest plus a provider adapter — two
    files, no config step.** The manifest *is the channel* (fields and their
    limits, max modules, execution shape, capabilities) and is true for everyone;
    the adapter *is the vendor* (APNs, FCM, OneSignal) — the same split
@@ -283,7 +283,7 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
    setting. Not decided.
 4. ✅ Campaign coverage: derived view, or stored intent ("this campaign is meant to
    run on email + push")? *Lean: warn, never block.*
-   **Resolution (2026-08-07): derived, and purely descriptive. No stored intent,
+   **Resolution (2026-08-15): derived, and purely descriptive. No stored intent,
    and — correcting the lean — no coverage warning either.** Coverage is just
    what exists: email + push variants means the campaign is email/push; only a
    social variant means it is social. Stored intent is *"unnecessary
@@ -309,15 +309,15 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
    choice becomes a decision-layer output.
 5. ✅ Does a variant's channel ever change after creation, or is it fixed at
    creation?
-   **Resolution (2026-08-07): fixed at creation.** Fell out of Q2 rather than
+   **Resolution (2026-08-15): fixed at creation.** Fell out of Q2 rather than
    being argued separately — switching an email variant to push would invalidate
    its modules, its content-readiness and its renderer simultaneously. Changing
    channel means creating a new variant.
 
-### Cluster 2 — Execution shapes  ✅ CLOSED 2026-08-07
+### Cluster 2 — Execution shapes  ✅ CLOSED 2026-09-01
 6. ✅ How are addressed and audience-delegated modelled — one provider interface
    with optional methods, two interfaces, or a capability flag?
-   **Resolution (2026-08-07): as many interfaces as the execution shapes
+   **Resolution (2026-08-15): as many interfaces as the execution shapes
    genuinely need — two, three, more — never one with optional methods.**
    *"Putting everything in one interface usually means compromises being
    necessary, and that's mostly a lack of comfort"* (user). One interface with
@@ -345,7 +345,7 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
    the type does not fit.
 7. ✅ What does a `DeliveryExecutionDB` row *mean* for a delegated send, where the
    platform never learns who was reached?
-   **Resolution (2026-08-07): the row records a TRANSFER, not a delivery.** Per-
+   **Resolution (2026-08-15): the row records a TRANSFER, not a delivery.** Per-
    recipient rows are still created, with a status vocabulary that does not lie:
    `submitted`, meaning "included in the uploaded list", never progressing to
    `sent` / `delivered` / `opened`, none of which are knowable. Match outcomes are
@@ -384,7 +384,7 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
    shape whose executions never reach `sent` at all.
 8. ✅ Which ADR-101 capabilities become channel capabilities, and which stay
    provider-specific?
-   **Resolution (2026-08-07): ALL capabilities live in the provider file. There is
+   **Resolution (2026-08-15): ALL capabilities live in the provider file. There is
    no channel capability declaration.** [[ADR-101 — Provider Capabilities Are Explicit]] is **extended** from email providers to channel providers — same
    ADR, wider scope, no second system. *"Every channel should allow feedback; if
    it gets one from the provider depends on the provider"* (user), and the letter
@@ -419,7 +419,7 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
    *device* truncates the display, so nobody is ever told. Hence lengths belong in
    the manifest and are enforced by the **editor as an input constraint**
    (`maxlength`), not as a validation gate and not from `provider.py`.
-   **Preferred handling (user, 2026-08-07): a frontend preview showing potential
+   **Preferred handling (user, 2026-08-15): a frontend preview showing potential
    truncation**, rather than blocking. Truncation is not a real problem once it
    is *visible* — showing the manager what the notification will actually look
    like solves it without a gate, and matches the "warn, never block" idiom used
@@ -427,7 +427,7 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
    previews will need.
 9. ✅ Does the platform own frequency capping across channels, or is that per
    channel? (Relevant the moment a recipient is reachable three ways.)
-   **Resolution (2026-08-07): the platform owns it, because nothing else can** —
+   **Resolution (2026-09-01): the platform owns it, because nothing else can** —
    per-channel capping is structurally incapable of the thing that matters, since
    each channel would faithfully cap itself at three and the recipient would get
    nine. Only the platform sees across channels, and it already holds the data.
@@ -465,7 +465,7 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
    missing timestamp weakens the open P1 send-status work.
 10. ✅ Letter specifically: batch-file handoff to a letter shop rather than
     per-message API — does that fit `send()`, or is it a third shape?
-    **Resolution (2026-08-07): not a third interface. Letter uses the addressed
+    **Resolution (2026-09-01): not a third interface. Letter uses the addressed
     interface, and `finalize()` stays in the contract as designed.** Batch versus
     per-message is a **provider capability**, not a channel property — some letter
     services take a per-message API call, others want a CSV plus a PDF bundle over
@@ -488,10 +488,10 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
     demonstrates the flush path, which Q6's "every interface ships a mock" rule
     already requires.
 
-### Cluster 3 — Rendering & modules  ✅ CLOSED 2026-08-07
+### Cluster 3 — Rendering & modules  ✅ CLOSED 2026-09-01
 11. ✅ What replaces `subject` / `preheader` — channel-typed JSON on the variant, or
     a per-channel side table?
-    **Resolution (2026-08-07): neither — the variant holds no channel fields at
+    **Resolution (2026-09-01): neither — the variant holds no channel fields at
     all. Subject and preheader become module fields, declared in a manifest.**
     Q1 put the authoring contract in the module manifest and Q8 confirmed fields
     and limits live there; subject and preheader are simply *fields of an email*.
@@ -517,7 +517,7 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
     says needs rework; and "what is the subject of this variant" becomes a lookup
     rather than a column, which matters for list views and sorting.
 12. ✅ Renderer registry: what is the contract, and what does a renderer receive?
-    **Resolution (2026-08-07): `render(composition, merge_context) -> Artifact`,
+    **Resolution (2026-09-01): `render(composition, merge_context) -> Artifact`,
     receiving fully resolved content.** Decision slots resolved, overrides
     applied, content versions pinned *before* the renderer sees anything — **it
     formats, it never decides**. Keeps editorial and personalisation logic in the
@@ -545,7 +545,7 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
 13. ✅ What does [[ADR-063 — Rendering Parity Over Rendering Implementation]] mean
     across channels, where parity between an email and a letter is not even
     definable?
-    **Resolution (2026-08-07): the question dissolves — ADR-063 was never a
+    **Resolution (2026-09-01): the question dissolves — ADR-063 was never a
     cross-channel claim.** Reread to check rather than assumed: its parity is
     between **preview, final rendering and snapshot** — three *render contexts* of
     one thing, permitting browser-friendly markup in the builder and nested tables
@@ -567,7 +567,7 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
     decision.
 14. ✅ Do module manifests gain a channel dimension, or does each channel get its
     own module namespace?
-    **Resolution (2026-08-07): both, plus an assertion.** Directory per channel
+    **Resolution (2026-09-01): both, plus an assertion.** Directory per channel
     (`modules/email/`, `modules/push/`) **and** the channel declared in the
     manifest, with the loader failing at startup if they disagree.
     **Namespace** because name collisions are real — "hero" is natural in email,
@@ -595,7 +595,7 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
     push declares 1, email and letter unbounded — with no special-casing.
 15. ✅ Snapshot: one artifact per execution, or can one execution carry several
     (e.g. letter PDF + a print-ready address file)? Touches [[ADR-062 — Snapshot Stores Final Render State]] and [[ADR-005 — Separate Snapshot State from Recipient Delivery Artifact]].
-    **Resolution (2026-08-07): a set of artifacts, each with a role, plus a
+    **Resolution (2026-09-01): a set of artifacts, each with a role, plus a
     package hash over the set.** `render()` returns a collection — push returns
     one, email two, letter a PDF plus its address manifest — with roles such as
     `body_html`, `body_text`, `address_manifest`, `creative_image`.
@@ -615,11 +615,11 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
     generalised from a single render to a package — the same amendment ADR-063
     needs from Q13.
 
-### Cluster 4 — Identity, consent & permission  ✅ CLOSED 2026-08-07
+### Cluster 4 — Identity, consent & permission  ✅ CLOSED 2026-09-01
 16. ✅ Consent as rows per `(recipient, channel, purpose, status, source, timestamp)`
     — confirm the shape. *Lean: rows, not columns — the same idiom already used
     for roles in the security base.*
-    **Resolution (2026-08-07): rows, append-only events, latest-wins per
+    **Resolution (2026-09-01): rows, append-only events, latest-wins per
     `(recipient, channel, purpose)`.** Columns were never viable — five channels
     × three purposes is fifteen of them, none extensible without a migration, and
     a column cannot carry the *source* and *timestamp* that make consent provable.
@@ -647,7 +647,7 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
     *CRM conversations* rather than *consent facts*?
 17. ✅ Addressability per channel: where do device tokens, postal addresses, handles
     and hashed identifiers live? Extends [[ADR-121 — Minimal Recipient Model]].
-    **Resolution (2026-08-07): one addressability table, rows plus a JSON value —
+    **Resolution (2026-09-01): one addressability table, rows plus a JSON value —
     "here's all contact points possible per recipient", whatever the type**
     (user). Three things force it off `RecipientDB`: **cardinality** (one email,
     but many push tokens — phone, tablet, reinstalled app), **lifecycle** (tokens
@@ -682,7 +682,7 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
     the same trap that made signals easy to miss there.
 18. ✅ Is "may I transfer your hashed identifier to an ad platform" a consent
     *purpose*, a separate consent *type*, or out of scope for the platform?
-    **Resolution (2026-08-07): a purpose.** `(recipient, paid_social, transfer)`
+    **Resolution (2026-09-01): a purpose.** `(recipient, paid_social, transfer)`
     sits alongside `(recipient, paid_social, marketing)` as an independent grant
     in the Q16 grid — no new machinery.
     **Why not fold it into the channel**, the tempting simplification since paid
@@ -705,7 +705,7 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
     **expressible**.
 19. ✅ How does CRM consent sync carry per-channel state? (`ConsentSyncLogDB` today
     syncs a single status.)
-    **Resolution (2026-08-07): two separate tables, because they record different
+    **Resolution (2026-09-01): two separate tables, because they record different
     kinds of fact.** **Consent events** record what the *person* permitted,
     whatever the source — CRM sync, a signup form, an unsubscribe click, an
     import. **The sync log** records what happened in a *conversation with the
@@ -739,7 +739,7 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
     email marketing, adrift on social transfer.
 20. ✅ Does the send-time consent gate become per-channel, and what happens when a
     campaign spans channels with different consent coverage?
-    **Resolution (2026-08-07): yes, per `(channel, purpose)` — and the second half
+    **Resolution (2026-09-01): yes, per `(channel, purpose)` — and the second half
     dissolves.** A *variant* is planned and sent, not a campaign (Q4), so there is
     no moment at which a campaign "spans channels" at send time. Each variant
     resolves its own audience against its own channel's consent; the push audience
@@ -776,10 +776,10 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
     the N+1 pattern the send path is already flagged for (code review P2-04), and
     the query planner handles ordering within a stage.
 
-### Cluster 5 — Feedback & signals  CLOSED 2026-08-07
+### Cluster 5 — Feedback & signals  CLOSED 2026-09-01
 21. ✅ Which channels return per-recipient events, which return aggregate — and how
     is that declared rather than assumed?
-    **Resolution (2026-08-07): declared per PROVIDER, never per channel — and
+    **Resolution (2026-09-01): declared per PROVIDER, never per channel — and
     the user's reason is the stronger one.** *"Technology will change and a social
     media platform might allow per-recipient feedback in the future."* Encoding
     "social = aggregate" anywhere would bake in a vendor limitation with a shelf
@@ -814,7 +814,7 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
 22. ✅ **How is aggregate feedback kept out of the per-recipient signal layer?**
     Attributing segment numbers to individuals would corrupt the decision layer's
     auditability.
-    **Resolution (2026-08-07): a separate table with its own grain — explicitly
+    **Resolution (2026-09-01): a separate table with its own grain — explicitly
     NOT the engagement event table with `recipient_id` made nullable.**
     That is the same reasoning that made dropping organic social a simplification:
     a nullable recipient column leaves campaign-level and per-recipient facts
@@ -839,7 +839,7 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
     decisions (Q21).
 23. ✅ What does [[ADR-103 — Provider Events Are Normalized Into Internal Events]]
     normalisation mean when an event has no recipient?
-    **Resolution (2026-08-07): it does not — a thing with no recipient is not an
+    **Resolution (2026-09-01): it does not — a thing with no recipient is not an
     event in ADR-103's sense. It is a metric.** Internal events are per-recipient
     by construction: they carry a recipient, feed signals and attribute to
     content. Something reported per audience-and-creative over a period has a
@@ -866,7 +866,7 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
     if and when a provider reports it.
 24. ✅ Is the conversion-API path (adopter's own site fires back with their
     identifier) in scope for the POC, or a documented extension point?
-    **Resolution (2026-08-07): documented extension point — consistent with the
+    **Resolution (2026-09-01): documented extension point — consistent with the
     existing backlog decision** that conversions are a pluggable contribution
     type whose ingest path is per-deployment, delivering "the extension point plus
     one worked example when a real adopter needs it". Omni-channel does not change
@@ -899,7 +899,7 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
     belongs with the analytics phase.
 25. ✅ Does the signal layer need a channel dimension — is a click in email the same
     signal as a tap in push? Touches [[ADR-132 — Signal Layer Implementation Event-Sourced Contributions with Decay-on-Read]].
-    **Resolution (2026-08-07): yes — an explicit `channel` column on
+    **Resolution (2026-09-01): yes — an explicit `channel` column on
     `SignalContributionDB`. It does not change the topic score.** One append-only
     log read along two axes: **topic affinity** (sum over categories, ignoring
     channel — unchanged; interest in hiking is interest in hiking wherever it was
