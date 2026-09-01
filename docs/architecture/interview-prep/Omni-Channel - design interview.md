@@ -9,10 +9,9 @@ created: 2026-08-12
 status: open
 ---
 
-> **Status (2026-08-12): idea captured, interview deferred by the user.**
-> **Update — interview STARTED 2026-08-07 (see Cluster 1 resolutions below).**
-> Everything not marked with a **Resolution** line is still undecided. No code
-> changes until the clusters that govern them are closed.
+> **Status: interview CLOSED 2026-08-07 — all five clusters, 25/25 questions
+> answered.** Every question carries a **Resolution** line. Next step is writing
+> the ADRs (expected ~160 block); no code changes before then.
 
 # Omni-Channel — design interview (forward-looking)
 
@@ -315,7 +314,7 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
    its modules, its content-readiness and its renderer simultaneously. Changing
    channel means creating a new variant.
 
-### Cluster 2 — Execution shapes
+### Cluster 2 — Execution shapes  ✅ CLOSED 2026-08-07
 6. ✅ How are addressed and audience-delegated modelled — one provider interface
    with optional methods, two interfaces, or a capability flag?
    **Resolution (2026-08-07): as many interfaces as the execution shapes
@@ -426,48 +425,513 @@ yet; `Lean:` marks where a steer already exists from the 2026-08-12 conversation
    like solves it without a gate, and matches the "warn, never block" idiom used
    for system mail and channel coverage. Same surface the letter and social
    previews will need.
-9. Does the platform own frequency capping across channels, or is that per
+9. ✅ Does the platform own frequency capping across channels, or is that per
    channel? (Relevant the moment a recipient is reachable three ways.)
-10. Letter specifically: batch-file handoff to a letter shop rather than
+   **Resolution (2026-08-07): the platform owns it, because nothing else can** —
+   per-channel capping is structurally incapable of the thing that matters, since
+   each channel would faithfully cap itself at three and the recipient would get
+   nine. Only the platform sees across channels, and it already holds the data.
+   **Volume capping is NOT in the POC (user)** — an advanced feature. **The
+   *concept* should be explained in the playbook**, which is the right home for a
+   capability an adopter will need before we build it.
+   **Cross-channel repetition is NOT suppressed — the blanket rule proposed in
+   the interview was wrong and the user corrected it.** *"A person that gets a
+   topic as a newsletter might be allowed to get it via push as well — for example
+   as a reminder because the email wasn't engaged with."* That is not an accident
+   to prevent, it is one of the more valuable things omni-channel enables.
+   **So the mechanism is audience composition, not a cap.** "Push the topic to
+   people who received the email variant and did not click within 48 hours" is an
+   **audience rule**, expressible as an `AudienceRuleBlockDB` predicate over prior
+   deliveries and engagement — which is exactly the parked **engagement-driven
+   audiences** item in `docs/backlog.md` (use case 2, gated behind the automation
+   workstream). Cross-channel follow-up therefore needs *that* item, not a
+   frequency feature.
+   **What remains a genuine risk is the *accidental* overlap** — two variants of
+   one campaign planned to overlapping audiences with no deliberate intent.
+   Handled by **surfacing the fact at variant plan time** ("380 of these 500
+   already received the email variant"), never by blocking, since the manager may
+   want exactly that. **Note this does not contradict Q4:** Q4 removed a
+   *campaign-level* warning because no campaign-level send event exists; this is
+   at variant plan time, which is a real moment.
+   **Delegated channels are a partial exception, to declare rather than pretend:**
+   for paid social the platform controls *inclusion in the audience*, not delivery
+   frequency — the ad platform decides impressions.
+   **Numbers belong to the company, the mechanism to us** — same split as
+   retention periods and the AI spend cap.
+   **Concrete gap found while checking:** `DeliveryExecutionDB` has `created_at`
+   (written at *plan* time) and `updated_at` (bumped by any later status change)
+   but **no `sent_at`**. Any capping or overlap check needs "when did this
+   actually go out", and `updated_at` does not reliably mean that. The same
+   missing timestamp weakens the open P1 send-status work.
+10. ✅ Letter specifically: batch-file handoff to a letter shop rather than
     per-message API — does that fit `send()`, or is it a third shape?
+    **Resolution (2026-08-07): not a third interface. Letter uses the addressed
+    interface, and `finalize()` stays in the contract as designed.** Batch versus
+    per-message is a **provider capability**, not a channel property — some letter
+    services take a per-message API call, others want a CSV plus a PDF bundle over
+    SFTP, and that is a difference *between vendors of one channel*, which is
+    exactly the Q8 discriminator. The platform still calls `send()` per recipient;
+    a batch adapter buffers and flushes on `finalize()`. Per-message providers
+    implement it as a no-op — a small ceremony everyone pays so one case works,
+    against a third interface that would be 90% identical.
+    **Status semantics come from Q7, not from a new shape:** a batch yields one
+    result for the handoff, not per recipient, so executions carry `submitted`
+    until — *if* — the shop reports back, with optional later reconciliation.
+    So the prep's third execution shape dissolves into an existing one; **two
+    interfaces, not three.**
+    **Scope (user): letter is an advanced feature and highly provider-dependent.**
+    The POC should **show that it is possible**, not ship an integration — a real
+    letter-shop connection will be heavily customised per company. The deliverable
+    is a **library article**: *"if you need batch instead of per message, here is
+    how"*, the same posture as the swap-send-provider and webhook guides. In the
+    POC that means the interface supports it and a **mock batch provider**
+    demonstrates the flush path, which Q6's "every interface ships a mock" rule
+    already requires.
 
-### Cluster 3 — Rendering & modules
-11. What replaces `subject` / `preheader` — channel-typed JSON on the variant, or
+### Cluster 3 — Rendering & modules  ✅ CLOSED 2026-08-07
+11. ✅ What replaces `subject` / `preheader` — channel-typed JSON on the variant, or
     a per-channel side table?
-12. Renderer registry: what is the contract, and what does a renderer receive?
-13. What does [[ADR-063 — Rendering Parity Over Rendering Implementation]] mean
+    **Resolution (2026-08-07): neither — the variant holds no channel fields at
+    all. Subject and preheader become module fields, declared in a manifest.**
+    Q1 put the authoring contract in the module manifest and Q8 confirmed fields
+    and limits live there; subject and preheader are simply *fields of an email*.
+    So they move into the composition — a `header` module for email whose
+    manifest declares them, at position 0 — exactly as push's single module
+    declares `title`/`body`/`image`/`link`. Nothing on `VariantDB` is
+    channel-shaped.
+    **Both offered options were rejected for the same reason:** typed JSON on the
+    variant and a per-channel side table are each a *second* place where channel
+    fields live, beside the manifests — and the failure mode is the familiar one,
+    where one gets updated and the other does not.
+    **Three things it buys.** **Overrides work unchanged** — the override layer
+    edits module fields, so a personalised subject line comes free instead of
+    needing its own mechanism, which it cannot have today because subject is not a
+    module field. **Mode A generalises without a special case** — "suggest subject
+    & preheader" currently reaches into variant columns; as module fields the same
+    task shape covers a push title or a letter salutation
+    ([[ADR-141 — In-App Assistive AI Actions]]). And **no third pattern** to keep
+    in step.
+    **Honest costs:** a migration moving two columns into module data; the send
+    path reads `variant.subject` directly today and would read from the
+    composition instead — the same code the code review's P1-04 finding already
+    says needs rework; and "what is the subject of this variant" becomes a lookup
+    rather than a column, which matters for list views and sorting.
+12. ✅ Renderer registry: what is the contract, and what does a renderer receive?
+    **Resolution (2026-08-07): `render(composition, merge_context) -> Artifact`,
+    receiving fully resolved content.** Decision slots resolved, overrides
+    applied, content versions pinned *before* the renderer sees anything — **it
+    formats, it never decides**. Keeps editorial and personalisation logic in the
+    decision layer where it stays explainable, matches Q1's finding that a push
+    renderer fills fields and has no layout job, and is
+    [[ADR-060 — Rendering as Independent Layer]] taken seriously.
+    **The return type is the crux:** email returns HTML, push a field dict, letter
+    a PDF, social creative fields plus media — so the contract cannot be `-> str`.
+    It returns an **`Artifact`**: media type, payload, size, and a **content hash,
+    carried from the start** (user). The hash is not decoration — it is what the
+    code review's P1-04 finding asks for, an immutable per-delivery package a
+    provider request can be traced back to, so that *"snapshot reviewed"* actually
+    proves *"content sent"*. This is also where the prep's `html_* → artifact_* +
+    media type` rename lands.
+    **Registry keyed by channel, auto-registering** — the `decision/strategies/`
+    idiom and the Q3 "drop a file" standard.
+    **One renderer per channel, not per provider.** The artifact belongs to the
+    channel; the provider transmits it. A push artifact is the same whether FCM or
+    OneSignal carries it, which keeps the Q8 split intact and means swapping
+    vendor never changes what gets rendered.
+    **Email note:** MJML compilation stays in the frontend layer per
+    [[ADR-131 — Email Module Templates Use MJML as Source Format]], so the email
+    renderer assembles already-compiled module HTML and inlines CSS — it does not
+    gain a compiler.
+13. ✅ What does [[ADR-063 — Rendering Parity Over Rendering Implementation]] mean
     across channels, where parity between an email and a letter is not even
     definable?
-14. Do module manifests gain a channel dimension, or does each channel get its
+    **Resolution (2026-08-07): the question dissolves — ADR-063 was never a
+    cross-channel claim.** Reread to check rather than assumed: its parity is
+    between **preview, final rendering and snapshot** — three *render contexts* of
+    one thing, permitting browser-friendly markup in the builder and nested tables
+    in the final email so long as they represent the same intended output. That is
+    a **within-channel** guarantee and it generalises unchanged: for push, a mock
+    notification card in the UI versus a JSON payload; for letter, an on-screen
+    preview versus a print-ready PDF.
+    **Cross-channel sameness was not lost, it was rejected in Q1** — per-channel
+    variants exist precisely because a social ad is not a squeezed newsletter. So
+    "parity between an email and a letter" was never a goal.
+    **What improves, and what honestly does not:** the Q12 content hash makes the
+    **snapshot ↔ sent** half checkable for the first time, which is exactly the
+    code review's P1-04 gap. But **preview ↔ final stays a testing concern**,
+    because ADR-063 deliberately permits different implementations there, so those
+    artifacts differ by design and their hashes will not match. Worth stating
+    rather than overclaiming what the hash buys.
+    **Change needed: wording only.** "The same intended newsletter output" becomes
+    "the same intended channel artifact" — an amendment, not a superseding
+    decision.
+14. ✅ Do module manifests gain a channel dimension, or does each channel get its
     own module namespace?
-15. Snapshot: one artifact per execution, or can one execution carry several
+    **Resolution (2026-08-07): both, plus an assertion.** Directory per channel
+    (`modules/email/`, `modules/push/`) **and** the channel declared in the
+    manifest, with the loader failing at startup if they disagree.
+    **Namespace** because name collisions are real — "hero" is natural in email,
+    letter and social, and flat organisation just re-implements namespacing in
+    filenames. It also makes "drop a file" literal and keeps a designer working on
+    email from scrolling past push modules. **Declaration** because a manifest
+    read on its own should say what it is for; location-only makes the file
+    meaningless outside its directory, which bites in review, docs and error
+    messages. **The assertion matters more than either:** a misfiled manifest
+    would otherwise surface as a manager being offered a module that cannot
+    render. Same fail-closed idiom as unmapped write routes and the webhook
+    secret.
+    **Renames:** `app/email_modules/` → `app/modules/`, `storage/email_modules/`
+    → `storage/modules/email/`, registry loads per channel.
+    [[ADR-131 — Email Module Templates Use MJML as Source Format]] stays intact —
+    MJML remains the *email* module format, not the module system's format.
+    **The user's question — does any channel but email actually need modules? —
+    checks out in the opposite direction, which strengthens the decision.** Push
+    is flat, but a **letter is genuinely compositional** (salutation, body
+    sections, offer block, footer — a printed piece resembles a newsletter), and
+    **carousel social ads** are several ordered cards each with image, headline and
+    link. So composition is not an email peculiarity; **push is the exception**.
+    Channel-neutral wording and per-channel splitting is therefore the scalable
+    choice, and the `max_modules` channel fact from Q1 already spans the range —
+    push declares 1, email and letter unbounded — with no special-casing.
+15. ✅ Snapshot: one artifact per execution, or can one execution carry several
     (e.g. letter PDF + a print-ready address file)? Touches [[ADR-062 — Snapshot Stores Final Render State]] and [[ADR-005 — Separate Snapshot State from Recipient Delivery Artifact]].
+    **Resolution (2026-08-07): a set of artifacts, each with a role, plus a
+    package hash over the set.** `render()` returns a collection — push returns
+    one, email two, letter a PDF plus its address manifest — with roles such as
+    `body_html`, `body_text`, `address_manifest`, `creative_image`.
+    **Email already needs this today**, which is what settles it: `multipart/
+    alternative` — an HTML body *and* a plain-text alternative — is twenty-year-old
+    standard practice that spam filters penalise the absence of. "One artifact per
+    execution" was a constraint being lived with, not a simplification chosen.
+    **The hash covers the set, not a member.** Hashing only the HTML would leave
+    the plain-text part unverified, and the two will eventually diverge.
+    **This is [[ADR-005 — Separate Snapshot State from Recipient Delivery Artifact]] landing where it always pointed** — it already separates snapshot
+    state from the recipient delivery artifact, and this gives the second half a
+    shape. It is also exactly the two-artifact framing the code review recommends
+    for P1-04: an approval snapshot, and an immutable per-delivery package the
+    provider request traces back to.
+    **Costs:** every renderer returns a collection even with one thing to give,
+    and [[ADR-062 — Snapshot Stores Final Render State]] needs its wording
+    generalised from a single render to a package — the same amendment ADR-063
+    needs from Q13.
 
-### Cluster 4 — Identity, consent & permission
-16. Consent as rows per `(recipient, channel, purpose, status, source, timestamp)`
+### Cluster 4 — Identity, consent & permission  ✅ CLOSED 2026-08-07
+16. ✅ Consent as rows per `(recipient, channel, purpose, status, source, timestamp)`
     — confirm the shape. *Lean: rows, not columns — the same idiom already used
     for roles in the security base.*
-17. Addressability per channel: where do device tokens, postal addresses, handles
+    **Resolution (2026-08-07): rows, append-only events, latest-wins per
+    `(recipient, channel, purpose)`.** Columns were never viable — five channels
+    × three purposes is fifteen of them, none extensible without a migration, and
+    a column cannot carry the *source* and *timestamp* that make consent provable.
+    **Events rather than mutable current state**, for reasons already settled
+    elsewhere: [[ADR-154 — Erasure and Retention]] requires consent proof to
+    survive an erasure, and a mutable status overwrites exactly the history
+    needed to defend a UWG §7 complaint; and the signal layer already made this
+    choice, dropping the mutable `RecipientPreferenceDB` running total in favour
+    of append-only contributions computed on read ([[ADR-132 — Signal Layer Implementation Event-Sourced Contributions with Decay-on-Read]]). Consent is
+    cheaper than signals — no decay, just latest-row-wins on an indexed query.
+    **The user's addition, and it removes an obligation rather than adding one:**
+    the readable **current state lives in the CRM anyway** — that is where
+    customer service looks — so this platform does not need to be the
+    human-facing consent store. *"For our purposes we can use latest."* Consistent
+    with [[ADR-120 — CRM as Customer Source of Truth]] and
+    [[ADR-126 — Maintain Local Recipient Projection]]: the CRM owns the readable
+    truth, we hold the operational event log.
+    **Replaces `RecipientDB.consent_status`**, the single column the consent gate
+    is built on in `resolve_audience` and `execute_decision_slot`. That schema
+    change was already logged as a known cost when consent split by *purpose* in
+    the security chapter; adding the channel dimension now means it lands once.
+    **Left to Q19:** `ConsentSyncLogDB` already exists as an append-only sync log
+    beside the mutable column. If consent becomes an event log, the two need
+    reconciling — same table, or does the sync log stay separate as the record of
+    *CRM conversations* rather than *consent facts*?
+17. ✅ Addressability per channel: where do device tokens, postal addresses, handles
     and hashed identifiers live? Extends [[ADR-121 — Minimal Recipient Model]].
-18. Is "may I transfer your hashed identifier to an ad platform" a consent
+    **Resolution (2026-08-07): one addressability table, rows plus a JSON value —
+    "here's all contact points possible per recipient", whatever the type**
+    (user). Three things force it off `RecipientDB`: **cardinality** (one email,
+    but many push tokens — phone, tablet, reinstalled app), **lifecycle** (tokens
+    expire and APNs reports dead ones, so a status you can mark invalid beats a
+    value you overwrite), and **structure** (a postal address is street/postcode/
+    city/country, not a string). `value` as JSON matches the idiom already used by
+    `ContentRecordDB.content`, `module_data` and `app_config.value`.
+    **Hashed identifiers are NOT stored** (agreed): `SHA256(normalised email)` is
+    computed when the audience is assembled. Storing it adds nothing already held
+    and creates a second copy of the person to find at erasure time. It is a
+    derivation step in the delegated adapter, not addressability.
+    **OPEN sub-problem the user raised, and it has no answer yet: selection when
+    a recipient has several rows for one channel.** *"If a person had more than 1
+    address we'd need to think of a 'what address to take' process."* The
+    semantics differ per channel — **push fans out** to every valid token (all
+    the person's devices buzz), while **letter, SMS and email pick one**. So this
+    is *fan-out vs pick-one*, which is true of the channel whatever the vendor,
+    making it a **second channel-level fact** alongside module cardinality from
+    Q1 — both are "how many". For pick-one, the minimal answer is a primary flag
+    per `(recipient, channel)` with most-recently-verified as fallback; not
+    decided here. **Barely bites today**: email has one address in practice and
+    push fans out, so it only becomes real with letter or multi-email.
+    **Reinforces scope (user): another reason to keep letter out of the POC**, or
+    out entirely.
+    **Two consequences to name rather than discover:**
+    [[ADR-121 — Minimal Recipient Model]] assumes one address and needs
+    revisiting — the model stays minimal, addresses just move out of it, but the
+    ADR says otherwise on its face. And **erasure reaches these rows**: they are
+    identity data, so they go with the identity under
+    [[ADR-154 — Erasure and Retention]], not with the id-keyed activity that
+    survives — easy to overlook precisely because they sit in a different table,
+    the same trap that made signals easy to miss there.
+18. ✅ Is "may I transfer your hashed identifier to an ad platform" a consent
     *purpose*, a separate consent *type*, or out of scope for the platform?
-19. How does CRM consent sync carry per-channel state? (`ConsentSyncLogDB` today
+    **Resolution (2026-08-07): a purpose.** `(recipient, paid_social, transfer)`
+    sits alongside `(recipient, paid_social, marketing)` as an independent grant
+    in the Q16 grid — no new machinery.
+    **Why not fold it into the channel**, the tempting simplification since paid
+    social is impossible without the upload: it breaks on an ordinary case,
+    **suppression uploads**. Companies routinely push a customer list to Meta in
+    order to *exclude* those people from acquisition ads — a transfer with no
+    marketing to them at all, arguably in their interest. If transfer were
+    implied by channel consent, that case could not be expressed without claiming
+    a marketing consent nobody gave.
+    **Why not a separate consent type:** it would mean a second consent mechanism
+    beside Q16's, with its own storage and its own gate — the kind that later gets
+    checked in one place and forgotten in the other.
+    **Why not out of scope:** the platform is the thing *performing* the transfer.
+    Shipping the capability while disowning permission for it leaves an adopter
+    with no way to comply.
+    Consistent with [[ADR-144 — AI Data and Model Governance]]: we do not make the
+    legal determination, we make the model granular enough that the adopter can
+    encode whatever their counsel says. Whether a German DPA accepts a given basis
+    for Custom Audiences is their lawyer's question; ours is whether the answer is
+    **expressible**.
+19. ✅ How does CRM consent sync carry per-channel state? (`ConsentSyncLogDB` today
     syncs a single status.)
-20. Does the send-time consent gate become per-channel, and what happens when a
+    **Resolution (2026-08-07): two separate tables, because they record different
+    kinds of fact.** **Consent events** record what the *person* permitted,
+    whatever the source — CRM sync, a signup form, an unsubscribe click, an
+    import. **The sync log** records what happened in a *conversation with the
+    CRM*: it ran, it failed, it found drift. Merging them would put failed sync
+    attempts into somebody's consent history, and a sync that errored is not a
+    consent change. A sync that does change something writes to **both** — an
+    event with `source = crm`, and a sync-log entry saying the run applied N
+    changes. Q16's `source` field is what links them without a second mechanism.
+    **Mapping lives in the sync adapter, per deployment**, because every CRM
+    differs — same posture as the provider layer, and the same reasoning the
+    inbound-adapter backlog item already uses in preferring "simple to adjust to
+    your provider" over "one contract that auto-fits everything".
+    **The principle the user set here, and it reaches well past this question:**
+    *"We don't say that a company doesn't have to make changes to external
+    systems to prepare data — so we can say: if you want this, your CRM system has
+    to do this."* A company wanting several channels **must capture consent per
+    channel**, and will adjust its CRM to match. So the platform does **not** build
+    inference or elaborate mapping to compensate for a CRM that cannot express
+    per-channel consent; it states the requirement. Consistent with
+    [[ADR-120 — CRM as Customer Source of Truth]] and
+    [[ADR-104 — Audience Ownership Stays Outside Provider]], and it settles a whole
+    class of future questions of the form "should we infer X because their system
+    lacks it?" — no.
+    **Consequence:** a single-flag CRM maps to `(email, marketing)` and reasonably
+    to other addressed channels, but says nothing about uploading someone to an ad
+    platform. That grant is **absent until captured**, never inferred, and the UI
+    shows it missing rather than assumed — safe by construction, and the adopter
+    goes and gets the consent.
+    **Drift grows with it:** `GET /recipients/consent/drift` compares one status
+    today; per-channel consent makes drift per `(channel, purpose)` — in sync on
+    email marketing, adrift on social transfer.
+20. ✅ Does the send-time consent gate become per-channel, and what happens when a
     campaign spans channels with different consent coverage?
+    **Resolution (2026-08-07): yes, per `(channel, purpose)` — and the second half
+    dissolves.** A *variant* is planned and sent, not a campaign (Q4), so there is
+    no moment at which a campaign "spans channels" at send time. Each variant
+    resolves its own audience against its own channel's consent; the push audience
+    simply comes out smaller. Not a condition to handle — that is the answer.
+    **The gate becomes an ordered stack**, run immediately before handing to the
+    provider (and at **audience assembly** instead for delegated channels, which
+    have no per-recipient send moment):
+    **(1) addressability** — a valid, non-expired address for this channel;
+    **(2) consent** — a grant for this `(channel, purpose)`;
+    **(3) suppression** — hard bounce, complaint, manual blocklist;
+    **(4) frequency** — post-POC, concept documented in the playbook (Q9).
+    **The stack must record WHY each recipient was excluded, not merely exclude
+    them.** That is the real lesson of the open P0: the consent guard *did* fire,
+    and a bare `except ValueError` threw the reason away, so a compliance defect
+    read as a rendering behaviour. A stack that silently drops people reproduces
+    that failure one layer up. Typed exceptions plus a recorded exclusion reason
+    make "why didn't Anna get this?" answerable — which
+    [[ADR-085 — Decision Resolution Should Be Optionally Explainable]] already
+    promises for decisions and [[ADR-153 — Audit and Accountability]] is the home
+    for. **This is the shape the P0 fix should be built in**, which was the reason
+    for running Cluster 4 before fixing it.
+    **ORDER IS A PERFORMANCE DECISION AND MUST BE WRITTEN DOWN (user).** All four
+    stages are ANDed, so order never changes *correctness* — only how many rows
+    reach the later, more expensive stages (frequency needs history). The user's
+    instinct that consent-first reduces processed records **is right for email and
+    probably wrong for push**: for email everyone has an address and some opted
+    out, so consent is the selective filter; for push few people have a live token
+    at all while most who installed granted permission, so addressability is. So
+    **most-selective-first is channel-dependent** — do not hardcode one order as
+    universal. Belongs in the performance-notes document with a trigger threshold.
+    **Implementation note that gets both properties:** express each stage as a
+    **set operation, not a per-recipient loop**. The set excluded by a stage is
+    `input − output`, recordable in bulk, so per-stage attribution survives without
+    the N+1 pattern the send path is already flagged for (code review P2-04), and
+    the query planner handles ordering within a stage.
 
-### Cluster 5 — Feedback & signals
-21. Which channels return per-recipient events, which return aggregate — and how
+### Cluster 5 — Feedback & signals  CLOSED 2026-08-07
+21. ✅ Which channels return per-recipient events, which return aggregate — and how
     is that declared rather than assumed?
-22. **How is aggregate feedback kept out of the per-recipient signal layer?**
+    **Resolution (2026-08-07): declared per PROVIDER, never per channel — and
+    the user's reason is the stronger one.** *"Technology will change and a social
+    media platform might allow per-recipient feedback in the future."* Encoding
+    "social = aggregate" anywhere would bake in a vendor limitation with a shelf
+    life. This closes a loop: it is the same argument that made the Q8 rejection
+    of a channel-level capability file correct.
+    **Enforced at ingestion, because a declaration nothing checks is decoration.**
+    A provider that declared aggregate-only attempting to write a per-recipient
+    event is refused and fails loudly. That guard is also **Q22's protection** —
+    aggregate leaking into per-recipient signals is an enforcement gap, not a
+    discipline problem, and closing it here closes it structurally.
+    **Two destinations, and this is the load-bearing split (user).**
+    **Per-recipient events → the signal layer → decisions.** That is what signals
+    are *for*.
+    **Aggregate results → analytics.** A human-read view, not a decision input:
+    *"if a company wants to use numbers from the socials or letters it's more an
+    analytical look instead of signals that can be used in the decision
+    algorithm."* Aggregate data is therefore **not discarded** — it simply lives
+    in reporting rather than the decision path, and **is never interpolated onto
+    individual recipients**.
+    **Feedback source ≠ provider.** Q7 established that for blind channels the
+    return path is the adopter's **own domain** — a tracked link in a letter or an
+    ad firing back with our identifier from their site. A letter-shop adapter
+    declaring "no feedback" is accurate about *itself* while per-recipient
+    engagement still arrives by another route. So **any channel can have
+    per-recipient feedback if the adopter instruments their own site**; it is just
+    not the provider's to give. A better line for the playbook than "letters have
+    no feedback".
+    **Direction, explicitly NOT phase 1 (user):** eventually aggregate results
+    should inform decisions at **segment level** — using how a social post
+    performed to shape the next one. That is genuinely valuable and genuinely
+    different from per-recipient signals; parked.
+22. ✅ **How is aggregate feedback kept out of the per-recipient signal layer?**
     Attributing segment numbers to individuals would corrupt the decision layer's
     auditability.
-23. What does [[ADR-103 — Provider Events Are Normalized Into Internal Events]]
+    **Resolution (2026-08-07): a separate table with its own grain — explicitly
+    NOT the engagement event table with `recipient_id` made nullable.**
+    That is the same reasoning that made dropping organic social a simplification:
+    a nullable recipient column leaves campaign-level and per-recipient facts
+    sharing a table with incompatible meanings. Every consumer would then have to
+    remember `WHERE recipient_id IS NOT NULL` — the signal layer, attribution,
+    every report — and one omission means segment numbers are read as a person's
+    behaviour, silently. **The corruption would arrive through the schema rather
+    than through carelessness**, so the schema is where it gets prevented.
+    Keyed by what aggregate data is actually about:
+    `(send_instance or audience, creative/variant, metric, value, period)`.
+    **The signal layer then cannot physically read it** — Q22's guarantee becomes
+    structural rather than a rule to follow, the same property typed interfaces
+    bought in Q6.
+    **SCOPE (user): aggregate ingestion and display are NOT POC.** *"We need to
+    cut down features and this might be easy to move into a future phase."*
+    Prepared in the POC only if trivial, otherwise explained in the library.
+    **The deliverable here is the recorded constraint, not code** — it costs
+    nothing now and stops phase 2 taking the nullable-column shortcut.
+    **Fifth deferral in this interview, and they form a coherent phase-2 set:**
+    volume capping (Q9), letter integration (Q10), cross-channel follow-up
+    audiences (Q9), aggregate ingestion/display (Q22), aggregate-informed segment
+    decisions (Q21).
+23. ✅ What does [[ADR-103 — Provider Events Are Normalized Into Internal Events]]
     normalisation mean when an event has no recipient?
-24. Is the conversion-API path (adopter's own site fires back with their
+    **Resolution (2026-08-07): it does not — a thing with no recipient is not an
+    event in ADR-103's sense. It is a metric.** Internal events are per-recipient
+    by construction: they carry a recipient, feed signals and attribute to
+    content. Something reported per audience-and-creative over a period has a
+    different grain, a different table (Q22) and a different consumer. **Calling
+    both "events" is what pushes toward the nullable column already ruled out —
+    the noun does the damage before the schema does.**
+    So **ADR-103 needs only a scope clarification**: it governs per-recipient
+    events. Metrics have their own path, not built.
+    **The rule to state in the ADR, because it is the part that gets forgotten:
+    an event without a recipient is refused at ingestion, not stored with a
+    null.** Together with the Q21 declaration check, that is what makes Q22's
+    separation hold at runtime rather than only in the schema.
+    **Example of why the distinction pays:** "audience synced, 340 of 500 matched"
+    is genuinely useful to a manager and genuinely meaningless attributed to
+    anyone.
+    **Returned letters — an exception NOT to design around (user).** "Address
+    doesn't exist" is per-recipient, but it is unlike an email or push
+    non-deliverable in two ways: it arrives **days later** as an asynchronous
+    event rather than an API response to the send, and whether it arrives **at
+    all** depends both on the provider offering it and on there being an API path
+    rather than a physical box of returned mail. It would likely need its own
+    reconciliation process. **Do not over-design it** — doubly deferred, since
+    letter is already out of POC scope (Q10). The bounce vocabulary can absorb it
+    if and when a provider reports it.
+24. ✅ Is the conversion-API path (adopter's own site fires back with their
     identifier) in scope for the POC, or a documented extension point?
-25. Does the signal layer need a channel dimension — is a click in email the same
+    **Resolution (2026-08-07): documented extension point — consistent with the
+    existing backlog decision** that conversions are a pluggable contribution
+    type whose ingest path is per-deployment, delivering "the extension point plus
+    one worked example when a real adopter needs it". Omni-channel does not change
+    the answer, it raises the stakes: for delegated and blind channels this is the
+    **only** per-recipient feedback path there is.
+    **The mechanism largely exists.** A conversion callback is structurally what
+    `POST /provider/webhooks/resend` already does — an external system posting an
+    event carrying an identifier. What is missing is **machine authentication**
+    (already P0) and a **documented event contract**. So it arrives close to free
+    once machine auth lands, rather than needing its own build.
+    **Conversions are per-recipient events under ADR-103** and feed signals
+    normally, even though they arrive from the adopter's system rather than a
+    provider — the one case where a blind channel produces a first-class signal.
+    **But a conversion is NOT a click with a different name (user):** it carries
+    *what* converted, not only *that* it did, and structuring that depends
+    entirely on the business — products, PDF downloads, bookings.
+    **Boundary: the platform records THAT it converted; WHAT belongs to the CRM or
+    DWH.** Modelling "what" means modelling every adopter's business, which is
+    unbounded and is already assigned elsewhere by
+    [[ADR-120 — CRM as Customer Source of Truth]] and
+    [[ADR-124 — DWH Is Recommended but Not Mandatory]]. At most an **opaque
+    external reference** the adopter's own system resolves. Same posture as Q19:
+    if they want product-level conversion analysis, that is their DWH's job.
+    **Minimum that holds (user): "clicked this and bought *anything*"** — enough
+    for signals, since it yields the content, its categories, and a heavier
+    contribution weight than a click.
+    **Trap named:** a conversion *value* looks like one nullable number but drags
+    **currency, net-versus-gross and refunds** behind it — a refunded conversion
+    arguably has to be reversed. So the honest minimum is the boolean; value
+    belongs with the analytics phase.
+25. ✅ Does the signal layer need a channel dimension — is a click in email the same
     signal as a tap in push? Touches [[ADR-132 — Signal Layer Implementation Event-Sourced Contributions with Decay-on-Read]].
+    **Resolution (2026-08-07): yes — an explicit `channel` column on
+    `SignalContributionDB`. It does not change the topic score.** One append-only
+    log read along two axes: **topic affinity** (sum over categories, ignoring
+    channel — unchanged; interest in hiking is interest in hiking wherever it was
+    clicked) and **channel affinity** (sum over channels, ignoring category —
+    new). The second is what makes Q2's forward consequence possible at all: the
+    decision layer cannot choose a channel per recipient without knowing which
+    channels that person engages with.
+    **Two alternatives the user raised, both checked and rejected on evidence.**
+    **(a) Extend `contribution_type` values** (`click_email`, `tap_push`): crosses
+    two orthogonal facts into one enum — five types x five channels is 25 values —
+    and it breaks channel weighting, which wants a **grid**, not a flat list.
+    ADR-132 configures half-lives per contribution type, so it would also produce
+    25 half-lives where two independent axes are wanted.
+    **(b) Derive channel from `event_id`**: the path exists but is **five joins** —
+    contribution to event to execution to send instance to snapshot to variant —
+    on every read, in a layer designed around compute-on-read. Worse, `event_id`
+    is **nullable** (manual declared preferences have no event), so channel
+    returns unknowable rather than not-applicable; and **ADR-132 prunes**, keeping
+    only a bounded operational window locally with history in the DWH — so if
+    executions are pruned on a different schedule than contributions, **old
+    contributions lose their channel retroactively**, degrading silently over
+    exactly the period worth analysing. A denormalised column is immune to all
+    three.
+    **Weights: extend the settings grid by channel, and it is the company's call
+    whether to weigh channels differently, not ours (user)** — consistent with
+    "numbers belong to the company, mechanism to us" (Q9). Default equal until
+    there is data; a push tap is lower-friction than an email click and arguably
+    signals less, but that is a guess without evidence.
+    **Note the two affinities decay differently.** Topic interests shift over
+    months; "never opens email, always taps push" is a stabler fact. ADR-132
+    already makes half-lives configurable per type, so this needs no new
+    mechanism.
 
 ---
 
