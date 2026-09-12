@@ -47,6 +47,15 @@ class DeliveryExecutionDB(Base):
     status = Column(String(50), nullable=False, default="created")
     provider = Column(String(100), nullable=True)
     provider_message_id = Column(String(255), nullable=True, unique=True, index=True)
+    # Denormalized at plan time (ADR-163 addendum 2026-09-12, point 1). An
+    # inbound bounce/complaint webhook resolves a provider message id to this
+    # row and must write a consent event keyed (recipient, channel, purpose) —
+    # deriving channel from here would mean execution → send instance →
+    # snapshot → variant on every inbound event, the same four-join shape
+    # ADR-164 point 9 rejected for SignalContributionDB, and it degrades to
+    # unknowable once executions are pruned.
+    channel = Column(String(50), nullable=False, default="email")
+    purpose = Column(String(50), nullable=False, default="marketing")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime(timezone=True),
