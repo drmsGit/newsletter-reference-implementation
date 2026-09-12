@@ -18,7 +18,15 @@ The *axis* is decided, even though the sentence is not. Recorded across
   management and orchestration for any API-reachable channel**, not an email tool.
   This is the strongest available expression of pillar 3 for the Mittelstand
   segment — an adopter can connect a local letter shop no SaaS vendor will ever
-  integrate. The omni-channel interview that would settle it is deferred.
+  integrate. The omni-channel interview **closed 2026-09-01 (25/25)** and is
+  written up as ADR-160–164, accepted 2026-09-12, with
+  [[ADR-165 — Core Scope Is Channel-Neutral Content Orchestration]] superseding
+  ADR-001 to make channel-neutral orchestration the formal core scope.
+  **It is designed and accepted, not built** — only email is implemented.
+  **Decided 2026-09-12: that does not clear rule 2 below, so this sharpening
+  stays out of the headline claim until there is code.** The rule's bar is
+  *demonstrable in the repo*, and accepted ADRs demonstrate a design, not a
+  capability. Revisit when a second channel actually sends.
 
 ## What a candidate statement must satisfy
 1. Names the primary audience (agencies and freelancers serving mid-market),
@@ -37,3 +45,8 @@ superseding rather than editing when it changes.
 ## History
 - 2026-08-20 — file created; gate still open. `CLAUDE.md` had pointed here since
   before the file existed.
+- 2026-09-12 — corrected the stale claim that the omni-channel interview was
+  deferred; it closed and its ADRs were accepted. Rule 2 was tested against the
+  result and **held**: designed-and-accepted does not count as demonstrable, so
+  the omni-channel sharpening stays out of the headline. Gate still open — no
+  statement adopted.

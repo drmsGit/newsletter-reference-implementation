@@ -59,12 +59,12 @@ publishing the repo at all, which Gate-8/9/4C already assume.
 - The React/Node frontend — not started, a second codebase, explicitly
   deferred in `playbook-strategy.md` §6 ("Product frontend... deliberately
   deferred until the stage-1 base is complete").
-- Omni-channel generalization — still out of scope for beta itself, but no
-  longer un-started: the five-cluster design interview is underway (cluster 2
-  nearing completion, two questions left, clusters 3–5 to follow), expected
-  to finish as one of the next tasks. Finishing it doesn't pull omni-channel
-  *building* into beta scope — but see §3 for why its timing now matters for
-  Gate 2, and §5 for why it now matters for frontend sequencing too.
+- Omni-channel generalization — still out of scope for beta itself, and now
+  **designed rather than merely started**: the five-cluster interview closed
+  2026-09-01 (25/25) and ADR-160–164 were accepted 2026-09-12, with ADR-165
+  superseding ADR-001. Design being done does **not** pull omni-channel
+  *building* into beta scope — but see §3 for what it settles for Gate 2, and
+  §5 for frontend sequencing.
 - Phase 3D (AI-based audience selection) — roadmap explicitly says "unblocked
   but should NOT be started yet" pending the per-recipient-LLM cost finding.
 - Mode B (autonomous workflows), the Mode-A shared approval inbox, the second
@@ -126,17 +126,24 @@ on its face:
   constraint on Phase 4C, resolved by *not* overclaiming, not by resolving
   the ADR.
 
-  **Status update 2026-08-22:** the interview is now running (cluster 2
-  nearly done, clusters 3–5 queued), which changes the calculus on one
-  point. Gate 2's own write-up in `LAUNCH-GATES.md` already flags that the
-  P0 consent fix overlaps the omni-channel restructuring of the same
-  send-time gate, and that fixing it once in the right shape is the
-  argument for running the interview first. With the interview now close
-  rather than indefinitely deferred, that argument gets stronger — worth
-  deciding whether to sequence the Gate-2 fix *after* the interview lands
-  instead of fixing the consent gate twice. Still a sequencing question
-  inside already-in-scope Gate 2 work, not a new required ADR — the count
-  in this section stays at zero.
+  **Status update 2026-09-12 (supersedes the 2026-08-22 update below):** the
+  interview is closed and ADR-160–165 are accepted. Two consequences.
+  *First, the writing constraint survives in a narrower form* — the design
+  now exists, but only email is built, and POSITIONING.md's rule 2 was tested
+  against exactly this case on 2026-09-12 and **held**: designed-and-accepted
+  is not demonstrable, so the omni-channel framing still stays out of the
+  headline claim. The constraint is now "not built" rather than "not
+  designed". *Second, the Gate-2 sequencing question is answerable rather
+  than open* — ADR-163 §7/§8 states the shape the P0 fix should take, so the
+  remaining call is only whether the consent/addressability migration lands
+  before that fix or after beta. Still a sequencing question inside
+  already-in-scope Gate 2 work, not a new required ADR — the count in this
+  section stays at zero.
+
+  **Status update 2026-08-22 (stale, kept for the record):** the interview is
+  now running (cluster 2 nearly done, clusters 3–5 queued)… worth deciding
+  whether to sequence the Gate-2 fix *after* the interview lands instead of
+  fixing the consent gate twice.
 - **Dynamic decision-content × audience resolution ordering.** The circular
   dependency this item describes is already "masked" in the running system —
   suggest-audience reads existing resolutions and works for the current demo

@@ -23,9 +23,17 @@ apart. From the 2026-08-07 external review:
 - **Gate 2** — a frozen audience is consent-gated at plan time and never again,
   and the decision layer's consent guard is swallowed by a bare `except
   ValueError` in `delivery/service.py`. A compliance defect currently reads as a
-  rendering behaviour. Note it overlaps the deferred omni-channel interview,
-  which restructures the same send-time gate — fixing once, in the right shape,
-  is the argument for running that interview first.
+  rendering behaviour. It overlaps the omni-channel interview, which restructures
+  the same send-time gate. **That interview closed and its ADRs were accepted
+  2026-09-12, so "run it first" is no longer a reason to wait** — ADR-163 §7/§8
+  states the shape the fix should take: an ordered exclusion stack
+  (addressability → consent → suppression → frequency) that **records why each
+  recipient was excluded**, which is the P0's real lesson (the guard fired; the
+  bare `except` discarded the reason). What remains is only the ordering call —
+  whether the consent/addressability migration lands before this fix or after
+  beta. Note also that this fix cannot currently be regression-tested:
+  `app/database.py` builds an engine at import, making four test modules
+  uncollectable, and the top-ranked missing test is send-time consent revocation.
 - **Gate 3** — the JSON API routers are deliberately unguarded; that is machine
   authentication, scoped as a Mode B prerequisite. It was raised to P0 because
   it blocks public exposure, not just Mode B.
