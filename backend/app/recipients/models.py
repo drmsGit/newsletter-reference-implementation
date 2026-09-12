@@ -45,27 +45,46 @@ class ConsentSyncRequest(BaseModel):
 
 
 class ConsentSyncLog(BaseModel):
+    """One conversation with the CRM — that it ran, whether it succeeded, how
+    much it changed. It carries no consent values: those are consent events
+    with `source="crm"` (ADR-163 addendum 2026-09-12, point 2)."""
+
     id: int
-    recipient_id: int
-    external_id: str
-    crm_consent_status: ConsentStatus
-    platform_status_before: ConsentStatus
-    applied: bool
+    recipient_id: int | None = None
+    external_id: str | None = None
+    ok: bool
+    changes_applied: int
     source: str
     note: str | None = None
     synced_at: datetime
 
 
+class ConsentDriftDirection(str, Enum):
+    """Which side moved, and therefore which way the correction flows."""
+
+    # Something here opted the person out (usually a bounce or complaint) and
+    # the CRM has not been told — relay it outward.
+    platform_ahead = "platform_ahead"
+    # The CRM asserted something that never took effect here — re-run the sync.
+    crm_ahead = "crm_ahead"
+
+
 class ConsentDriftItem(BaseModel):
-    """A recipient whose live platform consent_status disagrees with the most
-    recent value the CRM asserted for them — i.e. a sync that never took."""
+    """A `(recipient, channel, purpose)` cell where the platform's effective
+    consent disagrees with the CRM's last assertion."""
 
     recipient_id: int
     external_id: str
     email: str
+    channel: str = "email"
+    purpose: str = "marketing"
     platform_consent_status: ConsentStatus
     last_crm_consent_status: ConsentStatus
     last_synced_at: datetime
+    direction: ConsentDriftDirection
+    # What produced the platform's current state — "provider" on a bounce or
+    # complaint, which is the common platform_ahead case.
+    platform_source: str | None = None
 
 
 class RecipientPreference(BaseModel):

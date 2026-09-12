@@ -5,7 +5,7 @@ from app.campaigns.models import DecisionResolution
 from app.campaigns.service import create_decision_resolution, to_decision_resolution
 from app.decision.strategies.registry import get_strategy
 from app.recipients.db_models import RecipientDB
-from app.recipients.service import CONSENTING_STATUS
+from app.recipients.consent import require_consent
 
 
 def execute_decision_slot(
@@ -33,13 +33,11 @@ def execute_decision_slot(
         )
         if recipient is None:
             raise ValueError(f"Recipient {recipient_id} not found")
-        if recipient.consent_status != CONSENTING_STATUS:
-            raise ValueError(
-                f"Recipient {recipient_id} is not opted-in "
-                f"(consent_status='{recipient.consent_status}') — decisioning is "
-                "gated at audience-resolution time and must not run for "
-                "non-consenting recipients"
-            )
+        # Raises ConsentDenied — a ValueError subclass, so existing callers that
+        # catch ValueError are unaffected, while a caller that needs to tell a
+        # compliance refusal apart from "the strategy resolved nothing" now can.
+        # That conflation is the root of the open P0 (ADR-163 point 8).
+        require_consent(db, recipient_id)
 
     strategy = get_strategy(slot.decision_strategy)
 

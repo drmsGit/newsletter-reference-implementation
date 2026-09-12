@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB, AudienceRuleBlockDB
 from app.recipients.db_models import RecipientDB
-from app.recipients.service import CONSENTING_STATUS
+from app.recipients.consent import is_consenting_filter
 from app.insight.signals import operational_signals_for_category
 
 # Default minimum signal a system-suggested include block asks for. Deliberately
@@ -148,8 +148,13 @@ def find_by_criteria(
     # non-consenting recipients out of the processing scope entirely, both for
     # GDPR reasons (running the decision engine over their data is itself
     # "processing") and cost reasons (no paid AI/token spend on people who will
-    # never receive anything). "pending" and "opted_out" are both excluded.
-    q = db.query(RecipientDB).filter(RecipientDB.consent_status == CONSENTING_STATUS)
+    # never receive anything).
+    #
+    # Reads the latest (recipient, email, marketing) consent event (ADR-163
+    # point 1). Fail-closed in both directions: "pending" and "opted_out" are
+    # excluded, and so is a recipient with no consent event at all, since the
+    # absence of a decision is not a grant.
+    q = db.query(RecipientDB).filter(is_consenting_filter())
 
     if language:
         q = q.filter(RecipientDB.language == language)
@@ -345,7 +350,7 @@ def resolve_audience(db: Session, group_id: int) -> list[RecipientDB]:
         db.query(RecipientDB)
         .filter(
             RecipientDB.id.in_(final_ids),
-            RecipientDB.consent_status == CONSENTING_STATUS,  # consent floor
+            is_consenting_filter(),  # consent floor
         )
         .order_by(RecipientDB.email.asc())
         .all()

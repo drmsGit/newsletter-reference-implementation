@@ -48,7 +48,12 @@ from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB
 from app.audience.service import find_by_criteria, resolve_audience
 from app.database import SessionLocal
 from app.decision.service import execute_decision_slot
-from app.recipients.db_models import RecipientDB
+from app.recipients.consent import record_consent
+from app.recipients.db_models import (
+    AddressabilityDB,
+    ConsentEventDB,
+    RecipientDB,
+)
 
 # The states the gates must treat as non-consenting. "pending" is included
 # deliberately: consent is opt-IN, so the absence of a decision is not consent.
@@ -56,19 +61,33 @@ NON_CONSENTING = ["opted_out", "pending"]
 
 
 def _make_recipient(db, consent_status, email=None, language=None):
-    """A throwaway recipient with a unique external_id.
+    """A throwaway recipient with a unique external_id, in a given consent state.
 
-    external_id is the identity key (it carries the unique constraint); email
-    deliberately is not, which is what the deduplication test below exercises.
+    This helper is the *only* thing the ADR-163 migration changed in this file,
+    exactly as intended: consent used to be a column on the recipient and is now
+    the latest event for `(recipient, email, marketing)`. Every assertion below
+    is untouched, because what must be true did not change — only where the
+    answer is stored.
+
+    external_id is the identity key (it carries the unique constraint); the
+    address deliberately is not, which is what the deduplication test exercises.
     """
     recipient = RecipientDB(
         external_id=f"test-consent-{uuid.uuid4()}",
         email=email or f"{uuid.uuid4()}@example.invalid",
         language=language,
         status="active",
-        consent_status=consent_status,
     )
     db.add(recipient)
+    db.flush()
+    record_consent(
+        db,
+        recipient.id,
+        consent_status,
+        source="test",
+        note="test_consent_gates fixture",
+        commit=False,
+    )
     db.flush()
     return recipient
 
@@ -118,6 +137,14 @@ def db():
                 AudienceGroupDB.id.in_(created_groups)
             ).delete(synchronize_session=False)
         if created_recipients:
+            # Consent events and addresses are FK-bound to the recipient, so
+            # they go first or the delete below fails.
+            session.query(ConsentEventDB).filter(
+                ConsentEventDB.recipient_id.in_(created_recipients)
+            ).delete(synchronize_session=False)
+            session.query(AddressabilityDB).filter(
+                AddressabilityDB.recipient_id.in_(created_recipients)
+            ).delete(synchronize_session=False)
             session.query(RecipientDB).filter(
                 RecipientDB.id.in_(created_recipients)
             ).delete(synchronize_session=False)
