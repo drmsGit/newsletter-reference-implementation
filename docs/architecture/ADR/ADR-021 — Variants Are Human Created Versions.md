@@ -6,7 +6,7 @@ topic:
   - campaign
   - variant
 created: 2026-05-30
-modified: 2026-07-31
+modified: 2026-09-12
 source:
   - condor-reference-system
   - interview-2026-05-30
@@ -52,6 +52,35 @@ A/B test versions are variants. The delivery logic that decides who receives whi
 
 Also considered and rejected (2026-07-31): materializing the N renderings as N real variants now that storage is cheap. It would require a new level (`Campaign → Variant → Version`) purely to distinguish "the human's version" from "what each recipient received" — a distinction **variant vs. resolution/snapshot already draws** ([[ADR-083 — Personalization Happens Inside Variants Through Decision Slots]]).
 
+## Addendum 2026-09-12 — a variant now carries a second meaning at once
+
+Prompted by [[ADR-160 — Channel Model and Composition]] point 4, which fixed
+channel as **an attribute on the variant** rather than introducing a new
+channel-plan level between campaign and variant.
+
+A variant already meant "a deliberately created, reviewable version of a
+campaign" — the A/B sense this ADR exists to protect. Channel adds a second,
+independent sense on top of it: which channel the variant is expressed in.
+A campaign can now carry an email variant, a push variant and a paid-social
+variant, each of which may itself have A and B versions. The two senses
+compose rather than collide — "Push A" and "Push B" are still each a
+deliberately created, reviewable version, exactly as this ADR requires; there
+are simply two of them for the push channel instead of one.
+
+This reads awkwardly in a flat list — "Push A", "Push B", "Email A" sitting
+next to each other without visual grouping — and that awkwardness is
+accepted as a **display** concern, to be solved by grouping variants by
+channel in the UI, not by adding a model concept. ADR-160 point 4 makes the
+same call for the same reason: a channel-plan level would have made "which
+channels is this campaign running on" stored intent rather than derived, for
+no benefit this ADR's granularity concern needs.
+
+Nothing here touches this ADR's Decision. This ADR constrains **the
+granularity of a version** — deliberate and reviewed, never one-per-resolution
+— not **which dimensions a variant is allowed to vary along**. Channel is
+simply one more dimension a human-created, reviewed version can vary along,
+alongside audience, branch and test arm.
+
 ## Related ADRs
 
 ### Depends On
@@ -62,3 +91,7 @@ Also considered and rejected (2026-07-31): materializing the N renderings as N r
 
 - [[ADR-079 — Dynamic Resolution Outside Builder]]
 - [[ADR-083 — Personalization Happens Inside Variants Through Decision Slots]]
+
+### Referenced By
+
+- [[ADR-160 — Channel Model and Composition]]

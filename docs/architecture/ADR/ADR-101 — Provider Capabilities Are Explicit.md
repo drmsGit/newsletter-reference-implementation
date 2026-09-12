@@ -5,7 +5,7 @@ topic:
   - architecture
   - provider
 created: 2026-06-01
-modified: 2026-08-02
+modified: 2026-09-12
 source:
   - interview-2026-06-01
 depends_on:
@@ -106,6 +106,51 @@ adapter that motivates it — are tracked in `docs/backlog.md`; the first real
 consumer is the operator-facing **system mail** channel, which deliberately
 wants a provider with none of these capabilities.
 
+## Addendum 2026-09-12 — extended from email providers to channel providers
+
+Prompted by [[ADR-161 — Channel Execution Shapes]] point 6, which needed this
+ADR to widen scope rather than build a second capability system, and by
+[[ADR-164 — Channel Feedback and Signals]] point 1, which needed the same
+scope for feedback granularity specifically.
+
+**The extension.** This ADR was written against email providers. It now
+applies to **channel providers generally** — the same ADR, a wider scope, no
+second capability-declaration system introduced alongside it. A **channel-
+level** capability file was considered and rejected in ADR-161: it would only
+stay correct if kept current with everything a channel could possibly do,
+and it has no owner — it goes stale the moment any one vendor ships
+something new, whereas a provider file describes one thing its author
+actually knows. Duplication across provider files is accepted as the cheaper
+failure, the same trade this ADR's 2026-08-02 addendum already made for the
+SMTP case: a capability declaration describes **the configured provider
+instance**, not the channel or the protocol it happens to speak.
+
+**Two things this addendum records as provider capabilities, not channel-level
+facts, because both vary by vendor rather than by channel:**
+
+- **Batch-versus-per-message handoff.** Some channel vendors — a letter shop
+  is the motivating case — take a per-message API call; others want a CSV
+  plus a PDF bundle over SFTP. That is a difference between vendors *of one
+  channel*, exactly the discriminator this ADR already draws for SMTP versus
+  an ESP's API. It is not a fact about "letter" as a channel; it is a fact
+  about which letter shop is configured.
+- **Feedback granularity is declared per provider, never per channel.**
+  Whether feedback comes back per recipient or only in aggregate is a
+  property of the configured provider instance. A social platform might
+  someday offer per-recipient feedback where today it only reports
+  aggregate; encoding "social = aggregate" anywhere in the architecture
+  would bake a vendor's current limitation in with a shelf life, and the
+  first vendor to improve would falsify the encoding. Declaring it per
+  provider means a platform that starts reporting per-recipient events needs
+  only a changed provider file, nothing else.
+
+Both are the same argument this ADR's existing 2026-08-02 addendum already
+made for SMTP — a capability declaration describes the configured provider
+instance — extended from email specifically to channel providers in general.
+Nothing above changes this ADR's Decision section; core and optional
+capabilities are unchanged, and the gating relationship with [[ADR-106 —
+Bounce and Complaint Feedback Is Mandatory]] is unchanged.
+
 ## Related ADRs
 
 ### Depends On
@@ -115,3 +160,8 @@ wants a provider with none of these capabilities.
 ### Enables
 
 - [[ADR-106 — Bounce and Complaint Feedback Is Mandatory]]
+
+### Referenced By
+
+- [[ADR-161 — Channel Execution Shapes]]
+- [[ADR-164 — Channel Feedback and Signals]]

@@ -1,6 +1,6 @@
 ---
 type: adr
-status: proposed
+status: accepted
 topic:
   - architecture
   - channels
@@ -8,7 +8,7 @@ topic:
   - variant
   - composition
 created: 2026-09-01
-modified: 2026-09-01
+modified: 2026-09-12
 source:
   - "Omni-Channel design interview (interview-prep, closed 2026-09-01), Cluster 1 / Q1–Q5"
 depends_on:
@@ -25,7 +25,7 @@ enables:
 ---
 
 ## Status
-Proposed
+Accepted
 
 ## Context
 
@@ -64,6 +64,9 @@ Coverage is just what exists: email + push variants means the campaign is email/
 
 The pre-interview lean was "warn, never block". **It is superseded because its premise was wrong: a variant is planned and sent, not a campaign.** There is no campaign schedule that launches every variant in it — a `SendInstanceDB` hangs off a snapshot of one variant ([[ADR-095 — Use Send Instances for Technical Execution Tracking]]). So there is no campaign-level send event at which to warn that "push has no variant", and nothing to warn about: nobody asked to send push.
 
+**8. Whether a channel is available to select is a settings row, not a file to delete.**
+A deployment not licensed for a channel — no paid-social ad account, no letter-shop contract — still has the manifest and provider files on disk, because deleting them is not how an adopter is expected to manage a contract they don't have. Availability is a boolean row in the existing settings/config table, the same idiom already trusted for the AI kill switch and the governed model list ([[ADR-140 — AI Capability Layer]], [[ADR-144 — AI Data and Model Governance]]): code and manifests describe what the platform *can* do, a setting describes what *this deployment* has turned on. A disabled channel disappears from the variant-creation UI and is refused server-side if requested directly — the same fail-closed idiom used elsewhere in this record. This closes the loose end left open at proposal time; no separate registry is introduced.
+
 ## Consequences
 
 ### Positive
@@ -73,6 +76,7 @@ The pre-interview lean was "warn, never block". **It is superseded because its p
 - Content that a channel cannot carry can never be selected by the engine, because the existing `candidate_filter_fields` mechanism already expresses the filter.
 - The campaign stays the topic. The model does not encode a channel-shaped way of working, which keeps it usable by teams that organise differently.
 - Registering a channel is two files, consistent with the auto-registration idiom already trusted for strategies and modules.
+- A deployment can turn a channel off it isn't licensed for without touching code, using the same settings-row idiom already trusted for AI governance.
 
 ### Negative
 - **A variant now carries two meanings at once** — A/B version *and* channel expression — which reads awkwardly at "Push A / Push B". Accepted as a **display** concern to be solved by grouping in the UI, not a model one.
@@ -84,7 +88,7 @@ The pre-interview lean was "warn, never block". **It is superseded because its p
 ## Notes
 
 - **Forward consequence, explicitly not decided here.** If the channel is "what the recipient might like best", channel selection eventually becomes a *decision* — the engine choosing per recipient which channel, and therefore which variant, they receive, with the AI selecting the most suitable. That requires channel to be a signal dimension, which [[ADR-164 — Channel Feedback and Signals]] provides. It is named so it is not designed away, not scheduled.
-- **Loose end from the registration decision:** whether a deployment can *disable* a channel it is not licensed for without deleting files. It is governance of the same shape as [[ADR-140 — AI Capability Layer]]'s kill switch and governed model list, where availability is code and selection is a setting. Not decided.
+- **Resolved 2026-09-12:** whether a deployment can *disable* a channel it is not licensed for without deleting files — yes, via the settings-row toggle in Decision point 8.
 - **Amendments other records need — none of them made here.** [[ADR-021 — Variants Are Human Created Versions]] does not anticipate a variant carrying a channel and would benefit from a dated addendum recording the second meaning and that it is a display concern. [[ADR-001 — Newsletter Architecture Boundaries]] scopes the core to "newsletter-specific responsibilities", which no longer describes the intended scope; **no resolution in this interview decided what to do about it**, so it is flagged rather than answered.
 - Nothing in this ADR supersedes an accepted record. What point 7 supersedes is a *lean* recorded in the interview prep and in the playbook decision log (entry 16, 2026-08-12), not a decision in force.
 

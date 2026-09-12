@@ -1,6 +1,6 @@
 ---
 type: adr
-status: proposed
+status: accepted
 topic:
   - architecture
   - channels
@@ -8,7 +8,7 @@ topic:
   - snapshot
   - templates
 created: 2026-09-01
-modified: 2026-09-01
+modified: 2026-09-12
 source:
   - "Omni-Channel design interview (interview-prep, closed 2026-09-01), Cluster 3 / Q11–Q15"
 depends_on:
@@ -22,7 +22,7 @@ enables:
 ---
 
 ## Status
-Proposed
+Accepted
 
 ## Context
 

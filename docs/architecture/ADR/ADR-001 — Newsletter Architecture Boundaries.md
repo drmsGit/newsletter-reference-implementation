@@ -1,11 +1,11 @@
 ---
 type: adr
-status: accepted
+status: superseded by ADR-165
 topic:
   - architecture
   - boundaries
 created: 2026-05-30
-modified: 2026-06-05
+modified: 2026-09-12
 source:
   - condor-reference-system
   - interview-2026-05-30
@@ -20,7 +20,7 @@ enables:
 
 
 ## Status
-Accepted
+Superseded by ADR-165
 
 ## Context
 The newsletter architecture is intended to explain and implement the core concepts of modular newsletter systems.
@@ -64,3 +64,6 @@ This boundary is especially important because the project is not meant to compet
 - [[ADR-100 — Provider Layer as Send and Feedback Adapter]]
 - [[ADR-120 — CRM as Customer Source of Truth]]
 - [[ADR-125 — Define a Minimal Reference Architecture]]
+
+### Superseded By
+- [[ADR-165 — Core Scope Is Channel-Neutral Content Orchestration]]

@@ -1,6 +1,6 @@
 ---
 type: adr
-status: proposed
+status: accepted
 topic:
   - architecture
   - channels
@@ -8,7 +8,7 @@ topic:
   - privacy
   - data-model
 created: 2026-09-01
-modified: 2026-09-01
+modified: 2026-09-12
 source:
   - "Omni-Channel design interview (interview-prep, closed 2026-09-01), Cluster 4 / Q16–Q20"
 depends_on:
@@ -22,7 +22,7 @@ depends_on:
 ---
 
 ## Status
-Proposed
+Accepted
 
 ## Context
 
@@ -78,6 +78,9 @@ All four stages are ANDed, so order never changes the outcome — only how many 
 **10. Each stage is expressed as a set operation, not a per-recipient loop.**
 The set excluded by a stage is `input − output`, recordable in bulk, so per-stage attribution from point 8 survives without the N+1 pattern the send path is already flagged for (code review P2-04), and the query planner handles ordering within a stage.
 
+**11. Address-pick, for pick-one channels, is an optional primary flag with most-recently-verified as fallback — never a required choice.**
+This is a mechanism question, not a business one: unlike the frequency-capping numbers or channel weights elsewhere in this cluster, there is no company-tunable quantity here, just a data-model shape, so it is settled here rather than deferred to `docs/business/decisions/`. Point 2 already allows multiple addressability rows per `(recipient, channel)`; this adds one optional `is_primary` boolean on that table. **Fan-out channels (push) ignore it entirely** — every valid token still gets one, as point 2 already establishes. **Pick-one channels (letter, SMS, email in the rare multi-address case)** use the flagged row if one exists; if none is flagged, the most-recently-verified row wins, so the platform never blocks on an unmade choice. A manager or CRM sync can set the flag when it matters and otherwise never has to think about it — flexible by default, pinnable when needed.
+
 ## Consequences
 
 ### Positive
@@ -89,19 +92,20 @@ The set excluded by a stage is `input − output`, recordable in bulk, so per-st
 - One consent mechanism, one gate. There is no second consent path to check in one place and forget in the other.
 - The exclusion stack turns "why didn't this person get it?" into a recorded answer, which is the property the open P0 defect proved was absent.
 - Expressing stages as set operations gives per-stage attribution *and* avoids the N+1 already flagged on the send path.
+- Address-pick never blocks: a channel with several addresses always resolves to exactly one for pick-one channels, flagged or not.
 
 ### Negative
 - **`RecipientDB.consent_status` goes away**, and with it the single-column gate in `resolve_audience` and `execute_decision_slot`. This is a schema migration touching the most safety-critical path in the system.
 - Reading "is this person consented" becomes a query over an event log rather than a column read, and is only tolerable because the human-readable current state is the CRM's job, not ours.
 - Two tables now describe consent-adjacent history — events and the sync log — and someone will eventually ask why. The answer has to be documented, not assumed obvious.
 - An adopter whose CRM cannot express per-channel consent is told to change their CRM. Some will read that as a missing feature; it is a deliberate refusal to invent permissions.
-- **Selection when a recipient has several addresses for one channel is unresolved.** See Notes.
+- An unflagged, stale-but-preferred address can lose to a newer address nobody actually prefers, since the fallback is recency, not judgment.
 - The stack's ordering is left channel-dependent and unhardcoded, which is correct but means there is no single answer to "what order does it run in".
 - Addressability rows are identity data and sit in a table of their own, which makes them easy to overlook at erasure time — the same trap that made signals easy to miss.
 
 ## Notes
 
-- **Open sub-problem, deliberately not decided here: which address to use when a recipient has several rows for one channel.** The semantics differ per channel — **push fans out** to every valid token, so all of the person's devices buzz, while **letter, SMS and email pick one**. That makes *fan-out vs pick-one* a **second channel-level fact**, alongside module cardinality from [[ADR-160 — Channel Model and Composition]]; both are "how many". For pick-one the minimal answer is a primary flag per `(recipient, channel)` with most-recently-verified as fallback, but that was not decided. It barely bites today — email has one address in practice and push fans out — and it only becomes real with letter or multi-email. It is a further reason to keep letter out of the POC.
+- **Resolved 2026-09-12:** which address to use when a recipient has several rows for one channel — via the optional `is_primary` flag in Decision point 11. The semantics still differ per channel — **push fans out** to every valid token, so all of the person's devices buzz, while **letter, SMS and email pick one** — which makes *fan-out vs pick-one* a **second channel-level fact**, alongside module cardinality from [[ADR-160 — Channel Model and Composition]]; both are "how many". It barely bites today — email has one address in practice and push fans out — and only becomes real with letter or multi-email, which is a further reason to keep letter out of the POC.
 - **Erasure reaches the addressability rows.** They are identity data, so they go with the identity under [[ADR-154 — Erasure and Retention]], not with the id-keyed activity that survives.
 - **Amendments other records need, not made here.** [[ADR-121 — Minimal Recipient Model]] lists `email` and `consent status` among minimum recipient fields; the model stays minimal but both move out of it, so the record says otherwise on its face and needs a dated addendum. [[ADR-122 — Minimal Consent Model Required]] distinguishes only marketing from transactional and needs the `(channel, purpose)` grid — an amendment, not a superseding decision, and it composes with the consent purpose-split already recorded as a proposed amendment in [[ADR-150 — Tenancy and Access Model]]'s notes.
 - Whether a German supervisory authority accepts a given lawful basis for Custom Audiences is an adopter's counsel's question. Ours is only whether the answer is **expressible**.
