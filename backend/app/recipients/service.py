@@ -229,6 +229,9 @@ def sync_consent_from_crm(
     crm_consent_status: str,
     source: str = "crm",
     note: str | None = None,
+    *,
+    channel: str = DEFAULT_CHANNEL,
+    purpose: str = DEFAULT_PURPOSE,
 ) -> Recipient:
     """Apply a CRM consent assertion to the local projection and record it in
     the append-only consent-sync log. The CRM is the source of truth; this
@@ -247,17 +250,31 @@ def sync_consent_from_crm(
         db, recipient.id, channel=channel, purpose=purpose
     )
     changed = before != crm_consent_status
-    if changed:
-        record_consent(
-            db,
-            recipient.id,
-            crm_consent_status,
-            source=source,
-            channel=channel,
-            purpose=purpose,
-            note=note,
-            commit=False,
-        )
+
+    # The assertion is ALWAYS recorded, even when it matches what is already in
+    # force. Two reasons, and the first is not an optimisation question:
+    #
+    #   * drift compares the effective state against the CRM's last assertion,
+    #     so skipping an unchanged assertion leaves drift with no baseline —
+    #     a later provider suppression would then be invisible, which is the
+    #     exact failure this design exists to prevent;
+    #   * the assertion is the evidence. "The CRM asserted opt-in on this date,
+    #     from this source" is what defends a UWG §7 complaint, and it is not
+    #     less true for having been asserted before.
+    #
+    # The cost is a row per sync rather than per change. Accepted: consent syncs
+    # are low-frequency, and an append-only evidence log that omits evidence to
+    # save rows is the wrong trade.
+    record_consent(
+        db,
+        recipient.id,
+        crm_consent_status,
+        source=source,
+        channel=channel,
+        purpose=purpose,
+        note=note,
+        commit=False,
+    )
 
     # The log records the conversation, not the value: it ran, it succeeded, it
     # applied N changes. The asserted value itself is the consent event above,

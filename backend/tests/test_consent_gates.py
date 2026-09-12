@@ -48,11 +48,17 @@ from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB
 from app.audience.service import find_by_criteria, resolve_audience
 from app.database import SessionLocal
 from app.decision.service import execute_decision_slot
-from app.recipients.consent import record_consent
+from app.recipients.consent import is_consenting, record_consent
 from app.recipients.db_models import (
     AddressabilityDB,
     ConsentEventDB,
+    ConsentSyncLogDB,
     RecipientDB,
+)
+from app.recipients.service import (
+    detect_consent_drift,
+    suppress_recipient,
+    sync_consent_from_crm,
 )
 
 # The states the gates must treat as non-consenting. "pending" is included
@@ -137,8 +143,11 @@ def db():
                 AudienceGroupDB.id.in_(created_groups)
             ).delete(synchronize_session=False)
         if created_recipients:
-            # Consent events and addresses are FK-bound to the recipient, so
-            # they go first or the delete below fails.
+            # Consent events, sync logs and addresses are FK-bound to the
+            # recipient, so they go first or the delete below fails.
+            session.query(ConsentSyncLogDB).filter(
+                ConsentSyncLogDB.recipient_id.in_(created_recipients)
+            ).delete(synchronize_session=False)
             session.query(ConsentEventDB).filter(
                 ConsentEventDB.recipient_id.in_(created_recipients)
             ).delete(synchronize_session=False)
@@ -281,6 +290,128 @@ class TestAddressDeduplication:
             "two recipient rows sharing one address both resolved — the same "
             "inbox would receive the send twice"
         )
+
+
+class TestConsentEventsAndDrift:
+    """The consent write paths and directional drift (ADR-163 addendum points 2 and 4).
+
+    Added after a smoke test found two defects here that the gate tests above
+    could not see: a missing keyword argument on `sync_consent_from_crm`, and —
+    more seriously — a "only write an event if the value changed" optimisation
+    that left drift with no CRM baseline to compare against, making a provider
+    suppression invisible. Both were in the one path whose entire job is to make
+    a silent divergence loud.
+    """
+
+    def test_crm_assertion_is_recorded_even_when_unchanged(self, db):
+        recipient = db.recipient("opted_in")
+        db.session.commit()
+        before = _event_count(db.session, recipient.id)
+
+        sync_consent_from_crm(
+            db.session, recipient.external_id, "opted_in", note="test"
+        )
+
+        assert _event_count(db.session, recipient.id) == before + 1, (
+            "an unchanged CRM assertion wrote no event. It must: drift compares "
+            "the effective state against the CRM's last assertion, so with no "
+            "assertion recorded a later provider suppression is invisible — and "
+            "the assertion is also the consent evidence"
+        )
+
+    def test_agreement_produces_no_drift(self, db):
+        recipient = db.recipient("opted_in")
+        db.session.commit()
+        sync_consent_from_crm(
+            db.session, recipient.external_id, "opted_in", note="test"
+        )
+
+        assert _drift_for(db.session, recipient.id) == []
+
+    def test_provider_suppression_shows_as_platform_ahead(self, db):
+        recipient = db.recipient("opted_in")
+        db.session.commit()
+        sync_consent_from_crm(
+            db.session, recipient.external_id, "opted_in", note="test"
+        )
+
+        assert suppress_recipient(db.session, recipient.id, reason="hard_bounce")
+
+        drift = _drift_for(db.session, recipient.id)
+        assert len(drift) == 1, (
+            "a provider suppressed someone the CRM still believes is opted-in "
+            "and drift did not report it — this is the case the old code "
+            "deliberately skipped a sync-log row to expose"
+        )
+        item = drift[0]
+        assert item.direction.value == "platform_ahead"
+        assert item.platform_consent_status.value == "opted_out"
+        assert item.last_crm_consent_status.value == "opted_in"
+        # Says *what* moved the platform, which is what tells an operator this
+        # needs relaying outward rather than re-syncing inward.
+        assert item.platform_source == "provider"
+
+    def test_suppression_is_idempotent(self, db):
+        recipient = db.recipient("opted_in")
+        db.session.commit()
+
+        assert suppress_recipient(db.session, recipient.id, reason="hard_bounce")
+        assert not suppress_recipient(
+            db.session, recipient.id, reason="hard_bounce"
+        ), "a repeat bounce wrote a second opt-out event"
+
+    def test_crm_reassertion_clears_drift_and_reopens_the_gate(self, db):
+        recipient = db.recipient("opted_in")
+        db.session.commit()
+        sync_consent_from_crm(
+            db.session, recipient.external_id, "opted_in", note="test"
+        )
+        suppress_recipient(db.session, recipient.id, reason="hard_bounce")
+        assert _drift_for(db.session, recipient.id)
+
+        # The CRM asserts again — the person re-subscribed, say.
+        sync_consent_from_crm(
+            db.session, recipient.external_id, "opted_in", note="test"
+        )
+
+        assert _drift_for(db.session, recipient.id) == []
+        assert is_consenting(db.session, recipient.id), (
+            "the newest event is the CRM's opt-in, so it must be back in force "
+            "— latest wins, per cell"
+        )
+
+    def test_suppression_is_scoped_to_its_channel(self, db):
+        """A bounce on email says nothing about push."""
+        recipient = db.recipient("opted_in")
+        record_consent(
+            db.session,
+            recipient.id,
+            "opted_in",
+            source="test",
+            channel="push",
+            commit=False,
+        )
+        db.session.commit()
+
+        suppress_recipient(db.session, recipient.id, reason="hard_bounce")
+
+        assert not is_consenting(db.session, recipient.id, channel="email")
+        assert is_consenting(db.session, recipient.id, channel="push"), (
+            "an email bounce withdrew push consent — consent is per "
+            "(channel, purpose) and a failure on one says nothing about another"
+        )
+
+
+def _event_count(session, recipient_id: int) -> int:
+    return (
+        session.query(ConsentEventDB)
+        .filter(ConsentEventDB.recipient_id == recipient_id)
+        .count()
+    )
+
+
+def _drift_for(session, recipient_id: int) -> list:
+    return [d for d in detect_consent_drift(session) if d.recipient_id == recipient_id]
 
 
 def _any_decision_slot_id(session) -> int:

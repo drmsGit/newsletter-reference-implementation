@@ -193,6 +193,40 @@ ALTER TABLE consent_sync_logs
 ALTER TABLE consent_sync_logs
     ADD COLUMN IF NOT EXISTS changes_applied INTEGER NOT NULL DEFAULT 0;
 
+-- Relax the columns the contract half will drop. Expanding is not only adding:
+-- between the two halves, the new code no longer writes crm_consent_status or
+-- platform_status_before, and a NOT NULL they no longer populate would make
+-- every sync fail. Dropping a NOT NULL destroys nothing and is reversible;
+-- leaving it in place would mean the schema and the code cannot both be right
+-- at the same time, which is the whole condition expand/contract exists to
+-- avoid.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'consent_sync_logs' AND column_name = 'crm_consent_status'
+    ) THEN
+        EXECUTE 'ALTER TABLE consent_sync_logs ALTER COLUMN crm_consent_status DROP NOT NULL';
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'consent_sync_logs' AND column_name = 'platform_status_before'
+    ) THEN
+        EXECUTE 'ALTER TABLE consent_sync_logs ALTER COLUMN platform_status_before DROP NOT NULL';
+    END IF;
+    -- `applied` needs the same treatment for a subtler reason: its NOT NULL was
+    -- satisfied by a *Python-side* SQLAlchemy default, never a database one, so
+    -- the constraint was only ever met by the ORM remembering to fill it in.
+    -- With the column gone from the model, nothing does.
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'consent_sync_logs' AND column_name = 'applied'
+    ) THEN
+        EXECUTE 'ALTER TABLE consent_sync_logs ALTER COLUMN applied DROP NOT NULL';
+    END IF;
+END
+$$;
+
 -- Dynamic SQL for the same parse-time reason as step 4.
 DO $$
 BEGIN
