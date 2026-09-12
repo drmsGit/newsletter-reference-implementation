@@ -5,5 +5,5 @@ sqlalchemy
 jinja2
 css-inline
 pytest
-httpx2
+httpx
 python-multipart

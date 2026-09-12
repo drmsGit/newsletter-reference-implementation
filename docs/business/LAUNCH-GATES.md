@@ -31,9 +31,17 @@ apart. From the 2026-08-07 external review:
   recipient was excluded**, which is the P0's real lesson (the guard fired; the
   bare `except` discarded the reason). What remains is only the ordering call —
   whether the consent/addressability migration lands before this fix or after
-  beta. Note also that this fix cannot currently be regression-tested:
-  `app/database.py` builds an engine at import, making four test modules
-  uncollectable, and the top-ranked missing test is send-time consent revocation.
+  beta. **On testability, corrected 2026-09-12 by running the suite rather than
+  trusting the report:** an earlier note here claimed `app/database.py`'s
+  engine-at-import made four test modules uncollectable. That is **wrong** —
+  all 141 tests collect and pass locally in ~1s. The real constraint is
+  different and narrower: `test_overrides.py` ("Uses FastAPI TestClient against
+  the real database — no mocks"), `test_signals.py` and `test_auth.py` need a
+  **live, seeded Postgres at the configured URL**, so the suite runs on a
+  developer machine but not in a clean container — which is the isolated-test-DB
+  Needs-ADR item, not a defect in `database.py`. What genuinely is missing is a
+  regression test for **send-time consent revocation**, the top-ranked gap from
+  the 2026-08-07 review; nothing prevents writing it today.
 - **Gate 3** — the JSON API routers are deliberately unguarded; that is machine
   authentication, scoped as a Mode B prerequisite. It was raised to P0 because
   it blocks public exposure, not just Mode B.
