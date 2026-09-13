@@ -7,7 +7,7 @@ topic:
   - access
   - governance
 created: 2026-08-02
-modified: 2026-08-02
+modified: 2026-09-13
 source:
   - "Security Chapter design interview, Part 1 (playbook-strategy.md Decision Log, 2026-08-02)"
 depends_on:
@@ -20,6 +20,7 @@ enables:
   - "[[ADR-152 — Secret and Credential Handling]]"
   - "[[ADR-153 — Audit and Accountability]]"
   - "[[ADR-154 — Erasure and Retention]]"
+  - "[[ADR-166 — Inbound Machine Callers Are Authenticated Principals]]"
 ---
 
 ## Status
@@ -56,6 +57,22 @@ Many companies use "brand" to mean a logo and a palette. One implicit default br
 | **Viewer** | Read-only — dashboards, signals, delivery history |
 
 Roles and permissions are **rows, not code**. The three ship as a preset a company can extend, replace or ignore; adding a role or scoping a permission further requires no code change. This is the same convention-based-extension posture the decision strategies and email module templates already use. We explicitly do not model the average company's org chart: companies mostly run everything as admin, or arrive with a scheme of their own, and copying an imagined average serves neither.
+
+**The vocabulary is sixteen keys, not nine (2026-09-13).** Making an inbound machine caller a principal in this model ([[ADR-166 — Inbound Machine Callers Are Authenticated Principals]]) forced the key set wider, for two reasons, of which the second is the larger. First, the nine were too coarse to express the grants that record's own worked example describes: a website form that may pin a recipient but may not restructure an audience was inexpressible, because pinning sat under `audiences.manage`, which also deletes groups and edits rule blocks. Second, the nine did not reach the API at all. `app/auth/policy.py`'s `WRITE_POLICY` maps only `/ui/…` prefixes and the vocabulary named UI concerns; of the twelve JSON routers, **four had no key naming what they do** — recipients (3 write routes), overrides (3), insight (2) and provider (2). Splitting was therefore the smaller half of the work. The larger half was that the vocabulary stopped at the UI boundary, so an integration could not have been granted the things [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]]'s examples describe.
+
+- **Unchanged (7):** `view`, `campaigns.manage`, `content.manage`, `ai.run`, `settings.manage`, `users.manage`, `credentials.manage`.
+- **Split (2 → 4):** `audiences.manage` keeps group and rule-block CRUD; **`audiences.pin`** covers adding and removing individual members. `sends.execute` keeps firing a real send; **`sends.plan`** covers creating send instances and delivery executions without dispatching. Both splits serve humans identically — a junior marketer who may pin but not restructure, or prepare a send but not release it, is the same grant — which is why they land in the shared vocabulary rather than in a machine-only scope list.
+- **New, filling the gaps (5):** **`recipients.manage`** (create and edit recipients), **`recipients.consent`** (write a consent record), **`insight.write`** (write engagement events, including the locked `POST /provider/events` ingest route), **`overrides.manage`**, and **`integrations.manage`** (issue, rotate and revoke machine credentials — added by [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]]).
+
+Two grain choices inside that set are decisions rather than consequences, and are recorded as such.
+
+**`recipients.consent` is separate from `recipients.manage`.** An integration that only imports contact records cannot also assert consent for them. Consent is the record [[ADR-142 — Autonomous Workflows and the Automation Boundary]] §7 calls a hard floor and the defence a UWG §7 complaint is answered with, so the narrowest possible grant for writing it is warranted. The cost, which should be stated rather than discovered: the common case — a real signup form — needs two grants rather than one, and whoever configures it can get that wrong.
+
+**`POST /provider/events` is gated by `insight.write` rather than by an `events.ingest` key of its own.** Ingesting a provider event and posting an insight event both end in an engagement row feeding the signal layer, so one key names the capability that matters rather than two naming the doors. The cost, equally worth stating: an integration allowed to post conversions can also post opens and clicks, so a compromised website-form credential could still steer personalization.
+
+What does not change is as load-bearing as what does. Roles remain **rows, not an enum** — only the key set grows, not the model — and `VIEW` remains implied by every role. `permissions.py`'s own rule also still holds: **a permission key names a code path**, so each new key is real only once the guard it names exists. This list is therefore a specification for work, not a finished state.
+
+One consequence follows at once, and it fails closed. `required_permission()` returns `UNMAPPED` for any write route with no policy entry, and `UNMAPPED` is refused. `WRITE_POLICY` must therefore gain entries for the JSON routes at the same time the routers are guarded, or every API write fails closed — loudly and safely, but completely.
 
 **6. Access is assigned as `(user × role × brand)`.**
 One mechanism serves both role assignment and brand scoping, rather than a role system with a scoping system bolted alongside it. A user may be Manager on one brand, Viewer on another, and absent from a third.
@@ -107,3 +124,4 @@ Restricting candidates to the sending brand, to a named list of brands, or to no
 - [[ADR-152 — Secret and Credential Handling]]
 - [[ADR-153 — Audit and Accountability]]
 - [[ADR-154 — Erasure and Retention]]
+- [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]]
