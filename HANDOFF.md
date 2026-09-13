@@ -158,10 +158,42 @@ was mutation-verified — removing a gate fails only that gate's tests.
    and building on a proposal is what makes a cluster expensive to change.
    Found 2026-09-13 by the gate-3 ADR sweep; it was in nobody's queue.
 
-2. **Gate 3 — inbound machine authentication (P0).** Every JSON router is
-   unguarded and `POST /provider/events` takes no signature. API keys with
-   scopes; needs schema and carries real design decisions — this one *is* an
-   interview.
+2. **Gate 3 — inbound machine authentication (P0).** The interview **happened
+   on 2026-09-13** and six decisions are made; `adr-author` is drafting
+   **ADR-166**. Until that lands, the decisions are here so they are not
+   stranded in chat:
+
+   1. **A machine caller is a principal inside ADR-150**, not a parallel
+      authorization system — it holds permission rows in the same table a user
+      does, brand-scoped, and resolves to an ADR-153 actor. A company wanting a
+      cleaner separation may build one; the reference build does not. Issued as
+      **key + secret pairs** so systems are distinguishable.
+   2. **The permission vocabulary gets finer keys, for humans and machines
+      alike.** The nine in `app/auth/permissions.py` are too coarse for this
+      feature's own example — pinning a recipient lives under
+      `audiences.manage`, which also deletes groups. An **amendment to ADR-150**
+      (still Proposed), not a supersession.
+   3. **An integration owns its credentials**, and the *integration* is the
+      durable audit actor — so history stays continuous across a rotation and
+      still reads "n8n triggered this send" a year later.
+   4. **`integrations.manage` gates issuance, any holder may hold it.** A
+      credential is **independent of its creator**: deactivating a user does
+      *not* revoke keys they issued, because the key belongs to the integration.
+      **Known gap, accepted deliberately:** ADR-151 pt.5 calls deactivation "the
+      whole offboarding control" and this is a hole in that story.
+   5. **Unattended real sends are configurable per integration, defaulting to
+      requiring approval** — a machine send lands in ADR-142's approval surface
+      unless that integration is deliberately flagged otherwise.
+   6. **`POST /provider/events` is kept and locked**, not removed. Two inbound
+      mechanisms coexist on purpose: platform-issued credentials for systems the
+      adopter controls, provider signature verification for providers, who
+      cannot hold a credential the platform issued. ADR-164 pt.7 plans the
+      conversion callback on exactly that endpoint's shape.
+
+   **Scale of the hole being closed:** 69 unguarded JSON routes, 36 of them
+   state-changing — including `POST /delivery/send-instances/{id}/send` (fires
+   real mail), `POST /recipients/{external_id}/consent` (writes the compliance
+   record), `GET /recipients/` (dumps PII) and `POST /insight/events`.
 3. **Gate 1 — the positioning statement.** Still the named blocker on public
    beta, and unchanged by any of this: rule 2 was tested on 2026-09-12 and
    held, so omni-channel stays out of the headline claim until a second channel
