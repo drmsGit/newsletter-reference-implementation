@@ -70,7 +70,7 @@ apart. From the 2026-08-07 external review:
   access control for everyone. A deactivated sole admin still needs database
   access — stated, not papered over.
 
-  **Rate limiting — the last piece, done 2026-09-13.** ADR-151 §2 requires the
+  **Rate limiting — the last piece, done 2026-09-13.** ADR-151 §2 calls for the
   limit **per address and per IP**; verification attempts were already capped
   at 5 (`CODE_MAX_ATTEMPTS`) but *requesting* a code was uncapped, so anyone
   could trigger unlimited mail to a guessed address. Five requests per address
@@ -102,6 +102,16 @@ apart. From the 2026-08-07 external review:
   set. Off by default because an attacker who can set `X-Forwarded-For` can
   otherwise mint a fresh rate-limit identity per request — the safe failure is
   a limit that is too broad, not one that does not exist.
+
+- **The security cluster is built but not accepted.** ADR-150–154 all carry
+  **Proposed** status, in the frontmatter and the body alike — so gates 4 and 4b
+  were closed by implementing decisions the repo has not formally adopted. The
+  code is not in question; the record is. Gate 7 already says "base built,
+  proposed status", and this is the same fact seen from the other side. An
+  acceptance pass over the five is an open item that is currently in nobody's
+  queue, and gate 3 will want it settled first — a machine-auth ADR has to
+  build on ADR-150's access model and ADR-153's actor, and building on a
+  proposal is what makes a cluster hard to change later.
 
 - **Gate 4b — ✅ CLOSED 2026-09-13**, together with the P1 enumeration oracle
   that was filed separately. They were the same three lines.

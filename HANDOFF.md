@@ -150,11 +150,19 @@ was mutation-verified — removing a gate fails only that gate's tests.
 
 ## Open queue
 
-1. **Gate 3 — inbound machine authentication (P0).** Every JSON router is
+1. **Accept (or amend) ADR-150–154.** All five are still **Proposed**, in both
+   places. The security base is built against them and two launch gates were
+   closed by implementing them, so the code and the record disagree about how
+   settled this is. Gate 3 needs them: a machine-auth ADR builds on ADR-150's
+   access model and ADR-153's "the actor may be a system or an integration",
+   and building on a proposal is what makes a cluster expensive to change.
+   Found 2026-09-13 by the gate-3 ADR sweep; it was in nobody's queue.
+
+2. **Gate 3 — inbound machine authentication (P0).** Every JSON router is
    unguarded and `POST /provider/events` takes no signature. API keys with
    scopes; needs schema and carries real design decisions — this one *is* an
    interview.
-2. **Gate 1 — the positioning statement.** Still the named blocker on public
+3. **Gate 1 — the positioning statement.** Still the named blocker on public
    beta, and unchanged by any of this: rule 2 was tested on 2026-09-12 and
    held, so omni-channel stays out of the headline claim until a second channel
    actually sends.
