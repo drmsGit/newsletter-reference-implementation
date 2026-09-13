@@ -66,3 +66,36 @@ the main-checkout copy are identical. Either is fine to read.
 touches nothing shared. Prefer this shape whenever the defect is in a pure
 helper (`providers/adapters/`, `ai/adapters/`, signature/parsing code) — it
 sidesteps the shared-Postgres hazard entirely.
+
+## Worktree staleness vs the migrated shared DB (run 5, 2026-09-13) — READ THIS FIRST
+
+**The suite baseline depends on how old your worktree's branch point is.** The
+invoker told me "175 passing". In my worktree (branch point `f403d61`) I got
+**154 pass / 21 fail**, all 21 in `tests/test_consent_gates.py`, all the same
+error:
+
+```
+psycopg2.errors.UndefinedColumn: column "email" of relation "recipients" does not exist
+```
+
+Cause: `RecipientDB.email` and `RecipientDB.consent_status` were **dropped** (ADR-163,
+migrations 0001a–0004, already applied to the shared dev Postgres). The main checkout's
+`backend/app/recipients/db_models.py:11` now says "No `email` column"; my worktree copy
+still had `email = Column(String(255), ...)`. Code older than the DB.
+
+**So: before trusting any baseline, run**
+`diff <main>/backend/app/recipients/db_models.py <worktree>/backend/app/recipients/db_models.py`.
+If they differ, your worktree predates the consent migration and `test_consent_gates.py`
+will fail 21 times no matter what you do. That is **not yours to fix** —
+`app/recipients/` is on the protected-paths wall. Report it and move on; do not
+re-derive it, and do not try to rebase the worktree.
+
+Everything outside `test_consent_gates.py` is unaffected, so a change in
+`app/ai/`, templates, or adapters is still verifiable in a stale worktree.
+
+## Suite baselines, updated
+
+- Runs 1/3 worktrees: 157 pass.
+- Run 5 worktree (f403d61): 175 collected → 154 pass / 21 fail (see above); 183
+  collected / 162 pass with my 8 added tests.
+- "175 passing" is the figure for a worktree whose code matches the migrated DB.

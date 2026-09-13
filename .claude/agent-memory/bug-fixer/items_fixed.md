@@ -114,3 +114,41 @@ outside the worktree** in this harness, which collides with the definition's
 "write memory to the main checkout". What worked: write the block to the
 scratchpad with `Write`, then one plain Bash append (`cat <scratch> >> <memory
 path>`) with no `cd` and no heredoc. Do that from the start next run.
+
+## AI suggestion UI withholds truncation and lost options (`docs/backlog.md` line 43, 🔴 low)
+
+- **Run:** 2026-09-13 (run 5). Outcome: `fixed`. Worktree `agent-a9c5fa83a52fa50ee`.
+- **Entry was NOT stale.** Every cited symbol still lands: `ai/service.py:223-227`
+  is still the `message=("output hit its ceiling and is truncated" if
+  result.stop_reason == "max_tokens" else None)` on the ok-path `_record`, and
+  `parse_options` is still exactly `tasks/subject_preheader.py:74-98`.
+- **The defect was one branch in `frontend/router.py`:** the campaign-detail
+  read-back used `row.message` **only** in the `else` (non-ok) arm as `ai_error`.
+  On `status == "ok"` the message was dropped on the floor, so a `max_tokens`
+  truncation never reached the page.
+- **Fix (3 files):** `REQUESTED_OPTIONS = 3` + a pure `option_notices(options,
+  run_message)` in `app/ai/tasks/subject_preheader.py`; router builds
+  `ai_notices` on the ok path and passes it in the context; `campaign_detail.html`
+  renders the notices in an `alert-warning`, **outside** the `{% if ai_suggestions %}`
+  block so a truncation that left nothing parseable is still said.
+- **Two decisions I made (entry left them open), both stated in the report:**
+  (1) the run message is surfaced **verbatim** — consistent with how the router
+  already surfaces `row.message` verbatim as `ai_error`; (2) the "requested" count
+  is a constant in the **dev-owned scaffold**, not parsed out of the
+  manager-owned prompt body. Caveat: if a manager edits the Settings prompt to
+  ask for 5, `REQUESTED_OPTIONS` does not follow. Flagged as the unverified line.
+- **Test:** 8 cases appended to `tests/test_ai_subject_task.py`, **no DB, no
+  network**. Five pure `option_notices` cases, three that render the notice block
+  extracted from `campaign_detail.html` by regex through a standalone
+  `jinja2.Environment` (the run-4 template-fragment shape — it keeps working,
+  reuse it). Falsified in both halves: `if False and run_message` → 3 fail;
+  `if False and 0 < len(...)` → 2 fail; deleting the template block → 3 fail.
+  All restored.
+- **Deliberately not touched:** the `ai_error` wording "The model replied, but not
+  in the requested format." (it can now be misleading when the true cause is
+  truncation — but both lines render together, so the manager sees the cause);
+  `parse_options` itself; `ai/service.py` (the audit side was already correct).
+- **ADR-144 (accepted)** is the governing record — "If a running task hits its own
+  output ceiling, the **partial result is still shown** (display ≠ commit), never
+  silently discarded." ADR-140 §3 (the run row is the source of truth for what was
+  offered) is why the notice is read back off the row rather than held in session.

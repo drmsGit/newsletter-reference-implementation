@@ -731,6 +731,7 @@ def campaign_detail(
     ai_suggestions_variant_id = None
     ai_error = None
     ai_run_tokens = 0
+    ai_notices: list[str] = []
     if ai_run is not None:
         from app.ai.db_models import AIRunDB
         from app.ai.tasks import subject_preheader as subject_task
@@ -741,6 +742,10 @@ def campaign_detail(
             ai_run_tokens = (row.input_tokens or 0) + (row.output_tokens or 0)
             if row.status == "ok":
                 ai_suggestions = subject_task.parse_options(row.output_text or "")
+                # A successful run can still carry a message — a `max_tokens`
+                # stop is recorded there — and it is the manager, not only the
+                # audit trail, who needs to know before applying an option.
+                ai_notices = subject_task.option_notices(ai_suggestions, row.message)
                 if not ai_suggestions:
                     ai_error = "The model replied, but not in the requested format."
             else:
@@ -762,6 +767,7 @@ def campaign_detail(
             "ai_suggestions": ai_suggestions,
             "ai_suggestions_variant_id": ai_suggestions_variant_id,
             "ai_error": ai_error,
+            "ai_notices": ai_notices,
             "ai_run_tokens": ai_run_tokens,
         },
     )

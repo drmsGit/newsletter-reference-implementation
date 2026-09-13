@@ -28,6 +28,14 @@ TASK_KEY = "subject_preheader"
 # gate rather than a mid-run kill (ADR-144 §5).
 MAX_OUTPUT_TOKENS = 400
 
+# How many options the scaffold asks for. Declared here beside the ceiling for
+# the same reason: the scaffold is dev-owned and states the shape of the result
+# (see the module docstring), so the UI has something to compare the parsed
+# count against. The prompt body itself is manager-owned and versioned — if a
+# manager edits DEFAULT_PROMPT's "3" in Settings, this number is the one that
+# should move with it.
+REQUESTED_OPTIONS = 3
+
 DEFAULT_PROMPT = """You write subject lines and preheaders for an email newsletter.
 
 Below is the content of one newsletter edition. Suggest 3 subject line and
@@ -96,6 +104,29 @@ def parse_options(text: str) -> list[dict[str, str]]:
         for o in options
         if o.get("subject")
     ]
+
+
+def option_notices(
+    options: list[dict[str, str]], run_message: str | None = None
+) -> list[str]:
+    """What the manager must be told about these options before using one.
+
+    Both facts already exist in the system and were previously dropped on the
+    way to the page: the run row's own `message` (which says when the output hit
+    its ceiling and is truncated), and the gap between what the scaffold asked
+    for and what `parse_options` could recover. ADR-144 keeps a partial result on
+    screen — display is not commit — but showing it without saying it is partial
+    is what this closes.
+    """
+    notices: list[str] = []
+    if run_message:
+        notices.append(run_message)
+    if 0 < len(options) < REQUESTED_OPTIONS:
+        notices.append(
+            f"{len(options)} of the {REQUESTED_OPTIONS} requested options came "
+            f"back in a usable form; the rest were not returned or could not be read."
+        )
+    return notices
 
 
 def suggest(db: Session, variant_id: int, provider_name: str | None = None):

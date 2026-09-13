@@ -119,6 +119,17 @@
                 {% if ai_error %}
                 <div class="alert alert-warning mt-3 mb-0 py-2 small">{{ ai_error }}</div>
                 {% endif %}
+                {# What the run row already knows and the page used to swallow:
+                   a truncated output, and fewer options than were asked for.
+                   Outside the ai_suggestions block on purpose — a truncation
+                   that left nothing parseable still has to be said. #}
+                {% if ai_notices is defined and ai_notices %}
+                <div class="alert alert-warning mt-3 mb-0 py-2 small">
+                    {% for notice in ai_notices %}
+                    <div>{{ notice }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
                 {% if ai_suggestions %}
                 <div class="card mt-3 mb-0">
                     <div class="card-body py-2">
