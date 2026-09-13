@@ -24,6 +24,7 @@
                 delete, or extend them.
             </p>
             <form method="post" action="/ui/campaigns/0/suggest-audience" id="suggest-form" class="row g-2 align-items-end">
+                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                 <div class="col-md-8">
                     <label class="form-label">Campaign</label>
                     <select id="suggest-campaign" class="form-select" required>
@@ -46,6 +47,7 @@
         <div class="card-body">
             <h5 class="card-title">New audience group</h5>
             <form method="post" action="/ui/audience-groups">
+                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                 <div class="mb-3">
                     <label class="form-label">Name</label>
                     <input type="text" name="name" class="form-control" required placeholder="e.g. VIP customers">

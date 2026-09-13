@@ -43,12 +43,14 @@
             </div>
             {% if not row.role.is_builtin %}
             <form method="post" action="/ui/roles/{{ row.role.id }}/delete">
+                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                 <button type="submit" class="btn btn-sm btn-outline-danger">Delete role</button>
             </form>
             {% endif %}
         </div>
 
         <form method="post" action="/ui/roles/{{ row.role.id }}/permissions">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
             <div class="row">
                 {% for key, description in all_permissions.items() %}
                 <div class="col-md-6 mb-1">
@@ -78,6 +80,7 @@
             then adjust one by one.
         </p>
         <form method="post" action="/ui/roles" class="row g-2 align-items-end">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
             <div class="col-md-3">
                 <label class="form-label small"><strong>Key</strong></label>
                 <input type="text" name="key" required placeholder="editor"

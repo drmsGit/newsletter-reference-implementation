@@ -13,6 +13,7 @@
     {% if send_instance.status in ["draft", "scheduled"] %}
     <form method="post" action="/ui/send-instances/{{ send_instance.id }}/send"
           onsubmit="return confirm('Send{% if send_instance.audience_resolution_mode == 'rerun' %} (audience re-resolved now){% endif %} to {{ recipient_count }} recipient(s) via the {{ send_instance.provider or 'mock' }} provider?{% if send_instance.provider == 'resend' %}\n\nThis sends REAL email. Recipients whose address is not deliverable from your verified/sandbox sender will fail.{% endif %}\n\nThis cannot be undone.');">
+        <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
         <button type="submit" class="btn btn-success">
             {% if send_instance.status == "scheduled" %}Send now (override schedule){% else %}Trigger send{% endif %} → {{ recipient_count }} recipient(s)
         </button>

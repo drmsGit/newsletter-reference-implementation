@@ -18,6 +18,7 @@
     <div class="card-header"><strong>Signal weights &amp; decay half-lives</strong> (ADR-132)</div>
     <div class="card-body">
         <form method="post" action="/ui/settings">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
             <table class="table table-sm align-middle">
                 <thead>
                     <tr>
@@ -79,6 +80,7 @@
         </p>
 
         <form method="post" action="/ui/settings/ai-provider" class="d-flex gap-2 align-items-start">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
             <select name="ai_provider" class="form-select form-select-sm" style="max-width:220px">
                 {% for name in ai_providers %}
                 <option value="{{ name }}" {% if name == ai_provider %}selected{% endif %}>{{ name }}</option>
@@ -142,6 +144,7 @@
         </div>
 
         <form method="post" action="/ui/settings/ai">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
             <div class="row" style="max-width:520px">
                 <div class="col-md-6 mb-3">
                     <label class="form-label"><strong>Warn at (tokens)</strong></label>
@@ -180,6 +183,7 @@
         </p>
 
         <form method="post" action="/ui/settings/ai-prompt">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
             <input type="hidden" name="task_key" value="{{ ai_prompt_task_key }}">
             <div class="mb-2">
                 <textarea name="body" class="form-control font-monospace" rows="14"

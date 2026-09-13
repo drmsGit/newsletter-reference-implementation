@@ -24,6 +24,7 @@
             {% if request.state.current_user %}
             <span class="navbar-text small">{{ request.state.current_user.email }}</span>
             <form method="post" action="/ui/logout" class="m-0">
+                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                 <button type="submit" class="btn btn-sm btn-outline-light">Sign out</button>
             </form>
             {% else %}

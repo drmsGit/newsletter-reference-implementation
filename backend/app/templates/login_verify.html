@@ -22,6 +22,7 @@
         {% endif %}
 
         <form method="post" action="/ui/login/verify">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
             <input type="hidden" name="email" value="{{ email }}">
             <input type="hidden" name="next" value="{{ next }}">
             <div class="mb-3">

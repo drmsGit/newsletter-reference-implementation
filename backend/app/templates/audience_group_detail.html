@@ -2,6 +2,7 @@
 
 {% macro block_form(action, b, submit_label) %}
 <form method="post" action="{{ action }}">
+    <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
     <div class="row g-2">
         <div class="col-md-2">
             <label class="form-label small mb-0">Type</label>
@@ -71,11 +72,13 @@
         {% if source_campaign %}
         <form method="post" action="/ui/audience-groups/{{ group.id }}/recalculate"
               title="Re-derive the suggested rules from the campaign's current content (after changing its slots/content). Your manual rules and members are kept.">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
             <button type="submit" class="btn btn-outline-success btn-sm">↻ Recalculate from campaign</button>
         </form>
         {% endif %}
         <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="collapse" data-bs-target="#form-edit-group">Edit</button>
         <form method="post" action="/ui/audience-groups/{{ group.id }}/delete" onsubmit="return confirm('Delete this group?')">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
             <button type="submit" class="btn btn-outline-danger btn-sm">Delete group</button>
         </form>
     </div>
@@ -90,6 +93,7 @@
         <div class="card-body">
             <h5 class="card-title">Edit group</h5>
             <form method="post" action="/ui/audience-groups/{{ group.id }}/edit">
+                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                 <div class="mb-3">
                     <label class="form-label">Name</label>
                     <input type="text" name="name" class="form-control" value="{{ group.name }}" required>
@@ -137,6 +141,7 @@
                                 data-bs-toggle="collapse" data-bs-target="#edit-block-{{ b.id }}">✎</button>
                         <form method="post" action="/ui/audience-groups/{{ group.id }}/blocks/{{ b.id }}/delete" class="d-inline"
                               onsubmit="return confirm('Delete this rule?')">
+                            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                             <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Delete">✕</button>
                         </form>
                     </td>
@@ -198,6 +203,7 @@
                     At least one criterion must be selected.
                 </p>
                 <form id="criteria-form" method="post" action="/ui/audience-groups/{{ group.id }}/bulk-add">
+                    <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                     <div class="row g-3 mb-3">
                         <div class="col-md-3">
                             <label class="form-label">Language</label>
@@ -255,6 +261,7 @@
         {# ── Single recipient add ─────────────────────────────────────── #}
         <div class="collapse mb-3" id="form-add-member">
             <form method="post" action="/ui/audience-groups/{{ group.id }}/members">
+                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                 <div class="row align-items-end">
                     <div class="col-md-6 mb-2">
                         <label class="form-label">Recipient</label>
@@ -293,6 +300,7 @@
                     <td>{{ m.added_at.strftime("%Y-%m-%d") }}</td>
                     <td>
                         <form method="post" action="/ui/audience-groups/{{ group.id }}/members/{{ m.recipient_id }}/remove">
+                            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                             <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
                         </form>
                     </td>

@@ -141,11 +141,13 @@ from app.auth.db_models import (
     BrandDB, LoginCodeDB, RoleAssignmentDB, RoleDB, RolePermissionDB, SessionDB, UserDB,
 )
 from app.auth.dependencies import (
-    NotAuthenticated, NotAuthorised, auth_enforced, enforce_policy,
+    CsrfFailed, NotAuthenticated, NotAuthorised, auth_enforced, enforce_csrf,
+    enforce_policy,
 )
 from app.auth.router import router as auth_router
 from app.auth.service import (
-    SESSION_COOKIE, bootstrap as bootstrap_auth, current_user_summary,
+    SESSION_COOKIE, bootstrap as bootstrap_auth, csrf_token_for,
+    current_user_summary,
 )
 
 from app.frontend.router import router as frontend_router
@@ -215,8 +217,26 @@ with SessionLocal() as db:
     if not auth_enforced(db):
         logger.warning(
             "auth: access control is NOT enforced — sessions and roles work, but no "
-            "route refuses anyone. Turn it on at /ui/users once sign-in is verified."
+            "route refuses anyone. This is no longer the default; someone turned it "
+            "off at /ui/users. Turn it back on there."
         )
+    else:
+        from app.auth.service import dev_code_visible, system_mail_provider
+
+        if dev_code_visible():
+            logger.info(
+                "auth: access control is enforced. Sign-in codes are written to THIS "
+                "log (system mail provider is '%s'), so read your code from here.",
+                system_mail_provider(),
+            )
+        else:
+            logger.info(
+                "auth: access control is enforced and sign-in codes are emailed via "
+                "'%s'. If mail breaks, nobody can sign in — recover by setting "
+                "AUTH_DEV_SHOW_CODE=true, which logs the code here so you can sign "
+                "in as yourself.",
+                system_mail_provider(),
+            )
 
 
 @app.middleware("http")
@@ -237,6 +257,9 @@ async def attach_current_user(request: Request, call_next):
         # hiding the navigation from anonymous visitors would hide it from
         # everybody and leave the app unusable.
         request.state.auth_enforced = auth_enforced(db)
+        # Every form needs this; deriving it here means no route has to
+        # remember to put it in its template context.
+        request.state.csrf_token = csrf_token_for(request.cookies.get(SESSION_COOKIE))
     finally:
         db.close()
     return await call_next(request)
@@ -262,6 +285,28 @@ def _not_authenticated(request: Request, exc: NotAuthenticated):
         target = f"{target}?{request.url.query}"
     return RedirectResponse(
         url=f"/ui/login?next={quote(target, safe='')}", status_code=303
+    )
+
+
+@app.exception_handler(CsrfFailed)
+def _csrf_failed(request: Request, exc: CsrfFailed):
+    """A refused form is a 403 with an explanation, not a blank failure.
+
+    The realistic cause in this codebase is not an attack but a form added
+    without the hidden field, so the message says that outright — a developer
+    hitting this should not have to go looking for what "403" meant.
+    """
+    detail = (
+        "This form was refused because its security token was missing or stale. "
+        "Reload the page and try again. If you are developing: every state-"
+        "changing form needs the hidden csrf_token field."
+    )
+    if not _wants_html(request):
+        return JSONResponse({"detail": detail}, status_code=403)
+    return templates.TemplateResponse(
+        request, "forbidden.html",
+        {"title": "Form refused", "permission": "a valid CSRF token"},
+        status_code=403,
     )
 
 
@@ -298,7 +343,9 @@ app.include_router(auth_router)
 # docs/backlog.md. A human session cookie would be the wrong mechanism.
 app.include_router(
     frontend_router,
-    dependencies=[Depends(enforce_policy)],
+    # CSRF first: a forged request should be refused before its permissions are
+    # even considered, and before any handler runs.
+    dependencies=[Depends(enforce_csrf), Depends(enforce_policy)],
 )
 app.include_router(content_router)
 app.include_router(campaigns_router)

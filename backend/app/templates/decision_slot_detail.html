@@ -83,6 +83,7 @@
     <div class="collapse" id="form-edit-slot">
         <div class="card-body border-top">
             <form method="post" action="/ui/decisions/slots/{{ slot.id }}/edit">
+                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                 <div class="mb-3">
                     <label class="form-label">Strategy</label>
                     <select name="decision_strategy" class="form-select">

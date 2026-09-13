@@ -96,3 +96,57 @@ class TestFailsClosed:
             "write routes with no entry in app/auth/policy.py:\n  "
             + "\n  ".join(unmapped)
         )
+
+
+class TestCsrf:
+    """The CSRF guard (launch gate 4).
+
+    Applied once over the UI router alongside enforce_policy, because a
+    per-route decorator across 62 forms is a list someone eventually forgets to
+    extend — and the omission would be silent.
+    """
+
+    def test_token_is_bound_to_the_session(self):
+        from app.auth.service import csrf_token_for
+
+        a = csrf_token_for("session-token-a")
+        b = csrf_token_for("session-token-b")
+        assert a and b and a != b, "the token must differ per session"
+        assert csrf_token_for("session-token-a") == a, "and be stable for one"
+
+    def test_token_is_not_the_stored_session_hash(self):
+        """Domain separation.
+
+        Both derive from the session token; if they were equal, the value in
+        auth_sessions.token_hash would also be a usable CSRF token.
+        """
+        from app.auth.service import csrf_token_for, hash_secret
+
+        token = "some-session-token"
+        assert csrf_token_for(token) != hash_secret(token)
+
+    def test_no_session_yields_no_token(self):
+        from app.auth.service import csrf_token_for
+
+        assert csrf_token_for(None) == ""
+        assert csrf_token_for("") == ""
+
+    def test_every_post_form_carries_the_field(self):
+        """Fails closed by construction: a new form without the field is a 403,
+        so this test exists to catch it at authoring time instead."""
+        import pathlib
+        import re
+
+        missing = []
+        for path in sorted(pathlib.Path("app/templates").glob("*.html")):
+            src = path.read_text()
+            for m in re.finditer(r"<form\b.*?>", src, re.S | re.I):
+                if 'method="post"' not in m.group(0).lower():
+                    continue
+                if "csrf_token" not in src[m.end():m.end() + 400]:
+                    line = src[: m.start()].count("\n") + 1
+                    missing.append(f"{path.name}:{line}")
+        assert not missing, (
+            "these POST forms have no csrf_token field and would be refused at "
+            f"runtime: {missing}"
+        )

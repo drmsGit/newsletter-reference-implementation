@@ -49,6 +49,26 @@ def hash_secret(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def csrf_token_for(session_token: str | None) -> str:
+    """A CSRF token bound to one session, derived rather than stored.
+
+    A synchroniser token normally means a random value kept server-side per
+    session. Deriving it from the session token instead is equivalent here and
+    costs no storage, no column and no new secret to rotate: CSRF defends
+    against a cross-site attacker who can make the browser *send* the session
+    cookie but cannot *read* it. Such an attacker therefore cannot compute this
+    value. One who can read the cookie already has the session and has no need
+    of CSRF.
+
+    Domain-separated from `hash_secret` so this can never collide with the
+    session hash stored in `auth_sessions.token_hash` — the two must not be the
+    same string even though both derive from the same input.
+    """
+    if not session_token:
+        return ""
+    return hashlib.sha256(f"csrf:{session_token}".encode("utf-8")).hexdigest()
+
+
 def normalise_email(email: str) -> str:
     return (email or "").strip().lower()
 

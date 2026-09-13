@@ -5,6 +5,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="mb-0">Delivery Monitoring</h1>
     <form method="post" action="/ui/deliveries/process-due">
+        <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
         <button type="submit" class="btn btn-sm btn-outline-primary"
                 {% if not scheduled_count %}disabled{% endif %}
                 title="Fire scheduled sends whose time has arrived. In production a cron/worker/automation flow calls this on an interval.">

@@ -20,6 +20,7 @@
         </p>
         {% endif %}
         <form method="post" action="/ui/users/enforcement" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
             <input type="hidden" name="enforced" value="{{ '0' if enforced else '1' }}">
             <button type="submit" class="btn btn-sm {{ 'btn-outline-secondary' if enforced else 'btn-primary' }}">
                 {{ 'Turn enforcement off' if enforced else 'Turn enforcement on' }}
@@ -28,6 +29,7 @@
         {% if signed_in_as %}
         <span class="ms-2 small text-muted">Signed in as {{ signed_in_as.email }}</span>
         <form method="post" action="/ui/logout" class="d-inline ms-2">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
             <button type="submit" class="btn btn-link btn-sm p-0">Sign out</button>
         </form>
         {% else %}
@@ -73,6 +75,7 @@
                         <div class="d-flex align-items-center gap-1 mb-1">
                             <span>{{ grant.role }} <span class="text-muted">on {{ grant.brand }}</span></span>
                             <form method="post" action="/ui/users/assignments/{{ grant.id }}/remove">
+                                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                                 <button type="submit" class="btn btn-sm btn-link p-0 text-danger"
                                         title="Remove this role">&times;</button>
                             </form>
@@ -82,6 +85,7 @@
                         {% endfor %}
                         <form method="post" action="/ui/users/{{ row.user.id }}/roles"
                               class="d-flex gap-1 mt-1">
+                            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                             <select name="role_id" class="form-select form-select-sm" style="width:auto">
                                 {% for role in roles %}
                                 <option value="{{ role.id }}">{{ role.name }}</option>
@@ -96,6 +100,7 @@
                     <td class="small">{{ row.live_sessions }}</td>
                     <td class="text-end">
                         <form method="post" action="/ui/users/{{ row.user.id }}/active">
+                            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                             <input type="hidden" name="active" value="{{ '0' if row.user.is_active else '1' }}">
                             <button type="submit" class="btn btn-sm btn-outline-secondary">
                                 {{ 'Deactivate' if row.user.is_active else 'Reactivate' }}
@@ -125,6 +130,7 @@
             <a href="/ui/roles">Roles &amp; permissions</a>.
         </p>
         <form method="post" action="/ui/users" class="row g-2 align-items-end">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
             <div class="col-md-4">
                 <label class="form-label small"><strong>Email</strong></label>
                 <input type="email" name="email" required class="form-control form-control-sm">

@@ -30,6 +30,7 @@
 <div class="card" style="max-width: 640px;">
     <div class="card-body">
         <form method="post" action="/ui/send-test">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
             <div class="mb-3">
                 <label class="form-label">To</label>
                 <input type="email" name="to" class="form-control" required

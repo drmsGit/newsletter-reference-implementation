@@ -8,16 +8,19 @@
         <span class="badge fs-6 {% if record.status == 'active' %}bg-success{% else %}bg-secondary{% endif %}">{{ record.status }}</span>
         {% if record.status == 'active' %}
         <form method="post" action="/ui/content/{{ record.id }}/set-status" onsubmit="return confirm('Deactivate this content record? It stays visible wherever it is already used, but will no longer be offered for new modules or picked by the decision engine.')">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
             <input type="hidden" name="status" value="inactive">
             <button type="submit" class="btn btn-outline-secondary btn-sm">Deactivate</button>
         </form>
         {% else %}
         <form method="post" action="/ui/content/{{ record.id }}/set-status">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
             <input type="hidden" name="status" value="active">
             <button type="submit" class="btn btn-outline-success btn-sm">Reactivate</button>
         </form>
         {% endif %}
         <form method="post" action="/ui/content/{{ record.id }}/delete" onsubmit="return confirm('Delete this content record? Deactivating is usually the safer choice — it keeps historical sends intact.')">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
             <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
         </form>
     </div>
@@ -28,6 +31,7 @@
     {{ error }}
     {% if confirm_delete %}
     <form method="post" action="/ui/content/{{ record.id }}/delete" class="d-inline" onsubmit="return confirm('This will remove the related category assignments and versions, and clear this content from any module that uses it. Continue?')">
+        <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
         <input type="hidden" name="force" value="true">
         <button type="submit" class="btn btn-sm btn-danger ms-2">Yes, delete anyway</button>
     </form>
@@ -55,6 +59,7 @@
     <div class="collapse" id="form-edit">
         <div class="card-body border-top">
             <form method="post" action="/ui/content/{{ record.id }}/edit">
+                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                 <div class="mb-3">
                     <label class="form-label">Title <span class="text-muted">(catalog label)</span></label>
                     <input type="text" name="title" class="form-control" value="{{ record.title }}" required>
@@ -140,6 +145,7 @@
         <div class="card-body border-top">
             <p class="text-muted small">Freezing a version copies the record's current content fields (above) into an immutable snapshot for audit/rollback. Sends and snapshots resolve against the latest frozen version, not live edits.</p>
             <form method="post" action="/ui/content/{{ record.id }}/publish-version">
+                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                 <div class="mb-3">
                     <label class="form-label">Created by <span class="text-muted">(optional)</span></label>
                     <input type="text" name="created_by" class="form-control" placeholder="e.g. your name">
@@ -170,6 +176,7 @@
                     <td>{{ category.score }}</td>
                     <td>
                         <form method="post" action="/ui/content/{{ record.id }}/categories/{{ category.assignment_id }}/delete">
+                            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                             <button type="submit" class="btn btn-sm btn-link text-danger p-0">Remove</button>
                         </form>
                     </td>
@@ -184,6 +191,7 @@
     <div class="collapse" id="form-assign-category">
         <div class="card-body border-top">
             <form method="post" action="/ui/content/{{ record.id }}/assign-category">
+                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                 <div class="row align-items-end">
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Category</label>

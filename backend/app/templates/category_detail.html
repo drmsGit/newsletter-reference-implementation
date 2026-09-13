@@ -7,6 +7,7 @@
     <div class="d-flex align-items-center gap-2">
         <span class="badge bg-secondary fs-6">{{ category.type }}</span>
         <form method="post" action="/ui/categories/{{ category.id }}/delete" onsubmit="return confirm('Delete this category?')">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
             <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
         </form>
     </div>
@@ -17,6 +18,7 @@
     {{ error }}
     {% if confirm_delete %}
     <form method="post" action="/ui/categories/{{ category.id }}/delete" class="d-inline" onsubmit="return confirm('This will remove the related content assignments and parent/child relations. Continue?')">
+        <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
         <input type="hidden" name="force" value="true">
         <button type="submit" class="btn btn-sm btn-danger ms-2">Yes, delete anyway</button>
     </form>
@@ -42,6 +44,7 @@
                             <span class="d-inline-flex align-items-center gap-1 me-1 mb-1">
                                 <a href="/ui/categories/{{ row[0].id }}" class="badge bg-secondary text-decoration-none">{{ row[0].name }}</a>
                                 <form method="post" action="/ui/categories/{{ category.id }}/relations/{{ row[1] }}/delete" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                                     <button type="submit" class="btn btn-link p-0 text-danger" style="font-size:.75rem;line-height:1" title="Unlink">×</button>
                                 </form>
                             </span>
@@ -59,6 +62,7 @@
                             <span class="d-inline-flex align-items-center gap-1 me-1 mb-1">
                                 <a href="/ui/categories/{{ row[0].id }}" class="badge bg-secondary text-decoration-none">{{ row[0].name }}</a>
                                 <form method="post" action="/ui/categories/{{ category.id }}/relations/{{ row[1] }}/delete" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                                     <button type="submit" class="btn btn-link p-0 text-danger" style="font-size:.75rem;line-height:1" title="Unlink">×</button>
                                 </form>
                             </span>
@@ -73,6 +77,7 @@
     <div class="collapse" id="form-relation">
         <div class="card-body border-top">
             <form method="post" action="/ui/categories/relations">
+                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                 <div class="row align-items-end">
                     <div class="col-md-4 mb-3">
                         <label class="form-label">Parent</label>

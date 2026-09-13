@@ -599,3 +599,97 @@ class TestDevCodePath:
             auth.deliver_code("someone@example.invalid", "123456")
             is auth.CodeDelivery.dev_not_attempted
         )
+
+
+class TestCsrfIsActuallyEnforced:
+    """The guard, exercised over HTTP rather than in isolation.
+
+    Written after a mutation check caught the gap: unit tests covering the
+    token derivation and the hidden field both passed with the guard disabled
+    entirely, because neither one sent a request through it. A CSRF test that
+    never makes a forged request proves nothing.
+
+    The two refusal cases need no cleanup by construction — a rejected request
+    never reaches its handler, so nothing is created.
+    """
+
+    def _client_and_token(self, db, user):
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        token = auth.verify_login_code(db, user.email, auth.request_login_code(db, user.email))
+        client = TestClient(app, follow_redirects=False)
+        client.cookies.set(auth.SESSION_COOKIE, token)
+        return client, auth.csrf_token_for(token)
+
+    def test_post_without_a_token_is_refused(self, db, temp_user):
+        from app.campaigns.db_models import CampaignDB
+
+        user = temp_user(role_key="admin")
+        client, _ = self._client_and_token(db, user)
+        before = db.query(CampaignDB).count()
+
+        response = client.post("/ui/campaigns", data={"name": "csrf-test-no-token"})
+
+        assert response.status_code == 403
+        db.expire_all()
+        assert db.query(CampaignDB).count() == before, (
+            "a request refused for CSRF still reached its handler"
+        )
+
+    def test_post_with_a_wrong_token_is_refused(self, db, temp_user):
+        from app.campaigns.db_models import CampaignDB
+
+        user = temp_user(role_key="admin")
+        client, _ = self._client_and_token(db, user)
+        before = db.query(CampaignDB).count()
+
+        response = client.post(
+            "/ui/campaigns",
+            data={"name": "csrf-test-wrong-token", "csrf_token": "not-the-right-token"},
+        )
+
+        assert response.status_code == 403
+        db.expire_all()
+        assert db.query(CampaignDB).count() == before
+
+    def test_post_with_the_right_token_goes_through(self, db, temp_user):
+        """Without this, a guard that refused everything would pass the suite."""
+        from app.campaigns.db_models import (
+            CampaignDB, DecisionSlotDB, ModuleInstanceDB, VariantDB,
+        )
+
+        user = temp_user(role_key="admin")
+        client, csrf = self._client_and_token(db, user)
+        name = f"csrf-test-accepted-{uuid.uuid4().hex[:8]}"
+        try:
+            response = client.post(
+                "/ui/campaigns", data={"name": name, "csrf_token": csrf}
+            )
+            assert response.status_code == 303, (
+                f"a correctly-tokened form was refused ({response.status_code})"
+            )
+            db.expire_all()
+            assert db.query(CampaignDB).filter(CampaignDB.name == name).count() == 1
+        finally:
+            # The route creates a variant alongside the campaign, so the
+            # children go first or the delete hits a foreign key.
+            for campaign in db.query(CampaignDB).filter(CampaignDB.name == name).all():
+                variant_ids = [
+                    v.id for v in db.query(VariantDB).filter(
+                        VariantDB.campaign_id == campaign.id
+                    ).all()
+                ]
+                if variant_ids:
+                    db.query(ModuleInstanceDB).filter(
+                        ModuleInstanceDB.variant_id.in_(variant_ids)
+                    ).delete(synchronize_session=False)
+                    db.query(DecisionSlotDB).filter(
+                        DecisionSlotDB.variant_id.in_(variant_ids)
+                    ).delete(synchronize_session=False)
+                    db.query(VariantDB).filter(
+                        VariantDB.campaign_id == campaign.id
+                    ).delete(synchronize_session=False)
+                db.delete(campaign)
+            db.commit()

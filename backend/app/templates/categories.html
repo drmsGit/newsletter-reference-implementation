@@ -19,6 +19,7 @@
         <div class="card-body">
             <h5 class="card-title">New category</h5>
             <form method="post" action="/ui/categories">
+                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                 <div class="row align-items-end">
                     <div class="col-md-5 mb-3">
                         <label class="form-label">Name</label>
@@ -45,6 +46,7 @@
         <div class="card-body">
             <h5 class="card-title">Add parent–child relation</h5>
             <form method="post" action="/ui/categories/relations">
+                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                 <div class="row align-items-end">
                     <div class="col-md-4 mb-3">
                         <label class="form-label">Parent category</label>
