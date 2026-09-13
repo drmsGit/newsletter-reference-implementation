@@ -27,7 +27,12 @@ from app.content.db_models import (
     ContentVersionDB,
     ContentCategoryAssignmentDB,
 )
-from app.recipients.db_models import RecipientDB, SignalContributionDB
+from app.recipients.db_models import (
+    AddressabilityDB,
+    ConsentEventDB,
+    RecipientDB,
+    SignalContributionDB,
+)
 from app.campaigns.db_models import (
     CampaignDB,
     VariantDB,
@@ -40,6 +45,20 @@ from app.snapshots.db_models import SnapshotDB
 from app.insight.db_models import EngagementEventDB
 from app.insight.service import apply_event_to_signals
 
+# Imported for metadata registration only. SQLAlchemy resolves foreign keys
+# against whatever is registered on Base.metadata, and a model class registers
+# by being imported — so a module nothing imports leaves its table invisible.
+# Without these, SendInstanceDB.audience_group_id cannot resolve audience_groups
+# and mapper configuration fails on the first query, which is how this script
+# came to be broken before anyone noticed. tests/test_signals.py carries the
+# same wall for the same reason.
+import app.audience.db_models  # noqa: F401
+import app.overrides.db_models  # noqa: F401
+import app.providers.db_models  # noqa: F401
+import app.settings.db_models  # noqa: F401
+import app.auth.db_models  # noqa: F401
+import app.ai.db_models  # noqa: F401
+
 random.seed(42)
 NOW = datetime.now(timezone.utc)
 
@@ -49,6 +68,7 @@ def _truncate(db):
         TRUNCATE TABLE
             signal_contributions, engagement_events, delivery_executions,
             content_overrides, decision_resolutions, consent_sync_logs,
+            consent_events, recipient_addresses,
             snapshots, send_instances, content_category_assignments,
             content_versions, category_relations, module_instances,
             decision_slots, variants, categories, recipients, campaigns,
@@ -137,10 +157,37 @@ def seed():
                 language=random.choice(langs),
                 attributes={"firstname": name},
                 status="active",
-                consent_status="opted_in",
             )
             db.add(r)
             recipients.append(r)
+        db.flush()  # assign ids before the consent/address rows reference them
+
+        # Consent is an event per (recipient, channel, purpose), latest wins
+        # (ADR-163 point 1), and the address is a row rather than a column on
+        # the recipient (point 2). Both are required for a recipient to resolve
+        # into an audience at all — consent clears the gate, the address makes
+        # them reachable — so a seed that writes neither produces 40 recipients
+        # the system correctly refuses to send to.
+        for r in recipients:
+            db.add(
+                ConsentEventDB(
+                    recipient_id=r.id,
+                    channel="email",
+                    purpose="marketing",
+                    status="opted_in",
+                    source="seed",
+                    note="seed_demo_data.py",
+                )
+            )
+            db.add(
+                AddressabilityDB(
+                    recipient_id=r.id,
+                    channel="email",
+                    value={"email": r.email},
+                    status="active",
+                    is_primary=True,
+                )
+            )
         db.commit()
 
         # manual preferences: 2–5 positive categories each, varied magnitude,

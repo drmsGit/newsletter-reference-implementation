@@ -21,6 +21,8 @@ TRUNCATE TABLE
     content_overrides,
     decision_resolutions,
     consent_sync_logs,
+    consent_events,
+    recipient_addresses,
     snapshots,
     send_instances,
     content_category_assignments,
@@ -93,12 +95,30 @@ JOIN categories cat ON cat.name = v.category_name;
 -- RECIPIENTS
 -- =========================================================
 
--- consent_status is CRM-sourced; seed recipients are opted_in so the
--- end-to-end demo (audience resolution → decisioning → send) works out of the box.
-INSERT INTO recipients (external_id, email, language, attributes, status, consent_status) VALUES
-    ('r-001', 'anna.mueller@example.com',  'de', '{"firstname": "Anna",   "lastname": "Müller",   "preferred_airport": "HAM"}', 'active', 'opted_in'),
-    ('r-002', 'jan.devries@example.com',   'nl', '{"firstname": "Jan",    "lastname": "de Vries", "preferred_airport": "AMS"}', 'active', 'opted_in'),
-    ('r-003', 'sophie.martin@example.com', 'fr', '{"firstname": "Sophie", "lastname": "Martin",    "preferred_airport": "CDG"}', 'active', 'opted_in');
+INSERT INTO recipients (external_id, email, language, attributes, status) VALUES
+    ('r-001', 'anna.mueller@example.com',  'de', '{"firstname": "Anna",   "lastname": "Müller",   "preferred_airport": "HAM"}', 'active'),
+    ('r-002', 'jan.devries@example.com',   'nl', '{"firstname": "Jan",    "lastname": "de Vries", "preferred_airport": "AMS"}', 'active'),
+    ('r-003', 'sophie.martin@example.com', 'fr', '{"firstname": "Sophie", "lastname": "Martin",    "preferred_airport": "CDG"}', 'active');
+
+-- Consent is an append-only event per (recipient, channel, purpose), latest
+-- wins (ADR-163 point 1) — not a column. Seed recipients are opted_in on
+-- email/marketing so the end-to-end demo (audience resolution → decisioning →
+-- send) works out of the box. source='seed' rather than 'crm': claiming a CRM
+-- asserted this would put fabricated evidence in the table whose job is to
+-- prove consent, and it would give drift detection a baseline nobody stated.
+INSERT INTO consent_events (recipient_id, channel, purpose, status, source, note)
+SELECT r.id, 'email', 'marketing', 'opted_in', 'seed', 'reset_all_data.sql'
+FROM recipients r
+WHERE r.external_id IN ('r-001', 'r-002', 'r-003');
+
+-- Addressability: the email address is a row, not a column on the recipient
+-- (ADR-163 point 2). Audience resolution and the send path both read this —
+-- a recipient without one is correctly treated as unreachable. is_primary is
+-- set because it is their only address (point 11).
+INSERT INTO recipient_addresses (recipient_id, channel, value, status, is_primary)
+SELECT r.id, 'email', json_build_object('email', r.email), 'active', TRUE
+FROM recipients r
+WHERE r.external_id IN ('r-001', 'r-002', 'r-003');
 
 -- Anna: beach-leaning | Jan: city/culture | Sophie: nature/city
 -- Declared preferences are heavy, slowly-decaying "manual" contributions to the
