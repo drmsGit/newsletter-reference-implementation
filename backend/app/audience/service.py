@@ -167,7 +167,12 @@ def find_by_criteria(
     if exclude_ids:
         q = q.filter(RecipientDB.id.notin_(exclude_ids))
 
-    records = q.order_by(RecipientDB.email.asc()).all()
+    # Ordered by id since the address is no longer a column (ADR-163 point 2).
+    # This also makes deduplication deterministic: two recipients sharing an
+    # address have no order between them under an email sort, so which one
+    # survived was previously whatever the database happened to return. Now it
+    # is the earliest-created, always.
+    records = q.order_by(RecipientDB.id.asc()).all()
 
     # Preference criterion: keep recipients whose *operational signal* for the
     # category clears the threshold (ADR-132, decay-on-read). Computed rather
@@ -413,7 +418,7 @@ def resolve_audience(db: Session, group_id: int) -> list[RecipientDB]:
             RecipientDB.id.in_(final_ids),
             is_consenting_filter(),  # consent floor
         )
-        .order_by(RecipientDB.email.asc())
+        .order_by(RecipientDB.id.asc())
         .all()
     )
     return records

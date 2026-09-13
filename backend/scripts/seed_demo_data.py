@@ -149,16 +149,19 @@ def seed():
                  "Emma", "Noah", "Julia", "Ben", "Clara", "Max", "Ida", "Leon", "Marie", "Elias"]
         langs = ["de", "de", "de", "nl", "fr", "en"]
         recipients = []
+        addresses_by_external_id: dict[str, str] = {}
         for i in range(1, 41):
             name = random.choice(first)
             r = RecipientDB(
                 external_id=f"demo-{i:03d}",
-                email=f"{name.lower()}.{i}@example.com",
                 language=random.choice(langs),
                 attributes={"firstname": name},
                 status="active",
             )
             db.add(r)
+            # The address is a row, not a column (ADR-163 point 2), so it is
+            # carried alongside until the rows are written below.
+            addresses_by_external_id[r.external_id] = f"{name.lower()}.{i}@example.com"
             recipients.append(r)
         db.flush()  # assign ids before the consent/address rows reference them
 
@@ -183,7 +186,7 @@ def seed():
                 AddressabilityDB(
                     recipient_id=r.id,
                     channel="email",
-                    value={"email": r.email},
+                    value={"email": addresses_by_external_id[r.external_id]},
                     status="active",
                     is_primary=True,
                 )

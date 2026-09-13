@@ -10,6 +10,8 @@ import math
 import os
 
 from app.database import get_db
+from app.recipients.consent import resolve_emails
+from app.recipients.service import to_recipient, to_recipients
 
 import json
 
@@ -241,10 +243,15 @@ def _send_test_context(db):
         .order_by(VariantDB.id.asc())
         .all()
     )
-    recipients = db.query(RecipientDB.id, RecipientDB.email).order_by(RecipientDB.id.asc()).limit(200).all()
+    recipient_rows = db.query(RecipientDB.id).order_by(RecipientDB.id.asc()).limit(200).all()
+    recipient_ids = [rid for (rid,) in recipient_rows]
+    recipient_addresses = resolve_emails(db, recipient_ids)
     return {
         "variant_choices": [{"id": vid, "label": f"#{vid} {cname} — {vname}"} for vid, vname, cname in variants],
-        "recipient_choices": [{"id": rid, "email": email} for rid, email in recipients],
+        "recipient_choices": [
+            {"id": rid, "email": recipient_addresses.get(rid, "")}
+            for rid in recipient_ids
+        ],
     }
 
 
@@ -304,11 +311,16 @@ def recipients_list(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    recipients = (
+    records = (
         db.query(RecipientDB)
         .order_by(RecipientDB.id.asc())
         .all()
     )
+    # Projected rather than passed raw: the address is no longer an attribute
+    # on the ORM row (ADR-163 point 2), so a template reading `.email` off one
+    # would silently render nothing. to_recipients resolves addresses and
+    # consent for the whole page in two queries.
+    recipients = to_recipients(db, records)
 
     return templates.TemplateResponse(
         request,
@@ -474,7 +486,9 @@ def recipient_detail(
         "recipient_detail.html",
         {
             "title": f"Recipient {recipient_id}",
-            "recipient": recipient,
+            # Projected for the same reason as the list view — a raw ORM row
+            # has no address attribute since ADR-163 point 2.
+            "recipient": to_recipient(db, recipient),
             "preferences": preference_rows,
             "decisions": decision_rows,
             "deliveries": delivery_rows,
@@ -2672,19 +2686,29 @@ def audience_group_detail(group_id: int, request: Request, error: str | None = N
     raw_members = audience_service.list_members(db, group_id)
 
     members = []
+    member_addresses = resolve_emails(db, [m.recipient_id for m in raw_members])
     for m in raw_members:
         r = db.query(RecipientDB).filter(RecipientDB.id == m.recipient_id).first()
         if r:
             members.append({
                 "recipient_id": r.id,
                 "external_id": r.external_id,
-                "email": r.email,
+                "email": member_addresses.get(r.id, ""),
                 "status": r.status,
                 "added_at": m.added_at,
             })
 
-    all_recipients = db.query(RecipientDB).order_by(RecipientDB.email.asc()).all()
-    non_members = [r for r in all_recipients if r.id not in member_ids]
+    # Sorted by resolved address rather than in SQL: the address is a row on
+    # another table now (ADR-163 point 2), and this list is short enough that
+    # ordering it in Python is cheaper than joining for a display concern.
+    all_recipients = db.query(RecipientDB).order_by(RecipientDB.id.asc()).all()
+    all_addresses = resolve_emails(db, [r.id for r in all_recipients])
+    all_recipients.sort(key=lambda r: all_addresses.get(r.id, ""))
+    non_members = [
+        {"id": r.id, "email": all_addresses.get(r.id, ""), "external_id": r.external_id,
+         "language": r.language, "status": r.status}
+        for r in all_recipients if r.id not in member_ids
+    ]
 
     languages = sorted({r.language for r in all_recipients if r.language})
     statuses = sorted({r.status for r in all_recipients if r.status})
@@ -2716,6 +2740,7 @@ def audience_group_detail(group_id: int, request: Request, error: str | None = N
         })
 
     resolved = audience_service.resolve_audience(db, group_id)
+    resolved_addresses = resolve_emails(db, [r.id for r in resolved[:20]])
 
     # Source campaign (if this group was seeded by "Suggest audience") — enables
     # the Recalculate button and a link back to the campaign.
@@ -2733,7 +2758,11 @@ def audience_group_detail(group_id: int, request: Request, error: str | None = N
         "categories": categories,
         "blocks": blocks,
         "resolved_count": len(resolved),
-        "resolved_preview": resolved[:20],
+        "resolved_preview": [
+            {"id": r.id, "email": resolved_addresses.get(r.id, ""),
+             "external_id": r.external_id, "language": r.language, "status": r.status}
+            for r in resolved[:20]
+        ],
         "source_campaign": source_campaign,
         "error": error,
     })
@@ -2798,9 +2827,12 @@ def audience_group_criteria_preview(
         min_preference_score=min_score,
         exclude_ids=member_ids,
     )
+    preview = matches[:20]
+    preview_addresses = resolve_emails(db, [r.id for r in preview])
     return JSONResponse({"count": len(matches), "recipients": [
-        {"id": r.id, "email": r.email, "external_id": r.external_id, "language": r.language, "status": r.status}
-        for r in matches[:20]
+        {"id": r.id, "email": preview_addresses.get(r.id, ""), "external_id": r.external_id,
+         "language": r.language, "status": r.status}
+        for r in preview
     ]})
 
 

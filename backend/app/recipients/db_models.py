@@ -8,7 +8,11 @@ class RecipientDB(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     external_id = Column(String(255), nullable=False, unique=True, index=True)
-    email = Column(String(255), nullable=False)
+    # No `email` column. An address is a row in AddressabilityDB (ADR-163
+    # point 2), because a recipient has many contact points across channels,
+    # they expire independently, and a postal address is not a string. The
+    # email channel is resolved by the point 11 rules — primary flag, else
+    # most-recently-verified.
     language = Column(String(20), nullable=True)
     attributes = Column(JSON, nullable=True)
     status = Column(String(50), nullable=False, default="active")

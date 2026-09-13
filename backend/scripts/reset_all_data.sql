@@ -95,10 +95,12 @@ JOIN categories cat ON cat.name = v.category_name;
 -- RECIPIENTS
 -- =========================================================
 
-INSERT INTO recipients (external_id, email, language, attributes, status) VALUES
-    ('r-001', 'anna.mueller@example.com',  'de', '{"firstname": "Anna",   "lastname": "Müller",   "preferred_airport": "HAM"}', 'active'),
-    ('r-002', 'jan.devries@example.com',   'nl', '{"firstname": "Jan",    "lastname": "de Vries", "preferred_airport": "AMS"}', 'active'),
-    ('r-003', 'sophie.martin@example.com', 'fr', '{"firstname": "Sophie", "lastname": "Martin",    "preferred_airport": "CDG"}', 'active');
+-- No email column: an address is a row in recipient_addresses (ADR-163
+-- point 2), written below.
+INSERT INTO recipients (external_id, language, attributes, status) VALUES
+    ('r-001', 'de', '{"firstname": "Anna",   "lastname": "Müller",   "preferred_airport": "HAM"}', 'active'),
+    ('r-002', 'nl', '{"firstname": "Jan",    "lastname": "de Vries", "preferred_airport": "AMS"}', 'active'),
+    ('r-003', 'fr', '{"firstname": "Sophie", "lastname": "Martin",    "preferred_airport": "CDG"}', 'active');
 
 -- Consent is an append-only event per (recipient, channel, purpose), latest
 -- wins (ADR-163 point 1) — not a column. Seed recipients are opted_in on
@@ -116,9 +118,13 @@ WHERE r.external_id IN ('r-001', 'r-002', 'r-003');
 -- a recipient without one is correctly treated as unreachable. is_primary is
 -- set because it is their only address (point 11).
 INSERT INTO recipient_addresses (recipient_id, channel, value, status, is_primary)
-SELECT r.id, 'email', json_build_object('email', r.email), 'active', TRUE
+SELECT r.id, 'email', json_build_object('email', v.address), 'active', TRUE
 FROM recipients r
-WHERE r.external_id IN ('r-001', 'r-002', 'r-003');
+JOIN (VALUES
+    ('r-001', 'anna.mueller@example.com'),
+    ('r-002', 'jan.devries@example.com'),
+    ('r-003', 'sophie.martin@example.com')
+) AS v(external_id, address) ON v.external_id = r.external_id;
 
 -- Anna: beach-leaning | Jan: city/culture | Sophie: nature/city
 -- Declared preferences are heavy, slowly-decaying "manual" contributions to the

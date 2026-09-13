@@ -136,6 +136,40 @@ def latest_consent_status(
     return event.status if event is not None else None
 
 
+def latest_consent_statuses(
+    db: Session,
+    recipient_ids: list[int],
+    *,
+    channel: str = DEFAULT_CHANNEL,
+    purpose: str = DEFAULT_PURPOSE,
+) -> dict[int, str]:
+    """`latest_consent_status` for many recipients in one query.
+
+    A list view projecting N recipients would otherwise issue N consent
+    queries — the same N+1 ADR-163 point 10 rules out for the exclusion stages,
+    and just as avoidable here.
+    """
+    if not recipient_ids:
+        return {}
+    rows = (
+        db.query(ConsentEventDB)
+        .filter(
+            ConsentEventDB.recipient_id.in_(recipient_ids),
+            ConsentEventDB.channel == channel,
+            ConsentEventDB.purpose == purpose,
+        )
+        .order_by(
+            ConsentEventDB.created_at.desc(), ConsentEventDB.id.desc()
+        )
+        .all()
+    )
+    # Ordered newest-first, so the first row seen per recipient wins.
+    latest: dict[int, str] = {}
+    for row in rows:
+        latest.setdefault(row.recipient_id, row.status)
+    return latest
+
+
 def is_consenting(
     db: Session,
     recipient_id: int,

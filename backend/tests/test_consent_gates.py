@@ -82,21 +82,20 @@ def _make_recipient(db, consent_status, email=None, language=None):
     answer is stored.
 
     external_id is the identity key (it carries the unique constraint); the
-    address deliberately is not, which is what the deduplication test exercises.
+    address deliberately is not — several recipients may share one, which is
+    what the deduplication test exercises.
     """
     address = email or f"{uuid.uuid4()}@example.invalid"
     recipient = RecipientDB(
         external_id=f"test-consent-{uuid.uuid4()}",
-        email=address,
         language=language,
         status="active",
     )
     db.add(recipient)
     db.flush()
-    # Real recipients have an addressability row — create_recipient writes one,
-    # and the migration backfilled every existing recipient. Audience resolution
-    # reads it rather than RecipientDB.email, so a fixture without one is not a
-    # recipient the system would ever produce.
+    # Since phase B the addressability row is the ONLY place an address lives —
+    # there is no column to set. A recipient without one is unreachable, which
+    # is exactly what the stage-1 exclusion test deliberately constructs.
     db.add(
         AddressabilityDB(
             recipient_id=recipient.id,

@@ -6,7 +6,10 @@ from app.recipients.consent import (
     DEFAULT_PURPOSE,
     latest_consent_event,
     latest_consent_status,
+    latest_consent_statuses,
     record_consent,
+    resolve_email,
+    resolve_emails,
 )
 from app.recipients.db_models import (
     AddressabilityDB,
@@ -110,27 +113,51 @@ def validate_recipient_attributes(attributes: dict | None) -> None:
 
 
 def to_recipient(db: Session, record: RecipientDB) -> Recipient:
-    """Project a recipient row for the API.
+    """Project one recipient row for the API.
 
-    `consent_status` is no longer a column: it is resolved from the latest
-    (email, marketing) consent event. The API keeps exposing a single scalar
-    because that is what one channel's callers need today; a per-cell view is
-    what `GET /recipients/consent/drift` gives, and a fuller grid belongs with
-    the per-channel UI that does not exist yet.
+    Neither `email` nor `consent_status` is a column any more. The address is
+    the recipient's email-channel addressability row (ADR-163 point 2, resolved
+    by the point 11 rules) and the consent status is the latest
+    (email, marketing) event. The API still exposes both as flat scalars,
+    because that is what one channel's callers need; the per-cell view is
+    `GET /recipients/consent/drift`, and a fuller grid belongs with the
+    per-channel UI that does not exist yet.
+
+    Use `to_recipients` for more than one — this issues two queries per record.
     """
-    return Recipient(
-        id=record.id,
-        external_id=record.external_id,
-        email=record.email,
-        language=record.language,
-        attributes=record.attributes,
-        status=record.status,
-        consent_status=(
-            latest_consent_status(db, record.id) or ConsentStatus.pending.value
-        ),
-        created_at=record.created_at,
-        updated_at=record.updated_at,
-    )
+    return to_recipients(db, [record])[0]
+
+
+def to_recipients(db: Session, records: list[RecipientDB]) -> list[Recipient]:
+    """Project many recipients with a fixed number of queries.
+
+    Two lookups for the whole set rather than two per record. The consent
+    lookup was already per-record before phase B and the address lookup would
+    have doubled it; a list endpoint over a few hundred recipients would then
+    issue several hundred queries to render one page.
+    """
+    if not records:
+        return []
+    ids = [record.id for record in records]
+    addresses = resolve_emails(db, ids)
+    consents = latest_consent_statuses(db, ids)
+    return [
+        Recipient(
+            id=record.id,
+            external_id=record.external_id,
+            # "" rather than None when a recipient has no address: the field is
+            # non-optional in the API contract, and "unreachable" is already
+            # expressed by the exclusion stack rather than by a null here.
+            email=addresses.get(record.id, ""),
+            language=record.language,
+            attributes=record.attributes,
+            status=record.status,
+            consent_status=consents.get(record.id, ConsentStatus.pending.value),
+            created_at=record.created_at,
+            updated_at=record.updated_at,
+        )
+        for record in records
+    ]
 
 
 def create_recipient(
@@ -156,7 +183,6 @@ def create_recipient(
         recipient = RecipientDB(external_id=external_id)
         db.add(recipient)
 
-    recipient.email = email
     recipient.language = language
     recipient.attributes = attributes
     recipient.status = status
@@ -176,9 +202,9 @@ def create_recipient(
             commit=False,
         )
 
-    # Addressability likewise: the email argument is an address on the email
-    # channel (ADR-163 point 2). Phase A still writes RecipientDB.email above;
-    # phase B removes that column and leaves only this.
+    # The email argument is an address on the email channel (ADR-163 point 2),
+    # and since phase B this row is the only place it lives — there is no
+    # column on the recipient to keep in step with it.
     _upsert_email_address(db, recipient.id, email)
 
     db.commit()
@@ -359,12 +385,14 @@ def detect_consent_drift(db: Session) -> list[ConsentDriftItem]:
         if row.source == "crm":
             latest_crm[key] = row
 
+    drifting_ids = {k[0] for k in latest_crm}
     recipients = {
         r.id: r
-        for r in db.query(RecipientDB)
-        .filter(RecipientDB.id.in_({k[0] for k in latest_crm}))
-        .all()
+        for r in db.query(RecipientDB).filter(RecipientDB.id.in_(drifting_ids)).all()
     } if latest_crm else {}
+    # Addresses in one query, not one per drift row — the drift report is a
+    # list view like any other.
+    addresses = resolve_emails(db, sorted(drifting_ids)) if latest_crm else {}
 
     drift: list[ConsentDriftItem] = []
     for key, crm_event in latest_crm.items():
@@ -387,7 +415,7 @@ def detect_consent_drift(db: Session) -> list[ConsentDriftItem]:
             ConsentDriftItem(
                 recipient_id=recipient.id,
                 external_id=recipient.external_id,
-                email=recipient.email,
+                email=addresses.get(recipient.id, ""),
                 channel=key[1],
                 purpose=key[2],
                 platform_consent_status=effective.status,
@@ -402,7 +430,7 @@ def detect_consent_drift(db: Session) -> list[ConsentDriftItem]:
 
 def list_recipients(db: Session) -> list[Recipient]:
     records = db.query(RecipientDB).order_by(RecipientDB.id.asc()).all()
-    return [to_recipient(db, record) for record in records]
+    return to_recipients(db, records)
 
 
 def get_recipient_by_external_id(
