@@ -55,25 +55,26 @@ def login_request(
     next: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    """Issue a code. The response is the same whether or not the address exists."""
-    code = request_login_code(db, email)
+    """Issue a code. The response is the same whether or not the address exists.
+
+    One response, unconditionally — same status, same location, same body, for
+    a known address, an unknown one, a deactivated user, and a failed send.
+    That is ADR-151 §2, and it is enforced here rather than trusted: the
+    branch this handler used to have rendered a 200 with the code for existing
+    users and redirected 303 for everyone else, which told an unauthenticated
+    visitor exactly which addresses were real.
+
+    The dev code is not rendered either. It goes to the server log, which is
+    the only place it can be shown without the response revealing that the
+    account exists. Convenience on a demo machine is not worth an oracle in the
+    configuration a prospect is shown — and `mock` is the default, so that was
+    the shipped behaviour.
+    """
+    # Return value deliberately unused. It carries the dev code, and rendering
+    # it is exactly the defect this handler had.
+    request_login_code(db, email)
     address = normalise_email(email)
     target = safe_next(next)
-
-    if code:
-        # Dev path only: request_login_code returns a code exclusively when it
-        # could not be delivered over a real provider. Rendered directly rather
-        # than redirected, breaking the post-redirect-get pattern used
-        # everywhere else on purpose — the alternative is putting a sign-in
-        # code in a query string, where it lands in history and referrer logs.
-        # That is a bad habit to teach in a reference implementation, and the
-        # inconsistency is confined to a branch production never reaches.
-        return templates.TemplateResponse(
-            request, "login_verify.html",
-            {"title": "Enter your code", "email": address, "prefilled": code,
-             "error": "", "notice": NEUTRAL_NOTICE, "dev_mode": True,
-             "next": target},
-        )
 
     return RedirectResponse(
         url=f"/ui/login/verify?email={address}&next={quote(target, safe='')}",

@@ -447,6 +447,122 @@ class TestPostLoginRedirect:
         assert auth.safe_next("/ui/x\r\nSet-Cookie: a=b") == "/"
 
 
+class TestSignInCodeIsNeverDisclosed:
+    """Gate 4b (P0) and the enumeration oracle beside it (P1).
+
+    These were filed as two bugs and are one change: `deliver_code` returned
+    False both when the dev path skipped sending and when a real send failed,
+    so `request_login_code` could not tell them apart and returned the live
+    code in both cases. A deployment with a broken mail provider handed a
+    working sign-in code to anyone who typed an admin's address — and the
+    handler's 200-with-code vs 303-redirect branch told an unauthenticated
+    visitor which addresses were real.
+
+    ADR-151 §2 requires an identical response whether or not the address
+    exists, with no dev carve-out. Decided 2026-09-13: that holds everywhere,
+    including the demo configuration, and the dev code goes to the log.
+    """
+
+    def test_failed_real_send_does_not_return_the_code(self, db, temp_user, monkeypatch):
+        """The P0 itself. A send that was attempted and failed returns nothing."""
+        user = temp_user()
+        # Force the real-provider path, then make the send fail.
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "resend")
+        monkeypatch.delenv("AUTH_DEV_SHOW_CODE", raising=False)
+        monkeypatch.setattr(
+            auth, "deliver_code", lambda email, code: auth.CodeDelivery.failed
+        )
+
+        assert auth.request_login_code(db, user.email) is None, (
+            "a sign-in code was returned after a real delivery attempt failed — "
+            "this is the P0: a misconfigured mail provider hands a working code "
+            "to whoever typed the address"
+        )
+
+    def test_successful_real_send_does_not_return_the_code(self, db, temp_user, monkeypatch):
+        user = temp_user()
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "resend")
+        monkeypatch.delenv("AUTH_DEV_SHOW_CODE", raising=False)
+        monkeypatch.setattr(
+            auth, "deliver_code", lambda email, code: auth.CodeDelivery.sent
+        )
+
+        assert auth.request_login_code(db, user.email) is None
+
+    def test_dev_path_still_returns_the_code_for_local_use(self, db, temp_user, monkeypatch):
+        """The one case that may return it — and it is already in the log.
+
+        Without this the suite could pass by never returning a code at all,
+        and every other test here signs in through this path.
+        """
+        user = temp_user()
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        code = auth.request_login_code(db, user.email)
+        assert code is not None and len(code) == 6
+
+    def test_login_response_is_identical_for_known_and_unknown_addresses(
+        self, db, temp_user, monkeypatch
+    ):
+        """The P1. The oracle was the 200-vs-303 branch, so compare responses.
+
+        Runs against the default mock provider — the configuration a prospect
+        is shown, and the one where the oracle used to be live.
+        """
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        user = temp_user()
+        client = TestClient(app, follow_redirects=False)
+
+        known = client.post("/ui/login", data={"email": user.email, "next": ""})
+        unknown = client.post(
+            "/ui/login",
+            data={"email": f"nobody-{uuid.uuid4().hex[:8]}@example.invalid", "next": ""},
+        )
+
+        assert known.status_code == unknown.status_code == 303, (
+            "the login form answered a known address differently from an "
+            "unknown one — that difference is the enumeration oracle"
+        )
+        # The redirect target carries the address back, which differs by
+        # construction; everything else about the response must match.
+        assert known.headers["location"].split("email=")[0] == (
+            unknown.headers["location"].split("email=")[0]
+        )
+        assert known.content == unknown.content
+
+    def test_the_code_never_appears_in_the_login_response(
+        self, db, temp_user, monkeypatch
+    ):
+        """Belt and braces: even in dev, the body must not carry the code."""
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        user = temp_user()
+        client = TestClient(app, follow_redirects=True)
+
+        response = client.post("/ui/login", data={"email": user.email, "next": ""})
+
+        latest = (
+            db.query(LoginCodeDB)
+            .filter(LoginCodeDB.user_id == user.id)
+            .order_by(LoginCodeDB.id.desc())
+            .first()
+        )
+        assert latest is not None, "no code was issued, so this proves nothing"
+        # Codes are stored hashed, so scan the body for any six-digit run
+        # rather than for the code itself.
+        import re
+
+        assert not re.search(r"\b\d{6}\b", response.text), (
+            "a six-digit code appeared in the login response body"
+        )
+
+
 class TestDevCodePath:
 
     def test_mock_is_the_default_provider(self, monkeypatch):
@@ -476,4 +592,10 @@ class TestDevCodePath:
         # so a misconfigured deployment cannot accidentally send.
         monkeypatch.delenv("SYSTEM_MAIL_PROVIDER", raising=False)
         monkeypatch.delenv("AUTH_DEV_SHOW_CODE", raising=False)
-        assert auth.deliver_code("someone@example.invalid", "123456") is False
+        # Tri-state, not a boolean: "nothing was attempted" must be
+        # distinguishable from "a real send failed", because only the first
+        # may ever hand the code back to the caller.
+        assert (
+            auth.deliver_code("someone@example.invalid", "123456")
+            is auth.CodeDelivery.dev_not_attempted
+        )

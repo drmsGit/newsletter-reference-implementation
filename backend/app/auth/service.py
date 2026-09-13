@@ -21,6 +21,7 @@ import logging
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
+from enum import Enum
 
 from sqlalchemy.orm import Session
 
@@ -243,8 +244,27 @@ def dev_code_visible() -> bool:
     return system_mail_provider() == "mock"
 
 
-def deliver_code(email: str, code: str) -> bool:
-    """Send the code. Returns True if it went out over a real provider.
+class CodeDelivery(str, Enum):
+    """What actually happened to a sign-in code.
+
+    A tri-state, because the two ways delivery can *not* happen are not the
+    same thing and collapsing them is what created the P0: `deliver_code`
+    returned False both when the dev path deliberately skipped sending and when
+    a real send was attempted and failed, and the caller could not tell them
+    apart. So a deployment whose provider was misconfigured handed the live
+    code to whoever typed the address.
+    """
+
+    #: Dev path — nothing was attempted. The code is in the server log.
+    dev_not_attempted = "dev_not_attempted"
+    #: A real provider accepted it.
+    sent = "sent"
+    #: A real send was attempted and failed. The code must NOT be shown.
+    failed = "failed"
+
+
+def deliver_code(email: str, code: str) -> CodeDelivery:
+    """Send the code, and say which of the three things happened.
 
     Never raises: a delivery failure must leave the user with a clear message,
     not a stack trace — and the caller answers identically either way so the
@@ -252,7 +272,7 @@ def deliver_code(email: str, code: str) -> bool:
     """
     if dev_code_visible():
         logger.warning("auth: DEV sign-in code for %s is %s", email, code)
-        return False
+        return CodeDelivery.dev_not_attempted
 
     from app.delivery.providers.factory import get_provider
 
@@ -272,20 +292,36 @@ def deliver_code(email: str, code: str) -> bool:
             f"<p>It expires in {CODE_TTL_MINUTES} minutes.</p>",
         )
         if not result.success:
-            logger.warning("auth: sign-in code delivery failed: %s", result.message)
-        return bool(result.success)
+            # error, not warning: nobody can sign in, and the person affected
+            # is told nothing (deliberately — see request_login_code), so this
+            # log line is the only signal anyone gets.
+            logger.error("auth: sign-in code delivery FAILED: %s", result.message)
+            return CodeDelivery.failed
+        return CodeDelivery.sent
     except Exception as error:  # noqa: BLE001 — never let login raise
-        logger.warning("auth: sign-in code delivery error: %s", error)
-        return False
+        logger.error("auth: sign-in code delivery ERROR: %s", error)
+        return CodeDelivery.failed
 
 
 def request_login_code(db: Session, email: str) -> str | None:
     """Issue a code for an existing active user.
 
-    Returns the code **only** when the dev path is active, so a caller can show
-    it. Returns None otherwise — including for unknown or deactivated
-    addresses, which is what keeps the response identical for every input
-    (ADR-151 §2).
+    Returns the code **only** on the dev path, where nothing was sent and the
+    code is already in the server log. Returns None for every other outcome —
+    unknown address, deactivated user, successful send, and **a real send that
+    failed**.
+
+    That last case is the P0 this function used to have. It returned the code
+    whenever delivery did not succeed, without distinguishing "deliberately not
+    attempted" from "attempted and failed", so a deployment with a broken mail
+    provider handed a working sign-in code to anyone who typed an admin's
+    address.
+
+    **No HTTP path may render this value.** The router redirects identically in
+    every case (ADR-151 §2), which is what keeps the form from being an
+    account-enumeration oracle; this return exists for local development and
+    for tests, which run on the mock provider. If you find yourself passing it
+    into a template, you are reintroducing the defect.
     """
     address = normalise_email(email)
     user = db.query(UserDB).filter(UserDB.email == address).first()
@@ -307,8 +343,12 @@ def request_login_code(db: Session, email: str) -> str | None:
     ))
     db.commit()
 
-    delivered = deliver_code(address, code)
-    return None if delivered else code
+    outcome = deliver_code(address, code)
+    # The code escapes this function only when nothing was sent and it is
+    # already in the log. `failed` deliberately returns None: the user is told
+    # nothing, because telling them delivery failed would reveal that delivery
+    # was ATTEMPTED, which only happens for addresses that exist.
+    return code if outcome is CodeDelivery.dev_not_attempted else None
 
 
 def verify_login_code(db: Session, email: str, code: str) -> str | None:

@@ -12,11 +12,12 @@
         <div class="alert alert-danger py-2">{{ error }}</div>
         {% endif %}
 
-        {% if dev_mode and prefilled %}
+        {% if dev_mode %}
         <div class="alert alert-warning py-2">
-            <strong>Development mode.</strong> Your code is
-            <code class="fs-5">{{ prefilled }}</code> — shown here and written to the
-            server log because no real send provider is configured.
+            <strong>Development mode.</strong> No real send provider is configured, so
+            your code was written to the <strong>server log</strong> rather than emailed.
+            It is deliberately not shown here: this page looks identical whether or not
+            the address exists, and printing the code would give that away.
         </div>
         {% endif %}
 
