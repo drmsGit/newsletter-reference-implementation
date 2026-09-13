@@ -241,6 +241,24 @@ Design principles adopted:
 
 **Status:** the omni-channel *design* is closed and accepted; implementation is not started and not yet broken into ranked items — that is the open Cowork timeline pass. Full question-by-question record in [[Omni-Channel - design interview]]; dependency graph and cost-of-delay classification in `.claude/agent-memory/backlog-sequencer/`.
 
+### 2026-09-13 — Launch gate 2 closed; the P0 fixed in ADR-163's shape
+
+**Context:** the consent/addressability migration (phase A) landed, and the P0 it
+was sequenced ahead of was fixed immediately after — the point of settling
+ADR-163 first was so this would be built once, in the right shape.
+
+1. **The send-time gate exists, and it is the ADR-163 §7 stack.** `app/delivery/exclusion.py` runs four ordered stages immediately before the send loop, **for every resolution mode including `freeze`** — which is where the defect lived. The framing that made the fix obvious: re-resolving the audience is *not* the answer, because that is what `rerun` mode already does and it changes who is **targeted**. **Freezing targeting must never freeze permission to contact.** Stages 3 (suppression) and 4 (frequency) are named, ordered and deliberately empty — a bounce is currently a consent event with `source='provider'` so stage 2 catches it, and inventing a suppression table would pre-empt an open Needs-ADR item. Stages are set operations (§10), so per-stage attribution costs no N+1, and the address stage 1 resolves is reused by the send rather than looked up again — which also stops the address that was *checked* differing from the one that is *used*.
+
+2. **§8's "record why" turned out to be the load-bearing half.** `DeliveryExecutionDB` gained `exclusion_reason` and an `excluded` status. The original defect was not that the guard failed — it fired — but that a bare `except ValueError` threw the reason away, so a compliance defect read as a rendering behaviour. A stack that silently dropped people would have reproduced that one layer up. `ConsentDenied` is now re-raised rather than swallowed: a consent refusal reaching the decision layer means the gate and that layer disagree about who may be contacted, which is a defect to surface, not a slot to hide.
+
+3. **New decision — `no_recipients`.** The P1 beside the P0 in the same function (a send reporting `sent` when every delivery failed) is fixed by deriving the parent status from its children. The exclusion stack created a case the backlog entry predates: a send where everyone was excluded delivered nothing, but nothing failed. Given its own status rather than rounded to a neighbour — `sent` would show green for a send that delivered nothing, which is the exact lie the P1 exists to stop, and `failed` would invite retrying something that worked correctly. `excluded_count` is likewise kept apart from `failed_count`: an exclusion is the stack working, not a delivery problem.
+
+4. **A `bug-fixer` agent now takes the delegable tail, and its refusals are the point.** It implements one named 🔴 bug per run in an isolated git worktree, only when the entry states its own fix, and it is the first agent here holding real `Edit` over `backend/`. Two findings from trialling it are worth more than the fixes: handed the "0 loc" enumeration-oracle item, it **refused** and demonstrated that the zero is conditional on the P0 sign-in defect being fixed first — **B1 and B7 are one change to the same function, not two independent items**, so neither can be handed to an implementer as written. And it found that `memory: project` writes into a worktree that is never committed, so agent memory was being silently discarded every run; memory now goes to the main checkout by absolute path.
+
+5. **Two more defects fixed by delegation:** the Settings signal-weight editor was inert (the help text claimed weight and half-life both applied immediately; only half-life did), and webhook signature verification failed **open** when the signing secret was absent — a missing secret silently turned a public endpoint into an unauthenticated one, where forged bounces reach suppression and forged clicks corrupt affinity signals.
+
+**Status:** launch gate 2 is **closed**. Gates 3 (machine auth), 4/4b (auth enforcement and the sign-in disclosure) remain open, and gate 1 (positioning) is still the named blocker on public beta.
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*

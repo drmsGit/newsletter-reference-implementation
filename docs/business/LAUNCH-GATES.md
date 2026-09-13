@@ -6,7 +6,7 @@ What must be true before public beta. Reviewed against commits and
 | # | Gate | Blocks | State |
 |---|---|---|---|
 | 1 | Positioning statement adopted | public beta, Phase 4C write & publish | ❌ open — `POSITIONING.md` |
-| 2 | P0 consent defect fixed | any public exposure (compliance) | ❌ open |
+| 2 | P0 consent defect fixed | any public exposure (compliance) | ✅ done 2026-09-13 — send-time exclusion stack |
 | 3 | P0 inbound machine authentication | any public exposure | ❌ open |
 | 4 | Auth enforcement flag switched on | any public exposure | 🟡 built, ships off |
 | 4b | Sign-in code disclosure fixed (P0, security) | any public exposure | ❌ open — found 2026-08-21 |
@@ -20,28 +20,38 @@ What must be true before public beta. Reviewed against commits and
 Gates 2, 3 and 4 are the ones where "we launched" and "we were fine" come
 apart. From the 2026-08-07 external review:
 
-- **Gate 2** — a frozen audience is consent-gated at plan time and never again,
-  and the decision layer's consent guard is swallowed by a bare `except
-  ValueError` in `delivery/service.py`. A compliance defect currently reads as a
-  rendering behaviour. It overlaps the omni-channel interview, which restructures
-  the same send-time gate. **That interview closed and its ADRs were accepted
-  2026-09-12, so "run it first" is no longer a reason to wait** — ADR-163 §7/§8
-  states the shape the fix should take: an ordered exclusion stack
-  (addressability → consent → suppression → frequency) that **records why each
-  recipient was excluded**, which is the P0's real lesson (the guard fired; the
-  bare `except` discarded the reason). What remains is only the ordering call —
-  whether the consent/addressability migration lands before this fix or after
-  beta. **On testability, corrected 2026-09-12 by running the suite rather than
-  trusting the report:** an earlier note here claimed `app/database.py`'s
-  engine-at-import made four test modules uncollectable. That is **wrong** —
-  all 141 tests collect and pass locally in ~1s. The real constraint is
-  different and narrower: `test_overrides.py` ("Uses FastAPI TestClient against
-  the real database — no mocks"), `test_signals.py` and `test_auth.py` need a
-  **live, seeded Postgres at the configured URL**, so the suite runs on a
-  developer machine but not in a clean container — which is the isolated-test-DB
-  Needs-ADR item, not a defect in `database.py`. What genuinely is missing is a
-  regression test for **send-time consent revocation**, the top-ranked gap from
-  the 2026-08-07 review; nothing prevents writing it today.
+- **Gate 2 — ✅ CLOSED 2026-09-13.** A frozen audience was consent-gated at plan
+  time and never again, and the decision layer's consent guard was swallowed by
+  a bare `except ValueError` in `delivery/service.py`, so a compliance defect
+  read as a rendering behaviour.
+
+  Fixed in the shape ADR-163 §7/§8 prescribes — which is why that cluster was
+  settled first. `app/delivery/exclusion.py` runs an ordered stack
+  (addressability → consent → suppression → frequency) immediately before the
+  send loop, **for every resolution mode including `freeze`**, and records *why*
+  each recipient was excluded on the execution row. Re-resolving the audience
+  was explicitly not the fix: that is what `rerun` mode does and it changes who
+  is *targeted*. Freezing targeting must never freeze permission to contact.
+
+  Stage 3 (suppression) is named, ordered and empty by construction — a bounce
+  is currently written as a consent event with `source="provider"`, so stage 2
+  catches it, and the suppression data model is still an open Needs-ADR item.
+  Stage 4 (frequency) is post-POC per ADR-161 §8.
+
+  `ConsentDenied` is now re-raised rather than swallowed; the bare
+  `except ValueError` survives only for its one legitimate case, a strategy
+  resolving nothing (ADR-086).
+
+  The regression test the 2026-08-07 review ranked first — send-time consent
+  revocation — ships with the fix and is mutation-verified: removing the gate
+  fails it. The P1 beside it in the same function (a send reporting `sent` when
+  every delivery failed) is fixed in the same pass.
+
+  *Historical note, kept because it was wrong and was acted on:* an earlier
+  version of this entry claimed `app/database.py`'s engine-at-import made four
+  test modules uncollectable. It does not — the suite collects and passes. The
+  real constraint is that several tests need a live seeded Postgres, which is
+  the isolated-test-DB Needs-ADR item.
 - **Gate 3** — the JSON API routers are deliberately unguarded; that is machine
   authentication, scoped as a Mode B prerequisite. It was raised to P0 because
   it blocks public exposure, not just Mode B.

@@ -1,6 +1,6 @@
 # HANDOFF — Newsletter Blueprint
 
-**Last updated:** 2026-09-13 · **Branch:** `main` · **Phase A of the consent migration is complete**
+**Last updated:** 2026-09-13 · **Branch:** `main` · **Launch gate 2 is closed**
 
 The account migration this file was originally written for (2026-09-04) is
 **done** — sessions now run on the business account, and nothing is left
@@ -22,7 +22,8 @@ READ FIRST (in order):
 2. CLAUDE.md (repo root) — project rules. ADR discipline is strict: required
    sections, status-in-two-places, never edit an Accepted ADR's Decision
    (supersede or append a dated addendum), never renumber. Highest ADR is 165.
-3. docs/playbook-strategy.md §5 (Decision Log — read the 2026-09-12 entry),
+3. docs/playbook-strategy.md §5 (Decision Log — read the 2026-09-12 and
+   2026-09-13 entries),
    docs/backlog.md, docs/business/ (BRIEF, POSITIONING, LAUNCH-GATES,
    ASSUMPTIONS, BETA-SCOPE).
 4. .claude/agent-memory/backlog-sequencer/ — the dependency graph and
@@ -38,8 +39,9 @@ WORKING STYLE:
 - One question at a time in interview/review passes; I decide each, nothing
   is written into an ADR until I've made the call.
 - Use the project's own subagents in .claude/agents/ — adr-author for ADRs and
-  addenda, backlog-sequencer for queue work, code-slimmer, adr-drift,
-  positioning-critic, assumption-scanner. They are NOT selectable as
+  addenda, backlog-sequencer for queue work, bug-fixer for a named 🔴 bug whose
+  entry states its own fix (runs in a worktree; invoke with isolation:
+  "worktree"), code-slimmer, adr-drift, positioning-critic, assumption-scanner. They are NOT selectable as
   subagent_type in the desktop app: launch general-purpose and tell it to read
   .claude/agents/<name>.md and follow that persona, restating hard constraints
   (e.g. backlog-sequencer must never edit docs/backlog.md).
@@ -68,7 +70,11 @@ fallback; ADR-001's fate).
 the Gate-2 P0 fix, so the P0 is built once, in ADR-163 §8's shape. Split into
 two phases:
 
-* **Phase A — consent. ✅ COMPLETE** (2026-09-13). Consent is append-only
+* **Phase A — consent. ✅ COMPLETE** (2026-09-13), and **launch gate 2 is
+  closed**: the P0 send-time consent gate is built in ADR-163 §7's ordered-stack
+  shape (`app/delivery/exclusion.py`), recording *why* each recipient was
+  excluded, and the P1 beside it (a send reporting `sent` when every delivery
+  failed) is fixed in the same function. Consent is append-only
   events keyed `(recipient, channel, purpose)`, latest wins.
   `recipients.consent_status` **is gone**, from the model and the database.
   All three gates read events. `ConsentDenied` (a `ValueError` subclass)
@@ -110,7 +116,7 @@ change is hand-written, numbered, idempotent DDL in `backend/scripts/`.
 
 ### Tests
 
-157 green. **Run from `backend/`** — `test_auth_policy.py` opens a file by
+167 green. **Run from `backend/`** — `test_auth_policy.py` opens a file by
 relative path and fails from the repo root (pre-existing, not a regression).
 
 `tests/test_consent_gates.py` is new and load-bearing: before it, the suite
@@ -121,15 +127,11 @@ was mutation-verified — removing a gate fails only that gate's tests.
 
 ## Open queue
 
-1. **The P0 consent fix** (Gate 2), in ADR-163 §8's ordered-stack shape:
-   addressability → consent → suppression → frequency, **recording why** each
-   recipient was excluded. The P1 send-status fix is in the same function
-   (`app/delivery/service.py:273-433`) — do them together, it is one context.
-2. **Cowork timeline pass** — turn the sequencer's ranked graph into
+1. **Cowork timeline pass** — turn the sequencer's ranked graph into
    weeks/milestones. The graph is in `.claude/agent-memory/backlog-sequencer/`.
-3. **Phase B** (email → addressability) — possibly deferrable to the React
+2. **Phase B** (email → addressability) — possibly deferrable to the React
    frontend work, since those display sites are what that rewrite replaces.
-4. *(Optional)* the `content_card` dropdown fix from the code-slimmer report.
+3. *(Optional)* the `content_card` dropdown fix from the code-slimmer report.
    The Settings weight-editor no-op is also still open and is now rising in
    cost — ADR-164 §10 extends that same settings grid with channel weights.
 
