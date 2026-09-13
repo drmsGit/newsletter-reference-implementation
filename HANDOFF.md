@@ -1,6 +1,6 @@
 # HANDOFF — Newsletter Blueprint
 
-**Last updated:** 2026-09-13 · **Branch:** `main` · **Launch gates 2 and 4b are closed**
+**Last updated:** 2026-09-13 · **Branch:** `main` · **ADR-163 is fully implemented; gates 2 and 4b closed**
 
 The account migration this file was originally written for (2026-09-04) is
 **done** — sessions now run on the business account, and nothing is left
@@ -83,20 +83,21 @@ two phases:
   re-run the sync. The send path resolves its address from addressability, the
   webhook scopes opt-outs to the execution's channel/purpose, and dedupe runs
   on the resolved address in one bulk query.
-* **Phase B — email → addressability.** Not started. `RecipientDB.email` still
-  exists and is still the display value in ~22 sites (templates, the
-  audience-group JS doing `${r.email}`, the send-test picker). Note the
-  addressability row is already authoritative for *resolution* — the column is
-  now display-only.
+* **Phase B — email → addressability. ✅ COMPLETE** (2026-09-13).
+  `RecipientDB.email` is gone. Every display site resolves the address through
+  `resolve_email(s)` or projects via `to_recipient(s)`. `to_recipients` is the
+  bulk path — use it for any list, since the per-record form issues two queries
+  each.
 
-### Database state: CONTRACTED (Phase A fully applied)
+### Database state: migrations 0001a–0004 applied
 
 Both `scripts/migrate_0001a_consent_expand.sql` and
 `scripts/migrate_0001b_consent_contract.sql` **have been applied** to the local
 dev database. `consent_events` and `recipient_addresses` exist and are
 populated (41 recipients → 41 events, 41 addresses), `delivery_executions` has
-`channel` + `purpose`, and `recipients.consent_status` **no longer exists**.
-`recipients.email` is untouched — that is phase B.
+`channel` + `purpose`, and neither `recipients.consent_status` nor `recipients.email` exists any more.
+`delivery_executions` also has `exclusion_reason`, and `send_instances` has
+`sent_count` / `failed_count` / `excluded_count`.
 
 Both scripts are idempotent and were rehearsed against a restored copy before
 being applied: expand→contract clean, both re-runnable, contract-without-expand
@@ -130,9 +131,7 @@ was mutation-verified — removing a gate fails only that gate's tests.
 1. **Gate 3 — inbound machine authentication (P0).** Every JSON router is
    unguarded and `POST /provider/events` takes no signature. API keys with
    scopes; needs schema and carries real design decisions.
-2. **Phase B** (email → addressability) — possibly deferrable to the React
-   frontend work, since those display sites are what that rewrite replaces.
-3. **Gate 4 — auth enforcement default-on, plus CSRF across 43 write routes.**
+2. **Gate 4 — auth enforcement default-on, plus CSRF across 43 write routes.**
    `auth_enforced` still defaults to False. Cross-cutting and it carries a
    decision: the current fail-open default exists for a stated lockout reason.
 

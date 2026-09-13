@@ -257,7 +257,11 @@ ADR-163 first was so this would be built once, in the right shape.
 
 5. **Two more defects fixed by delegation:** the Settings signal-weight editor was inert (the help text claimed weight and half-life both applied immediately; only half-life did), and webhook signature verification failed **open** when the signing secret was absent — a missing secret silently turned a public endpoint into an unauthenticated one, where forged bounces reach suppression and forged clicks corrupt affinity signals.
 
-**Status:** launch gate 2 is **closed**. Gates 3 (machine auth), 4/4b (auth enforcement and the sign-in disclosure) remain open, and gate 1 (positioning) is still the named blocker on public beta.
+6. **Gate 4b closed the same day, and it was one bug rather than two.** `deliver_code` collapsed "dev, nothing attempted" and "attempted and failed" into a single `False`, so a deployment with a broken mail provider handed a live sign-in code to whoever typed an admin's address — and because a code came back only for a real user, the handler's 200-vs-303 branch was also the enumeration oracle filed separately as a P1. Two decisions went with the fix: a failed send shows the **same neutral response as success** (saying "delivery failed" reveals delivery was *attempted*, which happens only for real accounts), and the dev code goes to the **server log** rather than the screen, so ADR-151 §2 holds with no dev carve-out — the carve-out was what made the shipped default an oracle.
+
+7. **ADR-163 is now fully implemented.** Phase B removed `RecipientDB.email`; the address is only a row, resolved by the point 11 rules. Two list views were passing raw ORM rows into templates, which after the drop would have rendered an empty cell **silently** rather than failing — found by loading the pages, not by the suite, which is the argument for checking the UI rather than trusting green tests. The projection is also now bulk: a 41-recipient list went from 82 queries to 2, since the consent lookup had already been per-record since phase A.
+
+**Status:** launch gates **2 and 4b are closed** and ADR-163 is fully built. Gate 3 (machine auth) and gate 4 (auth enforcement + CSRF) remain open, and gate 1 (positioning) is still the named blocker on public beta.
 
 ## 6. Roadmap
 
