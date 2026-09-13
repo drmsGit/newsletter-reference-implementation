@@ -7,9 +7,9 @@ from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
 from app.delivery.models import DeliveryExecution, SendInstance
 
 from app.campaigns.db_models import VariantDB
+from app.delivery.exclusion import run_exclusion_stack
 from app.delivery.providers.factory import get_provider
-from app.recipients.consent import resolve_email
-from app.recipients.db_models import RecipientDB
+from app.recipients.consent import DEFAULT_CHANNEL, DEFAULT_PURPOSE, ConsentDenied
 from app.rendering.service import render_variant_html
 from app.snapshots.db_models import SnapshotDB
 
@@ -371,25 +371,84 @@ def send_send_instance(
         .all()
     )
 
+    # THE SEND-TIME GATE (ADR-163 point 7). Run here, immediately before the
+    # send loop, for every resolution mode — including "freeze".
+    #
+    # This is the P0 fix. A frozen send materialises its executions at plan
+    # time and, before this, never looked at permission again, so a recipient
+    # who opted out in between was still mailed. Re-resolving the audience is
+    # not the answer — that is what "rerun" does, and it changes *who is
+    # targeted*, which a frozen send deliberately does not want. Freezing
+    # targeting must never freeze permission to contact.
+    #
+    # Set operations, one query per stage, so per-stage attribution costs no
+    # N+1 (point 10).
+    # Channel and purpose come off the execution rows, which carry both since
+    # ADR-163's addendum point 1. Every execution of one send instance shares
+    # them, so the first is representative; the defaults cover a send with no
+    # executions at all.
+    send_channel = executions[0].channel if executions else DEFAULT_CHANNEL
+    send_purpose = executions[0].purpose if executions else DEFAULT_PURPOSE
+
+    gate = run_exclusion_stack(
+        db,
+        {execution.recipient_id for execution in executions},
+        channel=send_channel,
+        purpose=send_purpose,
+    )
+
+    if gate.exclusions:
+        logger.warning(
+            "send %s: %d of %d recipients excluded at send time — %s",
+            send_instance_id,
+            len(gate.exclusions),
+            len(executions),
+            ", ".join(
+                f"{exclusion.stage}={sum(1 for e in gate.exclusions if e.stage == exclusion.stage)}"
+                for exclusion in {e.stage: e for e in gate.exclusions}.values()
+            ),
+        )
+
     try:
         for execution in executions:
 
-            # execution.recipient_id is a direct FK to RecipientDB.id, so no
-            # external_id translation is needed here (ADR-054).
-            recipient = (
-                db.query(RecipientDB)
-                .filter(RecipientDB.id == execution.recipient_id)
-                .first()
-            )
+            # Excluded by the stack above: record why and move on, before any
+            # work is done for this recipient. Ordering matters — a recipient
+            # who may not be contacted must not have decision slots resolved
+            # (that is AI spend on someone who will not be sent to, the cost
+            # reason ADR-163 gives alongside the legal one) and must not be
+            # rendered.
+            if execution.recipient_id not in gate.eligible:
+                execution.status = "excluded"
+                execution.exclusion_reason = gate.reason_for(execution.recipient_id)
+                logger.info(
+                    "execution %s excluded: recipient %s — %s",
+                    execution.id,
+                    execution.recipient_id,
+                    execution.exclusion_reason,
+                )
+                db.commit()
+                continue
 
             # Resolve + persist each decision slot for this recipient before
             # rendering, so their personalized content is chosen and recorded.
             for slot in decision_slots:
                 try:
                     execute_decision_slot(db, slot.id, recipient_id=execution.recipient_id)
+                except ConsentDenied:
+                    # Unreachable in practice — the stack above already excluded
+                    # every non-consenting recipient, so this is belt and braces
+                    # behind it. Deliberately NOT swallowed with the rest: a
+                    # consent refusal arriving here means the gate and the
+                    # decision layer disagree about who may be contacted, which
+                    # is a defect to surface rather than a slot to hide.
+                    raise
                 except ValueError:
-                    # Strategy resolved nothing (or a guard tripped) — the slot
-                    # renders hidden (ADR-086), the send continues.
+                    # Strategy resolved nothing — the slot renders hidden
+                    # (ADR-086) and the send continues. This is the ONLY case
+                    # this handler is for. Before ADR-163 point 8 it also
+                    # swallowed the consent guard, which is how a compliance
+                    # defect came to read as a rendering behaviour.
                     pass
 
             # Resolve HTML per recipient rather than reusing one shared
@@ -405,31 +464,12 @@ def send_send_instance(
                 mode="send",
             )
 
-            # The send address comes from addressability (ADR-163 point 2), not
-            # from RecipientDB.email — phase B removes that column entirely, and
-            # a pick-one channel resolves its address via the primary flag with
-            # most-recently-verified as fallback (point 11).
-            #
-            # A recipient with no usable address is skipped rather than handed
-            # to the provider as an empty string, which is what this line did
-            # before. That is stage 1 of the ADR-163 point 7 exclusion stack in
-            # embryo; the full ordered stack — and the recorded exclusion reason
-            # point 8 requires — lands with the P0 fix, which rewrites this loop.
-            recipient_email = (
-                resolve_email(db, execution.recipient_id)
-                if recipient is not None
-                else None
-            )
-            if not recipient_email:
-                logger.error(
-                    "execution %s skipped: recipient %s has no usable address "
-                    "on the email channel",
-                    execution.id,
-                    execution.recipient_id,
-                )
-                execution.status = "failed"
-                db.commit()
-                continue
+            # Already resolved by stage 1 of the gate, which had to look it up
+            # to decide addressability at all. Resolving it again here would
+            # reintroduce the per-recipient query the stack exists to avoid,
+            # and would let the address that was *checked* differ from the
+            # address that is *used*.
+            recipient_email = gate.addresses[execution.recipient_id]
 
             result = provider.send(
                 recipient_email=recipient_email,

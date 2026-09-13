@@ -29,11 +29,14 @@ ADR-163's 2026-09-12 addendum moves into stage 1 of the exclusion stack. The
 assertion ("one address yields one recipient") must hold before and after; only
 its implementation site moves.
 
-NOT covered here, deliberately: the open P0 — a recipient opted out *after* the
-audience was frozen is still sent to, because `send_send_instance` re-checks
-nothing. That needs a full send-instance fixture and is the regression test for
-the P0 fix itself; it belongs with that fix, in the ordered-stack shape
-ADR-163 §8 prescribes.
+**Added 2026-09-13 with the P0 fix** (`TestSendTimeConsentRevocation`): a
+recipient who opts out *after* the audience is frozen must not be sent to. This
+file originally declared that out of scope because it needs a full send
+fixture; it landed with the fix, as planned, and is the regression test the
+2026-08-07 review ranked first. It exercises the ADR-163 §7 exclusion stack
+through `send_send_instance` against the mock provider — stage 1
+(addressability) and stage 2 (consent), each asserting the *recorded reason*
+§8 requires, not merely that the send stopped.
 
 Uses the real database, like test_overrides.py — fixtures create their own
 throwaway recipients and delete them again, so nothing depends on seed ids.
@@ -55,11 +58,14 @@ from app.recipients.db_models import (
     ConsentSyncLogDB,
     RecipientDB,
 )
+from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
+from app.delivery.service import send_send_instance
 from app.recipients.service import (
     detect_consent_drift,
     suppress_recipient,
     sync_consent_from_crm,
 )
+from app.snapshots.db_models import SnapshotDB
 
 # The states the gates must treat as non-consenting. "pending" is included
 # deliberately: consent is opt-IN, so the absence of a decision is not consent.
@@ -118,6 +124,7 @@ def db():
     session = SessionLocal()
     created_recipients = []
     created_groups = []
+    created_sends = []
 
     class Tracker:
         def __init__(self, session):
@@ -144,6 +151,50 @@ def db():
             self.session.flush()
             return member
 
+        def send_to(self, recipient):
+            """A frozen, ready-to-fire send instance targeting one recipient.
+
+            Reuses an existing snapshot rather than rendering one: this test is
+            about the consent gate, not about rendering, and building a snapshot
+            would drag in the whole variant/module/storage path. The snapshot's
+            variant supplies the subject and the decision slots, exactly as a
+            real send does.
+
+            `audience_resolution_mode="freeze"` is the point — it is the mode
+            where the defect lives. A "rerun" send re-resolves its audience and
+            would filter the opt-out out by accident, which is why the P0 hid
+            for as long as it did.
+            """
+            snapshot = (
+                self.session.query(SnapshotDB)
+                .order_by(SnapshotDB.id.desc())
+                .first()
+            )
+            if snapshot is None:
+                pytest.skip("no snapshot in this database to send from")
+
+            send_instance = SendInstanceDB(
+                snapshot_id=snapshot.id,
+                name=f"test-consent-send-{uuid.uuid4()}",
+                status="draft",
+                provider="mock",
+                audience_resolution_mode="freeze",
+            )
+            self.session.add(send_instance)
+            self.session.flush()
+            created_sends.append(send_instance.id)
+
+            execution = DeliveryExecutionDB(
+                send_instance_id=send_instance.id,
+                recipient_id=recipient.id,
+                status="created",
+                provider="mock",
+            )
+            self.session.add(execution)
+            self.session.flush()
+            self.session.commit()
+            return send_instance, execution
+
     tracker = Tracker(session)
     session.commit()
     try:
@@ -156,6 +207,13 @@ def db():
             ).delete(synchronize_session=False)
             session.query(AudienceGroupDB).filter(
                 AudienceGroupDB.id.in_(created_groups)
+            ).delete(synchronize_session=False)
+        if created_sends:
+            session.query(DeliveryExecutionDB).filter(
+                DeliveryExecutionDB.send_instance_id.in_(created_sends)
+            ).delete(synchronize_session=False)
+            session.query(SendInstanceDB).filter(
+                SendInstanceDB.id.in_(created_sends)
             ).delete(synchronize_session=False)
         if created_recipients:
             # Consent events, sync logs and addresses are FK-bound to the
@@ -436,6 +494,87 @@ class TestConsentEventsAndDrift:
             "an email bounce withdrew push consent — consent is per "
             "(channel, purpose) and a failure on one says nothing about another"
         )
+
+
+class TestSendTimeConsentRevocation:
+    """The P0: opting out after the audience is frozen must stop the send.
+
+    This is the regression test the 2026-08-07 review ranked first, and the one
+    `test_consent_gates.py` originally declared out of scope because it needs a
+    full send fixture. It lands with the fix, as planned.
+
+    The defect it pins: a `freeze` send materialises its `DeliveryExecutionDB`
+    rows at plan time, with consent checked *then*. Before the ADR-163 point 7
+    exclusion stack, nothing looked again, so a recipient who opted out between
+    planning and sending was still handed to the provider. Re-resolving the
+    audience is not the fix — that is what `rerun` mode does, and it changes who
+    is targeted. Freezing targeting must never freeze permission to contact.
+
+    Runs against the mock provider, so nothing leaves the machine.
+    """
+
+    def test_optout_after_freeze_stops_the_send(self, db):
+        recipient = db.recipient("opted_in")
+        send_instance, execution = db.send_to(recipient)
+
+        # The audience is now frozen: the execution row exists and consent was
+        # good when it was created. The person then opts out.
+        record_consent(
+            db.session,
+            recipient.id,
+            "opted_out",
+            source="test",
+            note="withdrew after the audience was frozen",
+            commit=False,
+        )
+        db.session.commit()
+
+        send_send_instance(db.session, send_instance.id)
+        db.session.refresh(execution)
+
+        assert execution.status == "excluded", (
+            "a recipient who opted out after the audience was frozen was still "
+            "sent to — this is the P0, and the whole reason the send-time gate "
+            f"exists (status was {execution.status!r})"
+        )
+        # Point 8: the reason has to be recorded, not merely acted on. A stack
+        # that silently drops people reproduces the original defect one layer up.
+        assert execution.exclusion_reason is not None
+        assert "consent" in execution.exclusion_reason
+
+    def test_consenting_recipient_still_sends(self, db):
+        """The gate must not be a blanket refusal."""
+        recipient = db.recipient("opted_in")
+        send_instance, execution = db.send_to(recipient)
+
+        send_send_instance(db.session, send_instance.id)
+        db.session.refresh(execution)
+
+        assert execution.status == "sent", (
+            f"a fully consenting recipient was not sent to (status "
+            f"{execution.status!r}, reason {execution.exclusion_reason!r})"
+        )
+        assert execution.exclusion_reason is None
+
+    def test_unaddressable_recipient_is_excluded_at_stage_one(self, db):
+        """Stage 1 runs before stage 2, and says so in the reason.
+
+        Being unreachable is a different fact from having refused contact, and
+        the recorded reason has to tell them apart — that distinction is what
+        the single-status model could not express.
+        """
+        recipient = db.recipient("opted_in")
+        send_instance, execution = db.send_to(recipient)
+        db.session.query(AddressabilityDB).filter(
+            AddressabilityDB.recipient_id == recipient.id
+        ).delete(synchronize_session=False)
+        db.session.commit()
+
+        send_send_instance(db.session, send_instance.id)
+        db.session.refresh(execution)
+
+        assert execution.status == "excluded"
+        assert "addressability" in execution.exclusion_reason
 
 
 def _event_count(session, recipient_id: int) -> int:

@@ -44,7 +44,17 @@ class DeliveryExecutionDB(Base):
     id = Column(Integer, primary_key=True, index=True)
     send_instance_id = Column(Integer, ForeignKey("send_instances.id"), nullable=False)
     recipient_id = Column(Integer, ForeignKey("recipients.id"), nullable=False)
+    # "created" | "sent" | "failed" | "excluded".
+    # "excluded" is not a failure: the recipient was deliberately not sent to,
+    # and exclusion_reason says which stage of the ADR-163 point 7 stack
+    # dropped them and why. Anything aggregating statuses has to know the
+    # difference — an excluded recipient is a correct outcome, a failed one is
+    # a problem.
     status = Column(String(50), nullable=False, default="created")
+    # Populated only when status == "excluded". The property ADR-163 point 8
+    # requires: "why didn't Anna get this?" answerable from the data rather
+    # than from whether someone happened to be reading the log.
+    exclusion_reason = Column(String(255), nullable=True)
     provider = Column(String(100), nullable=True)
     provider_message_id = Column(String(255), nullable=True, unique=True, index=True)
     # Denormalized at plan time (ADR-163 addendum 2026-09-12, point 1). An
