@@ -116,7 +116,7 @@ change is hand-written, numbered, idempotent DDL in `backend/scripts/`.
 
 ### Tests
 
-167 green. **Run from `backend/`** — `test_auth_policy.py` opens a file by
+170 green. **Run from `backend/`** — `test_auth_policy.py` opens a file by
 relative path and fails from the repo root (pre-existing, not a regression).
 
 `tests/test_consent_gates.py` is new and load-bearing: before it, the suite
@@ -131,9 +131,12 @@ was mutation-verified — removing a gate fails only that gate's tests.
    weeks/milestones. The graph is in `.claude/agent-memory/backlog-sequencer/`.
 2. **Phase B** (email → addressability) — possibly deferrable to the React
    frontend work, since those display sites are what that rewrite replaces.
-3. *(Optional)* the `content_card` dropdown fix from the code-slimmer report.
-   The Settings weight-editor no-op is also still open and is now rising in
-   cost — ADR-164 §10 extends that same settings grid with channel weights.
+3. **B1 + B7 are ONE item, not two** — the sign-in-code disclosure (P0,
+   gate 4b) and the login-form enumeration oracle (P1) are the same three lines
+   in `deliver_code`. The P1's advertised "0 loc" is conditional on the P0
+   landing first. Establish the recovery path (what a real delivery failure
+   should show the user) and both fall out together. Not a bug-fixer item —
+   it is auth, and it carries the decision.
 
 ## Known-stale or wrong claims to distrust
 
