@@ -63,7 +63,7 @@ Resend can't reach `localhost`, so the endpoint must be publicly reachable.
    ngrok http 8000
    ```
 2. **Resend dashboard → Webhooks → Add endpoint:** `https://<your-tunnel>/provider/webhooks/resend`. Subscribe to `email.clicked`, `email.opened`, `email.bounced`, `email.complained`, `email.delivered`. Copy the **signing secret**.
-3. **Add the secret to `backend/.env`:** `RESEND_WEBHOOK_SECRET=whsec_...`, then **restart the server** (it reads `.env` at startup). Until this is set, signature verification is *skipped* with a warning — fine for local testing, never for production.
+3. **Add the secret to `backend/.env`:** `RESEND_WEBHOOK_SECRET=whsec_...`, then **restart the server** (it reads `.env` at startup). Verification fails **closed**: until this is set, every webhook is rejected with a 401 and an error is logged.
 4. **Send via the campaign flow** — build/pick an audience with your recipient, then **Prepare send → provider `resend` → Plan delivery → Trigger send**.
 
 Then open/click the email and watch the recipient's score on `/ui/recipients/<id>`.

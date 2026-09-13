@@ -52,7 +52,7 @@ sequenceDiagram
 ## Step by step
 
 1. **Receive** — the provider POSTs to the public route [[providers]] `POST /provider/webhooks/resend`.
-2. **Verify** — `verify_signature` checks the Svix HMAC against `RESEND_WEBHOOK_SECRET`. Bad signature → **401**. No secret set → allowed *with a warning* (local dev only). *The secret only applies after a full server restart.*
+2. **Verify** — `verify_signature` checks the Svix HMAC against `RESEND_WEBHOOK_SECRET`. Bad signature → **401**. No secret set → also **401** (fails closed), with an error logged. *The secret only applies after a full server restart.*
 3. **Normalize** — the Resend adapter maps the raw event name (`email.clicked`) to a canonical type (`click`) and extracts the `provider_message_id`. An unmapped event → **200 `ignored`** (so the provider doesn't retry forever).
 4. **Correlate** — [[providers]] `ingest_provider_event` finds the `DeliveryExecutionDB` whose `provider_message_id` matches (the id [[delivery]] stamped at send). No match → **quarantined** ([[ADR-129 — Correlate Provider Events to Delivery Executions]], never silently dropped). Same event again → **duplicate**, recorded once (deterministic `provider_event_id` makes redelivery idempotent).
 5. **Attribute** — for a click/open, `_primary_content_id_for_delivery` walks execution → send → [[snapshots|snapshot]] → variant to find **what the recipient actually received**: their resolved [[decision]] pick, else the variant's first fixed-content module. (Attribution is "what was shown", not link-parsing.)
@@ -74,4 +74,4 @@ Provider (external) → [[providers]] → [[delivery]] (correlation target) → 
 - **A quarantined event is a signal, not a bug** — it usually means the send didn't record a message id (e.g. a mock send, or a failure). Check `GET /provider/quarantine`.
 - **Opens move nothing by default** (weight 0). If you're testing signals, use a **click**.
 - **Bounce/complaint don't produce category signals** — they belong on the consent/suppression path (parked). Only click/open are content-tied.
-- **No secret = no security.** In production `RESEND_WEBHOOK_SECRET` must be set (and the server restarted). Never read `backend/.env` to check — ask or observe.
+- **No secret = no webhooks.** `RESEND_WEBHOOK_SECRET` must be set (and the server restarted) or every event is rejected 401. Never read `backend/.env` to check — ask or observe.

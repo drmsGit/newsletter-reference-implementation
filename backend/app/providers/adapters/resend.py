@@ -11,8 +11,8 @@ map, and the field paths.
 
 Credentials/secrets come from the environment, never code or the DB:
   RESEND_WEBHOOK_SECRET   Svix signing secret ("whsec_…") from the Resend
-                          dashboard. If unset, signature verification is
-                          SKIPPED (local testing only — never in production).
+                          dashboard. REQUIRED: verification fails closed, so
+                          while it is unset every webhook is rejected (401).
 """
 import base64
 import hashlib
@@ -63,13 +63,15 @@ def _bounce_suppresses(data: dict) -> bool:
 
 
 def verify_signature(raw_body: bytes, headers: dict) -> bool:
-    """Verify a Resend/Svix webhook signature. Returns True (allow) when no
-    secret is configured, so the pipeline is testable locally without one —
-    a warning is logged so this can't silently ship to production."""
+    """Verify a Resend/Svix webhook signature. Fails CLOSED: with no secret
+    configured there is nothing to verify against, so the event is rejected.
+    A missing secret is a configuration mistake, not a request to trust the
+    caller — this endpoint is public, and forged bounces/complaints reach the
+    suppression logic while forged clicks corrupt affinity signals."""
     secret = os.environ.get("RESEND_WEBHOOK_SECRET")
     if not secret:
-        logger.warning("RESEND_WEBHOOK_SECRET unset — skipping webhook signature verification (dev only)")
-        return True
+        logger.error("RESEND_WEBHOOK_SECRET unset — rejecting webhook, signature cannot be verified")
+        return False
 
     # Svix headers (case-insensitive lookup).
     lower = {k.lower(): v for k, v in headers.items()}

@@ -40,13 +40,29 @@ to the code defaults — read it and restore it rather than writing `{}`.
 Needs ADR 146, Won't Do 200, Done 204, Related 313. Grep a section with
 `awk 'NR>=23 && NR<=52'`, then `awk 'NR==<n>' | fold -s -w 160` for one item.
 
-## Memory does not survive the worktree (IMPORTANT)
+## Memory persistence — RESOLVED as of run 3
 
-Run 2 discovered run 1's memory stranded in `.claude/worktrees/agent-afd52ccdfdbe71252/`,
-never merged to the main checkout — so run 2 started blind despite run 1 having
-written good notes. `memory: project` writes into *this* worktree, and the
-worktree is never committed (by design: we leave it dirty for a human).
+Runs 1 and 2 wrote memory *inside* the worktree, where it died with it. The
+definition now mandates writing to the main checkout by absolute path:
+`/Users/diedeslembrouck/Projects/newsletter-reference-implementation/.claude/agent-memory/bug-fixer/`
+Run 3 wrote there and it persisted. **Stop flagging this to the human — it is
+fixed.** Just remember: that directory is the only path outside the worktree you
+may write, and memory is the only thing you may write there.
 
-Run 2 carried run 1's files forward by copying them. That does not scale. **Tell
-the human, every run, that agent memory needs to be copied out of the worktree
-or it is lost.**
+## My own definition IS in the worktree now (supersedes the note above it)
+
+`.claude/agents/bug-fixer.md` is committed as of run 3, so the worktree copy and
+the main-checkout copy are identical. Either is fine to read.
+
+## Verified suite baselines
+
+- Run 1 worktree: 157 pass (158 with its added test).
+- Run 3 worktree: 157 baseline, 161 with its 4 added tests. So the branch point
+  is the same 157 — the baseline is stable across worktrees.
+
+## Tests that need neither DB nor network
+
+`monkeypatch` over `os.environ` plus a pure function import runs in ~0.01s and
+touches nothing shared. Prefer this shape whenever the defect is in a pure
+helper (`providers/adapters/`, `ai/adapters/`, signature/parsing code) — it
+sidesteps the shared-Postgres hazard entirely.
