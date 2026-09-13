@@ -8,7 +8,7 @@ What must be true before public beta. Reviewed against commits and
 | 1 | Positioning statement adopted | public beta, Phase 4C write & publish | ❌ open — `POSITIONING.md` |
 | 2 | P0 consent defect fixed | any public exposure (compliance) | ✅ done 2026-09-13 — send-time exclusion stack |
 | 3 | P0 inbound machine authentication | any public exposure | ❌ open |
-| 4 | Auth enforcement flag switched on | any public exposure | 🟡 default is now ON + CSRF done; login rate limiting still missing |
+| 4 | Auth enforcement flag switched on | any public exposure | ✅ CLOSED 2026-09-13 — default ON, CSRF on all 62 forms, code requests rate limited |
 | 4b | Sign-in code disclosure fixed (P0, security) | any public exposure | ✅ done 2026-09-13 — with the enumeration oracle, one change |
 | 5 | Real provider integration proven | the "no lock-in" claim | ✅ done — Resend, live, verified domain |
 | 6 | Inbound engagement loop proven | the signal-layer claim | ✅ done — signed webhooks, end-to-end |
@@ -55,7 +55,7 @@ apart. From the 2026-08-07 external review:
 - **Gate 3** — the JSON API routers are deliberately unguarded; that is machine
   authentication, scoped as a Mode B prerequisite. It was raised to P0 because
   it blocks public exposure, not just Mode B.
-- **Gate 4 — mostly closed 2026-09-13.** Enforcement now **defaults to ON**, and
+- **Gate 4 — ✅ CLOSED 2026-09-13.** Enforcement now **defaults to ON**, and
   CSRF covers all 62 forms via one router-level dependency beside
   `enforce_policy`, failing closed so a new form without the hidden field is
   refused rather than shipping unguarded.
@@ -70,11 +70,38 @@ apart. From the 2026-08-07 external review:
   access control for everyone. A deactivated sole admin still needs database
   access — stated, not papered over.
 
-  **Still open:** requesting a sign-in code is **not rate-limited**, per address
-  or per IP, which ADR-151 §2 requires. Verification attempts are capped at 5
-  (`CODE_MAX_ATTEMPTS`); requesting is not capped at all. That is the remaining
-  work on this gate and it carries a storage decision — where counters live,
-  given in-memory does not survive multiple workers.
+  **Rate limiting — the last piece, done 2026-09-13.** ADR-151 §2 requires the
+  limit **per address and per IP**; verification attempts were already capped
+  at 5 (`CODE_MAX_ATTEMPTS`) but *requesting* a code was uncapped, so anyone
+  could trigger unlimited mail to a guessed address. Five requests per address
+  per 15 minutes, twenty per client per hour, counted in `login_code_requests`
+  rows (`scripts/migrate_0005_...`).
+
+  Four properties there are decisions rather than defaults:
+
+  - **Rows, not memory** — an in-memory counter resets on restart and each
+    worker keeps its own, so a stated limit of five is silently five times the
+    worker count. A limit that lies about its own value is worse than none.
+  - **A throttled request returns the same neutral 303** as an unknown address,
+    a successful send and a failed one. A 429 would confirm the probe was
+    counted, and would differ per address — the enumeration oracle re-opened
+    through the back door, a day after closing it.
+  - **Refusals are not counted.** Otherwise an attacker holds a real person's
+    address over the limit for as long as they keep hammering it, which turns a
+    mail-volume control into an indefinite denial of sign-in. Counting only
+    what was allowed bounds that to one window and protects the mail just as
+    well.
+  - **Both identifiers are stored hashed**, address and client alike: a
+    throttle necessarily counts attempts for addresses that may belong to
+    nobody, and ADR-154's rule is that accountability records carry ids rather
+    than contact details. The cost is that these rows are useless for abuse
+    forensics — they are a counter, not an audit trail.
+
+  **Known limit:** behind a reverse proxy the peer address is the proxy, so
+  every visitor shares one per-IP bucket unless `TRUST_PROXY_HEADERS=true` is
+  set. Off by default because an attacker who can set `X-Forwarded-For` can
+  otherwise mint a fresh rate-limit identity per request — the safe failure is
+  a limit that is too broad, not one that does not exist.
 
 - **Gate 4b — ✅ CLOSED 2026-09-13**, together with the P1 enumeration oracle
   that was filed separately. They were the same three lines.

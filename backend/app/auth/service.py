@@ -26,7 +26,8 @@ from enum import Enum
 from sqlalchemy.orm import Session
 
 from app.auth.db_models import (
-    BrandDB, LoginCodeDB, RoleAssignmentDB, RoleDB, RolePermissionDB, SessionDB, UserDB,
+    BrandDB, LoginCodeDB, LoginCodeRequestDB, RoleAssignmentDB, RoleDB,
+    RolePermissionDB, SessionDB, UserDB,
 )
 from app.auth.permissions import ALL_PERMISSIONS, BUILTIN_ROLES, IMPLIED, ADMIN
 
@@ -34,6 +35,17 @@ logger = logging.getLogger(__name__)
 
 CODE_TTL_MINUTES = 10
 CODE_MAX_ATTEMPTS = 5
+
+# How often a code may be *requested*, as opposed to guessed (ADR-151 §2).
+# Deliberately generous: the threat is bulk mail to a guessed address, not a
+# user who clicks "send it again" because the first one has not arrived. The
+# per-address window is longer than CODE_TTL_MINUTES so that a real person can
+# always outlast one dead code, and the per-client allowance is larger because
+# an office behind one NAT address is several people, not one.
+CODE_REQUESTS_PER_ADDRESS = 5
+CODE_REQUEST_ADDRESS_WINDOW_MINUTES = 15
+CODE_REQUESTS_PER_CLIENT = 20
+CODE_REQUEST_CLIENT_WINDOW_MINUTES = 60
 SESSION_ABSOLUTE_HOURS = 12
 SESSION_IDLE_MINUTES = 60
 SESSION_COOKIE = "nra_session"
@@ -321,6 +333,99 @@ def deliver_code(email: str, code: str) -> CodeDelivery:
     except Exception as error:  # noqa: BLE001 — never let login raise
         logger.error("auth: sign-in code delivery ERROR: %s", error)
         return CodeDelivery.failed
+
+
+def trust_proxy_headers() -> bool:
+    """Whether `X-Forwarded-For` may be believed. **Off by default.**
+
+    The per-IP limit is only as good as the address it counts. Behind a reverse
+    proxy the peer address is the proxy, so every visitor shares one bucket and
+    the limit becomes global — restrictive, but never wrong in the direction
+    that matters. Believing the header instead makes the limit per-visitor
+    again, but an attacker who can set a header can then mint a fresh identity
+    per request and the limit stops existing at all.
+
+    So the safe failure is the default and the useful one is opt-in, the same
+    posture as AUTH_DEV_SHOW_CODE: turn it on only where a proxy you control
+    overwrites the header rather than appending to it.
+    """
+    return (os.environ.get("TRUST_PROXY_HEADERS") or "").strip().lower() in {"1", "true", "yes"}
+
+
+def client_identifier(peer: str | None, forwarded_for: str | None) -> str:
+    """Which address the per-IP limit counts against.
+
+    Takes strings rather than a Request so the choice above is testable without
+    standing up a server, and so `service` stays clear of FastAPI.
+    """
+    if trust_proxy_headers() and forwarded_for:
+        # Left-most entry is the original client; the rest are proxies.
+        return forwarded_for.split(",")[0].strip()
+    return (peer or "").strip()
+
+
+def login_request_allowed(db: Session, email: str, client_ip: str) -> bool:
+    """May this caller ask for a sign-in code right now? Records it if so.
+
+    ADR-151 §2 requires the request path to be rate limited **per address and
+    per IP**. Verification was already capped (`CODE_MAX_ATTEMPTS`); requesting
+    was not, so anyone could trigger unlimited mail to a guessed address.
+
+    **Refused requests are not recorded.** Counting them would let an attacker
+    hold a victim's address over the limit indefinitely by simply continuing to
+    hammer it — turning a mail-volume control into a way to lock a real person
+    out of sign-in for as long as the attacker cares to keep going. Counting
+    only what was allowed bounds that to a single window, and protects the mail
+    volume just as well, which is the thing the limit is actually for.
+
+    The caller must answer identically whether this returns True or False. A
+    distinct response for a throttled request would tell an attacker their
+    probe was counted, and would differ per address — reopening the
+    enumeration oracle that ADR-151 §2 closes in the same sentence.
+    """
+    address_hash = hash_secret(normalise_email(email))
+    client_hash = hash_secret(client_ip or "")
+    current = now()
+
+    windows = (
+        (LoginCodeRequestDB.address_hash == address_hash,
+         CODE_REQUEST_ADDRESS_WINDOW_MINUTES, CODE_REQUESTS_PER_ADDRESS, "address"),
+        (LoginCodeRequestDB.client_hash == client_hash,
+         CODE_REQUEST_CLIENT_WINDOW_MINUTES, CODE_REQUESTS_PER_CLIENT, "client"),
+    )
+    for match, minutes, limit, label in windows:
+        used = db.query(LoginCodeRequestDB).filter(
+            match, LoginCodeRequestDB.created_at > current - timedelta(minutes=minutes)
+        ).count()
+        if used >= limit:
+            # No address and no IP in this line — the row does not keep them
+            # and neither should the log. `label` says which limit bit, which
+            # is what an operator reading a burst of these needs to know.
+            logger.warning(
+                "auth: sign-in code request throttled on the %s limit "
+                "(%s in the last %s minutes)", label, used, minutes,
+            )
+            return False
+
+    db.add(LoginCodeRequestDB(address_hash=address_hash, client_hash=client_hash))
+    _prune_login_requests(db, current)
+    db.commit()
+    return True
+
+
+def _prune_login_requests(db: Session, current: datetime) -> None:
+    """Drop counter rows older than the longest window.
+
+    These rows are a counter, not a record — once they are outside every window
+    they can never affect a decision again, so keeping them would only
+    accumulate hashes of who tried to sign in. Pruned on write rather than on a
+    schedule because there is no scheduler, and the write rate here is a
+    handful of rows a day.
+    """
+    longest = max(CODE_REQUEST_ADDRESS_WINDOW_MINUTES, CODE_REQUEST_CLIENT_WINDOW_MINUTES)
+    db.query(LoginCodeRequestDB).filter(
+        LoginCodeRequestDB.created_at <= current - timedelta(minutes=longest)
+    ).delete(synchronize_session=False)
 
 
 def request_login_code(db: Session, email: str) -> str | None:

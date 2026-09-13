@@ -12,7 +12,8 @@ import pytest
 
 from app.auth import service as auth
 from app.auth.db_models import (
-    LoginCodeDB, RoleAssignmentDB, RoleDB, RolePermissionDB, SessionDB, UserDB,
+    LoginCodeDB, LoginCodeRequestDB, RoleAssignmentDB, RoleDB, RolePermissionDB,
+    SessionDB, UserDB,
 )
 from app.auth.permissions import (
     ADMIN, AI_RUN, CREDENTIALS_MANAGE, MANAGER, USERS_MANAGE, VIEW, VIEWER,
@@ -28,6 +29,49 @@ def db():
         yield session
     finally:
         session.close()
+
+
+#: Starlette's TestClient presents this as the peer address.
+TEST_CLIENT_HOST = "testclient"
+
+
+@pytest.fixture(autouse=True)
+def clear_test_client_throttle():
+    """Keep the request-rate counters from leaking between suite runs.
+
+    Every HTTP test here posts to /ui/login from the same peer address, and
+    those requests are now counted against the per-client limit for an hour
+    (ADR-151 §2). Left alone, a handful of consecutive suite runs would
+    exhaust that bucket and the *oracle* tests — which need a code to actually
+    be issued — would start failing for a reason that has nothing to do with
+    what they assert.
+
+    Scoped to the test client's own bucket on purpose. Clearing the table
+    wholesale would wipe the live counters of whoever is using the dev
+    database at the time, which is exactly the kind of "cleanup" that is
+    really a security hole.
+    """
+    def clear():
+        with SessionLocal() as session:
+            session.query(LoginCodeRequestDB).filter(
+                LoginCodeRequestDB.client_hash == auth.hash_secret(TEST_CLIENT_HOST)
+            ).delete(synchronize_session=False)
+            session.commit()
+
+    clear()
+    yield
+    clear()
+
+
+@pytest.fixture
+def throttle_ip(db):
+    """A client address nobody else is counting against."""
+    address = f"198.51.100.{uuid.uuid4().int % 250 + 1}-{uuid.uuid4().hex[:8]}"
+    yield address
+    db.query(LoginCodeRequestDB).filter(
+        LoginCodeRequestDB.client_hash == auth.hash_secret(address)
+    ).delete(synchronize_session=False)
+    db.commit()
 
 
 @pytest.fixture
@@ -693,3 +737,261 @@ class TestCsrfIsActuallyEnforced:
                     ).delete(synchronize_session=False)
                 db.delete(campaign)
             db.commit()
+
+
+def _unique_address() -> str:
+    return f"throttle-{uuid.uuid4().hex[:12]}@example.invalid"
+
+
+class TestLoginCodeRequestThrottle:
+    """Launch gate 4's last piece — ADR-151 §2's "rate limited per address and
+    per IP", which was the half of that sentence nobody had built.
+
+    `CODE_MAX_ATTEMPTS` capped how often a code could be **guessed**. Nothing
+    capped how often one could be **asked for**, so a single unauthenticated
+    visitor could trigger unlimited mail to any address they cared to guess —
+    at the sender reputation that the rest of the system depends on.
+    """
+
+    def test_requests_are_allowed_up_to_the_address_limit(self, db, throttle_ip):
+        address = _unique_address()
+        for attempt in range(auth.CODE_REQUESTS_PER_ADDRESS):
+            assert auth.login_request_allowed(db, address, throttle_ip) is True, (
+                f"request {attempt + 1} was refused, below the limit of "
+                f"{auth.CODE_REQUESTS_PER_ADDRESS}"
+            )
+        assert auth.login_request_allowed(db, address, throttle_ip) is False, (
+            "the address limit did not bite — requesting a code is uncapped"
+        )
+
+    def test_the_limit_is_per_address_not_global(self, db, throttle_ip):
+        exhausted = _unique_address()
+        for _ in range(auth.CODE_REQUESTS_PER_ADDRESS):
+            auth.login_request_allowed(db, exhausted, throttle_ip)
+        assert auth.login_request_allowed(db, exhausted, throttle_ip) is False
+        assert auth.login_request_allowed(db, _unique_address(), throttle_ip) is True, (
+            "one exhausted address blocked a different one — the limit is "
+            "counting the wrong thing"
+        )
+
+    def test_the_client_limit_bites_across_different_addresses(self, db, throttle_ip):
+        """The per-IP half. Every address is distinct, so only the IP can stop this."""
+        for attempt in range(auth.CODE_REQUESTS_PER_CLIENT):
+            assert auth.login_request_allowed(db, _unique_address(), throttle_ip) is True, (
+                f"request {attempt + 1} was refused below the client limit"
+            )
+        assert auth.login_request_allowed(db, _unique_address(), throttle_ip) is False, (
+            "a single client walked through the per-IP limit by varying the "
+            "address — which is exactly how an enumeration sweep is shaped"
+        )
+
+    def test_a_different_client_is_unaffected(self, db, throttle_ip):
+        for _ in range(auth.CODE_REQUESTS_PER_CLIENT):
+            auth.login_request_allowed(db, _unique_address(), throttle_ip)
+        assert auth.login_request_allowed(db, _unique_address(), throttle_ip) is False
+
+        other = f"203.0.113.{uuid.uuid4().hex[:8]}"
+        try:
+            assert auth.login_request_allowed(db, _unique_address(), other) is True, (
+                "one exhausted client locked out everybody else"
+            )
+        finally:
+            db.query(LoginCodeRequestDB).filter(
+                LoginCodeRequestDB.client_hash == auth.hash_secret(other)
+            ).delete(synchronize_session=False)
+            db.commit()
+
+    def test_a_refused_request_is_not_recorded(self, db, throttle_ip):
+        """The anti-lockout property, and it is deliberate rather than incidental.
+
+        If refusals counted, an attacker could hold a real person's address
+        over the limit for as long as they kept hammering it — turning a
+        mail-volume control into an indefinite denial of sign-in against any
+        address they know. Counting only what was allowed bounds that to a
+        single window.
+        """
+        address = _unique_address()
+        for _ in range(auth.CODE_REQUESTS_PER_ADDRESS + 5):
+            auth.login_request_allowed(db, address, throttle_ip)
+
+        recorded = db.query(LoginCodeRequestDB).filter(
+            LoginCodeRequestDB.address_hash == auth.hash_secret(address)
+        ).count()
+        assert recorded == auth.CODE_REQUESTS_PER_ADDRESS, (
+            f"{recorded} rows recorded for {auth.CODE_REQUESTS_PER_ADDRESS} "
+            "allowed requests — refusals are being counted, so an attacker can "
+            "keep a victim locked out indefinitely"
+        )
+
+    def test_a_request_outside_the_window_stops_counting(self, db, throttle_ip):
+        address = _unique_address()
+        for _ in range(auth.CODE_REQUESTS_PER_ADDRESS):
+            auth.login_request_allowed(db, address, throttle_ip)
+        assert auth.login_request_allowed(db, address, throttle_ip) is False
+
+        # Age every one of them past the window. The limit is a window, not a
+        # lifetime cap — without this a real person who used their five is
+        # locked out of the product permanently.
+        db.query(LoginCodeRequestDB).filter(
+            LoginCodeRequestDB.address_hash == auth.hash_secret(address)
+        ).update(
+            {"created_at": auth.now() - timedelta(
+                minutes=auth.CODE_REQUEST_ADDRESS_WINDOW_MINUTES + 1)},
+            synchronize_session=False,
+        )
+        db.commit()
+
+        assert auth.login_request_allowed(db, address, throttle_ip) is True, (
+            "the window never reopens — the limit is a permanent lockout"
+        )
+
+    def test_the_address_is_normalised_before_counting(self, db, throttle_ip):
+        """Otherwise changing the case of one letter buys a fresh allowance."""
+        address = _unique_address()
+        for _ in range(auth.CODE_REQUESTS_PER_ADDRESS):
+            auth.login_request_allowed(db, address, throttle_ip)
+
+        assert auth.login_request_allowed(db, f"  {address.upper()}  ", throttle_ip) is False, (
+            "ANNA@x.com and anna@x.com counted as two addresses, so the limit "
+            "is bypassed by shouting"
+        )
+
+    def test_neither_identifier_is_stored_raw(self, db, throttle_ip):
+        """ADR-154: accountability records carry ids, not contact details.
+
+        A throttle necessarily counts attempts for addresses that may belong to
+        nobody, so the table would otherwise become a list of who *tried* to
+        sign in — assembled from unauthenticated input.
+        """
+        address = _unique_address()
+        auth.login_request_allowed(db, address, throttle_ip)
+
+        row = (
+            db.query(LoginCodeRequestDB)
+            .filter(LoginCodeRequestDB.address_hash == auth.hash_secret(address))
+            .first()
+        )
+        assert row is not None
+        assert row.address_hash == auth.hash_secret(auth.normalise_email(address))
+        assert row.client_hash == auth.hash_secret(throttle_ip)
+
+        stored = f"{row.address_hash}{row.client_hash}"
+        assert address.split("@")[0] not in stored
+        assert throttle_ip not in stored
+
+    def test_rows_outside_every_window_are_pruned_on_write(self, db, throttle_ip):
+        stale = LoginCodeRequestDB(
+            address_hash=auth.hash_secret(_unique_address()),
+            client_hash=auth.hash_secret(throttle_ip),
+            created_at=auth.now() - timedelta(
+                minutes=max(auth.CODE_REQUEST_ADDRESS_WINDOW_MINUTES,
+                            auth.CODE_REQUEST_CLIENT_WINDOW_MINUTES) + 5),
+        )
+        db.add(stale)
+        db.commit()
+        stale_id = stale.id
+
+        auth.login_request_allowed(db, _unique_address(), throttle_ip)
+
+        assert db.query(LoginCodeRequestDB).filter(
+            LoginCodeRequestDB.id == stale_id
+        ).first() is None, (
+            "a row that can never affect a decision again was kept — the table "
+            "grows forever, accumulating hashes of everyone who tried to sign in"
+        )
+
+
+class TestTheLoginRouteIsActuallyThrottled:
+    """The connecting line, over HTTP.
+
+    Written this way on purpose. Twice in one day the unit tests either side of
+    a defect both passed while the line joining them was never exercised — the
+    CSRF guard could be switched off entirely without failing anything. So the
+    question here is not "does `login_request_allowed` count correctly" but
+    "does the route stop issuing codes", which is the behaviour the gate is
+    about.
+    """
+
+    def test_no_further_code_is_issued_once_the_limit_is_reached(
+        self, db, temp_user, monkeypatch
+    ):
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        user = temp_user()
+        client = TestClient(app, follow_redirects=False)
+
+        def codes_issued() -> int:
+            return db.query(LoginCodeDB).filter(LoginCodeDB.user_id == user.id).count()
+
+        for _ in range(auth.CODE_REQUESTS_PER_ADDRESS):
+            client.post("/ui/login", data={"email": user.email, "next": ""})
+        at_limit = codes_issued()
+        assert at_limit == auth.CODE_REQUESTS_PER_ADDRESS, (
+            f"{at_limit} codes issued for {auth.CODE_REQUESTS_PER_ADDRESS} "
+            "requests — this test cannot prove anything about the one after"
+        )
+
+        client.post("/ui/login", data={"email": user.email, "next": ""})
+
+        assert codes_issued() == at_limit, (
+            "the route issued a code past the limit — the throttle exists but "
+            "the request path does not go through it"
+        )
+
+    def test_a_throttled_response_is_indistinguishable(
+        self, db, temp_user, monkeypatch
+    ):
+        """A distinct 429 would say "your probe was counted", per address.
+
+        That is the enumeration oracle re-opened through the back door: the
+        response would differ for an address someone else is also probing.
+        """
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        user = temp_user()
+        client = TestClient(app, follow_redirects=False)
+
+        allowed = client.post("/ui/login", data={"email": user.email, "next": ""})
+        for _ in range(auth.CODE_REQUESTS_PER_ADDRESS):
+            client.post("/ui/login", data={"email": user.email, "next": ""})
+        throttled = client.post("/ui/login", data={"email": user.email, "next": ""})
+
+        assert allowed.status_code == throttled.status_code == 303
+        assert allowed.headers["location"] == throttled.headers["location"]
+        assert allowed.content == throttled.content
+
+
+class TestWhichAddressTheLimitCounts:
+    """`X-Forwarded-For` is attacker-controlled unless a proxy overwrites it."""
+
+    def test_the_header_is_ignored_by_default(self, monkeypatch):
+        monkeypatch.delenv("TRUST_PROXY_HEADERS", raising=False)
+        assert auth.client_identifier("10.0.0.1", "1.2.3.4") == "10.0.0.1", (
+            "an unauthenticated caller set a header and got a fresh rate-limit "
+            "identity, so the per-IP limit does not exist"
+        )
+
+    def test_the_header_is_used_when_explicitly_trusted(self, monkeypatch):
+        monkeypatch.setenv("TRUST_PROXY_HEADERS", "true")
+        assert auth.client_identifier("10.0.0.1", "1.2.3.4") == "1.2.3.4"
+
+    def test_only_the_left_most_entry_is_taken(self, monkeypatch):
+        # The rest of the chain is the proxies it passed through.
+        monkeypatch.setenv("TRUST_PROXY_HEADERS", "true")
+        assert auth.client_identifier("10.0.0.1", "1.2.3.4, 10.0.0.9") == "1.2.3.4"
+
+    def test_a_trusted_deployment_still_falls_back_without_the_header(self, monkeypatch):
+        monkeypatch.setenv("TRUST_PROXY_HEADERS", "true")
+        assert auth.client_identifier("10.0.0.1", None) == "10.0.0.1"
+
+    def test_a_missing_peer_is_not_an_error(self, monkeypatch):
+        # ASGI allows request.client to be None. Everything with no peer then
+        # shares one bucket, which is restrictive rather than open.
+        monkeypatch.delenv("TRUST_PROXY_HEADERS", raising=False)
+        assert auth.client_identifier(None, None) == ""

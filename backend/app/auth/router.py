@@ -21,8 +21,9 @@ from app.auth.dependencies import AUTH_ENFORCED_KEY, auth_enforced, require_perm
 from app.auth.permissions import ALL_PERMISSIONS, BUILTIN_ROLES, USERS_MANAGE
 from app.auth.db_models import RoleDB
 from app.auth.service import (
-    SESSION_COOKIE, SESSION_ABSOLUTE_HOURS, access_list, assign_role, create_role,
-    create_user, delete_role, dev_code_visible, normalise_email, request_login_code,
+    SESSION_COOKIE, SESSION_ABSOLUTE_HOURS, access_list, assign_role,
+    client_identifier, create_role, create_user, delete_role, dev_code_visible,
+    login_request_allowed, normalise_email, request_login_code,
     revoke_assignment, revoke_token, roles_with_permissions, safe_next, set_active,
     set_role_permissions, user_for_token, verify_login_code,
 )
@@ -70,9 +71,24 @@ def login_request(
     configuration a prospect is shown — and `mock` is the default, so that was
     the shipped behaviour.
     """
-    # Return value deliberately unused. It carries the dev code, and rendering
-    # it is exactly the defect this handler had.
-    request_login_code(db, email)
+    # Throttled BEFORE the user lookup, so the path cannot diverge at all — a
+    # limit applied after it would take a different amount of work for a known
+    # address than an unknown one, which is a timing oracle in place of the
+    # response one. This is also the only call site of `request_login_code`
+    # reachable over HTTP; a second one would need its own throttle, because
+    # the limit lives here rather than in the service (the client address is a
+    # request-scoped fact, and the service has no Request).
+    if login_request_allowed(
+        db, email,
+        client_identifier(
+            request.client.host if request.client else None,
+            request.headers.get("x-forwarded-for"),
+        ),
+    ):
+        # Return value deliberately unused. It carries the dev code, and
+        # rendering it is exactly the defect this handler had.
+        request_login_code(db, email)
+
     address = normalise_email(email)
     target = safe_next(next)
 

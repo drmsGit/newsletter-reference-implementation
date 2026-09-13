@@ -126,6 +126,40 @@ class LoginCodeDB(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
+class LoginCodeRequestDB(Base):
+    """One recorded *request* for a sign-in code — the rate-limit counter.
+
+    `LoginCodeDB` caps how many times a code may be **guessed**
+    (`CODE_MAX_ATTEMPTS`). Nothing capped how often one could be **asked for**,
+    so anyone could trigger unlimited mail to a guessed address. ADR-151 §2
+    requires the limit per address *and* per IP; this table is how it is
+    counted.
+
+    **Rows, not memory.** An in-memory counter resets on restart and each
+    worker keeps its own, so a stated limit of five is silently five times the
+    worker count — a limit that lies about its own value is worse than none.
+
+    **Both identifiers are stored hashed.** The decision recorded for the
+    address was that a throttle counts attempts for addresses that may not be
+    users at all, and ADR-154's rule is that accountability records carry ids
+    rather than contact details. The same reasoning covers the client IP, which
+    is equally personal data, and counting works identically on a digest either
+    way. The cost is that these rows are useless for abuse forensics — they are
+    a counter, not an audit trail, and ADR-153's log is the place for the
+    latter.
+
+    Rows outside the longest window are pruned as they are written, so the
+    table stays proportional to live traffic rather than growing forever.
+    """
+
+    __tablename__ = "login_code_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    address_hash = Column(String(64), nullable=False, index=True)
+    client_hash = Column(String(64), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+
+
 class SessionDB(Base):
     """A signed-in session (ADR-151 §3).
 

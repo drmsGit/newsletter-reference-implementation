@@ -1,6 +1,6 @@
 # HANDOFF — Newsletter Blueprint
 
-**Last updated:** 2026-09-13 · **Branch:** `main` · **Gates 2 and 4b closed; gate 4 all but done**
+**Last updated:** 2026-09-13 · **Branch:** `main` · **Gates 2, 4 and 4b closed; gate 3 is the last P0**
 
 The account migration this file was originally written for (2026-09-04) is
 **done** — sessions now run on the business account, and nothing is left
@@ -89,7 +89,26 @@ two phases:
   bulk path — use it for any list, since the per-record form issues two queries
   each.
 
-### Database state: migrations 0001a–0004 applied
+### Gate 4 — sign-in is guarded end to end (2026-09-13)
+
+Three things landed, in this order: enforcement **defaults to ON**; CSRF covers
+all 62 forms through one router-level dependency beside `enforce_policy`,
+failing closed; and requesting a sign-in code is **rate limited per address and
+per IP** (ADR-151 §2), five per address per 15 minutes and twenty per client per
+hour, counted in `login_code_requests` rows.
+
+A throttled request answers with the **same neutral 303** as every other
+outcome, and **refusals are not counted** — counting them would let an attacker
+hold a real person's address over the limit indefinitely, turning a mail-volume
+control into a denial of sign-in. Both identifiers are stored hashed.
+
+**Known limit:** behind a reverse proxy every visitor shares one per-IP bucket
+unless `TRUST_PROXY_HEADERS=true`. Off by default, because an attacker who can
+set `X-Forwarded-For` would otherwise get a fresh rate-limit identity per
+request — a limit that is too broad fails safely, one that does not exist does
+not.
+
+### Database state: migrations 0001a–0005 applied
 
 Both `scripts/migrate_0001a_consent_expand.sql` and
 `scripts/migrate_0001b_consent_contract.sql` **have been applied** to the local
@@ -97,7 +116,10 @@ dev database. `consent_events` and `recipient_addresses` exist and are
 populated (41 recipients → 41 events, 41 addresses), `delivery_executions` has
 `channel` + `purpose`, and neither `recipients.consent_status` nor `recipients.email` exists any more.
 `delivery_executions` also has `exclusion_reason`, and `send_instances` has
-`sent_count` / `failed_count` / `excluded_count`.
+`sent_count` / `failed_count` / `excluded_count`. `migrate_0005` adds
+`login_code_requests` — the sign-in rate-limit counter — and has been applied.
+It was rehearsed twice on a scratch database first, and the schema it builds is
+identical to the one `create_all()` produces.
 
 Both scripts are idempotent and were rehearsed against a restored copy before
 being applied: expand→contract clean, both re-runnable, contract-without-expand
@@ -117,7 +139,7 @@ change is hand-written, numbered, idempotent DDL in `backend/scripts/`.
 
 ### Tests
 
-191 green. **Run from `backend/`** — `test_auth_policy.py` opens a file by
+207 green. **Run from `backend/`** — `test_auth_policy.py` opens a file by
 relative path and fails from the repo root (pre-existing, not a regression).
 
 `tests/test_consent_gates.py` is new and load-bearing: before it, the suite
@@ -128,31 +150,11 @@ was mutation-verified — removing a gate fails only that gate's tests.
 
 ## Open queue
 
-1. **Finish gate 4 — login-code rate limiting.** The last piece, and **both
-   decisions are already made (2026-09-13), so this is implementation, not an
-   interview:**
-   - **Counters live in database rows**, not in memory — in-memory resets on
-     restart and each worker counts separately, so the real limit is silently N
-     times what it says. A small table keyed by address and client IP with a
-     time window, pruned like sessions and login codes are.
-   - **Store the address hashed, never raw.** A throttle has to count attempts
-     for addresses that may not be users at all, and ADR-154's rule is that
-     accountability records carry ids, not contact details. `hash_secret` is
-     already there and counting works identically on a digest.
-   - **A throttled request returns the same neutral 303 as every other
-     outcome** — an unknown address, a successful send, a failed send. A
-     distinct 429 would tell an attacker their probe was counted and would
-     differ per address, reopening the oracle closed this morning.
-   - Throttle **before** the user lookup, so the path cannot diverge at all.
-   - ADR-151 §2 requires per address *and* per IP. Verification attempts are
-     already capped (`CODE_MAX_ATTEMPTS = 5`); it is *requesting* that is
-     uncapped today, so anyone can trigger unlimited mail to a guessed address.
-
-2. **Gate 3 — inbound machine authentication (P0).** Every JSON router is
+1. **Gate 3 — inbound machine authentication (P0).** Every JSON router is
    unguarded and `POST /provider/events` takes no signature. API keys with
    scopes; needs schema and carries real design decisions — this one *is* an
    interview.
-3. **Gate 1 — the positioning statement.** Still the named blocker on public
+2. **Gate 1 — the positioning statement.** Still the named blocker on public
    beta, and unchanged by any of this: rule 2 was tested on 2026-09-12 and
    held, so omni-channel stays out of the headline claim until a second channel
    actually sends.
@@ -184,6 +186,6 @@ Public beta is blocked on the positioning statement, not on features.
 the repo today"), because only email is built. The channel-neutral sharpening
 stays out of the headline claim until a second channel actually sends.
 
-Two P0 defects also block public exposure — see `docs/business/LAUNCH-GATES.md`.
+One P0 defect still blocks public exposure — gate 3. See `docs/business/LAUNCH-GATES.md`.
 
 *Git remote: `github.com/drmsGit/newsletter-reference-implementation`.*
