@@ -556,6 +556,53 @@ class TestSendTimeConsentRevocation:
         )
         assert execution.exclusion_reason is None
 
+    def test_parent_status_is_derived_not_declared(self, db):
+        """P1: the send's own status must reflect what actually happened.
+
+        `send_instance.status = "sent"` used to run unconditionally after the
+        loop, so 100 failures out of 100 still reported a sent campaign. A
+        provider failure returns SendResult(success=False) rather than raising,
+        so nothing caught it.
+        """
+        recipient = db.recipient("opted_in")
+        send_instance, execution = db.send_to(recipient)
+
+        send_send_instance(db.session, send_instance.id)
+        db.session.refresh(send_instance)
+
+        assert send_instance.status == "sent"
+        assert send_instance.sent_count == 1
+        assert send_instance.failed_count == 0
+        assert send_instance.excluded_count == 0
+
+    def test_all_excluded_is_not_reported_as_sent(self, db):
+        """The case the P1 entry predates.
+
+        Every recipient excluded means nothing was delivered — but nothing
+        failed either. Reporting `sent` would show a green send that delivered
+        nothing, which is the class of lie the P1 fix exists to stop; reporting
+        `failed` would invite a retry of something that worked correctly.
+        """
+        recipient = db.recipient("opted_in")
+        send_instance, execution = db.send_to(recipient)
+        record_consent(
+            db.session, recipient.id, "opted_out", source="test", commit=False
+        )
+        db.session.commit()
+
+        send_send_instance(db.session, send_instance.id)
+        db.session.refresh(send_instance)
+
+        assert send_instance.status == "no_recipients", (
+            f"a send that delivered to nobody reported {send_instance.status!r}"
+        )
+        assert send_instance.sent_count == 0
+        assert send_instance.failed_count == 0, (
+            "an excluded recipient was counted as a delivery failure — "
+            "exclusion is the stack working, not a delivery problem"
+        )
+        assert send_instance.excluded_count == 1
+
     def test_unaddressable_recipient_is_excluded_at_stage_one(self, db):
         """Stage 1 runs before stage 2, and says so in the reason.
 

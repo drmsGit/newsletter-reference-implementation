@@ -501,5 +501,36 @@ def send_send_instance(
         db.commit()
         raise
 
-    send_instance.status = "sent"
+    # Derive the parent status from its children rather than declaring success.
+    # This line used to be an unconditional `status = "sent"`, so 100 failed
+    # deliveries out of 100 still reported a sent campaign — only an exception
+    # escaping the loop marked it failed, and a provider failure returns
+    # SendResult(success=False) rather than raising.
+    #
+    # "excluded" is counted apart from "failed" on purpose: an excluded
+    # recipient is the ADR-163 point 7 stack working, not a delivery problem.
+    # Folding them together would recreate the same lie one level down.
+    counts = {"sent": 0, "failed": 0, "excluded": 0}
+    for execution in executions:
+        if execution.status in counts:
+            counts[execution.status] += 1
+
+    send_instance.sent_count = counts["sent"]
+    send_instance.failed_count = counts["failed"]
+    send_instance.excluded_count = counts["excluded"]
+
+    if counts["sent"] and counts["failed"]:
+        send_instance.status = "partial_failed"
+    elif counts["sent"]:
+        send_instance.status = "sent"
+    elif counts["failed"]:
+        send_instance.status = "failed"
+    else:
+        # Nothing sent and nothing failed: every recipient was excluded, or
+        # there were none to begin with. The send did exactly what it should
+        # and delivered to nobody — which is neither a success to report green
+        # nor a failure to retry, so it gets its own value rather than being
+        # rounded to whichever lies less.
+        send_instance.status = "no_recipients"
+
     db.commit()
