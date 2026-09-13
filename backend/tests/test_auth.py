@@ -995,3 +995,95 @@ class TestWhichAddressTheLimitCounts:
         # shares one bucket, which is restrictive rather than open.
         monkeypatch.delenv("TRUST_PROXY_HEADERS", raising=False)
         assert auth.client_identifier(None, None) == ""
+
+
+class TestSubAddressedAddressesCanSignIn:
+    """P1 — any address containing `+` could never sign in through the UI.
+
+    `/ui/login` interpolated the address into the redirect's query string
+    unescaped while the `next` parameter beside it on the same line *was*
+    escaped. Starlette decodes `+` in a query value as a space, so
+    `name+tag@example.com` reached the verify form as `name tag@example.com`,
+    was written into the form's hidden field, posted back mangled, and
+    `verify_login_code` found no user — reporting *"that code is not valid or
+    has expired"*. The wrong diagnosis, which is what made it expensive.
+
+    Invisible in development: `dev_code_visible()` is true under the shipped
+    `mock` default, and the old handler rendered the verify page inline instead
+    of taking this redirect. The bug existed only in deployments with a real
+    provider — the ones that matter. Sub-addressing is common in this product's
+    operator population.
+    """
+
+    @pytest.fixture
+    def plus_user(self, db):
+        email = f"ops+tag-{uuid.uuid4().hex[:8]}@example.invalid"
+        user = auth.create_user(db, email=email, role_key=VIEWER)
+        yield user
+        db.query(SessionDB).filter(SessionDB.user_id == user.id).delete()
+        db.query(LoginCodeDB).filter(LoginCodeDB.user_id == user.id).delete()
+        db.query(RoleAssignmentDB).filter(RoleAssignmentDB.user_id == user.id).delete()
+        db.query(UserDB).filter(UserDB.id == user.id).delete()
+        db.commit()
+
+    def test_the_address_the_verify_form_posts_back_is_the_real_one(
+        self, db, plus_user, monkeypatch
+    ):
+        """The whole defect, at the only layer that shows it.
+
+        Asserting on the redirect's Location would not do: the bug is in what
+        the *next* request receives after Starlette decodes it, and the hidden
+        field is what the browser actually sends back.
+        """
+        import re
+
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        client = TestClient(app, follow_redirects=True)
+
+        page = client.post("/ui/login", data={"email": plus_user.email, "next": ""})
+
+        field = re.search(r'name="email"\s+value="([^"]*)"', page.text)
+        assert field is not None, "the verify form has no email field to post back"
+        assert field.group(1) == plus_user.email, (
+            f"the form will post back {field.group(1)!r} instead of "
+            f"{plus_user.email!r} — the user is told their code is invalid"
+        )
+
+    def test_a_mangled_address_really_does_fail_to_sign_in(self, db, plus_user):
+        """Why the above matters, rather than being a cosmetic difference."""
+        code = auth.request_login_code(db, plus_user.email)
+        assert code is not None
+
+        mangled = plus_user.email.replace("+", " ")
+        assert auth.verify_login_code(db, mangled, code) is None
+        # ...and the untouched address still works, so this proves the space is
+        # the cause rather than the code being spent.
+        assert auth.verify_login_code(db, plus_user.email, code) is not None
+
+    def test_the_retry_redirect_escapes_it_too(self, db, plus_user, monkeypatch):
+        """The second interpolation — a wrong code sends you round again.
+
+        Fixing only the first would leave the address intact until the user's
+        first typo, then mangle it for every attempt after.
+        """
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        client = TestClient(app, follow_redirects=False)
+
+        response = client.post(
+            "/ui/login/verify",
+            data={"email": plus_user.email, "code": "000000", "next": ""},
+        )
+
+        assert response.status_code == 303
+        assert "%2B" in response.headers["location"], (
+            "the retry redirect passed `+` through raw, so the address is "
+            "mangled from the second attempt onwards"
+        )

@@ -93,7 +93,15 @@ def login_request(
     target = safe_next(next)
 
     return RedirectResponse(
-        url=f"/ui/login/verify?email={address}&next={quote(target, safe='')}",
+        # `quote` on BOTH parameters. Starlette decodes `+` in a query value
+        # as a space, so an unescaped `name+tag@example.com` arrives at
+        # verify_form as `name tag@example.com`, pre-fills the mangled value,
+        # and verify_login_code finds no user — reporting "that code is not
+        # valid or has expired", which is the wrong diagnosis and is what made
+        # this expensive to find. Sub-addressing is common in this product's
+        # operator population.
+        url=f"/ui/login/verify?email={quote(address, safe='')}"
+            f"&next={quote(target, safe='')}",
         status_code=303,
     )
 
@@ -122,7 +130,7 @@ def verify_submit(
     token = verify_login_code(db, email, code)
     if token is None:
         return RedirectResponse(
-            url=f"/ui/login/verify?email={normalise_email(email)}"
+            url=f"/ui/login/verify?email={quote(normalise_email(email), safe='')}"
                 f"&next={quote(target, safe='')}"
                 f"&error=That+code+is+not+valid+or+has+expired.",
             status_code=303,
