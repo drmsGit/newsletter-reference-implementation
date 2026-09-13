@@ -1,6 +1,6 @@
 # HANDOFF — Newsletter Blueprint
 
-**Last updated:** 2026-09-13 · **Branch:** `main` · **ADR-163 is fully implemented; gates 2 and 4b closed**
+**Last updated:** 2026-09-13 · **Branch:** `main` · **Gates 2 and 4b closed; gate 4 all but done**
 
 The account migration this file was originally written for (2026-09-04) is
 **done** — sessions now run on the business account, and nothing is left
@@ -117,7 +117,7 @@ change is hand-written, numbered, idempotent DDL in `backend/scripts/`.
 
 ### Tests
 
-175 green. **Run from `backend/`** — `test_auth_policy.py` opens a file by
+191 green. **Run from `backend/`** — `test_auth_policy.py` opens a file by
 relative path and fails from the repo root (pre-existing, not a regression).
 
 `tests/test_consent_gates.py` is new and load-bearing: before it, the suite
@@ -128,12 +128,34 @@ was mutation-verified — removing a gate fails only that gate's tests.
 
 ## Open queue
 
-1. **Gate 3 — inbound machine authentication (P0).** Every JSON router is
+1. **Finish gate 4 — login-code rate limiting.** The last piece, and **both
+   decisions are already made (2026-09-13), so this is implementation, not an
+   interview:**
+   - **Counters live in database rows**, not in memory — in-memory resets on
+     restart and each worker counts separately, so the real limit is silently N
+     times what it says. A small table keyed by address and client IP with a
+     time window, pruned like sessions and login codes are.
+   - **Store the address hashed, never raw.** A throttle has to count attempts
+     for addresses that may not be users at all, and ADR-154's rule is that
+     accountability records carry ids, not contact details. `hash_secret` is
+     already there and counting works identically on a digest.
+   - **A throttled request returns the same neutral 303 as every other
+     outcome** — an unknown address, a successful send, a failed send. A
+     distinct 429 would tell an attacker their probe was counted and would
+     differ per address, reopening the oracle closed this morning.
+   - Throttle **before** the user lookup, so the path cannot diverge at all.
+   - ADR-151 §2 requires per address *and* per IP. Verification attempts are
+     already capped (`CODE_MAX_ATTEMPTS = 5`); it is *requesting* that is
+     uncapped today, so anyone can trigger unlimited mail to a guessed address.
+
+2. **Gate 3 — inbound machine authentication (P0).** Every JSON router is
    unguarded and `POST /provider/events` takes no signature. API keys with
-   scopes; needs schema and carries real design decisions.
-2. **Gate 4 — auth enforcement default-on, plus CSRF across 43 write routes.**
-   `auth_enforced` still defaults to False. Cross-cutting and it carries a
-   decision: the current fail-open default exists for a stated lockout reason.
+   scopes; needs schema and carries real design decisions — this one *is* an
+   interview.
+3. **Gate 1 — the positioning statement.** Still the named blocker on public
+   beta, and unchanged by any of this: rule 2 was tested on 2026-09-12 and
+   held, so omni-channel stays out of the headline claim until a second channel
+   actually sends.
 
 ## Known-stale or wrong claims to distrust
 
