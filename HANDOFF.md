@@ -167,9 +167,22 @@ was mutation-verified — removing a gate fails only that gate's tests.
    **Before implementation can start, four things are unspecified** — the ADR
    flags each as such rather than inventing an answer:
 
-   - **The concrete key list for the vocabulary split. This one blocks.**
-     `permissions.py`'s own rule is that a key names a code path, so the list
-     cannot be settled apart from the guards it creates.
+   - ~~The concrete key list for the vocabulary split.~~ **SETTLED 2026-09-13 —
+     9 keys become 16**, recorded as an amendment to ADR-150 point 5. Working it
+     out found something larger than the split: `WRITE_POLICY` maps only `/ui/…`
+     prefixes, so **four of the twelve JSON routers had no key naming what they
+     do** — recipients, overrides, insight, provider. Splitting was the smaller
+     half; the vocabulary stopping at the UI boundary was the larger.
+     Unchanged (7): `view`, `campaigns.manage`, `content.manage`, `ai.run`,
+     `settings.manage`, `users.manage`, `credentials.manage`. Split (2→4):
+     `audiences.manage` + **`audiences.pin`**, `sends.execute` + **`sends.plan`**.
+     New (5): **`recipients.manage`**, **`recipients.consent`**,
+     **`insight.write`**, **`overrides.manage`**, **`integrations.manage`**.
+     Consent is a separate key from recipient CRUD deliberately; the locked
+     `POST /provider/events` is gated by `insight.write` rather than its own key.
+     **Still a specification, not a state:** a key names a code path, so each one
+     is real only once its guard exists, and `WRITE_POLICY` must gain JSON-route
+     entries in the same change or every API write fails closed.
    - **What "unattended" is scoped to.** Decided for real sends; consent writes,
      bulk recipient reads and credential changes are unstated.
    - **Rotation overlap** — may an integration hold two live credentials at
