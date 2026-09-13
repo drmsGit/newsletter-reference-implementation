@@ -196,13 +196,24 @@ def process_provider_webhook_event(db: Session, normalized) -> ProviderEventInge
             .first()
         )
         if delivery_execution is not None:
+            # Scope the opt-out to the channel and purpose this message actually
+            # went out on. Both are denormalized onto the execution at plan time
+            # (ADR-163 addendum 2026-09-12, point 1) precisely so this path has
+            # them without joining back to the variant — a bounce on email says
+            # nothing about whether the person still wants push.
             changed = suppress_recipient(
-                db, delivery_execution.recipient_id, reason=normalized.event_type
+                db,
+                delivery_execution.recipient_id,
+                reason=normalized.event_type,
+                channel=delivery_execution.channel,
+                purpose=delivery_execution.purpose,
             )
             if changed:
                 logger.info(
-                    "recipient %s opted out via %s feedback",
+                    "recipient %s opted out of %s/%s via %s feedback",
                     delivery_execution.recipient_id,
+                    delivery_execution.channel,
+                    delivery_execution.purpose,
                     normalized.event_type,
                 )
 

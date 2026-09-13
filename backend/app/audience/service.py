@@ -1,11 +1,15 @@
+import logging
+
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB, AudienceRuleBlockDB
 from app.recipients.db_models import RecipientDB
-from app.recipients.consent import is_consenting_filter
+from app.recipients.consent import is_consenting_filter, resolve_emails
 from app.insight.signals import operational_signals_for_category
+
+logger = logging.getLogger(__name__)
 
 # Default minimum signal a system-suggested include block asks for. Deliberately
 # low: the first suggestion should be inclusive ("anyone who's shown interest in
@@ -173,18 +177,75 @@ def find_by_criteria(
         signals = operational_signals_for_category(db, preference_category_id)
         records = [r for r in records if signals.get(r.id, 0.0) >= min_score]
 
-    # RecipientDB.email has no unique constraint (a hard-unique decision is
-    # deferred) — dedupe by email here so a bad import with duplicate-email
-    # rows doesn't inflate or double-count a segment preview.
-    seen_emails: set[str] = set()
-    deduplicated: list[RecipientDB] = []
-    for record in records:
-        if record.email in seen_emails:
-            continue
-        seen_emails.add(record.email)
-        deduplicated.append(record)
+    return _deduplicate_by_address(db, records)
 
-    return deduplicated
+
+def _deduplicate_by_address(
+    db: Session, records: list[RecipientDB]
+) -> list[RecipientDB]:
+    """One address yields one recipient.
+
+    Two recipient rows can legitimately share an address — a shared team inbox,
+    `info@`, a household — so ADR-163's 2026-09-12 addendum (point 3) rejected a
+    uniqueness constraint and put deduplication in the **addressability** stage
+    of the point 7 exclusion stack instead. Without it the same inbox receives
+    the send twice, and a segment preview over-reports.
+
+    Deduplicating on the *resolved* address rather than `RecipientDB.email` is
+    what makes this survive phase B, when that column goes away: a recipient is
+    identified here by the address they would actually be sent to, chosen by the
+    point 11 rules (primary flag, else most-recently-verified).
+
+    A recipient with no usable address is dropped here too — they are not
+    addressable on this channel, which is precisely what stage 1 means.
+
+    Exclusions are logged rather than recorded to a table: the durable,
+    per-recipient exclusion record point 8 requires arrives with the full
+    ordered stack, in the P0 fix. Losing someone silently is the failure mode
+    that made the P0 read as a rendering bug, so until then this at least says
+    so out loud.
+    """
+    if not records:
+        return []
+
+    # One query for the whole candidate set, not one per recipient. ADR-163
+    # point 10 requires each stage to be a set operation precisely so that
+    # per-stage attribution does not cost the N+1 the send path is already
+    # flagged for — resolving addresses in the loop would reintroduce it on the
+    # audience path, where segments are largest.
+    addresses = resolve_emails(db, [r.id for r in records])
+
+    seen: set[str] = set()
+    kept: list[RecipientDB] = []
+    unaddressable: list[int] = []
+    duplicates: list[int] = []
+    for record in records:
+        address = addresses.get(record.id)
+        if not address:
+            unaddressable.append(record.id)
+            continue
+        if address in seen:
+            duplicates.append(record.id)
+            continue
+        seen.add(address)
+        kept.append(record)
+
+    # Logged in bulk for the same reason — one line per stage, not per person.
+    if unaddressable:
+        logger.info(
+            "audience: %d recipient(s) excluded — no usable address on the "
+            "email channel: %s",
+            len(unaddressable),
+            unaddressable,
+        )
+    if duplicates:
+        logger.info(
+            "audience: %d recipient(s) excluded — duplicate address, already "
+            "covered by an earlier recipient in this resolution: %s",
+            len(duplicates),
+            duplicates,
+        )
+    return kept
 
 
 def bulk_add_members(db: Session, group_id: int, recipient_ids: list[int]) -> int:

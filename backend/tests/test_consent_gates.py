@@ -78,13 +78,28 @@ def _make_recipient(db, consent_status, email=None, language=None):
     external_id is the identity key (it carries the unique constraint); the
     address deliberately is not, which is what the deduplication test exercises.
     """
+    address = email or f"{uuid.uuid4()}@example.invalid"
     recipient = RecipientDB(
         external_id=f"test-consent-{uuid.uuid4()}",
-        email=email or f"{uuid.uuid4()}@example.invalid",
+        email=address,
         language=language,
         status="active",
     )
     db.add(recipient)
+    db.flush()
+    # Real recipients have an addressability row — create_recipient writes one,
+    # and the migration backfilled every existing recipient. Audience resolution
+    # reads it rather than RecipientDB.email, so a fixture without one is not a
+    # recipient the system would ever produce.
+    db.add(
+        AddressabilityDB(
+            recipient_id=recipient.id,
+            channel="email",
+            value={"email": address},
+            status="active",
+            is_primary=True,
+        )
+    )
     db.flush()
     record_consent(
         db,
@@ -276,6 +291,27 @@ class TestAddressDeduplication:
     here must therefore still hold after the migration — only where it happens
     changes.
     """
+
+    def test_recipient_with_no_address_is_excluded(self, db):
+        """Consent is not enough — you also have to be reachable.
+
+        Stage 1 of the ADR-163 point 7 stack is addressability: a valid,
+        non-expired address for this channel. A fully opted-in recipient with no
+        address row is not addressable, and previously would have been handed to
+        the provider as an empty string.
+        """
+        recipient = db.recipient("opted_in", language="test-lang-noaddr")
+        db.session.query(AddressabilityDB).filter(
+            AddressabilityDB.recipient_id == recipient.id
+        ).delete(synchronize_session=False)
+        db.session.commit()
+
+        found = find_by_criteria(db.session, language="test-lang-noaddr")
+
+        assert recipient.id not in {r.id for r in found}, (
+            "a recipient with consent but no address resolved into the "
+            "audience — they are not reachable on this channel"
+        )
 
     def test_two_recipients_sharing_an_address_yield_one(self, db):
         shared = f"shared-{uuid.uuid4()}@example.invalid"

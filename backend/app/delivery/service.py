@@ -8,6 +8,7 @@ from app.delivery.models import DeliveryExecution, SendInstance
 
 from app.campaigns.db_models import VariantDB
 from app.delivery.providers.factory import get_provider
+from app.recipients.consent import resolve_email
 from app.recipients.db_models import RecipientDB
 from app.rendering.service import render_variant_html
 from app.snapshots.db_models import SnapshotDB
@@ -170,6 +171,10 @@ def prepare_send_from_audience(
     db.add(send_instance)
     db.flush()  # assign send_instance.id before creating child executions
 
+    # channel/purpose fall to their column defaults (email/marketing) — the
+    # only ones that exist today. When a variant carries a channel (ADR-160
+    # point 4), it is read here, at plan time, because the inbound feedback
+    # path depends on the execution row carrying it (ADR-163 addendum point 1).
     for recipient in recipients:
         db.add(
             DeliveryExecutionDB(
@@ -400,8 +405,34 @@ def send_send_instance(
                 mode="send",
             )
 
+            # The send address comes from addressability (ADR-163 point 2), not
+            # from RecipientDB.email — phase B removes that column entirely, and
+            # a pick-one channel resolves its address via the primary flag with
+            # most-recently-verified as fallback (point 11).
+            #
+            # A recipient with no usable address is skipped rather than handed
+            # to the provider as an empty string, which is what this line did
+            # before. That is stage 1 of the ADR-163 point 7 exclusion stack in
+            # embryo; the full ordered stack — and the recorded exclusion reason
+            # point 8 requires — lands with the P0 fix, which rewrites this loop.
+            recipient_email = (
+                resolve_email(db, execution.recipient_id)
+                if recipient is not None
+                else None
+            )
+            if not recipient_email:
+                logger.error(
+                    "execution %s skipped: recipient %s has no usable address "
+                    "on the email channel",
+                    execution.id,
+                    execution.recipient_id,
+                )
+                execution.status = "failed"
+                db.commit()
+                continue
+
             result = provider.send(
-                recipient_email=recipient.email if recipient is not None else "",
+                recipient_email=recipient_email,
                 subject=subject,
                 html=html,
             )

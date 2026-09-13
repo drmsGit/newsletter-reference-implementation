@@ -265,3 +265,53 @@ def address_value(address: AddressabilityDB | None, key: str = "email") -> str |
 def resolve_email(db: Session, recipient_id: int) -> str | None:
     """The send address for the email channel, via the point 11 rules."""
     return address_value(resolve_address(db, recipient_id, channel="email"))
+
+
+def resolve_addresses(
+    db: Session,
+    recipient_ids: list[int],
+    *,
+    channel: str = DEFAULT_CHANNEL,
+) -> dict[int, AddressabilityDB]:
+    """`resolve_address` for many recipients in one query.
+
+    ADR-163 point 10 requires the exclusion stages to be set operations rather
+    than per-recipient loops — audience resolution runs over whole segments, so
+    resolving addresses one at a time is the N+1 the record explicitly rules
+    out. Precedence is identical to `resolve_address`: primary flag first, then
+    most-recently-verified.
+    """
+    if not recipient_ids:
+        return {}
+    rows = (
+        db.query(AddressabilityDB)
+        .filter(
+            AddressabilityDB.recipient_id.in_(recipient_ids),
+            AddressabilityDB.channel == channel,
+            AddressabilityDB.status == "active",
+        )
+        .order_by(
+            AddressabilityDB.is_primary.desc(),
+            AddressabilityDB.verified_at.desc().nullslast(),
+            AddressabilityDB.created_at.desc(),
+        )
+        .all()
+    )
+    # Ordered best-first, so the first row seen per recipient is the winner.
+    resolved: dict[int, AddressabilityDB] = {}
+    for row in rows:
+        resolved.setdefault(row.recipient_id, row)
+    return resolved
+
+
+def resolve_emails(
+    db: Session, recipient_ids: list[int]
+) -> dict[int, str]:
+    """Bulk `resolve_email`: recipient id → send address, skipping any with none."""
+    resolved = resolve_addresses(db, recipient_ids, channel="email")
+    out: dict[int, str] = {}
+    for recipient_id, row in resolved.items():
+        value = address_value(row)
+        if value:
+            out[recipient_id] = value
+    return out
