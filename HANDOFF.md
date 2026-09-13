@@ -1,6 +1,6 @@
 # HANDOFF — Newsletter Blueprint
 
-**Last updated:** 2026-09-13 · **Branch:** `main`, clean, everything pushed
+**Last updated:** 2026-09-13 · **Branch:** `main` · **Phase A of the consent migration is complete**
 
 The account migration this file was originally written for (2026-09-04) is
 **done** — sessions now run on the business account, and nothing is left
@@ -54,7 +54,7 @@ left open across multiple review passes.
 
 ## Current state (2026-09-13)
 
-### Omni-channel — designed and accepted; consent half part-built
+### Omni-channel — designed and accepted; the consent half is built
 
 **ADR-160–164** accepted 2026-09-12, and **ADR-165** written to supersede
 **ADR-001** — the repository's **first supersession ever**. Seven dated addenda
@@ -68,31 +68,41 @@ fallback; ADR-001's fate).
 the Gate-2 P0 fix, so the P0 is built once, in ADR-163 §8's shape. Split into
 two phases:
 
-* **Phase A — consent.** Schema and service layer **done and pushed**. Consent
-  is append-only events keyed `(recipient, channel, purpose)`, latest wins.
+* **Phase A — consent. ✅ COMPLETE** (2026-09-13). Consent is append-only
+  events keyed `(recipient, channel, purpose)`, latest wins.
+  `recipients.consent_status` **is gone**, from the model and the database.
   All three gates read events. `ConsentDenied` (a `ValueError` subclass)
   replaces the bare `ValueError` at the decisioning gate. Drift is
   **directional** — `platform_ahead` means relay outward, `crm_ahead` means
-  re-run the sync.
-* **Phase B — email → addressability.** Not started. ~22 mostly-display sites
-  (templates, the audience-group JS doing `${r.email}`, the send-test picker).
+  re-run the sync. The send path resolves its address from addressability, the
+  webhook scopes opt-outs to the execution's channel/purpose, and dedupe runs
+  on the resolved address in one bulk query.
+* **Phase B — email → addressability.** Not started. `RecipientDB.email` still
+  exists and is still the display value in ~22 sites (templates, the
+  audience-group JS doing `${r.email}`, the send-test picker). Note the
+  addressability row is already authoritative for *resolution* — the column is
+  now display-only.
 
-### ⚠️ The dev database is in the EXPANDED state
+### Database state: CONTRACTED (Phase A fully applied)
 
-`scripts/migrate_0001a_consent_expand.sql` **has been applied** to the local
+Both `scripts/migrate_0001a_consent_expand.sql` and
+`scripts/migrate_0001b_consent_contract.sql` **have been applied** to the local
 dev database. `consent_events` and `recipient_addresses` exist and are
-populated (41 recipients → 41 events, 41 addresses), and `delivery_executions`
-has `channel` + `purpose`.
+populated (41 recipients → 41 events, 41 addresses), `delivery_executions` has
+`channel` + `purpose`, and `recipients.consent_status` **no longer exists**.
+`recipients.email` is untouched — that is phase B.
 
-`recipients.consent_status` **still exists but is vestigial** — nothing reads
-it for a decision. `scripts/migrate_0001b_consent_contract.sql` drops it and
-**has not been run**. It refuses unless every recipient already has a consent
-event and an address, so it is safe to attempt.
-
-Both scripts are idempotent and were verified against a restored copy of the
-dev database: expand→contract clean, both re-runnable, contract-without-expand
+Both scripts are idempotent and were rehearsed against a restored copy before
+being applied: expand→contract clean, both re-runnable, contract-without-expand
 refused, and a recipient inserted between the two runs correctly refused rather
-than silently losing its consent state.
+than silently losing its consent state. `migrate_0001b` guards rather than
+trusts — it will not drop anything unless every recipient already has a consent
+event and an address.
+
+**"Address" means the email address stored as a row, nothing postal**, and a
+recipient is never required to have one — the guard only asks for an address
+where the old email column had a value, and a recipient without one is simply
+unreachable on that channel rather than rejected.
 
 There is **no Alembic and no migration runner**. Decided 2026-09-12: schema
 change is hand-written, numbered, idempotent DDL in `backend/scripts/`.
@@ -100,7 +110,7 @@ change is hand-written, numbered, idempotent DDL in `backend/scripts/`.
 
 ### Tests
 
-156 green. **Run from `backend/`** — `test_auth_policy.py` opens a file by
+157 green. **Run from `backend/`** — `test_auth_policy.py` opens a file by
 relative path and fails from the repo root (pre-existing, not a regression).
 
 `tests/test_consent_gates.py` is new and load-bearing: before it, the suite
@@ -111,27 +121,15 @@ was mutation-verified — removing a gate fails only that gate's tests.
 
 ## Open queue
 
-1. **Finish Phase A** (the current thread):
-   - `app/providers/service.py:186-207` — the bounce/complaint webhook calls
-     `suppress_recipient` without `channel`/`purpose`; read both off the
-     `DeliveryExecutionDB` row, which now carries them.
-   - `app/delivery/service.py:404` — the send address should come from
-     addressability (`resolve_email`), not `recipient.email`.
-   - Move the email dedupe (`app/audience/service.py:171-182`) into the
-     addressability stage with a recorded exclusion reason.
-   - Seed scripts: `reset_all_data.sql`, `seed_demo_data.py`, and
-     **`reset_poc_data.sql`, which is already broken** — it still references
-     `recipient_preferences`, dropped in the ADR-132 signal migration.
-   - Then run `migrate_0001b_consent_contract.sql`.
-2. **The P0 consent fix** (Gate 2), in ADR-163 §8's ordered-stack shape:
+1. **The P0 consent fix** (Gate 2), in ADR-163 §8's ordered-stack shape:
    addressability → consent → suppression → frequency, **recording why** each
    recipient was excluded. The P1 send-status fix is in the same function
    (`app/delivery/service.py:273-433`) — do them together, it is one context.
-3. **Cowork timeline pass** — turn the sequencer's ranked graph into
+2. **Cowork timeline pass** — turn the sequencer's ranked graph into
    weeks/milestones. The graph is in `.claude/agent-memory/backlog-sequencer/`.
-4. **Phase B** (email → addressability) — possibly deferrable to the React
+3. **Phase B** (email → addressability) — possibly deferrable to the React
    frontend work, since those display sites are what that rewrite replaces.
-5. *(Optional)* the `content_card` dropdown fix from the code-slimmer report.
+4. *(Optional)* the `content_card` dropdown fix from the code-slimmer report.
    The Settings weight-editor no-op is also still open and is now rising in
    cost — ADR-164 §10 extends that same settings grid with channel weights.
 
