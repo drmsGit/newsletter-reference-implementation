@@ -59,7 +59,11 @@
         </form>
         <p class="small text-muted mt-3 mb-0">
             e.g. set <code>click</code> weight higher to make clicks count more, or lower a
-            half-life to make interest fade faster. Changes apply immediately to computed signals.
+            half-life to make interest fade faster. The two apply differently: a <strong>half-life</strong>
+            change takes effect immediately and re-scores the whole existing log, because decay is applied
+            on read. A <strong>weight</strong> change affects only <em>future</em> contributions — each
+            contribution stores the weight in force when it was recorded, so past signals keep their
+            original weight (ADR-132).
         </p>
     </div>
 </div>

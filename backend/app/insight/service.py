@@ -8,7 +8,7 @@ from app.insight.models import EngagementEvent, PreferenceUpdateResult
 from app.delivery.db_models import DeliveryExecutionDB
 from app.content.db_models import ContentCategoryAssignmentDB
 from app.recipients.db_models import SignalContributionDB
-from app.insight.signals import CONTRIBUTION_WEIGHTS, record_contribution
+from app.insight.signals import record_contribution
 
 # Engagement event types that map to per-category signal contributions (they
 # carry a content_record_id, whose category assignments locate the affinity).
@@ -89,7 +89,18 @@ def apply_event_to_signals(
             f"Event type {event.event_type} does not produce a content signal"
         )
 
-    base_weight = CONTRIBUTION_WEIGHTS[event.event_type]
+    # Read the *configured* weight, not the module-level defaults, so the
+    # Settings editor's override actually reaches computed signals
+    # (ADR-132 §3: weights are tunable). Lazy import mirrors
+    # `signals._configured_half_lives` — settings.service imports the weight
+    # defaults from app.insight.signals, so keep it off the module-load path.
+    from app.settings.service import get_signal_weights
+
+    base_weight = get_signal_weights(db).get(event.event_type)
+    if base_weight is None:
+        raise ValueError(
+            f"no configured weight for contribution_type '{event.event_type}'"
+        )
 
     event_data = event.event_data or {}
     content_record_id = event_data.get("content_record_id")

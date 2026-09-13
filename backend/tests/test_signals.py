@@ -142,3 +142,79 @@ class TestConfigAffectsSignals:
             assert abs(restored - baseline) < 1.0
         finally:
             db.close()
+
+    def test_weight_override_reaches_apply_event_to_signals(self):
+        """The Settings weight editor must affect newly recorded contributions.
+
+        Regression: `apply_event_to_signals` read the module-level
+        CONTRIBUTION_WEIGHTS dict rather than the merged config, so a stored
+        SIGNAL_WEIGHTS override reached nothing and the weight editor was inert
+        (the half-life editor beside it worked, because half-lives apply on
+        read). ADR-132 §3 makes the weights tunable; this asserts the configured
+        value is the one actually written into the contribution's base_weight.
+        """
+        from app.settings.service import set_config, get_config, SIGNAL_WEIGHTS
+        from app.insight.service import apply_event_to_signals
+        from app.insight.db_models import EngagementEventDB
+        from app.delivery.db_models import DeliveryExecutionDB
+        from app.content.db_models import ContentCategoryAssignmentDB
+
+        # Nothing like the 5.0 code default for "click", so the recorded
+        # base_weight identifies which dict was read.
+        OVERRIDE = 500.0
+
+        db = SessionLocal()
+        event = None
+        previous = get_config(db, SIGNAL_WEIGHTS, {}) or {}
+        try:
+            # Existing rows are handles for *where* to write, not a source of
+            # expected values (see this module's docstring).
+            execution = db.query(DeliveryExecutionDB).first()
+            assert execution is not None, "no delivery execution to hang an event on"
+            assignment = db.query(ContentCategoryAssignmentDB).first()
+            assert assignment is not None, "no content/category assignment present"
+            assignments = (
+                db.query(ContentCategoryAssignmentDB)
+                .filter(ContentCategoryAssignmentDB.content_id == assignment.content_id)
+                .all()
+            )
+
+            set_config(db, SIGNAL_WEIGHTS, {"click": OVERRIDE})
+
+            event = EngagementEventDB(
+                delivery_execution_id=execution.id,
+                event_type="click",
+                event_data={"content_record_id": assignment.content_id},
+                occurred_at=datetime.now(timezone.utc),
+            )
+            db.add(event)
+            db.commit()
+            db.refresh(event)
+
+            result = apply_event_to_signals(db, event.id)
+
+            # One contribution per category assignment, each the *configured*
+            # weight scaled by the 0-10 assignment score. Under the bug these
+            # are 5.0 * score/10 instead.
+            expected = {a.category_id: OVERRIDE * (a.score / 10) for a in assignments}
+            assert result.applied_deltas == expected
+
+            rows = (
+                db.query(SignalContributionDB)
+                .filter(SignalContributionDB.event_id == event.id)
+                .all()
+            )
+            assert rows, "no contribution was written"
+            for row in rows:
+                assert row.base_weight == expected[row.category_id]
+        finally:
+            if event is not None:
+                db.query(SignalContributionDB).filter(
+                    SignalContributionDB.event_id == event.id
+                ).delete(synchronize_session=False)
+                db.query(EngagementEventDB).filter(
+                    EngagementEventDB.id == event.id
+                ).delete(synchronize_session=False)
+            set_config(db, SIGNAL_WEIGHTS, previous)
+            db.commit()
+            db.close()
