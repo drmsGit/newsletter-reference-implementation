@@ -9,7 +9,7 @@ What must be true before public beta. Reviewed against commits and
 | 2 | P0 consent defect fixed | any public exposure (compliance) | ✅ done 2026-09-13 — send-time exclusion stack |
 | 3 | P0 inbound machine authentication | any public exposure | ❌ open |
 | 4 | Auth enforcement flag switched on | any public exposure | 🟡 built, ships off |
-| 4b | Sign-in code disclosure fixed (P0, security) | any public exposure | ❌ open — found 2026-08-21 |
+| 4b | Sign-in code disclosure fixed (P0, security) | any public exposure | ✅ done 2026-09-13 — with the enumeration oracle, one change |
 | 5 | Real provider integration proven | the "no lock-in" claim | ✅ done — Resend, live, verified domain |
 | 6 | Inbound engagement loop proven | the signal-layer claim | ✅ done — signed webhooks, end-to-end |
 | 7 | Security model designed + base built | Phase 4C | ✅ ADR-150–154; base built, proposed status |
@@ -57,18 +57,26 @@ apart. From the 2026-08-07 external review:
   it blocks public exposure, not just Mode B.
 - **Gate 4** — the enforcement mechanism covers every UI page but ships off
   until a deployment has signed in once. Fine locally, not for anything public.
-- **Gate 4b** — a failed sign-in-code delivery prints the live six-digit code
-  into the requester's browser, so an unauthenticated visitor who names an
-  Admin's address gets a working code whenever the mail provider fails
-  (`auth/service.py:310-311` → `auth/router.py:63-76`). Found by the
-  code-slimmer sweep 2026-08-21, missed by the external review, ~3 loc to fix
-  plus a decision about the admin lockout path. Two related auth defects are
-  logged with it: `+`-addressed accounts cannot sign in at all once a real
-  provider is configured, and the default configuration makes the login form an
-  account-enumeration oracle — the one property ADR-151 §2 makes load-bearing.
+- **Gate 4b — ✅ CLOSED 2026-09-13**, together with the P1 enumeration oracle
+  that was filed separately. They were the same three lines.
 
-## Rules
-- A gate moves to ✅ only with something checkable behind it — a commit, a
-  verified live run, an adopted file. "Designed" is not "done"; gate 7 is
-  deliberately split that way.
-- Update this file when a gate moves, not at review time.
+  `deliver_code()` returned False both when the dev path skipped sending and
+  when a real send failed, so `request_login_code` could not distinguish them
+  and returned the live code in both cases — a deployment with a broken mail
+  provider handed a working sign-in code to whoever typed an admin's address.
+  The oracle came off the same line: a code was returned only for an existing
+  active user, so the handler answered 200-with-code or 303-redirect and gave
+  account existence away. `mock` is the default, so both were live in the
+  shipped configuration.
+
+  `deliver_code` now returns a tri-state (dev_not_attempted / sent / failed),
+  and the handler redirects unconditionally — identical status, location shape
+  and body for a known address, an unknown one, a deactivated user and a failed
+  send. Two decisions went with it: a failed send shows the same neutral
+  response as success (saying "delivery failed" reveals delivery was
+  *attempted*, which only happens for real accounts), and the dev code goes to
+  the server log rather than the screen, so ADR-151 §2 holds with no dev
+  carve-out — the carve-out was what made the default an oracle.
+
+  Five tests, mutation-verified, plus an end-to-end check against the running
+  app.

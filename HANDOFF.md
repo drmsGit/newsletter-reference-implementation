@@ -1,6 +1,6 @@
 # HANDOFF — Newsletter Blueprint
 
-**Last updated:** 2026-09-13 · **Branch:** `main` · **Launch gate 2 is closed**
+**Last updated:** 2026-09-13 · **Branch:** `main` · **Launch gates 2 and 4b are closed**
 
 The account migration this file was originally written for (2026-09-04) is
 **done** — sessions now run on the business account, and nothing is left
@@ -70,8 +70,8 @@ fallback; ADR-001's fate).
 the Gate-2 P0 fix, so the P0 is built once, in ADR-163 §8's shape. Split into
 two phases:
 
-* **Phase A — consent. ✅ COMPLETE** (2026-09-13), and **launch gate 2 is
-  closed**: the P0 send-time consent gate is built in ADR-163 §7's ordered-stack
+* **Phase A — consent. ✅ COMPLETE** (2026-09-13), and **launch gates 2 and 4b
+  are closed**: the P0 send-time consent gate is built in ADR-163 §7's ordered-stack
   shape (`app/delivery/exclusion.py`), recording *why* each recipient was
   excluded, and the P1 beside it (a send reporting `sent` when every delivery
   failed) is fixed in the same function. Consent is append-only
@@ -116,7 +116,7 @@ change is hand-written, numbered, idempotent DDL in `backend/scripts/`.
 
 ### Tests
 
-170 green. **Run from `backend/`** — `test_auth_policy.py` opens a file by
+175 green. **Run from `backend/`** — `test_auth_policy.py` opens a file by
 relative path and fails from the repo root (pre-existing, not a regression).
 
 `tests/test_consent_gates.py` is new and load-bearing: before it, the suite
@@ -127,16 +127,14 @@ was mutation-verified — removing a gate fails only that gate's tests.
 
 ## Open queue
 
-1. **Cowork timeline pass** — turn the sequencer's ranked graph into
-   weeks/milestones. The graph is in `.claude/agent-memory/backlog-sequencer/`.
+1. **Gate 3 — inbound machine authentication (P0).** Every JSON router is
+   unguarded and `POST /provider/events` takes no signature. API keys with
+   scopes; needs schema and carries real design decisions.
 2. **Phase B** (email → addressability) — possibly deferrable to the React
    frontend work, since those display sites are what that rewrite replaces.
-3. **B1 + B7 are ONE item, not two** — the sign-in-code disclosure (P0,
-   gate 4b) and the login-form enumeration oracle (P1) are the same three lines
-   in `deliver_code`. The P1's advertised "0 loc" is conditional on the P0
-   landing first. Establish the recovery path (what a real delivery failure
-   should show the user) and both fall out together. Not a bug-fixer item —
-   it is auth, and it carries the decision.
+3. **Gate 4 — auth enforcement default-on, plus CSRF across 43 write routes.**
+   `auth_enforced` still defaults to False. Cross-cutting and it carries a
+   decision: the current fail-open default exists for a stated lockout reason.
 
 ## Known-stale or wrong claims to distrust
 
