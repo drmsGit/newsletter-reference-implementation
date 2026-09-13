@@ -159,9 +159,36 @@ was mutation-verified — removing a gate fails only that gate's tests.
    Found 2026-09-13 by the gate-3 ADR sweep; it was in nobody's queue.
 
 2. **Gate 3 — inbound machine authentication (P0).** The interview **happened
-   on 2026-09-13** and six decisions are made; `adr-author` is drafting
-   **ADR-166**. Until that lands, the decisions are here so they are not
-   stranded in chat:
+   on 2026-09-13** and **[[ADR-166 — Inbound Machine Callers Are Authenticated
+   Principals]] is written** — status **Proposed**, awaiting your acceptance.
+   Written by `adr-author`; wikilinks verified (69 of 70 mentions, the one
+   exception a protected verbatim quotation), every target resolves.
+
+   **Before implementation can start, four things are unspecified** — the ADR
+   flags each as such rather than inventing an answer:
+
+   - **The concrete key list for the vocabulary split. This one blocks.**
+     `permissions.py`'s own rule is that a key names a code path, so the list
+     cannot be settled apart from the guards it creates.
+   - **What "unattended" is scoped to.** Decided for real sends; consent writes,
+     bulk recipient reads and credential changes are unstated.
+   - **Rotation overlap** — may an integration hold two live credentials at
+     once? Without it every rotation is a small outage for the caller; with it,
+     revocation semantics need stating.
+   - **Brand selection on inbound calls.** A human picks the brand from
+     navigation context (ADR-150 §2); a machine has none. Sits directly under
+     decision 7's derivation.
+
+   **Also pending:** the **ADR-150 amendment** for the finer permission
+   vocabulary. `adr-author` supplied the text and deliberately did not apply it
+   — ADR-150 is Proposed, so it is a direct edit to point 5 or a dated addendum,
+   and that is your call. The text is in the agent's report.
+
+   **And check before building decision 5:** its safe default ("machine sends
+   land in ADR-142's approval surface") needs that approval surface to exist. If
+   it does not yet, the default has nothing to fall back to.
+
+   The six decisions, for reference:
 
    1. **A machine caller is a principal inside ADR-150**, not a parallel
       authorization system — it holds permission rows in the same table a user
