@@ -22,7 +22,7 @@ from app.auth.permissions import ALL_PERMISSIONS, BUILTIN_ROLES, USERS_MANAGE
 from app.auth.db_models import RoleDB
 from app.auth.service import (
     SESSION_COOKIE, SESSION_ABSOLUTE_HOURS, access_list, assign_role,
-    client_identifier, create_role, create_user, delete_role, dev_code_visible,
+    client_identifier, cookie_secure, create_role, create_user, delete_role, dev_code_visible,
     login_request_allowed, normalise_email, request_login_code,
     revoke_assignment, revoke_token, roles_with_permissions, safe_next, set_active,
     set_role_permissions, user_for_token, verify_login_code,
@@ -143,7 +143,11 @@ def verify_submit(
     response.set_cookie(
         SESSION_COOKIE, token,
         max_age=SESSION_ABSOLUTE_HOURS * 3600,
-        httponly=True, samesite="lax",
+        # `secure` defaults on: without it a reachable HTTP path sends the
+        # session token in clear. `httponly` stops script from reading it and
+        # `samesite` blunts cross-site POST, but neither does anything about a
+        # network observer, which is the gap this closes.
+        httponly=True, samesite="lax", secure=cookie_secure(),
     )
     return response
 

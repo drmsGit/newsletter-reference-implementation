@@ -213,6 +213,15 @@ with SessionLocal() as db:
     # step nobody could ever sign in (ADR-151).
     bootstrap_auth(db)
     from app.auth.dependencies import auth_enforced
+    from app.auth.service import cookie_secure
+
+    if not cookie_secure():
+        logger.warning(
+            "auth: AUTH_COOKIE_INSECURE is set — the session cookie has NO Secure "
+            "flag, so any plain-HTTP request transmits the session token in clear. "
+            "This exists for browsers that refuse a Secure cookie on "
+            "http://localhost. Never set it on a reachable host."
+        )
 
     if not auth_enforced(db):
         logger.warning(

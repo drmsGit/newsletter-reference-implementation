@@ -1087,3 +1087,70 @@ class TestSubAddressedAddressesCanSignIn:
             "the retry redirect passed `+` through raw, so the address is "
             "mangled from the second attempt onwards"
         )
+
+
+class TestSessionCookieIsSecure:
+    """B9(c) — the session cookie set `HttpOnly` and `SameSite=Lax` but not
+    `Secure`, so a reachable HTTP path transmitted the session token in clear.
+
+    The other two flags do not cover this between them: `HttpOnly` stops script
+    reading the cookie and `SameSite` blunts cross-site POST, but neither says
+    anything to a network observer. A reference implementation people are meant
+    to copy should not ship the gap.
+    """
+
+    def _sign_in(self, db, user, monkeypatch):
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        client = TestClient(app, follow_redirects=False)
+        code = auth.request_login_code(db, user.email)
+        return client.post(
+            "/ui/login/verify",
+            data={"email": user.email, "code": code, "next": ""},
+        )
+
+    def test_the_cookie_carries_secure_by_default(self, db, temp_user, monkeypatch):
+        monkeypatch.delenv("AUTH_COOKIE_INSECURE", raising=False)
+        response = self._sign_in(db, temp_user(), monkeypatch)
+
+        header = response.headers["set-cookie"]
+        assert auth.SESSION_COOKIE in header, "no session cookie was set at all"
+        assert "Secure" in header, (
+            f"the session cookie shipped without Secure: {header!r} — a plain-HTTP "
+            "request would transmit the session token in clear"
+        )
+        # The other two are not a substitute, but they must not have been lost
+        # while adding the third.
+        # Starlette emits `SameSite=lax` lowercase, so compare case-insensitively
+        # rather than pinning a spelling the framework is free to change.
+        lowered = header.lower()
+        assert "httponly" in lowered and "samesite=lax" in lowered
+
+    def test_the_escape_hatch_removes_it(self, db, temp_user, monkeypatch):
+        """It has to actually work, or a Safari developer is locked out.
+
+        Chrome and Firefox send a Secure cookie to http://localhost anyway;
+        Safari historically does not, and the failure there is a login form
+        that silently loops with nothing to read.
+        """
+        monkeypatch.setenv("AUTH_COOKIE_INSECURE", "true")
+        response = self._sign_in(db, temp_user(), monkeypatch)
+
+        header = response.headers["set-cookie"]
+        assert auth.SESSION_COOKIE in header
+        assert "Secure" not in header, (
+            "AUTH_COOKIE_INSECURE did not take effect, so the documented way out "
+            "of a localhost lockout does not work"
+        )
+
+    def test_the_default_is_secure_not_merely_unset(self, monkeypatch):
+        # Guards the direction of the check: reading the env var with the wrong
+        # polarity would make every deployment insecure and no other test here
+        # would notice, because both cases above set the variable explicitly.
+        monkeypatch.delenv("AUTH_COOKIE_INSECURE", raising=False)
+        assert auth.cookie_secure() is True
+        monkeypatch.setenv("AUTH_COOKIE_INSECURE", "")
+        assert auth.cookie_secure() is True

@@ -276,6 +276,25 @@ def dev_code_visible() -> bool:
     return system_mail_provider() == "mock"
 
 
+def cookie_secure() -> bool:
+    """Whether the session cookie carries `Secure`. **Defaults to True.**
+
+    Without it a reachable HTTP path transmits the session token in clear, and
+    a reference implementation people are meant to copy should not ship that.
+    So the safe value is the default and the exception is explicit, the same
+    posture as `system_mail_provider` and `trust_proxy_headers`.
+
+    **The exception is real, not theoretical.** A `Secure` cookie is not sent
+    over plain HTTP. Chrome and Firefox treat `http://localhost` as a
+    trustworthy origin and send it anyway, so local development is normally
+    fine — but Safari has not historically made that exemption, and a developer
+    there would find sign-in silently looping back to the login form with no
+    error to read. `AUTH_COOKIE_INSECURE=true` is for exactly that case, and
+    startup says loudly which mode is in force so it is never a silent setting.
+    """
+    return (os.environ.get("AUTH_COOKIE_INSECURE") or "").strip().lower() not in {"1", "true", "yes"}
+
+
 class CodeDelivery(str, Enum):
     """What actually happened to a sign-in code.
 
