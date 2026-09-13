@@ -134,6 +134,17 @@ app.** That is a scheduling rule you cannot enforce and must not assume. If you
 see unexplained row counts or a test failing on data you did not create, stop
 and report rather than "fixing" the data.
 
+**Your worktree can be older than the database.** It is cut from a commit, but
+the shared dev database has whatever migrations have been applied to it — so if
+a migration landed after your branch point, your code and that database
+disagree, and you will see failures like `UndefinedColumn: column "email" of
+relation "recipients" does not exist` in tests you never touched. That is not
+your change and not something to work around. Establish your **baseline before
+editing anything** — run the suite first, write the number down, and compare
+your final run against *that*, not against a figure someone told you. Report
+the discrepancy and say which commit you are on. Never rebase, never migrate,
+never reseed.
+
 Never truncate, reseed, or reset the database. `scripts/reset_all_data.sql` and
 `scripts/seed_demo_data.py` destroy the dev data; running one to make a test
 pass is a catastrophe dressed as a cleanup.

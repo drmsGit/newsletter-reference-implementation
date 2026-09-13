@@ -8,7 +8,7 @@ What must be true before public beta. Reviewed against commits and
 | 1 | Positioning statement adopted | public beta, Phase 4C write & publish | ❌ open — `POSITIONING.md` |
 | 2 | P0 consent defect fixed | any public exposure (compliance) | ✅ done 2026-09-13 — send-time exclusion stack |
 | 3 | P0 inbound machine authentication | any public exposure | ❌ open |
-| 4 | Auth enforcement flag switched on | any public exposure | 🟡 built, ships off |
+| 4 | Auth enforcement flag switched on | any public exposure | 🟡 default is now ON + CSRF done; login rate limiting still missing |
 | 4b | Sign-in code disclosure fixed (P0, security) | any public exposure | ✅ done 2026-09-13 — with the enumeration oracle, one change |
 | 5 | Real provider integration proven | the "no lock-in" claim | ✅ done — Resend, live, verified domain |
 | 6 | Inbound engagement loop proven | the signal-layer claim | ✅ done — signed webhooks, end-to-end |
@@ -55,8 +55,27 @@ apart. From the 2026-08-07 external review:
 - **Gate 3** — the JSON API routers are deliberately unguarded; that is machine
   authentication, scoped as a Mode B prerequisite. It was raised to P0 because
   it blocks public exposure, not just Mode B.
-- **Gate 4** — the enforcement mechanism covers every UI page but ships off
-  until a deployment has signed in once. Fine locally, not for anything public.
+- **Gate 4 — mostly closed 2026-09-13.** Enforcement now **defaults to ON**, and
+  CSRF covers all 62 forms via one router-level dependency beside
+  `enforce_policy`, failing closed so a new form without the hidden field is
+  refused rather than shipping unguarded.
+
+  The default flipped because its original justification lapsed. The 2026-08-02
+  decision shipped it off partly because "system mail defaults to mock, so the
+  sign-in code appears on screen" — and the gate-4b fix removed the on-screen
+  code that same day, since it was the enumeration oracle. **How to get in:**
+  locally the code is in the server log (you cannot be locked out); in
+  production it is emailed; if production mail breaks, `AUTH_DEV_SHOW_CODE=true`
+  puts it back in the log so you sign in *as yourself* rather than disabling
+  access control for everyone. A deactivated sole admin still needs database
+  access — stated, not papered over.
+
+  **Still open:** requesting a sign-in code is **not rate-limited**, per address
+  or per IP, which ADR-151 §2 requires. Verification attempts are capped at 5
+  (`CODE_MAX_ATTEMPTS`); requesting is not capped at all. That is the remaining
+  work on this gate and it carries a storage decision — where counters live,
+  given in-memory does not survive multiple workers.
+
 - **Gate 4b — ✅ CLOSED 2026-09-13**, together with the P1 enumeration oracle
   that was filed separately. They were the same three lines.
 
