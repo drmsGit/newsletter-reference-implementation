@@ -37,6 +37,7 @@ commercial product. Learnings feed the separate Condor use case.
   reached elsewhere, write the ADR before implementing it.
 - Business-side decisions go in `docs/business/decisions/`, not in ADRs.
 - Do not invent ADR numbers. Check the highest existing number first (165).
+- Never read the .env file. If you need information out of this file, ask.
 
 ## Before any code change
 State, before touching any file — whether asked to review, suggest, or implement:
