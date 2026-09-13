@@ -12,12 +12,11 @@ class RecipientDB(Base):
     language = Column(String(20), nullable=True)
     attributes = Column(JSON, nullable=True)
     status = Column(String(50), nullable=False, default="active")
-    # Marketing consent, sourced from the CRM (ADR-126 explicitly permits
-    # "communication preferences" on the Recipient Projection). This is NOT a
-    # system-of-record for consent — the CRM owns it; this is a synced copy
-    # used to gate audience resolution before any decisioning/rendering runs.
-    # Only "opted_in" is treated as consenting; "pending"/"opted_out" are not.
-    consent_status = Column(String(50), nullable=False, default="pending", server_default="pending")
+    # Consent is no longer a column here. It is an append-only event per
+    # (recipient, channel, purpose), latest wins — see ConsentEventDB and
+    # ADR-163 point 1. A single column could not carry the source and timestamp
+    # that make consent provable, could not survive an erasure in the minimised
+    # form ADR-154 requires, and could not express more than one channel.
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime(timezone=True),
