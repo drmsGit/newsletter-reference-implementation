@@ -7,7 +7,7 @@ topic:
   - security
   - governance
 created: 2026-08-02
-modified: 2026-08-02
+modified: 2026-09-14
 source:
   - "Security Chapter design interview, Part 2 (playbook-strategy.md Decision Log, 2026-08-02)"
 depends_on:
@@ -79,6 +79,7 @@ Where a person has been erased, a minimal consent record is kept: internal ident
 - **Retention periods are deliberately out of scope.** How long delivery history, signals or audit entries are kept is the company's determination; the architecture's obligation is to provide a prune mechanism and to make the choice visible. This ties to the open data-lifecycle item in `docs/backlog.md`.
 - **Breach response (Art. 33/34, 72 hours) is process, not architecture.** What the architecture owes is the ability to *detect* (the audit log) and to *scope* (knowing what data lives where). The response procedure belongs in the playbook's security chapter, as the adopter's documented process.
 - The audit log may outlive the personal data it references. That is coherent rather than contradictory precisely because of point 1: what survives is an identifier and an action, not a person.
+- **Implementation status, 2026-09-14:** **Nothing in this record is built.** There is no erasure operation anywhere in `backend/` — no route, service function or script removes a person and the data keyed to them; the recipients router exposes no delete route at all, and the only delete routes in the system are for content, categories, module instances and audience groups. There is likewise no retention or prune mechanism for person-scoped data: the single prune in the codebase is `_prune_login_requests` (`backend/app/auth/service.py`), which trims rate-limit counter rows. Point 1's precondition does hold — delivery executions, engagement events and signal contributions key on `recipient_id` and carry no contact details, and since [[ADR-163 — Per-Channel Consent and Addressability]] consent is an append-only `ConsentEventDB` row carrying identifier, timestamp, source and what was granted, which is the minimised shape point 6 asks for even though nothing prunes to it. Point 5's target exists and is unreached: `SnapshotDB` persists per-recipient rendered HTML to a file (`html_location`). The `### Negative` item above is still accurate — snapshot handling remains blocked behind the undecided storage strategy.
 
 ## Related ADRs
 

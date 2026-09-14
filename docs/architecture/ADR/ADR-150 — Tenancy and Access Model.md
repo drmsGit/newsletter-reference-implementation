@@ -7,7 +7,7 @@ topic:
   - access
   - governance
 created: 2026-08-02
-modified: 2026-09-13
+modified: 2026-09-14
 source:
   - "Security Chapter design interview, Part 1 (playbook-strategy.md Decision Log, 2026-08-02)"
 depends_on:
@@ -108,8 +108,9 @@ Restricting candidates to the sending brand, to a named list of brands, or to no
 ## Notes
 
 - **Open, deliberately not decided here:** the **consent purpose-split** (marketing opt-in versus transactional basis as distinct permissions on the same person, with brand carried on the grant) is recorded in the Decision Log as a proposed amendment to [[ADR-122 — Minimal Consent Model Required]]. It is not folded into this ADR because it changes an existing accepted decision rather than adding a new concern, and that amendment has not been written.
-- Known implementation cost of that amendment: `RecipientDB.consent_status` is a single field today, with the consent gate built on it in `resolve_audience` and `execute_decision_slot`.
+- Known implementation cost of that amendment, corrected 2026-09-14 — the point has inverted, because the *mechanism* shipped first. `RecipientDB.consent_status` is no longer a column: [[ADR-163 — Per-Channel Consent and Addressability]] replaced it on 2026-09-12 with append-only `ConsentEventDB` rows keyed `(recipient, channel, purpose)`, where `purpose` is already a real column defaulting to `"marketing"` (`backend/app/recipients/db_models.py`). Two things are still genuinely open. First, the amendment recorded above has not been written as such — [[ADR-122 — Minimal Consent Model Required]] carries a dated addendum (2026-09-12) widening consent to the `(channel, purpose)` grid, and that addendum itself still describes this purpose-split as a *proposed* amendment. Second, **brand on the grant is unbuilt**: `ConsentEventDB` has no brand column, and `role_assignments.brand_id` is the only brand foreign key anywhere in the database.
 - Interacts with [[ADR-081 — AI Ranks Within Governed Candidate Sets]] and [[ADR-083 — Personalization Happens Inside Variants Through Decision Slots]]: the brand candidate filter composes with the governed candidate set rather than replacing it.
+- **Implementation status, 2026-09-14:** Points 5 and 6 are built as rows rather than code — `RoleDB`, `RolePermissionDB` and `RoleAssignmentDB` exist with the three seeded roles, and a grant is one `(user × role × brand)` row (`backend/app/auth/db_models.py`). Brand scoping is **modelled but not enforced, and cannot be**: `role_assignments.brand_id` is the only brand foreign key in the database — no campaign, content record, audience or send belongs to a brand — and no caller passes `has_permission`'s `brand_id` argument (`backend/app/auth/dependencies.py`), so points 2, 8, 9 and 10 have no implementation. The sixteen-key vocabulary in point 5 is a specification, not a state: `backend/app/auth/permissions.py` still holds the original nine, and `policy.py`'s `WRITE_POLICY` still maps only `/ui/…` prefixes, so the twelve JSON routers are included in `backend/main.py` with no guard at all. The rule that a permission key names a code path is already broken by one of the nine — `credentials.manage` appears only in `permissions.py` and its tests, and no guard names it — before any of the seven new keys are added.
 
 ## Related ADRs
 

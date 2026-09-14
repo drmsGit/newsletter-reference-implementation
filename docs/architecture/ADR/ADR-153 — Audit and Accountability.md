@@ -7,7 +7,7 @@ topic:
   - governance
   - privacy
 created: 2026-08-02
-modified: 2026-08-02
+modified: 2026-09-14
 source:
   - "Security Chapter design interview, Part 2 (playbook-strategy.md Decision Log, 2026-08-02)"
 depends_on:
@@ -73,7 +73,8 @@ An unauthenticated attacker can generate failed logins at will, so a log that wr
 
 ## Notes
 
-- The audit log is **not** a replacement for the existing domain records and must not be allowed to become one. `AIRunDB`, `ContentOverrideDB`, `ConsentSyncLogDB` and delivery history remain the authoritative account of *what* happened; the audit log is authoritative for *who*.
+- The audit log is **not** a replacement for the existing domain records and must not be allowed to become one. `AIRunDB`, `ContentOverrideDB`, `ConsentEventDB` and delivery history remain the authoritative account of *what* happened; the audit log is authoritative for *who*. Corrected 2026-09-14: `ConsentSyncLogDB` is **not** that record for consent. Since [[ADR-163 — Per-Channel Consent and Addressability]] it deliberately carries no consent values — it records only that a CRM sync ran, failed, or applied N changes, and drift is computed from the event log (`backend/app/recipients/db_models.py`). The authoritative consent record is the append-only `ConsentEventDB`, which this record did not previously name.
+- **Implementation status, 2026-09-14:** **Nothing in this record is built.** There is no audit table anywhere in `backend/` — no `__tablename__` across `backend/app/*/db_models.py` is an audit log — so points 1 through 6 have no implementation. The only actor field in the system is `ContentVersionDB.created_by`, free text typed into a form (`backend/app/content/db_models.py`, `backend/app/frontend/router.py`). Point 6's aggregated authentication-failure record does not exist either: `LoginCodeRequestDB` is a rate-limit counter over hashed address and client, and its own docstring calls it "a counter, not an audit trail".
 - Retention of the audit log itself is out of scope here. It plausibly outlives the data it describes — see [[ADR-154 — Erasure and Retention]] for why that is coherent rather than contradictory.
 - Aggregating failed logins (point 6) trades forensic detail for resilience: an investigator sees "41 failures against this address in this window," not each attempt. That is the right trade for a log whose value is accountability rather than intrusion detection; a company wanting per-attempt telemetry should ship it to a SIEM, which is the tool for it.
 

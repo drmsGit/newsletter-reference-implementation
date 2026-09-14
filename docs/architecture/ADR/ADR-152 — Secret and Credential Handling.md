@@ -6,7 +6,7 @@ topic:
   - security
   - operations
 created: 2026-08-02
-modified: 2026-08-02
+modified: 2026-09-14
 source:
   - "Security Chapter design interview, Part 2 (playbook-strategy.md Decision Log, 2026-08-02)"
 depends_on:
@@ -62,8 +62,9 @@ A credential that is present but not loaded is invisible, and the resulting fail
 ## Notes
 
 - Deliberately **not** chosen: encrypting secrets at rest in the database. It moves the problem rather than solving it — the decryption key still has to live somewhere outside the database — while adding a schema, a migration path and a false sense of security.
-- The startup reporting in point 5 is already implemented in `main.py` (loaded / ignored-empty / invalid-name, names only) as of 2026-08-02; the rest of this ADR is documentation and a UI constraint rather than new machinery.
-- **Machine credentials issued *by* the platform** to inbound API callers are a separate concern, tracked in `docs/backlog.md` as a Mode B prerequisite. This ADR covers credentials the platform *holds*, not credentials it *issues*.
+- The startup reporting in point 5 is already implemented in `main.py`, first as of 2026-08-02 and now emitting **four** categories, names only: `.env loaded`, `.env not applied (already set in the environment)`, `.env ignored (no value)` and `.env ignored (not a valid variable name)`. The rest of this ADR is documentation and a UI constraint rather than new machinery.
+- **Machine credentials issued *by* the platform** to inbound API callers are a separate concern, picked up by [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]], which designs exactly this carve-out. This ADR covers credentials the platform *holds*, not credentials it *issues*.
+- **Implementation status, 2026-09-14:** Points 1, 2, 3 and 5 are built — credentials are read from the process environment, `backend/.env` is development-only and loaded at startup, nothing is cached beyond process lifetime, and startup reports what it found by name. **Point 4 guards a surface that does not exist.** There is no set-or-replace credential route anywhere in `backend/`; the only credential-shaped thing the UI exposes is `"ai_key_present": bool(os.environ.get("ANTHROPIC_API_KEY"))` in `backend/app/frontend/router.py`, a presence indicator that honours "never its value" but is not the write-only credential interface point 4 describes.
 
 ## Related ADRs
 

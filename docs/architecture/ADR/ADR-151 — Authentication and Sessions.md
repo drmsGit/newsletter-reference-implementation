@@ -6,7 +6,7 @@ topic:
   - security
   - access
 created: 2026-08-02
-modified: 2026-08-02
+modified: 2026-09-14
 source:
   - "Security Chapter design interview, Part 2 (playbook-strategy.md Decision Log, 2026-08-02)"
 depends_on:
@@ -72,7 +72,8 @@ Sequence follows from this: ship the code flow, add passkeys as an additive laye
 
 - Passkeys are **not gating** for the standard package. The decision above settles the *shape* (additive, optional, code flow mandatory underneath); the build is tracked separately rather than blocking this ADR.
 - **Still open: step-up authentication** for destructive or high-value actions — triggering a real send, changing credentials, deactivating a user. Given that a mailbox compromise yields full Admin, this deserves a deliberate answer rather than an omission. Passkeys make an attractive step-up factor for users who have enrolled one, which is a further argument for point 6 but does not by itself decide the question.
-- Machine authentication for inbound API callers is a **separate concern** with its own scope, tracked in `docs/backlog.md` as a prerequisite for Mode B ([[ADR-142 — Autonomous Workflows and the Automation Boundary]]). This ADR covers human authentication only.
+- Machine authentication for inbound API callers is a **separate concern** with its own scope, now designed in [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]], which also carries its status as a prerequisite for Mode B ([[ADR-142 — Autonomous Workflows and the Automation Boundary]]). This ADR covers human authentication only.
+- **Implementation status, 2026-09-14:** Points 1, 2, 3 and 5 are built — passwordless typed codes stored hashed, short-lived and attempt-limited; sessions carrying both an absolute and an idle expiry and revocable server-side; deactivation revoking sessions immediately; and the access list at `/ui/users` showing role assignments, last login and whether an account is external (`backend/app/auth/db_models.py`, `backend/app/auth/router.py`, `backend/app/auth/service.py`). Rate limiting of code *requests* per address and per IP — required by point 2 and previously missing — was built on 2026-09-13 (`LoginCodeRequestDB`). Points 4 and 6, SSO/SCIM and passkeys, are documented and not built **by decision**, not by omission. **Step-up authentication is unbuilt** and remains open, as the note above says.
 
 ## Related ADRs
 
