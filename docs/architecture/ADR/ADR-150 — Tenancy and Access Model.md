@@ -1,6 +1,6 @@
 ---
 type: adr
-status: proposed
+status: accepted
 topic:
   - architecture
   - security
@@ -24,7 +24,7 @@ enables:
 ---
 
 ## Status
-Proposed
+Accepted
 
 ## Context
 
@@ -39,14 +39,18 @@ A second question arrives with the first: companies frequently run **several bra
 **1. Single-tenant per deployment.**
 One installation serves one company. Several brands of the *same* company may share an installation, but no agency runs multiple clients on one system. Consequence: no tenant discriminator on any query, and separation between companies is a **deployment boundary**, not a code path. This is ruled in deliberately rather than by omission, because multi-tenancy is the one decision here that cannot be retrofitted without touching every query in the system.
 
-**2. Brands are a scope, not a hierarchy.**
+**2. Brands are a scope, not a hierarchy — and multi-brand is the ordinary case.**
 A brand switcher in the top navigation selects the working context. Content and branding differ per brand; most everything else carries over. No nested organisation machinery, no per-brand duplication of settings, strategies or taxonomy. Brands behave "like categories."
+
+Several brands is what the customers we have actually look like, not a state a company escalates into: the first pilot customer runs around ten brands today and creates several new ones every year. The scope is therefore **designed for from the start rather than held dormant until someone needs it**. Concretely, **a `brand` column belongs on every table that needs one** — beginning with content, campaigns, audiences and the permission grants — and the brand a request is working in is carried into the queries that read them.
+
+This is a scope *inside* one company and does not reopen point 1. A second brand is another working context in one company's own data; a second *company* on the same installation stays refused. The brand column is not the tenant discriminator point 1 rules out, and the two must not be conflated — point 1 is the only reason there is no tenant column to begin with.
 
 **3. Where GDPR forces brand separation, the answer is two installations — and we ship no alternative.**
 If a company must keep brand A's and brand B's people apart, they run two systems. We deliberately do **not** offer a mixed-but-separated mode. Shipping one would imply we had judged that arrangement compliant, which is precisely the data-protection liability [[ADR-144 — AI Data and Model Governance]] §3 already refuses to take. A company that wants it anyway is changing its own code, with its own legal advice.
 
-**4. The visual-only case stays degenerate.**
-Many companies use "brand" to mean a logo and a palette. One implicit default brand always exists, and the scoping machinery stays invisible until a second brand is created. A company treating brands as a skin pays nothing for the capability.
+**4. The visual-only case is a degenerate case of the same model, not a separate mode.**
+Many companies use "brand" to mean a logo and a palette. One default brand always exists, so such a company never has to think about the switcher and never sees a second context. That is where the invisibility ends: the column is on the tables and the queries carry it from the first migration, filled with the default brand. A company treating brands as a skin pays a default value in a column — not a mode of its own, and not the retrofit that waiting would cost everyone else.
 
 **5. Three seeded roles over a real permission model — not a role enum.**
 
@@ -81,13 +85,13 @@ One mechanism serves both role assignment and brand scoping, rather than a role 
 External staff are Admins or Managers who happen to work for the agency. What distinguishes them is **accountability, not capability** — the audit trail records who acted ([[ADR-153 — Audit and Accountability]]). Introducing an `agency` role would encode an organisational relationship into the schema and immediately be wrong for the next company.
 
 **8. Signals are shared at person level; content candidates are scoped to the sending brand.**
-Brands are presentation, so engagement is engagement — a recipient who moves from brand A to brand B arrives with useful history rather than as a stranger. The accident worth preventing is *content* crossing brands through those shared signals, so a decision slot resolves **only the sending brand's content by default**. Safe by construction; widening it is a deliberate and visible act, matching the idiom already used by the mock-provider default, ADR-144's PII line and the governed model list.
+Brands are presentation, so engagement is engagement — a recipient who moves from brand A to brand B arrives with useful history rather than as a stranger. The accident worth preventing is *content* crossing brands through those shared signals, so a decision slot resolves **only the sending brand's content by default**. Safe by construction; widening it is a deliberate and visible act, matching the idiom already used by the mock-provider default, ADR-144's PII line and the governed model list. The brand column point 2 puts on content records is what makes that default enforceable rather than merely intended.
 
 **9. `recipient.brand` is the sending brand, not an attribute of the person.**
 A person connected to brands A and B *is* brand A in the context of a send from brand A; the brand comes from the navigation context. A brand affiliation may additionally arrive from the CRM as a projected attribute ([[ADR-120 — CRM as Customer Source of Truth]] / [[ADR-126 — Maintain Local Recipient Projection]]) feeding the permission table — a source of the data, not a competing concept.
 
 **10. Brand as a decision-strategy filter is demonstrated, not built.**
-Restricting candidates to the sending brand, to a named list of brands, or to none of the above is expressible through the existing `candidate_filter_fields` manifest, so it needs no new machinery. It is **out of scope for the POC and the standard package**; the playbook's obligation is to show *that* it is possible and *how*.
+Restricting candidates to the sending brand, to a named list of brands, or to none of the above is expressible through the existing `candidate_filter_fields` manifest, so it needs no new machinery. It is **out of scope for the POC and the standard package**; the playbook's obligation is to show *that* it is possible and *how*. What is deferred is the configurable filter, not point 8's default: resolving only the sending brand's content is part of the brand-column work and ships with it.
 
 ## Consequences
 
@@ -96,21 +100,24 @@ Restricting candidates to the sending brand, to a named list of brands, or to no
 - GDPR separation between companies is a deployment decision an adopter can verify by looking at their server list, not an invariant they have to trust our code to hold.
 - Role and brand scoping share one mechanism, so there is one place to reason about "may this person do this here."
 - Companies with their own role scheme are unblocked without a fork; companies with no scheme get three roles that work.
-- Cross-brand content leakage is prevented structurally rather than by care.
-- The brand capability costs nothing for the companies who do not need it.
+- Cross-brand content leakage is prevented structurally rather than by care, because the brand a record belongs to is a column rather than a convention.
+- A company running many brands is served by the model it already has, not by a second product, and a company using brands as a skin still only carries a default value in a column.
+- The brand scope stops being a promise the schema cannot keep: the filter `has_permission` already implements gets something to filter on.
 
 ### Negative
 - An agency operating twenty clients runs twenty installations. That is real operational weight, accepted because the alternative is the irreversible one.
 - A company that genuinely needs brand separation *and* wants one system is told no. Some will consider that a missing feature; it is a deliberate refusal to make a compliance judgement on their behalf.
 - Sharing signals across brands is defensible only while brands are presentation. A company using brands as a proxy for separate legal entities is in case 3 and should not be on one installation.
 - Introducing users and roles requires an actor on every audited action, which is a change to code written when no actor existed.
+- Brand scoping is now a **schema change across several modules** rather than a dormant column on the access grants. Content, campaigns, audiences and sends each gain a column, a migration and a filter in queries already written, and the reach goes further than the four: `ConsentEventDB` has no brand column either, which is the same gap this record's Notes already flag as "brand carried on the grant" in the unwritten consent purpose-split. That is work bought now, before the first pilot, instead of work avoided until someone asks.
+- It is adopted on the strength of **one pilot customer's needs** — a real customer with around ten brands, but one data point. If that customer proves unrepresentative, we will have paid a cross-module migration for a scope most adopters leave at its default. Accepted because the retrofit is the expensive direction and this is the cheap one, but the evidence should be visible rather than buried.
 
 ## Notes
 
 - **Open, deliberately not decided here:** the **consent purpose-split** (marketing opt-in versus transactional basis as distinct permissions on the same person, with brand carried on the grant) is recorded in the Decision Log as a proposed amendment to [[ADR-122 — Minimal Consent Model Required]]. It is not folded into this ADR because it changes an existing accepted decision rather than adding a new concern, and that amendment has not been written.
-- Known implementation cost of that amendment, corrected 2026-09-14 — the point has inverted, because the *mechanism* shipped first. `RecipientDB.consent_status` is no longer a column: [[ADR-163 — Per-Channel Consent and Addressability]] replaced it on 2026-09-12 with append-only `ConsentEventDB` rows keyed `(recipient, channel, purpose)`, where `purpose` is already a real column defaulting to `"marketing"` (`backend/app/recipients/db_models.py`). Two things are still genuinely open. First, the amendment recorded above has not been written as such — [[ADR-122 — Minimal Consent Model Required]] carries a dated addendum (2026-09-12) widening consent to the `(channel, purpose)` grid, and that addendum itself still describes this purpose-split as a *proposed* amendment. Second, **brand on the grant is unbuilt**: `ConsentEventDB` has no brand column, and `role_assignments.brand_id` is the only brand foreign key anywhere in the database.
+- Known implementation cost of that amendment, corrected 2026-09-14 — the point has inverted, because the *mechanism* shipped first. `RecipientDB.consent_status` is no longer a column: [[ADR-163 — Per-Channel Consent and Addressability]] replaced it on 2026-09-12 with append-only `ConsentEventDB` rows keyed `(recipient, channel, purpose)`, where `purpose` is already a real column defaulting to `"marketing"` (`backend/app/recipients/db_models.py`). Two things are still genuinely open. First, the amendment recorded above has not been written as such — [[ADR-122 — Minimal Consent Model Required]] carries a dated addendum (2026-09-12) widening consent to the `(channel, purpose)` grid, and that addendum itself still describes this purpose-split as a *proposed* amendment. Second, **brand on the grant is unbuilt**: `ConsentEventDB` has no brand column, and `role_assignments.brand_id` is the only brand foreign key anywhere in the database — one of the columns point 2 now requires.
 - Interacts with [[ADR-081 — AI Ranks Within Governed Candidate Sets]] and [[ADR-083 — Personalization Happens Inside Variants Through Decision Slots]]: the brand candidate filter composes with the governed candidate set rather than replacing it.
-- **Implementation status, 2026-09-14:** Points 5 and 6 are built as rows rather than code — `RoleDB`, `RolePermissionDB` and `RoleAssignmentDB` exist with the three seeded roles, and a grant is one `(user × role × brand)` row (`backend/app/auth/db_models.py`). Brand scoping is **modelled but not enforced, and cannot be**: `role_assignments.brand_id` is the only brand foreign key in the database — no campaign, content record, audience or send belongs to a brand — and no caller passes `has_permission`'s `brand_id` argument (`backend/app/auth/dependencies.py`), so points 2, 8, 9 and 10 have no implementation. The sixteen-key vocabulary in point 5 is a specification, not a state: `backend/app/auth/permissions.py` still holds the original nine, and `policy.py`'s `WRITE_POLICY` still maps only `/ui/…` prefixes, so the twelve JSON routers are included in `backend/main.py` with no guard at all. The rule that a permission key names a code path is already broken by one of the nine — `credentials.manage` appears only in `permissions.py` and its tests, and no guard names it — before any of the seven new keys are added.
+- **Implementation status, 2026-09-14:** Points 5 and 6 are built as rows rather than code — `RoleDB`, `RolePermissionDB` and `RoleAssignmentDB` exist with the three seeded roles, and a grant is one `(user × role × brand)` row (`backend/app/auth/db_models.py`). Brand scoping is **modelled but not enforceable as the code stands**, verified 2026-09-14. `role_assignments.brand_id` is the only brand foreign key in the database; the `brands` table itself exists (`id`, `key`, `name`, `created_at`) with one default row seeded, but no campaign, content record, audience or send belongs to a brand. `has_permission(db, user, permission, brand_id=None)` in `backend/app/auth/service.py` already accepts a brand and narrows the grants it reads to it — **no caller ever passes one**: both call sites in `backend/app/auth/dependencies.py`, `require_permission` and `enforce_policy`, omit the argument. Points 2, 8, 9 and 10 therefore have no implementation, and the work point 2 creates is three things: brand columns on the resource tables (content, campaigns, audiences, sends, and in due course the consent grants), a way for a request to say which brand it is acting in, and passing that brand into the filter that already exists. How each of those is done is not decided here. The sixteen-key vocabulary in point 5 is a specification, not a state: `backend/app/auth/permissions.py` still holds the original nine, and `policy.py`'s `WRITE_POLICY` still maps only `/ui/…` prefixes, so the twelve JSON routers are included in `backend/main.py` with no guard at all. The rule that a permission key names a code path is already broken by one of the nine — `credentials.manage` appears only in `permissions.py` and its tests, and no guard names it — before any of the seven new keys are added.
 
 ## Related ADRs
 
