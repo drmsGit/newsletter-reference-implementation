@@ -1,3 +1,4 @@
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.campaigns.db_models import ModuleInstanceDB, DecisionResolutionDB
@@ -381,7 +382,16 @@ def assign_category_to_content(
     )
 
     db.add(assignment)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # A concurrent call won the TOCTOU race between the SELECT above and
+        # this insert — the unique constraint caught it. Answer exactly as the
+        # fast path does, so a caller cannot tell whether it lost a race or
+        # simply asked for an assignment that already existed. Same shape as
+        # `add_member` in audience/service.py.
+        db.rollback()
+        return None
     db.refresh(assignment)
 
     return assignment
@@ -408,31 +418,47 @@ def create_content_version(
     if record is None:
         return None
 
-    latest_version = (
-        db.query(ContentVersionDB)
-        .filter(ContentVersionDB.content_record_id == content_record_id)
-        .order_by(ContentVersionDB.version_number.desc())
-        .first()
-    )
+    # Read-then-insert, so two concurrent publishes can compute the same next
+    # number. The unique constraint now refuses the second rather than storing
+    # a duplicate — retry, because the conflict means somebody else published
+    # while we were deciding, and their version is simply the earlier one.
+    #
+    # Bounded rather than a `while True`: a retry that never terminates turns a
+    # constraint violation into a hung request. Three attempts is far beyond
+    # what a manual publish click can contend with, and if it is ever exceeded
+    # the IntegrityError surfaces — which is the honest outcome, because at that
+    # point something other than ordinary contention is wrong.
+    for attempt in range(3):
+        latest_version = (
+            db.query(ContentVersionDB)
+            .filter(ContentVersionDB.content_record_id == content_record_id)
+            .order_by(ContentVersionDB.version_number.desc())
+            .first()
+        )
 
-    next_version_number = (
-        latest_version.version_number + 1
-        if latest_version
-        else 1
-    )
+        next_version_number = (
+            latest_version.version_number + 1
+            if latest_version
+            else 1
+        )
 
-    version = ContentVersionDB(
-        content_record_id=content_record_id,
-        version_number=next_version_number,
-        content=record.content or {},
-        created_by=created_by,
-    )
+        version = ContentVersionDB(
+            content_record_id=content_record_id,
+            version_number=next_version_number,
+            content=record.content or {},
+            created_by=created_by,
+        )
 
-    db.add(version)
-    db.commit()
-    db.refresh(version)
-
-    return to_content_version(version)
+        db.add(version)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            if attempt == 2:
+                raise
+            continue
+        db.refresh(version)
+        return to_content_version(version)
 
 
 def list_versions_for_content(

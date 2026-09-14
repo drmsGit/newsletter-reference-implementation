@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, JSON, func
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, JSON, func, UniqueConstraint
 
 from app.database import Base
 
@@ -33,6 +33,15 @@ class CategoryRelationDB(Base):
 
 class ContentCategoryAssignmentDB(Base):
     __tablename__ = "content_category_assignments"
+    # The same TOCTOU that was closed for audience members
+    # (uq_audience_group_members_group_recipient) and recipient preferences on
+    # 2026-07-12. Content was missed at the time.
+    __table_args__ = (
+        UniqueConstraint(
+            "content_id", "category_id",
+            name="uq_content_category_assignments_content_category",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     content_id = Column(Integer, ForeignKey("content_records.id"), nullable=False)
@@ -42,6 +51,17 @@ class ContentCategoryAssignmentDB(Base):
 
 class ContentVersionDB(Base):
     __tablename__ = "content_versions"
+    # ADR-128 makes a version the audit answer to "what exact content did this
+    # recipient receive?". Two rows sharing a number make
+    # `resolve_renderable_content`'s ORDER BY version_number DESC ... .first()
+    # pick one arbitrarily, so the audit answer becomes a coin toss — the same
+    # ambiguity uq_module_instances_variant_position was added for.
+    __table_args__ = (
+        UniqueConstraint(
+            "content_record_id", "version_number",
+            name="uq_content_versions_record_version",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     content_record_id = Column(Integer, ForeignKey("content_records.id"), nullable=False)
