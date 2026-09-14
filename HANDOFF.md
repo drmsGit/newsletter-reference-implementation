@@ -1,6 +1,6 @@
 # HANDOFF — Newsletter Blueprint
 
-**Last updated:** 2026-09-13 · **Branch:** `main` · **Gates 2, 4 and 4b closed; gate 3 is the last P0**
+**Last updated:** 2026-09-14 · **Branch:** `main` · **Gates 2, 4 and 4b closed; five security ADRs accepted**
 
 The account migration this file was originally written for (2026-09-04) is
 **done** — sessions now run on the business account, and nothing is left
@@ -150,15 +150,47 @@ was mutation-verified — removing a gate fails only that gate's tests.
 
 ## Open queue
 
-1. **Accept (or amend) ADR-150–154.** All five are still **Proposed**, in both
-   places. The security base is built against them and two launch gates were
-   closed by implementing them, so the code and the record disagree about how
-   settled this is. Gate 3 needs them: a machine-auth ADR builds on ADR-150's
-   access model and ADR-153's "the actor may be a system or an integration",
-   and building on a proposal is what makes a cluster expensive to change.
-   Found 2026-09-13 by the gate-3 ADR sweep; it was in nobody's queue.
+**ADR acceptance, decided 2026-09-14.** ADR-004, 150, 151, 153 and 154 are
+**Accepted**. ADR-152 and ADR-166 stay Proposed, for different reasons:
 
-2. **Gate 3 — inbound machine authentication (P0).** The interview **happened
+1. **ADR-152 needs its own session — an interview, taught rather than asked.**
+   The user's words: *"I can't make a decision here because I don't understand
+   it."* The subject is credential handling and the goal is a state-of-the-art
+   setup, so the session has to explain the options before asking anything.
+   Do not fold this into another pass.
+2. **ADR-166 stays Proposed** by decision. Nothing about it is blocked — the
+   design is complete and the key list settled — the user simply is not
+   adopting it yet.
+
+**Work the acceptances create, in the order it makes sense:**
+
+3. **ADR-150 — multi-brand is now a normal case, not a rare escalation.** A
+   pilot customer already runs ~10 brands and adds several a year, so the old
+   "one brand until a company needs more" framing is gone. **Add a `brand`
+   column to every table that needs one, starting with content, campaigns,
+   audiences and the permission grants**, give a request a way to say which
+   brand it is acting in, then pass it to the filter that already exists:
+   `has_permission(db, user, permission, brand_id=None)` accepts and filters on
+   a brand today and **no caller ever passes one**. `ConsentEventDB` has no
+   brand column either. This is a schema change across several modules — the
+   largest single piece of work in this queue.
+4. **ADR-154 — ready to implement; plan it.** Nothing exists today: no erasure
+   route, no service function, no script. Its own Consequences admit snapshot
+   handling is blocked behind the undecided storage strategy, so that Needs-ADR
+   item gates part of it.
+5. **ADR-153 — the audit log, now accepted and entirely unbuilt.** There is no
+   audit table anywhere in `backend/`; the only actor field in the system is
+   the free-text `ContentVersionDB.created_by`. **The user gave a second reason
+   for wanting it that is not in the ADR:** concurrent editing — stopping two
+   users working the same asset, possibly with a *"user 1 is working on this —
+   overwrite?"* prompt. That is a **contention model**, which is already a
+   separate Needs-ADR item (*"Concurrent actors: a contention model, not just
+   row locks"*), and it is not what ADR-153 decides. Keep them apart: the audit
+   log records who did what; preventing a collision is a different mechanism.
+
+6. **Gate 3 — inbound machine authentication (P0).** Designed and fully
+   specified, but ADR-166 is deliberately still Proposed, so this is not ready
+   to build. The interview **happened
    on 2026-09-13** and **[[ADR-166 — Inbound Machine Callers Are Authenticated
    Principals]] is written** — status **Proposed**, awaiting your acceptance.
    Written by `adr-author`; wikilinks verified (69 of 70 mentions, the one
@@ -234,7 +266,7 @@ was mutation-verified — removing a gate fails only that gate's tests.
    state-changing — including `POST /delivery/send-instances/{id}/send` (fires
    real mail), `POST /recipients/{external_id}/consent` (writes the compliance
    record), `GET /recipients/` (dumps PII) and `POST /insight/events`.
-3. **Gate 1 — the positioning statement.** Still the named blocker on public
+7. **Gate 1 — the positioning statement.** Still the named blocker on public
    beta, and unchanged by any of this: rule 2 was tested on 2026-09-12 and
    held, so omni-channel stays out of the headline claim until a second channel
    actually sends.

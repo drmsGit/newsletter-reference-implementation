@@ -1,6 +1,6 @@
 ---
 type: adr
-status: proposed
+status: accepted
 topic:
   - architecture
   - security
@@ -19,7 +19,7 @@ enables:
 ---
 
 ## Status
-Proposed
+Accepted
 
 ## Context
 

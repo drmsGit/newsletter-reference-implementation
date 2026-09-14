@@ -1,6 +1,6 @@
 ---
 type: adr
-status: proposed
+status: accepted
 topic:
   - privacy
   - gdpr
@@ -8,11 +8,11 @@ topic:
   - recipients
   - governance
 created: 2026-06-06
-modified: 2026-06-06
+modified: 2026-09-14
 ---
 
 ## Status
-Proposed
+Accepted
 
 ## Context
 

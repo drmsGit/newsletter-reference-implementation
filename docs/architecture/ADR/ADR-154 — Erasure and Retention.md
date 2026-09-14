@@ -1,6 +1,6 @@
 ---
 type: adr
-status: proposed
+status: accepted
 topic:
   - architecture
   - privacy
@@ -18,7 +18,7 @@ depends_on:
 ---
 
 ## Status
-Proposed
+Accepted
 
 ## Context
 
