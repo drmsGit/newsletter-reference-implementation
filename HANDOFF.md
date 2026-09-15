@@ -48,7 +48,7 @@ WORKING STYLE:
 - Never read all ADRs into the main session — delegate the sweep.
 - Run the test suite from backend/, not the repo root.
 
-Do NOT touch the 14 Needs-ADR items unless I ask — they were deliberately
+Do NOT touch the 15 Needs-ADR items unless I ask — they were deliberately
 left open across multiple review passes.
 ```
 
