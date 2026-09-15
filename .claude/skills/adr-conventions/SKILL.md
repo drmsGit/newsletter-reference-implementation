@@ -6,7 +6,7 @@ description: The ADR format, status vocabulary, numbering rules, and
 
 # ADR Conventions
 
-Verified against all 82 records on 2026-09-14. Where this file and a habit
+Verified against all 82 records on 2026-09-15. Where this file and a habit
 disagree, this file wins — but check the reference records before assuming
 a record is wrong.
 
@@ -52,7 +52,7 @@ Optional:
 has one. Do not add one and do not flag its absence.
 
 ## Status vocabulary
-- `Proposed` — drafted, not agreed (7 records)
+- `Proposed` — drafted, not agreed (2 records)
 - `Accepted` — in force (69 records)
 - `Superseded by ADR-NNN` — replaced; the successor must exist
 - `Deprecated` — no longer in force, no successor
@@ -75,12 +75,12 @@ Decision intact. See ADR-101 (addendum 2026-08-02) and ADR-003's
 ## Known intentional deviations
 - `## Notes` absent in 36 records — optional, not a defect.
 - ADR-130 has no `## Related ADRs` section — the only record without one.
-- Seven records sit at `proposed`: **ADR-004** (privacy operations, 2026-06-06),
-  **ADR-150–154** (security, written and reviewed 2026-08-02) and **ADR-166**
-  (inbound machine authentication, 2026-09-13). Proposed is a real state here,
-  not a stalled draft. ADR-004 is easy to miss because it sits nowhere near the
-  others, and both ADR-150 and ADR-154 depend on it — so the security cluster
-  cannot strictly be ratified ahead of it.
+- **Two** records sit at `proposed`: **ADR-152** (secret and credential
+  handling, awaiting a session of its own) and **ADR-166** (inbound machine
+  authentication, 2026-09-13). Proposed is a real state here, not a stalled
+  draft. ADR-004, ADR-150, ADR-151, ADR-153 and ADR-154 were **accepted
+  2026-09-15** — this file said seven as recently as the previous day, so check
+  the frontmatter rather than this line if the two disagree.
 - **One record has been superseded:** ADR-165 supersedes ADR-001 (2026-09-12).
   It was the first supersession in the repository, so it is still worth saying
   out loud when proposing another.
