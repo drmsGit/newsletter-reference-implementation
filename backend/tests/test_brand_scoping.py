@@ -411,17 +411,6 @@ class TestBrandsCanActuallyBeAdministered:
             "named — which is what made a second brand unreachable"
         )
         assert auth.current_brand_summary(db, auth.create_session(db, user))["switchable"] is True
-
-    def test_usage_counts_are_reported_per_brand(self, db, temp_brand, temp_content):
-        brand = temp_brand()
-        assert auth.brand_usage(db).get(brand.id) == 0
-        temp_content(brand)
-        assert auth.brand_usage(db).get(brand.id) == 1, (
-            "the usage count shown beside Delete disagrees with what Delete "
-            "will actually refuse"
-        )
-
-
     def test_the_users_page_actually_renders_the_brands_panel(self, db, monkeypatch):
         """The whole visible half of the fix, asserted over HTTP.
 
@@ -456,3 +445,85 @@ class TestBrandsCanActuallyBeAdministered:
         )
         for brand in auth.list_brands(db):
             assert brand.name in page.text, f"brand {brand.name!r} is not listed"
+
+
+class TestTheAccessListResolvesOverlappingRoles:
+    """Several roles on one brand stay legal — it is how customised roles
+    combine — but the effective access must be visible rather than inferred.
+
+    Permissions are grants with no DENY, so two roles on one brand produce the
+    union. An access list showing "Manager on Default" and "Admin on Default"
+    as two lines leaves a reader to work that out in their head, and the
+    resulting set is one nobody chose explicitly.
+    """
+
+    def test_a_single_role_per_brand_shows_nothing_extra(self, db, default_brand, user_on):
+        """No noise in the ordinary case, which is almost every case."""
+        user = user_on(default_brand)
+        row = next(r for r in auth.access_list(db) if r["user"].id == user.id)
+        assert row["combined"] == [], (
+            "the effective-permissions line rendered for a user with one role "
+            "on one brand, where there is nothing to resolve"
+        )
+
+    def test_two_roles_on_one_brand_resolve_to_their_union(self, db, default_brand, user_on):
+        user = user_on(default_brand)  # Manager
+        admin_role = db.query(RoleDB).filter(RoleDB.key == "admin").first()
+        auth.assign_role(db, user.id, admin_role.id, brand_id=default_brand.id)
+
+        row = next(r for r in auth.access_list(db) if r["user"].id == user.id)
+
+        assert len(row["combined"]) == 1, (
+            f"expected one resolved brand, got {row['combined']}"
+        )
+        resolved = row["combined"][0]
+        assert resolved["brand"] == default_brand.name
+        # users.manage comes from Admin and not from Manager, so its presence
+        # proves the union was actually computed rather than one role echoed.
+        assert "users.manage" in resolved["permissions"]
+        assert "campaigns.manage" in resolved["permissions"]
+
+    def test_roles_on_different_brands_are_not_merged(
+        self, db, default_brand, temp_brand, user_on
+    ):
+        """ADR-150 point 6 — Manager on one, Viewer on another, is the design.
+
+        The union is per brand. Merging across brands would be the bug this
+        display is meant to expose, not commit.
+        """
+        second = temp_brand()
+        user = user_on(default_brand, second)
+
+        row = next(r for r in auth.access_list(db) if r["user"].id == user.id)
+
+        assert row["combined"] == [], (
+            "one role on each of two brands was reported as an overlap — the "
+            "union is per brand, not across them"
+        )
+
+    def test_the_union_is_scoped_to_its_own_brand(
+        self, db, default_brand, temp_brand, user_on
+    ):
+        """The union must not leak permissions in from another brand.
+
+        Written after a mutation exposed the gap: the earlier test gave the
+        user roles on one brand only, so "every brand" and "this brand"
+        returned the same set and dropping the brand argument entirely changed
+        nothing. Here Admin sits on a DIFFERENT brand, so `users.manage` can
+        only appear in the resolved set if the scoping was lost.
+        """
+        second = temp_brand()
+        user = user_on(default_brand)              # Manager on default
+        viewer = db.query(RoleDB).filter(RoleDB.key == "viewer").first()
+        admin = db.query(RoleDB).filter(RoleDB.key == "admin").first()
+        auth.assign_role(db, user.id, viewer.id, brand_id=default_brand.id)
+        auth.assign_role(db, user.id, admin.id, brand_id=second.id)
+
+        row = next(r for r in auth.access_list(db) if r["user"].id == user.id)
+        resolved = next(c for c in row["combined"] if c["brand"] == default_brand.name)
+
+        assert "campaigns.manage" in resolved["permissions"], "Manager's own grant is missing"
+        assert "users.manage" not in resolved["permissions"], (
+            "a permission held only on another brand appeared in this brand's "
+            "resolved set — the union is not scoped"
+        )

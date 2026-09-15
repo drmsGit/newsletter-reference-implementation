@@ -23,7 +23,7 @@ from app.auth.db_models import RoleDB
 from app.auth.service import (
     SESSION_COOKIE, SESSION_ABSOLUTE_HOURS, access_list, assign_role,
     client_identifier, cookie_secure, create_brand, create_role, create_user,
-    brand_usage, delete_brand, delete_role, dev_code_visible, list_brands,
+    delete_brand, delete_role, dev_code_visible, list_brands,
     rename_brand,
     login_request_allowed, normalise_email, request_login_code,
     revoke_assignment, revoke_token, roles_with_permissions, safe_next, set_active,
@@ -180,7 +180,6 @@ def users_page(
             "title": "Users & access",
             "error": error,
             "brands": brands,
-            "brand_usage": brand_usage(db),
             # Every brand-aware control on this page hides itself below two
             # brands (ADR-150 point 4). The brands panel itself always shows,
             # because it is the only place a second brand can come from — and

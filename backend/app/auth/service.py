@@ -135,30 +135,6 @@ def list_brands(db: Session) -> list[BrandDB]:
     return db.query(BrandDB).order_by(BrandDB.id.asc()).all()
 
 
-def brand_usage(db: Session) -> dict[int, int]:
-    """How many rows hang off each brand — content, campaigns, audiences, sends
-    and grants combined.
-
-    Shown beside Delete so the refusal is predictable rather than a surprise
-    after clicking. A zero here is the only case `delete_brand` accepts.
-    """
-    from app.audience.db_models import AudienceGroupDB
-    from app.campaigns.db_models import CampaignDB
-    from app.content.db_models import ContentRecordDB
-    from app.delivery.db_models import SendInstanceDB
-
-    counts: dict[int, int] = {}
-    for brand in db.query(BrandDB).all():
-        counts[brand.id] = sum((
-            db.query(ContentRecordDB).filter(ContentRecordDB.brand_id == brand.id).count(),
-            db.query(CampaignDB).filter(CampaignDB.brand_id == brand.id).count(),
-            db.query(AudienceGroupDB).filter(AudienceGroupDB.brand_id == brand.id).count(),
-            db.query(SendInstanceDB).filter(SendInstanceDB.brand_id == brand.id).count(),
-            db.query(RoleAssignmentDB).filter(RoleAssignmentDB.brand_id == brand.id).count(),
-        ))
-    return counts
-
-
 def create_brand(db: Session, key: str, name: str) -> BrandDB | None:
     """Add a brand. Returns None if the key is taken or empty.
 
@@ -1002,12 +978,28 @@ def access_list(db: Session) -> list[dict]:
     rows = []
     for user in db.query(UserDB).order_by(UserDB.email.asc()).all():
         grants = (
-            db.query(RoleAssignmentDB.id, RoleDB.name, BrandDB.name)
+            db.query(RoleAssignmentDB.id, RoleDB.name, BrandDB.name, BrandDB.id)
             .join(RoleDB, RoleDB.id == RoleAssignmentDB.role_id)
             .join(BrandDB, BrandDB.id == RoleAssignmentDB.brand_id)
             .filter(RoleAssignmentDB.user_id == user.id)
             .all()
         )
+
+        # Where a brand carries more than one role, resolve the union and show
+        # it. Several roles on one brand stay legal on purpose — it is how
+        # customised roles combine — but two lines reading "Manager on Default"
+        # and "Admin on Default" leave a reader to work out the actual access in
+        # their head, and nobody chose that set explicitly. Computed only for
+        # the ambiguous brands, so the ordinary one-role case costs no query
+        # and adds no noise to the page.
+        per_brand: dict[tuple[int, str], int] = {}
+        for _, _, brand_name, brand_id in grants:
+            per_brand[(brand_id, brand_name)] = per_brand.get((brand_id, brand_name), 0) + 1
+        combined = [
+            {"brand": brand_name,
+             "permissions": sorted(permissions_for(db, user, brand_id=brand_id))}
+            for (brand_id, brand_name), count in per_brand.items() if count > 1
+        ]
         live = db.query(SessionDB).filter(
             SessionDB.user_id == user.id,
             SessionDB.revoked_at.is_(None),
@@ -1015,7 +1007,8 @@ def access_list(db: Session) -> list[dict]:
         ).count()
         rows.append({
             "user": user,
-            "grants": [{"id": i, "role": r, "brand": b} for i, r, b in grants],
+            "grants": [{"id": i, "role": r, "brand": b} for i, r, b, _ in grants],
+            "combined": combined,
             "live_sessions": live,
         })
     return rows

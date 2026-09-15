@@ -83,6 +83,16 @@
                         {% else %}
                         <span class="text-muted">no roles</span>
                         {% endfor %}
+                        {# Shown only where one brand carries several roles.
+                           Permissions are grants with no DENY, so the effective
+                           access is the union — this spells it out instead of
+                           leaving it to be worked out from two lines above. #}
+                        {% for combo in row.combined %}
+                        <div class="small text-muted border-start ps-2 mb-1">
+                            Effective on <strong>{{ combo.brand }}</strong>:
+                            {{ combo.permissions | join(', ') }}
+                        </div>
+                        {% endfor %}
                         <form method="post" action="/ui/users/{{ row.user.id }}/roles"
                               class="d-flex gap-1 mt-1">
                             <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
@@ -146,7 +156,7 @@
         <table class="table table-sm align-middle mb-3">
             <thead>
                 <tr>
-                    <th>Name</th><th>Key</th><th class="text-end">In use</th><th></th>
+                    <th>Name</th><th>Key</th><th></th>
                 </tr>
             </thead>
             <tbody>
@@ -164,7 +174,6 @@
                        and any future per-brand asset path reference it, so
                        renaming the label must not move it. #}
                     <td class="small text-muted"><code>{{ brand.key }}</code></td>
-                    <td class="text-end small text-muted">{{ brand_usage[brand.id] }}</td>
                     <td class="text-end">
                         {% if brand.key != 'default' %}
                         <form method="post" action="/ui/brands/{{ brand.id }}/delete" class="m-0">
