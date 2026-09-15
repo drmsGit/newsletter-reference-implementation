@@ -573,7 +573,13 @@ def campaign_detail(
 ):
     campaign = (
         db.query(CampaignDB)
-        .filter(CampaignDB.id == campaign_id)
+        .filter(
+            CampaignDB.id == campaign_id,
+            # Scoped here too, not only in the list. A hard filter that filters
+            # only lists is not a hard filter — another brand's campaign would
+            # still open by URL, and a guessable integer id is not a secret.
+            CampaignDB.brand_id == working_brand_id(request, db),
+        )
         .first()
     )
 
@@ -762,7 +768,12 @@ def campaign_detail(
     # Audience choices for the prepare-send form, each with its live resolved
     # (consent-gated) recipient count so a manager sees the reach before planning.
     audience_choices = []
-    for group in audience_service.list_groups(db):
+    # Scoped: these feed a picker on the campaign page, and a suggested group
+    # is NAMED after the campaign that produced it ("Demo Campaign 1 —
+    # suggested audience"). Unfiltered, the picker leaked another brand's
+    # campaign names even though the campaign itself was correctly refused —
+    # the page said no and the dropdown beside it said everything.
+    for group in audience_service.list_groups(db, brand_id=working_brand_id(request, db)):
         audience_choices.append({
             "id": group.id,
             "name": group.name,
@@ -1265,9 +1276,25 @@ def content_detail(
 ):
     record = (
         db.query(ContentRecordDB)
-        .filter(ContentRecordDB.id == content_record_id)
+        .filter(
+            ContentRecordDB.id == content_record_id,
+            ContentRecordDB.brand_id == working_brand_id(request, db),
+        )
         .first()
     )
+
+    # Until the brand filter above, `record` could not be None on this route —
+    # the id came from a list the caller had just been shown. Scoping it made
+    # absence reachable for the first time, and `content_detail.html` reads
+    # `record.content.headline_medium` unguarded, so the page raised a 500
+    # instead of saying no. Answering exactly as a deleted record does is also
+    # the point: another brand's content must be indistinguishable from content
+    # that does not exist.
+    if record is None:
+        return RedirectResponse(
+            url="/ui/content?error=" + quote("That content record does not exist in this brand."),
+            status_code=303,
+        )
 
     categories = (
         db.query(
@@ -1777,6 +1804,9 @@ def decisions_list(
             CampaignDB,
             VariantDB.campaign_id == CampaignDB.id,
         )
+        # A decision slot has no brand of its own — it inherits one through the
+        # variant's campaign, which is the only place the brand is recorded.
+        .filter(CampaignDB.brand_id == working_brand_id(request, db))
         .outerjoin(
             DecisionResolutionDB,
             DecisionResolutionDB.decision_slot_id == DecisionSlotDB.id,
@@ -1856,7 +1886,8 @@ def decision_slot_detail(
             VariantDB.campaign_id == CampaignDB.id,
         )
         .filter(
-            DecisionSlotDB.id == decision_slot_id
+            DecisionSlotDB.id == decision_slot_id,
+            CampaignDB.brand_id == working_brand_id(request, db),
         )
         .first()
     )
@@ -2079,6 +2110,10 @@ def deliveries_list(
 ):
     send_instances = (
         db.query(SendInstanceDB)
+        # send_instances.brand_id is the sending brand and the arbiter of
+        # record — the send went out as this brand whatever its snapshot chain
+        # says — so this filters on the column rather than walking to campaign.
+        .filter(SendInstanceDB.brand_id == working_brand_id(request, db))
         .order_by(SendInstanceDB.created_at.desc())
         .all()
     )
@@ -2177,7 +2212,10 @@ def delivery_detail(
 ):
     send_instance = (
         db.query(SendInstanceDB)
-        .filter(SendInstanceDB.id == send_instance_id)
+        .filter(
+            SendInstanceDB.id == send_instance_id,
+            SendInstanceDB.brand_id == working_brand_id(request, db),
+        )
         .first()
     )
 
@@ -2743,6 +2781,8 @@ def audience_groups_create(
 @router.get("/ui/audience-groups/{group_id}")
 def audience_group_detail(group_id: int, request: Request, error: str | None = None, db: Session = Depends(get_db)):
     group = audience_service.get_group(db, group_id)
+    if group and group.brand_id != working_brand_id(request, db):
+        group = None  # another brand's group: indistinguishable from absent
     if not group:
         return RedirectResponse("/ui/audience-groups", status_code=303)
 

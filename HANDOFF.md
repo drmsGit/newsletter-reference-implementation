@@ -203,9 +203,14 @@ was mutation-verified — removing a gate fails only that gate's tests.
    how a second brand comes into existence.
 
    **Three known gaps, none hidden:**
-   - **Detail-by-id routes are not scoped.** The list views filter; opening
-     another brand's campaign by URL still works. A hard filter that only
-     filters lists is not yet a hard filter.
+   - ~~Detail-by-id routes are not scoped.~~ **DONE 2026-09-15** for campaigns,
+     content, audience groups, sends and decision slots. Two things that only
+     surfaced by loading the pages: scoping `content_detail` made `record is
+     None` reachable for the first time and the template raised a 500 rather
+     than saying no; and `/ui/campaigns/{id}` still leaked another brand's
+     campaign *name* through an audience picker beside it, because suggested
+     groups are named after the campaign that produced them. The page refused
+     and the dropdown did not.
    - **The twelve JSON routers default to the default brand**, with a comment
      pointing at ADR-166. They are unauthenticated, so there is no session to
      read a brand from; ADR-166's one-credential-per-brand is the real answer.
@@ -213,7 +218,29 @@ was mutation-verified — removing a gate fails only that gate's tests.
      no brand** — ruled out by ADR-150 points 2, 9 and 8 respectively. Email
      module templates are files, so already shared.
 
-4. **ADR-150 Phase 2 — consent by brand. The phase that makes the boundary
+4. **DECISION NEEDED — should anything stay global by design?** Raised
+   2026-09-15 after switching to an empty brand and finding categories and the
+   category graph still fully populated. That is **ADR-150 point 2 working as
+   written**: "no per-brand duplication of settings, strategies or taxonomy —
+   brands behave like categories". Recipients are the same (point 9).
+
+   **The user's position, which contradicts point 2 and needs an ADR before
+   anything is built:** singular areas that are global by design are
+   inconsistent and confusing, so taxonomy should be brand-specific too — and
+   the *"but then I have to do it for every brand"* complaint that follows
+   should be answered by **duplicate and/or sync between brands**, not by
+   exempting some areas from the scope. In their words, that is "probably
+   better than having singular areas that are global by design."
+
+   That reframes Phase 3 from a convenience into the mechanism the whole model
+   leans on: if nothing is global, duplication and synchronisation are how a
+   company avoids doing everything N times. Worth deciding **before** Phase 3
+   is designed, because it changes what Phase 3 is for.
+
+   Not decided here, and deliberately not implemented: point 2 is Accepted, so
+   this needs a dated addendum via `adr-author` once the call is made.
+
+5. **ADR-150 Phase 2 — consent by brand. The phase that makes the boundary
    real, and it needs an ADR-163 addendum FIRST** (that record is Accepted and
    defines the consent cell). Consent becomes
    `(recipient, brand, channel, purpose)`; the latest-wins index changes with
@@ -224,7 +251,7 @@ was mutation-verified — removing a gate fails only that gate's tests.
    Consequence to tell an adopter: a newly created brand starts with **zero
    reachable recipients** until consent is captured for it.
 
-5. **ADR-150 Phase 3 — duplication.** "Duplicate campaign to brand X", content
+6. **ADR-150 Phase 3 — duplication.** "Duplicate campaign to brand X", content
    copied with it. This is what makes single-brand content tolerable: sharing
    was rejected because the same copy under two brands needs different URLs and
    domains. No duplication machinery exists;
@@ -256,7 +283,7 @@ was mutation-verified — removing a gate fails only that gate's tests.
    row locks"*), and it is not what ADR-153 decides. Keep them apart: the audit
    log records who did what; preventing a collision is a different mechanism.
 
-6. **Gate 3 — inbound machine authentication (P0).** Designed and fully
+7. **Gate 3 — inbound machine authentication (P0).** Designed and fully
    specified, but ADR-166 is deliberately still Proposed, so this is not ready
    to build. The interview **happened
    on 2026-09-13** and **[[ADR-166 — Inbound Machine Callers Are Authenticated
@@ -334,7 +361,7 @@ was mutation-verified — removing a gate fails only that gate's tests.
    state-changing — including `POST /delivery/send-instances/{id}/send` (fires
    real mail), `POST /recipients/{external_id}/consent` (writes the compliance
    record), `GET /recipients/` (dumps PII) and `POST /insight/events`.
-7. **Gate 1 — the positioning statement.** Still the named blocker on public
+8. **Gate 1 — the positioning statement.** Still the named blocker on public
    beta, and unchanged by any of this: rule 2 was tested on 2026-09-12 and
    held, so omni-channel stays out of the headline claim until a second channel
    actually sends.
