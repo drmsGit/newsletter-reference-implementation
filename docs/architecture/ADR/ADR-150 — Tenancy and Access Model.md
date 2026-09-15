@@ -165,6 +165,31 @@ Prompted by the question of whether an admin is an admin *globally*, with only m
 
 One correction the above depends on, since the Notes above it now read older than they look: the 2026-09-14 statement that `role_assignments.brand_id` is the only brand foreign key in the database no longer holds. `content_records`, `campaigns`, `audience_groups`, `send_instances` and `sessions` each carry one as of 2026-09-15, which is what makes "the rows it guards carry a `brand_id`" a test that can be applied rather than a prediction. `consent_events` still carries none, so the brand-on-the-grant gap those Notes flag is unchanged.
 
+## Addendum 2026-09-15 — the category vocabulary is global; which content is in a category is already per-brand
+
+Prompted by switching into an empty brand: content and campaigns came back correctly empty while **the category list and the category graph stayed fully populated**. That is point 2 working exactly as written — "no per-brand duplication of settings, strategies or taxonomy" — but the question it raised is the fair one, and it is that **"most everything else carries over" is too vague to act on**. Categories look like they belong to the *content* area, which is brand-scoped, rather than to the *taxonomy*, which is not. This settles it by naming them.
+
+**The rule, and the distinction that resolves the doubt: the category vocabulary is global, and the category assignments already are not.**
+
+Verified against the schema on 2026-09-15, in `backend/app/content/db_models.py`:
+
+- `categories` and `category_relations` carry **no `brand_id`**. One shared vocabulary and one graph — "Beach" means the same thing in every brand, and the taxonomy is one graph rather than one per brand.
+- `content_category_assignments` carries **no `brand_id` either**, and does not need one. It hangs off `content_records`, which has carried a NOT NULL `brand_id` since the 2026-09-15 brand-scoping migration (`backend/scripts/migrate_0007_brand_scoping.sql`). **Which content is Beach is therefore already per-brand, transitively, with no column of its own.**
+
+A taxonomy is one shared language and each brand writes its own sentences in it. Duplicating the vocabulary per brand would produce two "Beach" categories that cannot be compared, which is precisely what point 2's refusal of per-brand taxonomy protects against — and comparability is what makes a governed taxonomy worth having at all ([[ADR-080 — Human-governed Taxonomy Before AI Selection]]).
+
+**Duplication was considered as the general answer and rejected, and that rejection is what holds the line here.** The alternative shape was to make everything brand-specific and answer the resulting "but then I have to do it for every brand" with a duplicate-and-sync convenience. It is refused because **duplication as a comfortable default is bad for data hygiene**: a per-brand taxonomy would need syncing to stay comparable, and a synced copy is a copy that drifts. The global vocabulary is kept on that argument, not on a preference for the status quo.
+
+**Flagged, not decided: a brand filter on the category graph and its analytics.** The need is real and stated — recipients of different brands react differently to the same categories. Two halves of that requirement have very different costs, and only the first is a reporting question.
+
+- **Engagement is already brand-derivable today.** `engagement_events` → `delivery_executions` → `send_instances`, and `send_instances.brand_id` exists as of 2026-09-15. A per-brand *engagement* view over categories is computable with joins, needing **no new column and no decision here**.
+- **Signal contributions are not.** `signal_contributions` (`backend/app/recipients/db_models.py`) carries recipient, category, contribution type, base weight, `occurred_at`, `source` and a nullable `event_id` — **no brand**, by point 8. A per-brand view of the decayed *affinity* score would need one.
+
+That second half **is in tension with point 8 and is deliberately not resolved here.** Point 8 shares signals at person level because "brands are presentation, so engagement is engagement". The observation behind the new requirement is that a person may respond to "Beach" under brand A and ignore it under brand B, which the shared-signal premise does not model. So, stated as the split it is: **a brand filter on engagement analytics is available now; a brand filter on the affinity score is a change to point 8's model.** It is an open question for whoever picks it up, not a decision taken by this addendum.
+
+One warning for anyone tempted to derive per-brand affinity at read time instead of answering that question. [[ADR-164 — Channel Feedback and Signals]] §9 rejected deriving `channel` from `event_id` for three reasons that transfer unchanged to deriving brand: the join path (five there, three here — contribution to event to execution to send instance) sits on every read in a layer designed around compute-on-read; `event_id` is **nullable**, since manually declared preferences have no event behind them, so brand would come back *unknowable* rather than *not applicable*; and [[ADR-132 — Signal Layer Implementation Event-Sourced Contributions with Decay-on-Read]] prunes, so old contributions would lose their brand retroactively over exactly the window worth analysing. The same three objections point at the same answer — a column — which is why this is a point 8 question rather than a reporting one.
+
+
 ## Related ADRs
 
 ### Depends On
