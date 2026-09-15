@@ -218,27 +218,34 @@ was mutation-verified — removing a gate fails only that gate's tests.
      no brand** — ruled out by ADR-150 points 2, 9 and 8 respectively. Email
      module templates are files, so already shared.
 
-4. **DECISION NEEDED — should anything stay global by design?** Raised
-   2026-09-15 after switching to an empty brand and finding categories and the
-   category graph still fully populated. That is **ADR-150 point 2 working as
-   written**: "no per-brand duplication of settings, strategies or taxonomy —
-   brands behave like categories". Recipients are the same (point 9).
+4. ~~DECISION NEEDED — should anything stay global by design?~~ **DECIDED
+   2026-09-15: yes, the category vocabulary stays global**, and it is being
+   named explicitly in ADR-150 rather than left to "most everything else
+   carries over".
 
-   **The user's position, which contradicts point 2 and needs an ADR before
-   anything is built:** singular areas that are global by design are
-   inconsistent and confusing, so taxonomy should be brand-specific too — and
-   the *"but then I have to do it for every brand"* complaint that follows
-   should be answered by **duplicate and/or sync between brands**, not by
-   exempting some areas from the scope. In their words, that is "probably
-   better than having singular areas that are global by design."
+   The distinction that settled it: **the vocabulary is global, the assignments
+   already are not.** `categories` and `category_relations` are one shared
+   language — "Beach" means the same thing in every brand — while
+   `content_category_assignments` hangs off `content_records`, which carries a
+   brand, so *which content is Beach* is already per-brand with no column of
+   its own. Each brand writes its own sentences in one shared language.
 
-   That reframes Phase 3 from a convenience into the mechanism the whole model
-   leans on: if nothing is global, duplication and synchronisation are how a
-   company avoids doing everything N times. Worth deciding **before** Phase 3
-   is designed, because it changes what Phase 3 is for.
+   **Duplication was considered as the general answer and rejected**: as a
+   comfortable default it is bad for data hygiene. A per-brand taxonomy would
+   need syncing to stay comparable, and a synced copy is a copy that drifts.
+   That keeps Phase 3 duplication as an escape hatch for campaigns and content,
+   not as the mechanism the model leans on.
 
-   Not decided here, and deliberately not implemented: point 2 is Accepted, so
-   this needs a dated addendum via `adr-author` once the call is made.
+   **Flagged for later, not decided — a brand filter on category analytics.**
+   The user's point: recipients react differently to the same category under
+   different brands. Two halves, and only one is free:
+   - **Engagement is already brand-derivable** — `engagement_events` →
+     `delivery_executions` → `send_instances.brand_id`. A per-brand engagement
+     view over categories needs joins, not columns.
+   - **Affinity is not.** `signal_contributions` carries no brand by ADR-150
+     point 8 ("brands are presentation, so engagement is engagement"). A
+     per-brand affinity score would change that premise, which is a point 8
+     question rather than a reporting one.
 
 5. **ADR-150 Phase 2 — consent by brand. The phase that makes the boundary
    real, and it needs an ADR-163 addendum FIRST** (that record is Accepted and
@@ -252,28 +259,20 @@ was mutation-verified — removing a gate fails only that gate's tests.
    reachable recipients** until consent is captured for it.
 
 6. **ADR-150 Phase 3 — duplication.** "Duplicate campaign to brand X", content
-   copied with it. This is what makes single-brand content tolerable: sharing
+   copied with it. **An escape hatch, not the mechanism** — item 4 rejected
+   duplicate-and-sync as the general answer to brand scoping, so this covers
+   campaigns and content only, where the alternative is rebuilding by hand. This is what makes single-brand content tolerable: sharing
    was rejected because the same copy under two brands needs different URLs and
    domains. No duplication machinery exists;
    `create_role(copy_from_role_id=…)` copies one flat list and is the only
    precedent. **Accepted cost:** copies diverge — a typo fixed in brand 1 stays
    wrong in brand 2.
 
-6. **ADR-150 — the original item, for reference.** A
-   pilot customer already runs ~10 brands and adds several a year, so the old
-   "one brand until a company needs more" framing is gone. **Add a `brand`
-   column to every table that needs one, starting with content, campaigns,
-   audiences and the permission grants**, give a request a way to say which
-   brand it is acting in, then pass it to the filter that already exists:
-   `has_permission(db, user, permission, brand_id=None)` accepts and filters on
-   a brand today and **no caller ever passes one**. `ConsentEventDB` has no
-   brand column either. This is a schema change across several modules — the
-   largest single piece of work in this queue.
-4. **ADR-154 — ready to implement; plan it.** Nothing exists today: no erasure
+7. **ADR-154 — ready to implement; plan it.** Nothing exists today: no erasure
    route, no service function, no script. Its own Consequences admit snapshot
    handling is blocked behind the undecided storage strategy, so that Needs-ADR
    item gates part of it.
-5. **ADR-153 — the audit log, now accepted and entirely unbuilt.** There is no
+8. **ADR-153 — the audit log, now accepted and entirely unbuilt.** There is no
    audit table anywhere in `backend/`; the only actor field in the system is
    the free-text `ContentVersionDB.created_by`. **The user gave a second reason
    for wanting it that is not in the ADR:** concurrent editing — stopping two
@@ -283,7 +282,7 @@ was mutation-verified — removing a gate fails only that gate's tests.
    row locks"*), and it is not what ADR-153 decides. Keep them apart: the audit
    log records who did what; preventing a collision is a different mechanism.
 
-7. **Gate 3 — inbound machine authentication (P0).** Designed and fully
+9. **Gate 3 — inbound machine authentication (P0).** Designed and fully
    specified, but ADR-166 is deliberately still Proposed, so this is not ready
    to build. The interview **happened
    on 2026-09-13** and **[[ADR-166 — Inbound Machine Callers Are Authenticated
@@ -361,7 +360,7 @@ was mutation-verified — removing a gate fails only that gate's tests.
    state-changing — including `POST /delivery/send-instances/{id}/send` (fires
    real mail), `POST /recipients/{external_id}/consent` (writes the compliance
    record), `GET /recipients/` (dumps PII) and `POST /insight/events`.
-8. **Gate 1 — the positioning statement.** Still the named blocker on public
+10. **Gate 1 — the positioning statement.** Still the named blocker on public
    beta, and unchanged by any of this: rule 2 was tested on 2026-09-12 and
    held, so omni-channel stays out of the headline claim until a second channel
    actually sends.
