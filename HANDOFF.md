@@ -1,6 +1,6 @@
 # HANDOFF — Newsletter Blueprint
 
-**Last updated:** 2026-09-15 · **Branch:** `main` · **Brand scoping Phase 1 built; five security ADRs accepted**
+**Last updated:** 2026-09-15 · **Branch:** `main` · **Brand scoping step 1 built; five security ADRs accepted**
 
 The account migration this file was originally written for (2026-09-04) is
 **done** — sessions now run on the business account, and nothing is left
@@ -150,6 +150,12 @@ was mutation-verified — removing a gate fails only that gate's tests.
 
 ## Open queue
 
+> **Naming:** the brand work's steps are "brand step 1/2/3", not "Phase N".
+> [[ADR-130]] already uses "Phase 2" for an unrelated architecture phase, and
+> an `adr-author` run refused to write "Phase 2" into ADR-150 for exactly that
+> reason. The label was only ever chat shorthand.
+
+
 **ADR acceptance, decided 2026-09-14.** ADR-004, 150, 151, 153 and 154 are
 **Accepted**. ADR-152 and ADR-166 stay Proposed, for different reasons:
 
@@ -164,7 +170,7 @@ was mutation-verified — removing a gate fails only that gate's tests.
 
 **Work the acceptances create, in the order it makes sense:**
 
-3. ~~**ADR-150 — multi-brand.**~~ **PHASE 1 BUILT 2026-09-15.** `brand_id` is
+3. ~~**ADR-150 — multi-brand.**~~ **BRAND STEP 1 BUILT 2026-09-15.** `brand_id` is
    on `content_records`, `campaigns`, `audience_groups` and `send_instances`
    (NOT NULL), plus `auth_sessions` (nullable, the working context).
    `migrate_0007` backfilled everything to the single default brand and
@@ -178,7 +184,7 @@ was mutation-verified — removing a gate fails only that gate's tests.
    switches brand between building a send and firing it cannot send brand 1's
    campaign as brand 2.
 
-   **What Phase 1 deliberately does NOT do — read before going near a real
+   **What brand step 1 deliberately does NOT do — read before going near a real
    send.** Brand scoping is **authoring-side only**. A brand 2 campaign is
    filtered to brand 2's content and audiences, but the send still reaches
    **every consenting recipient**, because consent carries no brand yet.
@@ -233,7 +239,7 @@ was mutation-verified — removing a gate fails only that gate's tests.
    **Duplication was considered as the general answer and rejected**: as a
    comfortable default it is bad for data hygiene. A per-brand taxonomy would
    need syncing to stay comparable, and a synced copy is a copy that drifts.
-   That keeps Phase 3 duplication as an escape hatch for campaigns and content,
+   That keeps brand step 3 duplication as an escape hatch for campaigns and content,
    not as the mechanism the model leans on.
 
    **The brand filter on category analytics — DECIDED 2026-09-15, and the
@@ -258,7 +264,7 @@ was mutation-verified — removing a gate fails only that gate's tests.
      `event_id`, ADR-132 pruning) all evaporate, because nothing derives a
      brand per contribution. The expensive answer was avoided by asking a
      better question.
-   - **It is blocked on Phase 2.** "Consented to this brand" is inexpressible
+   - **It is blocked on brand step 2.** "Consented to this brand" is inexpressible
      until consent carries a brand, so this ships *with* the consent work.
    - **Do not half-ship it.** `/ui/graph` aggregates a content count and a
      selection count, both brand-scopeable today via `content_records`, plus
@@ -270,7 +276,7 @@ was mutation-verified — removing a gate fails only that gate's tests.
    behaved, and whether particular categories drove them away. The user placed
    it in a future analytics/reporting scope not yet discussed.
 
-5. **ADR-150 Phase 2 — consent by brand. The phase that makes the boundary
+5. **Brand step 2 — consent by brand. The phase that makes the boundary
    real, and it needs an ADR-163 addendum FIRST** (that record is Accepted and
    defines the consent cell). Consent becomes
    `(recipient, brand, channel, purpose)`; the latest-wins index changes with
@@ -281,7 +287,7 @@ was mutation-verified — removing a gate fails only that gate's tests.
    Consequence to tell an adopter: a newly created brand starts with **zero
    reachable recipients** until consent is captured for it.
 
-6. **ADR-150 Phase 3 — duplication.** "Duplicate campaign to brand X", content
+6. **Brand step 3 — duplication.** "Duplicate campaign to brand X", content
    copied with it. **An escape hatch, not the mechanism** — item 4 rejected
    duplicate-and-sync as the general answer to brand scoping, so this covers
    campaigns and content only, where the alternative is rebuilding by hand. This is what makes single-brand content tolerable: sharing
