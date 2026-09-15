@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.audience import service
 from app.audience.models import AudienceGroup, AudienceGroupCreate, AudienceGroupMember
+from app.auth.service import ensure_default_brand
 from app.database import get_db
 
 router = APIRouter(prefix="/api/audience-groups", tags=["audience"])
@@ -16,7 +17,16 @@ def list_groups(db: Session = Depends(get_db)):
 @router.post("/", response_model=AudienceGroup, status_code=201)
 def create_group(payload: AudienceGroupCreate, db: Session = Depends(get_db)):
     try:
-        return service.create_group(db, payload.name, payload.description)
+        # PROVISIONAL. This router is unauthenticated (main.py leaves the twelve
+        # JSON routers unguarded — launch gate 3), so there is no session and no
+        # working brand to read. ADR-166 decides the real answer: one credential
+        # per brand, so the brand arrives with the caller's identity. Until that
+        # lands, a machine-created row goes to the default brand rather than this
+        # API inventing a brand argument ADR-166 will replace.
+        return service.create_group(
+            db, payload.name, brand_id=ensure_default_brand(db).id,
+            description=payload.description,
+        )
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error))
 

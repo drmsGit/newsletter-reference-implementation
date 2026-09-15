@@ -99,10 +99,20 @@ def set_content_status(
     return to_content_record(record)
 
 
-def list_content_records(db: Session) -> list[ContentRecord]:
-    records = db.query(ContentRecordDB).all()
+def list_content_records(db: Session, brand_id: int | None = None) -> list[ContentRecord]:
+    """Content records, scoped to one brand (ADR-150 point 2).
 
-    return [to_content_record(record) for record in records]
+    **`brand_id=None` means every brand, and is not the caller's default.**
+    It exists for the places that genuinely span brands — a platform-wide
+    count, a migration, a test. Any surface a user looks at must pass the
+    working brand, because ADR-150 point 2 makes the switcher a hard boundary,
+    not a preference.
+    """
+    query = db.query(ContentRecordDB)
+    if brand_id is not None:
+        query = query.filter(ContentRecordDB.brand_id == brand_id)
+
+    return [to_content_record(record) for record in query.all()]
 
 
 def list_categories(db: Session) -> list[Category]:
@@ -145,6 +155,14 @@ def create_demo_content_if_empty(db: Session) -> None:
     if existing_count > 0:
         return
 
+    # Content carries a NOT NULL brand since ADR-150 point 2, so the default
+    # brand must already exist. `main.py` calls `bootstrap_auth` before this
+    # for that reason — the reverse order was harmless until 2026-09-15 and is
+    # now a crash on first boot against an empty database.
+    from app.auth.service import ensure_default_brand
+
+    brand_id = ensure_default_brand(db).id
+
     mallorca = ContentRecordDB(
         title="Mallorca Beach Walk",
         description="A reusable content record about beach walks in Mallorca.",
@@ -154,6 +172,7 @@ def create_demo_content_if_empty(db: Session) -> None:
             "button_label": "Read more",
         },
         status="active",
+        brand_id=brand_id,
     )
     rome = ContentRecordDB(
         title="Rome City Weekend",
@@ -164,6 +183,7 @@ def create_demo_content_if_empty(db: Session) -> None:
             "button_label": "Read more",
         },
         status="active",
+        brand_id=brand_id,
     )
     tenerife = ContentRecordDB(
         title="Tenerife Nature Escape",
@@ -174,6 +194,7 @@ def create_demo_content_if_empty(db: Session) -> None:
             "button_label": "Read more",
         },
         status="active",
+        brand_id=brand_id,
     )
 
     beach = CategoryDB(name="Beach", type="main")
@@ -197,6 +218,7 @@ def create_content(
     db: Session,
     title: str,
     content: dict,
+    brand_id: int,
     description: str | None = None,
 ) -> ContentRecord:
 
@@ -205,6 +227,7 @@ def create_content(
         description=description,
         content=content,
         status="active",
+        brand_id=brand_id,
     )
 
     db.add(record)

@@ -10,6 +10,7 @@ import math
 import os
 
 from app.database import get_db
+from app.auth.service import SESSION_COOKIE, brands_for_user, safe_next, set_session_brand, user_for_token
 from app.recipients.consent import resolve_emails
 from app.recipients.service import to_recipient, to_recipients
 
@@ -44,6 +45,50 @@ from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
 from app.insight.db_models import EngagementEventDB
 
 router = APIRouter(tags=["frontend"])
+
+
+def working_brand_id(request: Request, db: Session) -> int:
+    """The brand this request is acting in (ADR-150 point 2).
+
+    Reads the value the middleware already resolved onto `request.state`, so
+    this is a dict lookup rather than a query on the hot path.
+
+    **Falls back to the default brand when there is no working context.** That
+    happens in exactly two situations, both legitimate: access control is
+    switched off, so nobody is signed in; or the signed-in user holds no role
+    grant at all. Falling back keeps the app usable in the first case, and in
+    the second the user cannot reach a write route anyway — `enforce_policy`
+    refuses them before this is called.
+    """
+    brand = getattr(request.state, "current_brand", None)
+    if brand:
+        return brand["id"]
+    from app.auth.service import ensure_default_brand
+
+    return ensure_default_brand(db).id
+
+
+@router.post("/ui/brand")
+def switch_brand(
+    request: Request,
+    brand_id: int = Form(...),
+    next: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Change the working brand (ADR-150 point 2's switcher).
+
+    Not a permission — any signed-in user may switch to a brand they already
+    hold a grant on, and `set_session_brand` refuses anything else. Its
+    `WRITE_POLICY` entry is therefore `view`, which every role implies.
+
+    **Answers identically whether the switch was accepted or refused.** A
+    distinct response would tell a signed-in user which brands exist beyond
+    their own grants, which is the enumeration shape ADR-151 point 2 closes on
+    the login form, arriving in a different place.
+    """
+    set_session_brand(db, request.cookies.get(SESSION_COOKIE), brand_id)
+    return RedirectResponse(url=safe_next(next), status_code=303)
+
 
 templates = Jinja2Templates(directory="app/templates")
 
@@ -503,6 +548,7 @@ def campaigns_list(
 ):
     campaigns = (
         db.query(CampaignDB)
+        .filter(CampaignDB.brand_id == working_brand_id(request, db))
         .order_by(CampaignDB.created_at.desc())
         .all()
     )
@@ -785,10 +831,11 @@ def content_category_delete(
 
 @router.post("/ui/campaigns")
 def campaign_create(
+    request: Request,
     name: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    campaign = create_campaign(db, name=name)
+    campaign = create_campaign(db, name=name, brand_id=working_brand_id(request, db))
     return RedirectResponse(url=f"/ui/campaigns/{campaign.id}", status_code=303)
 
 
@@ -1183,13 +1230,15 @@ def content_list(
     show_inactive: bool = False,
     db: Session = Depends(get_db),
 ):
-    query = db.query(ContentRecordDB)
+    brand_id = working_brand_id(request, db)
+    query = db.query(ContentRecordDB).filter(ContentRecordDB.brand_id == brand_id)
     if not show_inactive:
         query = query.filter(ContentRecordDB.status == "active")
     records = query.order_by(ContentRecordDB.id.asc()).all()
 
     inactive_count = (
         db.query(ContentRecordDB)
+        .filter(ContentRecordDB.brand_id == brand_id)
         .filter(ContentRecordDB.status != "active")
         .count()
     )
@@ -1386,6 +1435,7 @@ def content_delete(
 
 @router.post("/ui/content")
 def content_create(
+    request: Request,
     title: str = Form(...),
     description: str = Form(""),
     headline_medium: str = Form(...),
@@ -1399,6 +1449,7 @@ def content_create(
     record = create_content(
         db,
         title=title,
+        brand_id=working_brand_id(request, db),
         description=description or None,
         content={
             "headline_medium": headline_medium,
@@ -2651,7 +2702,7 @@ def category_graph(
 
 @router.get("/ui/audience-groups")
 def audience_groups_list(request: Request, error: str | None = None, db: Session = Depends(get_db)):
-    groups = audience_service.list_groups(db)
+    groups = audience_service.list_groups(db, brand_id=working_brand_id(request, db))
     rows = []
     for g in groups:
         # "Recipients" = the live resolved audience (rule blocks ∪ pins − excludes,
@@ -2661,7 +2712,12 @@ def audience_groups_list(request: Request, error: str | None = None, db: Session
         rows.append({"id": g.id, "name": g.name, "description": g.description,
                      "recipient_count": len(audience_service.resolve_audience(db, g.id)),
                      "pinned_count": pinned, "created_at": g.created_at})
-    campaigns = db.query(CampaignDB).order_by(CampaignDB.created_at.desc()).all()
+    campaigns = (
+        db.query(CampaignDB)
+        .filter(CampaignDB.brand_id == working_brand_id(request, db))
+        .order_by(CampaignDB.created_at.desc())
+        .all()
+    )
     return templates.TemplateResponse(request, "audience_groups.html",
                                       {"title": "Audience Groups", "groups": rows,
                                        "campaigns": campaigns, "error": error})
@@ -2676,7 +2732,9 @@ def audience_groups_create(
 ):
     desc = description.strip() or None
     try:
-        group = audience_service.create_group(db, name.strip(), desc)
+        group = audience_service.create_group(
+            db, name.strip(), brand_id=working_brand_id(request, db), description=desc,
+        )
     except ValueError as error:
         return RedirectResponse(f"/ui/audience-groups?error={quote(str(error))}", status_code=303)
     return RedirectResponse(f"/ui/audience-groups/{group.id}", status_code=303)

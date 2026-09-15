@@ -79,6 +79,37 @@ def to_send_instance(record: SendInstanceDB) -> SendInstance:
     )
 
 
+def brand_for_snapshot(db: Session, snapshot_id: int) -> int:
+    """The sending brand, derived from the campaign being sent (ADR-150 point 9).
+
+    Deliberately NOT taken from the caller's working context. A manager who
+    switches brand between building a send and firing it would otherwise send
+    brand 1's campaign as brand 2 — the content would be brand 1's, the record
+    would say brand 2, and every consequence downstream (point 8's candidate
+    scoping, per-brand reporting, and the per-brand consent of Phase 2) would
+    follow the wrong one.
+
+    `send_instances.brand_id` is the arbiter of record once written; this is
+    where its value comes from.
+    """
+    from app.campaigns.db_models import CampaignDB, VariantDB
+    from app.snapshots.db_models import SnapshotDB
+
+    brand_id = (
+        db.query(CampaignDB.brand_id)
+        .join(VariantDB, VariantDB.campaign_id == CampaignDB.id)
+        .join(SnapshotDB, SnapshotDB.variant_id == VariantDB.id)
+        .filter(SnapshotDB.id == snapshot_id)
+        .scalar()
+    )
+    if brand_id is None:
+        raise ValueError(
+            f"Snapshot {snapshot_id} does not resolve to a campaign, so the sending "
+            "brand cannot be determined. Refusing rather than guessing one."
+        )
+    return brand_id
+
+
 def create_send_instance(
     db: Session,
     snapshot_id: int,
@@ -91,6 +122,7 @@ def create_send_instance(
 ) -> SendInstance:
     send_instance = SendInstanceDB(
         snapshot_id=snapshot_id,
+        brand_id=brand_for_snapshot(db, snapshot_id),
         name=name,
         status=status,
         provider=provider,
@@ -160,6 +192,7 @@ def prepare_send_from_audience(
 
     send_instance = SendInstanceDB(
         snapshot_id=snapshot_id,
+        brand_id=brand_for_snapshot(db, snapshot_id),
         name=name,
         status="scheduled" if scheduled_at else "draft",
         provider=provider,

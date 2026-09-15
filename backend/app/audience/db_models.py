@@ -7,6 +7,11 @@ class AudienceGroupDB(Base):
     __tablename__ = "audience_groups"
 
     id = Column(Integer, primary_key=True, index=True)
+    # ADR-150 point 2. Brand here is OWNERSHIP, not membership: the criteria
+    # resolve to the same people whichever brand asks, because a recipient
+    # carries no brand (point 9) and consent does not carry one yet. Making
+    # membership differ per brand is the Phase 2 consent work.
+    brand_id = Column(Integer, ForeignKey("brands.id"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     # Set when the group was seeded by "Suggest audience" from a campaign.
@@ -26,7 +31,10 @@ class AudienceGroupDB(Base):
         # vips" must not both exist) — a functional index on lower(name)
         # subsumes plain case-sensitive uniqueness, so there's no separate
         # unique=True on the column.
-        Index("ux_audience_groups_name_lower", func.lower(name), unique=True),
+        # Scoped to the brand, so two brands may each own a "VIPs". This stays
+        # expressible as a database constraint only because an audience belongs
+        # to exactly one brand.
+        Index("ux_audience_groups_brand_name_lower", brand_id, func.lower(name), unique=True),
     )
 
 

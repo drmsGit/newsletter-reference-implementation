@@ -7,6 +7,14 @@ class SendInstanceDB(Base):
     __tablename__ = "send_instances"
 
     id = Column(Integer, primary_key=True, index=True)
+    # ADR-150 points 2 and 9 — the sending brand, and singular by decision.
+    #
+    # This table already has two paths to a brand: snapshot -> variant ->
+    # campaign (snapshot_id is NOT NULL) and audience_group_id. This column is
+    # the ARBITER when those disagree, not a third opinion — the send went out
+    # as this brand whatever the chain says. Same reasoning as the denormalised
+    # channel/purpose below.
+    brand_id = Column(Integer, ForeignKey("brands.id"), nullable=False, index=True)
     snapshot_id = Column(Integer, ForeignKey("snapshots.id"), nullable=False)
     name = Column(String(255), nullable=False)
     status = Column(String(50), nullable=False, default="draft")

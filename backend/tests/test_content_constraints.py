@@ -22,6 +22,7 @@ from app.content import service as content_service
 from app.content.db_models import (
     CategoryDB, ContentCategoryAssignmentDB, ContentRecordDB, ContentVersionDB,
 )
+from app.auth.service import ensure_default_brand
 from app.database import SessionLocal
 
 
@@ -43,6 +44,7 @@ def temp_record(db):
         record = ContentRecordDB(
             title=f"test-{uuid.uuid4().hex[:12]}",
             content={"headline_medium": "x"},
+            brand_id=ensure_default_brand(db).id,
         )
         db.add(record)
         db.commit()

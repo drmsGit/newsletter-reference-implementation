@@ -7,6 +7,8 @@ class CampaignDB(Base):
     __tablename__ = "campaigns"
 
     id = Column(Integer, primary_key=True, index=True)
+    # ADR-150 point 2. A campaign is composed for one brand and sent as it.
+    brand_id = Column(Integer, ForeignKey("brands.id"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     status = Column(String(50), nullable=False, default="draft")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

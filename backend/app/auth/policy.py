@@ -33,6 +33,12 @@ WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 UNMAPPED = "unmapped.write"
 
 WRITE_POLICY: tuple[tuple[str, str], ...] = (
+    # --- the working context -------------------------------------------------
+    # Switching brand is not a capability, it is navigation: the route refuses
+    # any brand the user holds no grant on, so `view` (implied by every role)
+    # is the honest requirement rather than inventing a permission for it.
+    ("/ui/brand", VIEW),
+
     # --- narrow cases that live inside broader prefixes ---------------------
     # Spends real money, so it is gated on AI rather than on owning the campaign.
     ("/ui/campaigns/{campaign_id}/variants/{variant_id}/suggest-subject", AI_RUN),

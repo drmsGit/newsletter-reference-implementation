@@ -49,6 +49,7 @@ import pytest
 
 from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB
 from app.audience.service import find_by_criteria, resolve_audience
+from app.auth.service import ensure_default_brand
 from app.database import SessionLocal
 from app.decision.service import execute_decision_slot
 from app.recipients.consent import is_consenting, record_consent
@@ -58,6 +59,7 @@ from app.recipients.db_models import (
     ConsentSyncLogDB,
     RecipientDB,
 )
+from app.delivery.service import brand_for_snapshot
 from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
 from app.delivery.service import send_send_instance
 from app.recipients.service import (
@@ -135,7 +137,10 @@ def db():
             return record
 
         def group(self, name="test-consent-group"):
-            group = AudienceGroupDB(name=f"{name}-{uuid.uuid4()}")
+            group = AudienceGroupDB(
+                name=f"{name}-{uuid.uuid4()}",
+                brand_id=ensure_default_brand(self.session).id,
+            )
             self.session.add(group)
             self.session.flush()
             created_groups.append(group.id)
@@ -174,6 +179,9 @@ def db():
 
             send_instance = SendInstanceDB(
                 snapshot_id=snapshot.id,
+                # Derived the same way the service derives it, so the fixture
+                # cannot drift from what a real send would record.
+                brand_id=brand_for_snapshot(self.session, snapshot.id),
                 name=f"test-consent-send-{uuid.uuid4()}",
                 status="draft",
                 provider="mock",

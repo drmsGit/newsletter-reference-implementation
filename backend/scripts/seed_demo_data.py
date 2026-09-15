@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import text
 
+from app.auth.service import ensure_default_brand
 from app.database import SessionLocal, engine
 from app.content.db_models import (
     CategoryDB,
@@ -94,10 +95,23 @@ RELATIONS = [
 ]
 
 
+BRAND_ID: int | None = None
+
+
 def seed():
     db = SessionLocal()
     try:
         _truncate(db)
+
+        # Content, campaigns and sends carry a NOT NULL brand since ADR-150
+        # point 2. `_truncate` deliberately leaves `brands` alone, so the
+        # default row survives a reseed — but on a database that has never
+        # booted the app there is nothing to survive, hence ensure rather than
+        # assume. Everything demo data creates belongs to the one brand: this
+        # is a single-brand fixture, and it stays that way so the suite keeps
+        # exercising the degenerate case ADR-150 point 4 promises is free.
+        global BRAND_ID
+        BRAND_ID = ensure_default_brand(db).id
 
         # --- categories -------------------------------------------------
         cat = {}
@@ -128,7 +142,8 @@ def seed():
                 "button_label": "Read more",
                 "image_url": f"/static/img/demo-{i}.jpg",
             }
-            rec = ContentRecordDB(title=title, description=body["body_medium"], content=body, status="active")
+            rec = ContentRecordDB(title=title, description=body["body_medium"], content=body,
+                                  status="active", brand_id=BRAND_ID)
             db.add(rec)
             contents.append((rec, primary))
         db.commit()
@@ -224,7 +239,7 @@ def seed():
         slots = []
         pos_ids = [cat[n].id for n in POSITIVE]
         for ci in range(1, 5):
-            camp = CampaignDB(name=f"Demo Campaign {ci}", status="draft")
+            camp = CampaignDB(name=f"Demo Campaign {ci}", status="draft", brand_id=BRAND_ID)
             db.add(camp); db.flush()
             variant = VariantDB(campaign_id=camp.id, name=f"Variant {ci}A",
                                 subject=f"Edition {ci}: picked for you", preheader="Your personalized selection", status="draft")
@@ -275,7 +290,8 @@ def seed():
         snap = SnapshotDB(variant_id=slots[0][1].id, html_storage_type="file",
                           html_location="/tmp/demo.html", html_size=0)
         db.add(snap); db.flush()
-        si = SendInstanceDB(snapshot_id=snap.id, name="Demo send", status="sent", provider="mock")
+        si = SendInstanceDB(snapshot_id=snap.id, name="Demo send", status="sent",
+                            provider="mock", brand_id=BRAND_ID)
         db.add(si); db.flush()
         db.commit()
 

@@ -178,3 +178,10 @@ class SessionDB(Base):
     last_seen_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False)
     revoked_at = Column(DateTime(timezone=True), nullable=True)
+    # The brand this session is working in (ADR-150 point 2's switcher).
+    # Nullable: a session predating the switcher, or one belonging to a user
+    # with no grant at all, simply has no working context — the resolver falls
+    # back rather than the column lying. Server-side on purpose: the same
+    # reason the session token is, and it dies with the session when ADR-151
+    # point 3's immediate revocation fires.
+    brand_id = Column(Integer, ForeignKey("brands.id"), nullable=True, index=True)

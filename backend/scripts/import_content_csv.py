@@ -20,6 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from app.auth.service import ensure_default_brand
 from app.database import SessionLocal  # noqa: E402
 from app.content.db_models import (  # noqa: E402
     CategoryDB,
@@ -130,6 +131,12 @@ def main() -> int:
                 description=((row.get("description") or "").strip() or None),
                 content=content,
                 status="active",
+                # The CSV has no brand column and inventing one per row would
+                # be guessing. Imported content lands on the default brand; a
+                # multi-brand adopter reassigns it or imports per brand, which
+                # is a conversation to have when somebody actually needs it
+                # rather than a column added to a file format on spec.
+                brand_id=ensure_default_brand(db).id,
             )
             db.add(record)
             db.flush()  # assign record.id without committing

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.campaigns.db_models import DecisionSlotDB
 from app.content.db_models import ContentCategoryAssignmentDB, ContentRecordDB
 from app.content.service import get_latest_version_for_content
-from app.decision.strategies.base import ConfigField, DecisionStrategy, StrategyMeta, StrategyResult
+from app.decision.strategies.base import ConfigField, DecisionStrategy, StrategyMeta, StrategyResult, sending_brand_id
 from app.insight.signals import operational_signals_for_recipient
 
 DEFAULT_CONFIG = {
@@ -83,6 +83,12 @@ class RecipientTopScoreStrategy(DecisionStrategy):
                 ContentRecordDB.id == ContentCategoryAssignmentDB.content_id,
             )
             .filter(ContentRecordDB.status == "active")
+            # ADR-150 point 8: a decision slot resolves ONLY the sending
+            # brand's content. Safe by construction — widening it is the
+            # configurable filter point 10 defers, not this default. A slot
+            # whose campaign chain is broken resolves nothing rather than
+            # every brand's content, because an unknown brand is not "any".
+            .filter(ContentRecordDB.brand_id == sending_brand_id(db, slot))
         )
 
         if category_ids:

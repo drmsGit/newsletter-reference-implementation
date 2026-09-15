@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.auth.service import ensure_default_brand
 from app.database import get_db
 from app.campaigns.models import (
     Campaign,
@@ -44,9 +45,16 @@ def create_campaign_record(
     payload: CampaignCreate,
     db: Session = Depends(get_db),
 ):
+    # PROVISIONAL. This router is unauthenticated (main.py leaves the twelve
+    # JSON routers unguarded — launch gate 3), so there is no session and no
+    # working brand to read. ADR-166 decides the real answer: one credential
+    # per brand, so the brand arrives with the caller's identity. Until that
+    # lands, a machine-created row goes to the default brand rather than this
+    # API inventing a brand argument ADR-166 will replace.
     return create_campaign(
         db=db,
         name=payload.name,
+        brand_id=ensure_default_brand(db).id,
         status=payload.status,
         initial_variant_name=payload.initial_variant_name,
     )

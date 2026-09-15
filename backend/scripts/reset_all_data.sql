@@ -38,16 +38,29 @@ TRUNCATE TABLE
 RESTART IDENTITY CASCADE;
 
 -- =========================================================
+-- BRAND
+-- =========================================================
+-- Content and campaigns carry a NOT NULL brand since ADR-150 point 2. This
+-- script does not truncate `brands`, so the default row survives a reset —
+-- resolve it once here and reference it as :brand_id below. Everything this
+-- fixture creates belongs to the single default brand, deliberately: that is
+-- the degenerate one-brand case ADR-150 point 4 promises costs nothing, and
+-- it is the shape the fixture should keep exercising.
+
+SELECT id AS brand_id FROM brands ORDER BY id LIMIT 1 \gset
+
+
+-- =========================================================
 -- CONTENT
 -- =========================================================
 
-INSERT INTO content_records (title, description, content, status) VALUES
+INSERT INTO content_records (title, description, content, status, brand_id) VALUES
     ('Mallorca Beach Walk',    'Discover the hidden coves of Mallorca''s northwest coast — a 12km walk between Port de Sóller and Sa Calobra.',
-     '{"headline_medium": "Mallorca Beach Walk", "body_medium": "Discover the hidden coves of Mallorca''s northwest coast.", "button_label": "Read more", "image_url": "/static/img/mallorca.jpg"}', 'active'),
+     '{"headline_medium": "Mallorca Beach Walk", "body_medium": "Discover the hidden coves of Mallorca''s northwest coast.", "button_label": "Read more", "image_url": "/static/img/mallorca.jpg"}', 'active', :brand_id),
     ('Rome City Weekend',      'Three days in Rome without the tourist traps: neighbourhood trattorias, the Trastevere market, and a private tour of the Borghese Gallery.',
-     '{"headline_medium": "Rome City Weekend", "body_medium": "Three days in Rome without the tourist traps.", "button_label": "Read more", "image_url": "/static/img/rome.jpg"}', 'active'),
+     '{"headline_medium": "Rome City Weekend", "body_medium": "Three days in Rome without the tourist traps.", "button_label": "Read more", "image_url": "/static/img/rome.jpg"}', 'active', :brand_id),
     ('Tenerife Nature Escape', 'Teide at sunrise, laurel forest hikes in Anaga, and the star-gazing plateau of El Médano — Tenerife beyond the resorts.',
-     '{"headline_medium": "Tenerife Nature Escape", "body_medium": "Teide at sunrise, laurel forest hikes in Anaga.", "button_label": "Read more", "image_url": "/static/img/tenerife.jpg"}', 'active');
+     '{"headline_medium": "Tenerife Nature Escape", "body_medium": "Teide at sunrise, laurel forest hikes in Anaga.", "button_label": "Read more", "image_url": "/static/img/tenerife.jpg"}', 'active', :brand_id);
 
 INSERT INTO content_versions (content_record_id, version_number, content, created_by) VALUES
     (1, 1, '{"headline_medium": "Mallorca Beach Walk",    "body_medium": "Discover the hidden coves of Mallorca''s northwest coast.", "button_label": "Read more", "image_url": "/static/img/mallorca.jpg"}', 'seed'),
@@ -150,8 +163,8 @@ JOIN categories cat ON cat.name = v.category_name;
 -- CAMPAIGN + VARIANTS + STRUCTURE
 -- =========================================================
 
-INSERT INTO campaigns (name, status) VALUES
-    ('Summer 2026 Newsletter', 'draft');
+INSERT INTO campaigns (name, status, brand_id) VALUES
+    ('Summer 2026 Newsletter', 'draft', :brand_id);
 
 -- name is the internal label; subject/preheader are the recipient-facing copy
 -- used at send time (never the send_instance label).

@@ -20,8 +20,24 @@ logger = logging.getLogger(__name__)
 DEFAULT_SUGGESTION_MIN_SCORE = 1.0
 
 
-def list_groups(db: Session) -> list[AudienceGroupDB]:
-    return db.query(AudienceGroupDB).order_by(AudienceGroupDB.name.asc()).all()
+def list_groups(db: Session, brand_id: int | None = None) -> list[AudienceGroupDB]:
+    """Audience groups, scoped to one brand (ADR-150 point 2).
+
+    Brand here is **ownership, not membership**: the criteria behind a group
+    resolve to the same people whichever brand asks, because a recipient
+    carries no brand (point 9) and consent does not carry one yet. Making
+    membership differ per brand is the Phase 2 consent work.
+
+    **`brand_id=None` means every brand, and is not the caller's default.**
+    It exists for the places that genuinely span brands — a platform-wide
+    count, a migration, a test. Any surface a user looks at must pass the
+    working brand, because ADR-150 point 2 makes the switcher a hard boundary,
+    not a preference.
+    """
+    query = db.query(AudienceGroupDB)
+    if brand_id is not None:
+        query = query.filter(AudienceGroupDB.brand_id == brand_id)
+    return query.order_by(AudienceGroupDB.name.asc()).all()
 
 
 def get_group(db: Session, group_id: int) -> AudienceGroupDB | None:
@@ -29,9 +45,13 @@ def get_group(db: Session, group_id: int) -> AudienceGroupDB | None:
 
 
 def create_group(
-    db: Session, name: str, description: str | None = None, source_campaign_id: int | None = None
+    db: Session, name: str, brand_id: int, description: str | None = None,
+    source_campaign_id: int | None = None,
 ) -> AudienceGroupDB:
-    group = AudienceGroupDB(name=name, description=description, source_campaign_id=source_campaign_id)
+    group = AudienceGroupDB(
+        name=name, brand_id=brand_id, description=description,
+        source_campaign_id=source_campaign_id,
+    )
     db.add(group)
     try:
         db.commit()

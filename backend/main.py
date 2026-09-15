@@ -147,7 +147,10 @@ from app.auth.dependencies import (
 from app.auth.router import router as auth_router
 from app.auth.service import (
     SESSION_COOKIE, bootstrap as bootstrap_auth, csrf_token_for,
+    brands_for_user,
+    current_brand_summary,
     current_user_summary,
+    user_for_token,
 )
 
 from app.frontend.router import router as frontend_router
@@ -207,11 +210,16 @@ Base.metadata.create_all(bind=engine)
 
 
 with SessionLocal() as db:
-    create_demo_content_if_empty(db)
     # Seed the default brand, the three preset roles and — while the user table
     # is empty — an initial Admin from INITIAL_ADMIN_EMAIL. Without that last
     # step nobody could ever sign in (ADR-151).
+    #
+    # MUST run before create_demo_content_if_empty: `ensure_default_brand` lives
+    # in here, and content now carries a NOT NULL brand (ADR-150 point 2). The
+    # other order was harmless until 2026-09-15 and would now be a crash on
+    # first boot against an empty database — the one case nobody tests twice.
     bootstrap_auth(db)
+    create_demo_content_if_empty(db)
     from app.auth.dependencies import auth_enforced
     from app.auth.service import cookie_secure
 
@@ -269,6 +277,27 @@ async def attach_current_user(request: Request, call_next):
         # Every form needs this; deriving it here means no route has to
         # remember to put it in its template context.
         request.state.csrf_token = csrf_token_for(request.cookies.get(SESSION_COOKIE))
+        # The working brand (ADR-150 point 2), for the same reason as the two
+        # above: there are 21 TemplateResponse sites and no shared context
+        # helper, so threading it through per-route dicts would be 21 chances
+        # to forget. A plain dict, never the ORM object — this session closes
+        # immediately below and a committed instance expires on first attribute
+        # access in the template.
+        request.state.current_brand = current_brand_summary(
+            db, request.cookies.get(SESSION_COOKIE)
+        )
+        # Only paid for when the switcher will actually render. A single-brand
+        # company never reaches this query at all.
+        request.state.brand_options = (
+            [
+                {"id": b.id, "name": b.name}
+                for b in brands_for_user(
+                    db, user_for_token(db, request.cookies.get(SESSION_COOKIE))
+                )
+            ]
+            if request.state.current_brand and request.state.current_brand["switchable"]
+            else []
+        )
     finally:
         db.close()
     return await call_next(request)

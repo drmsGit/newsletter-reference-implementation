@@ -127,3 +127,21 @@ class DecisionStrategy(ABC):
         the caller handles graceful degradation (ADR-086).
         """
         pass
+
+
+def sending_brand_id(db, slot) -> int | None:
+    """The brand of the campaign this decision slot belongs to (ADR-150 point 8).
+
+    A slot hangs off a variant, which hangs off a campaign, which carries the
+    brand. Returns None only if that chain is broken, in which case the caller
+    must not silently widen the candidate set — an unknown brand is not the
+    same as every brand.
+    """
+    from app.campaigns.db_models import CampaignDB, VariantDB
+
+    return (
+        db.query(CampaignDB.brand_id)
+        .join(VariantDB, VariantDB.campaign_id == CampaignDB.id)
+        .filter(VariantDB.id == slot.variant_id)
+        .scalar()
+    )

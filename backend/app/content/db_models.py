@@ -7,6 +7,11 @@ class ContentRecordDB(Base):
     __tablename__ = "content_records"
 
     id = Column(Integer, primary_key=True, index=True)
+    # ADR-150 point 2: a content record belongs to exactly one brand. Sharing
+    # one record across brands was considered and rejected on 2026-09-15 —
+    # the same copy under two brands needs different URLs and domains at
+    # minimum, so 1:1 reuse is not realistic. The escape hatch is duplication.
+    brand_id = Column(Integer, ForeignKey("brands.id"), nullable=False, index=True)
     title = Column(String(255), nullable=False)
     description = Column(String(500), nullable=True)
     content = Column(JSON, nullable=False, default=dict)

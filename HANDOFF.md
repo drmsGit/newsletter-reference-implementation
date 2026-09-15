@@ -1,6 +1,6 @@
 # HANDOFF — Newsletter Blueprint
 
-**Last updated:** 2026-09-14 · **Branch:** `main` · **Gates 2, 4 and 4b closed; five security ADRs accepted**
+**Last updated:** 2026-09-15 · **Branch:** `main` · **Brand scoping Phase 1 built; five security ADRs accepted**
 
 The account migration this file was originally written for (2026-09-04) is
 **done** — sessions now run on the business account, and nothing is left
@@ -164,7 +164,59 @@ was mutation-verified — removing a gate fails only that gate's tests.
 
 **Work the acceptances create, in the order it makes sense:**
 
-3. **ADR-150 — multi-brand is now a normal case, not a rare escalation.** A
+3. ~~**ADR-150 — multi-brand.**~~ **PHASE 1 BUILT 2026-09-15.** `brand_id` is
+   on `content_records`, `campaigns`, `audience_groups` and `send_instances`
+   (NOT NULL), plus `auth_sessions` (nullable, the working context).
+   `migrate_0007` backfilled everything to the single default brand and
+   rescoped `ux_audience_groups_name_lower` to `(brand_id, lower(name))`, so
+   two brands may each own a "VIPs". A switcher sits in the navbar and
+   **renders only when the user holds grants on more than one brand** — ADR-150
+   point 4's promise, and the thing most worth not breaking. 229 tests.
+
+   **The sending brand is derived, never taken from the session.**
+   `brand_for_snapshot` walks snapshot → variant → campaign, so a manager who
+   switches brand between building a send and firing it cannot send brand 1's
+   campaign as brand 2.
+
+   **What Phase 1 deliberately does NOT do — read before going near a real
+   send.** Brand scoping is **authoring-side only**. A brand 2 campaign is
+   filtered to brand 2's content and audiences, but the send still reaches
+   **every consenting recipient**, because consent carries no brand yet.
+   Audience criteria are `{language, status, category_id, min_score}` — all
+   properties of the person — and recipients deliberately carry no brand
+   (point 9). Two brands' "VIPs" contain the same people.
+
+   **Three known gaps, none hidden:**
+   - **Detail-by-id routes are not scoped.** The list views filter; opening
+     another brand's campaign by URL still works. A hard filter that only
+     filters lists is not yet a hard filter.
+   - **The twelve JSON routers default to the default brand**, with a comment
+     pointing at ADR-166. They are unauthenticated, so there is no session to
+     read a brand from; ADR-166's one-credential-per-brand is the real answer.
+   - **`categories`, `recipients`, `signal_contributions`, `app_config` carry
+     no brand** — ruled out by ADR-150 points 2, 9 and 8 respectively. Email
+     module templates are files, so already shared.
+
+4. **ADR-150 Phase 2 — consent by brand. The phase that makes the boundary
+   real, and it needs an ADR-163 addendum FIRST** (that record is Accepted and
+   defines the consent cell). Consent becomes
+   `(recipient, brand, channel, purpose)`; the latest-wins index changes with
+   it. Touches the compliance path: `app/recipients/consent.py`, both audience
+   gates, `app/delivery/exclusion.py`, `app/decision/service.py`, the CRM sync
+   and the provider webhook. **Opt-out defaults to the sending brand**, with a
+   visible "all brands" option a company can switch off. Decided 2026-09-15.
+   Consequence to tell an adopter: a newly created brand starts with **zero
+   reachable recipients** until consent is captured for it.
+
+5. **ADR-150 Phase 3 — duplication.** "Duplicate campaign to brand X", content
+   copied with it. This is what makes single-brand content tolerable: sharing
+   was rejected because the same copy under two brands needs different URLs and
+   domains. No duplication machinery exists;
+   `create_role(copy_from_role_id=…)` copies one flat list and is the only
+   precedent. **Accepted cost:** copies diverge — a typo fixed in brand 1 stays
+   wrong in brand 2.
+
+6. **ADR-150 — the original item, for reference.** A
    pilot customer already runs ~10 brands and adds several a year, so the old
    "one brand until a company needs more" framing is gone. **Add a `brand`
    column to every table that needs one, starting with content, campaigns,

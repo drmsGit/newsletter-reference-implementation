@@ -21,6 +21,27 @@
            Users & access, so an account whose role could not open that page had
            no way out at all. #}
         <div class="d-flex align-items-center gap-2">
+            {# The brand switcher renders ONLY for a user who holds grants on
+               more than one brand. ADR-150 point 4 promises a company using
+               brands as a logo and a palette "never has to think about the
+               switcher" — a dropdown with one option in it would break that
+               promise, and the promise is the reason the scope was designed in
+               from the start rather than retrofitted. #}
+            {% if request.state.current_brand and request.state.current_brand.switchable %}
+            <form method="post" action="/ui/brand" class="m-0">
+                <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+                <input type="hidden" name="next" value="{{ request.url.path }}">
+                <select name="brand_id" class="form-select form-select-sm"
+                        onchange="this.form.submit()" aria-label="Working brand">
+                    {% for brand in request.state.brand_options %}
+                    <option value="{{ brand.id }}"
+                        {% if brand.id == request.state.current_brand.id %}selected{% endif %}>
+                        {{ brand.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </form>
+            {% endif %}
             {% if request.state.current_user %}
             <span class="navbar-text small">{{ request.state.current_user.email }}</span>
             <form method="post" action="/ui/logout" class="m-0">

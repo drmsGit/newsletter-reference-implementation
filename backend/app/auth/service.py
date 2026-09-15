@@ -123,6 +123,102 @@ def current_user_summary(db: Session, token: str | None) -> dict | None:
     return {"id": user.id, "email": user.email, "display_name": user.display_name}
 
 
+# --- the working brand (ADR-150 point 2) -----------------------------------
+
+def brands_for_user(db: Session, user: UserDB | None) -> list[BrandDB]:
+    """Every brand this user holds a grant on, ordered by id.
+
+    Empty for an unknown or deactivated user. Note this is *grants*, not every
+    brand that exists: an Admin on brand 1 only does not get brand 2 handed to
+    them because it happens to be in the table.
+    """
+    if user is None or not user.is_active:
+        return []
+    return (
+        db.query(BrandDB)
+        .join(RoleAssignmentDB, RoleAssignmentDB.brand_id == BrandDB.id)
+        .filter(RoleAssignmentDB.user_id == user.id)
+        .order_by(BrandDB.id.asc())
+        .distinct()
+        .all()
+    )
+
+
+def resolve_session_brand(db: Session, token: str | None) -> BrandDB | None:
+    """Which brand this session is working in. Validated, never trusted.
+
+    `auth_sessions.brand_id` is a *cache* of a choice the user made, not an
+    authority. The grant table is the authority, so the stored value is checked
+    against it on every resolution — a grant revoked after the choice was made
+    must stop taking effect immediately, which is the same property ADR-151
+    point 3 gives sessions themselves.
+
+    Falls back to the user's first granted brand when the stored one is absent
+    or no longer granted. Returns None only when the user holds no grant at
+    all, which is a real state (a user created with no role) and must not be
+    papered over with the default brand — that would invent access.
+    """
+    user = user_for_token(db, token)
+    granted = brands_for_user(db, user)
+    if not granted:
+        return None
+
+    row = (
+        db.query(SessionDB)
+        .filter(SessionDB.token_hash == hash_secret(token or ""), SessionDB.revoked_at.is_(None))
+        .first()
+    )
+    if row is not None and row.brand_id is not None:
+        for brand in granted:
+            if brand.id == row.brand_id:
+                return brand
+
+    return granted[0]
+
+
+def current_brand_summary(db: Session, token: str | None) -> dict | None:
+    """Plain data about the working brand, safe to hand a template.
+
+    A dict rather than the ORM object, for the same reason
+    `current_user_summary` is one: the middleware closes its session
+    immediately and a committed instance would expire on first attribute
+    access in the template.
+
+    `switchable` is what keeps ADR-150 point 4's promise that a single-brand
+    company "never has to think about the switcher" — the navbar renders
+    nothing at all unless this is True.
+    """
+    brand = resolve_session_brand(db, token)
+    if brand is None:
+        return None
+    return {
+        "id": brand.id,
+        "key": brand.key,
+        "name": brand.name,
+        "switchable": len(brands_for_user(db, user_for_token(db, token))) > 1,
+    }
+
+
+def set_session_brand(db: Session, token: str | None, brand_id: int) -> BrandDB | None:
+    """Switch the working brand. Refuses a brand the user holds no grant on.
+
+    Returns the new brand, or None if the switch was refused — the caller
+    answers the same either way, because a response that differed would tell a
+    signed-in user which brands exist beyond their own grants.
+    """
+    user = user_for_token(db, token)
+    target = next((b for b in brands_for_user(db, user) if b.id == brand_id), None)
+    if target is None:
+        logger.warning("auth: refused a brand switch to a brand the user holds no grant on")
+        return None
+
+    db.query(SessionDB).filter(
+        SessionDB.token_hash == hash_secret(token or ""), SessionDB.revoked_at.is_(None)
+    ).update({"brand_id": target.id})
+    db.commit()
+    return target
+
+
 # --- seeding ---------------------------------------------------------------
 
 def ensure_default_brand(db: Session) -> BrandDB:
@@ -530,10 +626,15 @@ def verify_login_code(db: Session, email: str, code: str) -> str | None:
 
 def create_session(db: Session, user: UserDB) -> str:
     token = secrets.token_urlsafe(32)
+    granted = brands_for_user(db, user)
     db.add(SessionDB(
         user_id=user.id,
         token_hash=hash_secret(token),
         expires_at=now() + timedelta(hours=SESSION_ABSOLUTE_HOURS),
+        # The working brand starts at the first brand they hold, and stays None
+        # for a user with no grant — `resolve_session_brand` falls back rather
+        # than this column asserting access nobody gave.
+        brand_id=granted[0].id if granted else None,
     ))
     db.commit()
     return token

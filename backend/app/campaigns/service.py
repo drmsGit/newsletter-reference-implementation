@@ -30,14 +30,25 @@ def to_variant(record: VariantDB) -> Variant:
     )
 
 
-def list_campaigns(db: Session) -> list[Campaign]:
-    records = db.query(CampaignDB).all()
-    return [to_campaign(record) for record in records]
+def list_campaigns(db: Session, brand_id: int | None = None) -> list[Campaign]:
+    """Campaigns, scoped to one brand (ADR-150 point 2).
+
+    **`brand_id=None` means every brand, and is not the caller's default.**
+    It exists for the places that genuinely span brands — a platform-wide
+    count, a migration, a test. Any surface a user looks at must pass the
+    working brand, because ADR-150 point 2 makes the switcher a hard boundary,
+    not a preference.
+    """
+    query = db.query(CampaignDB)
+    if brand_id is not None:
+        query = query.filter(CampaignDB.brand_id == brand_id)
+    return [to_campaign(record) for record in query.all()]
 
 
 def create_campaign(
     db: Session,
     name: str,
+    brand_id: int,
     status: str = "draft",
     initial_variant_name: str = "Variant A",
 ) -> CampaignWithVariants:
@@ -49,6 +60,7 @@ def create_campaign(
     campaign = CampaignDB(
         name=name,
         status=status,
+        brand_id=brand_id,
     )
 
     db.add(campaign)
