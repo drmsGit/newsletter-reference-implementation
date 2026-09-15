@@ -287,6 +287,34 @@ was mutation-verified — removing a gate fails only that gate's tests.
    Consequence to tell an adopter: a newly created brand starts with **zero
    reachable recipients** until consent is captured for it.
 
+
+   **The ADR-163 addendum is written (2026-09-15).** Four things it decides:
+   the cell becomes `(recipient, brand, channel, purpose)`; an opt-out defaults
+   to the sending brand with an "all brands" option a company may switch off;
+   **the CRM carries the brand, and an assertion naming none is REFUSED rather
+   than defaulted** — defaulting would manufacture consent on the record that
+   answers a UWG §7 complaint, the same invention `migrate_0001a` refused when
+   it chose `source='migration'` over `'crm'`; and the 41 existing rows belong
+   to the default brand.
+
+   **The migration guard must NOT copy `migrate_0007`'s.** That script refuses
+   when more than one brand exists and rows are unassigned — and a second brand
+   now exists ("Test third", created 2026-09-15), so that guard would refuse.
+   A **timestamp** argument is available and is stronger anyway: the newest
+   consent row is 2026-07-27 and the oldest non-default brand is 2026-09-15,
+   seven weeks later, so every consent row provably predates every brand but
+   the default. That is a fact the script can assert, not a guess it has to
+   make.
+
+   **Three surfaces the addendum found that the brief had not:** there is **no
+   unsubscribe page at all** — the only opt-out writer is the provider webhook,
+   so the opt-out decision governs an unbuilt surface; `ConsentSyncRequest`
+   (`app/recipients/models.py`) carries only `consent_status`, `source`, `note`,
+   so brand lands on a payload that must also grow `channel` and `purpose`, and
+   the refusal has to live at that boundary; and there is a **third consent
+   write path** beyond CRM sync and webhook suppression — `create_recipient`
+   writes `source="import"` (`app/recipients/service.py:200`), which needs a
+   brand under the same refusal.
 6. **Brand step 3 — duplication.** "Duplicate campaign to brand X", content
    copied with it. **An escape hatch, not the mechanism** — item 4 rejected
    duplicate-and-sync as the general answer to brand scoping, so this covers
