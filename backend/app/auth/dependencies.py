@@ -24,6 +24,7 @@ from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
 from app.auth.db_models import UserDB
+from app.auth.permissions import is_brand_scoped
 from app.auth.policy import UNMAPPED, required_permission
 from app.auth.service import (
     SESSION_COOKIE,
@@ -76,6 +77,35 @@ def auth_enforced(db: Session) -> bool:
     return bool(get_config(db, AUTH_ENFORCED_KEY, True))
 
 
+def _permitted(request: Request, db: Session, user: UserDB, permission: str) -> bool:
+    """Check a permission, against the working brand when the permission is scoped.
+
+    ADR-150's 2026-09-15 addendum: a permission is brand-scoped if the rows it
+    guards carry a `brand_id`. A brand-scoped permission is checked against the
+    brand this request is working in; a platform-level one is checked across
+    every grant the user holds, which is what `permissions_for` does when given
+    no brand.
+
+    **A brand-scoped permission with no working brand is REFUSED, never checked
+    without one.** `brand_id=None` means "any brand this user holds" — the
+    union — so passing it through would be the fail-open direction: it would
+    let an Admin on brand A act as one on brand B, which is the exact hole this
+    addendum exists to close. No working brand means the user holds no grant at
+    all, and holding no grant is not a reason to be allowed more.
+    """
+    if not is_brand_scoped(permission):
+        return has_permission(db, user, permission)
+
+    brand = getattr(request.state, "current_brand", None)
+    if not brand:
+        logger.warning(
+            "auth: refused %s — brand-scoped, and this request has no working brand",
+            permission,
+        )
+        return False
+    return has_permission(db, user, permission, brand_id=brand["id"])
+
+
 def current_user(request: Request, db: Session = Depends(get_db)) -> UserDB | None:
     """Resolve the session cookie, or None. Never raises — for optional use."""
     return user_for_token(db, request.cookies.get(SESSION_COOKIE))
@@ -98,7 +128,7 @@ def require_permission(permission: str):
             return user
         if user is None:
             raise NotAuthenticated()
-        if not has_permission(db, user, permission):
+        if not _permitted(request, db, user, permission):
             raise NotAuthorised(permission)
         return user
 
@@ -180,6 +210,6 @@ def enforce_policy(request: Request, db: Session = Depends(get_db)) -> UserDB | 
         )
         raise NotAuthorised(permission)
 
-    if not has_permission(db, user, permission):
+    if not _permitted(request, db, user, permission):
         raise NotAuthorised(permission)
     return user

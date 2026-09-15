@@ -35,6 +35,52 @@ ALL_PERMISSIONS: dict[str, str] = {
     CREDENTIALS_MANAGE: "Set provider and model credentials (write-only)",
 }
 
+# --- scope: which permissions are checked against a brand -------------------
+# ADR-150, addendum 2026-09-15. **Scope is a property of the permission, not of
+# the role**: a permission is brand-scoped if the rows it guards carry a
+# `brand_id`, and platform-level otherwise.
+#
+# Saying it about the Admin role instead would hardcode a role name, and roles
+# are rows a company may rename or delete. Said about permissions it falls out
+# of the schema: recipients carry no brand (ADR-150 point 9) and signal
+# contributions carry none (point 8), so anything guarding them is
+# platform-level without anyone deciding it.
+#
+# The sharpest case is `users.manage`, which is platform-level for a reason
+# worth remembering: scoping it per brand would be theatre, because an Admin on
+# brand A can grant themselves Admin on brand B in two clicks. A control the
+# controlled party can lift is not a control.
+#
+# `ai.run` is the one entry that breaks the rule's own logic — an AI task
+# writes rows that DO carry a brand. What is actually protected is spend, and
+# the budget is one company-wide pot. The standard package does not assume how
+# a company would split or roll over a budget between brands.
+BRAND_SCOPED: frozenset[str] = frozenset({
+    CONTENT_MANAGE,
+    CAMPAIGNS_MANAGE,
+    AUDIENCES_MANAGE,
+    SENDS_EXECUTE,
+    # Classified now so the split lands correctly when these keys are built.
+    # They are in ADR-150 point 5's sixteen-key vocabulary but not yet in
+    # ALL_PERMISSIONS, because a key names a code path and those guards do not
+    # exist: "audiences.pin", "sends.plan", "overrides.manage".
+    "audiences.pin",
+    "sends.plan",
+    "overrides.manage",
+})
+
+
+def is_brand_scoped(permission: str) -> bool:
+    """Whether this permission is checked against the working brand.
+
+    Unknown permissions answer False, which is deliberate but NOT a licence to
+    fail open: an unmapped write route never reaches a permission check at all,
+    it is refused as `UNMAPPED` by `policy.required_permission`. So the only
+    callers here are permissions somebody classified.
+    """
+    return permission in BRAND_SCOPED
+
+
 # --- the shipped preset ----------------------------------------------------
 ADMIN = "admin"
 MANAGER = "manager"

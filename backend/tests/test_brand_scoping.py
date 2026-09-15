@@ -24,6 +24,7 @@ from app.auth import service as auth
 from app.auth.db_models import BrandDB, RoleAssignmentDB, RoleDB, SessionDB, UserDB
 from app.auth.permissions import MANAGER
 from app.campaigns.db_models import CampaignDB, VariantDB
+from app.delivery.db_models import SendInstanceDB
 from app.campaigns.service import create_campaign, list_campaigns
 from app.content.db_models import ContentRecordDB
 from app.content.service import create_content, list_content_records
@@ -60,7 +61,25 @@ def temp_brand(db):
 
     yield make
 
+    # Every table that carries a brand FK, or the delete fails and the brand
+    # survives the run. That is not hypothetical: a MUTATION run left two
+    # brands behind in the shared dev database, because disabling the guard
+    # under test let a POST that should have been refused create a campaign —
+    # and campaigns were missing from this list. Mutation testing deliberately
+    # breaks the code that refuses things, so cleanup here has to assume the
+    # test did the opposite of what it asserts.
     for brand_id in created:
+        campaign_ids = [
+            c.id for c in db.query(CampaignDB).filter(CampaignDB.brand_id == brand_id).all()
+        ]
+        if campaign_ids:
+            db.query(VariantDB).filter(VariantDB.campaign_id.in_(campaign_ids)).delete(
+                synchronize_session=False
+            )
+            db.query(CampaignDB).filter(CampaignDB.id.in_(campaign_ids)).delete(
+                synchronize_session=False
+            )
+        db.query(SendInstanceDB).filter(SendInstanceDB.brand_id == brand_id).delete()
         db.query(ContentRecordDB).filter(ContentRecordDB.brand_id == brand_id).delete()
         db.query(AudienceGroupDB).filter(AudienceGroupDB.brand_id == brand_id).delete()
         db.query(RoleAssignmentDB).filter(RoleAssignmentDB.brand_id == brand_id).delete()
@@ -527,3 +546,155 @@ class TestTheAccessListResolvesOverlappingRoles:
             "a permission held only on another brand appeared in this brand's "
             "resolved set — the union is not scoped"
         )
+
+
+class TestThePermissionCheckIsBrandAware:
+    """ADR-150's 2026-09-15 addendum, enforced.
+
+    Before this, `require_permission` and `enforce_policy` called
+    `has_permission` with no brand, so the check unioned across every grant a
+    person held: a Viewer on brand B who was Admin on brand A passed an Admin
+    check **while working in brand B**. The grant table recorded the brand and
+    the check ignored it.
+
+    Driven over HTTP on purpose. The service layer has accepted a `brand_id`
+    all along — the defect was that nobody passed one, so a test calling
+    `has_permission` directly proves nothing about the thing that was broken.
+    """
+
+    @pytest.fixture
+    def split_user(self, db, default_brand, temp_brand, user_on):
+        """Admin on one brand, Viewer on another — the case from the question."""
+        second = temp_brand()
+        user = user_on(default_brand)          # Manager on default, from the fixture
+        admin = db.query(RoleDB).filter(RoleDB.key == "admin").first()
+        viewer = db.query(RoleDB).filter(RoleDB.key == "viewer").first()
+        # Admin where the fixture put them, Viewer on the second brand.
+        auth.assign_role(db, user.id, admin.id, brand_id=default_brand.id)
+        db.query(RoleAssignmentDB).filter(
+            RoleAssignmentDB.user_id == user.id,
+            RoleAssignmentDB.brand_id == default_brand.id,
+            RoleAssignmentDB.role_id != admin.id,
+        ).delete(synchronize_session=False)
+        auth.assign_role(db, user.id, viewer.id, brand_id=second.id)
+        db.commit()
+        return user, default_brand, second
+
+    def _client(self, db, user, brand):
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        token = auth.create_session(db, user)
+        auth.set_session_brand(db, token, brand.id)
+        client = TestClient(app, follow_redirects=False)
+        client.cookies.set(auth.SESSION_COOKIE, token)
+        return client, token
+
+    def test_a_brand_scoped_permission_is_refused_on_the_wrong_brand(
+        self, db, split_user, monkeypatch
+    ):
+        """The hole itself: Admin on A must not act as Admin on B."""
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        user, _admin_brand, viewer_brand = split_user
+        client, token = self._client(db, user, viewer_brand)
+
+        response = client.post(
+            "/ui/campaigns",
+            data={"name": f"sneaky-{uuid.uuid4().hex[:8]}",
+                  "csrf_token": auth.csrf_token_for(token)},
+        )
+
+        assert response.status_code == 403, (
+            f"expected 403, got {response.status_code} — a Viewer on this brand "
+            "created a campaign because they are Admin on a different one, "
+            "which is the union the addendum exists to stop"
+        )
+
+    def test_the_same_permission_is_allowed_on_the_right_brand(
+        self, db, split_user, monkeypatch
+    ):
+        """Without this the test above could pass by refusing everything."""
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        user, admin_brand, _viewer_brand = split_user
+        client, token = self._client(db, user, admin_brand)
+
+        name = f"legit-{uuid.uuid4().hex[:8]}"
+        response = client.post(
+            "/ui/campaigns",
+            data={"name": name, "csrf_token": auth.csrf_token_for(token)},
+        )
+        try:
+            assert response.status_code == 303, (
+                f"an Admin was refused on their own brand: {response.status_code}"
+            )
+        finally:
+            campaign = db.query(CampaignDB).filter(CampaignDB.name == name).first()
+            if campaign:
+                db.query(VariantDB).filter(VariantDB.campaign_id == campaign.id).delete()
+                db.query(CampaignDB).filter(CampaignDB.id == campaign.id).delete()
+                db.commit()
+
+    def test_a_platform_level_permission_ignores_the_working_brand(
+        self, db, split_user, monkeypatch
+    ):
+        """users.manage is platform-level, so being on the Viewer brand is irrelevant.
+
+        This is the half that makes the split worth having: without it, scoping
+        the check would mean switching brand to reach Users — even though there
+        is one user list, which ADR-150 point 2 already establishes.
+        """
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        user, _admin_brand, viewer_brand = split_user
+        client, _token = self._client(db, user, viewer_brand)
+
+        response = client.get("/ui/users")
+
+        assert response.status_code == 200, (
+            f"got {response.status_code} — users.manage was checked against the "
+            "working brand, so an Admin has to switch brand to manage users"
+        )
+
+    def test_a_brand_scoped_permission_with_no_working_brand_is_refused(
+        self, db, default_brand, user_on
+    ):
+        """The defensive branch, pinned because it fails in the dangerous direction.
+
+        `brand_id=None` means "any brand this user holds" — the union — so
+        falling through to `has_permission(db, user, permission)` when there is
+        no working brand would quietly restore the exact hole the addendum
+        closes. A mutation proved nothing else covers this: every other test
+        here goes through a request that HAS a working brand, so the fallback
+        could be reverted and the suite stayed green.
+
+        Checked directly rather than over HTTP because the state is not
+        reachable through a normal request — which is the point. Unreachable
+        today is not the same as unreachable after the next refactor.
+        """
+        from types import SimpleNamespace
+
+        from app.auth.dependencies import _permitted
+
+        user = user_on(default_brand)  # Manager, so they DO hold campaigns.manage
+
+        assert auth.has_permission(db, user, "campaigns.manage") is True, (
+            "fixture is wrong — the union must say yes, or this proves nothing"
+        )
+
+        request = SimpleNamespace(state=SimpleNamespace())
+        assert _permitted(request, db, user, "campaigns.manage") is False, (
+            "a brand-scoped permission was granted with no working brand, by "
+            "falling back to the union across every brand the user holds"
+        )
+
+    def test_a_platform_level_permission_survives_no_working_brand(
+        self, db, default_brand, user_on
+    ):
+        """The other half — otherwise the test above could pass by refusing all."""
+        from types import SimpleNamespace
+
+        from app.auth.dependencies import _permitted
+
+        user = user_on(default_brand)
+        request = SimpleNamespace(state=SimpleNamespace())
+        assert _permitted(request, db, user, "view") is True
