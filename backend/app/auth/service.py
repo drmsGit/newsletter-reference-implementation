@@ -125,6 +125,119 @@ def current_user_summary(db: Session, token: str | None) -> dict | None:
 
 # --- the working brand (ADR-150 point 2) -----------------------------------
 
+def list_brands(db: Session) -> list[BrandDB]:
+    """Every brand that exists, oldest first — the administration view.
+
+    Distinct from `brands_for_user`, which answers "what may this person work
+    in". Only a `users.manage` holder sees this one, because it is the list you
+    grant *from*.
+    """
+    return db.query(BrandDB).order_by(BrandDB.id.asc()).all()
+
+
+def brand_usage(db: Session) -> dict[int, int]:
+    """How many rows hang off each brand — content, campaigns, audiences, sends
+    and grants combined.
+
+    Shown beside Delete so the refusal is predictable rather than a surprise
+    after clicking. A zero here is the only case `delete_brand` accepts.
+    """
+    from app.audience.db_models import AudienceGroupDB
+    from app.campaigns.db_models import CampaignDB
+    from app.content.db_models import ContentRecordDB
+    from app.delivery.db_models import SendInstanceDB
+
+    counts: dict[int, int] = {}
+    for brand in db.query(BrandDB).all():
+        counts[brand.id] = sum((
+            db.query(ContentRecordDB).filter(ContentRecordDB.brand_id == brand.id).count(),
+            db.query(CampaignDB).filter(CampaignDB.brand_id == brand.id).count(),
+            db.query(AudienceGroupDB).filter(AudienceGroupDB.brand_id == brand.id).count(),
+            db.query(SendInstanceDB).filter(SendInstanceDB.brand_id == brand.id).count(),
+            db.query(RoleAssignmentDB).filter(RoleAssignmentDB.brand_id == brand.id).count(),
+        ))
+    return counts
+
+
+def create_brand(db: Session, key: str, name: str) -> BrandDB | None:
+    """Add a brand. Returns None if the key is taken or empty.
+
+    Gated on `users.manage` at the route, not on a key of its own. A brand is
+    the scope in every access grant (ADR-150 point 6), so creating one is an
+    act on the access model — the same thing `users.manage` already guards for
+    roles and assignments. Inventing a seventeenth permission key would need an
+    ADR amendment, and ADR-150 point 5's rule is that a key names a code path:
+    there is no separate code path here worth naming.
+    """
+    key = (key or "").strip().lower().replace(" ", "-")
+    name = (name or "").strip()
+    if not key or not name:
+        return None
+    if db.query(BrandDB).filter(BrandDB.key == key).first():
+        return None
+
+    brand = BrandDB(key=key, name=name)
+    db.add(brand)
+    db.commit()
+    db.refresh(brand)
+    logger.warning("auth: brand created — %s (%s)", name, key)
+    return brand
+
+
+def rename_brand(db: Session, brand_id: int, name: str) -> BrandDB | None:
+    """Change a brand's display name. The key is permanent.
+
+    The key is what a deployment's own configuration and any future per-brand
+    asset path would reference, so renaming the label must not move it — the
+    same reason ADR numbers are permanent while their titles are editable.
+    """
+    brand = db.query(BrandDB).filter(BrandDB.id == brand_id).first()
+    if brand is None or not (name or "").strip():
+        return None
+    brand.name = name.strip()
+    db.commit()
+    db.refresh(brand)
+    return brand
+
+
+def delete_brand(db: Session, brand_id: int) -> str | None:
+    """Remove a brand. Returns an error message, or None on success.
+
+    Refused while anything still belongs to it, and refused outright for the
+    default brand. Both refusals exist for the same reason: every row in four
+    tables carries a NOT NULL brand, so deleting one out from under its content
+    would either fail at the foreign key or, worse, need a rule for where the
+    orphans go — and inventing that rule silently is how content ends up in a
+    brand nobody chose.
+    """
+    brand = db.query(BrandDB).filter(BrandDB.id == brand_id).first()
+    if brand is None:
+        return "That brand no longer exists."
+    if brand.key == DEFAULT_BRAND_KEY:
+        return "The default brand cannot be deleted — one brand always exists (ADR-150 point 4)."
+
+    from app.audience.db_models import AudienceGroupDB
+    from app.campaigns.db_models import CampaignDB
+    from app.content.db_models import ContentRecordDB
+    from app.delivery.db_models import SendInstanceDB
+
+    holders = {
+        "content record": db.query(ContentRecordDB).filter(ContentRecordDB.brand_id == brand_id).count(),
+        "campaign": db.query(CampaignDB).filter(CampaignDB.brand_id == brand_id).count(),
+        "audience group": db.query(AudienceGroupDB).filter(AudienceGroupDB.brand_id == brand_id).count(),
+        "send": db.query(SendInstanceDB).filter(SendInstanceDB.brand_id == brand_id).count(),
+        "role assignment": db.query(RoleAssignmentDB).filter(RoleAssignmentDB.brand_id == brand_id).count(),
+    }
+    blocking = [f"{n} {label}{'s' if n != 1 else ''}" for label, n in holders.items() if n]
+    if blocking:
+        return f"{brand.name} still has {', '.join(blocking)}. Move or remove those first."
+
+    db.query(SessionDB).filter(SessionDB.brand_id == brand_id).update({"brand_id": None})
+    db.query(BrandDB).filter(BrandDB.id == brand_id).delete()
+    db.commit()
+    return None
+
+
 def brands_for_user(db: Session, user: UserDB | None) -> list[BrandDB]:
     """Every brand this user holds a grant on, ordered by id.
 

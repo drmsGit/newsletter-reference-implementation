@@ -186,6 +186,22 @@ was mutation-verified — removing a gate fails only that gate's tests.
    properties of the person — and recipients deliberately carry no brand
    (point 9). Two brands' "VIPs" contain the same people.
 
+   **Brand administration is on `/ui/users`** — a Brands panel (create,
+   rename, delete) plus a brand selector on the create-user and add-role forms,
+   both of which render only above one brand. Gated on `users.manage`, not a
+   new permission key: a brand is the scope in every grant (point 6), so
+   creating one acts on the access model that permission already guards.
+   Delete refuses the default brand outright and any brand still holding
+   content, campaigns, audiences, sends or grants — and says which.
+
+   **This was missing from the first cut and made the whole feature
+   unreachable.** `ensure_default_brand` was the only code that ever created a
+   brand, `assign_role` was called without one so every grant landed on the
+   default, and no form offered the field — so the switcher could never appear
+   for anybody. Enforced and unadministrable is worse than absent, because it
+   looks finished. The planning error was covering scoping without ever asking
+   how a second brand comes into existence.
+
    **Three known gaps, none hidden:**
    - **Detail-by-id routes are not scoped.** The list views filter; opening
      another brand's campaign by URL still works. A hard filter that only

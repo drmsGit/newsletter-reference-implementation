@@ -22,7 +22,9 @@ from app.auth.permissions import ALL_PERMISSIONS, BUILTIN_ROLES, USERS_MANAGE
 from app.auth.db_models import RoleDB
 from app.auth.service import (
     SESSION_COOKIE, SESSION_ABSOLUTE_HOURS, access_list, assign_role,
-    client_identifier, cookie_secure, create_role, create_user, delete_role, dev_code_visible,
+    client_identifier, cookie_secure, create_brand, create_role, create_user,
+    brand_usage, delete_brand, delete_role, dev_code_visible, list_brands,
+    rename_brand,
     login_request_allowed, normalise_email, request_login_code,
     revoke_assignment, revoke_token, roles_with_permissions, safe_next, set_active,
     set_role_permissions, user_for_token, verify_login_code,
@@ -166,14 +168,24 @@ def logout(request: Request, db: Session = Depends(get_db)):
 @router.get("/ui/users")
 def users_page(
     request: Request,
+    error: str = "",
     db: Session = Depends(get_db),
     _user=Depends(require_permission(USERS_MANAGE)),
 ):
-    """The access list — who holds what, and when they last signed in."""
+    """The access list — who holds what, where, and when they last signed in."""
+    brands = list_brands(db)
     return templates.TemplateResponse(
         request, "users.html",
         {
             "title": "Users & access",
+            "error": error,
+            "brands": brands,
+            "brand_usage": brand_usage(db),
+            # Every brand-aware control on this page hides itself below two
+            # brands (ADR-150 point 4). The brands panel itself always shows,
+            # because it is the only place a second brand can come from — and
+            # a switcher that can never appear was exactly the hole this fixes.
+            "multi_brand": len(brands) > 1,
             "rows": access_list(db),
             "roles": db.query(RoleDB).order_by(RoleDB.id.asc()).all(),
             "builtin_keys": list(BUILTIN_ROLES),
@@ -190,12 +202,16 @@ def user_create(
     display_name: str = Form(""),
     role_key: str = Form("viewer"),
     is_external: str = Form(""),
+    brand_id: int | None = Form(None),
     db: Session = Depends(get_db),
     _user=Depends(require_permission(USERS_MANAGE)),
 ):
+    # Optional so a single-brand deployment never renders the field (ADR-150
+    # point 4). `create_user` falls back to the default brand when it is None,
+    # which in that case is the only brand there is — not a guess.
     create_user(
         db, email=email, display_name=display_name,
-        is_external=bool(is_external), role_key=role_key,
+        is_external=bool(is_external), role_key=role_key, brand_id=brand_id,
     )
     return RedirectResponse(url="/ui/users", status_code=303)
 
@@ -215,11 +231,60 @@ def user_set_active(
 def user_assign_role(
     user_id: int,
     role_id: int = Form(...),
+    brand_id: int | None = Form(None),
     db: Session = Depends(get_db),
     _user=Depends(require_permission(USERS_MANAGE)),
 ):
-    assign_role(db, user_id, role_id)
+    # A grant is (user × role × brand) — ADR-150 point 6. Dropping the brand
+    # here is what made every grant land on the default brand however many
+    # brands existed, so the switcher could never appear at all.
+    assign_role(db, user_id, role_id, brand_id=brand_id)
     return RedirectResponse(url="/ui/users", status_code=303)
+
+
+@router.post("/ui/brands")
+def brand_create(
+    key: str = Form(...),
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission(USERS_MANAGE)),
+):
+    """Add a brand.
+
+    Gated on `users.manage` rather than a key of its own: a brand is the scope
+    in every access grant (ADR-150 point 6), so creating one acts on the access
+    model — the same thing that permission already guards for roles and
+    assignments. A seventeenth permission key would need an ADR amendment, and
+    ADR-150 point 5's rule is that a key names a code path.
+    """
+    if create_brand(db, key=key, name=name) is None:
+        return RedirectResponse(
+            url="/ui/users?error=" + quote("That brand key is already taken, or the name is empty."),
+            status_code=303,
+        )
+    return RedirectResponse(url="/ui/users", status_code=303)
+
+
+@router.post("/ui/brands/{brand_id}/rename")
+def brand_rename(
+    brand_id: int,
+    name: str = Form(...),
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission(USERS_MANAGE)),
+):
+    rename_brand(db, brand_id, name)
+    return RedirectResponse(url="/ui/users", status_code=303)
+
+
+@router.post("/ui/brands/{brand_id}/delete")
+def brand_delete(
+    brand_id: int,
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission(USERS_MANAGE)),
+):
+    error = delete_brand(db, brand_id)
+    suffix = "?error=" + quote(error) if error else ""
+    return RedirectResponse(url=f"/ui/users{suffix}", status_code=303)
 
 
 @router.post("/ui/users/assignments/{assignment_id}/remove")

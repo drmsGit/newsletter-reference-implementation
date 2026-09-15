@@ -91,6 +91,17 @@
                                 <option value="{{ role.id }}">{{ role.name }}</option>
                                 {% endfor %}
                             </select>
+                            {# A grant is (user × role × brand), ADR-150 point 6.
+                               Omitted entirely at one brand, where there is
+                               nothing to choose — the route then falls back to
+                               the only brand there is. #}
+                            {% if multi_brand %}
+                            <select name="brand_id" class="form-select form-select-sm" style="width:auto">
+                                {% for brand in brands %}
+                                <option value="{{ brand.id }}">{{ brand.name }}</option>
+                                {% endfor %}
+                            </select>
+                            {% endif %}
                             <button type="submit" class="btn btn-sm btn-outline-secondary">Add</button>
                         </form>
                     </td>
@@ -119,7 +130,76 @@
 </div>
 
 <div class="card mb-4">
+    <div class="card mb-4">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <strong>Brands</strong>
+        <span class="text-muted small">
+            A brand is a working context, not a separate company — ADR-150 point 3:
+            where GDPR forces real separation the answer is two installations.
+        </span>
+    </div>
     <div class="card-body">
+        {% if error %}
+        <div class="alert alert-warning py-2 small">{{ error }}</div>
+        {% endif %}
+
+        <table class="table table-sm align-middle mb-3">
+            <thead>
+                <tr>
+                    <th>Name</th><th>Key</th><th class="text-end">In use</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for brand in brands %}
+                <tr>
+                    <td>
+                        <form method="post" action="/ui/brands/{{ brand.id }}/rename" class="d-flex gap-1">
+                            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+                            <input type="text" name="name" value="{{ brand.name }}"
+                                   class="form-control form-control-sm" style="max-width:16rem">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">Rename</button>
+                        </form>
+                    </td>
+                    {# The key is permanent — a deployment's own configuration
+                       and any future per-brand asset path reference it, so
+                       renaming the label must not move it. #}
+                    <td class="small text-muted"><code>{{ brand.key }}</code></td>
+                    <td class="text-end small text-muted">{{ brand_usage[brand.id] }}</td>
+                    <td class="text-end">
+                        {% if brand.key != 'default' %}
+                        <form method="post" action="/ui/brands/{{ brand.id }}/delete" class="m-0">
+                            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+                            <button type="submit" class="btn btn-sm btn-link text-danger p-0">Delete</button>
+                        </form>
+                        {% else %}
+                        <span class="text-muted small">always exists</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <form method="post" action="/ui/brands" class="row g-2 align-items-end">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+            <div class="col-md-3">
+                <label class="form-label small"><strong>Name</strong></label>
+                <input type="text" name="name" class="form-control form-control-sm"
+                       placeholder="Second Brand" required>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Key</label>
+                <input type="text" name="key" class="form-control form-control-sm"
+                       placeholder="second-brand" required>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary btn-sm">Add brand</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card-body">
         <h5 class="card-title">Add a user</h5>
         <p class="text-muted small">
             The three roles are a preset, not a model of your org chart — roles and
@@ -149,6 +229,16 @@
                     {% endfor %}
                 </select>
             </div>
+            {% if multi_brand %}
+            <div class="col-md-2">
+                <label class="form-label small"><strong>Brand</strong></label>
+                <select name="brand_id" class="form-select form-select-sm">
+                    {% for brand in brands %}
+                    <option value="{{ brand.id }}">{{ brand.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
             <div class="col-md-2">
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" name="is_external" value="1" id="ext">

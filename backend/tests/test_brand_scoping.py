@@ -304,3 +304,155 @@ class TestTwoBrandsMayReuseAName:
         finally:
             db.query(AudienceGroupDB).filter(AudienceGroupDB.id == first.id).delete()
             db.commit()
+
+
+class TestBrandsCanActuallyBeAdministered:
+    """The gap that made the first cut of this feature unreachable.
+
+    Brand scoping shipped with no way to create a brand: `ensure_default_brand`
+    was the only code that ever made one, `assign_role` was called without a
+    brand so every grant landed on the default, and no form offered the field.
+    The switcher therefore could not appear for anybody, ever — the scope was
+    enforced and unadministrable, which is worse than absent because it looks
+    finished.
+    """
+
+    def test_a_brand_can_be_created_and_renamed(self, db):
+        key = f"admin-{uuid.uuid4().hex[:8]}"
+        brand = auth.create_brand(db, key=key, name="Created")
+        try:
+            assert brand is not None and brand.key == key
+            assert auth.rename_brand(db, brand.id, "Renamed").name == "Renamed"
+            assert db.query(BrandDB).filter(BrandDB.id == brand.id).first().key == key, (
+                "renaming moved the key — it is permanent, because deployment "
+                "configuration and per-brand asset paths reference it"
+            )
+        finally:
+            db.query(BrandDB).filter(BrandDB.id == brand.id).delete()
+            db.commit()
+
+    def test_a_duplicate_key_is_refused(self, db, default_brand):
+        assert auth.create_brand(db, key=default_brand.key, name="Impostor") is None
+
+    def test_the_default_brand_cannot_be_deleted(self, db, default_brand):
+        error = auth.delete_brand(db, default_brand.id)
+
+        assert error is not None, "the default brand was deletable"
+        # Asserting on the specific refusal, not just on "default" appearing:
+        # the brand is NAMED "Default", so the generic in-use message
+        # ("Default still has 144 content records…") contains that word too,
+        # and an earlier version of this test passed with the guard removed.
+        assert "cannot be deleted" in error, (
+            f"refused for the wrong reason — the in-use check caught it rather "
+            f"than the default-brand guard: {error!r}"
+        )
+
+    def test_a_brand_in_use_cannot_be_deleted(self, db, temp_brand, temp_content):
+        brand = temp_brand()
+        temp_content(brand)
+
+        error = auth.delete_brand(db, brand.id)
+
+        assert error is not None, (
+            "a brand was deleted out from under its content — every row in "
+            "four tables carries a NOT NULL brand, so this either fails at the "
+            "foreign key or needs an invented rule for where orphans go"
+        )
+        assert "content record" in error, f"the refusal did not say why: {error!r}"
+
+    def test_an_empty_brand_can_be_deleted(self, db, temp_brand):
+        brand = temp_brand()
+        assert auth.delete_brand(db, brand.id) is None
+
+    def test_a_grant_lands_on_the_brand_it_was_given(self, db, default_brand, temp_brand, user_on):
+        """The defect in one line: `assign_role(db, user_id, role_id)`.
+
+        Without the brand argument every grant silently went to the default,
+        so a second brand could exist and still be unreachable.
+        """
+        second = temp_brand()
+        user = user_on(default_brand)
+        role = db.query(RoleDB).filter(RoleDB.key == MANAGER).first()
+
+        # Over HTTP, because the defect was in the ROUTE dropping the argument,
+        # not in `assign_role` refusing it. Calling the service directly proves
+        # nothing about the thing that was broken — reverting the route passed
+        # an earlier version of this test.
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        admin = db.query(UserDB).join(
+            RoleAssignmentDB, RoleAssignmentDB.user_id == UserDB.id
+        ).join(RoleDB, RoleDB.id == RoleAssignmentDB.role_id).filter(
+            RoleDB.key == "admin", UserDB.is_active.is_(True)
+        ).first()
+        if admin is None:
+            pytest.skip("no active admin in this database to act as")
+
+        admin_token = auth.create_session(db, admin)
+        client = TestClient(app, follow_redirects=False)
+        client.cookies.set(auth.SESSION_COOKIE, admin_token)
+
+        response = client.post(
+            f"/ui/users/{user.id}/roles",
+            data={
+                "role_id": role.id,
+                "brand_id": second.id,
+                "csrf_token": auth.csrf_token_for(admin_token),
+            },
+        )
+        db.expire_all()
+        assert response.status_code == 303, f"the form was refused: {response.status_code}"
+
+        brands = {b.id for b in auth.brands_for_user(db, user)}
+        assert second.id in brands, (
+            "the grant landed on the default brand instead of the one the form "
+            "named — which is what made a second brand unreachable"
+        )
+        assert auth.current_brand_summary(db, auth.create_session(db, user))["switchable"] is True
+
+    def test_usage_counts_are_reported_per_brand(self, db, temp_brand, temp_content):
+        brand = temp_brand()
+        assert auth.brand_usage(db).get(brand.id) == 0
+        temp_content(brand)
+        assert auth.brand_usage(db).get(brand.id) == 1, (
+            "the usage count shown beside Delete disagrees with what Delete "
+            "will actually refuse"
+        )
+
+
+    def test_the_users_page_actually_renders_the_brands_panel(self, db, monkeypatch):
+        """The whole visible half of the fix, asserted over HTTP.
+
+        Everything else in this class exercises the service layer, and the
+        original defect was not there — it was that no page offered any of it.
+        A panel that stops rendering would leave brand creation unreachable
+        again while every other test here still passed.
+        """
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        admin = db.query(UserDB).join(
+            RoleAssignmentDB, RoleAssignmentDB.user_id == UserDB.id
+        ).join(RoleDB, RoleDB.id == RoleAssignmentDB.role_id).filter(
+            RoleDB.key == "admin", UserDB.is_active.is_(True)
+        ).first()
+        if admin is None:
+            pytest.skip("no active admin in this database to act as")
+
+        token = auth.create_session(db, admin)
+        client = TestClient(app, follow_redirects=False)
+        client.cookies.set(auth.SESSION_COOKIE, token)
+
+        page = client.get("/ui/users")
+
+        assert page.status_code == 200, f"users page returned {page.status_code}"
+        assert 'action="/ui/brands"' in page.text, (
+            "the users page offers no way to create a brand — which is how "
+            "brand scoping shipped enforced and unadministrable"
+        )
+        for brand in auth.list_brands(db):
+            assert brand.name in page.text, f"brand {brand.name!r} is not listed"
