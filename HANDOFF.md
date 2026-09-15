@@ -236,16 +236,39 @@ was mutation-verified — removing a gate fails only that gate's tests.
    That keeps Phase 3 duplication as an escape hatch for campaigns and content,
    not as the mechanism the model leans on.
 
-   **Flagged for later, not decided — a brand filter on category analytics.**
-   The user's point: recipients react differently to the same category under
-   different brands. Two halves, and only one is free:
-   - **Engagement is already brand-derivable** — `engagement_events` →
-     `delivery_executions` → `send_instances.brand_id`. A per-brand engagement
-     view over categories needs joins, not columns.
-   - **Affinity is not.** `signal_contributions` carries no brand by ADR-150
-     point 8 ("brands are presentation, so engagement is engagement"). A
-     per-brand affinity score would change that premise, which is a point 8
-     question rather than a reporting one.
+   **The brand filter on category analytics — DECIDED 2026-09-15, and the
+   question turned out to be mis-framed.** It was posed as "does a person have
+   different affinities per brand". No, and that was never the requirement: a
+   person keeps **one** affinity profile, their interests as one entity. What
+   needs scoping is the **population an analytics view sums over**, not the
+   contribution.
+
+   The example that makes it obvious: Brand A is "Winter resorts and Spa",
+   Brand B is "Summer Sports Vacations". Their audiences react differently to
+   Beach content, and averaging across both yields "a grey blend of *every
+   category works the same*".
+
+   **Decided: that population is everyone who has CONSENTED to the brand** —
+   not everyone the brand has mailed, which is a history rather than an
+   audience.
+
+   Three consequences:
+   - **Point 8 needs no amendment and `signal_contributions` needs no brand
+     column.** ADR-164 §9's three objections (join path on every read, nullable
+     `event_id`, ADR-132 pruning) all evaporate, because nothing derives a
+     brand per contribution. The expensive answer was avoided by asking a
+     better question.
+   - **It is blocked on Phase 2.** "Consented to this brand" is inexpressible
+     until consent carries a brand, so this ships *with* the consent work.
+   - **Do not half-ship it.** `/ui/graph` aggregates a content count and a
+     selection count, both brand-scopeable today via `content_records`, plus
+     the signal impact, which is not. Scoping the first two now would put two
+     populations side by side on one page — the same grey blend, harder to
+     spot. They ship together.
+
+   **Parked, named, out of scope:** analysing how subscribers who *unsubscribed*
+   behaved, and whether particular categories drove them away. The user placed
+   it in a future analytics/reporting scope not yet discussed.
 
 5. **ADR-150 Phase 2 — consent by brand. The phase that makes the boundary
    real, and it needs an ADR-163 addendum FIRST** (that record is Accepted and
