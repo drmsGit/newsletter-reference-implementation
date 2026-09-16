@@ -36,6 +36,9 @@ WORKING STYLE:
   which ADR governs it (by number, or "none"), and what could break.
 - Architecture decisions are ADRs in the repo, written BEFORE implementing.
   Business-side decisions go in docs/business/decisions/, not ADRs.
+- An accepted ADR is NOT an implementation plan. Before implementing one, hold
+  a final-design pass with me: where exactly each part lands, what it reuses,
+  what it deliberately does not touch.
 - One question at a time in interview/review passes; I decide each, nothing
   is written into an ADR until I've made the call.
 - Use the project's own subagents in .claude/agents/ — adr-author for ADRs and

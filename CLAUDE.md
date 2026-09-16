@@ -36,7 +36,15 @@ commercial product. Learnings feed the separate Condor use case.
 - Architecture decisions are made in this repo, not in chat. If a decision is
   reached elsewhere, write the ADR before implementing it.
 - Business-side decisions go in `docs/business/decisions/`, not in ADRs.
-- Do not invent ADR numbers. Check the highest existing number first (165).
+- **An accepted ADR is not an implementation plan.** Before implementing one,
+  hold a **final-design pass**: where exactly each part lands, which existing
+  functions it reuses, what it deliberately does not touch, and what could
+  break. Decisions taken silently under "just implementing what was agreed"
+  are still design decisions, and they are the ones nobody reviewed.
+- Do not invent ADR numbers. **Run `ls docs/architecture/ADR/` and take the
+  highest — do not trust a number written here.** This line has gone stale
+  twice in three days (154 → 165 → 166), because the number changes every
+  time an ADR is written and nothing updates the rule that records it.
 - Never read the .env file. If you need information out of this file, ask.
 
 ## Before any code change
