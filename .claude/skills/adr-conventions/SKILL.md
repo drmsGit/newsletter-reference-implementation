@@ -67,7 +67,9 @@ so explicitly rather than proceeding quietly — it is more likely the intent
 was a dated addendum.
 
 ## Amending without superseding
-The established alternative is a **dated addendum**: a new `###` sub-section
+The established alternative is a **dated addendum**: a new `##` section
+(top level, a sibling of `## Notes` — all 13 addenda in the vault use `##`,
+not `###`, and this line said `###` until 2026-09-16)
 inside the existing record, headed with its date and what prompted it, leaving
 Decision intact. See ADR-101 (addendum 2026-08-02) and ADR-003's
 "How this philosophy is realized (2026-07-31 AI-layer interview)".
