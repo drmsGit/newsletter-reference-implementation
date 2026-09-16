@@ -19,7 +19,27 @@
             <button type="submit" class="btn btn-outline-success btn-sm">Reactivate</button>
         </form>
         {% endif %}
-        <form method="post" action="/ui/content/{{ record.id }}/delete" onsubmit="return confirm('Delete this content record? Deactivating is usually the safer choice — it keeps historical sends intact.')">
+        {# One step, no wizard, and deliberately no "already duplicated?" check.
+           A manager who retypes a record by hand is not stopped either, and
+           nothing breaks when they do — a guard here would be disproportionate
+           to a problem the product already tolerates from another direction.
+           The campaign wizard is where duplication is risky, because it
+           multiplies; one record does not. #}
+        {% if duplicate_targets %}
+        <form method="post" action="/ui/content/{{ record.id }}/duplicate" class="d-flex gap-1">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+            <select name="target_brand_id" class="form-select form-select-sm" style="width:auto"
+                    aria-label="Duplicate into which brand">
+                {% for brand in duplicate_targets %}
+                <option value="{{ brand.id }}">
+                    {{ brand.name }}{% if brand.id == record.brand_id %} — this brand{% endif %}
+                </option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-outline-secondary btn-sm">Duplicate to</button>
+        </form>
+        {% endif %}
+                <form method="post" action="/ui/content/{{ record.id }}/delete" onsubmit="return confirm('Delete this content record? Deactivating is usually the safer choice — it keeps historical sends intact.')">
             <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
             <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
         </form>

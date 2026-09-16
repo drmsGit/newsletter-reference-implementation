@@ -10,7 +10,13 @@ import math
 import os
 
 from app.database import get_db
-from app.auth.service import SESSION_COOKIE, brands_for_user, safe_next, set_session_brand, user_for_token
+from app.auth.service import (
+    SESSION_COOKIE, brands_for_user, brands_with_permission, has_permission,
+    list_brands, safe_next, set_session_brand, user_for_token,
+)
+from app.auth.permissions import CAMPAIGNS_MANAGE, CONTENT_MANAGE
+from app.audit import service as audit
+from app.campaigns import duplication
 from app.recipients.consent import resolve_emails
 from app.recipients.service import to_recipient, to_recipients
 
@@ -577,6 +583,8 @@ def recipient_detail(
 @router.get("/ui/campaigns")
 def campaigns_list(
     request: Request,
+    notice: str | None = None,
+    error: str | None = None,
     db: Session = Depends(get_db),
 ):
     campaigns = (
@@ -592,6 +600,8 @@ def campaigns_list(
         {
             "title": "Campaigns",
             "campaigns": campaigns,
+            "notice": notice,
+            "error": error,
         },
     )
 
@@ -890,6 +900,182 @@ def campaign_create(
 ):
     campaign = create_campaign(db, name=name, brand_id=working_brand_id(request, db))
     return RedirectResponse(url=f"/ui/campaigns/{campaign.id}", status_code=303)
+
+
+def _duplication_targets(db: Session, request: Request, permission: str):
+    """Brands this request may duplicate *into*.
+
+    Not `brands_for_user`: the target brand is chosen by the form, and the
+    policy table checks `campaigns.manage` against the **working** brand only.
+    Without this, a Manager on brand A could create a campaign in brand B by
+    picking it from a dropdown — the check would pass, because it never looked
+    at the destination.
+    """
+    if not getattr(request.state, "auth_enforced", True):
+        # Nobody is signed in, so there are no grants to read. Same reasoning
+        # as `working_brand_id` falling back to the default brand rather than
+        # refusing: with enforcement off, refusing would make the app unusable.
+        return list_brands(db)
+    user = user_for_token(db, request.cookies.get(SESSION_COOKIE))
+    if user is None:
+        return []
+    return brands_with_permission(db, user, permission)
+
+
+def _may_in_brand(db: Session, request: Request, permission: str, brand_id: int) -> bool:
+    if not getattr(request.state, "auth_enforced", True):
+        return True
+    user = user_for_token(db, request.cookies.get(SESSION_COOKIE))
+    if user is None:
+        return False
+    return has_permission(db, user, permission, brand_id=brand_id)
+
+
+@router.get("/ui/campaigns/{campaign_id}/duplicate")
+def campaign_duplicate_form(
+    campaign_id: int,
+    request: Request,
+    target_brand_id: int | None = None,
+    name: str = "",
+    error: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """The wizard. Two steps, and the second one's options depend on the first.
+
+    Two steps rather than one button, deliberately: a one-click copy produces a
+    campaign that looks complete and is wrong in ways the manager cannot see —
+    its content has no published version so it will refuse to send, its decision
+    slots would resolve against a catalogue that may be empty, and its URLs
+    still point at the brand it came from. Splitting the act is what makes those
+    three sayable before they are discovered.
+    """
+    source_brand_id = working_brand_id(request, db)
+    campaign = (
+        db.query(CampaignDB)
+        .filter(CampaignDB.id == campaign_id, CampaignDB.brand_id == source_brand_id)
+        .first()
+    )
+    if campaign is None:
+        return RedirectResponse(
+            url="/ui/campaigns?error=" + quote("That campaign does not exist in this brand."),
+            status_code=303,
+        )
+
+    targets = _duplication_targets(db, request, CAMPAIGNS_MANAGE)
+    target = next((b for b in targets if b.id == target_brand_id), None)
+
+    modes = []
+    if target is not None:
+        for mode in duplication.content_modes_for(source_brand_id, target.id):
+            # Copying content writes content rows into the *target* brand, so
+            # it needs the target's content permission, not the working one.
+            if mode == duplication.COPY and not _may_in_brand(
+                db, request, CONTENT_MANAGE, target.id
+            ):
+                continue
+            modes.append(mode)
+
+    return templates.TemplateResponse(
+        request,
+        "campaign_duplicate.html",
+        {
+            "title": f"Duplicate “{campaign.name}”",
+            "campaign": campaign,
+            "summary": duplication.summarise_source(db, campaign.id),
+            "brands": targets,
+            "target": target,
+            "crossing": target is not None and target.id != source_brand_id,
+            "modes": modes,
+            "suggested_name": name or f"{campaign.name} (copy)",
+            "error": error,
+        },
+    )
+
+
+@router.post("/ui/campaigns/{campaign_id}/duplicate")
+def campaign_duplicate(
+    campaign_id: int,
+    request: Request,
+    name: str = Form(...),
+    target_brand_id: int = Form(...),
+    content_mode: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    source_brand_id = working_brand_id(request, db)
+    campaign = (
+        db.query(CampaignDB)
+        .filter(CampaignDB.id == campaign_id, CampaignDB.brand_id == source_brand_id)
+        .first()
+    )
+    if campaign is None:
+        return RedirectResponse(
+            url="/ui/campaigns?error=" + quote("That campaign does not exist in this brand."),
+            status_code=303,
+        )
+
+    back = f"/ui/campaigns/{campaign_id}/duplicate?target_brand_id={target_brand_id}&name={quote(name)}"
+
+    targets = _duplication_targets(db, request, CAMPAIGNS_MANAGE)
+    target = next((b for b in targets if b.id == target_brand_id), None)
+    if target is None:
+        # Answers the same whether the brand does not exist or the user simply
+        # holds no grant on it — the difference would tell a signed-in user
+        # which brands exist beyond their own, exactly as `set_session_brand`
+        # refuses to.
+        return RedirectResponse(
+            url=back + "&error=" + quote("You cannot create campaigns in that brand."),
+            status_code=303,
+        )
+    if content_mode == duplication.COPY and not _may_in_brand(
+        db, request, CONTENT_MANAGE, target.id
+    ):
+        return RedirectResponse(
+            url=back + "&error=" + quote(
+                "Copying content creates records in the target brand, and you cannot "
+                "edit content there. Take the layout only."
+            ),
+            status_code=303,
+        )
+
+    try:
+        report = duplication.duplicate_campaign(
+            db,
+            campaign_id=campaign.id,
+            target_brand_id=target.id,
+            name=name,
+            content_mode=content_mode,
+        )
+    except duplication.DuplicationRefused as error:
+        return RedirectResponse(url=back + "&error=" + quote(str(error)), status_code=303)
+
+    audit.record_from_request(
+        request,
+        db,
+        audit.CAMPAIGN_DUPLICATED,
+        subject_type="campaign",
+        subject_id=report.campaign_id,
+        # The entry belongs to the brand the copy now lives in; the brand it
+        # came from is in the detail, so the log reads correctly from either end.
+        brand_id=report.target_brand_id,
+        detail=report.as_detail(),
+    )
+
+    if not report.crossed_brands:
+        return RedirectResponse(url=f"/ui/campaigns/{report.campaign_id}", status_code=303)
+
+    # The copy is in another brand, so it cannot appear in this list and
+    # following it would 404 behind the brand filter. Say where it went.
+    notice = (
+        f"Duplicated into {target.name}. Switch to that brand to open it."
+        if not report.content_records_copied
+        else (
+            f"Duplicated into {target.name}, with "
+            f"{len(report.content_records_copied)} content record(s) copied across. "
+            "They have no published version yet, so the copy cannot be sent until "
+            "someone publishes them. Switch to that brand to open it."
+        )
+    )
+    return RedirectResponse(url="/ui/campaigns?notice=" + quote(notice), status_code=303)
 
 
 @router.post("/ui/campaigns/{campaign_id}/variants")
@@ -1281,6 +1467,8 @@ def deliveries_process_due(db: Session = Depends(get_db)):
 def content_list(
     request: Request,
     show_inactive: bool = False,
+    notice: str | None = None,
+    error: str | None = None,
     db: Session = Depends(get_db),
 ):
     brand_id = working_brand_id(request, db)
@@ -1304,6 +1492,12 @@ def content_list(
             "records": records,
             "show_inactive": show_inactive,
             "inactive_count": inactive_count,
+            # `content_detail` has redirected here with ?error= since brand
+            # scoping landed, but the route never accepted the parameter and
+            # the template never rendered it — so "that record does not exist
+            # in this brand" was silently dropped for anyone who hit it.
+            "notice": notice,
+            "error": error,
         },
     )
 
@@ -1461,6 +1655,10 @@ def content_detail(
             "all_categories": all_categories,
             "error": error,
             "confirm_delete": confirm_delete,
+            # Which brands this record may be copied into — the target's own
+            # content permission, not the working brand's, because the copy is
+            # written there.
+            "duplicate_targets": _duplication_targets(db, request, CONTENT_MANAGE),
         },
     )
 
@@ -1530,6 +1728,77 @@ def content_create(
         },
     )
     return RedirectResponse(url=f"/ui/content/{record.id}", status_code=303)
+
+
+@router.post("/ui/content/{content_record_id}/duplicate")
+def content_duplicate(
+    content_record_id: int,
+    request: Request,
+    target_brand_id: int = Form(...),
+    db: Session = Depends(get_db),
+):
+    """One record, one step — no wizard.
+
+    The campaign wizard is deliberate because duplicating a campaign multiplies:
+    one click can produce a dozen content records and a composition that cannot
+    send. A single record does neither, so gating it the same way would be
+    ceremony without a risk behind it.
+    """
+    record = (
+        db.query(ContentRecordDB)
+        .filter(
+            ContentRecordDB.id == content_record_id,
+            ContentRecordDB.brand_id == working_brand_id(request, db),
+        )
+        .first()
+    )
+    if record is None:
+        return RedirectResponse(
+            url="/ui/content?error=" + quote("That content record does not exist in this brand."),
+            status_code=303,
+        )
+
+    targets = _duplication_targets(db, request, CONTENT_MANAGE)
+    target = next((b for b in targets if b.id == target_brand_id), None)
+    if target is None:
+        return RedirectResponse(
+            url="/ui/content?error=" + quote("You cannot create content in that brand."),
+            status_code=303,
+        )
+
+    try:
+        copy = duplication.duplicate_content_record(
+            db, content_id=record.id, target_brand_id=target.id
+        )
+    except duplication.DuplicationRefused as error:
+        return RedirectResponse(
+            url="/ui/content?error=" + quote(str(error)), status_code=303
+        )
+
+    audit.record_from_request(
+        request,
+        db,
+        audit.CONTENT_DUPLICATED,
+        subject_type="content_record",
+        subject_id=copy.id,
+        brand_id=target.id,
+        detail={
+            "source_content_id": record.id,
+            "source_brand_id": record.brand_id,
+            "target_brand_id": target.id,
+        },
+    )
+
+    if target.id == record.brand_id:
+        return RedirectResponse(url=f"/ui/content/{copy.id}", status_code=303)
+
+    return RedirectResponse(
+        url="/ui/content?notice=" + quote(
+            f"Copied “{copy.title}” into {target.name}. It has no published version "
+            "yet, so a campaign using it cannot be sent until someone publishes it."
+        ),
+        status_code=303,
+    )
 
 
 @router.post("/ui/content/{content_record_id}/edit")

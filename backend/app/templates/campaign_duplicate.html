@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+{#
+  Two steps, and the second one's options are decided by the first — that is the
+  whole design, not a UI flourish. ADR-150 point 2 fixes a content record to one
+  brand, so what "duplicate" means depends entirely on whether the copy stays in
+  this brand or leaves it. A single combined form would have to offer all three
+  content options at once and grey two of them out, which reads as the product
+  being fussy rather than as the boundary being real.
+#}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0">Duplicate “{{ campaign.name }}”</h1>
+    <a href="/ui/campaigns/{{ campaign.id }}" class="btn btn-outline-secondary">Cancel</a>
+</div>
+
+{% if error %}
+<div class="alert alert-danger" role="alert">{{ error }}</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-lg-7">
+
+        {# ---------- step 1: what, and where ---------- #}
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><span class="badge bg-secondary me-2">1</span> What, and where</span>
+                {% if target %}<span class="text-success small">✓ {{ target.name }}</span>{% endif %}
+            </div>
+            <div class="card-body">
+                <form method="get" action="/ui/campaigns/{{ campaign.id }}/duplicate">
+                    <div class="mb-3">
+                        <label class="form-label">Name of the copy</label>
+                        <input type="text" name="name" class="form-control" required
+                               maxlength="255" value="{{ suggested_name }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Into which brand</label>
+                        <select name="target_brand_id" class="form-select" required>
+                            <option value="">Choose a brand…</option>
+                            {% for brand in brands %}
+                            <option value="{{ brand.id }}"
+                                {% if target and brand.id == target.id %}selected{% endif %}>
+                                {{ brand.name }}{% if brand.id == campaign.brand_id %} — this brand{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        {# The current brand is deliberately on the list. "I want another
+                           campaign like this one" is at least as common a reason to
+                           duplicate as moving to a second brand. #}
+                        <div class="form-text">
+                            Only brands you can create campaigns in are listed.
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Continue</button>
+                </form>
+            </div>
+        </div>
+
+        {# ---------- step 2: the content ---------- #}
+        <div class="card mb-4 {% if not target %}opacity-50{% endif %}">
+            <div class="card-header">
+                <span class="badge bg-secondary me-2">2</span> What happens to the content
+            </div>
+            <div class="card-body">
+                {% if not target %}
+                <p class="text-muted mb-0">Choose a brand first — the options here depend on it.</p>
+                {% elif not modes %}
+                <p class="text-muted mb-0">
+                    You cannot create content in {{ target.name }}, so there is no
+                    content option available to you here.
+                </p>
+                {% else %}
+
+                {% if crossing %}
+                <p class="text-muted">
+                    <strong>{{ target.name }} is a different brand.</strong> A content
+                    record belongs to exactly one brand, so it cannot be shared across
+                    — it is either copied or left behind.
+                </p>
+                {% else %}
+                <p class="text-muted">
+                    <strong>Staying in this brand.</strong> The copy points at the same
+                    content records, so catalogue edits still reach it. No content is
+                    duplicated.
+                </p>
+                {% endif %}
+
+                <form method="post" action="/ui/campaigns/{{ campaign.id }}/duplicate">
+                    <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+                    <input type="hidden" name="name" value="{{ suggested_name }}">
+                    <input type="hidden" name="target_brand_id" value="{{ target.id }}">
+
+                    {% for mode in modes %}
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="radio" name="content_mode"
+                               id="mode-{{ mode }}" value="{{ mode }}"
+                               {% if loop.first %}checked{% endif %}>
+                        <label class="form-check-label" for="mode-{{ mode }}">
+                            {% if mode == "keep" %}
+                            <strong>Keep the content</strong>
+                            <div class="text-muted small">
+                                The copy's modules use the same
+                                {{ summary.content_titles | length }} record(s). Editing one
+                                changes both campaigns.
+                            </div>
+                            {% elif mode == "copy" %}
+                            <strong>Copy the content into {{ target.name }}</strong>
+                            <div class="text-muted small">
+                                {{ summary.content_titles | length }} new record(s) in
+                                {{ target.name }}'s catalogue, with their categories.
+                                Independent from here on.
+                            </div>
+                            {% else %}
+                            <strong>Layout only</strong>
+                            <div class="text-muted small">
+                                Modules arrive in the right order with nothing attached.
+                            </div>
+                            {% endif %}
+                        </label>
+                    </div>
+                    {% endfor %}
+
+                    <div class="alert alert-warning small">
+                        <strong>Before you do this:</strong>
+                        <ul class="mb-0 mt-2">
+                            {# Not a disclaimer — each of these is a thing the copy will do
+                               that looks like nothing at all until a send is attempted. #}
+                            <li>
+                                Decision slots arrive <strong>unconfigured</strong>. A slot
+                                keeps its name and strategy but no filter, so nobody
+                                inherits a rule chosen against a different catalogue.
+                            </li>
+                            {% if crossing %}
+                            <li>
+                                Copied content has <strong>no published version</strong>.
+                                The copy previews correctly and <strong>refuses to send</strong>
+                                until someone publishes it.
+                            </li>
+                            <li>
+                                Links and image URLs come across <strong>verbatim</strong>,
+                                still pointing at {{ request.state.current_brand.name
+                                if request.state.current_brand else "this brand" }}.
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Duplicate</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {# ---------- what is actually being copied ---------- #}
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header">What comes across</div>
+            <div class="card-body">
+                <ul class="list-unstyled mb-3">
+                    {% for variant in summary.variants %}
+                    <li class="mb-1">
+                        <strong>{{ variant.name }}</strong>
+                        <span class="text-muted small">
+                            — {{ variant.modules }} module(s),
+                            {{ variant.decision_slots }} decision slot(s)
+                        </span>
+                    </li>
+                    {% else %}
+                    <li class="text-muted">Nothing — this campaign has no variants.</li>
+                    {% endfor %}
+                </ul>
+
+                {% if summary.content_titles %}
+                <div class="text-muted small mb-1">Content referenced:</div>
+                <ul class="small mb-3">
+                    {% for title in summary.content_titles %}
+                    <li>{{ title }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+
+                <hr>
+                <div class="text-muted small">
+                    <strong>Not copied:</strong> sends, snapshots, delivery history,
+                    decision outcomes, published content versions and field overrides.
+                    Each of those records something that happened, and a copy has no
+                    history — reproducing them would claim decisions and sends that
+                    never took place.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+
+{% endblock %}

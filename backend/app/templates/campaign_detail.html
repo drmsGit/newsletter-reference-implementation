@@ -10,6 +10,9 @@
             <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
             <button type="submit" class="btn btn-sm btn-outline-success">✨ Suggest audience</button>
         </form>
+        <a href="/ui/campaigns/{{ campaign.id }}/duplicate"
+           class="btn btn-sm btn-outline-secondary"
+           title="Copy this campaign, into this brand or another one">Duplicate</a>
         <span class="badge bg-secondary fs-6">{{ campaign.status }}</span>
     </div>
 </div>

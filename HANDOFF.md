@@ -303,23 +303,63 @@ was mutation-verified — removing a gate fails only that gate's tests.
    the opt-out-scope decision governs a surface that does not exist — see the
    Needs-ADR item on flows and journeys, and **do not build one as a one-off.**
 
-6. **Brand step 3 — duplication.** "Duplicate campaign to brand X", content
-   copied with it. **An escape hatch, not the mechanism** — item 4 rejected
-   duplicate-and-sync as the general answer to brand scoping, so this covers
-   campaigns and content only, where the alternative is rebuilding by hand. This is what makes single-brand content tolerable: sharing
-   was rejected because the same copy under two brands needs different URLs and
-   domains. No duplication machinery exists;
-   `create_role(copy_from_role_id=…)` copies one flat list and is the only
-   precedent. **Accepted cost:** copies diverge — a typo fixed in brand 1 stays
-   wrong in brand 2.
+6. ~~Brand step 3 — duplication.~~ **BUILT 2026-09-16.** `backend/app/campaigns/duplication.py`,
+   a two-step wizard at `/ui/campaigns/{id}/duplicate`, and a one-step
+   "duplicate to brand X" on the content record.
+
+   **The rule to keep in your head: the boundary decides, not the act.**
+   Duplicating a campaign does not imply duplicating content; crossing a brand
+   does. Same brand → the copy's modules reference the *same* records and **no
+   content rows are created at all** (ADR-013 working normally). Different
+   brand → content is copied, because a record carries one `brand_id`. The
+   two modes that are not expressible are refused in the service, not merely
+   hidden in the UI.
+
+   **What arrives, and what deliberately does not.** Copied: campaign,
+   variants, modules (`module_data` verbatim), decision slots — as *prepared
+   spots*, keeping name/type/strategy but **no filter or config**, so nobody
+   inherits a rule chosen against a different catalogue. Not copied:
+   resolutions, snapshots, sends, delivery executions, content versions,
+   overrides. Status is forced to draft: a copy of a sent campaign has not been
+   sent. Module positions are renumbered from 1, since `delete_module` leaves
+   holes and a copy has no reason to inherit one.
+
+   **Three things the wizard says out loud** rather than letting the manager
+   discover them: a cross-brand copy's content has no published version, so it
+   **previews correctly and refuses to send** (ADR-128); URLs come across
+   verbatim, still pointing at the source brand; slots arrive unconfigured.
+
+   **Two traps found building it.** (1) `campaigns.manage` is checked against
+   the *working* brand, so the **target** brand was unguarded — a Manager on A
+   could create a campaign in B by choosing it from a dropdown.
+   `brands_with_permission` closes it, and the content copy additionally needs
+   `content.manage` on the target. (2) Those two checks **masked each other**:
+   each refuses independently, so breaking either failed no test. The Viewer
+   test now asks for *layout only* so exactly one guard stands.
+
+   **Accepted cost, unchanged:** copies diverge — a typo fixed in brand 1 stays
+   wrong in brand 2. **Merge** (repointing a stray copy into an earlier one)
+   stays deferred until the wizard's warnings show whether strays happen.
 
 7. **ADR-154 — ready to implement; plan it.** Nothing exists today: no erasure
    route, no service function, no script. Its own Consequences admit snapshot
    handling is blocked behind the undecided storage strategy, so that Needs-ADR
    item gates part of it.
-8. **ADR-153 — the audit log, now accepted and entirely unbuilt.** There is no
-   audit table anywhere in `backend/`; the only actor field in the system is
-   the free-text `ContentVersionDB.created_by`. **The user gave a second reason
+8. **ADR-153 — the audit log: first slice BUILT 2026-09-15, the rest unbuilt.**
+   `backend/app/audit/` now records sign-in, role grant/revoke,
+   deactivate/reactivate, brand creation, and — since brand step 3 —
+   `campaign.duplicated` and `content.duplicated`. **Written from routes, not
+   services**, because the route knows the actor; the stated cost is that
+   anything called from outside a route is unaudited. **No foreign keys, by
+   design** (point 5: an entry must outlive what it references) — which also
+   means nothing cascades on cleanup, and test fixtures that delete users or
+   brands must delete audit rows explicitly or leak them silently. That has
+   already happened twice.
+
+   Provenance for duplication is answered **from this log**, not from a
+   `copied_from_id` column, so it cannot go stale — note that
+   `content_records_copied` comes back out of the JSON column with **string
+   keys**. **The user gave a second reason
    for wanting it that is not in the ADR:** concurrent editing — stopping two
    users working the same asset, possibly with a *"user 1 is working on this —
    overwrite?"* prompt. That is a **contention model**, which is already a

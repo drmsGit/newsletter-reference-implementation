@@ -233,6 +233,30 @@ def brands_for_user(db: Session, user: UserDB | None) -> list[BrandDB]:
     )
 
 
+def brands_with_permission(
+    db: Session, user: UserDB | None, permission: str
+) -> list[BrandDB]:
+    """Brands this user may *write* to with `permission`, ordered by id.
+
+    `brands_for_user` answers "where may this person work at all"; the switcher
+    needs that. This answers a narrower question that only arises when an action
+    names a brand other than the working one — duplicating a campaign into a
+    second brand is the first. Without it, a Manager on brand A could create a
+    campaign in brand B simply by choosing it as a target, because the policy
+    table checks `campaigns.manage` against the *working* brand and nothing
+    else looks at the destination.
+
+    Platform-level permissions are not special-cased: a permission that is not
+    brand-scoped is held everywhere or nowhere, and `permissions_for` already
+    answers that correctly per brand.
+    """
+    return [
+        brand
+        for brand in brands_for_user(db, user)
+        if permission in permissions_for(db, user, brand.id)
+    ]
+
+
 def resolve_session_brand(db: Session, token: str | None) -> BrandDB | None:
     """Which brand this session is working in. Validated, never trusted.
 

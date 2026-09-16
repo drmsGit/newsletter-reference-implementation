@@ -31,6 +31,12 @@ ROLE_REVOKED = "user.role_revoked"
 USER_DEACTIVATED = "user.deactivated"
 USER_REACTIVATED = "user.reactivated"
 BRAND_CREATED = "brand.created"
+# Brand step 3. The audit log is how "where did this come from?" is answered —
+# deliberately instead of a `copied_from_id` column, so the answer cannot go
+# stale when the source is renamed, re-pointed or deleted. Same reasoning as
+# ADR-163 computing consent from events rather than storing a status.
+CAMPAIGN_DUPLICATED = "campaign.duplicated"
+CONTENT_DUPLICATED = "content.duplicated"
 
 ACTOR_USER = "user"
 #: ADR-166's machine principals will use this. Nothing writes it yet.

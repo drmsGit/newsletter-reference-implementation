@@ -9,6 +9,13 @@
     </button>
 </div>
 
+{% if notice %}
+<div class="alert alert-info" role="alert">{{ notice }}</div>
+{% endif %}
+{% if error %}
+<div class="alert alert-danger" role="alert">{{ error }}</div>
+{% endif %}
+
 <div class="collapse mb-4" id="form-new-campaign">
     <div class="card">
         <div class="card-body">
@@ -32,6 +39,7 @@
             <th>Name</th>
             <th>Status</th>
             <th>Created</th>
+            <th></th>
         </tr>
     </thead>
     <tbody>
@@ -43,6 +51,10 @@
             </td>
             <td>{{ campaign.status }}</td>
             <td>{{ campaign.created_at.strftime("%Y-%m-%d") if campaign.created_at else "—" }}</td>
+            <td class="text-end">
+                <a href="/ui/campaigns/{{ campaign.id }}/duplicate"
+                   class="btn btn-sm btn-outline-secondary">Duplicate</a>
+            </td>
         </tr>
         {% endfor %}
     </tbody>
