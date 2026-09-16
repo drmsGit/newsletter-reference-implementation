@@ -98,6 +98,8 @@ def dashboard(
     request: Request,
     db: Session = Depends(get_db),
 ):
+    dashboard_brand_id = working_brand_id(request, db)
+
     return templates.TemplateResponse(
         request,
         "dashboard.html",
@@ -106,16 +108,47 @@ def dashboard(
             # Active only — a deactivated record still exists and still renders
             # where it is already used, but it is not part of the catalogue a
             # manager can compose with, so counting it here overstates the number.
+            # Scoped to the working brand, all of them together. A dashboard
+            # mixing scopes is the subtler version of the problem brand
+            # scoping exists to solve: "0 campaigns, 7 snapshots" invites the
+            # reader to average two different populations in their head.
             "content_count": (
                 db.query(ContentRecordDB)
-                .filter(ContentRecordDB.status == "active")
+                .filter(
+                    ContentRecordDB.status == "active",
+                    ContentRecordDB.brand_id == dashboard_brand_id,
+                )
                 .count()
             ),
-            "campaign_count": db.query(CampaignDB).count(),
+            "campaign_count": (
+                db.query(CampaignDB)
+                .filter(CampaignDB.brand_id == dashboard_brand_id)
+                .count()
+            ),
+            # Recipients are company-wide by ADR-150 point 9 — brand is the
+            # SENDING context, not an attribute of the person — so this one is
+            # deliberately unscoped rather than overlooked.
             "recipient_count": db.query(RecipientDB).count(),
-            "snapshot_count": db.query(SnapshotDB).count(),
-            "delivery_count": db.query(DeliveryExecutionDB).count(),
-            "event_count": db.query(EngagementEventDB).count(),
+            "snapshot_count": (
+                db.query(SnapshotDB)
+                .join(VariantDB, VariantDB.id == SnapshotDB.variant_id)
+                .join(CampaignDB, CampaignDB.id == VariantDB.campaign_id)
+                .filter(CampaignDB.brand_id == dashboard_brand_id)
+                .count()
+            ),
+            "delivery_count": (
+                db.query(DeliveryExecutionDB)
+                .join(SendInstanceDB, SendInstanceDB.id == DeliveryExecutionDB.send_instance_id)
+                .filter(SendInstanceDB.brand_id == dashboard_brand_id)
+                .count()
+            ),
+            "event_count": (
+                db.query(EngagementEventDB)
+                .join(DeliveryExecutionDB, DeliveryExecutionDB.id == EngagementEventDB.delivery_execution_id)
+                .join(SendInstanceDB, SendInstanceDB.id == DeliveryExecutionDB.send_instance_id)
+                .filter(SendInstanceDB.brand_id == dashboard_brand_id)
+                .count()
+            ),
         },
     )
 
@@ -758,7 +791,16 @@ def campaign_detail(
     # selected (same rule the decision strategies apply to their candidate pool).
     content_records = (
         db.query(ContentRecordDB)
-        .filter(ContentRecordDB.status == "active")
+        .filter(
+            ContentRecordDB.status == "active",
+            # The CAMPAIGN's brand, not the viewer's. Without this a manager
+            # could bind brand A's content to brand B's campaign straight from
+            # the picker — the situation duplication exists to replace — and
+            # nothing downstream would object, because only the decision
+            # strategies enforce brand on content. The audience picker a few
+            # lines below was scoped for exactly this reason; this was missed.
+            ContentRecordDB.brand_id == campaign.brand_id,
+        )
         .order_by(ContentRecordDB.title.asc())
         .all()
     )

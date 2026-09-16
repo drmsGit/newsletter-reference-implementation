@@ -560,16 +560,38 @@ def create_suggested_group_for_campaign(db: Session, campaign_id: int, campaign_
     """Materialize a new group seeded with the campaign's suggested include
     blocks. Blocks are marked source='suggested' so the UI can badge them as the
     system's proposal — fully editable/deletable, never a locked list."""
+    # The group belongs to the campaign's brand, not to whoever clicked. Same
+    # rule as everywhere else a brand is needed: derive it, never read it off
+    # the viewer's context.
+    brand_id = _brand_of_campaign(db, campaign_id)
+
     base_name = f"{campaign_name} — suggested audience"
     name = base_name
     suffix = 2
-    while db.query(AudienceGroupDB).filter(func.lower(AudienceGroupDB.name) == name.lower()).first():
+    # Scoped to the brand, because the constraint is (brand_id, lower(name)).
+    # Querying every brand would enforce a stricter rule than the database and
+    # push brand B's group to "(2)" because brand A happens to own the name —
+    # the wrong direction entirely for a per-brand scope.
+    while (
+        db.query(AudienceGroupDB)
+        .filter(
+            AudienceGroupDB.brand_id == brand_id,
+            func.lower(AudienceGroupDB.name) == name.lower(),
+        )
+        .first()
+    ):
         name = f"{base_name} ({suffix})"
         suffix += 1
+        # `audience_groups.name` is String(255) and a long campaign name plus a
+        # suffix can exceed it, which would fail as a database error rather
+        # than as the collision it actually is.
+        if len(name) > 255:
+            name = f"{base_name[:240].rstrip()} ({suffix})"
 
     group = create_group(
         db,
         name,
+        brand_id,
         description=f"System-suggested from campaign #{campaign_id} content categories.",
         source_campaign_id=campaign_id,
     )

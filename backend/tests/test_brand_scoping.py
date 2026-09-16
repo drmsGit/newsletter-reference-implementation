@@ -943,3 +943,185 @@ class TestConsentIsScopedToTheSendingBrand:
             "the criteria search returned someone who never consented to the "
             "brand it was asked about"
         )
+
+
+class TestSuggestAudienceSurvivedTheBrandWork:
+    """Regression: "Suggest audience" was a 500 for a day.
+
+    `create_group` gained `brand_id` as a required positional in brand step 1,
+    and `create_suggested_group_for_campaign` was not updated — so every click
+    raised `TypeError`. The route catches `ValueError`, not `TypeError`, so it
+    surfaced as a 500 rather than a message.
+
+    **Driven over HTTP deliberately.** A service-level test would have called
+    the function with the right arguments and proved nothing: the defect was a
+    caller that did not. This is the fourth time in this project that a test
+    passing either side of a broken call has hidden it.
+    """
+
+    def _campaign_with_content(self, db, brand):
+        """A campaign whose content has categories, so suggestions exist."""
+        from app.content.db_models import ContentCategoryAssignmentDB, CategoryDB
+        from app.campaigns.db_models import ModuleInstanceDB
+        from app.campaigns.service import create_campaign
+        from app.content.service import create_content
+
+        campaign = create_campaign(
+            db, name=f"suggest-{uuid.uuid4().hex[:8]}", brand_id=brand.id
+        )
+        record = create_content(
+            db, title=f"suggest-{uuid.uuid4().hex[:8]}",
+            content={"headline_medium": "x"}, brand_id=brand.id,
+        )
+        category = db.query(CategoryDB).first()
+        if category is None:
+            pytest.skip("no category in this database to suggest from")
+        db.add(ContentCategoryAssignmentDB(
+            content_id=record.id, category_id=category.id, score=10,
+        ))
+        variant_id = db.query(VariantDB.id).filter(
+            VariantDB.campaign_id == campaign.id
+        ).scalar()
+        db.add(ModuleInstanceDB(
+            variant_id=variant_id, module_type="img_left",
+            content_record_id=record.id, position=1,
+        ))
+        db.commit()
+        return campaign, record
+
+    def test_suggest_audience_does_not_500(self, db, temp_brand, monkeypatch):
+        from fastapi.testclient import TestClient
+
+        from main import app
+        from app.audience.db_models import AudienceGroupDB, AudienceRuleBlockDB
+        from app.campaigns.db_models import CampaignDB, ModuleInstanceDB
+        from app.content.db_models import ContentCategoryAssignmentDB, ContentRecordDB
+
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        admin = db.query(UserDB).join(
+            RoleAssignmentDB, RoleAssignmentDB.user_id == UserDB.id
+        ).join(RoleDB, RoleDB.id == RoleAssignmentDB.role_id).filter(
+            RoleDB.key == "admin", UserDB.is_active.is_(True)
+        ).first()
+        if admin is None:
+            pytest.skip("no active admin in this database to act as")
+
+        # A NON-default brand deliberately. With the campaign on brand 1 this
+        # test could not tell a derived brand from a hardcoded one — a mutation
+        # proved exactly that, so the fixture has to make the two differ.
+        brand = temp_brand()
+        admin_role = db.query(RoleDB).filter(RoleDB.key == "admin").first()
+        auth.assign_role(db, admin.id, admin_role.id, brand_id=brand.id)
+
+        campaign, record = self._campaign_with_content(db, brand)
+        token = auth.create_session(db, admin)
+        auth.set_session_brand(db, token, brand.id)
+        client = TestClient(app, follow_redirects=False, raise_server_exceptions=False)
+        client.cookies.set(auth.SESSION_COOKIE, token)
+
+        try:
+            response = client.post(
+                f"/ui/campaigns/{campaign.id}/suggest-audience",
+                data={"csrf_token": auth.csrf_token_for(token)},
+            )
+
+            assert response.status_code < 500, (
+                f"Suggest audience returned {response.status_code} — the route "
+                "catches ValueError, so a TypeError from a changed signature "
+                "arrives as a 500 with no message"
+            )
+            group = db.query(AudienceGroupDB).filter(
+                AudienceGroupDB.source_campaign_id == campaign.id
+            ).first()
+            assert group is not None, "no group was created"
+            assert group.brand_id == brand.id, (
+                f"the suggested group landed on brand {group.brand_id} instead "
+                f"of the campaign's {brand.id} — it must follow the campaign"
+            )
+        finally:
+            groups = db.query(AudienceGroupDB).filter(
+                AudienceGroupDB.source_campaign_id == campaign.id
+            ).all()
+            for g in groups:
+                db.query(AudienceRuleBlockDB).filter(
+                    AudienceRuleBlockDB.group_id == g.id
+                ).delete()
+            db.query(AudienceGroupDB).filter(
+                AudienceGroupDB.source_campaign_id == campaign.id
+            ).delete()
+            db.query(ModuleInstanceDB).filter(
+                ModuleInstanceDB.content_record_id == record.id
+            ).delete()
+            db.query(ContentCategoryAssignmentDB).filter(
+                ContentCategoryAssignmentDB.content_id == record.id
+            ).delete()
+            db.query(ContentRecordDB).filter(ContentRecordDB.id == record.id).delete()
+            db.query(VariantDB).filter(VariantDB.campaign_id == campaign.id).delete()
+            db.query(CampaignDB).filter(CampaignDB.id == campaign.id).delete()
+            db.query(SessionDB).filter(
+                SessionDB.token_hash == auth.hash_secret(token)
+            ).delete()
+            db.commit()
+
+
+class TestTheContentPickerIsScoped:
+    """The campaign page's module content picker offered every brand's content.
+
+    Found while designing duplication. It matters more than it looks: nothing
+    downstream would have objected — only the decision strategies enforce brand
+    on content, so a module bound to another brand's record renders happily.
+    The picker was the one place a manager could create that state by hand, and
+    it is exactly the state cross-brand duplication exists to make unnecessary.
+    """
+
+    def test_the_picker_offers_only_the_campaigns_own_brand(
+        self, db, default_brand, temp_brand, monkeypatch
+    ):
+        from fastapi.testclient import TestClient
+
+        from main import app
+        from app.campaigns.db_models import CampaignDB
+        from app.campaigns.service import create_campaign
+        from app.content.db_models import ContentRecordDB
+        from app.content.service import create_content
+
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        admin = db.query(UserDB).join(
+            RoleAssignmentDB, RoleAssignmentDB.user_id == UserDB.id
+        ).join(RoleDB, RoleDB.id == RoleAssignmentDB.role_id).filter(
+            RoleDB.key == "admin", UserDB.is_active.is_(True)
+        ).first()
+        if admin is None:
+            pytest.skip("no active admin in this database to act as")
+
+        other = temp_brand()
+        # Content on the OTHER brand, with a title distinctive enough to find
+        # in the rendered page.
+        marker = f"PICKERLEAK-{uuid.uuid4().hex[:8]}"
+        foreign = create_content(
+            db, title=marker, content={"headline_medium": "x"}, brand_id=other.id
+        )
+        campaign = create_campaign(
+            db, name=f"picker-{uuid.uuid4().hex[:8]}", brand_id=default_brand.id
+        )
+        token = auth.create_session(db, admin)
+        client = TestClient(app, follow_redirects=False, raise_server_exceptions=False)
+        client.cookies.set(auth.SESSION_COOKIE, token)
+
+        try:
+            page = client.get(f"/ui/campaigns/{campaign.id}")
+
+            assert page.status_code == 200
+            assert marker not in page.text, (
+                "the module content picker offered another brand's content — "
+                "selecting it would bind brand B's record to a brand A "
+                "campaign, and nothing in the render path would refuse it"
+            )
+        finally:
+            db.query(ContentRecordDB).filter(ContentRecordDB.id == foreign.id).delete()
+            db.query(VariantDB).filter(VariantDB.campaign_id == campaign.id).delete()
+            db.query(CampaignDB).filter(CampaignDB.id == campaign.id).delete()
+            db.query(SessionDB).filter(
+                SessionDB.token_hash == auth.hash_secret(token)
+            ).delete()
+            db.commit()
