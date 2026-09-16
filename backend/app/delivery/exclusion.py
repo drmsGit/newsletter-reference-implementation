@@ -91,6 +91,7 @@ class ExclusionStackResult:
 def run_exclusion_stack(
     db: Session,
     recipient_ids: set[int],
+    brand_id: int,
     *,
     channel: str = DEFAULT_CHANNEL,
     purpose: str = DEFAULT_PURPOSE,
@@ -125,16 +126,21 @@ def run_exclusion_stack(
     surviving -= unaddressable
 
     # --- Stage 2: consent --------------------------------------------------
-    # The latest (recipient, channel, purpose) event must be a grant. This is
-    # the stage that closes the P0: it runs at send time, so an opt-out
+    # The latest (recipient, brand, channel, purpose) event must be a grant.
+    # This is the stage that closes the P0: it runs at send time, so an opt-out
     # recorded after the audience was frozen is seen.
+    #
+    # `brand_id` is required and defaulted nowhere. Consent is to a sender
+    # (ADR-163 addendum 2026-09-15), so gating without one would ask "did this
+    # person consent to anybody", which is the question that let a brand-B send
+    # reach brand-A's subscribers.
     if surviving:
         consenting = {
             row.id
             for row in db.query(RecipientDB.id)
             .filter(
                 RecipientDB.id.in_(sorted(surviving)),
-                is_consenting_filter(channel, purpose),
+                is_consenting_filter(brand_id, channel, purpose),
             )
             .all()
         }

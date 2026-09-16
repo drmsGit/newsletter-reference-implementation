@@ -698,3 +698,248 @@ class TestThePermissionCheckIsBrandAware:
         user = user_on(default_brand)
         request = SimpleNamespace(state=SimpleNamespace())
         assert _permitted(request, db, user, "view") is True
+
+
+class TestConsentIsScopedToTheSendingBrand:
+    """ADR-163 addendum 2026-09-15 — the change that makes the boundary real.
+
+    Until this, the authoring side was scoped and the send side was not: a
+    campaign belonging to brand B was filtered to brand B's content and
+    audiences, and then reached **every consenting recipient**, because
+    `is_consenting_filter()` had no brand in it. Measured before the change —
+    41 recipients, all 41 passing the gate whichever brand asked.
+
+    Consent is to a SENDER. Opting in to brand A says nothing about brand B,
+    so a newly created brand starts with zero reachable recipients.
+    """
+
+    @pytest.fixture
+    def consenting_recipient(self, db, default_brand):
+        """A recipient who has opted in to the DEFAULT brand and nothing else."""
+        from app.recipients.consent import record_consent
+        from app.recipients.db_models import (
+            AddressabilityDB, ConsentEventDB, RecipientDB,
+        )
+
+        recipient = RecipientDB(
+            external_id=f"brandconsent-{uuid.uuid4().hex[:10]}",
+            language="test-brand-consent",
+            status="active",
+        )
+        db.add(recipient)
+        db.commit()
+        db.refresh(recipient)
+        # An address as well as consent. The exclusion stack checks
+        # addressability FIRST (ADR-163 point 7), so a consent-only fixture is
+        # excluded at stage 1 and never reaches the stage under test — which
+        # is how the first version of this test failed, for the wrong reason.
+        db.add(AddressabilityDB(
+            recipient_id=recipient.id,
+            channel="email",
+            value={"email": f"{uuid.uuid4().hex[:10]}@example.invalid"},
+            status="active",
+            is_primary=True,
+        ))
+        record_consent(db, recipient.id, "opted_in", default_brand.id, source="test")
+        db.commit()
+
+        yield recipient
+
+        db.query(ConsentEventDB).filter(
+            ConsentEventDB.recipient_id == recipient.id
+        ).delete()
+        db.query(AddressabilityDB).filter(
+            AddressabilityDB.recipient_id == recipient.id
+        ).delete()
+        db.query(RecipientDB).filter(RecipientDB.id == recipient.id).delete()
+        db.commit()
+
+    def test_the_gate_admits_them_for_the_brand_they_opted_in_to(
+        self, db, default_brand, consenting_recipient
+    ):
+        from app.recipients.consent import is_consenting_filter
+        from app.recipients.db_models import RecipientDB
+
+        found = db.query(RecipientDB).filter(
+            RecipientDB.id == consenting_recipient.id,
+            is_consenting_filter(default_brand.id),
+        ).count()
+        assert found == 1, "an opted-in recipient was gated out of their own brand"
+
+    def test_the_gate_refuses_them_for_a_brand_they_never_opted_in_to(
+        self, db, temp_brand, consenting_recipient
+    ):
+        """The defect itself. This is what a brand-B send used to reach."""
+        from app.recipients.consent import is_consenting_filter
+        from app.recipients.db_models import RecipientDB
+
+        other = temp_brand()
+
+        found = db.query(RecipientDB).filter(
+            RecipientDB.id == consenting_recipient.id,
+            is_consenting_filter(other.id),
+        ).count()
+
+        assert found == 0, (
+            "a recipient who opted in to one brand was reachable by another — "
+            "consent is to a sender, and this is the gap that let a brand-B "
+            "campaign mail brand-A's subscribers"
+        )
+
+    def test_a_new_brand_starts_with_nobody(self, db, temp_brand):
+        """Correct, and the consequence an adopter must not meet by surprise."""
+        from app.recipients.consent import is_consenting_filter
+        from app.recipients.db_models import RecipientDB
+
+        fresh = temp_brand()
+        reachable = db.query(RecipientDB).filter(is_consenting_filter(fresh.id)).count()
+
+        assert reachable == 0, (
+            f"{reachable} recipients were reachable by a brand created seconds "
+            "ago that nobody has consented to"
+        )
+
+    def test_an_opt_out_on_one_brand_leaves_the_other_alone(
+        self, db, default_brand, temp_brand, consenting_recipient
+    ):
+        """Opt-out scope follows consent scope (addendum point 2).
+
+        A person genuinely subscribed to two brands should not lose both by
+        leaving one. The "all brands" option exists for the other case, and is
+        a company setting rather than the default.
+        """
+        from app.recipients.consent import is_consenting, record_consent
+        from app.recipients.db_models import ConsentEventDB
+
+        other = temp_brand()
+        record_consent(db, consenting_recipient.id, "opted_in", other.id, source="test")
+        assert is_consenting(db, consenting_recipient.id, other.id)
+
+        record_consent(db, consenting_recipient.id, "opted_out", other.id, source="test")
+
+        assert not is_consenting(db, consenting_recipient.id, other.id)
+        assert is_consenting(db, consenting_recipient.id, default_brand.id), (
+            "opting out of one brand withdrew consent for another"
+        )
+        db.query(ConsentEventDB).filter(
+            ConsentEventDB.recipient_id == consenting_recipient.id,
+            ConsentEventDB.brand_id == other.id,
+        ).delete()
+        db.commit()
+
+    def test_resolve_audience_gates_on_the_GROUPS_brand(
+        self, db, temp_brand, consenting_recipient
+    ):
+        """The audience path, not the filter helper.
+
+        Written because a mutation exposed the gap: hardcoding brand 1 inside
+        `resolve_audience` failed nothing, since every other test in the suite
+        uses the default brand and could not tell the difference.
+        """
+        from app.audience.db_models import AudienceGroupDB, AudienceRuleBlockDB
+
+        other = temp_brand()
+        group = audience_service.create_group(
+            db, f"crossbrand-{uuid.uuid4().hex[:8]}", brand_id=other.id
+        )
+        audience_service.add_block(
+            db, group_id=group.id, kind="include",
+            criteria={"language": "test-brand-consent"}, label="by language",
+        )
+        try:
+            resolved = audience_service.resolve_audience(db, group.id)
+
+            assert consenting_recipient.id not in {r.id for r in resolved}, (
+                "a group on brand B resolved a recipient who only ever "
+                "consented to brand A — the group's brand must gate it"
+            )
+        finally:
+            db.query(AudienceRuleBlockDB).filter(
+                AudienceRuleBlockDB.group_id == group.id
+            ).delete()
+            db.query(AudienceGroupDB).filter(AudienceGroupDB.id == group.id).delete()
+            db.commit()
+
+    def test_the_send_time_stack_excludes_on_the_sending_brand(
+        self, db, default_brand, temp_brand, consenting_recipient
+    ):
+        """The exclusion stack — ADR-163 point 7, the stage that closed the P0.
+
+        Also written after a mutation: hardcoding brand 1 in the consent stage
+        failed nothing. This is the path a real send takes, so it is the one
+        that matters most of the three.
+        """
+        from app.delivery.exclusion import run_exclusion_stack
+
+        other = temp_brand()
+        ids = {consenting_recipient.id}
+
+        mine = run_exclusion_stack(db, ids, default_brand.id)
+        assert consenting_recipient.id in mine.eligible, (
+            "an opted-in recipient was excluded from their own brand's send"
+        )
+
+        theirs = run_exclusion_stack(db, ids, other.id)
+        assert consenting_recipient.id not in theirs.eligible, (
+            "a send as brand B would have mailed someone who only consented "
+            "to brand A — this is the send-time half of the boundary"
+        )
+        assert any(
+            e.recipient_id == consenting_recipient.id for e in theirs.exclusions
+        ), "excluded without recording why — the exclusion reason is the audit trail"
+
+    def test_a_manual_pin_does_not_survive_the_brand_consent_floor(
+        self, db, temp_brand, consenting_recipient
+    ):
+        """Isolates the final consent floor, which nothing else reaches.
+
+        Two mutations exposed why this is needed: breaking the criteria gate
+        OR the final floor individually failed nothing, because each excludes
+        independently and the survivor covers for the other. Defence in depth
+        working, and a pair of untested paths hiding behind it.
+
+        A manual pin bypasses criteria by design — ADR-163's rule is that a pin
+        is a deliberate override that survives exclude blocks, with the consent
+        floor as the one exception. So a pinned recipient reaches the floor and
+        nothing else, which makes this the only way to test it alone.
+        """
+        from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB
+
+        other = temp_brand()
+        group = audience_service.create_group(
+            db, f"pinned-{uuid.uuid4().hex[:8]}", brand_id=other.id
+        )
+        audience_service.add_member(db, group.id, consenting_recipient.id)
+        try:
+            resolved = audience_service.resolve_audience(db, group.id)
+
+            assert consenting_recipient.id not in {r.id for r in resolved}, (
+                "a recipient pinned into a brand-B group was resolved despite "
+                "having consented only to brand A — the consent floor is the "
+                "one thing a manual pin must not override"
+            )
+        finally:
+            db.query(AudienceGroupMemberDB).filter(
+                AudienceGroupMemberDB.group_id == group.id
+            ).delete()
+            db.query(AudienceGroupDB).filter(AudienceGroupDB.id == group.id).delete()
+            db.commit()
+
+    def test_find_by_criteria_gates_on_the_brand_it_is_given(
+        self, db, default_brand, temp_brand, consenting_recipient
+    ):
+        """Isolates the criteria gate, for the same reason as the test above."""
+        other = temp_brand()
+
+        mine = audience_service.find_by_criteria(
+            db, default_brand.id, language="test-brand-consent"
+        )
+        theirs = audience_service.find_by_criteria(
+            db, other.id, language="test-brand-consent"
+        )
+
+        assert consenting_recipient.id in {r.id for r in mine}
+        assert consenting_recipient.id not in {r.id for r in theirs}, (
+            "the criteria search returned someone who never consented to the "
+            "brand it was asked about"
+        )

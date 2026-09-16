@@ -159,6 +159,7 @@ def get_member_recipient_ids(db: Session, group_id: int) -> set[int]:
 
 def find_by_criteria(
     db: Session,
+    brand_id: int,
     *,
     language: str | None = None,
     status: str | None = None,
@@ -178,7 +179,11 @@ def find_by_criteria(
     # point 1). Fail-closed in both directions: "pending" and "opted_out" are
     # excluded, and so is a recipient with no consent event at all, since the
     # absence of a decision is not a grant.
-    q = db.query(RecipientDB).filter(is_consenting_filter())
+    # Consent is to a SENDER (ADR-163 addendum 2026-09-15), so the gate has
+    # to ask "consenting to WHOM". Before brand_id was threaded here, every
+    # brand's audience resolved against every brand's consent — the authoring
+    # side was scoped and the send side was not.
+    q = db.query(RecipientDB).filter(is_consenting_filter(brand_id))
 
     if language:
         q = q.filter(RecipientDB.language == language)
@@ -309,7 +314,7 @@ def bulk_add_members(db: Session, group_id: int, recipient_ids: list[int]) -> in
 # Rule blocks — live, editable criteria that make up a group's audience
 # ---------------------------------------------------------------------------
 
-def _recipients_for_criteria(db: Session, criteria: dict) -> list[RecipientDB]:
+def _recipients_for_criteria(db: Session, criteria: dict, brand_id: int) -> list[RecipientDB]:
     """Resolve one block's criteria to consenting recipients. Thin adapter over
     find_by_criteria so blocks and the older bulk-add path share one definition
     of what a criterion means."""
@@ -317,6 +322,7 @@ def _recipients_for_criteria(db: Session, criteria: dict) -> list[RecipientDB]:
     cat = criteria.get("category_id")
     return find_by_criteria(
         db,
+        brand_id,
         language=criteria.get("language") or None,
         status=criteria.get("status") or None,
         preference_category_id=int(cat) if cat not in (None, "") else None,
@@ -324,8 +330,8 @@ def _recipients_for_criteria(db: Session, criteria: dict) -> list[RecipientDB]:
     )
 
 
-def count_for_criteria(db: Session, criteria: dict) -> int:
-    return len(_recipients_for_criteria(db, criteria))
+def count_for_criteria(db: Session, criteria: dict, brand_id: int) -> int:
+    return len(_recipients_for_criteria(db, criteria, brand_id))
 
 
 def list_blocks(db: Session, group_id: int) -> list[AudienceRuleBlockDB]:
@@ -414,12 +420,22 @@ def resolve_audience(db: Session, group_id: int) -> list[RecipientDB]:
     recipient is dropped even if pinned (legal, non-negotiable). Hard
     suppression (bounces/opt-outs) belongs on the consent/suppression floor, not
     in a regular exclude block, so it stays hard against pins too."""
+    # The brand comes from the GROUP, never from the caller's working context.
+    # A group belongs to exactly one brand (ADR-150 point 2), so resolving it
+    # gates on that brand's consent — and a manager who switched brand between
+    # building a send and firing it cannot change whose consent was checked.
+    # Same reasoning as `brand_for_snapshot` on the delivery side.
+    group = get_group(db, group_id)
+    if group is None:
+        return []
+    brand_id = group.brand_id
+
     blocks = list_blocks(db, group_id)
 
     include_ids: set[int] = set()
     exclude_ids: set[int] = set()
     for block in blocks:
-        ids = {r.id for r in _recipients_for_criteria(db, block.criteria)}
+        ids = {r.id for r in _recipients_for_criteria(db, block.criteria, brand_id)}
         if block.kind == "exclude":
             exclude_ids |= ids
         else:
@@ -436,7 +452,7 @@ def resolve_audience(db: Session, group_id: int) -> list[RecipientDB]:
         db.query(RecipientDB)
         .filter(
             RecipientDB.id.in_(final_ids),
-            is_consenting_filter(),  # consent floor
+            is_consenting_filter(brand_id),  # consent floor, for THIS brand
         )
         .order_by(RecipientDB.id.asc())
         .all()
@@ -447,6 +463,27 @@ def resolve_audience(db: Session, group_id: int) -> list[RecipientDB]:
 # ---------------------------------------------------------------------------
 # System-suggested audience — content/category driven (use case 1)
 # ---------------------------------------------------------------------------
+
+def _brand_of_campaign(db: Session, campaign_id: int) -> int:
+    """The brand a campaign belongs to, for gating its suggested audience.
+
+    A suggestion counts how many people a block would reach, and that count is
+    only meaningful against the consent of the brand the campaign will send as.
+    Counting against every brand's consent would advertise reach the send
+    cannot deliver.
+    """
+    from app.campaigns.db_models import CampaignDB
+
+    brand_id = (
+        db.query(CampaignDB.brand_id).filter(CampaignDB.id == campaign_id).scalar()
+    )
+    if brand_id is None:
+        raise ValueError(
+            f"Campaign {campaign_id} has no brand, so the consent to gate its "
+            "suggested audience on is unknown. Refusing rather than guessing."
+        )
+    return brand_id
+
 
 def campaign_category_scores(db: Session, campaign_id: int) -> list[dict]:
     """Rank the categories a campaign's content is about, so a suggestion can
@@ -514,7 +551,7 @@ def suggest_include_blocks_for_campaign(db: Session, campaign_id: int, max_categ
             "label": f"Interested in {row['category_name']}",
             "criteria": criteria,
             "content_score": row["content_score"],
-            "count": count_for_criteria(db, criteria),
+            "count": count_for_criteria(db, criteria, _brand_of_campaign(db, campaign_id)),
         })
     return suggestions
 

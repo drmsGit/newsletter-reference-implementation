@@ -426,6 +426,10 @@ def send_send_instance(
     gate = run_exclusion_stack(
         db,
         {execution.recipient_id for execution in executions},
+        # The send instance records the sending brand and is the arbiter of
+        # record, so the gate asks about the brand this mail actually goes out
+        # as — not the brand whoever pressed the button happens to be viewing.
+        send_instance.brand_id,
         channel=send_channel,
         purpose=send_purpose,
     )

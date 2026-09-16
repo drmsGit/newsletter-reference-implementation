@@ -33,6 +33,7 @@ __all__ = ["CONSENTING_STATUS"]
 def suppress_recipient(
     db: Session,
     recipient_id: int,
+    brand_id: int,
     reason: str,
     *,
     channel: str = DEFAULT_CHANNEL,
@@ -56,13 +57,16 @@ def suppress_recipient(
     recipient = db.query(RecipientDB).filter(RecipientDB.id == recipient_id).first()
     if recipient is None:
         return False
-    current = latest_consent_status(db, recipient_id, channel=channel, purpose=purpose)
+    current = latest_consent_status(
+        db, recipient_id, brand_id, channel=channel, purpose=purpose
+    )
     if current == ConsentStatus.opted_out.value:
-        return False  # already suppressed
+        return False  # already suppressed for THIS brand
     record_consent(
         db,
         recipient_id,
         ConsentStatus.opted_out.value,
+        brand_id,
         source="provider",
         channel=channel,
         purpose=purpose,
@@ -112,23 +116,25 @@ def validate_recipient_attributes(attributes: dict | None) -> None:
                 )
 
 
-def to_recipient(db: Session, record: RecipientDB) -> Recipient:
+def to_recipient(db: Session, record: RecipientDB, brand_id: int) -> Recipient:
     """Project one recipient row for the API.
 
     Neither `email` nor `consent_status` is a column any more. The address is
     the recipient's email-channel addressability row (ADR-163 point 2, resolved
     by the point 11 rules) and the consent status is the latest
-    (email, marketing) event. The API still exposes both as flat scalars,
+    (brand, email, marketing) event — so the same recipient projects a
+    different consent status depending on which brand is asking, which is the
+    point (ADR-163 addendum 2026-09-15). The API still exposes both as flat scalars,
     because that is what one channel's callers need; the per-cell view is
     `GET /recipients/consent/drift`, and a fuller grid belongs with the
     per-channel UI that does not exist yet.
 
     Use `to_recipients` for more than one — this issues two queries per record.
     """
-    return to_recipients(db, [record])[0]
+    return to_recipients(db, [record], brand_id)[0]
 
 
-def to_recipients(db: Session, records: list[RecipientDB]) -> list[Recipient]:
+def to_recipients(db: Session, records: list[RecipientDB], brand_id: int) -> list[Recipient]:
     """Project many recipients with a fixed number of queries.
 
     Two lookups for the whole set rather than two per record. The consent
@@ -140,7 +146,7 @@ def to_recipients(db: Session, records: list[RecipientDB]) -> list[Recipient]:
         return []
     ids = [record.id for record in records]
     addresses = resolve_emails(db, ids)
-    consents = latest_consent_statuses(db, ids)
+    consents = latest_consent_statuses(db, ids, brand_id)
     return [
         Recipient(
             id=record.id,
@@ -162,6 +168,7 @@ def to_recipients(db: Session, records: list[RecipientDB]) -> list[Recipient]:
 
 def create_recipient(
     db: Session,
+    brand_id: int,
     external_id: str,
     email: str,
     language: str | None = None,
@@ -192,11 +199,12 @@ def create_recipient(
     # Consent is an event, not a field: only write one when this call actually
     # asserts a different state, so a routine re-sync does not pad the log with
     # rows saying nothing changed.
-    if latest_consent_status(db, recipient.id) != consent_status:
+    if latest_consent_status(db, recipient.id, brand_id) != consent_status:
         record_consent(
             db,
             recipient.id,
             consent_status,
+            brand_id,
             source="import",
             note=f"set via create_recipient for external_id={external_id}",
             commit=False,
@@ -210,7 +218,7 @@ def create_recipient(
     db.commit()
     db.refresh(recipient)
 
-    return to_recipient(db, recipient)
+    return to_recipient(db, recipient, brand_id)
 
 
 def _upsert_email_address(db: Session, recipient_id: int, email: str) -> None:
@@ -253,6 +261,7 @@ def sync_consent_from_crm(
     db: Session,
     external_id: str,
     crm_consent_status: str,
+    brand_id: int,
     source: str = "crm",
     note: str | None = None,
     *,
@@ -273,7 +282,7 @@ def sync_consent_from_crm(
         raise ValueError(f"Recipient with external_id '{external_id}' not found")
 
     before = latest_consent_status(
-        db, recipient.id, channel=channel, purpose=purpose
+        db, recipient.id, brand_id, channel=channel, purpose=purpose
     )
     changed = before != crm_consent_status
 
@@ -295,6 +304,7 @@ def sync_consent_from_crm(
         db,
         recipient.id,
         crm_consent_status,
+        brand_id,
         source=source,
         channel=channel,
         purpose=purpose,
@@ -319,7 +329,7 @@ def sync_consent_from_crm(
     db.commit()
     db.refresh(recipient)
 
-    return to_recipient(db, recipient)
+    return to_recipient(db, recipient, brand_id)
 
 
 def list_consent_sync_logs(

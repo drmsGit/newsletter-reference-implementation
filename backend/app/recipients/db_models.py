@@ -33,7 +33,8 @@ class RecipientDB(Base):
 class ConsentEventDB(Base):
     """Append-only consent grants and withdrawals (ADR-163 point 1).
 
-    Latest row wins per `(recipient_id, channel, purpose)`. Events rather than a
+    Latest row wins per `(recipient_id, brand_id, channel, purpose)`. Events
+    rather than a
     mutable status because a column cannot carry the *source* and *timestamp*
     that make consent provable — and ADR-154 requires proof of consent to
     survive an erasure in minimised form, which a value you overwrite cannot do.
@@ -48,6 +49,12 @@ class ConsentEventDB(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     recipient_id = Column(Integer, ForeignKey("recipients.id"), nullable=False, index=True)
+    # Consent is to a SENDER, not to a platform (ADR-163 addendum 2026-09-15).
+    # Opting in to brand A says nothing about brand B, which is why a newly
+    # created brand starts with zero reachable recipients — correct, and the
+    # point. NOT NULL and with no default anywhere above it: a consent row
+    # whose brand was assumed is a consent record nobody gave.
+    brand_id = Column(Integer, ForeignKey("brands.id"), nullable=False, index=True)
     # The (channel, purpose) grid. Not an enum: a new channel or purpose must
     # cost a row, not a migration (ADR-163 point 1).
     channel = Column(String(50), nullable=False, default="email")
@@ -66,6 +73,7 @@ class ConsentEventDB(Base):
         Index(
             "ix_consent_events_cell_latest",
             "recipient_id",
+            "brand_id",
             "channel",
             "purpose",
             "created_at",

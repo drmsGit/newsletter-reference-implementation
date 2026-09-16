@@ -24,6 +24,32 @@ def to_provider_event_quarantine(record: ProviderEventQuarantineDB) -> ProviderE
     )
 
 
+def _brand_of_execution(db: Session, delivery_execution) -> int:
+    """The sending brand behind one delivery execution.
+
+    One join rather than a denormalised column: unlike channel and purpose,
+    which the execution carries because a webhook must resolve them after the
+    send instance may have been pruned, brand is needed only while the parent
+    row still exists — this path starts by finding that execution, so the send
+    instance is reachable by definition. Revisit if executions outlive their
+    send instances.
+    """
+    from app.delivery.db_models import SendInstanceDB
+
+    brand_id = (
+        db.query(SendInstanceDB.brand_id)
+        .filter(SendInstanceDB.id == delivery_execution.send_instance_id)
+        .scalar()
+    )
+    if brand_id is None:
+        raise ValueError(
+            f"Delivery execution {delivery_execution.id} has no send instance, so "
+            "the brand to scope this opt-out to is unknown. Refusing rather than "
+            "suppressing on a guessed brand."
+        )
+    return brand_id
+
+
 def ingest_provider_event(
     db: Session,
     provider: str,
@@ -201,9 +227,15 @@ def process_provider_webhook_event(db: Session, normalized) -> ProviderEventInge
             # (ADR-163 addendum 2026-09-12, point 1) precisely so this path has
             # them without joining back to the variant — a bounce on email says
             # nothing about whether the person still wants push.
+            # The brand comes from the send instance this execution belongs
+            # to (ADR-163 addendum 2026-09-15). An opt-out lands on the brand
+            # that actually mailed the person — a bounce from brand A says
+            # nothing about whether they still want brand B, the same reasoning
+            # that already scopes this to channel and purpose.
             changed = suppress_recipient(
                 db,
                 delivery_execution.recipient_id,
+                _brand_of_execution(db, delivery_execution),
                 reason=normalized.event_type,
                 channel=delivery_execution.channel,
                 purpose=delivery_execution.purpose,

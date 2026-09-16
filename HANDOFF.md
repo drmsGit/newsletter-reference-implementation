@@ -276,45 +276,30 @@ was mutation-verified — removing a gate fails only that gate's tests.
    behaved, and whether particular categories drove them away. The user placed
    it in a future analytics/reporting scope not yet discussed.
 
-5. **Brand step 2 — consent by brand. The phase that makes the boundary
-   real, and it needs an ADR-163 addendum FIRST** (that record is Accepted and
-   defines the consent cell). Consent becomes
-   `(recipient, brand, channel, purpose)`; the latest-wins index changes with
-   it. Touches the compliance path: `app/recipients/consent.py`, both audience
-   gates, `app/delivery/exclusion.py`, `app/decision/service.py`, the CRM sync
-   and the provider webhook. **Opt-out defaults to the sending brand**, with a
-   visible "all brands" option a company can switch off. Decided 2026-09-15.
-   Consequence to tell an adopter: a newly created brand starts with **zero
-   reachable recipients** until consent is captured for it.
+5. ~~Brand step 2 — consent by brand.~~ **BUILT 2026-09-16.** The consent
+   cell is `(recipient, brand, channel, purpose)`; `migrate_0008` applied, 41
+   rows on the default brand and 0 on every other. **253 tests.**
 
+   **The boundary is real now.** Before: 41 recipients, all 41 passing
+   `is_consenting_filter()` whichever brand asked, so a brand-B campaign
+   reached brand-A's subscribers. After: a brand nobody has consented to
+   resolves nobody, and the send-time exclusion stack drops them with a reason.
 
-   **The ADR-163 addendum is written (2026-09-15).** Four things it decides:
-   the cell becomes `(recipient, brand, channel, purpose)`; an opt-out defaults
-   to the sending brand with an "all brands" option a company may switch off;
-   **the CRM carries the brand, and an assertion naming none is REFUSED rather
-   than defaulted** — defaulting would manufacture consent on the record that
-   answers a UWG §7 complaint, the same invention `migrate_0001a` refused when
-   it chose `source='migration'` over `'crm'`; and the 41 existing rows belong
-   to the default brand.
+   **`brand_id` is required everywhere and defaults nowhere**, unlike channel
+   and purpose. A default would mean any forgotten call site silently gated on
+   one brand's consent while sending as another — the defect, reintroduced by
+   a convenience. Forgetting it is a `TypeError`.
 
-   **The migration guard must NOT copy `migrate_0007`'s.** That script refuses
-   when more than one brand exists and rows are unassigned — and a second brand
-   now exists ("Test third", created 2026-09-15), so that guard would refuse.
-   A **timestamp** argument is available and is stronger anyway: the newest
-   consent row is 2026-07-27 and the oldest non-default brand is 2026-09-15,
-   seven weeks later, so every consent row provably predates every brand but
-   the default. That is a fact the script can assert, not a guess it has to
-   make.
+   **Brand is derived, never taken from the viewer**, at all three entry
+   points: `resolve_audience` reads its own group's brand, the exclusion stack
+   takes the send instance's, and the webhook derives it from the execution's
+   send instance. A manager who switches brand mid-flow cannot change whose
+   consent was checked.
 
-   **Three surfaces the addendum found that the brief had not:** there is **no
-   unsubscribe page at all** — the only opt-out writer is the provider webhook,
-   so the opt-out decision governs an unbuilt surface; `ConsentSyncRequest`
-   (`app/recipients/models.py`) carries only `consent_status`, `source`, `note`,
-   so brand lands on a payload that must also grow `channel` and `purpose`, and
-   the refusal has to live at that boundary; and there is a **third consent
-   write path** beyond CRM sync and webhook suppression — `create_recipient`
-   writes `source="import"` (`app/recipients/service.py:200`), which needs a
-   brand under the same refusal.
+   **Still unbuilt, and named in the ADR:** there is no unsubscribe page, so
+   the opt-out-scope decision governs a surface that does not exist — see the
+   Needs-ADR item on flows and journeys, and **do not build one as a one-off.**
+
 6. **Brand step 3 — duplication.** "Duplicate campaign to brand X", content
    copied with it. **An escape hatch, not the mechanism** — item 4 rejected
    duplicate-and-sync as the general answer to brand scoping, so this covers

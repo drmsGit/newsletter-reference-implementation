@@ -365,7 +365,7 @@ def recipients_list(
     # on the ORM row (ADR-163 point 2), so a template reading `.email` off one
     # would silently render nothing. to_recipients resolves addresses and
     # consent for the whole page in two queries.
-    recipients = to_recipients(db, records)
+    recipients = to_recipients(db, records, working_brand_id(request, db))
 
     return templates.TemplateResponse(
         request,
@@ -533,7 +533,7 @@ def recipient_detail(
             "title": f"Recipient {recipient_id}",
             # Projected for the same reason as the list view — a raw ORM row
             # has no address attribute since ADR-163 point 2.
-            "recipient": to_recipient(db, recipient),
+            "recipient": to_recipient(db, recipient, working_brand_id(request, db)),
             "preferences": preference_rows,
             "decisions": decision_rows,
             "deliveries": delivery_rows,
@@ -2840,7 +2840,7 @@ def audience_group_detail(group_id: int, request: Request, error: str | None = N
             "source": b.source,
             "criteria": crit,
             "summary": ", ".join(parts) if parts else "everyone (no criteria)",
-            "count": audience_service.count_for_criteria(db, crit),
+            "count": audience_service.count_for_criteria(db, crit, group.brand_id),
         })
 
     resolved = audience_service.resolve_audience(db, group_id)
@@ -2925,6 +2925,9 @@ def audience_group_criteria_preview(
     min_score = float(min_preference_score) if min_preference_score else None
     matches = audience_service.find_by_criteria(
         db,
+        # The group's brand, not the viewer's: a preview must count the same
+        # people the resolve will, or it advertises reach the send refuses.
+        audience_service.get_group(db, group_id).brand_id,
         language=language or None,
         status=status or None,
         preference_category_id=cat_id,
@@ -2954,6 +2957,9 @@ def audience_group_bulk_add(
     min_score = float(min_preference_score) if min_preference_score else None
     matches = audience_service.find_by_criteria(
         db,
+        # The group's brand, not the viewer's: a preview must count the same
+        # people the resolve will, or it advertises reach the send refuses.
+        audience_service.get_group(db, group_id).brand_id,
         language=language or None,
         status=status or None,
         preference_category_id=cat_id,

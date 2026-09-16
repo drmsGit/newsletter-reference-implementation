@@ -34,6 +34,7 @@ def create_recipient_record(
     try:
         return create_recipient(
             db=db,
+            brand_id=payload.brand_id,
             external_id=payload.external_id,
             email=payload.email,
             language=payload.language,
@@ -83,7 +84,10 @@ def sync_recipient_consent(
             db=db,
             external_id=external_id,
             crm_consent_status=payload.consent_status.value,
+            brand_id=payload.brand_id,
             source=payload.source,
+            channel=payload.channel,
+            purpose=payload.purpose,
             note=payload.note,
         )
     except ValueError as error:

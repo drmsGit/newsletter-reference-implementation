@@ -28,6 +28,9 @@ class Recipient(BaseModel):
 
 
 class RecipientCreate(BaseModel):
+    # Creating a recipient writes a consent event (source="import"), so it
+    # carries the same requirement as a CRM assertion for the same reason.
+    brand_id: int
     external_id: str
     email: str
     language: str | None = None
@@ -37,10 +40,28 @@ class RecipientCreate(BaseModel):
 
 
 class ConsentSyncRequest(BaseModel):
-    """A consent assertion coming from the CRM for one recipient."""
+    """A consent assertion coming from the CRM for one recipient.
+
+    **`brand_id` is required and has no default.** Consent is to a sender
+    (ADR-163 addendum 2026-09-15), so an assertion that does not say which
+    brand is not an assertion about consent — and defaulting it would land a
+    grant nobody gave on whichever brand happens to be first. The CRM is the
+    source of truth (ADR-120) and a company that has brands has the brand to
+    send; a company with one brand has no brand field precisely because there
+    is one brand, so it hardcodes the value — one constant in an integration it
+    is writing anyway.
+
+    `channel` and `purpose` default, because the grid's defaults are real
+    defaults: an assertion that says nothing about channel is an assertion
+    about email marketing, which is the only cell that exists today. Brand has
+    no such honest default.
+    """
 
     consent_status: ConsentStatus
+    brand_id: int
     source: str = "crm"
+    channel: str = "email"
+    purpose: str = "marketing"
     note: str | None = None
 
 

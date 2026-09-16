@@ -38,7 +38,7 @@ CONSENTING_STATUS = "opted_in"
 
 
 class ConsentDenied(ValueError):
-    """A recipient has no grant for this (channel, purpose).
+    """A recipient has no grant for this (brand, channel, purpose).
 
     A ValueError subclass so existing `except ValueError` callers keep working
     unchanged; catch this type to distinguish a compliance refusal from an
@@ -48,18 +48,21 @@ class ConsentDenied(ValueError):
     def __init__(
         self,
         recipient_id: int,
+        brand_id: int,
         channel: str = DEFAULT_CHANNEL,
         purpose: str = DEFAULT_PURPOSE,
         status: str | None = None,
     ):
         self.recipient_id = recipient_id
+        self.brand_id = brand_id
         self.channel = channel
         self.purpose = purpose
         self.status = status
         super().__init__(
             f"Recipient {recipient_id} is not opted-in for "
-            f"({channel}, {purpose}) — current consent is "
-            f"{status or 'no recorded grant'!r}. Consent is gated at "
+            f"(brand {brand_id}, {channel}, {purpose}) — current consent is "
+            f"{status or 'no recorded grant'!r}. Consent is to a SENDER: a "
+            "grant on another brand is not a grant here. Consent is gated at "
             "audience-resolution time and must not be bypassed."
         )
 
@@ -68,6 +71,7 @@ def record_consent(
     db: Session,
     recipient_id: int,
     status: str,
+    brand_id: int,
     *,
     source: str,
     channel: str = DEFAULT_CHANNEL,
@@ -84,6 +88,7 @@ def record_consent(
     """
     event = ConsentEventDB(
         recipient_id=recipient_id,
+        brand_id=brand_id,
         channel=channel,
         purpose=purpose,
         status=status,
@@ -101,6 +106,7 @@ def record_consent(
 def latest_consent_event(
     db: Session,
     recipient_id: int,
+    brand_id: int,
     *,
     channel: str = DEFAULT_CHANNEL,
     purpose: str = DEFAULT_PURPOSE,
@@ -113,6 +119,7 @@ def latest_consent_event(
     """
     q = db.query(ConsentEventDB).filter(
         ConsentEventDB.recipient_id == recipient_id,
+        ConsentEventDB.brand_id == brand_id,
         ConsentEventDB.channel == channel,
         ConsentEventDB.purpose == purpose,
     )
@@ -126,12 +133,13 @@ def latest_consent_event(
 def latest_consent_status(
     db: Session,
     recipient_id: int,
+    brand_id: int,
     *,
     channel: str = DEFAULT_CHANNEL,
     purpose: str = DEFAULT_PURPOSE,
 ) -> str | None:
     event = latest_consent_event(
-        db, recipient_id, channel=channel, purpose=purpose
+        db, recipient_id, brand_id, channel=channel, purpose=purpose
     )
     return event.status if event is not None else None
 
@@ -139,6 +147,7 @@ def latest_consent_status(
 def latest_consent_statuses(
     db: Session,
     recipient_ids: list[int],
+    brand_id: int,
     *,
     channel: str = DEFAULT_CHANNEL,
     purpose: str = DEFAULT_PURPOSE,
@@ -155,6 +164,7 @@ def latest_consent_statuses(
         db.query(ConsentEventDB)
         .filter(
             ConsentEventDB.recipient_id.in_(recipient_ids),
+            ConsentEventDB.brand_id == brand_id,
             ConsentEventDB.channel == channel,
             ConsentEventDB.purpose == purpose,
         )
@@ -173,13 +183,14 @@ def latest_consent_statuses(
 def is_consenting(
     db: Session,
     recipient_id: int,
+    brand_id: int,
     *,
     channel: str = DEFAULT_CHANNEL,
     purpose: str = DEFAULT_PURPOSE,
 ) -> bool:
     return (
         latest_consent_status(
-            db, recipient_id, channel=channel, purpose=purpose
+            db, recipient_id, brand_id, channel=channel, purpose=purpose
         )
         == CONSENTING_STATUS
     )
@@ -188,19 +199,21 @@ def is_consenting(
 def require_consent(
     db: Session,
     recipient_id: int,
+    brand_id: int,
     *,
     channel: str = DEFAULT_CHANNEL,
     purpose: str = DEFAULT_PURPOSE,
 ) -> None:
-    """Raise ConsentDenied unless this cell holds a grant."""
+    """Raise ConsentDenied unless this cell holds a grant for this brand."""
     status = latest_consent_status(
-        db, recipient_id, channel=channel, purpose=purpose
+        db, recipient_id, brand_id, channel=channel, purpose=purpose
     )
     if status != CONSENTING_STATUS:
-        raise ConsentDenied(recipient_id, channel, purpose, status)
+        raise ConsentDenied(recipient_id, brand_id, channel, purpose, status)
 
 
 def consenting_status_expr(
+    brand_id: int,
     channel: str = DEFAULT_CHANNEL,
     purpose: str = DEFAULT_PURPOSE,
 ):
@@ -219,6 +232,7 @@ def consenting_status_expr(
         select(ConsentEventDB.status)
         .where(
             ConsentEventDB.recipient_id == RecipientDB.id,
+            ConsentEventDB.brand_id == brand_id,
             ConsentEventDB.channel == channel,
             ConsentEventDB.purpose == purpose,
         )
@@ -230,11 +244,18 @@ def consenting_status_expr(
 
 
 def is_consenting_filter(
+    brand_id: int,
     channel: str = DEFAULT_CHANNEL,
     purpose: str = DEFAULT_PURPOSE,
 ):
-    """The gate predicate: `.filter(is_consenting_filter())`."""
-    return consenting_status_expr(channel, purpose) == CONSENTING_STATUS
+    """The gate predicate: `.filter(is_consenting_filter(brand_id))`.
+
+    **`brand_id` is required and has no default**, unlike channel and purpose.
+    A default would mean any caller that forgot it silently gated on one
+    brand's consent while sending as another — which is the whole defect this
+    closes, reintroduced by a convenience. Forgetting it is a TypeError.
+    """
+    return consenting_status_expr(brand_id, channel, purpose) == CONSENTING_STATUS
 
 
 # ---------------------------------------------------------------------------
