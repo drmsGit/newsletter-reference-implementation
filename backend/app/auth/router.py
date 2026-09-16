@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AUTH_ENFORCED_KEY, auth_enforced, require_permission
 from app.auth.permissions import ALL_PERMISSIONS, BUILTIN_ROLES, USERS_MANAGE
-from app.auth.db_models import RoleDB
+from app.auth.db_models import RoleAssignmentDB, RoleDB
 from app.auth.service import (
     SESSION_COOKIE, SESSION_ABSOLUTE_HOURS, access_list, assign_role,
     client_identifier, cookie_secure, create_brand, create_role, create_user,
@@ -29,6 +29,7 @@ from app.auth.service import (
     revoke_assignment, revoke_token, roles_with_permissions, safe_next, set_active,
     set_role_permissions, user_for_token, verify_login_code,
 )
+from app.audit import service as audit
 from app.database import get_db
 from app.settings.service import set_config
 
@@ -138,6 +139,18 @@ def verify_submit(
             status_code=303,
         )
 
+    # ADR-153 point 2: a sign-in has no domain record anywhere, so without
+    # this line it is simply not recorded. Successes are logged individually;
+    # FAILURES deliberately are not — point 6 makes them an aggregate, because
+    # a row per failed attempt is a write-amplification target an
+    # unauthenticated attacker controls. That aggregate is not in this slice.
+    user = user_for_token(db, token)
+    audit.record(
+        db, audit.SIGNED_IN,
+        actor_id=user.id if user else None,
+        subject_type="user", subject_id=user.id if user else None,
+    )
+
     # The dashboard by default, never /ui/users — a Viewer sent there lands on
     # a 403 with no navigation, which is indistinguishable from being locked
     # out of a system they just signed in to.
@@ -217,17 +230,25 @@ def user_create(
 
 @router.post("/ui/users/{user_id}/active")
 def user_set_active(
+    request: Request,
     user_id: int,
     active: str = Form(""),
     db: Session = Depends(get_db),
     _user=Depends(require_permission(USERS_MANAGE)),
 ):
-    set_active(db, user_id, active == "1")
+    became_active = active == "1"
+    set_active(db, user_id, became_active)
+    audit.record_from_request(
+        request, db,
+        audit.USER_REACTIVATED if became_active else audit.USER_DEACTIVATED,
+        subject_type="user", subject_id=user_id,
+    )
     return RedirectResponse(url="/ui/users", status_code=303)
 
 
 @router.post("/ui/users/{user_id}/roles")
 def user_assign_role(
+    request: Request,
     user_id: int,
     role_id: int = Form(...),
     brand_id: int | None = Form(None),
@@ -238,11 +259,18 @@ def user_assign_role(
     # here is what made every grant land on the default brand however many
     # brands existed, so the switcher could never appear at all.
     assign_role(db, user_id, role_id, brand_id=brand_id)
+    audit.record_from_request(
+        request, db, audit.ROLE_GRANTED,
+        subject_type="user", subject_id=user_id,
+        brand_id=brand_id,
+        detail={"role_id": role_id},
+    )
     return RedirectResponse(url="/ui/users", status_code=303)
 
 
 @router.post("/ui/brands")
 def brand_create(
+    request: Request,
     key: str = Form(...),
     name: str = Form(...),
     db: Session = Depends(get_db),
@@ -256,11 +284,20 @@ def brand_create(
     assignments. A seventeenth permission key would need an ADR amendment, and
     ADR-150 point 5's rule is that a key names a code path.
     """
-    if create_brand(db, key=key, name=name) is None:
+    brand = create_brand(db, key=key, name=name)
+    if brand is None:
         return RedirectResponse(
             url="/ui/users?error=" + quote("That brand key is already taken, or the name is empty."),
             status_code=303,
         )
+    audit.record_from_request(
+        request, db, audit.BRAND_CREATED,
+        subject_type="brand", subject_id=brand.id,
+        # The brand the action CREATED, not the one the actor was working in —
+        # otherwise every brand creation reads as an event in brand 1.
+        brand_id=brand.id,
+        detail={"key": brand.key, "name": brand.name},
+    )
     return RedirectResponse(url="/ui/users", status_code=303)
 
 
@@ -288,11 +325,32 @@ def brand_delete(
 
 @router.post("/ui/users/assignments/{assignment_id}/remove")
 def user_revoke_assignment(
+    request: Request,
     assignment_id: int,
     db: Session = Depends(get_db),
     _user=Depends(require_permission(USERS_MANAGE)),
 ):
+    # Read the grant BEFORE revoking it — afterwards the row is gone and the
+    # entry could only say "some assignment was removed", which is not an
+    # accountability record. ADR-153 point 5 keeps this to internal ids.
+    grant = (
+        db.query(RoleAssignmentDB)
+        .filter(RoleAssignmentDB.id == assignment_id)
+        .first()
+    )
+    detail = (
+        {"role_id": grant.role_id, "brand_id": grant.brand_id}
+        if grant is not None else None
+    )
+    subject_id = grant.user_id if grant is not None else None
+
     revoke_assignment(db, assignment_id)
+    audit.record_from_request(
+        request, db, audit.ROLE_REVOKED,
+        subject_type="user", subject_id=subject_id,
+        brand_id=grant.brand_id if grant is not None else None,
+        detail=detail,
+    )
     return RedirectResponse(url="/ui/users", status_code=303)
 
 

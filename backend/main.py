@@ -135,6 +135,9 @@ from app.overrides.router import router as overrides_router
 from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB
 from app.audience.router import router as audience_router
 
+# Imported for metadata registration so create_all() knows the table —
+# the audit log has no router of its own in this slice.
+from app.audit.db_models import AuditEventDB  # noqa: F401
 from app.settings.db_models import AppConfigDB
 
 from app.auth.db_models import (

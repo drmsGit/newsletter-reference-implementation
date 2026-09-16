@@ -11,6 +11,7 @@ from datetime import timedelta
 import pytest
 
 from app.auth import service as auth
+from app.audit.db_models import AuditEventDB
 from app.auth.db_models import (
     LoginCodeDB, LoginCodeRequestDB, RoleAssignmentDB, RoleDB, RolePermissionDB,
     SessionDB, UserDB,
@@ -91,6 +92,15 @@ def temp_user(db):
         db.query(SessionDB).filter(SessionDB.user_id == user_id).delete()
         db.query(LoginCodeDB).filter(LoginCodeDB.user_id == user_id).delete()
         db.query(RoleAssignmentDB).filter(RoleAssignmentDB.user_id == user_id).delete()
+        # Audit rows have NO foreign key to users, deliberately — an entry must
+        # outlive what it references (ADR-153 point 5). The cost lands here:
+        # nothing cascades, so a fixture that forgets this leaks rows into the
+        # shared dev database silently, which is exactly what happened when
+        # sign-in logging landed and 14 rows accumulated before anyone looked.
+        db.query(AuditEventDB).filter(
+            (AuditEventDB.actor_id == user_id)
+            | ((AuditEventDB.subject_type == "user") & (AuditEventDB.subject_id == user_id))
+        ).delete(synchronize_session=False)
         db.query(UserDB).filter(UserDB.id == user_id).delete()
     db.commit()
 

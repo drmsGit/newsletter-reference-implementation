@@ -20,6 +20,7 @@ import pytest
 
 from app.audience import service as audience_service
 from app.audience.db_models import AudienceGroupDB
+from app.audit.db_models import AuditEventDB
 from app.auth import service as auth
 from app.auth.db_models import BrandDB, RoleAssignmentDB, RoleDB, SessionDB, UserDB
 from app.auth.permissions import MANAGER
@@ -111,6 +112,12 @@ def user_on(db):
     for user_id in created:
         db.query(SessionDB).filter(SessionDB.user_id == user_id).delete()
         db.query(RoleAssignmentDB).filter(RoleAssignmentDB.user_id == user_id).delete()
+        # No FK from audit_events to users, deliberately (ADR-153 point 5), so
+        # nothing cascades and a fixture that forgets this leaks silently.
+        db.query(AuditEventDB).filter(
+            (AuditEventDB.actor_id == user_id)
+            | ((AuditEventDB.subject_type == "user") & (AuditEventDB.subject_id == user_id))
+        ).delete(synchronize_session=False)
         db.query(UserDB).filter(UserDB.id == user_id).delete()
     db.commit()
 
