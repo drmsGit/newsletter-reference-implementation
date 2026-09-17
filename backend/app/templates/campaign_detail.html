@@ -287,7 +287,7 @@
                                     <label class="form-label small mb-0">Module type</label>
                                     <select name="module_type" class="form-select form-select-sm" required>
                                         {% set types = [] %}
-                                        {% for tpl in module_templates %}
+                                        {% for tpl in variant.module_templates %}
                                         <option value="{{ tpl.name }}" {% if tpl.name == module.module_type %}selected{% endif %}>{{ tpl.label }} ({{ tpl.name }})</option>
                                         {% set _ = types.append(tpl.name) %}
                                         {% endfor %}
@@ -383,7 +383,7 @@
                             <div class="col-md-4 mb-3">
                                 <label class="form-label">Module type</label>
                                 <select name="module_type" class="form-select" required>
-                                    {% for tpl in module_templates %}
+                                    {% for tpl in variant.module_templates %}
                                     <option value="{{ tpl.name }}">{{ tpl.label }} ({{ tpl.name }})</option>
                                     {% endfor %}
                                 </select>

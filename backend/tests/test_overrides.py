@@ -26,7 +26,7 @@ from main import app
 from app.database import SessionLocal
 from app.campaigns.db_models import ModuleInstanceDB, VariantDB
 from app.content.db_models import ContentRecordDB
-from app.email_modules.registry import get_manifest
+from app.modules.registry import get_manifest
 from app.overrides.db_models import ContentOverrideDB
 
 client = TestClient(app)
@@ -72,7 +72,16 @@ def _allowed_field(module_id: int) -> str:
     db = SessionLocal()
     try:
         module = db.query(ModuleInstanceDB).filter(ModuleInstanceDB.id == module_id).first()
-        manifest = get_manifest(module.module_type) if module else None
+        # A manifest is (channel, name) since ADR-162 point 5, and the channel
+        # is the variant's — ADR-160 point 4 is the only place it lives.
+        variant = (
+            db.query(VariantDB).filter(VariantDB.id == module.variant_id).first()
+            if module else None
+        )
+        manifest = (
+            get_manifest(variant.channel, module.module_type)
+            if module and variant else None
+        )
         # Same source the service validates against: manifest.variables.
         fields = sorted(v.name for v in getattr(manifest, "variables", None) or [])
         if not fields:
@@ -112,6 +121,31 @@ def static_module():
         )
         if variant_row is None or content_row is None:
             pytest.skip("no variant or active content record to build a module from")
+        # Position 9999 is a magic "out of the way" slot in a variant this
+        # fixture does not own, and `(variant_id, position)` is unique — so a
+        # run that dies before its teardown poisons every run after it with a
+        # UniqueViolation in *setup*, which reads like a product bug and is
+        # not one. That happened on 2026-09-17. Clearing it first makes the
+        # fixture idempotent, on the same principle as the duplication
+        # fixtures: cleanup has to assume the previous run did not happen.
+        stale = (
+            db.query(ModuleInstanceDB)
+            .filter(
+                ModuleInstanceDB.variant_id == variant_row[0],
+                ModuleInstanceDB.position == 9999,
+            )
+            .all()
+        )
+        if stale:
+            stale_ids = [m.id for m in stale]
+            db.query(ContentOverrideDB).filter(
+                ContentOverrideDB.module_instance_id.in_(stale_ids)
+            ).delete(synchronize_session=False)
+            db.query(ModuleInstanceDB).filter(
+                ModuleInstanceDB.id.in_(stale_ids)
+            ).delete(synchronize_session=False)
+            db.commit()
+
         module = ModuleInstanceDB(
             variant_id=variant_row[0],
             module_type="img_right",

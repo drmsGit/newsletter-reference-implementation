@@ -127,7 +127,7 @@ from app.providers.db_models import ProviderEventQuarantineDB
 from app.ai.db_models import AIPromptDB, AIRunDB
 from app.providers.router import router as provider_router
 
-from app.email_modules.router import router as email_modules_router
+from app.modules.router import router as email_modules_router
 
 from app.overrides.db_models import ContentOverrideDB
 from app.overrides.router import router as overrides_router
@@ -187,7 +187,7 @@ TAGS_METADATA = [
     {"name": "content", "description": "Content catalog: reusable records, the category taxonomy, and content versions. Source of truth for *what can be said*."},
     {"name": "recipients", "description": "Local projection of CRM contacts + marketing consent + the signal-contribution log. Not a CRM."},
     {"name": "campaigns", "description": "Composition: campaigns, variants, module instances, decision slots, and the decision-resolution audit. Structure, not content."},
-    {"name": "email-modules", "description": "The file-based email-module template registry (drop-a-file plugins). Read-only over `storage/email_modules/`."},
+    {"name": "email-modules", "description": "The file-based email-module template registry (drop-a-file plugins). Read-only over `storage/modules/<channel>/`."},
     {"name": "decision", "description": "The personalization engine: resolve a decision slot to content via pluggable strategies."},
     {"name": "overrides", "description": "Manager field-level edits on a module, logged against the system's original pick (trust loop)."},
     {"name": "audience", "description": "Audience groups from live rule blocks + manual pins, resolved consent-gated. (Prefix `/api/audience-groups`.)"},
@@ -223,6 +223,25 @@ with SessionLocal() as db:
     # first boot against an empty database — the one case nobody tests twice.
     bootstrap_auth(db)
     create_demo_content_if_empty(db)
+
+    # ADR-162 point 5's startup assertion. A manifest whose declared channel
+    # contradicts the directory it sits in would otherwise surface as a manager
+    # being offered a module the renderer cannot take — so discovery is forced
+    # here, where a misfiling stops the process, rather than at whichever
+    # request happens to touch the registry first.
+    from app.channels.registry import list_channels
+    from app.modules.registry import assert_manifests_load, list_manifests
+
+    assert_manifests_load()
+    logger.info(
+        "channels: %s",
+        ", ".join(
+            f"{c.name} ({len(list_manifests(c.name))} modules, "
+            f"max {c.max_modules if c.max_modules is not None else 'unbounded'})"
+            for c in list_channels()
+        ) or "none registered",
+    )
+
     from app.auth.dependencies import auth_enforced
     from app.auth.service import cookie_secure
 

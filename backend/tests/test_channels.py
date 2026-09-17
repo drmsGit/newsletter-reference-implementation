@@ -26,6 +26,7 @@ from app.campaigns import duplication
 from app.campaigns.db_models import CampaignDB, ModuleInstanceDB, VariantDB
 from app.campaigns.service import create_campaign, create_variant_for_campaign
 from app.channels.registry import get_channel, list_channels, max_modules_for
+from app.modules.registry import get_manifest, list_manifests
 from app.database import SessionLocal
 from app.settings.service import (
     CHANNEL_AVAILABILITY_KEY, available_channels, channel_available,
@@ -341,3 +342,123 @@ class TestDuplicationCarriesTheChannel:
             "duplicated push variant that arrives as email would render with the "
             "wrong renderer and carry modules its channel does not accept"
         )
+
+
+class TestAChannelOnlyOffersItsOwnModules:
+    """ADR-161 point 7: a channel is "an attribute on the variant **plus which
+    manifests it accepts**". ADR-162 point 5 makes that a directory plus a
+    declaration plus an assertion.
+
+    This is the leak that made the directory restructure part of the channel
+    work rather than a later tidy-up: the registry was flat and global, and the
+    add-module dropdown was built once per page, so the moment a second
+    channel's manifest existed an email composer was offered it.
+    """
+
+    def test_an_email_composer_is_not_offered_push_modules(self):
+        email = {m.name for m in list_manifests("email")}
+        push = {m.name for m in list_manifests("push")}
+        assert push, "no push modules are registered, so this proves nothing"
+        assert email, "no email modules are registered, so this proves nothing"
+        assert email.isdisjoint(push), (
+            f"these modules are offered on both channels: {email & push}. A "
+            "manager composing an email would be able to add a module whose "
+            "renderer cannot take it"
+        )
+        assert "notification" not in email
+
+    def test_the_same_name_on_two_channels_resolves_to_different_modules(self):
+        """The reason the key is (channel, name) and not name."""
+        assert get_manifest("email", "cta") is not None
+        assert get_manifest("push", "cta") is None, (
+            "an email module resolved on the push channel — the lookup is "
+            "ignoring the channel, which is what namespacing exists to prevent"
+        )
+
+    def test_a_push_module_loads_without_a_template_file(self):
+        """ADR-160 point 2: "a push renderer fills fields and has no layout
+        job", because the receiving OS does the rendering. The registry skips a
+        manifest with no `.html` counterpart, so push would silently vanish
+        without this — declared per module, which keeps ADR-161 point 7's split
+        intact (module manifest = fields and limits; channel = cardinality)."""
+        manifest = get_manifest("push", "notification")
+        assert manifest is not None, "the push module was skipped for having no template"
+        assert manifest.has_template is False
+        from app.modules.registry import get_template_html
+        assert get_template_html("push", "notification") is None
+
+    def test_a_misfiled_manifest_fails_loudly_rather_than_being_offered(self):
+        """ADR-162 point 5: "**the assertion matters more than either**" — a
+        misfiled manifest would otherwise surface as a manager being offered a
+        module that cannot render.
+
+        Deliberately raises rather than logging-and-skipping, which is how a
+        merely malformed manifest is treated. The difference: a typo costs that
+        one module; a manifest in the wrong directory offers it on a channel
+        whose renderer will not take it.
+        """
+        import json
+
+        from app.modules import registry
+        from app.modules.registry import MisfiledManifestError
+
+        misfiled = registry.MODULES_DIR / "push" / f"{PREFIX}_misfiled.json"
+        misfiled.write_text(json.dumps({
+            "label": "Misfiled", "channel": "email", "cms": False,
+            "has_template": False, "variables": [],
+        }))
+        try:
+            registry._registry_mtime = None  # force rediscovery
+            with pytest.raises(MisfiledManifestError, match="declares channel"):
+                registry.list_manifests("push")
+        finally:
+            misfiled.unlink(missing_ok=True)
+            registry._registry_mtime = None
+        # And the registry recovers once the file is gone.
+        assert get_manifest("push", "notification") is not None
+
+    def test_the_add_module_form_offers_only_the_variant_s_channel(
+        self, db, campaign, monkeypatch
+    ):
+        """The page-level version of the same thing — the form is rendered per
+        variant, so two variants on one page offer different modules."""
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("push"), channel="push"
+        )
+        user = UserDB(email=f"{PREFIX}-{uuid.uuid4().hex[:8]}@example.invalid", is_active=True)
+        db.add(user); db.commit(); db.refresh(user)
+        role = db.query(RoleDB).filter(RoleDB.key == ADMIN).first()
+        db.add(RoleAssignmentDB(user_id=user.id, role_id=role.id,
+                                brand_id=auth.ensure_default_brand(db).id))
+        db.commit()
+        token = auth.create_session(db, user)
+        client = TestClient(app, follow_redirects=False, raise_server_exceptions=False)
+        client.cookies.set(auth.SESSION_COOKIE, token)
+        try:
+            page = client.get(f"/ui/campaigns/{campaign.id}")
+            assert page.status_code == 200
+            assert 'value="notification"' in page.text, (
+                "the push variant was not offered its own module"
+            )
+            assert 'value="single_stack"' in page.text, (
+                "the email variant was not offered its own module"
+            )
+            # Both appear on the page because both variants are on it. What
+            # must not happen is one form offering the other's — counted rather
+            # than asserted on the page as a whole.
+            assert page.text.count('value="notification"') == 1, (
+                "the push module appears more than once — an email variant's "
+                "form is offering it"
+            )
+        finally:
+            db.query(SessionDB).filter(SessionDB.user_id == user.id).delete()
+            db.query(RoleAssignmentDB).filter(RoleAssignmentDB.user_id == user.id).delete()
+            db.query(AuditEventDB).filter(AuditEventDB.actor_id == user.id).delete(
+                synchronize_session=False)
+            db.query(UserDB).filter(UserDB.id == user.id).delete()
+            db.commit()

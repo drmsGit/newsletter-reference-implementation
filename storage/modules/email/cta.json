@@ -1,9 +1,16 @@
 {
   "label": "Call to Action",
+  "channel": "email",
   "description": "A single button link. Use at the end of a section to drive a specific action. Not connected to CMS — fill in label and URL manually.",
   "cms": false,
   "variables": [
-    { "name": "label", "required": true },
-    { "name": "url", "required": true }
+    {
+      "name": "label",
+      "required": true
+    },
+    {
+      "name": "url",
+      "required": true
+    }
   ]
 }

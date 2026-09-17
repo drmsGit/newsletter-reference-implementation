@@ -40,7 +40,7 @@ from app.settings.service import get_signal_weights, get_half_lives, get_max_sen
 from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB
 from app.audience import service as audience_service
 from app.decision.strategies.registry import list_strategies
-from app.email_modules.registry import list_manifests, get_manifest
+from app.modules.registry import list_manifests, get_manifest
 from app.overrides.service import (
     create_content_override,
     get_active_content_override,
@@ -720,7 +720,7 @@ def campaign_detail(
         modules = []
         override_module_choices = []
         for m in module_records:
-            manifest = get_manifest(m.module_type)
+            manifest = get_manifest(variant.channel, m.module_type)
             # Overrideable = the module resolves content (a content record or a
             # decision slot) and has a manifest so its fields are known. Not tied
             # to the cms flag — a hero/cta referencing a content record qualifies.
@@ -862,6 +862,13 @@ def campaign_detail(
                 "id": variant.id,
                 "name": variant.name,
                 "channel": variant.channel,
+                # Per variant, not per page. ADR-161 point 7: a channel is "an
+                # attribute on the variant plus **which manifests it accepts**".
+                # Page-level, an email composer was offered the push module the
+                # moment a second channel existed — which is the leak that made
+                # the directory restructure part of this work rather than a
+                # later tidy-up.
+                "module_templates": list_manifests(variant.channel),
                 "channel_label": (
                     get_channel(variant.channel).label
                     if get_channel(variant.channel) else variant.channel
@@ -893,7 +900,6 @@ def campaign_detail(
         .order_by(ContentRecordDB.title.asc())
         .all()
     )
-    module_templates = list_manifests()
     strategies = sorted(s.name for s in list_strategies())
 
     # Audience choices for the prepare-send form, each with its live resolved
@@ -948,7 +954,6 @@ def campaign_detail(
             "variants": variant_rows,
             "channels": available_channels(db),
             "content_records": content_records,
-            "module_templates": module_templates,
             "strategies": strategies,
             "audience_choices": audience_choices,
             "default_from": default_from,

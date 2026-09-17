@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.campaigns.db_models import ModuleInstanceDB, DecisionResolutionDB, VariantDB
 from app.content.db_models import ContentRecordDB, ContentVersionDB
-from app.email_modules.registry import ModuleManifest, get_manifest, get_template_html
+from app.modules.registry import ModuleManifest, get_manifest, get_template_html
 from app.overrides.service import get_active_content_override
 
 RenderMode = Literal["preview", "send"]
@@ -31,7 +31,7 @@ _jinja = Environment(loader=BaseLoader(), autoescape=True)
 _inliner = css_inline.CSSInliner()
 
 _BRAND_CSS_PATH = (
-    Path(__file__).parent.parent.parent.parent / "storage" / "email_modules" / "brand.css"
+    Path(__file__).parent.parent.parent.parent / "storage" / "modules" / "email" / "brand.css"
 )
 
 _RICH_TEXT_FIELD = "body_medium"
@@ -67,6 +67,18 @@ def render_variant_html(
     mode: RenderMode = "preview",
     collect_resolutions: bool = False,
 ) -> str | tuple[str, dict[int, DecisionResolutionDB]]:
+    # The variant's channel decides which manifests resolve — ADR-161 point 7:
+    # a channel is "an attribute on the variant plus which manifests it
+    # accepts". Read once here rather than per module.
+    #
+    # This function stays EMAIL-shaped: it returns an HTML string, and ADR-162
+    # point 3's role-tagged artifacts are not built. The channel is threaded
+    # through so module lookup is correct, not because this can render a push.
+    from app.campaigns.db_models import VariantDB
+
+    variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
+    channel = variant.channel if variant is not None else "email"
+
     modules = (
         db.query(ModuleInstanceDB)
         .filter(ModuleInstanceDB.variant_id == variant_id)
@@ -78,7 +90,7 @@ def render_variant_html(
     resolutions_by_module_id: dict[int, DecisionResolutionDB] = {}
 
     for module in modules:
-        html, resolution = render_module(db=db, module=module, recipient_id=recipient_id, mode=mode)
+        html, resolution = render_module(db=db, module=module, channel=channel, recipient_id=recipient_id, mode=mode)
         rendered_modules.append(html)
         if resolution is not None:
             resolutions_by_module_id[module.id] = resolution
@@ -122,24 +134,30 @@ def render_variant_html(
 def render_module(
     db: Session,
     module: ModuleInstanceDB,
+    channel: str,
     recipient_id: int | None = None,
     mode: RenderMode = "preview",
 ) -> tuple[str, DecisionResolutionDB | None]:
-    manifest = get_manifest(module.module_type)
+    """`channel` is passed down rather than looked up per module: the caller
+    already has the variant, and a query per module to re-derive a value that
+    cannot differ within one variant is the kind of thing that is invisible
+    until a variant has forty of them."""
+    manifest = get_manifest(channel, module.module_type)
 
     if manifest is None:
         return render_unknown_module(module), None
 
     if manifest.cms:
-        return render_cms_module(db=db, module=module, manifest=manifest, recipient_id=recipient_id, mode=mode)
+        return render_cms_module(db=db, module=module, manifest=manifest, channel=channel, recipient_id=recipient_id, mode=mode)
 
-    return render_static_module(db=db, module=module, manifest=manifest, mode=mode), None
+    return render_static_module(db=db, module=module, manifest=manifest, channel=channel, mode=mode), None
 
 
 def render_cms_module(
     db: Session,
     module: ModuleInstanceDB,
     manifest: ModuleManifest,
+    channel: str,
     recipient_id: int | None = None,
     mode: RenderMode = "preview",
 ) -> tuple[str, DecisionResolutionDB | None]:
@@ -173,7 +191,7 @@ def render_cms_module(
     if variables.get(_RICH_TEXT_FIELD):
         variables[_RICH_TEXT_FIELD] = render_rich_text(variables[_RICH_TEXT_FIELD])
 
-    html_source = get_template_html(module.module_type)
+    html_source = get_template_html(channel, module.module_type)
     if html_source is None:
         return render_unknown_module(module), decision_resolution
 
@@ -192,9 +210,10 @@ def render_static_module(
     db: Session,
     module: ModuleInstanceDB,
     manifest: ModuleManifest,
+    channel: str,
     mode: RenderMode = "preview",
 ) -> str:
-    html_source = get_template_html(module.module_type)
+    html_source = get_template_html(channel, module.module_type)
     if html_source is None:
         return render_unknown_module(module)
 

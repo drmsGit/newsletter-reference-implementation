@@ -76,7 +76,7 @@ def _discover() -> dict[str, ChannelManifest]:
             manifests[path.stem] = _load(path)
         except Exception:
             # One malformed manifest must not take the registry down with it —
-            # the same tolerance `email_modules.registry` already applies, and
+            # the same tolerance `modules.registry` already applies, and
             # for the same reason: a typo in a channel nobody is using should
             # not stop the ones that are.
             logger.warning("Failed to load channel manifest '%s' — skipping",

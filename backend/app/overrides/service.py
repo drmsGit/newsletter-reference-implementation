@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.campaigns.db_models import ModuleInstanceDB
 from app.content.db_models import ContentRecordDB
-from app.email_modules.registry import get_manifest
+from app.modules.registry import get_manifest
 from app.overrides.db_models import ContentOverrideDB
 from app.overrides.models import ContentOverrideCreate, OutcomeDeltaUpdate
 
@@ -22,7 +22,7 @@ def _validate_content_record_exists(db: Session, field_name: str, content_record
         )
 
 
-def _overrideable_manifest(module: ModuleInstanceDB):
+def _overrideable_manifest(db: Session, module: ModuleInstanceDB):
     """A content override needs (a) a module that actually resolves content — a
     content record or a decision slot — and (b) a manifest, so its overridable
     fields are known. A pure module_data module (no content reference) isn't
@@ -35,7 +35,14 @@ def _overrideable_manifest(module: ModuleInstanceDB):
             "— content overrides only apply to modules that resolve content; edit "
             "its module_data directly instead"
         )
-    manifest = get_manifest(module.module_type)
+    # An override edits module fields, so it needs the module's manifest — and
+    # a manifest is (channel, name) since ADR-162 point 5. The channel comes
+    # from the variant the module belongs to, which is where ADR-160 point 4
+    # put it; there is no other honest source for it here.
+    from app.campaigns.db_models import VariantDB
+
+    variant = db.query(VariantDB).filter(VariantDB.id == module.variant_id).first()
+    manifest = get_manifest(variant.channel if variant else "email", module.module_type)
     if manifest is None:
         raise ValueError(
             f"module {module.id} (type '{module.module_type}') has no manifest, so "
@@ -67,7 +74,7 @@ def create_content_override(db: Session, data: ContentOverrideCreate) -> Content
     if module is None:
         raise ValueError(f"module_instance_id={data.module_instance_id} does not exist")
 
-    manifest = _overrideable_manifest(module)
+    manifest = _overrideable_manifest(db, module)
 
     if not data.field_overrides:
         raise ValueError(
