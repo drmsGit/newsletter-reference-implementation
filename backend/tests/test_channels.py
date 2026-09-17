@@ -831,3 +831,197 @@ class TestAPushSnapshotLivesInTheRowNotOnDisk:
                 SnapshotDB.id.in_([push_snap.id, email_snap.id])).delete(
                     synchronize_session=False)
             db.commit()
+
+
+class TestPushContentIsAuthoredNotDerived:
+    """ADR-160 point 3: "channel fields are **separate and required — never
+    derived from email fields**", because deriving a 40-character push title
+    from a 60-character headline at render time is the rendering-time
+    transformation point 1 rejects.
+
+    Which means the content form needs a place to write them. Until this, push
+    rendering worked and no manager could reach it — the record had to be
+    created in Python.
+    """
+
+    def _admin(self, db):
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        user = UserDB(email=f"{PREFIX}-{uuid.uuid4().hex[:8]}@example.invalid", is_active=True)
+        db.add(user); db.commit(); db.refresh(user)
+        role = db.query(RoleDB).filter(RoleDB.key == ADMIN).first()
+        db.add(RoleAssignmentDB(user_id=user.id, role_id=role.id,
+                                brand_id=auth.ensure_default_brand(db).id))
+        db.commit()
+        token = auth.create_session(db, user)
+        client = TestClient(app, follow_redirects=False, raise_server_exceptions=False)
+        client.cookies.set(auth.SESSION_COOKIE, token)
+        return client, token, user
+
+    def _cleanup(self, db, user):
+        db.query(SessionDB).filter(SessionDB.user_id == user.id).delete()
+        db.query(RoleAssignmentDB).filter(RoleAssignmentDB.user_id == user.id).delete()
+        db.query(AuditEventDB).filter(AuditEventDB.actor_id == user.id).delete(
+            synchronize_session=False)
+        db.query(UserDB).filter(UserDB.id == user.id).delete()
+        db.commit()
+
+    def test_the_routes_accept_exactly_the_fields_the_manifest_declares(self):
+        """FastAPI needs the form parameters spelled out, so the route holds a
+        hand-written list beside a manifest — which is where drift lives. This
+        is the assertion that makes adding a push field to the manifest and
+        forgetting the route a failing test rather than a silent no-op."""
+        from app.frontend.router import PUSH_CONTENT_FIELDS
+
+        declared = tuple(v.name for v in get_manifest("push", "notification").variables)
+        assert set(PUSH_CONTENT_FIELDS) == set(declared), (
+            f"the content form accepts {sorted(PUSH_CONTENT_FIELDS)} but the push "
+            f"manifest declares {sorted(declared)} — a field in one and not the "
+            "other is either unauthorable or silently dropped"
+        )
+
+    def test_the_rendered_form_carries_its_own_section_marker(self, db, monkeypatch):
+        """The marker is what makes "cleared" expressible, so the form has to
+        actually emit it — a route reading a field no template sends is a
+        guard that silently never fires."""
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        client, token, user = self._admin(db)
+        try:
+            page = client.get("/ui/content")
+            assert 'name="channel_sections_present"' in page.text
+            assert 'value="push"' in page.text
+        finally:
+            self._cleanup(db, user)
+
+    def test_a_manager_can_author_push_copy_through_the_form(self, db, monkeypatch):
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        from app.content.db_models import ContentRecordDB
+
+        client, token, user = self._admin(db)
+        title = _name("authored")
+        try:
+            page = client.get("/ui/content")
+            assert 'name="push_title"' in page.text, (
+                "the create form has no push fields, so push copy cannot be written"
+            )
+
+            response = client.post("/ui/content", data={
+                "title": title, "headline_medium": "Winter spa",
+                "push_title": "Fresh snow", "push_body": "2m base.",
+                "csrf_token": auth.csrf_token_for(token)})
+            assert response.status_code == 303
+
+            record = db.query(ContentRecordDB).filter(
+                ContentRecordDB.title == title).first()
+            assert record is not None
+            assert record.content["push_title"] == "Fresh snow"
+            assert record.content["headline_medium"] == "Winter spa", (
+                "the email fields must survive alongside the push ones"
+            )
+        finally:
+            db.query(ContentRecordDB).filter(ContentRecordDB.title == title).delete()
+            db.commit()
+            self._cleanup(db, user)
+
+    def test_an_empty_push_title_is_absent_rather_than_blank(self, db, monkeypatch):
+        """ADR-161 point 7's rider makes catalogue readiness "push fields not
+        empty". Storing "" would make every record in the catalogue look
+        push-ready, and a decision slot filtering on it would select copy that
+        says nothing."""
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        from app.content.db_models import ContentRecordDB
+
+        client, token, user = self._admin(db)
+        title = _name("emailonly")
+        try:
+            client.post("/ui/content", data={
+                "title": title, "headline_medium": "Just an email",
+                "push_title": "", "push_body": "",
+                "csrf_token": auth.csrf_token_for(token)})
+            record = db.query(ContentRecordDB).filter(
+                ContentRecordDB.title == title).first()
+            assert "push_title" not in record.content, (
+                f"an empty push title was stored as {record.content.get('push_title')!r}, "
+                "so this record now looks prepared for a channel nobody prepared it for"
+            )
+        finally:
+            db.query(ContentRecordDB).filter(ContentRecordDB.title == title).delete()
+            db.commit()
+            self._cleanup(db, user)
+
+    def test_editing_with_push_switched_off_does_not_erase_push_copy(
+        self, db, monkeypatch
+    ):
+        """**The reason the form fields default to None rather than "".**
+
+        The edit route used to rebuild `content` from scratch, so any key the
+        form did not carry was dropped. Harmless while the form knew every
+        field; a data-loss bug the moment a section is conditionally rendered.
+        """
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        from app.content.db_models import ContentRecordDB
+        from app.content.service import create_content
+
+        client, token, user = self._admin(db)
+        record = create_content(
+            db, title=_name("haspush"), brand_id=auth.ensure_default_brand(db).id,
+            content={"headline_medium": "Spa", "push_title": "Booked out soon",
+                     "push_body": "Only 3 rooms left."})
+        set_channel_available(db, "push", False)
+        try:
+            page = client.get(f"/ui/content/{record.id}")
+            assert 'name="push_title"' not in page.text, (
+                "push is switched off but its fields are still rendered"
+            )
+            # The form the manager submits carries no push fields at all.
+            client.post(f"/ui/content/{record.id}/edit", data={
+                "title": record.title, "headline_medium": "Spa, revised",
+                "csrf_token": auth.csrf_token_for(token)})
+
+            stored = db.get(ContentRecordDB, record.id)
+            db.refresh(stored)
+            assert stored.content["headline_medium"] == "Spa, revised"
+            assert stored.content.get("push_title") == "Booked out soon", (
+                "editing a record while push was switched off erased its push "
+                "copy — the form not asking about a field is not the author "
+                "clearing it"
+            )
+        finally:
+            db.query(ContentRecordDB).filter(ContentRecordDB.id == record.id).delete()
+            db.commit()
+            self._cleanup(db, user)
+
+    def test_clearing_a_push_field_on_a_form_that_asks_does_remove_it(
+        self, db, monkeypatch
+    ):
+        """Without this, the test above could pass by never removing anything."""
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        from app.content.db_models import ContentRecordDB
+        from app.content.service import create_content
+
+        client, token, user = self._admin(db)
+        record = create_content(
+            db, title=_name("clearable"), brand_id=auth.ensure_default_brand(db).id,
+            content={"headline_medium": "Spa", "push_title": "Remove me"})
+        try:
+            client.post(f"/ui/content/{record.id}/edit", data={
+                "title": record.title, "headline_medium": "Spa",
+                # The marker the rendered form carries. Its presence is what
+                # says "this form asked about push", which is the only way an
+                # empty value can mean "cleared" — FastAPI gives None for an
+                # absent AND an empty `str | None`, so the parameter itself
+                # cannot carry that distinction.
+                "channel_sections_present": "push",
+                "push_title": "", "push_body": "",
+                "csrf_token": auth.csrf_token_for(token)})
+            stored = db.get(ContentRecordDB, record.id)
+            db.refresh(stored)
+            assert "push_title" not in stored.content, (
+                "an author cleared the push title and it survived"
+            )
+        finally:
+            db.query(ContentRecordDB).filter(ContentRecordDB.id == record.id).delete()
+            db.commit()
+            self._cleanup(db, user)

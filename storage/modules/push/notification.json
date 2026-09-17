@@ -5,9 +5,25 @@
   "cms": true,
   "has_template": false,
   "variables": [
-    { "name": "push_title", "required": true },
-    { "name": "push_body", "required": true },
-    { "name": "push_image_url", "required": false },
-    { "name": "push_link", "required": false }
+    {
+      "name": "push_title",
+      "required": true,
+      "label": "Notification title"
+    },
+    {
+      "name": "push_body",
+      "required": true,
+      "label": "Notification text"
+    },
+    {
+      "name": "push_image_url",
+      "required": false,
+      "label": "Image URL"
+    },
+    {
+      "name": "push_link",
+      "required": false,
+      "label": "Opens this link"
+    }
   ]
 }

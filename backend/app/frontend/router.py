@@ -28,7 +28,7 @@ from app.recipients.service import to_recipient, to_recipients
 import json
 
 from app.content.db_models import ContentRecordDB, ContentVersionDB, CategoryDB, ContentCategoryAssignmentDB, CategoryRelationDB
-from app.content.service import create_content, update_content_record, set_content_status, assign_category_to_content, create_content_version, delete_category_assignment, delete_category_relation
+from app.content.service import create_content, get_content_record, update_content_record, set_content_status, assign_category_to_content, create_content_version, delete_category_assignment, delete_category_relation
 from app.content.service import create_category, create_category_relation
 from app.content.service import delete_content_record, delete_category, ContentRecordHasHistoryError, HasRelationsError
 from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB, ModuleInstanceDB, DecisionSlotDB
@@ -666,6 +666,46 @@ def campaigns_list(
             "error": error,
         },
     )
+
+
+#: The push module's authoring fields, as names. Declared in the manifest, not
+#: here — `test_channels.py` asserts the two agree, because FastAPI needs the
+#: form parameters spelled out below and a hand-written list next to a manifest
+#: is exactly where drift lives.
+PUSH_CONTENT_FIELDS = ("push_title", "push_body", "push_image_url", "push_link")
+
+
+def _channel_authoring_sections(db: Session) -> list[dict]:
+    """Extra authoring fields a content record needs, per available channel.
+
+    **Channel fields are separate and required, never derived from the email
+    ones** — ADR-160 point 3. Deriving a 40-character push title from a
+    60-character headline at render time is the rendering-time transformation
+    point 1 rejects, so "push-ready" means somebody wrote a push title.
+
+    Email is deliberately absent: its fields are the form's hand-written
+    section, with labels and placeholders a manifest does not carry. That
+    asymmetry is real and recorded in the backlog — the fully manifest-driven
+    authoring form is a bigger change than adding one channel.
+    """
+    sections = []
+    for channel in available_channels(db):
+        if channel.name == "email":
+            continue
+        fields = []
+        for manifest in list_manifests(channel.name):
+            if not manifest.cms:
+                continue
+            for var in manifest.variables:
+                fields.append({
+                    "name": var.name,
+                    "label": var.label or var.name,
+                    "required": var.required,
+                })
+        if fields:
+            sections.append({"channel": channel.name, "label": channel.label,
+                             "fields": fields})
+    return sections
 
 
 def _push_preview(db: Session, variant) -> dict | None:
@@ -1643,6 +1683,7 @@ def content_list(
             "records": records,
             "show_inactive": show_inactive,
             "inactive_count": inactive_count,
+            "channel_sections": _channel_authoring_sections(db),
             # `content_detail` has redirected here with ?error= since brand
             # scoping landed, but the route never accepted the parameter and
             # the template never rendered it — so "that record does not exist
@@ -1810,6 +1851,7 @@ def content_detail(
             # content permission, not the working brand's, because the copy is
             # written there.
             "duplicate_targets": _duplication_targets(db, request, CONTENT_MANAGE),
+            "channel_sections": _channel_authoring_sections(db),
         },
     )
 
@@ -1862,21 +1904,38 @@ def content_create(
     button_url: str = Form(""),
     image_url: str = Form(""),
     image_alt: str = Form(""),
+    push_title: str = Form(""),
+    push_body: str = Form(""),
+    push_image_url: str = Form(""),
+    push_link: str = Form(""),
     db: Session = Depends(get_db),
 ):
+    content = {
+        "headline_medium": headline_medium,
+        "body_medium": body_medium,
+        "button_label": button_label,
+        "button_url": button_url,
+        "image_url": image_url,
+        "image_alt": image_alt,
+    }
+    # Only stored when actually written. An empty push_title is the difference
+    # between "not prepared for push" and "prepared with nothing in it", and
+    # ADR-161 point 7's rider makes catalogue readiness exactly "push fields
+    # not empty" — so writing empty strings would make every record look
+    # push-ready.
+    for name, value in (
+        ("push_title", push_title), ("push_body", push_body),
+        ("push_image_url", push_image_url), ("push_link", push_link),
+    ):
+        if value.strip():
+            content[name] = value.strip()
+
     record = create_content(
         db,
         title=title,
         brand_id=working_brand_id(request, db),
         description=description or None,
-        content={
-            "headline_medium": headline_medium,
-            "body_medium": body_medium,
-            "button_label": button_label,
-            "button_url": button_url,
-            "image_url": image_url,
-            "image_alt": image_alt,
-        },
+        content=content,
     )
     return RedirectResponse(url=f"/ui/content/{record.id}", status_code=303)
 
@@ -1963,21 +2022,58 @@ def content_edit(
     button_url: str = Form(""),
     image_url: str = Form(""),
     image_alt: str = Form(""),
+    push_title: str = Form(""),
+    push_body: str = Form(""),
+    push_image_url: str = Form(""),
+    push_link: str = Form(""),
+    # **Which channel sections this form actually rendered.** The route cannot
+    # work it out for itself: an absent field and a cleared one are
+    # indistinguishable, because FastAPI coerces an empty form value to None
+    # for a `str | None` parameter — so `Form(None)` looks like it draws that
+    # line and does not. Checked against 0.136/pydantic 2.13 rather than
+    # assumed, after a test caught it.
+    #
+    # Without this the merge below could not tell "push is switched off, so
+    # this form never asked" from "the author emptied the push title", and it
+    # would erase push copy on every edit made while push was off.
+    channel_sections_present: list[str] = Form([]),
     db: Session = Depends(get_db),
 ):
+    # **Merged onto what is there, not replacing it.** This route used to
+    # rebuild `content` from scratch, so any key the form did not carry was
+    # silently dropped — harmless while the form knew every field, and a
+    # data-loss bug the moment a channel's fields are conditionally rendered:
+    # editing a record while push is switched off would erase its push copy.
+    existing = get_content_record(db, content_record_id)
+    content = dict((existing.content if existing else None) or {})
+    content.update({
+        "headline_medium": headline_medium,
+        "body_medium": body_medium,
+        "button_label": button_label,
+        "button_url": button_url,
+        "image_url": image_url,
+        "image_alt": image_alt,
+    })
+    if "push" in channel_sections_present:
+        for name, value in (
+            ("push_title", push_title), ("push_body", push_body),
+            ("push_image_url", push_image_url), ("push_link", push_link),
+        ):
+            if value.strip():
+                content[name] = value.strip()
+            else:
+                # Asked and left empty means the author cleared it. Removed
+                # rather than stored as "" — ADR-161 point 7's rider makes
+                # catalogue readiness "push fields not empty", so a blank
+                # string would leave the record looking push-ready.
+                content.pop(name, None)
+
     update_content_record(
         db,
         content_record_id,
         title=title,
         description=description or None,
-        content={
-            "headline_medium": headline_medium,
-            "body_medium": body_medium,
-            "button_label": button_label,
-            "button_url": button_url,
-            "image_url": image_url,
-            "image_alt": image_alt,
-        },
+        content=content,
     )
     return RedirectResponse(url=f"/ui/content/{content_record_id}", status_code=303)
 

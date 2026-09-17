@@ -41,6 +41,11 @@ class MisfiledManifestError(Exception):
 class ModuleVariable:
     name: str
     required: bool = True
+    #: What to call this field in an authoring form. Optional — falls back to
+    #: the field name, which is what email's hardcoded form shows today. It
+    #: exists so a channel added later gets a readable authoring surface from
+    #: its manifest alone, rather than needing a hand-written form.
+    label: str | None = None
 
 
 @dataclass
@@ -79,7 +84,11 @@ def _load_manifest(json_path: Path, channel: str) -> ModuleManifest:
         cms=data.get("cms", False),
         has_template=data.get("has_template", True),
         variables=[
-            ModuleVariable(name=v["name"], required=v.get("required", True))
+            ModuleVariable(
+                name=v["name"],
+                required=v.get("required", True),
+                label=v.get("label"),
+            )
             for v in data.get("variables", [])
         ],
     )

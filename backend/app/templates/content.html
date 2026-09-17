@@ -61,6 +61,42 @@
                         <input type="text" name="image_alt" class="form-control">
                     </div>
                 </div>
+
+                {# ADR-160 point 3: channel fields are **separate and
+                   required, never derived from the email fields**. Deriving a
+                   40-character push title from a 60-character headline at
+                   render time is the rendering-time transformation point 1
+                   rejects — so "push-ready" means somebody wrote a push title,
+                   and this is where they write it.
+
+                   Rendered only for channels this deployment has turned on, so
+                   an email-only company never sees a field it will not use.
+                   Labels come from the module manifest, which is why a channel
+                   added later gets an authoring surface without a form being
+                   written for it. #}
+                {% for section in channel_sections %}
+                {# Tells the route this form carried this channel's fields, so
+                   an empty one means "cleared" rather than "never asked". #}
+                <input type="hidden" name="channel_sections_present"
+                       value="{{ section.channel }}">
+                <hr>
+                <p class="text-muted small mb-2">
+                    {{ section.label }} fields — written for this channel, not
+                    derived from the email copy.
+                </p>
+                <div class="row">
+                    {% for field in section.fields %}
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">
+                            {{ field.label }}
+                            <span class="text-muted">({{ field.name }})</span>
+                        </label>
+                        <input type="text" name="{{ field.name }}" class="form-control"
+                               >
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endfor %}
                 <button type="submit" class="btn btn-primary">Create</button>
             </form>
         </div>

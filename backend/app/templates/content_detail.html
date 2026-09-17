@@ -119,6 +119,54 @@
                         <input type="text" name="image_alt" class="form-control" value="{{ record.content.image_alt or '' }}">
                     </div>
                 </div>
+                {# ADR-160 point 3 — separate fields, never derived from the
+                   email copy. Rendered only for channels this deployment has
+                   turned on; a field this form does not ask about is left
+                   untouched by the route rather than blanked, which is why a
+                   record keeps its push copy while push is switched off. #}
+                {% for section in channel_sections %}
+                {# Tells the route this form carried this channel's fields, so
+                   an empty one means "cleared" rather than "never asked". #}
+                <input type="hidden" name="channel_sections_present"
+                       value="{{ section.channel }}">
+                <hr>
+                <p class="text-muted small mb-2">
+                    {{ section.label }} fields — written for this channel, not
+                    derived from the email copy.
+                </p>
+                <div class="row">
+                    {% for field in section.fields %}
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">
+                            {{ field.label }}
+                            <span class="text-muted">({{ field.name }})</span>
+                        </label>
+                        <input type="text" name="{{ field.name }}" class="form-control"
+                               value="{{ record.content.get(field.name, '') }}">
+                    </div>
+                    {% endfor %}
+                    <div class="col-12">
+                        {# ADR-161 point 7's rider: catalogue readiness is
+                           "push fields not empty" — not a length check and not
+                           a provider check, so the catalogue stays independent
+                           of provider configuration. #}
+                        {% set ready = section.fields | selectattr("required")
+                                       | map(attribute="name")
+                                       | map("string") | list %}
+                        {% set missing = ready | reject("in", record.content | list) | list %}
+                        {% if missing %}
+                        <div class="small text-muted">
+                            Not {{ section.label | lower }}-ready — a decision slot
+                            filtering on this channel will not select this record.
+                        </div>
+                        {% else %}
+                        <div class="small text-success">
+                            {{ section.label }}-ready.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
                 <button type="submit" class="btn btn-primary btn-sm">Save changes</button>
             </form>
         </div>
