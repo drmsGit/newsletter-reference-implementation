@@ -74,6 +74,41 @@ def working_brand_id(request: Request, db: Session) -> int:
     return ensure_default_brand(db).id
 
 
+#: Where a brand switch lands when you were looking at one specific row.
+#:
+#: **The switch was never the problem; the landing was.** `safe_next` sends you
+#: back to the page you were on, and that page is a row belonging to the brand
+#: you just left — so the correct answer is a red banner telling you the record
+#: does not exist, which reads as an accusation for an action that was entirely
+#: reasonable. The section is what you were doing; the id was only where you
+#: happened to be.
+#:
+#: A table rather than "strip the last numeric segment", for the same reason
+#: `WRITE_POLICY` is a table: the nested routes do not follow the pattern —
+#: `/ui/decisions/slots/{id}` would strip to `/ui/decisions/slots`, which is not
+#: a page. First match wins, so narrower prefixes sit above broader ones.
+#:
+#: **Deliberately excludes recipients and categories.** Recipients carry no
+#: brand (ADR-150 point 9) and categories are global, so the row you are looking
+#: at survives the switch. What changes is the consent shown against it, which
+#: is exactly what somebody switching brand on a recipient wants to see.
+SWITCH_LANDINGS: tuple[tuple[str, str], ...] = (
+    ("/ui/decisions/slots/", "/ui/decisions"),
+    ("/ui/deliveries/send-instances/", "/ui/deliveries"),
+    ("/ui/audience-groups/", "/ui/audience-groups"),
+    ("/ui/campaigns/", "/ui/campaigns"),
+    ("/ui/content/", "/ui/content"),
+)
+
+
+def landing_after_switch(path: str) -> str:
+    """The collection to land on, or `path` unchanged if it is not a row."""
+    for prefix, collection in SWITCH_LANDINGS:
+        if path.startswith(prefix):
+            return collection
+    return path
+
+
 @router.post("/ui/brand")
 def switch_brand(
     request: Request,
@@ -93,7 +128,12 @@ def switch_brand(
     the login form, arriving in a different place.
     """
     set_session_brand(db, request.cookies.get(SESSION_COOKIE), brand_id)
-    return RedirectResponse(url=safe_next(next), status_code=303)
+    # Rewritten unconditionally, not only when the switch was accepted. A
+    # refused switch leaves you in the brand you were already in, so landing on
+    # that brand's list is harmless — and branching here would make the response
+    # differ by outcome, which is the one property this route's docstring
+    # promises it does not do.
+    return RedirectResponse(url=landing_after_switch(safe_next(next)), status_code=303)
 
 
 templates = Jinja2Templates(directory="app/templates")
@@ -393,6 +433,7 @@ def send_test_submit(
 @router.get("/ui/recipients")
 def recipients_list(
     request: Request,
+    error: str | None = None,
     db: Session = Depends(get_db),
 ):
     records = (
@@ -412,6 +453,7 @@ def recipients_list(
         {
             "title": "Recipients",
             "recipients": recipients,
+            "error": error,
         },
     )
 
@@ -427,6 +469,17 @@ def recipient_detail(
         .filter(RecipientDB.id == recipient_id)
         .first()
     )
+
+    # Not a brand case — recipients carry no brand (ADR-150 point 9), so this
+    # row is either there or it is not. It crashed all the same: `to_recipient`
+    # is handed the record below and a typo'd id reached it as None. Found by
+    # probing every detail-by-id route with a nonexistent id while fixing the
+    # campaign one, rather than waiting for somebody to mistype a URL.
+    if recipient is None:
+        return RedirectResponse(
+            url="/ui/recipients?error=" + quote("That recipient does not exist."),
+            status_code=303,
+        )
 
     # Preferences are now computed operational signals (decay-on-read, ADR-132),
     # not stored rows.
@@ -625,6 +678,21 @@ def campaign_detail(
         )
         .first()
     )
+
+    # The same absence `content_detail` was taught to answer on 2026-09-15, in
+    # the route that was missed. Before the brand filter above, `campaign` could
+    # not be None — the id came from a list the caller had just been shown — so
+    # scoping made absence reachable for the first time and nothing was added to
+    # meet it. `campaign_detail.html` reads `{{ campaign.name }}` unguarded, so
+    # switching brand while viewing a campaign produced an internal error.
+    #
+    # Answering exactly as a deleted campaign does is also the point: another
+    # brand's campaign must be indistinguishable from one that does not exist.
+    if campaign is None:
+        return RedirectResponse(
+            url="/ui/campaigns?error=" + quote("That campaign does not exist in this brand."),
+            status_code=303,
+        )
 
     variants = (
         db.query(VariantDB)

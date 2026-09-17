@@ -1132,3 +1132,147 @@ class TestTheContentPickerIsScoped:
                 SessionDB.token_hash == auth.hash_secret(token)
             ).delete()
             db.commit()
+
+
+class TestSwitchingBrandFromADetailPage:
+    """Reported by the user 2026-09-16, and it is really one cause.
+
+    The switcher returns you to the URL you were on, and that URL is a row
+    belonging to the brand you just left. On a content record that produced a
+    red banner accusing you of following a dead link; on a campaign it produced
+    an internal error, because `campaign_detail` never learned the answer
+    `content_detail` was taught when brand scoping made absence reachable.
+
+    Fixing only the crash would have left the banner, so both are here.
+    """
+
+    def _client(self, db, user, brand):
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        token = auth.create_session(db, user)
+        auth.set_session_brand(db, token, brand.id)
+        client = TestClient(app, follow_redirects=False, raise_server_exceptions=False)
+        client.cookies.set(auth.SESSION_COOKIE, token)
+        return client, token
+
+    def test_another_brand_s_campaign_answers_instead_of_crashing(
+        self, db, default_brand, temp_brand, user_on, monkeypatch
+    ):
+        """The black screen. The assertion is on the status, because a 500 is
+        what the user saw and a redirect is what they should have."""
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        other = temp_brand()
+        user = user_on(default_brand, other)
+        campaign = create_campaign(
+            db, name=f"switchcrash-{uuid.uuid4().hex[:8]}", brand_id=default_brand.id
+        )
+        client, token = self._client(db, user, other)
+        try:
+            response = client.get(f"/ui/campaigns/{campaign.id}")
+
+            assert response.status_code != 500, (
+                "opening a campaign while working in another brand returned an "
+                "internal error — `campaign_detail` hands a None campaign to a "
+                "template that reads campaign.name unguarded"
+            )
+            assert response.status_code == 303
+            assert response.headers["location"].startswith("/ui/campaigns?error="), (
+                f"expected the campaigns list with a message, got "
+                f"{response.headers['location']!r}"
+            )
+        finally:
+            db.query(VariantDB).filter(VariantDB.campaign_id == campaign.id).delete()
+            db.query(CampaignDB).filter(CampaignDB.id == campaign.id).delete()
+            db.query(SessionDB).filter(
+                SessionDB.token_hash == auth.hash_secret(token)
+            ).delete()
+            db.commit()
+
+    def test_switching_brand_from_a_row_lands_on_that_section_s_list(
+        self, db, default_brand, temp_brand, user_on, monkeypatch
+    ):
+        """And this is why the crash was reached at all."""
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        other = temp_brand()
+        user = user_on(default_brand, other)
+        client, token = self._client(db, user, default_brand)
+        try:
+            for origin, expected in (
+                ("/ui/campaigns/12345", "/ui/campaigns"),
+                ("/ui/content/12345", "/ui/content"),
+                ("/ui/decisions/slots/12345", "/ui/decisions"),
+                ("/ui/deliveries/send-instances/12345", "/ui/deliveries"),
+                ("/ui/audience-groups/12345", "/ui/audience-groups"),
+            ):
+                response = client.post(
+                    "/ui/brand",
+                    data={
+                        "brand_id": str(other.id),
+                        "next": origin,
+                        "csrf_token": auth.csrf_token_for(token),
+                    },
+                )
+                assert response.status_code == 303
+                assert response.headers["location"] == expected, (
+                    f"switching brand from {origin} landed on "
+                    f"{response.headers['location']!r} — a row id from the brand "
+                    f"the user just left, which cannot resolve in the new one"
+                )
+        finally:
+            db.query(SessionDB).filter(
+                SessionDB.token_hash == auth.hash_secret(token)
+            ).delete()
+            db.commit()
+
+    def test_switching_brand_on_a_recipient_leaves_you_where_you_are(
+        self, db, default_brand, temp_brand, user_on, monkeypatch
+    ):
+        """Without this the rule above could be "always go to a list", which
+        would be wrong: a recipient carries no brand (ADR-150 point 9), so the
+        row survives the switch. What changes is the consent shown against it,
+        and that is precisely what somebody switching brand there wants to see.
+        """
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        other = temp_brand()
+        user = user_on(default_brand, other)
+        client, token = self._client(db, user, default_brand)
+        try:
+            response = client.post(
+                "/ui/brand",
+                data={
+                    "brand_id": str(other.id),
+                    "next": "/ui/recipients/12345",
+                    "csrf_token": auth.csrf_token_for(token),
+                },
+            )
+            assert response.headers["location"] == "/ui/recipients/12345", (
+                "a brand switch bounced the user off a recipient that is still "
+                "perfectly valid in the new brand"
+            )
+        finally:
+            db.query(SessionDB).filter(
+                SessionDB.token_hash == auth.hash_secret(token)
+            ).delete()
+            db.commit()
+
+    def test_a_recipient_that_does_not_exist_answers_instead_of_crashing(
+        self, db, default_brand, user_on, monkeypatch
+    ):
+        """Not a brand case at all — found by probing every detail-by-id route
+        with a nonexistent id while fixing the campaign one. A typo'd URL
+        reached `to_recipient` as None and raised."""
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        user = user_on(default_brand)
+        client, token = self._client(db, user, default_brand)
+        try:
+            response = client.get("/ui/recipients/99999999")
+
+            assert response.status_code != 500, "a mistyped recipient id crashed"
+            assert response.headers["location"].startswith("/ui/recipients?error=")
+        finally:
+            db.query(SessionDB).filter(
+                SessionDB.token_hash == auth.hash_secret(token)
+            ).delete()
+            db.commit()
