@@ -1,0 +1,6 @@
+{
+  "label": "Email",
+  "description": "A composed HTML message delivered to an address. Unbounded modules — an email is a newsletter-shaped composition.",
+  "max_modules": null,
+  "module_directory": "email"
+}

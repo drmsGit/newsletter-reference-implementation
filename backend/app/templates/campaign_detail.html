@@ -50,6 +50,30 @@
                     <label class="form-label">Variant name <span class="text-muted">(internal label)</span></label>
                     <input type="text" name="name" class="form-control" required placeholder="e.g. Variant B — City Focus">
                 </div>
+                {# The question. Asked once and never again — ADR-160 point 5
+                   fixes a variant's channel at creation, because switching it
+                   would invalidate its modules, its content-readiness and its
+                   renderer simultaneously. #}
+                <div class="mb-3">
+                    <label class="form-label">Channel</label>
+                    <select name="channel" class="form-select" required
+                            onchange="document.getElementById('email-only-fields').hidden = (this.value !== 'email')">
+                        {% for channel in channels %}
+                        <option value="{{ channel.name }}">{{ channel.label }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">
+                        Cannot be changed afterwards. Each channel accepts its own
+                        modules, and declares how many it may hold.
+                    </div>
+                </div>
+                <div id="email-only-fields">
+                {# Subject and preheader are fields of an EMAIL, not of a
+                   variant — ADR-162 point 1 moves them into a `header` module
+                   and is not built yet, so they are still columns and are
+                   hidden rather than absent for other channels. The server
+                   drops them for a non-email variant regardless, since a
+                   hand-crafted POST never sees this markup. #}
                 <div class="mb-3">
                     <label class="form-label">Subject line <span class="text-muted">(recipient-facing)</span></label>
                     <input type="text" name="subject" class="form-control" maxlength="255" placeholder="e.g. Your summer city escape awaits">
@@ -57,6 +81,7 @@
                 <div class="mb-3">
                     <label class="form-label">Preheader <span class="text-muted">(inbox preview text)</span></label>
                     <input type="text" name="preheader" class="form-control" maxlength="255" placeholder="Short preview shown after the subject">
+                </div>
                 </div>
                 <button type="submit" class="btn btn-primary btn-sm">Add variant</button>
             </form>
@@ -87,6 +112,12 @@
                `docs/backlog.md`. This is the accurate noun in the meantime,
                not an answer to it. #}
             <strong>Campaign {{ campaign.id }} — {{ variant.name }}</strong>
+            {# The channel, now that the variant actually carries one. A badge,
+               deliberately, and not folded into the label text: which identifier
+               a row shows and what it is called is parked for the frontend
+               design pass (see docs/backlog.md), and this is the missing FACT
+               that pass was blocked on, not an answer to it. #}
+            <span class="badge bg-light text-dark border ms-1">{{ variant.channel_label }}</span>
             <div class="small mt-1">
                 <span class="text-muted">Subject:</span>
                 {% if variant.subject %}{{ variant.subject }}{% else %}<em class="text-danger">not set — send would fall back to the send-instance label</em>{% endif %}

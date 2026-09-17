@@ -25,6 +25,22 @@ class VariantDB(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=False)
+    # ADR-160 point 4: **channel is an attribute on the variant.** Not on the
+    # campaign — a campaign ("Hiking") carries email, push and paid-social
+    # variants, and a channel-plan level between the two was considered and
+    # rejected, because "the campaign is the topic; the channel is a delivery
+    # preference, not a structural division of the work".
+    #
+    # Point 5: **fixed at creation.** Switching an email variant to push would
+    # invalidate its modules, its content-readiness and its renderer at once,
+    # so changing channel means creating a new variant. Nothing updates this.
+    #
+    # **No server default, deliberately.** A default would let a caller that
+    # forgets to pass a channel produce a silent email variant, which is
+    # harmless only while email is the only channel — exactly the shape of
+    # fail-open that stops being harmless the moment it matters. The migration
+    # uses a default to backfill and then drops it.
+    channel = Column(String(50), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     # `name` is an internal label (e.g. "Variant A — Beach Focus"); the actual
     # email subject line and inbox preview text are their own first-class

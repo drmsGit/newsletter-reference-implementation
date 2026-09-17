@@ -55,6 +55,11 @@ def create_campaign_record(
         db=db,
         name=payload.name,
         brand_id=ensure_default_brand(db).id,
+        # Same provisional posture as brand_id above: this router has no session
+        # to read a choice from. Email is the honest default for a machine
+        # caller until ADR-166's credentials arrive, and it is stated here
+        # rather than defaulted in `create_campaign`, which refuses to guess.
+        channel=payload.channel,
         status=payload.status,
         initial_variant_name=payload.initial_variant_name,
     )
@@ -81,6 +86,7 @@ def create_campaign_variant(
         db=db,
         campaign_id=campaign_id,
         name=payload.name,
+        channel=payload.channel,
         status=payload.status,
     )
 

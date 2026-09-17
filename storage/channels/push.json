@@ -1,0 +1,6 @@
+{
+  "label": "Push notification",
+  "description": "A structured notification rendered by the receiving OS. Exactly one module: a push is one message, not a composition.",
+  "max_modules": 1,
+  "module_directory": "push"
+}

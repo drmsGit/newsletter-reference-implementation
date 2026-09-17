@@ -15,6 +15,8 @@ from app.auth.service import (
     list_brands, safe_next, set_session_brand, user_for_token,
 )
 from app.auth.permissions import CAMPAIGNS_MANAGE, CONTENT_MANAGE
+from app.channels.registry import get_channel
+from app.settings.service import available_channels, channel_available
 from app.audit import service as audit
 from app.campaigns import duplication
 from app.recipients.consent import resolve_emails
@@ -653,6 +655,10 @@ def campaigns_list(
         {
             "title": "Campaigns",
             "campaigns": campaigns,
+            # ADR-160 point 8: a disabled channel "disappears from the
+            # variant-creation UI". This is that list, and it is the same one
+            # the server-side refusal checks against.
+            "channels": available_channels(db),
             "notice": notice,
             "error": error,
         },
@@ -855,6 +861,11 @@ def campaign_detail(
             {
                 "id": variant.id,
                 "name": variant.name,
+                "channel": variant.channel,
+                "channel_label": (
+                    get_channel(variant.channel).label
+                    if get_channel(variant.channel) else variant.channel
+                ),
                 "subject": variant.subject,
                 "preheader": variant.preheader,
                 "modules": modules,
@@ -935,6 +946,7 @@ def campaign_detail(
             "title": f"Campaign {campaign_id}",
             "campaign": campaign,
             "variants": variant_rows,
+            "channels": available_channels(db),
             "content_records": content_records,
             "module_templates": module_templates,
             "strategies": strategies,
@@ -964,9 +976,23 @@ def content_category_delete(
 def campaign_create(
     request: Request,
     name: str = Form(...),
+    channel: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    campaign = create_campaign(db, name=name, brand_id=working_brand_id(request, db))
+    """Creating a campaign also creates its first variant, so it also picks a
+    channel — the invariant that a campaign always has a variant makes that
+    unavoidable. The channel belongs to the variant, never to the campaign
+    (ADR-160 point 4); this form is simply the first place one is chosen."""
+    # ADR-160 point 8: a channel this deployment has not turned on is "refused
+    # server-side if requested directly", not merely absent from the dropdown.
+    if not channel_available(db, channel):
+        return RedirectResponse(
+            url="/ui/campaigns?error=" + quote("That channel is not available."),
+            status_code=303,
+        )
+    campaign = create_campaign(
+        db, name=name, brand_id=working_brand_id(request, db), channel=channel
+    )
     return RedirectResponse(url=f"/ui/campaigns/{campaign.id}", status_code=303)
 
 
@@ -1150,16 +1176,31 @@ def campaign_duplicate(
 def variant_create(
     campaign_id: int,
     name: str = Form(...),
+    channel: str = Form(...),
     subject: str = Form(""),
     preheader: str = Form(""),
     db: Session = Depends(get_db),
 ):
+    """The "what channel?" question. Asked once, here, and never again —
+    ADR-160 point 5 fixes it at creation."""
+    if not channel_available(db, channel):
+        return RedirectResponse(
+            url=f"/ui/campaigns/{campaign_id}?error=" + quote("That channel is not available."),
+            status_code=303,
+        )
+    # Subject and preheader are email fields. ADR-162 point 1 moves them into a
+    # `header` module and is not built, so they are still columns — but a push
+    # variant must not carry them, or the row would assert an email property of
+    # something that is not an email. Dropped here rather than hidden in the UI,
+    # because a hand-crafted POST reaches this and not the form.
+    email_shaped = channel == "email"
     create_variant_for_campaign(
         db,
         campaign_id=campaign_id,
         name=name,
-        subject=subject.strip() or None,
-        preheader=preheader.strip() or None,
+        channel=channel,
+        subject=(subject.strip() or None) if email_shaped else None,
+        preheader=(preheader.strip() or None) if email_shaped else None,
     )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 

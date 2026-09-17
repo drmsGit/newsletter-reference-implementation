@@ -719,7 +719,11 @@ class TestCsrfIsActuallyEnforced:
         name = f"csrf-test-accepted-{uuid.uuid4().hex[:8]}"
         try:
             response = client.post(
-                "/ui/campaigns", data={"name": name, "csrf_token": csrf}
+                "/ui/campaigns",
+                # `channel` is required since ADR-160 point 4 landed: creating a
+                # campaign also creates its first variant, and a variant always
+                # has a channel.
+                data={"name": name, "channel": "email", "csrf_token": csrf},
             )
             assert response.status_code == 303, (
                 f"a correctly-tokened form was refused ({response.status_code})"

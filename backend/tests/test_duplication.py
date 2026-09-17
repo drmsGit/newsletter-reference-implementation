@@ -251,7 +251,8 @@ def source(db, default_brand):
     made["campaigns"].append(campaign.id)
 
     variant = VariantDB(
-        campaign_id=campaign.id, name="Variant A", subject="Hello", preheader="Peek", status="sent"
+        campaign_id=campaign.id, channel="email", name="Variant A",
+        subject="Hello", preheader="Peek", status="sent",
     )
     db.add(variant)
     db.flush()

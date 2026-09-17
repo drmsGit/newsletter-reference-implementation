@@ -26,6 +26,30 @@
                     <label class="form-label">Name</label>
                     <input type="text" name="name" class="form-control" required placeholder="e.g. Summer 2026 Newsletter">
                 </div>
+                {# Creating a campaign also creates its first variant, and a
+                   variant always has a channel (ADR-160 pts 4 and 5) — so the
+                   question has to be asked here too, not only on "add variant".
+                   Only channels this deployment has turned on appear (pt 8). #}
+                {% if channels | length > 1 %}
+                <div class="mb-3">
+                    <label class="form-label">First variant is a</label>
+                    <select name="channel" class="form-select" required>
+                        {% for channel in channels %}
+                        <option value="{{ channel.name }}">{{ channel.label }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">
+                        Fixed once created — a variant cannot change channel later.
+                        You can add variants on other channels afterwards.
+                    </div>
+                </div>
+                {% else %}
+                {# One channel available: no choice to make, so no control.
+                   Same promise ADR-150 point 4 makes about the brand switcher —
+                   a deployment using one channel never has to think about it. #}
+                <input type="hidden" name="channel"
+                       value="{{ channels[0].name if channels else 'email' }}">
+                {% endif %}
                 <button type="submit" class="btn btn-primary">Create</button>
             </form>
         </div>

@@ -192,6 +192,11 @@ def duplicate_campaign(
     for source_variant in variants:
         variant = VariantDB(
             campaign_id=campaign.id,
+            # Carried, never re-chosen. ADR-160 point 5 fixes a variant's
+            # channel at creation because switching it would invalidate the
+            # modules, the content-readiness and the renderer at once — and a
+            # copy whose modules came from a push variant is a push variant.
+            channel=source_variant.channel,
             name=source_variant.name,
             subject=source_variant.subject,
             preheader=source_variant.preheader,

@@ -21,6 +21,7 @@ def to_variant(record: VariantDB) -> Variant:
     return Variant(
         id=record.id,
         campaign_id=record.campaign_id,
+        channel=record.channel,
         name=record.name,
         subject=record.subject,
         preheader=record.preheader,
@@ -49,9 +50,19 @@ def create_campaign(
     db: Session,
     name: str,
     brand_id: int,
+    channel: str,
     status: str = "draft",
     initial_variant_name: str = "Variant A",
 ) -> CampaignWithVariants:
+    """Create a campaign and the one variant it must always have.
+
+    **`channel` is required and has no default, even though this reads like a
+    campaign-level argument.** It is not one — ADR-160 point 4 keeps channel off
+    the campaign entirely; what needs it is the initial variant this function
+    manufactures to satisfy the always-has-a-variant invariant. Defaulting it to
+    email would mean a caller that never thought about channel silently produces
+    an email variant, which is harmless exactly until it is not.
+    """
     # A campaign must always have a variant (invariant) — flush (not commit)
     # after the campaign insert so campaign.id is assigned without ending
     # the transaction, then commit both inserts atomically in one go. A
@@ -68,6 +79,7 @@ def create_campaign(
 
     initial_variant = VariantDB(
         campaign_id=campaign.id,
+        channel=channel,
         name=initial_variant_name,
         status="draft",
     )
@@ -100,12 +112,23 @@ def create_variant_for_campaign(
     db: Session,
     campaign_id: int,
     name: str,
+    channel: str,
     subject: str | None = None,
     preheader: str | None = None,
     status: str = "draft",
 ) -> Variant:
+    """Add a variant. **The channel is chosen here and never again** (ADR-160
+    point 5): switching an email variant to push would invalidate its modules,
+    its content-readiness and its renderer at once, so changing channel means
+    creating a new variant. `update_variant` therefore does not touch it.
+
+    `subject` and `preheader` are email-shaped and stay on the row for now —
+    ADR-162 point 1 moves them into a `header` module and is not built. A push
+    variant leaves them NULL.
+    """
     variant = VariantDB(
         campaign_id=campaign_id,
+        channel=channel,
         name=name,
         subject=subject,
         preheader=preheader,

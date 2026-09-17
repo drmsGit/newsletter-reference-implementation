@@ -268,7 +268,7 @@ class TestListsAreScopedToTheWorkingBrand:
 
     def test_campaigns_are_scoped(self, db, default_brand, temp_brand):
         other = temp_brand()
-        campaign = create_campaign(db, name=f"brandtest-{uuid.uuid4().hex[:8]}",
+        campaign = create_campaign(db, channel="email", name=f"brandtest-{uuid.uuid4().hex[:8]}",
                                    brand_id=default_brand.id)
         try:
             assert campaign.id in [c.id for c in list_campaigns(db, brand_id=default_brand.id)]
@@ -629,7 +629,8 @@ class TestThePermissionCheckIsBrandAware:
         name = f"legit-{uuid.uuid4().hex[:8]}"
         response = client.post(
             "/ui/campaigns",
-            data={"name": name, "csrf_token": auth.csrf_token_for(token)},
+            data={"name": name, "channel": "email",
+                  "csrf_token": auth.csrf_token_for(token)},
         )
         try:
             assert response.status_code == 303, (
@@ -974,7 +975,8 @@ class TestSuggestAudienceSurvivedTheBrandWork:
         from app.content.service import create_content
 
         campaign = create_campaign(
-            db, name=f"suggest-{uuid.uuid4().hex[:8]}", brand_id=brand.id
+            db,
+            channel="email", name=f"suggest-{uuid.uuid4().hex[:8]}", brand_id=brand.id
         )
         record = create_content(
             db, title=f"suggest-{uuid.uuid4().hex[:8]}",
@@ -1109,7 +1111,8 @@ class TestTheContentPickerIsScoped:
             db, title=marker, content={"headline_medium": "x"}, brand_id=other.id
         )
         campaign = create_campaign(
-            db, name=f"picker-{uuid.uuid4().hex[:8]}", brand_id=default_brand.id
+            db,
+            channel="email", name=f"picker-{uuid.uuid4().hex[:8]}", brand_id=default_brand.id
         )
         token = auth.create_session(db, admin)
         client = TestClient(app, follow_redirects=False, raise_server_exceptions=False)
@@ -1166,7 +1169,8 @@ class TestSwitchingBrandFromADetailPage:
         other = temp_brand()
         user = user_on(default_brand, other)
         campaign = create_campaign(
-            db, name=f"switchcrash-{uuid.uuid4().hex[:8]}", brand_id=default_brand.id
+            db,
+            channel="email", name=f"switchcrash-{uuid.uuid4().hex[:8]}", brand_id=default_brand.id
         )
         client, token = self._client(db, user, other)
         try:

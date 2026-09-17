@@ -241,7 +241,7 @@ def seed():
         for ci in range(1, 5):
             camp = CampaignDB(name=f"Demo Campaign {ci}", status="draft", brand_id=BRAND_ID)
             db.add(camp); db.flush()
-            variant = VariantDB(campaign_id=camp.id, name=f"Variant {ci}A",
+            variant = VariantDB(campaign_id=camp.id, channel="email", name=f"Variant {ci}A",
                                 subject=f"Edition {ci}: picked for you", preheader="Your personalized selection", status="draft")
             db.add(variant); db.flush()
             slot = DecisionSlotDB(
