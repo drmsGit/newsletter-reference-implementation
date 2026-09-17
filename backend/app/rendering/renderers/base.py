@@ -42,8 +42,33 @@ class RenderedArtifact:
     media_type: str
     body: str | None = None
     fields: dict | None = None
+    #: Delivery metadata that is not the content itself — an email's subject
+    #: and preheader. It lives here rather than as a `send()` argument because
+    #: ADR-161 point 1 keeps ONE addressed interface for email, push, SMS and
+    #: letter: a `subject` parameter on that interface would be an email
+    #: concern every other channel has to ignore, which is the
+    #: optional-methods shape that point explicitly rejects.
+    #:
+    #: Subject and preheader are still read off the variant — ADR-162 point 1
+    #: moves them into a `header` module and is not built. When it is, they
+    #: arrive as module fields and this dict is filled from them instead,
+    #: without the interface changing.
+    envelope: dict = field(default_factory=dict)
     #: Per-module resolutions actually used, for the render context.
     resolutions_by_module_id: dict[int, DecisionResolutionDB] = field(default_factory=dict)
+
+    @classmethod
+    def email(cls, html: str, subject: str | None = None) -> "RenderedArtifact":
+        """A plain email artifact, for mail that is not a rendered variant.
+
+        The sign-in code is the only caller: it is *system* mail, with no
+        campaign, no snapshot, no consent gate and no channel behind it, and it
+        goes through the same provider adapter. Giving it a named constructor
+        keeps it on the one addressed interface instead of earning the
+        interface a second method for a case that is not delivery at all.
+        """
+        return cls(role=ROLE_HTML, media_type="text/html", body=html,
+                   envelope={"subject": subject} if subject else {})
 
     def size_bytes(self) -> int:
         if self.body is not None:

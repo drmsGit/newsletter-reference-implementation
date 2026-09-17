@@ -42,7 +42,7 @@ from app.recipients.consent import (
     DEFAULT_CHANNEL,
     DEFAULT_PURPOSE,
     is_consenting_filter,
-    resolve_emails,
+    resolve_send_addresses,
 )
 from app.recipients.db_models import RecipientDB
 
@@ -113,7 +113,11 @@ def run_exclusion_stack(
     # One query for the whole set. A recipient with no active address on this
     # channel is not reachable, which is a different fact from having refused
     # contact — hence a different stage and a different recorded reason.
-    addresses = resolve_emails(db, sorted(surviving))
+    # On THIS channel, not on email. The stage has been handed a channel since
+    # it was written and reported it in its own exclusion reason, while
+    # resolving email addresses regardless — so a push send would have found
+    # everyone "addressable" by their email address and delivered to it.
+    addresses = resolve_send_addresses(db, sorted(surviving), channel=channel)
     unaddressable = surviving - set(addresses)
     for recipient_id in sorted(unaddressable):
         exclusions.append(

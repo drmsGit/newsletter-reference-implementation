@@ -32,9 +32,24 @@ class EmailRenderer(ChannelRenderer):
             mode=mode,
             collect_resolutions=True,
         )
+        # Read here rather than by the send path, so "what goes in the subject
+        # line" is answered once, by the thing that renders the email. ADR-162
+        # point 1 will move these into a `header` module; when it does, only
+        # this function changes.
+        from app.campaigns.db_models import VariantDB
+
+        variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
+        envelope = {}
+        if variant is not None:
+            if variant.subject:
+                envelope["subject"] = variant.subject
+            if variant.preheader:
+                envelope["preheader"] = variant.preheader
+
         return RenderedArtifact(
             role=ROLE_HTML,
             media_type="text/html",
             body=html,
+            envelope=envelope,
             resolutions_by_module_id=resolutions,
         )

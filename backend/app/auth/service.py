@@ -545,11 +545,21 @@ def deliver_code(email: str, code: str) -> CodeDelivery:
         )
 
     try:
+        # System mail, not delivery: no campaign, no snapshot, no consent gate
+        # and no channel behind it — but the same adapter, so it builds a plain
+        # artifact rather than the addressed interface growing a second method
+        # for a case that is not a send (ADR-161 point 1).
+        from app.rendering.renderers.base import RenderedArtifact
+
         result = get_provider(system_mail_provider(), from_address=sender).send(
             email,
-            "Your sign-in code",
-            f"<p>Your sign-in code is <strong>{code}</strong>.</p>"
-            f"<p>It expires in {CODE_TTL_MINUTES} minutes.</p>",
+            RenderedArtifact.email(
+                subject="Your sign-in code",
+                html=(
+                    f"<p>Your sign-in code is <strong>{code}</strong>.</p>"
+                    f"<p>It expires in {CODE_TTL_MINUTES} minutes.</p>"
+                ),
+            ),
         )
         if not result.success:
             # error, not warning: nobody can sign in, and the person affected

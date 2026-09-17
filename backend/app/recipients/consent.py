@@ -305,6 +305,35 @@ def resolve_address(
     return candidates[0] if candidates else None
 
 
+#: Which key holds the deliverable value, per channel. ADR-163 point 2
+#: enumerates the shapes an address takes — `{"email": …}`, `{"token": …,
+#: "platform": …}`, `{"street": …, "postcode": …, …}` — because "a push token,
+#: a postal address and an email are not the same shape".
+#:
+#: **This is the one place a new channel's address shape has to be taught**,
+#: which is a real exception to ADR-160 point 6's "two files, no config step"
+#: and is better named than discovered. It is not in the channel manifest
+#: because address shape belongs to the addressability layer that ADR-163
+#: defines, not to the composition layer the manifest describes — and a postal
+#: address has no single scalar at all, so `letter` will need more than an
+#: entry here rather than being served by one.
+ADDRESS_KEYS: dict[str, str] = {
+    "email": "email",
+    "push": "token",
+}
+
+
+def address_key_for(channel: str) -> str:
+    """The JSON key holding this channel's deliverable value.
+
+    Unknown channels fall back to the channel's own name, which is a guess —
+    but a guess that yields None from `address_value` rather than silently
+    returning somebody's email address for a channel nobody mapped. Wrong in
+    the direction of "unaddressable", which the exclusion stack reports.
+    """
+    return ADDRESS_KEYS.get(channel, channel)
+
+
 def address_value(address: AddressabilityDB | None, key: str = "email") -> str | None:
     """Pull a scalar out of an address's JSON value.
 
@@ -359,14 +388,40 @@ def resolve_addresses(
     return resolved
 
 
-def resolve_emails(
-    db: Session, recipient_ids: list[int]
+def resolve_send_addresses(
+    db: Session, recipient_ids: list[int], channel: str = DEFAULT_CHANNEL
 ) -> dict[int, str]:
-    """Bulk `resolve_email`: recipient id → send address, skipping any with none."""
-    resolved = resolve_addresses(db, recipient_ids, channel="email")
+    """Bulk: recipient id → the value to deliver to on this channel, skipping
+    any recipient with none.
+
+    **The channel is a parameter, not an assumption.** `resolve_emails` below
+    hardcodes email and is correct for the many screens that are about email
+    addresses — but the send-time addressability gate is not one of them. It
+    was calling the email version for every channel while reporting "no active
+    address on the push channel", which would have resolved an email address
+    and handed it to a push provider. Harmless while email was the only
+    channel; a correctness bug the moment a second one existed.
+    """
+    resolved = resolve_addresses(db, recipient_ids, channel=channel)
+    key = address_key_for(channel)
     out: dict[int, str] = {}
     for recipient_id, row in resolved.items():
-        value = address_value(row)
+        # The key matters as much as the channel filter: a push row holds
+        # {"token": …}, so asking it for "email" returns nothing and the
+        # recipient reads as unaddressable on a channel they are reachable on.
+        value = address_value(row, key)
         if value:
             out[recipient_id] = value
     return out
+
+
+def resolve_emails(
+    db: Session, recipient_ids: list[int]
+) -> dict[int, str]:
+    """Bulk `resolve_email`: recipient id → email address, skipping any with none.
+
+    Kept as the email-specific name because its twelve callers really are about
+    email addresses — recipient lists, audience previews, CRM drift. Anything
+    that is channel-dependent uses `resolve_send_addresses` instead.
+    """
+    return resolve_send_addresses(db, recipient_ids, channel="email")

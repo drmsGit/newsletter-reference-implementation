@@ -419,7 +419,11 @@ def send_test_submit(
         html = f"<h1>{subject}</h1><p>Test email from the newsletter reference build.</p>"
 
     try:
-        send_result = get_provider(provider).send(to.strip(), subject, html)
+        from app.rendering.renderers.base import RenderedArtifact
+
+        send_result = get_provider(provider).send(
+            to.strip(), RenderedArtifact.email(html=html, subject=subject)
+        )
         result = {
             "success": send_result.success,
             "provider_message_id": send_result.provider_message_id,

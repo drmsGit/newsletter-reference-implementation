@@ -19,6 +19,7 @@ import os
 import httpx
 
 from app.delivery.providers.base import DeliveryProvider, SendResult
+from app.rendering.renderers.base import RenderedArtifact
 
 logger = logging.getLogger(__name__)
 
@@ -27,19 +28,30 @@ DEFAULT_FROM = "onboarding@resend.dev"
 
 
 class ResendProvider(DeliveryProvider):
+
+    #: Email only, declared rather than discovered. Resend delivers mail; a
+    #: push handed to it would fail at the vendor with a message about a
+    #: malformed request, which is a bad way to learn about a configuration
+    #: mistake. The factory refuses it up front instead (ADR-101).
+    channels = frozenset({"email"})
+
     def __init__(self, api_key: str | None = None, from_address: str | None = None):
         self.api_key = api_key if api_key is not None else os.environ.get("RESEND_API_KEY")
         self.from_address = from_address or os.environ.get("RESEND_FROM", DEFAULT_FROM)
 
-    def send(self, recipient_email: str, subject: str, html: str) -> SendResult:
+    def send(self, address: str, artifact: RenderedArtifact) -> SendResult:
         if not self.api_key:
             return SendResult(success=False, message="RESEND_API_KEY is not set")
 
+        recipient_email = address
         payload = {
             "from": self.from_address,
             "to": [recipient_email],
-            "subject": subject,
-            "html": html,
+            # The subject rides in the artifact's envelope rather than as a
+            # parameter: it is an email concern, and the addressed interface is
+            # shared with channels that have no such thing (ADR-161 point 1).
+            "subject": artifact.envelope.get("subject") or "",
+            "html": artifact.body or "",
         }
         try:
             response = httpx.post(

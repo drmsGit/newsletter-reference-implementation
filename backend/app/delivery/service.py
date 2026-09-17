@@ -10,7 +10,7 @@ from app.campaigns.db_models import VariantDB
 from app.delivery.exclusion import run_exclusion_stack
 from app.delivery.providers.factory import get_provider
 from app.recipients.consent import DEFAULT_CHANNEL, DEFAULT_PURPOSE, ConsentDenied
-from app.rendering.service import render_variant_html
+from app.rendering.service import render_variant, render_variant_html
 from app.snapshots.db_models import SnapshotDB
 
 logger = logging.getLogger(__name__)
@@ -177,7 +177,18 @@ def prepare_send_from_audience(
     if scheduled_at is not None and scheduled_at.tzinfo is None:
         scheduled_at = scheduled_at.astimezone()
 
-    recipients = resolve_audience(db, audience_group_id)
+    # Resolved against the channel this send will actually go out on. The
+    # variant is read once here and used for both the audience gate and the
+    # executions' channel, so the two cannot disagree about what is being sent.
+    plan_variant = (
+        db.query(VariantDB)
+        .join(SnapshotDB, SnapshotDB.variant_id == VariantDB.id)
+        .filter(SnapshotDB.id == snapshot_id)
+        .first()
+    )
+    plan_channel = plan_variant.channel if plan_variant else DEFAULT_CHANNEL
+
+    recipients = resolve_audience(db, audience_group_id, channel=plan_channel)
     if not recipients:
         raise ValueError(
             "The selected audience resolves to 0 consenting recipients — nothing to send."
@@ -204,14 +215,20 @@ def prepare_send_from_audience(
     db.add(send_instance)
     db.flush()  # assign send_instance.id before creating child executions
 
-    # channel/purpose fall to their column defaults (email/marketing) — the
-    # only ones that exist today. When a variant carries a channel (ADR-160
-    # point 4), it is read here, at plan time, because the inbound feedback
-    # path depends on the execution row carrying it (ADR-163 addendum point 1).
+    # **The channel comes off the variant** (ADR-160 point 4), read at plan
+    # time because the inbound feedback path depends on the execution row
+    # carrying it (ADR-163 addendum point 1) — a bounce arriving weeks later
+    # has only this row to say which channel it was about.
+    #
+    # Written rather than defaulted, which is the point of this change: the
+    # column has defaulted to 'email' since it was added, so every execution
+    # ever created claimed email whatever it was. Purpose still defaults,
+    # because nothing carries one yet.
     for recipient in recipients:
         db.add(
             DeliveryExecutionDB(
                 send_instance_id=send_instance.id,
+                channel=plan_channel,
                 recipient_id=recipient.id,
                 status="created",
                 provider=provider,
@@ -235,7 +252,20 @@ def reconcile_executions_to_audience(db: Session, send_instance: SendInstanceDB)
     from app.audience.service import resolve_audience
     from app.settings.service import get_max_send_recipients
 
-    resolved_ids = {r.id for r in resolve_audience(db, send_instance.audience_group_id)}
+    # Same channel the executions carry — a "rerun" send re-resolves WHO is
+    # targeted, and must ask about the channel it was planned for, or it would
+    # reconcile an email audience onto a push send.
+    rerun_channel = (
+        db.query(DeliveryExecutionDB.channel)
+        .filter(DeliveryExecutionDB.send_instance_id == send_instance.id)
+        .limit(1)
+        .scalar()
+    ) or DEFAULT_CHANNEL
+    resolved_ids = {
+        r.id for r in resolve_audience(
+            db, send_instance.audience_group_id, channel=rerun_channel
+        )
+    }
 
     cap = get_max_send_recipients(db)
     if len(resolved_ids) > cap:
@@ -373,9 +403,12 @@ def send_send_instance(
     )
     subject = (variant.subject if variant and variant.subject else send_instance.name)
 
+    # Refused up front if the adapter cannot carry this channel, rather than
+    # failing at the vendor with a message about a malformed request.
     provider = get_provider(
         send_instance.provider or "mock",
         from_address=send_instance.from_address,
+        channel=variant.channel if variant else DEFAULT_CHANNEL,
     )
 
     # Decision slots on this variant. Rendering only *looks up* an existing
@@ -494,12 +527,22 @@ def send_send_instance(
             # variant (ADR-083), so every recipient must get their own
             # rendered HTML, not identical copies of whatever the snapshot
             # happened to freeze for a single (or no) recipient.
-            html = render_variant_html(
+            # Through the channel's renderer (ADR-162 point 4), not the email
+            # one. An email comes back as HTML with a subject in its envelope;
+            # a push comes back as fields. Per recipient rather than reusing
+            # the snapshot, because decision-slot personalisation can resolve
+            # different content per recipient within one variant (ADR-083).
+            artifact = render_variant(
                 db=db,
                 variant_id=snapshot.variant_id,
                 recipient_id=execution.recipient_id,
                 mode="send",
             )
+            # Subject lives on the variant until ADR-162 point 1 moves it into
+            # a header module, so the renderer put it in the envelope. The send
+            # instance's name is the fallback it always was.
+            if artifact.body is not None and not artifact.envelope.get("subject"):
+                artifact.envelope["subject"] = subject
 
             # Already resolved by stage 1 of the gate, which had to look it up
             # to decide addressability at all. Resolving it again here would
@@ -508,11 +551,7 @@ def send_send_instance(
             # address that is *used*.
             recipient_email = gate.addresses[execution.recipient_id]
 
-            result = provider.send(
-                recipient_email=recipient_email,
-                subject=subject,
-                html=html,
-            )
+            result = provider.send(recipient_email, artifact)
 
             logger.info(
                 "send result: execution_id=%s recipient_id=%s success=%s "

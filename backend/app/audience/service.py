@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB, AudienceRuleBlockDB
 from app.recipients.db_models import RecipientDB
-from app.recipients.consent import is_consenting_filter, resolve_emails
+from app.recipients.consent import DEFAULT_CHANNEL, is_consenting_filter, resolve_emails
 from app.insight.signals import operational_signals_for_category
 
 logger = logging.getLogger(__name__)
@@ -408,7 +408,9 @@ def delete_block(db: Session, block_id: int) -> bool:
     return True
 
 
-def resolve_audience(db: Session, group_id: int) -> list[RecipientDB]:
+def resolve_audience(
+    db: Session, group_id: int, channel: str = DEFAULT_CHANNEL
+) -> list[RecipientDB]:
     """The group's live audience:
         ((∪ include blocks) − (∪ exclude blocks)) ∪ (manual member pins)
     then re-gated to consenting recipients.
@@ -419,7 +421,18 @@ def resolve_audience(db: Session, group_id: int) -> list[RecipientDB]:
     subtracted). The **consent floor is the one exception**: a non-consenting
     recipient is dropped even if pinned (legal, non-negotiable). Hard
     suppression (bounces/opt-outs) belongs on the consent/suppression floor, not
-    in a regular exclude block, so it stays hard against pins too."""
+    in a regular exclude block, so it stays hard against pins too.
+
+    **The consent floor is per channel**, and the caller must say which.
+    Consent is keyed `(recipient, brand, channel, purpose)` (ADR-163 point 1),
+    so gating a push send on email consent asks the wrong question twice over:
+    it would admit people who accepted email and never accepted notifications,
+    and refuse people who did the reverse. It defaulted to email while email
+    was the only channel, which made a push send unplannable — the audience
+    resolved to nobody and the planner reported "0 consenting recipients".
+
+    The default stays email for the screens that are previewing an email
+    audience; the send path passes the variant's channel."""
     # The brand comes from the GROUP, never from the caller's working context.
     # A group belongs to exactly one brand (ADR-150 point 2), so resolving it
     # gates on that brand's consent — and a manager who switched brand between
@@ -452,7 +465,8 @@ def resolve_audience(db: Session, group_id: int) -> list[RecipientDB]:
         db.query(RecipientDB)
         .filter(
             RecipientDB.id.in_(final_ids),
-            is_consenting_filter(brand_id),  # consent floor, for THIS brand
+            # Consent floor, for THIS brand AND this channel.
+            is_consenting_filter(brand_id, channel),
         )
         .order_by(RecipientDB.id.asc())
         .all()

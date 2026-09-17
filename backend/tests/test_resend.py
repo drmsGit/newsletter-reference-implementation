@@ -6,6 +6,14 @@ real DNS-verified send.
 import httpx
 
 from app.delivery.providers.resend import ResendProvider, RESEND_API_URL
+from app.rendering.renderers.base import RenderedArtifact
+
+
+def _artifact():
+    """The addressed interface takes an artifact since ADR-161 point 1 — one
+    interface for email, push, SMS and letter, so the payload and its envelope
+    travel together instead of `subject` riding as an email-only parameter."""
+    return RenderedArtifact.email(html="<p>x</p>", subject="s")
 
 
 class FakeResponse:
@@ -31,7 +39,7 @@ def test_builds_correct_request_and_maps_id(monkeypatch):
 
     monkeypatch.setattr(httpx, "post", fake_post)
     provider = ResendProvider(api_key="re_test", from_address="News <news@d.com>")
-    result = provider.send("anna@example.com", "Hello", "<p>hi</p>")
+    result = provider.send("anna@example.com", RenderedArtifact.email(html="<p>hi</p>", subject="Hello"))
 
     assert result.success is True
     assert result.provider_message_id == "abc-123"
@@ -50,7 +58,7 @@ def test_domain_not_verified_is_a_clean_failure(monkeypatch):
         httpx, "post",
         lambda url, **kw: FakeResponse(403, {"message": "The domain is not verified."}),
     )
-    result = ResendProvider(api_key="re_test").send("a@b.com", "s", "<p>x</p>")
+    result = ResendProvider(api_key="re_test").send("a@b.com", _artifact())
     assert result.success is False
     assert result.provider_message_id is None  # no collision on the unique column
     assert "not verified" in result.message
@@ -61,7 +69,7 @@ def test_missing_api_key_fails_without_calling_out(monkeypatch):
         raise AssertionError("should not hit the network without a key")
 
     monkeypatch.setattr(httpx, "post", boom)
-    result = ResendProvider(api_key="").send("a@b.com", "s", "<p>x</p>")
+    result = ResendProvider(api_key="").send("a@b.com", _artifact())
     assert result.success is False
     assert "RESEND_API_KEY" in result.message
 
@@ -71,6 +79,6 @@ def test_network_error_is_caught(monkeypatch):
         raise httpx.ConnectError("no route to host")
 
     monkeypatch.setattr(httpx, "post", boom)
-    result = ResendProvider(api_key="re_test").send("a@b.com", "s", "<p>x</p>")
+    result = ResendProvider(api_key="re_test").send("a@b.com", _artifact())
     assert result.success is False
     assert "network error" in result.message

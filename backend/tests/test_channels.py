@@ -98,6 +98,40 @@ def _sweep():
     mids = [m.id for m in session.query(ModuleInstanceDB).filter(
         ModuleInstanceDB.variant_id.in_(vids or [-1])).all()]
 
+    # Sends first: a send instance references a snapshot, which references a
+    # variant. Deleting inwards-out is the only order that works, and every
+    # table added to these tests has to be added here — nothing cascades.
+    from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB
+    from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
+    from app.recipients.db_models import AddressabilityDB, ConsentEventDB, RecipientDB
+
+    snap_ids = [r.id for r in session.query(SnapshotDB).filter(
+        SnapshotDB.variant_id.in_(vids or [-1])).all()]
+    send_ids = [r.id for r in session.query(SendInstanceDB).filter(
+        SendInstanceDB.snapshot_id.in_(snap_ids or [-1])).all()]
+    session.query(DeliveryExecutionDB).filter(
+        DeliveryExecutionDB.send_instance_id.in_(send_ids or [-1])).delete(synchronize_session=False)
+    session.query(SendInstanceDB).filter(
+        SendInstanceDB.id.in_(send_ids or [-1])).delete(synchronize_session=False)
+
+    group_ids = [r.id for r in session.query(AudienceGroupDB).filter(
+        AudienceGroupDB.name.like(f"{PREFIX}-%")).all()]
+    session.query(AudienceGroupMemberDB).filter(
+        AudienceGroupMemberDB.group_id.in_(group_ids or [-1])).delete(synchronize_session=False)
+    session.query(AudienceGroupDB).filter(
+        AudienceGroupDB.id.in_(group_ids or [-1])).delete(synchronize_session=False)
+
+    recipient_ids = [r.id for r in session.query(RecipientDB).filter(
+        RecipientDB.external_id.like(f"{PREFIX}-%")).all()]
+    session.query(ConsentEventDB).filter(
+        ConsentEventDB.recipient_id.in_(recipient_ids or [-1])).delete(synchronize_session=False)
+    session.query(AddressabilityDB).filter(
+        AddressabilityDB.recipient_id.in_(recipient_ids or [-1])).delete(synchronize_session=False)
+    session.query(DeliveryExecutionDB).filter(
+        DeliveryExecutionDB.recipient_id.in_(recipient_ids or [-1])).delete(synchronize_session=False)
+    session.query(RecipientDB).filter(
+        RecipientDB.id.in_(recipient_ids or [-1])).delete(synchronize_session=False)
+
     session.query(ContentOverrideDB).filter(
         ContentOverrideDB.module_instance_id.in_(mids or [-1])).delete(synchronize_session=False)
     # A snapshot that wrote a file leaves one behind too — an inline one does
@@ -1256,3 +1290,180 @@ class TestNoReadinessVerdictIsClaimed:
             )
         finally:
             self._cleanup(db, user, [record.id])
+
+
+class TestAPushSendGoesOutAsAPush:
+    """Step 5. Until this, `delivery_executions.channel` defaulted to 'email'
+    for every send ever made, and `delivery/service.py` carried a comment
+    saying so: channel and purpose "fall to their column defaults … When a
+    variant carries a channel (ADR-160 …)". It does now.
+
+    The test that matters most is the one asserting a recipient with no device
+    token is **excluded rather than emailed**. Three separate things had to be
+    channel-aware for that to come out right, and all three defaulted to email.
+    """
+
+    def _push_campaign(self, db, brand):
+        from app.content.service import create_content, create_content_version
+
+        record = create_content(
+            db, title=_name("alert"), brand_id=brand.id,
+            content={"push_title": "Fresh snow", "push_body": "2m base at Arosa."})
+        create_content_version(db, content_record_id=record.id, created_by="test")
+        campaign = create_campaign(
+            db, name=_name("campaign"), brand_id=brand.id, channel="email")
+        variant = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+        create_module_for_variant(
+            db, variant_id=variant.id, module_type="notification",
+            content_record_id=record.id)
+        return campaign, variant
+
+    def _recipients(self, db, brand, with_push_token: bool):
+        from app.recipients.consent import record_consent
+        from app.recipients.db_models import AddressabilityDB, RecipientDB
+
+        recipient = RecipientDB(external_id=_name("r"), status="active")
+        db.add(recipient); db.commit(); db.refresh(recipient)
+        if with_push_token:
+            db.add(AddressabilityDB(
+                recipient_id=recipient.id, channel="push",
+                value={"token": f"apns-{uuid.uuid4().hex[:8]}", "platform": "apns"}))
+        else:
+            db.add(AddressabilityDB(
+                recipient_id=recipient.id, channel="email",
+                value={"email": f"{_name('a')}@example.invalid"}))
+        db.commit()
+        record_consent(db, recipient.id, "opted_in", brand.id, channel="push", source="test")
+        record_consent(db, recipient.id, "opted_in", brand.id, channel="email", source="test")
+        return recipient
+
+    def _plan(self, db, brand, variant, recipients):
+        from app.audience.service import add_member, create_group
+        from app.delivery.service import prepare_send_from_audience
+        from app.snapshots.service import create_snapshot_for_variant
+
+        group = create_group(db, name=_name("group"), brand_id=brand.id)
+        for recipient in recipients:
+            add_member(db, group.id, recipient.id)
+        snapshot = create_snapshot_for_variant(db, variant_id=variant.id)
+        return prepare_send_from_audience(
+            db, snapshot_id=snapshot.id, name=_name("send"),
+            audience_group_id=group.id, provider="mock")
+
+    def test_executions_carry_the_variants_channel_not_the_default(self, db):
+        from app.delivery.db_models import DeliveryExecutionDB
+
+        brand = auth.ensure_default_brand(db)
+        _campaign, variant = self._push_campaign(db, brand)
+        recipient = self._recipients(db, brand, with_push_token=True)
+        send = self._plan(db, brand, variant, [recipient])
+
+        channels = {
+            e.channel for e in db.query(DeliveryExecutionDB).filter(
+                DeliveryExecutionDB.send_instance_id == send.id).all()
+        }
+        assert channels == {"push"}, (
+            f"executions were planned as {channels} — the column defaulted to "
+            "email for every send ever made, and an inbound bounce weeks later "
+            "has only this row to say which channel it was about"
+        )
+
+    def test_a_push_goes_to_the_device_token_with_its_fields(self, db):
+        from app.delivery.service import send_send_instance
+
+        brand = auth.ensure_default_brand(db)
+        _campaign, variant = self._push_campaign(db, brand)
+        recipient = self._recipients(db, brand, with_push_token=True)
+        send = self._plan(db, brand, variant, [recipient])
+
+        captured = {}
+        from app.delivery.providers import mock as mock_module
+
+        original = mock_module.MockProvider.send
+
+        def capture(self, address, artifact):
+            captured["address"] = address
+            captured["artifact"] = artifact
+            return original(self, address, artifact)
+
+        mock_module.MockProvider.send = capture
+        try:
+            send_send_instance(db, send.id)
+        finally:
+            mock_module.MockProvider.send = original
+
+        assert captured["address"].startswith("apns-"), (
+            f"the provider was handed {captured['address']!r} — an email "
+            "address was resolved for a push send, which is what the "
+            "addressability stage did for every channel before this"
+        )
+        assert captured["artifact"].body is None
+        assert captured["artifact"].fields["push_title"] == "Fresh snow"
+
+    def test_a_recipient_with_no_device_token_is_excluded_not_emailed(self, db):
+        """**The one to keep.** Three things defaulted to email — the audience
+        consent floor, the addressability stage, and the address's JSON key —
+        and each one alone would have produced a "successful" push delivered to
+        somebody's inbox."""
+        from app.delivery.db_models import DeliveryExecutionDB
+        from app.delivery.service import send_send_instance
+
+        brand = auth.ensure_default_brand(db)
+        _campaign, variant = self._push_campaign(db, brand)
+        reachable = self._recipients(db, brand, with_push_token=True)
+        unreachable = self._recipients(db, brand, with_push_token=False)
+        send = self._plan(db, brand, variant, [reachable, unreachable])
+        send_send_instance(db, send.id)
+        db.expire_all()
+
+        rows = {
+            e.recipient_id: e for e in db.query(DeliveryExecutionDB).filter(
+                DeliveryExecutionDB.send_instance_id == send.id).all()
+        }
+        assert rows[reachable.id].status == "sent"
+        assert rows[unreachable.id].status == "excluded", (
+            "a recipient with only an email address was sent a push — the "
+            "addressability stage resolved their email and called it a push "
+            "address, which the exclusion reason would then have denied"
+        )
+        assert "push" in rows[unreachable.id].exclusion_reason
+
+    def test_the_audience_is_gated_on_the_sends_own_channel(self, db):
+        """A push send planned against email consent asks the wrong question
+        twice: it admits people who accepted email and never accepted
+        notifications, and refuses the reverse. Before this it made a push send
+        unplannable — the planner reported "0 consenting recipients"."""
+        from app.recipients.consent import record_consent
+        from app.recipients.db_models import AddressabilityDB, RecipientDB
+
+        brand = auth.ensure_default_brand(db)
+        _campaign, variant = self._push_campaign(db, brand)
+
+        # Consented to push, never to email — invisible to an email-gated plan.
+        recipient = RecipientDB(external_id=_name("pushonly"), status="active")
+        db.add(recipient); db.commit(); db.refresh(recipient)
+        db.add(AddressabilityDB(
+            recipient_id=recipient.id, channel="push",
+            value={"token": f"apns-{uuid.uuid4().hex[:8]}", "platform": "apns"}))
+        db.commit()
+        record_consent(db, recipient.id, "opted_in", brand.id, channel="push", source="test")
+
+        send = self._plan(db, brand, variant, [recipient])
+        assert send.id is not None, (
+            "a recipient who consented to push was not found by a push send's "
+            "audience, because the consent floor asked about email"
+        )
+
+    def test_an_email_provider_refuses_a_push_channel(self, db):
+        """ADR-101: capabilities are explicit. Handing a notification to Resend
+        would fail at the vendor with a message about a malformed request,
+        which is a poor way to learn about a configuration mistake."""
+        from app.delivery.providers.factory import get_provider
+
+        assert get_provider("resend", channel="email") is not None
+        with pytest.raises(ValueError, match="cannot deliver on the 'push' channel"):
+            get_provider("resend", channel="push")
+        # The mock carries everything, or push would be untestable without an
+        # APNs certificate — which nobody has on a laptop.
+        assert get_provider("mock", channel="push") is not None
