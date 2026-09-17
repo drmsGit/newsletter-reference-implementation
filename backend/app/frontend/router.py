@@ -15,7 +15,7 @@ from app.auth.service import (
     list_brands, safe_next, set_session_brand, user_for_token,
 )
 from app.auth.permissions import CAMPAIGNS_MANAGE, CONTENT_MANAGE
-from app.channels.registry import get_channel
+from app.channels.registry import get_channel, max_modules_for
 from app.settings.service import available_channels, channel_available
 from app.audit import service as audit
 from app.campaigns import duplication
@@ -869,6 +869,15 @@ def campaign_detail(
                 # the directory restructure part of this work rather than a
                 # later tidy-up.
                 "module_templates": list_manifests(variant.channel),
+                # Cardinality, read from the channel manifest rather than known
+                # here. A full variant is offered no add-module form at all —
+                # but the service refuses it regardless, because a form that is
+                # not rendered is not a control.
+                "module_limit": max_modules_for(variant.channel),
+                "can_add_module": (
+                    max_modules_for(variant.channel) is None
+                    or len(modules) < max_modules_for(variant.channel)
+                ),
                 "channel_label": (
                     get_channel(variant.channel).label
                     if get_channel(variant.channel) else variant.channel

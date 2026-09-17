@@ -24,7 +24,9 @@ from app.auth.db_models import RoleAssignmentDB, RoleDB, SessionDB, UserDB
 from app.auth.permissions import ADMIN
 from app.campaigns import duplication
 from app.campaigns.db_models import CampaignDB, ModuleInstanceDB, VariantDB
-from app.campaigns.service import create_campaign, create_variant_for_campaign
+from app.campaigns.service import (
+    create_campaign, create_module_for_variant, create_variant_for_campaign,
+)
 from app.channels.registry import get_channel, list_channels, max_modules_for
 from app.modules.registry import get_manifest, list_manifests
 from app.database import SessionLocal
@@ -454,6 +456,150 @@ class TestAChannelOnlyOffersItsOwnModules:
             assert page.text.count('value="notification"') == 1, (
                 "the push module appears more than once — an email variant's "
                 "form is offering it"
+            )
+        finally:
+            db.query(SessionDB).filter(SessionDB.user_id == user.id).delete()
+            db.query(RoleAssignmentDB).filter(RoleAssignmentDB.user_id == user.id).delete()
+            db.query(AuditEventDB).filter(AuditEventDB.actor_id == user.id).delete(
+                synchronize_session=False)
+            db.query(UserDB).filter(UserDB.id == user.id).delete()
+            db.commit()
+
+
+class TestCardinalityIsDeclaredNotCodedIn:
+    """ADR-160 point 2: push is one message rather than a composition, and
+    **"the channel declares max one module as a declared capability rather than
+    the composition code special-casing push"**.
+
+    That sentence is the test. Nothing in `create_module_for_variant` knows what
+    push is — it reads a number out of a manifest. Which is also why a channel
+    added later needs no change here.
+    """
+
+    def test_a_push_variant_refuses_a_second_module(self, db, campaign):
+        variant = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("push"), channel="push"
+        )
+        first = create_module_for_variant(
+            db, variant_id=variant.id, module_type="notification",
+            module_data={"push_title": "Snow is here"},
+        )
+        assert first is not None
+
+        with pytest.raises(ValueError, match="already does"):
+            create_module_for_variant(
+                db, variant_id=variant.id, module_type="notification",
+                module_data={"push_title": "And again"},
+            )
+        assert db.query(ModuleInstanceDB).filter(
+            ModuleInstanceDB.variant_id == variant.id
+        ).count() == 1
+
+    def test_an_email_variant_is_not_limited(self, db, campaign):
+        """Without this, the test above could pass by refusing every second
+        module on every channel."""
+        variant = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("email"), channel="email"
+        )
+        for _ in range(3):
+            create_module_for_variant(
+                db, variant_id=variant.id, module_type="cta", module_data={},
+            )
+        assert db.query(ModuleInstanceDB).filter(
+            ModuleInstanceDB.variant_id == variant.id
+        ).count() == 3, "email declares no limit, so three modules must fit"
+
+    def test_the_limit_comes_from_the_manifest_not_from_the_code(self, db, campaign):
+        """Change the declared number and the behaviour changes with it —
+        which is what "declared capability" has to mean to be worth the words."""
+        import json
+
+        from app.channels import registry as channel_registry
+
+        path = channel_registry.CHANNELS_DIR / "email.json"
+        original = path.read_text()
+        variant = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("capped"), channel="email"
+        )
+        try:
+            data = json.loads(original)
+            data["max_modules"] = 1
+            path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+            channel_registry._registry_mtime = None
+
+            create_module_for_variant(
+                db, variant_id=variant.id, module_type="cta", module_data={})
+            with pytest.raises(ValueError, match="already does"):
+                create_module_for_variant(
+                    db, variant_id=variant.id, module_type="cta", module_data={})
+        finally:
+            path.write_text(original)
+            channel_registry._registry_mtime = None
+
+
+class TestAModuleMustBelongToItsVariantsChannel:
+
+    def test_a_push_module_cannot_be_added_to_an_email_variant(self, db, campaign):
+        """The composer's dropdown is scoped per channel — but a dropdown is
+        not a control, and a hand-crafted POST never sees it. Same shape as the
+        channel-availability hole one level up."""
+        variant = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("email"), channel="email"
+        )
+        with pytest.raises(ValueError, match="not a Email module"):
+            create_module_for_variant(
+                db, variant_id=variant.id, module_type="notification", module_data={})
+
+    def test_an_email_module_cannot_be_added_to_a_push_variant(self, db, campaign):
+        variant = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("push"), channel="push"
+        )
+        with pytest.raises(ValueError, match="not a Push notification module"):
+            create_module_for_variant(
+                db, variant_id=variant.id, module_type="single_stack", module_data={})
+
+    def test_each_channel_still_accepts_its_own(self, db, campaign):
+        """Without this, both tests above could pass by refusing everything."""
+        email = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("email"), channel="email")
+        push = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+        assert create_module_for_variant(
+            db, variant_id=email.id, module_type="single_stack", module_data={}) is not None
+        assert create_module_for_variant(
+            db, variant_id=push.id, module_type="notification", module_data={}) is not None
+
+    def test_a_full_variant_is_not_offered_the_add_module_form(
+        self, db, campaign, monkeypatch
+    ):
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        variant = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+        user = UserDB(email=f"{PREFIX}-{uuid.uuid4().hex[:8]}@example.invalid", is_active=True)
+        db.add(user); db.commit(); db.refresh(user)
+        role = db.query(RoleDB).filter(RoleDB.key == ADMIN).first()
+        db.add(RoleAssignmentDB(user_id=user.id, role_id=role.id,
+                                brand_id=auth.ensure_default_brand(db).id))
+        db.commit()
+        token = auth.create_session(db, user)
+        client = TestClient(app, follow_redirects=False, raise_server_exceptions=False)
+        client.cookies.set(auth.SESSION_COOKIE, token)
+        try:
+            page = client.get(f"/ui/campaigns/{campaign.id}")
+            assert 'value="notification"' in page.text, "the empty push variant should offer its module"
+
+            create_module_for_variant(
+                db, variant_id=variant.id, module_type="notification",
+                module_data={"push_title": "Full now"})
+
+            page = client.get(f"/ui/campaigns/{campaign.id}")
+            assert "already does" in page.text, (
+                "a full push variant still showed an add-module form with no "
+                "explanation of why submitting it would fail"
             )
         finally:
             db.query(SessionDB).filter(SessionDB.user_id == user.id).delete()

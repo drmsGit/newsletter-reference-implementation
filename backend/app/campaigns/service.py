@@ -3,7 +3,9 @@ from sqlalchemy.orm import Session
 
 from app.campaigns.db_models import CampaignDB, VariantDB, ModuleInstanceDB, DecisionSlotDB, DecisionResolutionDB
 from app.campaigns.models import Campaign, CampaignWithVariants, Variant, ModuleInstance, DecisionSlot, DecisionResolution
+from app.channels.registry import get_channel, max_modules_for
 from app.content.db_models import ContentRecordDB, ContentVersionDB
+from app.modules.registry import get_manifest
 from app.recipients.db_models import RecipientDB
 
 
@@ -196,11 +198,53 @@ def create_module_for_variant(
     module_data: dict | None = None,
     decision_slot_id: int | None = None,
 ) -> ModuleInstance:
+    """Append a module to a variant, within what its channel permits.
+
+    **The channel is derived from the variant, never passed.** Same rule the
+    brand work settled on: a caller that can state the channel is a caller that
+    can state the wrong one, and the variant already knows (ADR-160 point 4).
+    """
     if content_record_id is not None and decision_slot_id is not None:
         raise ValueError(
             "A module cannot have both content_record_id and decision_slot_id set — "
             "rendering would silently prefer content_record_id and ignore the decision slot"
         )
+
+    variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
+    if variant is None:
+        raise ValueError(f"variant {variant_id} does not exist")
+
+    channel = get_channel(variant.channel)
+    channel_label = channel.label if channel else variant.channel
+
+    # (1) The module must belong to this channel. ADR-161 point 7: a channel is
+    # "an attribute on the variant plus **which manifests it accepts**". The
+    # composer's dropdown is already scoped, but a dropdown is not a control —
+    # a hand-crafted POST never sees it, and this is the same shape of hole the
+    # channel-availability check closes one level up.
+    if get_manifest(variant.channel, module_type) is None:
+        raise ValueError(
+            f"'{module_type}' is not a {channel_label} module, so nothing could "
+            f"render it. Each channel accepts only its own modules."
+        )
+
+    # (2) Cardinality — ADR-161 point 7's one genuinely channel-level fact, and
+    # what keeps ADR-160 point 2's promise that push is "one ModuleInstanceDB"
+    # **as a declared capability rather than the composition code special-casing
+    # push**. Nothing here knows what push is; it reads a number from a file.
+    limit = max_modules_for(variant.channel)
+    if limit is not None:
+        current = (
+            db.query(ModuleInstanceDB)
+            .filter(ModuleInstanceDB.variant_id == variant_id)
+            .count()
+        )
+        if current >= limit:
+            raise ValueError(
+                f"A {channel_label} variant holds "
+                f"{limit} module{'s' if limit != 1 else ''}, and this one already "
+                f"does. Replace it, or add another variant."
+            )
 
     max_position = (
         db.query(func.max(ModuleInstanceDB.position))
