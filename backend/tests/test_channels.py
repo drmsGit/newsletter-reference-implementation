@@ -81,16 +81,45 @@ def _restore_availability():
 def _sweep():
     yield
     session = SessionLocal()
+    # In foreign-key order, and covering everything these tests can create
+    # even when they fail. An override row blocked the module delete once,
+    # which is the same shape of leak the duplication fixtures hit: the sweep
+    # has to know about every table the tests touch, because nothing cascades.
+    from pathlib import Path
+
+    from app.content.db_models import ContentRecordDB, ContentVersionDB
+    from app.overrides.db_models import ContentOverrideDB
+    from app.snapshots.db_models import SnapshotDB
+
     ids = [c.id for c in session.query(CampaignDB).filter(
         CampaignDB.name.like(f"{PREFIX}-%")).all()]
     vids = [v.id for v in session.query(VariantDB).filter(
         VariantDB.campaign_id.in_(ids or [-1])).all()]
+    mids = [m.id for m in session.query(ModuleInstanceDB).filter(
+        ModuleInstanceDB.variant_id.in_(vids or [-1])).all()]
+
+    session.query(ContentOverrideDB).filter(
+        ContentOverrideDB.module_instance_id.in_(mids or [-1])).delete(synchronize_session=False)
+    # A snapshot that wrote a file leaves one behind too — an inline one does
+    # not, which is half the point of storing it in the row.
+    for row in session.query(SnapshotDB).filter(SnapshotDB.variant_id.in_(vids or [-1])).all():
+        if row.html_storage_type != "inline" and row.html_location not in ("pending", ""):
+            Path(row.html_location).unlink(missing_ok=True)
+    session.query(SnapshotDB).filter(
+        SnapshotDB.variant_id.in_(vids or [-1])).delete(synchronize_session=False)
     session.query(ModuleInstanceDB).filter(
         ModuleInstanceDB.variant_id.in_(vids or [-1])).delete(synchronize_session=False)
     session.query(VariantDB).filter(
         VariantDB.id.in_(vids or [-1])).delete(synchronize_session=False)
     session.query(CampaignDB).filter(
         CampaignDB.id.in_(ids or [-1])).delete(synchronize_session=False)
+
+    cids = [r.id for r in session.query(ContentRecordDB).filter(
+        ContentRecordDB.title.like(f"{PREFIX}-%")).all()]
+    session.query(ContentVersionDB).filter(
+        ContentVersionDB.content_record_id.in_(cids or [-1])).delete(synchronize_session=False)
+    session.query(ContentRecordDB).filter(
+        ContentRecordDB.id.in_(cids or [-1])).delete(synchronize_session=False)
     session.commit()
     session.close()
 
@@ -607,4 +636,198 @@ class TestAModuleMustBelongToItsVariantsChannel:
             db.query(AuditEventDB).filter(AuditEventDB.actor_id == user.id).delete(
                 synchronize_session=False)
             db.query(UserDB).filter(UserDB.id == user.id).delete()
+            db.commit()
+
+
+class TestEachChannelRendersItsOwnShape:
+    """ADR-162 point 4 — one renderer per channel, keyed by channel and
+    auto-registering. The artifact belongs to the channel; the provider merely
+    transmits it, so a push artifact is the same whether FCM or OneSignal
+    carries it."""
+
+    def _push_variant_with_content(self, db, campaign, **content):
+        from app.content.service import create_content
+
+        record = create_content(
+            db,
+            title=_name("pushcontent"),
+            brand_id=campaign.brand_id,
+            content={"push_title": "Snow is here",
+                     "push_body": "Two metres at 1800m.",
+                     "push_link": "https://winter.example/snow", **content},
+        )
+        variant = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+        create_module_for_variant(
+            db, variant_id=variant.id, module_type="notification",
+            content_record_id=record.id)
+        return variant, record
+
+    def test_a_push_variant_renders_fields_not_html(self, db, campaign):
+        from app.rendering.renderers.base import ROLE_PAYLOAD
+        from app.rendering.service import render_variant
+
+        variant, _ = self._push_variant_with_content(db, campaign)
+        artifact = render_variant(db, variant.id, mode="preview")
+
+        assert artifact.role == ROLE_PAYLOAD
+        assert artifact.body is None, (
+            "the push renderer produced a document. ADR-160 point 2: the "
+            "receiving OS does all rendering, so a push renderer fills fields "
+            "and has no layout job"
+        )
+        assert artifact.fields["push_title"] == "Snow is here"
+        assert artifact.fields["push_body"] == "Two metres at 1800m."
+
+    def test_an_email_variant_still_renders_html(self, db, campaign):
+        """Without this, the test above could pass by breaking email."""
+        from app.rendering.renderers.base import ROLE_HTML
+        from app.rendering.service import render_variant
+
+        variant = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("email"), channel="email")
+        create_module_for_variant(
+            db, variant_id=variant.id, module_type="cta",
+            module_data={"label": "Book", "url": "https://x.example"})
+        artifact = render_variant(db, variant.id, mode="preview")
+        assert artifact.role == ROLE_HTML
+        assert artifact.fields is None
+        assert "<" in (artifact.body or ""), "email stopped producing markup"
+
+    def test_a_channel_with_no_renderer_refuses_rather_than_falling_back(
+        self, db, campaign
+    ):
+        """A fallback to email would render a push variant as an HTML email and
+        deliver something nobody composed."""
+        from app.rendering.service import render_variant
+
+        variant = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("orphan"), channel="push")
+        db.query(VariantDB).filter(VariantDB.id == variant.id).update(
+            {"channel": "letterpress"})
+        db.commit()
+        with pytest.raises(ValueError, match="no renderer is registered"):
+            render_variant(db, variant.id, mode="preview")
+
+    def test_an_override_reaches_a_push_field(self, db, campaign):
+        """ADR-162 point 1 claims moving fields into modules means "overrides
+        work unchanged". That is only true if every channel resolves its fields
+        through one path — so this is the test that keeps the second copy of
+        that loop from being written."""
+        from app.overrides.models import ContentOverrideCreate
+        from app.overrides.service import create_content_override
+        from app.rendering.service import render_variant
+
+        variant, _ = self._push_variant_with_content(db, campaign)
+        module = db.query(ModuleInstanceDB).filter(
+            ModuleInstanceDB.variant_id == variant.id).first()
+        create_content_override(db, ContentOverrideCreate(
+            module_instance_id=module.id,
+            field_overrides={"push_title": "Overridden title"},
+            overridden_by="test",
+        ))
+        artifact = render_variant(db, variant.id, mode="preview")
+        assert artifact.fields["push_title"] == "Overridden title", (
+            "the override layer did not reach a push field — push is resolving "
+            "its content through its own path instead of the shared one"
+        )
+
+
+class TestAPushSnapshotLivesInTheRowNotOnDisk:
+    """Decided 2026-09-17 (user). Writing a push payload to a .json beside the
+    .html files was the smaller diff and was rejected: it hardens the artifact
+    the project has a recorded lean away from, and leaves columns named html_*
+    holding a push payload.
+
+    This does NOT decide the open snapshot-storage question. It makes push the
+    first channel whose artifact lives in a table.
+    """
+
+    def test_a_push_snapshot_writes_no_file(self, db, campaign):
+        from app.snapshots.db_models import SnapshotDB
+        from app.snapshots.service import SNAPSHOT_STORAGE_DIR, create_snapshot_for_variant
+        from app.content.service import create_content, create_content_version
+
+        record = create_content(
+            db, title=_name("pushcontent"), brand_id=campaign.brand_id,
+            content={"push_title": "Ready", "push_body": "Go."})
+        create_content_version(db, content_record_id=record.id, created_by="test")
+        variant = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+        create_module_for_variant(
+            db, variant_id=variant.id, module_type="notification",
+            content_record_id=record.id)
+
+        before = set(SNAPSHOT_STORAGE_DIR.glob("*")) if SNAPSHOT_STORAGE_DIR.exists() else set()
+        snapshot = create_snapshot_for_variant(db, variant_id=variant.id)
+        try:
+            after = set(SNAPSHOT_STORAGE_DIR.glob("*")) if SNAPSHOT_STORAGE_DIR.exists() else set()
+            assert after == before, f"a push snapshot wrote files: {after - before}"
+
+            row = db.get(SnapshotDB, snapshot.id)
+            assert row.html_storage_type == "inline"
+            assert row.html_location == "inline:render_context"
+            stored = row.render_context["artifact"]
+            assert stored["role"] == "payload"
+            assert stored["fields"]["push_title"] == "Ready"
+            assert row.html_size > 0, "an inline artifact still has a size"
+        finally:
+            db.query(SnapshotDB).filter(SnapshotDB.id == snapshot.id).delete()
+            db.commit()
+
+    def test_a_push_snapshot_still_refuses_unpublished_content(self, db, campaign):
+        """The same rule email has (ADR-128). Storage shape changed; the
+        publication gate did not."""
+        from app.rendering.service import UnpublishedContentError
+        from app.snapshots.service import create_snapshot_for_variant
+        from app.content.service import create_content
+
+        record = create_content(
+            db, title=_name("unpublished"), brand_id=campaign.brand_id,
+            content={"push_title": "Draft", "push_body": "Not frozen."})
+        variant = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+        create_module_for_variant(
+            db, variant_id=variant.id, module_type="notification",
+            content_record_id=record.id)
+
+        with pytest.raises(UnpublishedContentError):
+            create_snapshot_for_variant(db, variant_id=variant.id)
+
+    def test_the_artifact_reads_back_for_both_shapes(self, db, campaign):
+        from app.snapshots.db_models import SnapshotDB
+        from app.snapshots.service import create_snapshot_for_variant, get_snapshot_artifact
+        from app.content.service import create_content, create_content_version
+
+        record = create_content(
+            db, title=_name("both"), brand_id=campaign.brand_id,
+            content={"push_title": "Hi", "push_body": "There",
+                     "headline_medium": "Hi", "body_medium": "There"})
+        create_content_version(db, content_record_id=record.id, created_by="test")
+
+        push = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+        create_module_for_variant(db, variant_id=push.id,
+                                  module_type="notification", content_record_id=record.id)
+        email = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("email"), channel="email")
+        create_module_for_variant(db, variant_id=email.id,
+                                  module_type="single_stack", content_record_id=record.id)
+
+        push_snap = create_snapshot_for_variant(db, variant_id=push.id)
+        email_snap = create_snapshot_for_variant(db, variant_id=email.id)
+        try:
+            assert get_snapshot_artifact(db, push_snap.id)["role"] == "payload"
+            assert get_snapshot_artifact(db, email_snap.id)["role"] == "html", (
+                "email's snapshot stopped reading back — the inline branch is "
+                "catching a case it should not"
+            )
+        finally:
+            from pathlib import Path
+            row = db.get(SnapshotDB, email_snap.id)
+            if row and row.html_location not in ("pending", "inline:render_context"):
+                Path(row.html_location).unlink(missing_ok=True)
+            db.query(SnapshotDB).filter(
+                SnapshotDB.id.in_([push_snap.id, email_snap.id])).delete(
+                    synchronize_session=False)
             db.commit()

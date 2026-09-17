@@ -6,8 +6,11 @@ from sqlalchemy import func, desc
 from itertools import combinations
 from urllib.parse import quote
 from datetime import datetime
+import logging
 import math
 import os
+
+logger = logging.getLogger(__name__)
 
 from app.database import get_db
 from app.auth.service import (
@@ -665,6 +668,25 @@ def campaigns_list(
     )
 
 
+def _push_preview(db: Session, variant) -> dict | None:
+    """The rendered fields of a push variant, or None for any other channel.
+
+    Never raises: a preview that breaks a page is worse than a missing
+    preview, and an unconfigured variant (no module yet) is an ordinary state
+    rather than an error.
+    """
+    if variant.channel != "push":
+        return None
+    try:
+        from app.rendering.service import render_variant
+
+        artifact = render_variant(db, variant.id, mode="preview")
+        return artifact.fields or None
+    except Exception as error:  # noqa: BLE001 — see the docstring
+        logger.warning("push preview failed for variant %s: %s", variant.id, error)
+        return None
+
+
 @router.get("/ui/campaigns/{campaign_id}")
 def campaign_detail(
     campaign_id: int,
@@ -874,6 +896,12 @@ def campaign_detail(
                 # but the service refuses it regardless, because a form that is
                 # not rendered is not a control.
                 "module_limit": max_modules_for(variant.channel),
+                # What the notification will actually say. A push has no HTML
+                # to open in a new tab, so the only way to see one before
+                # sending is to render it here. Preview mode, so unpublished
+                # content still shows — `mode="send"` is what refuses it, and
+                # that refusal belongs at snapshot time, not on a page load.
+                "push_preview": _push_preview(db, variant),
                 "can_add_module": (
                     max_modules_for(variant.channel) is None
                     or len(modules) < max_modules_for(variant.channel)

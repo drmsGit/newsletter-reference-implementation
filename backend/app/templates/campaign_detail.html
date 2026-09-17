@@ -377,6 +377,23 @@
         <div class="collapse mb-4" id="form-module-{{ variant.id }}">
             <div class="card">
                 <div class="card-body">
+                    {% if variant.push_preview %}
+                    {# A push has no HTML to open, so this is the only way to see
+                       one before it goes. Preview mode — unpublished content
+                       still shows here; snapshotting is what refuses it. #}
+                    <div class="card bg-light mb-3">
+                        <div class="card-body py-2">
+                            <div class="small text-muted mb-1">What the notification will say</div>
+                            <div class="fw-bold">{{ variant.push_preview.push_title or "—" }}</div>
+                            <div>{{ variant.push_preview.push_body or "" }}</div>
+                            {% if variant.push_preview.push_link %}
+                            <div class="small text-muted mt-1">
+                                opens {{ variant.push_preview.push_link }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
                     {% if not variant.can_add_module %}
                     {# ADR-161 point 7's cardinality, made visible. A push
                        variant is one message, not a composition — saying so

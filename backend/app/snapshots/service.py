@@ -2,7 +2,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from app.rendering.service import render_variant_html
+from app.rendering.service import render_variant, render_variant_html
 from app.snapshots.db_models import SnapshotDB
 from app.snapshots.models import Snapshot
 from app.campaigns.db_models import ModuleInstanceDB, DecisionResolutionDB
@@ -94,20 +94,67 @@ def build_render_context(
 
     return context
 
+#: What `html_location` says for an artifact that is not a file. The column is
+#: NOT NULL and named for HTML because it predates channels; renaming it is
+#: part of the open snapshot-storage question, not of this change.
+INLINE_LOCATION = "inline:render_context"
+
+
 def create_snapshot_for_variant(db: Session, variant_id: int, recipient_id: int | None = None) -> Snapshot:
-    html, resolutions_by_module_id = render_variant_html(
-        db=db,
-        variant_id=variant_id,
-        recipient_id=recipient_id,
-        mode="send",
-        collect_resolutions=True,
+    """Freeze a variant for approval and planning.
+
+    **Two storage shapes, and the split is deliberate rather than tidy.** Email
+    keeps writing an HTML file, exactly as before. A non-HTML artifact — push,
+    today — is stored *in the row*, under `render_context["artifact"]`, with
+    `html_storage_type="inline"` and no file at all.
+
+    Decided 2026-09-17 (user). Writing a push payload to a `.json` beside the
+    `.html` files was the smaller diff and was rejected: it would harden the
+    artifact the project has a recorded lean away from — the same reasoning
+    that put the snapshot-atomicity bug on hold on 2026-09-14 — and leave
+    columns named `html_*` holding a push payload, which is a lie the next
+    reader has to decode.
+
+    **This does not decide the snapshot-storage question**, which is still an
+    open Needs-ADR item covering approval-snapshot vs per-delivery package, the
+    medium, and whether per-recipient renders are persisted at all. It makes
+    push the first channel whose artifact lives in a table, which is the
+    direction that item is already leaning, and leaves email where it is. Two
+    shapes coexisting is visible rather than hidden, and that is the point.
+    """
+    artifact = render_variant(
+        db=db, variant_id=variant_id, recipient_id=recipient_id, mode="send",
     )
     render_context = build_render_context(
         db=db,
         variant_id=variant_id,
         recipient_id=recipient_id,
-        resolutions_by_module_id=resolutions_by_module_id,
+        resolutions_by_module_id=artifact.resolutions_by_module_id,
     )
+
+    if artifact.body is None:
+        # Structured artifact: it IS the render context's business, so it goes
+        # in beside the per-module resolutions rather than to disk.
+        render_context = {
+            **(render_context or {}),
+            "artifact": {
+                "role": artifact.role,
+                "media_type": artifact.media_type,
+                "fields": artifact.fields or {},
+            },
+        }
+        snapshot = SnapshotDB(
+            variant_id=variant_id,
+            recipient_id=recipient_id,
+            html_storage_type="inline",
+            html_location=INLINE_LOCATION,
+            html_size=artifact.size_bytes(),
+            render_context=render_context,
+        )
+        db.add(snapshot)
+        db.commit()
+        db.refresh(snapshot)
+        return to_snapshot(snapshot)
 
     SNAPSHOT_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -116,14 +163,14 @@ def create_snapshot_for_variant(db: Session, variant_id: int, recipient_id: int 
         recipient_id=recipient_id,
         html_storage_type="file",
         html_location="pending",
-        html_size=len(html.encode("utf-8")),
+        html_size=artifact.size_bytes(),
         render_context=render_context,
     )
 
     db.add(snapshot)
     db.commit()
     db.refresh(snapshot)
-    
+
     recipient_part = (
         f"recipient-{recipient_id}"
         if recipient_id is not None
@@ -132,7 +179,7 @@ def create_snapshot_for_variant(db: Session, variant_id: int, recipient_id: int 
 
     file_name = f"variant-{variant_id}-{recipient_part}-snapshot-{snapshot.id}.html"
     file_path = SNAPSHOT_STORAGE_DIR / file_name
-    file_path.write_text(html, encoding="utf-8")
+    file_path.write_text(artifact.body, encoding="utf-8")
 
     snapshot.html_location = str(file_path)
     db.commit()
@@ -162,9 +209,41 @@ def get_snapshot_html(db: Session, snapshot_id: int) -> str | None:
     if snapshot is None:
         return None
 
+    if snapshot.html_storage_type == "inline":
+        # Not a file, and not a failure either. Returning None here would be
+        # indistinguishable from "the file went missing", which is the state
+        # this function was written to report — so the caller is told plainly
+        # via `get_snapshot_artifact` instead.
+        return None
+
     file_path = Path(snapshot.html_location)
 
     if not file_path.exists():
         return None
 
     return file_path.read_text(encoding="utf-8")
+
+
+def get_snapshot_artifact(db: Session, snapshot_id: int) -> dict | None:
+    """What this snapshot froze, whatever shape it is in.
+
+    Answers for both storage shapes so a caller does not have to know which one
+    a channel uses: `{"role": "html", "body": ...}` for email,
+    `{"role": "payload", "fields": {...}}` for push.
+    """
+    snapshot = (
+        db.query(SnapshotDB)
+        .filter(SnapshotDB.id == snapshot_id)
+        .first()
+    )
+    if snapshot is None:
+        return None
+
+    if snapshot.html_storage_type == "inline":
+        stored = (snapshot.render_context or {}).get("artifact")
+        return dict(stored) if stored else None
+
+    html = get_snapshot_html(db, snapshot_id)
+    if html is None:
+        return None
+    return {"role": "html", "media_type": "text/html", "body": html}

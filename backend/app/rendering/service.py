@@ -153,14 +153,69 @@ def render_module(
     return render_static_module(db=db, module=module, manifest=manifest, channel=channel, mode=mode), None
 
 
-def render_cms_module(
+def render_variant(
+    db: Session,
+    variant_id: int,
+    recipient_id: int | None = None,
+    mode: RenderMode = "preview",
+):
+    """Render a variant through its channel's renderer — ADR-162 point 4.
+
+    `render_variant_html` remains the email path and its four callers are
+    untouched; this is the channel-neutral entry point, and for email it simply
+    wraps that. Two entry points rather than one is a transitional state, not a
+    design: point 3's artifact-set contract is what eventually collapses them,
+    and it is not built.
+
+    Raises ValueError for a channel with no renderer, rather than falling back
+    to email. A fallback would render a push variant as an HTML email and
+    deliver something nobody composed.
+    """
+    from app.campaigns.db_models import VariantDB
+    from app.rendering.renderers.registry import get_renderer
+
+    variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
+    if variant is None:
+        raise ValueError(f"variant {variant_id} does not exist")
+
+    renderer = get_renderer(variant.channel)
+    if renderer is None:
+        raise ValueError(
+            f"no renderer is registered for channel '{variant.channel}' — "
+            f"drop one into app/rendering/renderers/"
+        )
+
+    return renderer.render(
+        db=db, variant_id=variant_id, recipient_id=recipient_id, mode=mode
+    )
+
+
+def resolve_module_variables(
     db: Session,
     module: ModuleInstanceDB,
     manifest: ModuleManifest,
-    channel: str,
     recipient_id: int | None = None,
     mode: RenderMode = "preview",
-) -> tuple[str, DecisionResolutionDB | None]:
+) -> tuple[dict | None, dict | None, DecisionResolutionDB | None]:
+    """A module's declared variables, filled — decisions resolved, overrides
+    applied, content version pinned. **No formatting of any kind.**
+
+    Extracted from `render_cms_module` so the push renderer can share it, and
+    that sharing is the point rather than a convenience: ADR-162 point 1's
+    claim that moving fields into modules means "**overrides work unchanged**"
+    is only true if every channel resolves its fields through the same path.
+    A second copy of this loop would be where a channel quietly stopped
+    honouring the override layer.
+
+    It also keeps ADR-162 point 2's line intact — "it formats, it never
+    decides". Everything decided happens here; a renderer receives values.
+
+    Returns `(variables, content, resolution)`. The resolved content comes back
+    alongside the variables because the caller may need the record it came from
+    — email stamps `data-content-id` on the wrapper so a rendered email can be
+    traced to its source. `(None, None, resolution)` means nothing resolved,
+    which ADR-086 says is a hidden slot rather than a placeholder.
+    """
     # An active content override (ADR-040/041) replaces individual fields of
     # the resolved content — a consistent headline across personalized picks,
     # a shorter copy for this send — and takes precedence until reset.
@@ -171,11 +226,7 @@ def render_cms_module(
     )
 
     if content is None:
-        # ADR-086: no content resolved — hide the slot rather than show a placeholder
-        return (
-            f"<!-- module {module.id} ({module.module_type}): no content resolved, slot hidden -->",
-            decision_resolution,
-        )
+        return None, None, decision_resolution
 
     field_overrides = (override.field_overrides if override else None) or {}
     variables: dict = {}
@@ -188,8 +239,33 @@ def render_cms_module(
         else:
             variables[var.name] = content.get(var.name, "")
 
+    return variables, content, decision_resolution
+
+
+def render_cms_module(
+    db: Session,
+    module: ModuleInstanceDB,
+    manifest: ModuleManifest,
+    channel: str,
+    recipient_id: int | None = None,
+    mode: RenderMode = "preview",
+) -> tuple[str, DecisionResolutionDB | None]:
+    variables, content, decision_resolution = resolve_module_variables(
+        db=db, module=module, manifest=manifest, recipient_id=recipient_id, mode=mode
+    )
+
+    if variables is None:
+        # ADR-086: no content resolved — hide the slot rather than show a placeholder
+        return (
+            f"<!-- module {module.id} ({module.module_type}): no content resolved, slot hidden -->",
+            decision_resolution,
+        )
+
     if variables.get(_RICH_TEXT_FIELD):
-        variables[_RICH_TEXT_FIELD] = render_rich_text(variables[_RICH_TEXT_FIELD])
+        variables = {
+            **variables,
+            _RICH_TEXT_FIELD: render_rich_text(variables[_RICH_TEXT_FIELD]),
+        }
 
     html_source = get_template_html(channel, module.module_type)
     if html_source is None:
