@@ -1025,3 +1025,122 @@ class TestPushContentIsAuthoredNotDerived:
             db.query(ContentRecordDB).filter(ContentRecordDB.id == record.id).delete()
             db.commit()
             self._cleanup(db, user)
+
+
+class TestTheContentOverviewShowsEveryChannelsCopy:
+    """Reported by the user 2026-09-17: push copy could be written and then
+    became invisible — the read view listed only the email fields, so the only
+    way to see what a record said on push was to open the editor.
+
+    Tabs rather than one stacked list, deliberately. ADR-160 point 3 keeps the
+    two sets **separately authored**, and stacking them invites reading the
+    email text as a fallback for a missing push title — which is the derivation
+    that ADR rejects, arriving through the UI instead of through the renderer.
+    """
+
+    def _admin(self, db):
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        user = UserDB(email=f"{PREFIX}-{uuid.uuid4().hex[:8]}@example.invalid", is_active=True)
+        db.add(user); db.commit(); db.refresh(user)
+        role = db.query(RoleDB).filter(RoleDB.key == ADMIN).first()
+        db.add(RoleAssignmentDB(user_id=user.id, role_id=role.id,
+                                brand_id=auth.ensure_default_brand(db).id))
+        db.commit()
+        token = auth.create_session(db, user)
+        client = TestClient(app, follow_redirects=False, raise_server_exceptions=False)
+        client.cookies.set(auth.SESSION_COOKIE, token)
+        return client, token, user
+
+    def _cleanup(self, db, user, record_ids=()):
+        from app.content.db_models import ContentRecordDB
+
+        if record_ids:
+            db.query(ContentRecordDB).filter(
+                ContentRecordDB.id.in_(record_ids)).delete(synchronize_session=False)
+        db.query(SessionDB).filter(SessionDB.user_id == user.id).delete()
+        db.query(RoleAssignmentDB).filter(RoleAssignmentDB.user_id == user.id).delete()
+        db.query(AuditEventDB).filter(AuditEventDB.actor_id == user.id).delete(
+            synchronize_session=False)
+        db.query(UserDB).filter(UserDB.id == user.id).delete()
+        db.commit()
+
+    def test_stored_push_copy_is_visible_without_opening_the_editor(
+        self, db, monkeypatch
+    ):
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        from app.content.service import create_content
+
+        client, token, user = self._admin(db)
+        record = create_content(
+            db, title=_name("readable"), brand_id=auth.ensure_default_brand(db).id,
+            content={"headline_medium": "Praia da Marinha", "body_medium": "Go early.",
+                     "push_title": "Beat the crowds", "push_body": "Arrive before 09:00."})
+        try:
+            page = client.get(f"/ui/content/{record.id}")
+            assert page.status_code == 200
+
+            # **Scoped to the read pane, and that is the whole test.** Asserting
+            # the string appears anywhere on the page passes even with the read
+            # tabs deleted, because the edit form carries the same value in an
+            # `<input value="...">` — which is precisely the state the user
+            # reported: stored, and visible only to someone who opens the
+            # editor. A mutation proved the unscoped version useless.
+            assert 'id="read-push"' in page.text, "the push read pane is missing"
+            read_pane = page.text.split('id="read-push"')[1].split("</div>")[0]
+            assert "Beat the crowds" in read_pane, (
+                "the record's push copy is stored but does not appear in the "
+                "overview — it can only be seen by opening the edit form"
+            )
+            assert 'data-bs-target="#read-push"' in page.text
+        finally:
+            self._cleanup(db, user, [record.id])
+
+    def test_a_record_with_no_push_copy_says_so_rather_than_showing_the_email_text(
+        self, db, monkeypatch
+    ):
+        """The failure mode worth preventing: a blank push tab that quietly
+        borrows the headline would be the derivation ADR-160 point 3 forbids,
+        implemented in a template."""
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        from app.content.service import create_content
+
+        client, token, user = self._admin(db)
+        record = create_content(
+            db, title=_name("emailonly"), brand_id=auth.ensure_default_brand(db).id,
+            content={"headline_medium": "A headline for an inbox",
+                     "body_medium": "Long-form body copy."})
+        try:
+            page = client.get(f"/ui/content/{record.id}")
+            push_tab = page.text.split('id="read-push"')[1].split("</div>")[0]
+            assert "A headline for an inbox" not in push_tab, (
+                "the push tab showed the email headline — a notification is not "
+                "a shortened email, and presenting one as the other is exactly "
+                "what ADR-160 point 3 refuses"
+            )
+            assert "Not push notification-ready" in page.text
+        finally:
+            self._cleanup(db, user, [record.id])
+
+    def test_a_single_channel_deployment_sees_no_tabs_at_all(self, db, monkeypatch):
+        """Same promise ADR-150 point 4 makes about the brand switcher: a
+        company using one channel never has to think about the switcher."""
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        from app.content.service import create_content
+
+        client, token, user = self._admin(db)
+        record = create_content(
+            db, title=_name("single"), brand_id=auth.ensure_default_brand(db).id,
+            content={"headline_medium": "Just email", "body_medium": "."})
+        set_channel_available(db, "push", False)
+        try:
+            page = client.get(f"/ui/content/{record.id}")
+            assert 'data-bs-target="#read-push"' not in page.text
+            assert "nav-tabs" not in page.text, (
+                "a one-channel deployment was shown a channel switcher"
+            )
+            assert "Just email" in page.text, "the email copy must still render"
+        finally:
+            self._cleanup(db, user, [record.id])

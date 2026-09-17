@@ -66,15 +66,84 @@
         <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#form-edit">Edit</button>
     </div>
     <div class="card-body">
+        {# Record-level first: these belong to the record, not to any channel.
+           The catalogue label and blurb are the same whoever is reading. #}
         <table class="table table-sm mb-0">
             <tr><th style="width:160px">ID</th><td>{{ record.id }}</td></tr>
             <tr><th>Title</th><td>{{ record.title }}</td></tr>
             <tr><th>Description</th><td>{{ record.description or "—" }}</td></tr>
-            <tr><th>Headline <span class="text-muted">(headline_medium)</span></th><td>{{ record.content.headline_medium }}</td></tr>
-            <tr><th>Body <span class="text-muted">(body_medium)</span></th><td>{{ record.content.body_medium }}</td></tr>
-            <tr><th>Button</th><td>{{ record.content.button_label or "—" }} → {{ record.content.button_url or "—" }}</td></tr>
-            <tr><th>Image</th><td>{{ record.content.image_url or "—" }}</td></tr>
         </table>
+
+        {# Then the channel copy, one tab per channel. ADR-160 point 3 keeps
+           these sets **separate and independently authored**, so showing them
+           stacked invites reading one as a fallback for the other — which is
+           the derivation the ADR rejects, arriving through the UI instead of
+           the renderer. Tabs make "these are different copy" the default
+           reading.
+
+           No tabs at all when email is the only channel: a deployment using
+           one channel should never see a switcher, the same promise ADR-150
+           point 4 makes about brands. #}
+        {% if channel_sections %}
+        <ul class="nav nav-tabs mt-3" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" data-bs-toggle="tab"
+                        data-bs-target="#read-email" type="button" role="tab">Email</button>
+            </li>
+            {% for section in channel_sections %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" data-bs-toggle="tab"
+                        data-bs-target="#read-{{ section.channel }}" type="button" role="tab">
+                    {{ section.label }}
+                    {% set required = section.fields | selectattr("required") | map(attribute="name") | list %}
+                    {% set missing = required | reject("in", record.content | list) | list %}
+                    {% if not missing %}
+                    <span class="badge bg-success-subtle text-success-emphasis border ms-1">ready</span>
+                    {% endif %}
+                </button>
+            </li>
+            {% endfor %}
+        </ul>
+        <div class="tab-content border border-top-0 p-3">
+            <div class="tab-pane fade show active" id="read-email" role="tabpanel">
+        {% endif %}
+
+                <table class="table table-sm mb-0">
+                    <tr><th style="width:160px">Headline <span class="text-muted">(headline_medium)</span></th><td>{{ record.content.headline_medium }}</td></tr>
+                    <tr><th>Body <span class="text-muted">(body_medium)</span></th><td>{{ record.content.body_medium }}</td></tr>
+                    <tr><th>Button</th><td>{{ record.content.button_label or "—" }} → {{ record.content.button_url or "—" }}</td></tr>
+                    <tr><th>Image</th><td>{{ record.content.image_url or "—" }}</td></tr>
+                </table>
+
+        {% if channel_sections %}
+            </div>
+            {% for section in channel_sections %}
+            <div class="tab-pane fade" id="read-{{ section.channel }}" role="tabpanel">
+                <table class="table table-sm mb-0">
+                    {% for field in section.fields %}
+                    <tr>
+                        <th style="width:160px">
+                            {{ field.label }}
+                            <span class="text-muted">({{ field.name }})</span>
+                        </th>
+                        <td>{{ record.content.get(field.name) or "—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                {% set required = section.fields | selectattr("required") | map(attribute="name") | list %}
+                {% set missing = required | reject("in", record.content | list) | list %}
+                {% if missing %}
+                <p class="small text-muted mb-0 mt-2">
+                    Not {{ section.label | lower }}-ready — nothing has been written
+                    for this channel, so a decision slot filtering on it will not
+                    select this record. Channel copy is written, never derived from
+                    the email text.
+                </p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
     <div class="collapse" id="form-edit">
         <div class="card-body border-top">
