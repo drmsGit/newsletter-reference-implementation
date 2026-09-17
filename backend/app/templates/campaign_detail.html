@@ -73,10 +73,20 @@
                sequence, so "Variant 981" reads as *the 981st variant* on a
                system with a handful of campaigns, and it climbs every time
                anybody tests anything. The campaign id is the number a manager
-               actually uses — it is in the URL and in a support conversation —
-               and a variant is a variant *of* that email, so this is what the
-               label was trying to say. Reported by the user, 2026-09-16. #}
-            <strong>Email {{ campaign.id }} — {{ variant.name }}</strong>
+               actually uses — it is in the URL and in a support conversation.
+
+               **Says "Campaign", not "Email".** This first read "Email {id}",
+               which asserts that a campaign *is* an email — and ADR-160–165's
+               channel work is precisely what stops that being true: one
+               campaign will carry more than one channel, so a campaign id is
+               not an email id. Corrected by the user on 2026-09-17, the day
+               after the label was changed.
+
+               What this label should ultimately be is a UX question, parked
+               for the frontend design pass — see the identifier item in
+               `docs/backlog.md`. This is the accurate noun in the meantime,
+               not an answer to it. #}
+            <strong>Campaign {{ campaign.id }} — {{ variant.name }}</strong>
             <div class="small mt-1">
                 <span class="text-muted">Subject:</span>
                 {% if variant.subject %}{{ variant.subject }}{% else %}<em class="text-danger">not set — send would fall back to the send-instance label</em>{% endif %}
