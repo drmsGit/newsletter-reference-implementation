@@ -95,11 +95,6 @@
                 <button class="nav-link" data-bs-toggle="tab"
                         data-bs-target="#read-{{ section.channel }}" type="button" role="tab">
                     {{ section.label }}
-                    {% set required = section.fields | selectattr("required") | map(attribute="name") | list %}
-                    {% set missing = required | reject("in", record.content | list) | list %}
-                    {% if not missing %}
-                    <span class="badge bg-success-subtle text-success-emphasis border ms-1">ready</span>
-                    {% endif %}
                 </button>
             </li>
             {% endfor %}
@@ -130,14 +125,26 @@
                     </tr>
                     {% endfor %}
                 </table>
-                {% set required = section.fields | selectattr("required") | map(attribute="name") | list %}
-                {% set missing = required | reject("in", record.content | list) | list %}
-                {% if missing %}
+                {# **No readiness verdict here, deliberately.** An earlier
+                   version showed "push-ready" / "not push-ready", and it was
+                   wrong twice over. Whether a record may be used is gated by
+                   the manager activating it and freezing a version — a badge
+                   claiming readiness beside a draft asserts a status nobody
+                   granted. And per-record readiness is not even well defined:
+                   `required` belongs to a MODULE's manifest variable, not to
+                   the record, so a record with no headline cannot fill
+                   `single_stack` and fills `cta` perfectly well. "Ready" has
+                   no meaning until a module is named.
+
+                   ADR-161 point 7's rider does define catalogue readiness as
+                   "channel fields not empty" — but that is a candidate filter
+                   for decision slots, which is not built. It belongs on the
+                   slot, where a module is in scope, not on the record. #}
+                {% if not section.fields | map(attribute="name")
+                       | select("in", record.content | list) | list %}
                 <p class="small text-muted mb-0 mt-2">
-                    Not {{ section.label | lower }}-ready — nothing has been written
-                    for this channel, so a decision slot filtering on it will not
-                    select this record. Channel copy is written, never derived from
-                    the email text.
+                    Nothing written for this channel yet. Channel copy is
+                    authored, never derived from the email text.
                 </p>
                 {% endif %}
             </div>
@@ -215,24 +222,16 @@
                     </div>
                     {% endfor %}
                     <div class="col-12">
-                        {# ADR-161 point 7's rider: catalogue readiness is
-                           "push fields not empty" — not a length check and not
-                           a provider check, so the catalogue stays independent
-                           of provider configuration. #}
-                        {% set ready = section.fields | selectattr("required")
-                                       | map(attribute="name")
-                                       | map("string") | list %}
-                        {% set missing = ready | reject("in", record.content | list) | list %}
-                        {% if missing %}
+                        {# A hint, not a verdict. Which fields a send actually
+                           needs depends on the module it is composed into, so
+                           the honest statement is about what filling them in
+                           enables, not about whether this record is "ready". #}
                         <div class="small text-muted">
-                            Not {{ section.label | lower }}-ready — a decision slot
-                            filtering on this channel will not select this record.
+                            Filling these in lets this record be used on
+                            {{ section.label | lower }}. An empty field simply
+                            renders empty — which fields a module needs is the
+                            module's business, not the record's.
                         </div>
-                        {% else %}
-                        <div class="small text-success">
-                            {{ section.label }}-ready.
-                        </div>
-                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}

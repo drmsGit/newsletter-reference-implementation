@@ -681,7 +681,17 @@ def _channel_authoring_sections(db: Session) -> list[dict]:
     **Channel fields are separate and required, never derived from the email
     ones** — ADR-160 point 3. Deriving a 40-character push title from a
     60-character headline at render time is the rendering-time transformation
-    point 1 rejects, so "push-ready" means somebody wrote a push title.
+    point 1 rejects: a notification is not a shortened email.
+
+    **This returns fields, never a readiness verdict, and that is deliberate.**
+    Whether a record may be used at all is gated by the manager activating it
+    and freezing a version — a "ready" badge beside a draft asserts a status
+    nobody granted. And `required` belongs to a *module's* manifest variable,
+    not to the record: a record with no headline cannot fill `single_stack`
+    and fills `cta` perfectly well, so readiness is meaningless until a module
+    is named. ADR-161 point 7's catalogue-readiness rider is a candidate filter
+    for decision slots, where a module IS in scope. It is not a record badge,
+    and an earlier version of this page made it one.
 
     Email is deliberately absent: its fields are the form's hand-written
     section, with labels and placeholders a manifest does not carry. That

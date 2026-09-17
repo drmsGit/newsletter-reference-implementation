@@ -1114,13 +1114,23 @@ class TestTheContentOverviewShowsEveryChannelsCopy:
                      "body_medium": "Long-form body copy."})
         try:
             page = client.get(f"/ui/content/{record.id}")
-            push_tab = page.text.split('id="read-push"')[1].split("</div>")[0]
+            read_pane = page.text.split('id="read-push"')[1].split("</div>")[0]
+            push_tab = read_pane
             assert "A headline for an inbox" not in push_tab, (
                 "the push tab showed the email headline — a notification is not "
                 "a shortened email, and presenting one as the other is exactly "
                 "what ADR-160 point 3 refuses"
             )
-            assert "Not push notification-ready" in page.text
+            # A neutral statement of fact, NOT a readiness verdict. An earlier
+            # version said "not push-ready", which asserts a status the manager
+            # alone grants by activating the record and freezing a version —
+            # and which is undefined per-record anyway, since `required` lives
+            # on a module's manifest variable rather than on the record.
+            assert "Nothing written for this channel yet" in page.text
+            assert "ready" not in read_pane.lower(), (
+                "a readiness verdict came back — usability is gated by "
+                "activation and a frozen version, not by which fields are full"
+            )
         finally:
             self._cleanup(db, user, [record.id])
 
@@ -1142,5 +1152,107 @@ class TestTheContentOverviewShowsEveryChannelsCopy:
                 "a one-channel deployment was shown a channel switcher"
             )
             assert "Just email" in page.text, "the email copy must still render"
+        finally:
+            self._cleanup(db, user, [record.id])
+
+
+class TestNoReadinessVerdictIsClaimed:
+    """Corrected 2026-09-17 after the user pushed back on a "ready" badge.
+
+    Three reasons it had to go, and the third is the one that kills the concept
+    rather than the wording:
+
+      1. **Inconsistent** — push carried a badge and email did not.
+      2. **It asserts a status nobody granted.** Whether a record may be used
+         is gated by the manager activating it and freezing a version. "Ready"
+         beside an inactive draft is simply false.
+      3. **Per-record readiness is undefined.** `required` belongs to a
+         MODULE's manifest variable. A record with no `headline_medium` cannot
+         fill `single_stack` and fills `cta` perfectly well — so the question
+         has no answer until a module is named.
+
+    ADR-161 point 7's catalogue-readiness rider is not contradicted by this: it
+    describes a candidate filter for decision slots, where a module is in
+    scope. It was turned into a record badge here, which is a different claim.
+    """
+
+    def _admin(self, db):
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        user = UserDB(email=f"{PREFIX}-{uuid.uuid4().hex[:8]}@example.invalid", is_active=True)
+        db.add(user); db.commit(); db.refresh(user)
+        role = db.query(RoleDB).filter(RoleDB.key == ADMIN).first()
+        db.add(RoleAssignmentDB(user_id=user.id, role_id=role.id,
+                                brand_id=auth.ensure_default_brand(db).id))
+        db.commit()
+        token = auth.create_session(db, user)
+        client = TestClient(app, follow_redirects=False, raise_server_exceptions=False)
+        client.cookies.set(auth.SESSION_COOKIE, token)
+        return client, token, user
+
+    def _cleanup(self, db, user, record_ids=()):
+        from app.content.db_models import ContentRecordDB
+
+        if record_ids:
+            db.query(ContentRecordDB).filter(
+                ContentRecordDB.id.in_(record_ids)).delete(synchronize_session=False)
+        db.query(SessionDB).filter(SessionDB.user_id == user.id).delete()
+        db.query(RoleAssignmentDB).filter(RoleAssignmentDB.user_id == user.id).delete()
+        db.query(AuditEventDB).filter(AuditEventDB.actor_id == user.id).delete(
+            synchronize_session=False)
+        db.query(UserDB).filter(UserDB.id == user.id).delete()
+        db.commit()
+
+    def test_a_fully_filled_record_is_not_called_ready(self, db, monkeypatch):
+        """The case that prompted the correction: every push field written, on
+        a record the manager has not published a version of."""
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        from app.content.db_models import ContentVersionDB
+        from app.content.service import create_content
+
+        client, token, user = self._admin(db)
+        record = create_content(
+            db, title=_name("complete"), brand_id=auth.ensure_default_brand(db).id,
+            content={"headline_medium": "Full", "body_medium": "Everything filled.",
+                     "push_title": "Full", "push_body": "Everything filled.",
+                     "push_image_url": "https://x.example/i.jpg",
+                     "push_link": "https://x.example"})
+        try:
+            assert db.query(ContentVersionDB).filter(
+                ContentVersionDB.content_record_id == record.id).count() == 0, (
+                "fixture assumption: this record has no frozen version, so any "
+                "claim that it is usable is false"
+            )
+            page = client.get(f"/ui/content/{record.id}")
+            assert page.status_code == 200
+            assert ">ready<" not in page.text, (
+                "a record with no frozen version was labelled ready — usability "
+                "is granted by activating and publishing, not by filling fields"
+            )
+            assert "-ready" not in page.text
+        finally:
+            self._cleanup(db, user, [record.id])
+
+    def test_a_partially_filled_record_is_not_called_unready_either(
+        self, db, monkeypatch
+    ):
+        """The user's layout point: half the email fields is perfectly workable
+        for a module that does not declare the rest, so calling the record
+        unready would be wrong in the other direction."""
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        from app.content.service import create_content
+
+        client, token, user = self._admin(db)
+        record = create_content(
+            db, title=_name("partial"), brand_id=auth.ensure_default_brand(db).id,
+            content={"headline_medium": "Half", "push_title": "Half"})
+        try:
+            page = client.get(f"/ui/content/{record.id}")
+            assert "-ready" not in page.text, (
+                "a record missing one optional field was declared unready, but "
+                "which fields matter is the module's business, not the record's"
+            )
         finally:
             self._cleanup(db, user, [record.id])
