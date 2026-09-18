@@ -46,21 +46,85 @@
                 <td>{{ recipient.status }}</td>
             </tr>
 
-            <tr>
-                <th>Consent</th>
-                <td>
-                    {% if recipient.consent_status == "opted_in" %}
-                    <span class="badge bg-success">opted-in</span>
-                    {% elif recipient.consent_status == "opted_out" %}
-                    <span class="badge bg-danger">opted-out</span>
-                    {% else %}
-                    <span class="badge bg-secondary">{{ recipient.consent_status }}</span>
-                    {% endif %}
-                    <small class="text-muted d-block mt-1">CRM-sourced. Only opted-in recipients resolve into an audience.</small>
-                </td>
-            </tr>
-
         </table>
+
+{# ---- consent: a grid, not a status ---------------------------------------
+   Consent is keyed (recipient, brand, channel, purpose) and stored as
+   append-only events (ADR-163 point 1). A single badge was one cell of that
+   grid — the (email, marketing) one — presented as though it were the whole
+   answer, which is what made the read side email-shaped while the write side
+   had been per-channel since the addendum.
+
+   Cells with no event are shown rather than omitted: the absence of a decision
+   is not consent, so "never asked" and "refused" are both non-consenting and
+   must still be told apart by anyone looking. -->
+#}
+        <h5 class="mt-4">Consent</h5>
+        <p class="text-muted small">
+            Consent is to a <strong>sender</strong>, not to the platform — this
+            grid is for the brand you are working in. Only a grant lets this
+            recipient resolve into an audience on that channel.
+        </p>
+        <table class="table table-sm">
+            <thead>
+                <tr><th style="width:160px">Channel</th><th>Purpose</th><th>State</th><th>Source</th><th>Recorded</th></tr>
+            </thead>
+            <tbody>
+                {% for cell in consent_grid %}
+                <tr>
+                    <td>{{ cell.channel }}</td>
+                    <td>{{ cell.purpose }}</td>
+                    <td>
+                        {% if cell.status == "opted_in" %}
+                        <span class="badge bg-success">opted-in</span>
+                        {% elif cell.status == "opted_out" %}
+                        <span class="badge bg-danger">opted-out</span>
+                        {% elif cell.status %}
+                        <span class="badge bg-secondary">{{ cell.status }}</span>
+                        {% else %}
+                        {# Not the same as opted-out, and the difference is
+                           actionable: nobody has asked. It is still not a
+                           grant, so the send gate excludes either way. #}
+                        <span class="badge bg-light text-dark border">never asked</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-muted small">{{ cell.source or "—" }}</td>
+                    <td class="text-muted small">
+                        {{ cell.recorded_at.strftime("%Y-%m-%d %H:%M") if cell.recorded_at else "—" }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <h5 class="mt-4">Consent history</h5>
+        <p class="text-muted small">
+            Append-only, across every brand — a status is only ever the newest
+            row of a cell. "Opted out" alone does not say whether they refused
+            at signup or complained after a send; this does.
+        </p>
+        {% if consent_history %}
+        <table class="table table-sm table-striped">
+            <thead>
+                <tr><th>When</th><th>Brand</th><th>Channel</th><th>Purpose</th><th>State</th><th>Source</th><th>Note</th></tr>
+            </thead>
+            <tbody>
+                {% for event in consent_history %}
+                <tr>
+                    <td class="text-muted small">{{ event.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+                    <td>{{ brand_names.get(event.brand_id, event.brand_id) }}</td>
+                    <td>{{ event.channel }}</td>
+                    <td>{{ event.purpose }}</td>
+                    <td>{{ event.status }}</td>
+                    <td class="text-muted small">{{ event.source }}</td>
+                    <td class="text-muted small">{{ event.note or "" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted">No consent event has ever been recorded for this recipient.</p>
+        {% endif %}
 
     </div>
 </div>

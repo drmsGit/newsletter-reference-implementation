@@ -180,6 +180,96 @@ def latest_consent_statuses(
     return latest
 
 
+def consent_history(
+    db: Session,
+    recipient_id: int,
+    brand_id: int | None = None,
+    limit: int = 50,
+) -> list[ConsentEventDB]:
+    """Every consent event for this recipient, newest first.
+
+    Consent is append-only (point 1), so the log *is* the record — a status is
+    only ever the newest row of a cell. Showing it is not a nicety: it is the
+    difference between "this person is opted out" and "this person opted in via
+    the signup form, then the provider reported a complaint" — and only the
+    second tells an operator what happened.
+
+    `brand_id=None` spans brands, which is the honest default for a recipient
+    page: consent is to a sender (addendum 2026-09-15), so a person may be
+    opted in to one brand and out of another, and hiding the other brand's
+    events would present a partial record as a whole one.
+    """
+    q = db.query(ConsentEventDB).filter(ConsentEventDB.recipient_id == recipient_id)
+    if brand_id is not None:
+        q = q.filter(ConsentEventDB.brand_id == brand_id)
+    return q.order_by(
+        ConsentEventDB.created_at.desc(), ConsentEventDB.id.desc()
+    ).limit(limit).all()
+
+
+def consent_grid(
+    db: Session,
+    recipient_id: int,
+    brand_id: int,
+    channels: list[str],
+) -> list[dict]:
+    """The (channel × purpose) state for one recipient and one brand.
+
+    One entry per cell, each carrying the latest event or None. **Cells with no
+    event are included deliberately**: the absence of a decision is not
+    consent (point 1, and the status column's own comment says so), so a
+    channel nobody has ever been asked about is *not consenting* and must read
+    differently from one that was asked and refused. Omitting empty cells would
+    make an unreachable recipient look fine.
+
+    Purposes are derived from the events that exist, unioned with the default,
+    so a second purpose shows up here without this function changing.
+
+    **No global opt-in sits above this grid, and that is a decision.** A
+    "consented to marketing everywhere" flag implying the per-channel cells was
+    raised on 2026-09-18 and rejected by the user on the ground that settles
+    it: *it only makes sense if the CRM actually has one.* Consent is owned by
+    the CRM ([[ADR-120]]), so a global grant we synthesise is a consent record
+    nobody gave — the same defect as the email-channel default this codebase
+    just removed from `create_recipient`, arriving one layer up. If a source
+    system does model a global opt-in, it syncs as cells like anything else.
+    """
+    events = (
+        db.query(ConsentEventDB)
+        .filter(
+            ConsentEventDB.recipient_id == recipient_id,
+            ConsentEventDB.brand_id == brand_id,
+        )
+        .order_by(ConsentEventDB.created_at.desc(), ConsentEventDB.id.desc())
+        .all()
+    )
+
+    latest: dict[tuple[str, str], ConsentEventDB] = {}
+    for event in events:
+        latest.setdefault((event.channel, event.purpose), event)
+
+    purposes = sorted({p for _, p in latest} | {DEFAULT_PURPOSE})
+    # Channels the caller asked about, plus any that carry events — a
+    # deployment that switched a channel off still holds the consent it
+    # gathered, and dropping it from the view would present a partial record.
+    known = list(dict.fromkeys(list(channels) + sorted({c for c, _ in latest})))
+
+    grid = []
+    for channel in known:
+        for purpose in purposes:
+            event = latest.get((channel, purpose))
+            grid.append({
+                "channel": channel,
+                "purpose": purpose,
+                "status": event.status if event else None,
+                "consenting": bool(event and event.status == CONSENTING_STATUS),
+                "source": event.source if event else None,
+                "recorded_at": event.created_at if event else None,
+                "note": event.note if event else None,
+            })
+    return grid
+
+
 def is_consenting(
     db: Session,
     recipient_id: int,

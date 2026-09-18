@@ -1593,3 +1593,152 @@ class TestADeviceContactCanBeSyncedIn:
         assert channels == ["email", "push"]
         assert latest_consent_status(db, matches[0].id, brand.id, channel="email") == "opted_in"
         assert latest_consent_status(db, matches[0].id, brand.id, channel="push") == "opted_in"
+
+
+class TestTheRecipientPageShowsEveryChannelsConsent:
+    """Asked for by the user 2026-09-18, and the mirror of the sync-path fix:
+    writes went per-channel with ADR-163's addendum, reads did not. The page
+    showed one badge — the (email, marketing) cell — presented as though it
+    were the whole answer.
+
+    The test worth reading is `test_a_channel_never_asked_about_is_not_shown_as
+    _opted_out`. Consent is fail-closed on absence, so "never asked" and
+    "refused" behave identically at the send gate — which is exactly why an
+    operator has to be able to tell them apart, since only one of them is
+    fixable by asking.
+    """
+
+    def _admin_client(self, db):
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        user = UserDB(email=f"{PREFIX}-{uuid.uuid4().hex[:8]}@example.invalid", is_active=True)
+        db.add(user); db.commit(); db.refresh(user)
+        role = db.query(RoleDB).filter(RoleDB.key == ADMIN).first()
+        db.add(RoleAssignmentDB(user_id=user.id, role_id=role.id,
+                                brand_id=auth.ensure_default_brand(db).id))
+        db.commit()
+        token = auth.create_session(db, user)
+        client = TestClient(app, follow_redirects=False, raise_server_exceptions=False)
+        client.cookies.set(auth.SESSION_COOKIE, token)
+        return client, user
+
+    def _cleanup(self, db, user, recipient=None):
+        from app.recipients.db_models import AddressabilityDB, ConsentEventDB, RecipientDB
+
+        if recipient is not None:
+            db.query(ConsentEventDB).filter(
+                ConsentEventDB.recipient_id == recipient.id).delete(synchronize_session=False)
+            db.query(AddressabilityDB).filter(
+                AddressabilityDB.recipient_id == recipient.id).delete(synchronize_session=False)
+            db.query(RecipientDB).filter(RecipientDB.id == recipient.id).delete()
+        db.query(SessionDB).filter(SessionDB.user_id == user.id).delete()
+        db.query(RoleAssignmentDB).filter(RoleAssignmentDB.user_id == user.id).delete()
+        db.query(AuditEventDB).filter(AuditEventDB.actor_id == user.id).delete(
+            synchronize_session=False)
+        db.query(UserDB).filter(UserDB.id == user.id).delete()
+        db.commit()
+
+    def _recipient(self, db):
+        from app.recipients.db_models import RecipientDB
+
+        recipient = RecipientDB(external_id=_name("r"), status="active")
+        db.add(recipient); db.commit(); db.refresh(recipient)
+        return recipient
+
+    def test_each_channels_consent_is_shown_separately(self, db, monkeypatch):
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        from app.recipients.consent import record_consent
+
+        brand = auth.ensure_default_brand(db)
+        recipient = self._recipient(db)
+        record_consent(db, recipient.id, "opted_in", brand.id, channel="email", source="crm")
+        record_consent(db, recipient.id, "opted_out", brand.id, channel="push", source="form")
+        client, user = self._admin_client(db)
+        try:
+            page = client.get(f"/ui/recipients/{recipient.id}")
+            assert page.status_code == 200
+            rows = page.text.split("<tbody>")[1].split("</tbody>")[0]
+            assert "email" in rows and "push" in rows
+            assert "opted-in" in rows and "opted-out" in rows, (
+                "one badge cannot express a recipient who accepted email and "
+                "refused push, which is the ordinary case once a second "
+                "channel exists"
+            )
+        finally:
+            self._cleanup(db, user, recipient)
+
+    def test_a_channel_never_asked_about_is_not_shown_as_opted_out(
+        self, db, monkeypatch
+    ):
+        """Both are non-consenting at the gate. Only one of them is a question
+        nobody has put to the person yet, and conflating them would tell an
+        operator a refusal happened that never did."""
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        from app.recipients.consent import record_consent
+
+        brand = auth.ensure_default_brand(db)
+        recipient = self._recipient(db)
+        record_consent(db, recipient.id, "opted_in", brand.id, channel="email", source="crm")
+        client, user = self._admin_client(db)
+        try:
+            page = client.get(f"/ui/recipients/{recipient.id}")
+            assert "never asked" in page.text, (
+                "a channel with no consent event was not distinguished from a "
+                "refusal — the absence of a decision is not a decision"
+            )
+        finally:
+            self._cleanup(db, user, recipient)
+
+    def test_the_append_only_history_is_visible(self, db, monkeypatch):
+        """"Opted out" does not say whether they refused at signup or
+        complained after a send. The log does, and it is the record — a status
+        is only ever its newest row."""
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        from app.recipients.consent import record_consent
+
+        brand = auth.ensure_default_brand(db)
+        recipient = self._recipient(db)
+        record_consent(db, recipient.id, "opted_in", brand.id,
+                       channel="email", source="form", note="signup form")
+        record_consent(db, recipient.id, "opted_out", brand.id,
+                       channel="email", source="provider", note="complaint reported")
+        client, user = self._admin_client(db)
+        try:
+            page = client.get(f"/ui/recipients/{recipient.id}")
+            assert "complaint reported" in page.text and "signup form" in page.text, (
+                "the earlier event vanished — showing only the latest turns an "
+                "append-only record into a mutable field"
+            )
+        finally:
+            self._cleanup(db, user, recipient)
+
+    def test_the_grid_is_scoped_to_the_working_brand(self, db, monkeypatch):
+        """Consent is to a sender (ADR-163 addendum). A grant to brand B must
+        not read as a grant on brand A's page."""
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        from app.recipients.consent import consent_grid, record_consent
+
+        from app.auth.db_models import BrandDB
+
+        brand = auth.ensure_default_brand(db)
+        other = BrandDB(key=_name("brand"), name="Other sender")
+        db.add(other); db.commit(); db.refresh(other)
+        recipient = self._recipient(db)
+        record_consent(db, recipient.id, "opted_in", other.id, channel="email", source="crm")
+        try:
+            grid = consent_grid(db, recipient.id, brand.id, ["email", "push"])
+            assert all(cell["status"] is None for cell in grid), (
+                "a grant given to another brand showed up on this brand's grid"
+            )
+            assert any(c["consenting"] for c in consent_grid(
+                db, recipient.id, other.id, ["email"]))
+        finally:
+            from app.recipients.db_models import ConsentEventDB, RecipientDB
+
+            db.query(ConsentEventDB).filter(
+                ConsentEventDB.recipient_id == recipient.id).delete(synchronize_session=False)
+            db.query(RecipientDB).filter(RecipientDB.id == recipient.id).delete()
+            db.query(BrandDB).filter(BrandDB.id == other.id).delete()
+            db.commit()

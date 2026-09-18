@@ -22,7 +22,7 @@ from app.channels.registry import get_channel, max_modules_for
 from app.settings.service import available_channels, channel_available
 from app.audit import service as audit
 from app.campaigns import duplication
-from app.recipients.consent import resolve_emails
+from app.recipients.consent import consent_grid, consent_history, resolve_emails
 from app.recipients.service import to_recipient, to_recipients
 
 import json
@@ -635,6 +635,21 @@ def recipient_detail(
             # Projected for the same reason as the list view — a raw ORM row
             # has no address attribute since ADR-163 point 2.
             "recipient": to_recipient(db, recipient, working_brand_id(request, db)),
+            # The (channel × purpose) grid for the working brand, and the
+            # append-only log across every brand. The flat `consent_status` on
+            # `recipient` is the (email, marketing) cell of this grid — it is
+            # kept because the API exposes it, but it is one cell of several
+            # and reading it as "the" consent status is what made the read side
+            # email-shaped.
+            "consent_grid": consent_grid(
+                db, recipient.id, working_brand_id(request, db),
+                [c.name for c in available_channels(db)],
+            ),
+            "consent_history": consent_history(db, recipient.id),
+            # Consent is to a sender, so the log names the brand each event
+            # belongs to — otherwise a recipient opted in to one brand and out
+            # of another reads as self-contradictory.
+            "brand_names": {b.id: b.name for b in list_brands(db)},
             "preferences": preference_rows,
             "decisions": decision_rows,
             "deliveries": delivery_rows,
