@@ -131,6 +131,7 @@ def duplicate_campaign(
     target_brand_id: int,
     name: str,
     content_mode: str,
+    variant_ids: list[int] | None = None,
 ) -> DuplicationReport:
     """Copy one campaign into `target_brand_id`, which may be its own brand.
 
@@ -149,6 +150,15 @@ def duplicate_campaign(
 
     Status is forced to draft throughout, for the same reason: a copy of a sent
     campaign has not been sent.
+
+    **`variant_ids` selects which variants come across**; None means all, which
+    keeps "duplicate this campaign" the default. It earned its place when
+    variants gained channels (ADR-160 point 4): "duplicate this campaign" then
+    started meaning "duplicate its email *and* its push", and giving another
+    brand only the push had no expression short of deleting the rest
+    afterwards. An empty selection is refused rather than silently treated as
+    all — a campaign must always have a variant, and a request that names none
+    is a mistake rather than a shorthand.
     """
     source = db.query(CampaignDB).filter(CampaignDB.id == campaign_id).first()
     if source is None:
@@ -183,12 +193,19 @@ def duplicate_campaign(
     db.add(campaign)
     db.flush()
 
-    variants = (
-        db.query(VariantDB)
-        .filter(VariantDB.campaign_id == source.id)
-        .order_by(VariantDB.id.asc())
-        .all()
-    )
+    query = db.query(VariantDB).filter(VariantDB.campaign_id == source.id)
+    if variant_ids is not None:
+        if not variant_ids:
+            raise DuplicationRefused(
+                "Choose at least one variant — a campaign cannot exist without one."
+            )
+        query = query.filter(VariantDB.id.in_(variant_ids))
+    variants = query.order_by(VariantDB.id.asc()).all()
+
+    if not variants:
+        raise DuplicationRefused(
+            "None of the chosen variants belong to this campaign."
+        )
 
     for source_variant in variants:
         variant = VariantDB(
@@ -395,19 +412,25 @@ def duplicate_content_record(
     return copy
 
 
-def summarise_source(db: Session, campaign_id: int) -> dict:
+def summarise_source(
+    db: Session, campaign_id: int, variant_ids: list[int] | None = None
+) -> dict:
     """What the copy will consist of — the asset list step 1 shows.
 
     Step 1 exists to make the size of the act visible before it is taken. A
     campaign with four variants and eleven modules is a different decision from
     a campaign with one of each, and nothing else on the page says so.
+
+    **Scoped to `variant_ids` when given**, because step 2 counts the content
+    records this copy will duplicate. Summarising the whole campaign while
+    copying two of its four variants would advertise records that never get
+    copied — a warning that is wrong in the direction of sounding worse,
+    which is still wrong.
     """
-    variants = (
-        db.query(VariantDB)
-        .filter(VariantDB.campaign_id == campaign_id)
-        .order_by(VariantDB.id.asc())
-        .all()
-    )
+    query = db.query(VariantDB).filter(VariantDB.campaign_id == campaign_id)
+    if variant_ids is not None:
+        query = query.filter(VariantDB.id.in_(variant_ids))
+    variants = query.order_by(VariantDB.id.asc()).all()
     rows = []
     content_ids: set[int] = set()
     for variant in variants:
@@ -424,7 +447,12 @@ def summarise_source(db: Session, campaign_id: int) -> dict:
         )
         content_ids.update(m.content_record_id for m in modules if m.content_record_id)
         rows.append({
+            "id": variant.id,
             "name": variant.name,
+            # Shown in the picker: since ADR-160 point 4 "the email one" and
+            # "the push one" is how a manager tells two variants apart, more
+            # reliably than by a name somebody typed.
+            "channel": variant.channel,
             "modules": len(modules),
             "decision_slots": slots,
         })

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request, Form
+from fastapi import APIRouter, Depends, Query, Request, Form
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -1211,6 +1211,7 @@ def campaign_duplicate_form(
     request: Request,
     target_brand_id: int | None = None,
     name: str = "",
+    variant_id: list[int] = Query(default=[]),
     error: str | None = None,
     db: Session = Depends(get_db),
 ):
@@ -1255,7 +1256,15 @@ def campaign_duplicate_form(
         {
             "title": f"Duplicate “{campaign.name}”",
             "campaign": campaign,
+            # The whole campaign's assets, for the picker in step 1.
             "summary": duplication.summarise_source(db, campaign.id),
+            # Only the chosen ones, for step 2's content count — summarising
+            # the whole campaign while copying two of its four variants would
+            # advertise records this copy never creates.
+            "selected_summary": duplication.summarise_source(
+                db, campaign.id, variant_id or None
+            ),
+            "selected_variant_ids": variant_id,
             "brands": targets,
             "target": target,
             "crossing": target is not None and target.id != source_brand_id,
@@ -1273,6 +1282,7 @@ def campaign_duplicate(
     name: str = Form(...),
     target_brand_id: int = Form(...),
     content_mode: str = Form(...),
+    variant_id: list[int] = Form(default=[]),
     db: Session = Depends(get_db),
 ):
     source_brand_id = working_brand_id(request, db)
@@ -1318,6 +1328,10 @@ def campaign_duplicate(
             target_brand_id=target.id,
             name=name,
             content_mode=content_mode,
+            # Empty means "all", which is what the wizard did before there was
+            # anything to choose — the service refuses an explicitly empty
+            # list, which is a different thing from not choosing.
+            variant_ids=variant_id or None,
         )
     except duplication.DuplicationRefused as error:
         return RedirectResponse(url=back + "&error=" + quote(str(error)), status_code=303)

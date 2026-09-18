@@ -885,3 +885,117 @@ class TestTheTargetBrandIsChecked:
             _purge_named(db, name)
             _purge_brand(db, target.id)
             self._cleanup_user(db, user)
+
+
+class TestChoosingWhichVariantsComeAcross:
+    """Asked for by the user 2026-09-17 after a cross-brand duplication brought
+    both an email and a push variant across.
+
+    It became worth having when variants gained channels (ADR-160 point 4):
+    before that, "duplicate this campaign" meant one kind of thing; after it,
+    "give brand A just the push" is a real operation with no expression short
+    of deleting the rest afterwards.
+    """
+
+    def _two_variant_campaign(self, db, source):
+        """The fixture campaign plus a push variant, so a selection is possible."""
+        from app.campaigns.service import create_variant_for_campaign
+
+        push = create_variant_for_campaign(
+            db, campaign_id=source["campaign"].id,
+            name=_name("push"), channel="push")
+        return source["variant"], push
+
+    def test_only_the_chosen_variants_are_copied(self, db, source, default_brand):
+        email_variant, push_variant = self._two_variant_campaign(db, source)
+
+        report = duplication.duplicate_campaign(
+            db,
+            campaign_id=source["campaign"].id,
+            target_brand_id=default_brand.id,
+            name=_name("copy"),
+            content_mode=duplication.KEEP,
+            variant_ids=[push_variant.id],
+        )
+        try:
+            copied = db.query(VariantDB).filter(
+                VariantDB.campaign_id == report.campaign_id).all()
+            assert [v.channel for v in copied] == ["push"], (
+                f"asked for the push variant and got {[v.channel for v in copied]}"
+            )
+            assert report.variants == 1
+        finally:
+            _purge_campaigns(db, [report.campaign_id])
+
+    def test_passing_nothing_still_copies_everything(self, db, source, default_brand):
+        """The default has to stay "the whole campaign" — a wizard nobody
+        touches must behave as it did before there was anything to choose."""
+        self._two_variant_campaign(db, source)
+        report = duplication.duplicate_campaign(
+            db,
+            campaign_id=source["campaign"].id,
+            target_brand_id=default_brand.id,
+            name=_name("copy"),
+            content_mode=duplication.KEEP,
+        )
+        try:
+            assert report.variants == 2
+        finally:
+            _purge_campaigns(db, [report.campaign_id])
+
+    def test_an_empty_selection_is_refused_not_read_as_all(self, db, source, default_brand):
+        """A campaign must always have a variant, so a request naming none is a
+        mistake rather than a shorthand — and treating it as "all" would be the
+        opposite of what was asked."""
+        self._two_variant_campaign(db, source)
+        with pytest.raises(duplication.DuplicationRefused, match="at least one"):
+            duplication.duplicate_campaign(
+                db,
+                campaign_id=source["campaign"].id,
+                target_brand_id=default_brand.id,
+                name=_name("copy"),
+                content_mode=duplication.KEEP,
+                variant_ids=[],
+            )
+
+    def test_the_content_count_reflects_only_the_chosen_variants(self, db, source):
+        """**The one that would have lied rather than failed.** Step 2 warns how
+        many content records a cross-brand copy will create. Summarising the
+        whole campaign while copying one of its variants advertises records the
+        copy never makes."""
+        _email, push_variant = self._two_variant_campaign(db, source)
+
+        whole = duplication.summarise_source(db, source["campaign"].id)
+        just_push = duplication.summarise_source(
+            db, source["campaign"].id, [push_variant.id])
+
+        assert whole["content_titles"], "the fixture's email variant references content"
+        assert just_push["content_titles"] == [], (
+            "the push variant references no content, so a copy of it creates "
+            "no records — the count must say so"
+        )
+        assert [v["id"] for v in just_push["variants"]] == [push_variant.id]
+
+    def test_a_variant_from_another_campaign_is_refused(self, db, source, default_brand):
+        """Ids arrive from a form, so they are a claim rather than a fact."""
+        other = duplication.duplicate_campaign(
+            db,
+            campaign_id=source["campaign"].id,
+            target_brand_id=default_brand.id,
+            name=_name("elsewhere"),
+            content_mode=duplication.KEEP,
+        )
+        stranger = db.query(VariantDB).filter(
+            VariantDB.campaign_id == other.campaign_id).first()
+        try:
+            with pytest.raises(duplication.DuplicationRefused, match="belong to this campaign"):
+                duplication.duplicate_campaign(
+                    db,
+                    campaign_id=source["campaign"].id,
+                    target_brand_id=default_brand.id,
+                    name=_name("copy"),
+                    content_mode=duplication.KEEP,
+                    variant_ids=[stranger.id],
+                )
+        finally:
+            _purge_campaigns(db, [other.campaign_id])
