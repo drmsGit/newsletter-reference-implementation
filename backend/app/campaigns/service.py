@@ -19,29 +19,28 @@ def to_campaign(record: CampaignDB) -> Campaign:
     )
 
 
-def to_variant(record: VariantDB, db: Session | None = None) -> Variant:
-    """`subject` and `preheader` are projected from the envelope module when a
-    session is available (ADR-162 point 1), and from the columns otherwise.
+def to_variant(record: VariantDB, db: Session) -> Variant:
+    """Project a variant, reading its envelope copy from the module that holds
+    it (ADR-162 point 1).
 
-    The optional session is the awkward part of this transition and is worth
-    naming: `to_variant` was a pure row-to-model mapper, and reading a field
-    that now lives in another table gives it a query. It keeps the columns as
-    the fallback so a caller without a session still gets the old answer rather
-    than None — which matters only until the contract migration.
+    **The session is required**, which is the honest cost of the move: this was
+    a pure row-to-model mapper, and a field that lives in another table gives
+    it a query. It was optional during the expand half so a caller without a
+    session could still fall back to the columns; the columns are gone, so
+    there is nothing to fall back to and a caller that cannot query cannot
+    answer.
     """
-    envelope = {}
-    if db is not None:
-        from app.rendering.service import envelope_fields_for_variant
+    from app.rendering.service import envelope_fields_for_variant
 
-        envelope = envelope_fields_for_variant(db, record.id, record.channel)
+    envelope = envelope_fields_for_variant(db, record.id, record.channel)
 
     return Variant(
         id=record.id,
         campaign_id=record.campaign_id,
         channel=record.channel,
         name=record.name,
-        subject=envelope.get("subject", record.subject),
-        preheader=envelope.get("preheader", record.preheader),
+        subject=envelope.get("subject"),
+        preheader=envelope.get("preheader"),
         status=record.status,
         created_at=record.created_at,
         updated_at=record.updated_at,

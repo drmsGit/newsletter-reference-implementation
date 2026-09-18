@@ -41,14 +41,21 @@ class VariantDB(Base):
     # fail-open that stops being harmless the moment it matters. The migration
     # uses a default to backfill and then drops it.
     channel = Column(String(50), nullable=False, index=True)
+    # An internal label ("Variant A — Beach Focus"), never recipient-facing.
+    # The send path once reused `send_instance.name` as the subject line,
+    # conflating an internal label with copy a person reads; subject and
+    # preheader became first-class fields to end that, and they still are —
+    # they are simply not columns here.
     name = Column(String(255), nullable=False)
-    # `name` is an internal label (e.g. "Variant A — Beach Focus"); the actual
-    # email subject line and inbox preview text are their own first-class
-    # fields, per-variant so A/B versions can differ. Historically the send
-    # path reused send_instance.name as the subject, conflating an internal
-    # label with recipient-facing copy — these fields end that.
-    subject = Column(String(255), nullable=True)
-    preheader = Column(String(255), nullable=True)
+    # **No `subject` / `preheader`.** ADR-162 point 1: "The variant holds no
+    # channel fields at all." They are fields of an *email*, so they live in
+    # the composition — a `header` module whose manifest declares them, at
+    # position 0 (migration 0011 expand, 0012 contract).
+    #
+    # Nothing on this row is channel-shaped now, which is what lets one table
+    # carry an email variant and a push variant without either describing the
+    # other. A push variant used to hold two NULL columns naming a thing it is
+    # not.
     status = Column(String(50), nullable=False, default="draft")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(

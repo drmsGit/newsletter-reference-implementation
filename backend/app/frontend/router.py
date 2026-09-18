@@ -1356,19 +1356,19 @@ def variant_create(
             url=f"/ui/campaigns/{campaign_id}?error=" + quote("That channel is not available."),
             status_code=303,
         )
-    # Subject and preheader are email fields. ADR-162 point 1 moves them into a
-    # `header` module and is not built, so they are still columns — but a push
-    # variant must not carry them, or the row would assert an email property of
-    # something that is not an email. Dropped here rather than hidden in the UI,
-    # because a hand-crafted POST reaches this and not the form.
-    email_shaped = channel == "email"
+    # Passed through as given. The channel check that used to live here is
+    # gone, not forgotten: ADR-162 point 1 landed, so envelope copy is written
+    # by `set_envelope_fields`, which finds the module a channel *declares* for
+    # it — and push declares none, so a subject posted to a push variant has
+    # nowhere to go and is discarded by the model rather than by a guard. A
+    # redundant check that reads as load-bearing is worse than no check.
     create_variant_for_campaign(
         db,
         campaign_id=campaign_id,
         name=name,
         channel=channel,
-        subject=(subject.strip() or None) if email_shaped else None,
-        preheader=(preheader.strip() or None) if email_shaped else None,
+        subject=subject.strip() or None,
+        preheader=preheader.strip() or None,
     )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 

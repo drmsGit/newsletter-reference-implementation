@@ -236,10 +236,14 @@ class TestTheColumnIsFailClosed:
         assert db.get(VariantDB, variant.id).channel == "push"
 
     def test_a_push_variant_carries_no_subject_or_preheader(self, db, campaign):
-        """Those are fields of an *email*. ADR-162 point 1 moves them into a
-        `header` module and is unbuilt, so they are still columns — which makes
-        it possible for a push row to assert an email property of something
-        that is not an email. The route drops them; this pins that it does."""
+        """Those are fields of an *email*, and since ADR-162 point 1 landed a
+        push variant cannot hold one **structurally** — there is no column, and
+        `set_envelope_fields` writes only into the module a channel declares
+        for its envelope. Push declares none.
+
+        So this no longer tests a guard; it tests that the guard is
+        unnecessary. A subject posted at a push variant is discarded by the
+        model rather than refused by a check, which is the stronger version."""
         from fastapi.testclient import TestClient
 
         from main import app
@@ -263,13 +267,16 @@ class TestTheColumnIsFailClosed:
                       "csrf_token": auth.csrf_token_for(token)},
             )
             assert response.status_code == 303
+            from app.rendering.service import envelope_fields_for_variant
+
             variant = db.query(VariantDB).filter(VariantDB.name == name).first()
             assert variant is not None and variant.channel == "push"
-            assert variant.subject is None and variant.preheader is None, (
-                "a push variant kept an email subject line — a hand-crafted POST "
-                "never sees the form that hides the field, so hiding it in the "
-                "template is not the control"
+            assert db.query(ModuleInstanceDB).filter(
+                ModuleInstanceDB.variant_id == variant.id).count() == 0, (
+                "a subject posted to a push variant created a module — push "
+                "declares no envelope field, so there is nowhere for it to go"
             )
+            assert envelope_fields_for_variant(db, variant.id, "push") == {}
         finally:
             db.query(SessionDB).filter(SessionDB.user_id == user.id).delete()
             db.query(RoleAssignmentDB).filter(RoleAssignmentDB.user_id == user.id).delete()
