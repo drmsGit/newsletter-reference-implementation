@@ -94,6 +94,10 @@ cap) and [[frontend]] (the Jinja UI that drives all of the above).
 ## Modules by layer
 
 Each links to its module page. One line = what it owns. Full detail is on the page.
+[[brand]] is the exception: a cross-cutting concern with no directory of its own.
+
+> `backend/app/automation/` and `backend/app/privacy/` contain no code and have no page.
+> Their ADRs are accepted-but-unimplemented — a business finding, not a missing module.
 
 ### Sources — bring the raw material in
 - [[content]] — the content catalog: reusable content records, categories, versions. Source of truth for *what can be said*.
@@ -102,6 +106,7 @@ Each links to its module page. One line = what it owns. Full detail is on the pa
 ### Compose — assemble an email
 - [[campaigns]] — a campaign (= one newsletter) with its variants, module instances, and decision slots. The structure, not the content.
 - [[modules]] — the registry of email module templates (JSON manifest + HTML), drop-a-file plugin style. Defines what a "hero" or "img_left" module is.
+- [[channels]] — the channel registry: a manifest per channel, and the cardinality rule that is the only genuinely channel-level fact. Channel is an attribute on the *variant*.
 
 ### Personalize — decide what each person sees
 - [[decision]] — resolves a decision slot to actual content per recipient via pluggable **strategies**. The personalization engine.
@@ -124,6 +129,10 @@ Each links to its module page. One line = what it owns. Full detail is on the pa
 ### Cross-cutting
 - [[settings]] — app configuration (e.g. `max_send_recipients`), editable in the UI.
 - [[frontend]] — the Jinja/Bootstrap admin UI. **57 routes in one file** — documented as a [[frontend#Route index|route index table]], not per-route pages.
+- [[auth]] — who is calling, and may they do this here: brands, users × roles × brands, passwordless sessions, machine principals, and the one route→permission policy table. Every other module is ignorant that users exist.
+- [[audit]] — the append-only accountability log. Deliberately separate from the domain history the product needs to function.
+- [[ai]] — the AI capability layer: discovered tasks, manager-owned prompts, vendor adapters, and the token ledger that gates spend. Proposes; never applies.
+- [[brand]] — **a concern, not a module** (there is no `backend/app/brand/`): the scope column that cuts across twelve modules, what carries it, what deliberately does not, and what leaks if a filter is dropped.
 
 ---
 

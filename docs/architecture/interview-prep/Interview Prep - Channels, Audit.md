@@ -1,0 +1,74 @@
+---
+type: interview-prep
+status: open
+topic:
+  - architecture
+  - review
+  - channels
+  - audit
+created: 2026-09-18
+modified: 2026-09-18
+source:
+  - interview-prep-baseline-2026-09-18
+depends_on:
+  - "[[ADR-160 — Channel Model and Composition]]"
+  - "[[ADR-161 — Channel Execution Shapes]]"
+  - "[[ADR-162 — Channel Rendering and Artifacts]]"
+  - "[[ADR-163 — Per-Channel Consent and Addressability]]"
+  - "[[ADR-153 — Audit and Accountability]]"
+  - "[[ADR-154 — Erasure and Retention]]"
+---
+
+# Interview Prep — Channels, Audit
+
+Generated 2026-09-18 via `/interview-prep-baseline`, covering the channel abstraction **as built** and the audit log's first slice.
+
+Scope note: [[Omni-Channel - design interview]] (2026-09-01) already covers the channel *design*. Most channel code landed after that date, so these questions are about the **implementation** — what the build decided that the design left open. Companion module pages: [[channels]], [[audit]].
+
+Check off each item once discussed, and record the outcome in **Resolution**.
+
+## A — Channel abstraction
+
+- [ ] **Q1.** Migrations 0011 and 0012 are two scripts against a nine-row table. Why expand/contract rather than one script, and what does a half-applied deployment do?
+    **A:** Because the contract half is a `DROP COLUMN`, which nothing undoes. 0011 creates the `header` module and copies the values while `variants.subject`/`preheader` stay readable as a fallback, so a deployment stopped between the two still sends mail with a subject line. 0012 re-checks at migration time rather than trusting the dev-database verification: a `DO` block counts variants holding envelope copy with no header module and raises if any exist (`migrate_0012_drop_variant_envelope_columns.sql:28-50`). It uses `DO`/`EXECUTE` because Postgres resolves column names at parse time — a plain statement mentioning `variants.subject` fails on a second run with "column does not exist" instead of being idempotent, a lesson recorded from migrate_0008.
+
+- [ ] **Q2.** 0011 inserts the header module at position 0. Why not renumber, and what breaks if a channel ever wants two envelope modules?
+    **A:** `(variant_id, position)` is unique and `create_module_for_variant` appends at max+1, so existing modules start at 1 and 0 is free on every variant — shifting every row would have been a far larger change than adding one (`migrate_0011:15-17`). The envelope module also bypasses the cardinality check, since an envelope module is not a content module. The arguable part: "position 0 is free" is a property of current append behaviour, not an enforced invariant, and nothing asserts it; and `envelope_module_type(channel)` (`modules/registry.py:208-222`) returns *one* type per channel, so a second envelope module per channel is not representable. Is the first-match-wins scan intended to stay singular?
+
+- [ ] **Q3.** A push artifact is stored inline in `snapshots`, in columns still named `html_*`. Why was "write a `.json` next to the `.html`" — the smaller diff — rejected?
+    **A:** `create_snapshot_for_variant` branches on `artifact.body is None` and writes the structured artifact into `render_context["artifact"]` with `html_storage_type="inline"` (`snapshots/service.py:97-166`). A `.json` on disk would harden the artifact-on-disk shape the project has a recorded lean away from, and would leave `html_*` columns pointing at a push payload — "a lie the next reader has to decode". Inline leaves the same lie in the *column names* but not in the storage shape; the `html_* → artifact_*` rename is ADR-162 point 3's and is not done. Two storage shapes now coexist deliberately and visibly. What is the trigger that forces the rename, and does `html_size` mean the same thing across both branches?
+
+- [ ] **Q4.** A misfiled *module* manifest stops the process at startup; a malformed *channel* manifest is logged and skipped. Defend the asymmetry.
+    **A:** `_load_manifest` raises `MisfiledManifestError` when a manifest's declared channel contradicts its directory and `_discover` deliberately re-raises rather than warning (`modules/registry.py:80-84`), with `main.py:228-236` forcing discovery at startup so the failure lands there instead of at whichever request touches the registry first. The channel registry does the opposite (`channels/registry.py:69-83`) so a typo in an unused channel cannot take down the ones in use. The justification is blast radius plus detectability — a misfiled module surfaces as a manager being offered a module the renderer cannot take, which is silent and recipient-facing; a missing channel is loud at the first picker. The arguable edge: a *malformed* channel manifest and a *missing* one are indistinguishable downstream, and `is_registered` then reports false for a channel whose variants already exist in the database.
+
+- [ ] **Q5.** `max_modules_for` answers 1 for an unregistered channel. Why not 0, and why not raise?
+    **A:** Unregistered means the caller is about to be refused anyway, and "guessing 'unlimited' for something nobody declared is the wrong direction to be wrong in" (`channels/registry.py:125-134`). Returning a number rather than raising keeps the function total, so callers hold one code path. Worth probing: 1 is not fail-*closed*, it is fail-permissive-by-one — an unregistered channel can still acquire a single module — and the membership check at `campaigns/service.py:300-306` is what really refuses it, so the fail-closed claim leans on a check in a different module.
+
+- [ ] **Q6.** `ADDRESS_KEYS` is named as the one place a new channel's address shape must be taught — a stated exception to "two files, no config step". Why is it not on the channel manifest?
+    **A:** `recipients/consent.py:489`, with `address_key_for` falling back to the channel's own name — a guess that yields `None` and reports everyone unaddressable rather than silently returning somebody's email for an unmapped channel. Address shape belongs to the addressability layer ADR-163 defines, not the composition layer the manifest describes. The honest limit is in the same comment: a postal address has no single scalar at all, so `letter` needs more than an entry here. Is this the right home or the currently-cheap one? It is an exception to ADR-160 point 6 that the code names rather than hides, and it is on the change-impact list precisely because it fails *quietly*.
+
+- [ ] **Q7.** `DEFAULT_CHANNEL` is defined twice, at `channels/registry.py:41` and `recipients/consent.py:33`. Why is that not a bug?
+    **A:** Same string, different meanings: the consent one is the default *cell* in `(recipient, brand, channel, purpose)` per ADR-163; the registry one is the fallback a composition caller gets when it asks for nothing. [[delivery]] and [[audience]] import the consent constant, [[frontend]] imports the registry one. Collapsing them would make the addressability layer import the composition registry, which the channels module's zero-intra-app-imports position exists to prevent. Counter-argument to press: they must change together if push ever becomes a default anywhere, and nothing tests that they agree.
+
+- [ ] **Q8.** Migration 0010 adds a server default and then drops it in the same script. What is that buying, and where does the guarantee actually get enforced?
+    **A:** The default fills existing rows in one statement, then `DROP DEFAULT` so a caller that forgets a channel fails rather than silently creating an email variant — which is fail-open the moment a second channel exists (`migrate_0010:38-47`). The model declares no server default either, so both creation paths agree. But `modules/router.py:39,47` still default `channel="email"`, so the fail-closed posture is not uniform.
+
+- [ ] **Q9.** The readiness verdict was built and then removed. Why does the channel authoring endpoint return fields and no verdict?
+    **A:** A "ready" badge beside a draft asserts a status nobody granted — usability is gated by activating the record and freezing a version — and `required` belongs to a *module's* manifest variable, not to the record, so "a record with no headline cannot fill `single_stack` and fills `cta` perfectly well" (`frontend/router.py:750-757`). ADR-161 point 7's catalogue-readiness rider is a candidate filter for decision slots, where a module *is* in scope. Follow-up: the design interview's Cluster 1 resolution says "channel readiness is a property of the content record" — this implementation reads that back as *not* a record-level verdict, a narrowing worth stating explicitly rather than leaving in a docstring.
+
+## B — Audit log
+
+- [ ] **Q1.** Append-only is enforced by absence, not by the database. Why no trigger, no `REVOKE UPDATE`, no immutability check?
+    **A:** What enforces it is that the table offers no field that would invite an update — no `status`, no `updated_at` — and the service exposes only `record` (`audit/db_models.py:24-26`, "An audit entry that can be edited is not evidence"). The migration's verification asserts structure, not permissions. The honest framing is that this is discipline, not a guarantee: it stops holding the moment anyone adds a mutable column, and neither the DB nor the test suite catches it. What is the intended forcing function? A DB-level `REVOKE` is cheap and was not taken, so the answer should be about the threat model — careless future contributor vs. privileged operator — rather than effort.
+
+- [ ] **Q2.** Zero foreign keys on a table whose whole content is references. What does that cost on read?
+    **A:** An accountability entry must outlive what it references, and a FK would either block a recipient erasure or cascade it — both destroy the record (`db_models.py:16-22`). ADR-153 point 5, in deliberate tension with ADR-154. Costs: no referential integrity means a typo'd `subject_type` is invisible; resolution is an N+1 or a hand-written join per type; and since nothing reads it back yet, the resolve-on-read path has never been built, so the cost is asserted rather than measured.
+
+- [ ] **Q3.** `record` swallows every exception and returns `None`. Isn't a silently-missing entry exactly the failure an audit log must not have?
+    **A:** The reasoning is comparative (`service.py:66-91`): an incomplete log is bad, but a failure that rolls back a role grant because its log entry would not write is worse — and it is the failure mode that gets audit logging switched off in production. Three sharp follow-ups: (a) the bare `except` hides schema drift — add a column without running the migration on Postgres and every write fails into a log line while the app keeps working; (b) `commit=False` plus a failure calls `db.rollback()` on the *caller's* session, so fail-open becomes fail-destructive for the caller's transaction; (c) nothing counts the failures, so "incomplete log" has no metric.
+
+- [ ] **Q4.** Written from routes, never services, with the cost stated up front. Why was threading an actor through write signatures rejected when `brand_id` was threaded exactly that way?
+    **A:** A brand is a property of the *data*, an actor is a property of the *request*, and passing the actor down would put a request concern in the domain layer for the sake of one log (`service.py:1-15`). The consequence is named rather than discovered — a service called from anywhere but a route is not audited, so scripts, scheduled jobs and machine callers all bypass it. The fragile mechanism: `record_from_request` reads `request.state` via `getattr` with a `None` default, so a middleware rename turns every actor into `NULL` silently. Given that ADR-166's machine principals are a launch gate, when does "first thing to revisit" become now?
+
+- [ ] **Q5.** The write side landed first and nothing reads it back in production. What did that ordering buy, and what is still unproven?
+    **A:** Both read helpers are exercised only by tests — no route, no template, no export; ADR-153 point 1's operator screen is enabled, not built. Buying: evidence accumulates immediately, and nothing is backfilled because inventing entries would fabricate exactly the evidence the table exists to hold. Unproven, each a schema question rather than a UI one: `action` is a plain VARCHAR with nothing validating it against the constants, so typos are invisible until someone filters on one; `detail` is unvalidated JSON with a stated policy no test enforces; and brand filtering cannot be a plain `WHERE brand_id = ?` because sign-in and deactivation rows are `NULL` forever. Plus no retention or pruning on a write-mostly table carrying five indexes.

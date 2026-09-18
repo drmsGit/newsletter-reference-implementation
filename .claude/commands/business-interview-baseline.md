@@ -9,8 +9,13 @@ For each flagged decision, answer:
 
 Reference specific ADR IDs, files, and functions. Do not suggest fixes — only surface and classify.
 
-**Delegate the ADR sweep.** Never read the 75 records in `docs/architecture/ADR/` into the main session — fan out with the Explore agent, or use `assumption-scanner` when the input is business prose rather than code.
+**Delegate the ADR sweep.** Never read the full ADR set in `docs/architecture/ADR/` into the main session — fan out with the Explore agent, or use `assumption-scanner` when the input is business prose rather than code. Do not write a record count into this file; it goes stale every time an ADR is written.
 
-Skip what is already decided: `docs/playbook-strategy.md` §5 (Decision Log) and the resolved findings in `docs/business-interview-baseline.md`. Two full passes have run, so the value here is in what they did not reach — surface a settled decision only if you can say what changed.
+Skip what is already decided or already written down elsewhere:
+- `docs/playbook-strategy.md` §5 (Decision Log)
+- the resolved findings in `docs/business-interview-baseline.md`
+- `docs/business/` — `BRIEF.md`, `POSITIONING.md`, `ASSUMPTIONS.md`, `LAUNCH-GATES.md`, `BETA-SCOPE.md`, and anything under `docs/business/decisions/`
 
-Save output to `docs/business-interview-baseline.md`, grouped by ADR/feature area.
+Read that list first. `docs/business/` postdates the earlier passes and already resolves part of what this command used to surface. Two full passes have run, so the value here is in what they did not reach — surface a settled decision only if you can say what changed.
+
+Save output to `docs/business-interview-baseline.md`, grouped by ADR/feature area. That path is referenced by `/weekly-summary`, so keep it. A business *decision* that comes out of this belongs in `docs/business/decisions/`, not in the findings file.

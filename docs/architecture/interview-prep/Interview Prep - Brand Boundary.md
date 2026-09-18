@@ -1,0 +1,52 @@
+---
+type: interview-prep
+status: open
+topic:
+  - architecture
+  - review
+  - brand
+  - tenancy
+created: 2026-09-18
+modified: 2026-09-18
+source:
+  - interview-prep-baseline-2026-09-18
+depends_on:
+  - "[[ADR-150 — Tenancy and Access Model]]"
+  - "[[ADR-013 — Content Reference Instead of Content Copy]]"
+  - "[[ADR-163 — Per-Channel Consent and Addressability]]"
+  - "[[ADR-128 — Version Content for Auditability and Restoration]]"
+---
+
+# Interview Prep — Brand Boundary
+
+Generated 2026-09-18 via `/interview-prep-baseline`, for the cross-cutting brand scope introduced by ADR-150 and extended by addenda to ADR-013 and ADR-163. **Never reviewed** — it did not exist at the 2026-07-04 baseline. Companion concern page: [[brand]].
+
+Already logged, deliberately not raised here: the twelve JSON routers still create rows in the default brand regardless of `X-Brand`.
+
+Check off each item once discussed, and record the outcome in **Resolution**.
+
+## Brand boundary
+
+- [ ] **Q1.** `brand_id` is explicitly *not* a tenant discriminator (ADR-150 points 1 and 3) — but the enforcement mechanism is identical to multi-tenancy: a column plus a `WHERE` clause. What does the distinction buy, and why not Postgres RLS or a per-brand schema, which would make the leak paths structurally impossible?
+    **A:** The distinction buys the point-4 promise, not safety: one installation serves one company, so the threat model is "a manager sees the wrong brand's drafts," not "customer A reads customer B." RLS or schema-per-brand would force the default brand to be a real boundary and tax the single-brand company, which `test_brand_scoping.py:146` (`TestTheSingleBrandCompanyPaysNothing`) names as the property the whole design rests on — the navbar test at `:168` checks it over HTTP precisely because a unit-level flag proves nothing. The price is booked honestly: where GDPR *does* require separation, ADR-150 point 3 says two installations "and we ship no alternative." The arguable part is that this leaves every read individually responsible for its own filter, with no backstop.
+
+- [ ] **Q2.** The filter lives in the query, never in the schema or the session. `content/service.py:107`, `campaigns/service.py:53` and `audience/service.py:31` all default `brand_id=None`, meaning *every brand* — a forgotten argument silently returns the whole platform. Why is the safety mechanism a docstring repeated three times rather than a required argument?
+    **A:** This is the boundary's sharpest internal inconsistency, because the same repo made the opposite call twelve files away: `is_consenting_filter(brand_id, ...)` (`consent.py:415`) makes brand a required positional with the explicit reasoning that "forgetting it is a TypeError." The list functions took the fail-open direction for the genuine spanning callers (platform counts, migrations, tests). A required `brand_id` plus a separate `list_all_content_records()` would have given both, and would have converted every entry in [[brand]]'s change-impact table from a silent leak into an import-time error. As it stands the five detail-by-id routes were in fact unscoped until 2026-09-15, and the module content picker was missed for longer — its own comment says "the audience picker a few lines below was scoped for exactly this reason; this was missed."
+
+- [ ] **Q3.** `permissions.py:70` states the rule as "a permission is brand-scoped if the rows it guards carry a `brand_id`." Since migrate_0008, `consent_events.brand_id` is NOT NULL. So why is `recipients.consent` still platform-level?
+    **A:** The rule's own logic has drifted out from under it. The comment at `permissions.py:101-104` justifies the exclusion with "recipients carry no brand (point 9) and neither do signal contributions (point 8), so `recipients.manage`, `recipients.consent` and `insight.write` have no brand to be checked against" — true when written, **false after ADR-163's addendum widened the cell**. The file acknowledges exactly one exception to its own rule (`ai.run`, because what is protected is spend from one company-wide pot); this one is unacknowledged. Practical consequence: `policy.py:129` maps `/recipients/{external_id}/consent` to `RECIPIENTS_CONSENT`, `_permitted` takes the non-scoped branch, so a Manager granted `recipients.consent` on brand A can write a consent row for brand B — the one record ADR-142 §7 calls the answer to a UWG §7 complaint. Whether that is *wrong* is arguable (consent capture is arguably platform-level); what is not arguable is that the rule as stated does not produce the current answer.
+
+- [ ] **Q4.** Three call sites derive the sending brand and [[brand]] claims all of them "raise rather than guess." Two do. `sending_brand_id` (`decision/strategies/base.py:132`) returns `int | None`. Why the asymmetry, and what does the `None` actually do?
+    **A:** The `None` is fed straight into parameters annotated `brand_id: int` — `top_score.py:53` and `recipient_top_score.py:91` build `.filter(ContentRecordDB.brand_id == sending_brand_id(db, slot))`, and `decision/service.py:41` passes it to `require_consent(...)`. It is fail-*closed*, but only by accident of SQL: SQLAlchemy renders `== None` as `IS NULL`, the column is NOT NULL, so zero candidates match and `require_consent` sees no grant and raises. The behaviour is correct and the docstring's intent is honoured — but **honoured by a type violation plus `NULL` semantics rather than by a check**. A broken variant→campaign chain surfaces as "no suitable content" and graceful degradation under ADR-086, not as the structural error it is, and the `ConsentDenied` message would name "brand None". The two paths that touch the send record chose the louder failure.
+
+- [ ] **Q5.** Consent became a four-part cell with latest-row-wins, gated by a correlated scalar subquery (`consent.py:384-412`). Why keep the event log as the read model for the hot send-time path rather than materialising a current-state table?
+    **A:** The subquery is defended in place — kept as a subquery rather than resolved to ids in Python "so the gates stay a single query… materialising every consenting id would scale with the recipient table rather than with the segment" — and it is fail-closed by construction, since a recipient with no event yields NULL and `NULL = 'opted_in'` is never true. The cost: each of the three gates executes one index probe per candidate row, and the probe cost grows with a recipient's **consent history depth**, not with recipient count. `migrate_0008` rebuilt the index as `(recipient_id, brand_id, channel, purpose, created_at)`, but the subquery orders by `created_at DESC, id DESC` and `id` is not in the index, so the tiebreak cannot be served by it. A materialised current-state table would flatten this to a join, at the price of a second write path and a consistency invariant — reasonable to defer, but the multiplier is per-send, not per-page.
+
+- [ ] **Q6.** ADR-013 says content is referenced, never copied — and the 2026-09-16 addendum carves out a copy. Why is copy-at-the-boundary correct rather than a nullable `brand_id` or a content-sharing join table, and why is provenance in the audit log rather than a `copied_from_id` column?
+    **A:** The copy is forced, not preferred: `ContentRecordDB.brand_id` is NOT NULL, so a brand-B campaign has no expressible way to point at a brand-A record. `content_modes_for` (`duplication.py:105`) makes this structural rather than a preference, with the excluded mode in each case being unbuildable and the refusals raised in the service, not hidden in the UI. Sharing was considered and rejected in `migrate_0007`: "the same copy under two brands needs different URLs and domains, so 1:1 reuse is not realistic." Two costs worth pressing: ADR-013's own term, "a typo fixed in brand A stays wrong in brand B"; and `_target_content_id` dedupes copies only **within one report**, so duplicating the same campaign into the same brand twice produces a second full set of copies, and with provenance living only in the audit log there is no cheap query that finds them.
+
+- [ ] **Q7.** `delete_brand` refuses while anything still belongs to a brand, because "every row in four tables carries a NOT NULL brand" and deleting would "either fail at the foreign key or need a rule for where the orphans go." Its `holders` dict counts five tables. How many NOT NULL brand FKs exist?
+    **A:** **Seven.** `holders` (`service.py:201-207`) covers `content_records`, `campaigns`, `audience_groups`, `send_instances` and `role_assignments`. Missing: `consent_events.brand_id` (`recipients/db_models.py:57`, added by migrate_0008 *after* `delete_brand` was written) and `integration_grants.brand_id` (`auth/db_models.py:298`). So a brand that only ever captured consent, or only ever held a machine grant, reaches the `delete()` at `:215` and hits the exact foreign-key failure the guard exists to prevent — an unhandled `IntegrityError` instead of the sentence naming what blocks it. No data is lost (the transaction fails), but the clean refusal is not delivered. [[brand]] already states the maintenance rule; two tables have since been added without it.
+
+- [ ] **Q8.** The two brand migrations use different precondition guards for the same backfill shape. `migrate_0007` refuses when more than one brand exists with rows unassigned; `migrate_0008` asserts a timestamp fact instead. Why the switch, and is the second guard sound?
+    **A:** The switch is forced and documented: 0007's guard "would refuse here" because a second brand now exists, so 0008 substitutes a provable fact — every consent row predates every non-default brand (newest consent 2026-07-27, oldest other brand 2026-09-15) — and re-derives it at run time rather than trusting the note. It is careful about the repo's precedent: migrate_0003 refused to backfill counts because "a computed number would be indistinguishable from a recorded one," and 0008 argues the value is not computed, since at write time exactly one brand could have been meant. The gap: the guard reads `min(created_at) FROM brands WHERE id <> default_brand_id` — it can only see brands that **still exist**. A brand created and deleted before it captured consent leaves no row, so consent written while it existed passes the guard and is silently assigned to the default brand. Sound for this database and the common single-brand install; not sound in general — and it is the one script whose header says it is deciding the record that answers a UWG §7 complaint.
