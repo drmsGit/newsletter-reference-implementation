@@ -41,7 +41,7 @@ stateDiagram-v2
 
 ### Create ([[overrides]] `create_content_override`)
 1. The override targets a **module instance** ([[campaigns]]). It carries `field_overrides` = `{manifest field: value}` — a shorter headline for this send, a consistent title across personalized picks.
-2. Edits are **validated against the module's manifest variables** ([[email_modules]]) — you can only override fields the module actually declares.
+2. Edits are **validated against the module's manifest variables** ([[modules]]) — you can only override fields the module actually declares.
 3. An override **must change something** (empty `field_overrides` is rejected — CHECK + service).
 4. **One active override per module** — if one already exists, create fails asking you to reset it first (enforced by a partial unique index).
 
@@ -61,7 +61,7 @@ stateDiagram-v2
 
 ## Modules this flow passes through
 
-[[frontend]] (create/reset UI) → [[overrides]] → [[campaigns]] (module target) + [[email_modules]] (field validation) + [[content]] (audit context) → applied by [[rendering]].
+[[frontend]] (create/reset UI) → [[overrides]] → [[campaigns]] (module target) + [[modules]] (field validation) + [[content]] (audit context) → applied by [[rendering]].
 
 ## ⚠️ Gotchas for a new dev
 
@@ -69,4 +69,4 @@ stateDiagram-v2
 - **One active at a time** — a second create on the same module fails by design; reset first.
 - **Reset keeps history** — never hard-delete an override; the trust-loop comparison and `outcome_delta` depend on the row surviving.
 - **The UI is a dev affordance** — raw JSON field input today; the real deliverable is a WYSIWYG editor with live preview (a separate future stage). Don't polish the current UI; keep the backend model correct and flexible.
-- **Override keys are validated** against the live [[email_modules]] manifest — a module template change that drops a variable can invalidate what an override targets.
+- **Override keys are validated** against the live [[modules]] manifest — a module template change that drops a variable can invalidate what an override targets.

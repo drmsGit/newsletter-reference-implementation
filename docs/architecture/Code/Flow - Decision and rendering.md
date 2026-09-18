@@ -63,17 +63,17 @@ graph TD
    - decision-slot module → **looks up** the recipient's existing `DecisionResolutionDB` (this is why decisions are resolved first — no resolution ⇒ the slot renders hidden).
    - `mode="send"` resolves the latest **published** version (raises if none — never sends a draft); `mode="preview"` shows the live draft.
 7. **Override precedence** — for a CMS module, an active [[overrides|override]]'s field values win over the resolved content, per variable ([[ADR-041 — Override Precedence]]).
-8. **Fill variables** — each manifest variable ([[email_modules]]) is looked up by name in the content dict (no mapping layer). Rich-text fields are rendered safely.
+8. **Fill variables** — each manifest variable ([[modules]]) is looked up by name in the content dict (no mapping layer). Rich-text fields are rendered safely.
 9. **Assemble** — module HTML is wrapped with `data-module`/`data-content` attributes and concatenated; brand CSS is inlined for email-client compatibility ([[ADR-063 — Rendering Parity Over Rendering Implementation]]).
 
 ## Modules this flow passes through
 
-[[delivery]] (send path) → [[decision]] → [[campaigns]] (slots/resolutions) → [[rendering]] → [[content]] + [[email_modules]] + [[overrides]].
+[[delivery]] (send path) → [[decision]] → [[campaigns]] (slots/resolutions) → [[rendering]] → [[content]] + [[modules]] + [[overrides]].
 
 ## ⚠️ Gotchas for a new dev
 
 - **Rendering doesn't decide.** If a decision-slot module renders empty in a preview, it's because no resolution exists yet — that's expected until a send (or an explicit resolve) runs. Don't "fix" it by making rendering execute the slot; you'd double-resolve at send.
 - **A module is content XOR a decision slot.** If both were somehow set, rendering silently prefers the content record — the [[campaigns]] CHECK constraint exists to prevent this.
 - **`mode="send"` is strict.** No published version ⇒ `UnpublishedContentError`, by design — it refuses to send draft content. Preview is lenient.
-- **Override keys must be real manifest variables** — validated at override-create time against [[email_modules]]; an unknown key can't be saved.
+- **Override keys must be real manifest variables** — validated at override-create time against [[modules]]; an unknown key can't be saved.
 - **Variable name = content field name = manifest variable name.** A rename on any of the three blanks the variable everywhere.

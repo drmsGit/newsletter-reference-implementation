@@ -46,7 +46,7 @@ that most didn't beat the system."
 ## Depends on →
 - [[campaigns]] — an override attaches to a `ModuleInstanceDB`
 - [[content]] — `system_content_record_id` references a content record (audit context)
-- [[email_modules]] — validates field edits against the module manifest's declared variables
+- [[modules]] — validates field edits against the module manifest's declared variables
 
 ## Depended on by →
 - [[rendering]] — `render_cms_module` applies the active override's fields (precedence)
@@ -63,7 +63,7 @@ that most didn't beat the system."
 - **Reusable spine.** Shaped so a future `AudienceOverrideDB` mirrors the same create → active → reset + audit/outcome lifecycle — *not* a polymorphic single table.
 
 ## ⚠️ Change-impact — if you touch this, also check…
-- **`field_overrides` validation** → depends on [[email_modules]] manifest variable names; an override's keys must be declared module variables.
+- **`field_overrides` validation** → depends on [[modules]] manifest variable names; an override's keys must be declared module variables.
 - **The one-active-per-module index** → [[rendering]] and `create_content_override` both assume at most one active row; loosening it breaks precedence and O(1) lookup.
 - **`get_active_content_override`'s contract** → [[rendering]] `render_cms_module` calls it on every CMS module render; a slower/looser implementation hits the hot render path.
 - **The "field edits only" rule** → don't reintroduce record swaps here; that decision was made twice. Segment-targeted content is the guaranteed-placement Needs-ADR item.

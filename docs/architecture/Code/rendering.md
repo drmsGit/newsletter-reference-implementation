@@ -24,7 +24,7 @@ resolutions but does **not** execute decisions, and it has **no database**.
 ## Key files
 - `backend/app/rendering/service.py` — the whole pipeline (`render_variant_html` and the per-module renderers)
 - `backend/app/rendering/router.py` — the single `/rendering/*` endpoint
-- `storage/email_modules/brand.css` — the stylesheet inlined into output
+- `storage/modules/email/brand.css` — the stylesheet inlined into output
 
 ## Public surface
 **Service functions** (`rendering/service.py`):
@@ -36,12 +36,12 @@ resolutions but does **not** execute decisions, and it has **no database**.
 **Routes** (`/rendering`, tag `rendering`): 1 route — `GET /rendering/variants/{id}` (rendered preview).
 
 ## Data model
-**None.** Reads across [[campaigns]], [[content]], [[overrides]], and [[email_modules]]; produces HTML.
+**None.** Reads across [[campaigns]], [[content]], [[overrides]], and [[modules]]; produces HTML.
 
 ## Depends on →
 - [[campaigns]] — the variant's module instances + decision resolutions
 - [[content]] — resolves record fields / pinned versions into template variables
-- [[email_modules]] — fetches the manifest + Jinja HTML per module type
+- [[modules]] — fetches the manifest + Jinja HTML per module type
 - [[overrides]] — applies the active field override (precedence)
 
 ## Depended on by →
@@ -62,4 +62,4 @@ resolutions but does **not** execute decisions, and it has **no database**.
 - **`render_variant_html`'s signature** → [[delivery]] `send_send_instance` and [[snapshots]] `create_snapshot_for_variant` both call it; `mode` and `recipient_id` are load-bearing.
 - **`resolve_content_for_module`'s content-XOR-slot handling** → relies on the [[campaigns]] CHECK constraint; it silently prefers `content_record_id` if both are set.
 - **The "reads resolutions, doesn't execute" boundary** → if you make rendering resolve decisions, you'd double-resolve at send (delivery already does). Keep the split.
-- **Variable lookup by manifest name** → coupled to [[email_modules]] manifests and [[content]] field names; a rename on either side blanks a variable.
+- **Variable lookup by manifest name** → coupled to [[modules]] manifests and [[content]] field names; a rename on either side blanks a variable.

@@ -54,7 +54,7 @@ graph LR
   end
   subgraph Compose
     CAMP[campaigns]
-    MODREG[email_modules]
+    MODREG[modules]
   end
   subgraph Personalize
     DEC[decision]
@@ -101,7 +101,7 @@ Each links to its module page. One line = what it owns. Full detail is on the pa
 
 ### Compose — assemble an email
 - [[campaigns]] — a campaign (= one newsletter) with its variants, module instances, and decision slots. The structure, not the content.
-- [[email_modules]] — the registry of email module templates (JSON manifest + HTML), drop-a-file plugin style. Defines what a "hero" or "img_left" module is.
+- [[modules]] — the registry of email module templates (JSON manifest + HTML), drop-a-file plugin style. Defines what a "hero" or "img_left" module is.
 
 ### Personalize — decide what each person sees
 - [[decision]] — resolves a decision slot to actual content per recipient via pluggable **strategies**. The personalization engine.

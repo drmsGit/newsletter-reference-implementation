@@ -39,7 +39,7 @@ graph LR
   frontend --> content
   frontend --> decision
   frontend --> delivery
-  frontend --> email_modules
+  frontend --> modules
   frontend --> insight
   frontend --> overrides
   frontend --> recipients
@@ -52,7 +52,7 @@ graph LR
   insight --> settings
   overrides --> campaigns
   overrides --> content
-  overrides --> email_modules
+  overrides --> modules
   providers --> campaigns
   providers --> delivery
   providers --> insight
@@ -60,7 +60,7 @@ graph LR
   recipients --> insight
   rendering --> campaigns
   rendering --> content
-  rendering --> email_modules
+  rendering --> modules
   rendering --> overrides
   settings --> insight
   snapshots --> campaigns
@@ -77,12 +77,12 @@ graph LR
 | **content** | campaigns, overrides | audience, campaigns, decision, frontend, insight, overrides, rendering, snapshots |
 | **decision** | campaigns, content, insight, recipients | campaigns, delivery, frontend |
 | **delivery** | audience, campaigns, decision, recipients, rendering, settings, snapshots | frontend, insight, providers |
-| **email_modules** | — | frontend, overrides, rendering |
-| **frontend** | audience, campaigns, content, decision, delivery, email_modules, insight, overrides, recipients, rendering, settings, snapshots | — |
+| **modules** | — | frontend, overrides, rendering |
+| **frontend** | audience, campaigns, content, decision, delivery, modules, insight, overrides, recipients, rendering, settings, snapshots | — |
 | **insight** | content, delivery, recipients, settings | audience, decision, frontend, providers, recipients, settings |
-| **overrides** | campaigns, content, email_modules | campaigns, content, frontend, rendering |
+| **overrides** | campaigns, content, modules | campaigns, content, frontend, rendering |
 | **providers** | campaigns, delivery, insight, snapshots | — |
 | **recipients** | insight | audience, campaigns, decision, delivery, frontend, insight |
-| **rendering** | campaigns, content, email_modules, overrides | delivery, frontend, snapshots |
+| **rendering** | campaigns, content, modules, overrides | delivery, frontend, snapshots |
 | **settings** | insight | delivery, frontend, insight |
 | **snapshots** | campaigns, content, rendering | delivery, frontend, providers |

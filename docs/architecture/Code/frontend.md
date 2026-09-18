@@ -34,7 +34,7 @@ table grouped by feature** instead. The source of truth is the decorators in
 **None.** Reads/writes go through the other modules' services.
 
 ## Depends on →
-**Every other module.** `frontend` imports [[audience]], [[campaigns]], [[content]], [[decision]], [[delivery]], [[email_modules]], [[insight]], [[overrides]], [[recipients]], [[rendering]], [[settings]], [[snapshots]] — it's the top of the dependency graph (nothing depends on it). See [[Module dependency map]].
+**Every other module.** `frontend` imports [[audience]], [[campaigns]], [[content]], [[decision]], [[delivery]], [[modules]], [[insight]], [[overrides]], [[recipients]], [[rendering]], [[settings]], [[snapshots]] — it's the top of the dependency graph (nothing depends on it). See [[Module dependency map]].
 
 ## Depended on by →
 *Nothing* — it's the presentation leaf.
