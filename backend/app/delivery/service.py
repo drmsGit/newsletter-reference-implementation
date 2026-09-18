@@ -241,6 +241,28 @@ def prepare_send_from_audience(
 
 
 def reconcile_executions_to_audience(db: Session, send_instance: SendInstanceDB) -> None:
+    """Re-resolve this send's audience and adjust THIS send's executions.
+
+    **Scoped to one send instance, which answers a question asked on
+    2026-09-18**: if two variants of a campaign share an audience group and one
+    is "freeze" while the other is "rerun", does the rerun undo the freeze? It
+    does not. Every query below filters on `send_instance_id`, and nothing here
+    writes to the group — so a sibling send's re-resolution cannot reach these
+    executions.
+
+    The sharper version of that worry is real and already answered elsewhere: a
+    push that goes out first can *change the world* — someone complains, the
+    provider reports it, they are opted out — and the later frozen email send
+    must honour that. It does, because the send-time gate in
+    `send_send_instance` runs for **every** resolution mode including freeze
+    (ADR-163 point 7, the P0). Freeze locks *who is targeted*; it never locks
+    *who may be contacted*.
+
+    Which is also why a separate "audience snapshot" entity is not needed:
+    freezing already materialises the audience as delivery executions at plan
+    time, and a second mechanism for the same thing would be one more place for
+    the two to disagree.
+    """
     """For a "rerun" send: re-resolve the audience group right before firing and
     reconcile executions — add one for each newly-matching recipient, and drop
     executions for recipients who no longer match *and* haven't sent yet (an

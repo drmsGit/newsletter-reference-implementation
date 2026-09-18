@@ -649,17 +649,32 @@
 <script>
 // Prepare-send: the From address only applies to a real (resend) send — enable
 // it for resend, disable (and ignore) it for the mock provider.
+//
+// **The null check is load-bearing.** The field is not rendered at all when no
+// offered provider uses one, which is the case for push — and without the
+// guard `from.disabled` threw, the uncaught error aborted the rest of this
+// block, and the scheduling handler below never ran. The visible symptom was
+// that "Schedule for…" left its date field stuck read-only on push and worked
+// on email, which points nowhere near this line.
 document.querySelectorAll('.prepare-provider').forEach(function (sel) {
     const form = sel.closest('form');
     const from = form.querySelector('.prepare-from');
+    if (!from) { return; }
     const sync = () => { from.disabled = (sel.value !== 'resend'); };
     sel.addEventListener('change', sync);
     sync();
 });
+</script>
+
+{# A separate block on purpose: an uncaught error in one no longer stops the
+   other. That coupling is what turned a missing optional field into a broken
+   scheduling control on an unrelated part of the same form. #}
+<script>
 // Enable the scheduled-time input only when "Schedule for…" is chosen.
 document.querySelectorAll('.prepare-timing').forEach(function (sel) {
     const form = sel.closest('form');
     const when = form.querySelector('.prepare-scheduled');
+    if (!when) { return; }
     const sync = () => { when.disabled = (sel.value !== 'schedule'); when.required = (sel.value === 'schedule'); };
     sel.addEventListener('change', sync);
     sync();

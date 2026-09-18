@@ -2043,6 +2043,40 @@ class TestTheSendFormOffersOnlyWhatTheChannelCanDo:
             db.query(RecipientDB).filter(RecipientDB.id.in_(ids)).delete(synchronize_session=False)
             db.commit()
 
+    def test_the_optional_from_field_cannot_break_the_scheduling_control(self):
+        """A regression, reported by the user 2026-09-18: on a push variant the
+        "Schedule for…" date field stayed read-only, while email was fine.
+
+        Rendering the From address conditionally left `.prepare-from` absent on
+        push, so `from.disabled` threw — and an uncaught error aborts the whole
+        `<script>` block, taking the scheduling handler below it with it. The
+        symptom appeared in a control that shares no code with the cause.
+
+        The suite runs no JavaScript, so this asserts the two properties that
+        make the failure impossible rather than the behaviour: every optional
+        element is null-guarded before use, and the handlers live in separate
+        blocks so one throwing cannot silence the other.
+        """
+        from pathlib import Path
+
+        from app.modules import registry
+
+        source = (Path(registry.__file__).parent.parent / "templates"
+                  / "campaign_detail.html").read_text()
+
+        assert "if (!from) { return; }" in source, (
+            "`.prepare-from` is dereferenced without a null check, and it is "
+            "not rendered for a channel whose providers need no sender address"
+        )
+        assert "if (!when) { return; }" in source
+
+        script_bodies = source.count("<script>")
+        assert script_bodies >= 2, (
+            "the prepare-send handlers share one <script> block again — an "
+            "uncaught error in either then disables the other, which is how a "
+            "missing optional field broke scheduling"
+        )
+
     def test_a_push_snapshot_is_not_offered_an_open_html_link(
         self, db, campaign, monkeypatch
     ):
