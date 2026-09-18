@@ -9,8 +9,9 @@ import re
 from pathlib import Path
 
 from app.auth.permissions import (
-    AI_RUN, AUDIENCES_MANAGE, CAMPAIGNS_MANAGE, CONTENT_MANAGE,
-    SENDS_EXECUTE, SETTINGS_MANAGE, USERS_MANAGE, VIEW,
+    AI_RUN, AUDIENCES_MANAGE, AUDIENCES_PIN, CAMPAIGNS_MANAGE, CONTENT_MANAGE,
+    OVERRIDES_MANAGE, SENDS_EXECUTE, SENDS_PLAN, SETTINGS_MANAGE, USERS_MANAGE,
+    VIEW,
 )
 from app.auth.policy import UNMAPPED, required_permission
 
@@ -36,11 +37,17 @@ class TestWrites:
         assert required_permission("POST", "/ui/users") == USERS_MANAGE
 
     def test_anything_that_reaches_real_people_needs_sends_execute(self):
+        """Note what left this list on 2026-09-18: creating a send instance.
+
+        It was here when `sends.execute` meant both preparing and firing, and
+        it made the test contradict its own name — creating a send instance
+        reaches nobody. ADR-166 point 2 split the key, and the list now means
+        what it says.
+        """
         for route in (
             "/ui/send-test",
             "/ui/deliveries/process-due",
             "/ui/send-instances/{send_instance_id}/send",
-            "/ui/campaigns/{campaign_id}/snapshots/{snapshot_id}/send-instances",
         ):
             assert required_permission("POST", route) == SENDS_EXECUTE, route
 
@@ -55,7 +62,49 @@ class TestSpecificityOrdering:
 
     def test_planning_a_send_is_a_send_action(self):
         route = "/ui/campaigns/{campaign_id}/snapshots/{snapshot_id}/send-instances"
-        assert required_permission("POST", route) == SENDS_EXECUTE
+        assert required_permission("POST", route) == SENDS_PLAN
+
+    def test_firing_a_send_wins_over_the_prefix_that_prepares_one(self):
+        """The ordering that matters most in the whole table.
+
+        `/ui/send-instances/` maps to `sends.plan` and the one route under it
+        that dispatches maps to `sends.execute`. Both match the dispatch route,
+        so the narrow entry has to sit above the broad one. Reversed — which is
+        a plausible tidy-up, since the broad entry reads like the general case
+        — firing a real send would need only the permission to prepare one, and
+        nothing else in the suite would notice.
+        """
+        assert required_permission(
+            "POST", "/ui/send-instances/{send_instance_id}/send"
+        ) == SENDS_EXECUTE
+        assert required_permission("POST", "/ui/send-instances/") == SENDS_PLAN
+
+    def test_pinning_a_member_is_not_restructuring_the_audience(self):
+        """ADR-166 point 2's worked example, as a test.
+
+        A website form may add one recipient to a group. Under the old
+        vocabulary that grant also carried the right to rewrite the group's
+        rules or delete it, because both were `audiences.manage`.
+        """
+        for route in (
+            "/ui/audience-groups/{group_id}/members",
+            "/ui/audience-groups/{group_id}/members/{recipient_id}/remove",
+        ):
+            assert required_permission("POST", route) == AUDIENCES_PIN, route
+        assert required_permission("POST", "/ui/audience-groups") == AUDIENCES_MANAGE
+
+    def test_overriding_a_pick_is_not_editing_the_campaign(self):
+        """These sat under `campaigns.manage` by URL prefix alone.
+
+        The override layer (ADR-040/041) exists to keep correcting a system
+        pick distinct from rebuilding the composition it sits in; the policy
+        table did not reflect that until the ADR-166 split.
+        """
+        for route in (
+            "/ui/campaigns/{campaign_id}/variants/{variant_id}/overrides",
+            "/ui/campaigns/{campaign_id}/overrides/{override_id}/reset",
+        ):
+            assert required_permission("POST", route) == OVERRIDES_MANAGE, route
 
     def test_suggest_audience_is_an_audience_action(self):
         # Filed under /ui/campaigns by URL only — it creates an audience group.

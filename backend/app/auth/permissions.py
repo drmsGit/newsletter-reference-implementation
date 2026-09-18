@@ -23,6 +23,24 @@ SETTINGS_MANAGE = "settings.manage"        # tunable config, budgets, prompts
 USERS_MANAGE = "users.manage"              # invite, assign roles, deactivate
 CREDENTIALS_MANAGE = "credentials.manage"  # provider and model credentials
 
+# ADR-166 point 2 / ADR-150 point 5: nine keys became sixteen, because nine
+# were too coarse for their own worked example — *n8n may trigger a send; a
+# website form may only pin a recipient*. Pinning used to sit under
+# `audiences.manage`, so granting a public form the right to add one recipient
+# would also have granted it the right to restructure the audience.
+#
+# **The splits serve humans too**, which is why they live in the shared
+# vocabulary rather than in a machine-only scope list: "may pin, may not
+# restructure" and "may prepare a send, may not fire it" are both ordinary
+# descriptions of a junior marketer.
+AUDIENCES_PIN = "audiences.pin"            # add/remove one member, not the rules
+SENDS_PLAN = "sends.plan"                  # prepare a send without dispatching
+RECIPIENTS_MANAGE = "recipients.manage"    # create and edit recipients
+RECIPIENTS_CONSENT = "recipients.consent"  # write a consent record
+INSIGHT_WRITE = "insight.write"            # write engagement events
+OVERRIDES_MANAGE = "overrides.manage"      # override a system content pick
+INTEGRATIONS_MANAGE = "integrations.manage"  # issue/rotate/revoke machine keys
+
 ALL_PERMISSIONS: dict[str, str] = {
     VIEW: "See dashboards, campaigns, signals and delivery history",
     CAMPAIGNS_MANAGE: "Create and edit campaigns, variants and modules",
@@ -33,7 +51,20 @@ ALL_PERMISSIONS: dict[str, str] = {
     SETTINGS_MANAGE: "Change tunable settings, budgets and AI prompts",
     USERS_MANAGE: "Invite users, assign roles, deactivate accounts",
     CREDENTIALS_MANAGE: "Set provider and model credentials (write-only)",
+    AUDIENCES_PIN: "Add and remove individual audience members",
+    SENDS_PLAN: "Prepare a send — snapshot and send instance — without firing it",
+    RECIPIENTS_MANAGE: "Create and edit recipients",
+    RECIPIENTS_CONSENT: "Record a consent decision for a recipient",
+    INSIGHT_WRITE: "Write engagement events into the signal layer",
+    OVERRIDES_MANAGE: "Override a system content pick, and reset one",
+    INTEGRATIONS_MANAGE: "Issue, rotate and revoke machine credentials",
 }
+
+# `recipients.consent` is separate from `recipients.manage` deliberately
+# (ADR-150 point 5): an integration that imports contact records must not
+# thereby be able to assert consent for them. Consent is ADR-142 §7's hard
+# floor and the record a UWG §7 complaint is answered with, so the ability to
+# write one is its own grant and never a side effect of importing a contact.
 
 # --- scope: which permissions are checked against a brand -------------------
 # ADR-150, addendum 2026-09-15. **Scope is a property of the permission, not of
@@ -60,14 +91,20 @@ BRAND_SCOPED: frozenset[str] = frozenset({
     CAMPAIGNS_MANAGE,
     AUDIENCES_MANAGE,
     SENDS_EXECUTE,
-    # Classified now so the split lands correctly when these keys are built.
-    # They are in ADR-150 point 5's sixteen-key vocabulary but not yet in
-    # ALL_PERMISSIONS, because a key names a code path and those guards do not
-    # exist: "audiences.pin", "sends.plan", "overrides.manage".
-    "audiences.pin",
-    "sends.plan",
-    "overrides.manage",
+    # Built 2026-09-18; these were pre-classified here before their guards
+    # existed, and now name real code paths in `policy.py`.
+    AUDIENCES_PIN,
+    SENDS_PLAN,
+    OVERRIDES_MANAGE,
 })
+
+# Platform-level by omission, and each for a reason from ADR-150 point 5:
+# recipients carry no brand (point 9) and neither do signal contributions
+# (point 8), so `recipients.manage`, `recipients.consent` and `insight.write`
+# have no brand to be checked against. `integrations.manage` joins
+# `users.manage` for the same reason that one is platform-level — scoping the
+# power to mint credentials per brand would be theatre, since a holder could
+# mint a credential granted on any brand they can already reach.
 
 
 def is_brand_scoped(permission: str) -> bool:
@@ -100,7 +137,19 @@ BUILTIN_ROLES: dict[str, dict] = {
         "permissions": [
             VIEW, CAMPAIGNS_MANAGE, CONTENT_MANAGE,
             AUDIENCES_MANAGE, SENDS_EXECUTE, AI_RUN,
+            # Added with the 2026-09-18 split. A Manager could already pin, plan
+            # a send and override a pick — those acts were reachable under
+            # `audiences.manage`, `sends.execute` and `campaigns.manage`
+            # respectively. Naming them explicitly keeps the role's capability
+            # exactly where it was; omitting them would have been a silent
+            # downgrade dressed as a refactor.
+            AUDIENCES_PIN, SENDS_PLAN, OVERRIDES_MANAGE,
         ],
+        # Still not a Manager's: `recipients.manage`, `recipients.consent` and
+        # `insight.write` guard no UI surface — recipients originate in the
+        # source system (ADR-167) and engagement arrives from providers and
+        # integrations, so these exist for machine callers. `integrations.manage`
+        # is Admin's by ADR-166 point 4.
     },
     VIEWER: {
         "name": "Viewer",

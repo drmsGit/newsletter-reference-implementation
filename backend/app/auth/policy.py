@@ -22,8 +22,9 @@ ones they live inside.
 """
 
 from app.auth.permissions import (
-    AI_RUN, AUDIENCES_MANAGE, CAMPAIGNS_MANAGE, CONTENT_MANAGE,
-    SENDS_EXECUTE, SETTINGS_MANAGE, USERS_MANAGE, VIEW,
+    AI_RUN, AUDIENCES_MANAGE, AUDIENCES_PIN, CAMPAIGNS_MANAGE, CONTENT_MANAGE,
+    OVERRIDES_MANAGE, SENDS_EXECUTE, SENDS_PLAN, SETTINGS_MANAGE, USERS_MANAGE,
+    VIEW,
 )
 
 WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
@@ -44,15 +45,31 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
     ("/ui/campaigns/{campaign_id}/variants/{variant_id}/suggest-subject", AI_RUN),
     # Creates an audience group; it is filed under campaigns only by URL.
     ("/ui/campaigns/{campaign_id}/suggest-audience", AUDIENCES_MANAGE),
-    # Planning a send is a send action, not a campaign edit.
-    ("/ui/campaigns/{campaign_id}/snapshots/", SENDS_EXECUTE),
+    # Overriding a system pick is its own act, not a campaign edit (ADR-166
+    # point 2). These sat under `campaigns.manage`, which also means "restructure
+    # the composition" — and the override layer (ADR-040/041) exists precisely to
+    # keep correcting a pick distinct from rebuilding the thing it sits in.
+    ("/ui/campaigns/{campaign_id}/variants/{variant_id}/overrides", OVERRIDES_MANAGE),
+    ("/ui/campaigns/{campaign_id}/overrides", OVERRIDES_MANAGE),
 
-    # --- sending: the actions that reach real people ------------------------
-    ("/ui/send-instances/", SENDS_EXECUTE),
+    # --- sending: preparing is not firing -----------------------------------
+    # ADR-166 point 2 splits `sends.execute`. The line is "does a person receive
+    # something because of this request": snapshotting and creating a send
+    # instance do not reach anybody, and dispatching does. Both entries below
+    # are ordered narrow-above-broad, so the one route that actually sends is
+    # matched before the prefix that covers preparing it.
+    ("/ui/campaigns/{campaign_id}/snapshots/", SENDS_PLAN),
+    ("/ui/send-instances/{send_instance_id}/send", SENDS_EXECUTE),
+    ("/ui/send-instances/", SENDS_PLAN),
     ("/ui/deliveries/process-due", SENDS_EXECUTE),
     ("/ui/send-test", SENDS_EXECUTE),
 
     # --- editorial and audience --------------------------------------------
+    # Adding or removing one member is `audiences.pin`; changing the rules that
+    # decide membership is `audiences.manage`. ADR-166 point 2's worked example
+    # is exactly this: a website form may pin a recipient and must not be able
+    # to restructure the audience it pins into.
+    ("/ui/audience-groups/{group_id}/members", AUDIENCES_PIN),
     ("/ui/audience-groups", AUDIENCES_MANAGE),
     ("/ui/content", CONTENT_MANAGE),
     ("/ui/categories", CONTENT_MANAGE),
