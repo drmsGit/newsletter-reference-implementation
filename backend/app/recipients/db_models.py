@@ -181,6 +181,23 @@ class SignalContributionDB(Base):
 
     # "manual" | "click" | "open" | "unsubscribe" | "conversion" (extension).
     contribution_type = Column(String(50), nullable=False)
+    # ADR-164 point 9. **One log read along two axes**: topic affinity sums
+    # over categories ignoring channel — interest in hiking is interest in
+    # hiking wherever it was clicked — and channel affinity sums over channels
+    # ignoring category, which is what lets the decision layer eventually
+    # choose a channel per recipient.
+    #
+    # **Denormalised, not derived.** ADR-164 checked deriving it from
+    # `event_id` and rejected it three ways: the path is five joins on every
+    # read in a layer built around compute-on-read; `event_id` is nullable, so
+    # a declared preference would answer *unknowable* rather than *not
+    # applicable*; and ADR-132 prunes, so contributions would lose their
+    # channel retroactively over exactly the window worth analysing.
+    #
+    # **Nullable, and the null means "not applicable".** A manually declared
+    # preference happened on no channel at all. Storing 'email' for it would
+    # be inventing an engagement nobody had.
+    channel = Column(String(50), nullable=True, index=True)
 
     # The signed weight this contribution adds *before* decay.
     base_weight = Column(Float, nullable=False)

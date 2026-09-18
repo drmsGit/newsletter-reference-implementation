@@ -68,6 +68,7 @@ def record_contribution(
     event_id: int | None = None,
     source: str = "engagement",
     base_weight: float | None = None,
+    channel: str | None = None,
 ) -> SignalContributionDB:
     """Append one contribution to the log. `base_weight` defaults to the
     configured weight for the type; pass it explicitly to scale (e.g. by a
@@ -88,6 +89,9 @@ def record_contribution(
         occurred_at=occurred_at or datetime.now(timezone.utc),
         event_id=event_id,
         source=source,
+        # None means "not applicable" — a declared preference happened on no
+        # channel (ADR-164 point 9).
+        channel=channel,
     )
     db.add(contribution)
     db.commit()
@@ -155,6 +159,42 @@ def operational_signals_for_category(
     signals: dict[int, float] = {}
     for r in rows:
         signals[r.recipient_id] = signals.get(r.recipient_id, 0.0) + _decayed_weight(
+            r.base_weight, r.occurred_at, r.contribution_type, now, half_lives
+        )
+    return signals
+
+
+def channel_affinity(
+    db: Session,
+    recipient_id: int,
+    now: datetime | None = None,
+) -> dict[str, float]:
+    """{channel: signal} for one recipient — ADR-164 point 9's second axis.
+
+    The same log as topic affinity, summed over channels instead of over
+    categories, with the same decay. This is what [[ADR-160]]'s forward
+    consequence rests on: the decision layer cannot choose a channel per
+    recipient without knowing which channels that person engages with.
+
+    Contributions with no channel are **excluded rather than bucketed**. A
+    declared preference is a real signal about a topic and no signal at all
+    about a channel; counting it under any channel would invent an engagement,
+    and counting it under a "none" key would invite somebody to compare it with
+    the real ones.
+    """
+    now = now or datetime.now(timezone.utc)
+    half_lives = _configured_half_lives(db)
+    rows = (
+        db.query(SignalContributionDB)
+        .filter(
+            SignalContributionDB.recipient_id == recipient_id,
+            SignalContributionDB.channel.isnot(None),
+        )
+        .all()
+    )
+    signals: dict[str, float] = {}
+    for r in rows:
+        signals[r.channel] = signals.get(r.channel, 0.0) + _decayed_weight(
             r.base_weight, r.occurred_at, r.contribution_type, now, half_lives
         )
     return signals

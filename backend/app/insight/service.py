@@ -167,6 +167,10 @@ def apply_event_to_signals(
             event_id=event.id,
             source="engagement",
             base_weight=category_weight,
+            # The execution carries the real channel since ADR-160 point 4 was
+            # built; before that it defaulted to email for every send, so
+            # copying it then would have recorded a fact nobody had.
+            channel=delivery_execution.channel,
         )
 
         updated_categories.append(assignment.category_id)
