@@ -48,6 +48,66 @@ def db():
         session.close()
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _sweep():
+    """Last line of defence, and it earned its place immediately.
+
+    `scenario` below creates a recipient and a category before the first
+    statement that can fail, so a setup error leaves both behind — pytest runs
+    a fixture's teardown only if it reached its `yield`. Three failing debug
+    runs of this very file leaked thirteen of each into the shared dev
+    database before this existed.
+    """
+    yield
+    session = SessionLocal()
+    try:
+        _purge(session)
+    finally:
+        session.close()
+
+
+def _purge(session):
+    """Everything this file can create, in foreign-key order.
+
+    Order is the whole content of this function: a category cannot be deleted
+    while a content assignment points at it, and the first version of this
+    sweep tried and failed on exactly that.
+    """
+    from app.content.db_models import ContentCategoryAssignmentDB
+    from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
+
+    recipient_ids = [r.id for r in session.query(RecipientDB).filter(
+        RecipientDB.external_id.like(f"{PREFIX}%")).all()]
+    category_ids = [c.id for c in session.query(CategoryDB).filter(
+        CategoryDB.name.like(f"{PREFIX}%")).all()]
+    content_ids = [r.id for r in session.query(ContentRecordDB).filter(
+        ContentRecordDB.title.like(f"{PREFIX}%")).all()]
+    send_ids = [s.id for s in session.query(SendInstanceDB).filter(
+        SendInstanceDB.name.like(f"{PREFIX}%")).all()]
+    execution_ids = [e.id for e in session.query(DeliveryExecutionDB).filter(
+        DeliveryExecutionDB.send_instance_id.in_(send_ids or [-1])).all()]
+
+    session.query(SignalContributionDB).filter(
+        SignalContributionDB.recipient_id.in_(recipient_ids or [-1])).delete(synchronize_session=False)
+    session.query(EngagementEventDB).filter(
+        EngagementEventDB.delivery_execution_id.in_(execution_ids or [-1])).delete(synchronize_session=False)
+    session.query(DeliveryExecutionDB).filter(
+        DeliveryExecutionDB.id.in_(execution_ids or [-1])).delete(synchronize_session=False)
+    session.query(SendInstanceDB).filter(
+        SendInstanceDB.id.in_(send_ids or [-1])).delete(synchronize_session=False)
+    session.query(ContentCategoryAssignmentDB).filter(
+        ContentCategoryAssignmentDB.category_id.in_(category_ids or [-1])).delete(synchronize_session=False)
+    session.query(ContentCategoryAssignmentDB).filter(
+        ContentCategoryAssignmentDB.content_id.in_(content_ids or [-1])).delete(synchronize_session=False)
+    session.query(ContentRecordDB).filter(
+        ContentRecordDB.id.in_(content_ids or [-1])).delete(synchronize_session=False)
+    session.query(RecipientDB).filter(
+        RecipientDB.id.in_(recipient_ids or [-1])).delete(synchronize_session=False)
+    session.query(CategoryDB).filter(
+        CategoryDB.id.in_(category_ids or [-1])).delete(synchronize_session=False)
+    session.commit()
+
+
 @pytest.fixture
 def scenario(db):
     """One recipient, one category, and contributions on two channels."""
