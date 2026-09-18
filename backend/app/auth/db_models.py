@@ -297,3 +297,43 @@ class IntegrationGrantDB(Base):
     permission = Column(String(100), nullable=False)
     brand_id = Column(Integer, ForeignKey("brands.id"), nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class IntegrationAuthFailureDB(Base):
+    """Failed machine authentication, **aggregated** — ADR-153 §6.
+
+    "Counts and summarises failures per address and per source over a window,
+    with the aggregate recorded rather than each attempt", for the explicit
+    reason that an unauthenticated attacker can generate them at will. These
+    routes are reachable by exactly that attacker, so the rule applies as
+    written, with the key standing where the address stands.
+
+    One row per (claimed key, client, hour). A row-per-attempt table would let
+    anyone who can reach the port write unbounded rows into the database, which
+    turns an accountability record into a denial-of-service surface.
+
+    **The claimed key is stored in the clear, and that is consistent rather
+    than careless.** ADR-154 §3 holds accountability records to internal
+    identifiers rather than contact details; a key id *is* an internal
+    identifier, it is public by design (point 1 makes it the half that
+    identifies without proving), and storing it readable is what makes the
+    aggregate useful — "someone is hammering n8n's key" is the finding. The
+    client identifier is hashed, because it is a network address and a network
+    address is not ours.
+    """
+
+    __tablename__ = "integration_auth_failures"
+    __table_args__ = (
+        UniqueConstraint(
+            "key_id", "client_hash", "window_start",
+            name="uq_integration_auth_failure_window",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    # Truncated to the column width: this is attacker-controlled input, and an
+    # unbounded string from a header has no business deciding a row's size.
+    key_id = Column(String(64), nullable=False, index=True)
+    client_hash = Column(String(64), nullable=False)
+    window_start = Column(DateTime(timezone=True), nullable=False, index=True)
+    attempts = Column(Integer, nullable=False, default=1)

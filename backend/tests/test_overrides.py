@@ -31,6 +31,25 @@ from app.overrides.db_models import ContentOverrideDB
 
 client = TestClient(app)
 
+
+@pytest.fixture(scope="module", autouse=True)
+def _machine_credentials():
+    """The override API is the machine plane now (ADR-166).
+
+    These tests used to prove the override API worked for anybody, which was
+    exactly the defect launch gate 3 exists to close. They now authenticate as
+    an integration holding `overrides.manage` and `view` — the grants a real
+    caller would need, and no more.
+    """
+    from app.auth.permissions import OVERRIDES_MANAGE, VIEW
+    from tests.machine import machine
+
+    with machine([VIEW, OVERRIDES_MANAGE]) as headers:
+        client.headers.update(headers)
+        yield
+        for header in headers:
+            client.headers.pop(header, None)
+
 def _find_module(**criteria) -> int:
     """Resolve a module instance by its *properties* rather than a fixed id.
 

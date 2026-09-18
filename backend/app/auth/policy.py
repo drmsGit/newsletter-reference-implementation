@@ -23,8 +23,8 @@ ones they live inside.
 
 from app.auth.permissions import (
     AI_RUN, AUDIENCES_MANAGE, AUDIENCES_PIN, CAMPAIGNS_MANAGE, CONTENT_MANAGE,
-    OVERRIDES_MANAGE, SENDS_EXECUTE, SENDS_PLAN, SETTINGS_MANAGE, USERS_MANAGE,
-    VIEW,
+    INSIGHT_WRITE, OVERRIDES_MANAGE, RECIPIENTS_CONSENT, RECIPIENTS_MANAGE,
+    SENDS_EXECUTE, SENDS_PLAN, SETTINGS_MANAGE, USERS_MANAGE, VIEW,
 )
 
 WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
@@ -32,6 +32,21 @@ WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 # Returned when a write route matches nothing. Not a real permission — no role
 # can hold it — so the effect is a refusal that names itself in the log.
 UNMAPPED = "unmapped.write"
+
+# Returned for a route authenticated by a PROVIDER SIGNATURE rather than by a
+# credential this platform issued (ADR-166 point 6). Also not a permission: no
+# principal can hold it, and the guard reads it as "not mine to judge" and
+# stands aside so the route's own signature check runs.
+#
+# **Two inbound mechanisms coexist deliberately.** Platform-issued credentials
+# authenticate systems the adopter controls; signature verification
+# authenticates send providers, who cannot hold a credential this platform
+# issued and will not be asked to. Neither is a degraded version of the other.
+#
+# Listing the exemption here rather than skipping the guard at the wiring is
+# the point: the table is meant to read as *the* policy, and an exemption that
+# lives in `main.py` is an exemption nobody auditing this file would find.
+PROVIDER_SIGNED = "provider.signed"
 
 WRITE_POLICY: tuple[tuple[str, str], ...] = (
     # --- the working context -------------------------------------------------
@@ -84,6 +99,44 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
     ("/ui/settings", SETTINGS_MANAGE),
     ("/ui/users", USERS_MANAGE),
     ("/ui/roles", USERS_MANAGE),
+
+    # === the JSON API (ADR-166) ===========================================
+    # Until 2026-09-18 these 36 write routes had no guard at all, while the UI
+    # above them was locked — the state ADR-166's Context calls worse than
+    # either alone, "because it looks protected".
+    #
+    # Same rule as the UI half: first match wins, narrow above broad, and an
+    # unlisted write is refused. Nothing here is a new capability; each entry
+    # names the permission the equivalent UI act already required.
+
+    # A provider signs its own callbacks. Above /provider so it wins.
+    ("/provider/webhooks/", PROVIDER_SIGNED),
+    # ADR-150 point 5: gated by `insight.write` rather than an `events.ingest`
+    # key of its own, because ingesting a provider event and posting an insight
+    # event both end in an engagement row feeding the signal layer. One key
+    # names the capability that matters rather than two naming the doors.
+    ("/provider/events", INSIGHT_WRITE),
+    ("/insight/", INSIGHT_WRITE),
+
+    # Recipients. `recipients.consent` sits above `recipients.manage` so that
+    # an integration which only imports contact records cannot also assert
+    # consent for them (ADR-150 point 5, ADR-142 §7's hard floor).
+    ("/recipients/{external_id}/consent", RECIPIENTS_CONSENT),
+    ("/recipients/", RECIPIENTS_MANAGE),
+
+    # Sending: preparing is not firing, the same split as the UI half.
+    ("/delivery/send-instances/{send_instance_id}/send", SENDS_EXECUTE),
+    ("/delivery/", SENDS_PLAN),
+    ("/snapshots/", SENDS_PLAN),
+
+    # Audience: pinning one member is not restructuring the group.
+    ("/api/audience-groups/{group_id}/members", AUDIENCES_PIN),
+    ("/api/audience-groups", AUDIENCES_MANAGE),
+
+    ("/overrides/", OVERRIDES_MANAGE),
+    ("/content/", CONTENT_MANAGE),
+    ("/campaigns/", CAMPAIGNS_MANAGE),
+    ("/decision/", CAMPAIGNS_MANAGE),
 )
 
 

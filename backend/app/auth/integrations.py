@@ -17,7 +17,8 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.auth.db_models import (
-    IntegrationCredentialDB, IntegrationDB, IntegrationGrantDB,
+    IntegrationAuthFailureDB, IntegrationCredentialDB, IntegrationDB,
+    IntegrationGrantDB,
 )
 from app.auth.permissions import ALL_PERMISSIONS
 from app.auth.service import hash_secret, now
@@ -196,6 +197,40 @@ def credentials_for(db: Session, integration_id: int) -> list[IntegrationCredent
 
 
 # --- authentication ---------------------------------------------------------
+
+def record_auth_failure(db: Session, key_id: str, client: str | None) -> None:
+    """Count a failed attempt into its hour bucket (ADR-153 §6).
+
+    Aggregated rather than one row per attempt, because these routes are
+    reachable by an unauthenticated caller who can generate failures at will —
+    a row-per-attempt table hands them a write primitive.
+
+    **Never raises.** A failure to record a failure must not become a different
+    failure for the caller: the request is being refused either way, and an
+    exception here would turn a 401 into a 500 and tell an attacker that their
+    input reached something.
+    """
+    try:
+        window = now().replace(minute=0, second=0, microsecond=0)
+        claimed = (key_id or "")[:64]
+        client_hash = hash_secret(client or "unknown")
+        row = db.query(IntegrationAuthFailureDB).filter(
+            IntegrationAuthFailureDB.key_id == claimed,
+            IntegrationAuthFailureDB.client_hash == client_hash,
+            IntegrationAuthFailureDB.window_start == window,
+        ).first()
+        if row is None:
+            db.add(IntegrationAuthFailureDB(
+                key_id=claimed, client_hash=client_hash,
+                window_start=window, attempts=1,
+            ))
+        else:
+            row.attempts += 1
+        db.commit()
+    except Exception:  # pragma: no cover - defensive, see docstring
+        db.rollback()
+        logger.warning("integration auth: could not record a failed attempt")
+
 
 def authenticate(db: Session, key_id: str, secret: str) -> IntegrationDB | None:
     """Resolve a key + secret to the integration behind it, or None.

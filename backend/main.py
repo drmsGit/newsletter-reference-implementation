@@ -144,8 +144,8 @@ from app.auth.db_models import (
     BrandDB, LoginCodeDB, RoleAssignmentDB, RoleDB, RolePermissionDB, SessionDB, UserDB,
 )
 from app.auth.dependencies import (
-    CsrfFailed, NotAuthenticated, NotAuthorised, auth_enforced, enforce_csrf,
-    enforce_policy,
+    BrandNotDeclared, CsrfFailed, NotAuthenticated, NotAuthorised,
+    auth_enforced, enforce_api_policy, enforce_csrf, enforce_policy,
 )
 from app.auth.router import router as auth_router
 from app.auth.service import (
@@ -370,6 +370,24 @@ def _csrf_failed(request: Request, exc: CsrfFailed):
     )
 
 
+@app.exception_handler(BrandNotDeclared)
+def _brand_not_declared(request: Request, exc: BrandNotDeclared):
+    """Say which of the two refusals this is (ADR-166 point 8's mitigation).
+
+    Without this the caller sees the same 403 they would get for lacking the
+    permission, and "the integration that worked yesterday and stopped because
+    somebody scoped it to a second brand" reads as "permissions broke".
+    """
+    return JSONResponse(
+        {"detail": (
+            "This action is brand-scoped. Send the brand you are acting in as "
+            "an X-Brand header carrying the brand id. The header selects which "
+            "grant is checked — it grants nothing on its own."
+        )},
+        status_code=400,
+    )
+
+
 @app.exception_handler(NotAuthorised)
 def _not_authorised(request: Request, exc: NotAuthorised):
     """A browser gets a page it can navigate away from, not a dead end.
@@ -398,27 +416,48 @@ app.include_router(auth_router)
 # Sign-in itself lives in auth_router, above, whose login routes are
 # deliberately open and whose /ui/users routes carry their own explicit guard.
 #
-# The JSON API routers below are NOT guarded. That is machine authentication, a
-# separately scoped concern and a Mode B prerequisite (ADR-142) — see
-# docs/backlog.md. A human session cookie would be the wrong mechanism.
 app.include_router(
     frontend_router,
     # CSRF first: a forged request should be refused before its permissions are
     # even considered, and before any handler runs.
     dependencies=[Depends(enforce_csrf), Depends(enforce_policy)],
 )
-app.include_router(content_router)
-app.include_router(campaigns_router)
-app.include_router(rendering_router)
-app.include_router(snapshots_router)
-app.include_router(delivery_router)
-app.include_router(insight_router)
-app.include_router(decision_router)
-app.include_router(recipients_router)
-app.include_router(provider_router)
-app.include_router(email_modules_router)
-app.include_router(overrides_router)
-app.include_router(audience_router)
+
+# The JSON API — the machine plane, guarded since 2026-09-18 (ADR-166, launch
+# gate 3). Until then these routers were included with no guard at all while
+# the UI above them was locked, which ADR-166's Context calls worse than either
+# state alone "because it looks protected": 69 routes, 36 of them
+# state-changing, including one that fires real mail and one that writes the
+# consent record a UWG §7 complaint is answered with.
+#
+# `enforce_api_policy` accepts a platform-issued integration credential and
+# **not** a session cookie. The comment that stood here previously already said
+# why — "a human session cookie would be the wrong mechanism" — and the
+# narrowing is what makes CSRF a non-question on this plane: there is no
+# ambient credential for a cross-site request to carry.
+#
+# No `enforce_csrf` here, deliberately. It reads the request as a form, which
+# a JSON body is not, and it would protect against an attack this plane cannot
+# suffer.
+#
+# `POST /provider/webhooks/resend` is inside `provider_router` and is exempt by
+# policy rather than by wiring: the table maps it to PROVIDER_SIGNED and the
+# guard stands aside so the route's own Svix check runs (ADR-166 point 6). The
+# exemption is legible in `app/auth/policy.py` — where somebody auditing the
+# policy would actually look — instead of hiding here.
+_api = [Depends(enforce_api_policy)]
+app.include_router(content_router, dependencies=_api)
+app.include_router(campaigns_router, dependencies=_api)
+app.include_router(rendering_router, dependencies=_api)
+app.include_router(snapshots_router, dependencies=_api)
+app.include_router(delivery_router, dependencies=_api)
+app.include_router(insight_router, dependencies=_api)
+app.include_router(decision_router, dependencies=_api)
+app.include_router(recipients_router, dependencies=_api)
+app.include_router(provider_router, dependencies=_api)
+app.include_router(email_modules_router, dependencies=_api)
+app.include_router(overrides_router, dependencies=_api)
+app.include_router(audience_router, dependencies=_api)
 
 
 @app.get("/")

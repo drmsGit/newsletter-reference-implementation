@@ -25,7 +25,8 @@ from sqlalchemy.orm import Session
 
 from app.auth.db_models import UserDB
 from app.auth.permissions import is_brand_scoped
-from app.auth.policy import UNMAPPED, required_permission
+from app.auth.policy import PROVIDER_SIGNED, UNMAPPED, required_permission
+from app.auth.integrations import authenticate, record_auth_failure
 from app.auth.service import (
     SESSION_COOKIE,
     csrf_token_for,
@@ -213,3 +214,122 @@ def enforce_policy(request: Request, db: Session = Depends(get_db)) -> UserDB | 
     if not _permitted(request, db, user, permission):
         raise NotAuthorised(permission)
     return user
+
+
+# --- the machine plane (ADR-166) --------------------------------------------
+
+BRAND_HEADER = "X-Brand"
+
+
+class BrandNotDeclared(Exception):
+    """Raised when a brand-scoped write arrives with no `X-Brand` header.
+
+    Its own exception, rather than a NotAuthorised, because ADR-166 point 8's
+    `### Negative` names the confusion this exists to prevent: "a caller that
+    omits the header is refused for having no working brand, which from outside
+    is indistinguishable from being refused for lacking the permission", and
+    the mitigation is "an error that says which of the two happened".
+
+    Explicitly **not** a fallback to "the one brand this integration holds".
+    That would work right up until it holds two, and would then fail by
+    silently acting on the wrong brand rather than by refusing.
+    """
+
+
+def _machine_credential(request: Request) -> tuple[str, str] | None:
+    """Pull `Authorization: Bearer <key_id>.<secret>` apart, or None.
+
+    **Key and secret in one standard header.** ADR-166 point 1 wants the two
+    halves distinguishable so a request that fails to authenticate can still be
+    attributed and counted; splitting on the first dot gives that without a
+    second header to forget. `Authorization` rather than a custom name because
+    proxies, log scrubbers and client libraries already know to redact it —
+    ADR-166 point 3 bans the credential from anywhere a log or a referrer can
+    capture it, and the well-known header is the one most tooling protects.
+    """
+    scheme, _, value = (request.headers.get("authorization") or "").partition(" ")
+    if scheme.lower() != "bearer" or not value.strip():
+        return None
+    key_id, _, secret = value.strip().partition(".")
+    if not key_id or not secret:
+        return None
+    return key_id, secret
+
+
+def _declared_brand(request: Request) -> int | None:
+    raw = (request.headers.get(BRAND_HEADER) or "").strip()
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        # A malformed value is the same as none: it selects no grant, and
+        # guessing what was meant is how a header becomes a second identifier
+        # scheme nobody documented.
+        return None
+
+
+def enforce_api_policy(request: Request, db: Session = Depends(get_db)):
+    """One guard over the JSON API — the machine plane (ADR-166).
+
+    **Only machine credentials are accepted here; a session cookie is not.**
+    That is a deliberate narrowing and it buys the CSRF question outright:
+    there is no ambient credential on this plane, so a cross-site request
+    carries nothing to abuse. It also keeps `enforce_csrf` — which reads the
+    request as a form — away from JSON bodies. A developer who wants to call
+    the API issues themselves an integration key, which is attributable and
+    revocable in a way a browser session is not.
+
+    Everything else is shared with the human path on purpose: the same policy
+    table decides which permission a route needs, and the same
+    `permissions_for` answers whether the caller holds it. ADR-166 point 1
+    refuses a parallel authorization system, and this is where that promise is
+    either kept or quietly broken.
+    """
+    route = request.scope.get("route")
+    template = getattr(route, "path", None) or request.url.path
+    permission = required_permission(request.method, template)
+
+    # A provider signs its own callbacks (ADR-166 point 6). Checked before
+    # enforcement, because this door is not ours to open or close: the route
+    # verifies a signature whether or not access control is switched on, and
+    # ADR-106 makes that feedback path mandatory for a production provider.
+    if permission == PROVIDER_SIGNED:
+        return None
+
+    if not auth_enforced(db):
+        return None
+
+    credential = _machine_credential(request)
+    if credential is None:
+        raise NotAuthenticated()
+
+    key_id, secret = credential
+    integration = authenticate(db, key_id, secret)
+    if integration is None:
+        record_auth_failure(db, key_id, request.client.host if request.client else None)
+        raise NotAuthenticated()
+
+    if permission == UNMAPPED:
+        logger.warning(
+            "api: refused %s %s — no policy entry. Add one in app/auth/policy.py.",
+            request.method, template,
+        )
+        raise NotAuthorised(permission)
+
+    if is_brand_scoped(permission):
+        brand_id = _declared_brand(request)
+        if brand_id is None:
+            logger.warning(
+                "api: refused %s for integration %s — %s is brand-scoped and no "
+                "%s header was sent",
+                permission, integration.id, permission, BRAND_HEADER,
+            )
+            raise BrandNotDeclared()
+        if not has_permission(db, integration, permission, brand_id=brand_id):
+            raise NotAuthorised(permission)
+        return integration
+
+    if not has_permission(db, integration, permission):
+        raise NotAuthorised(permission)
+    return integration

@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.auth.dependencies import enforce_api_policy
+from app.auth.permissions import RECIPIENTS_CONSENT
+from app.auth.service import has_permission
 from app.database import get_db
 from app.recipients.models import (
     ConsentDriftItem,
@@ -30,7 +33,40 @@ router = APIRouter(prefix="/recipients", tags=["recipients"])
 def create_recipient_record(
     payload: RecipientCreate,
     db: Session = Depends(get_db),
+    principal=Depends(enforce_api_policy),
 ):
+    """Create or upsert a recipient.
+
+    **This route needs two permissions, not one**, and it is the only route in
+    the system that does. The policy table maps it to `recipients.manage`,
+    which is right for creating a contact — but the payload also carries
+    `consent_status`, and writing that is `recipients.consent`. ADR-150
+    point 5 separates the two precisely so "an integration that only imports
+    contact records cannot also assert consent for them", and a single mapping
+    would have let the weaker grant assert consent through the body.
+
+    The check is payload-dependent, so it cannot live in the route→permission
+    table — that table matches on the route template and has nothing to read a
+    body with. Hence an explicit guard here, in the one place the distinction
+    is visible. `enforce_api_policy` is already the router-level dependency, so
+    this re-declaration resolves from FastAPI's per-request cache rather than
+    authenticating a second time.
+
+    A cookie-authenticated caller cannot reach this route at all (the machine
+    plane takes no cookies), so `principal` is an integration or the guard has
+    already refused.
+    """
+    declared = payload.consent_status.value
+    if declared and principal is not None:
+        if not has_permission(db, principal, RECIPIENTS_CONSENT):
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Creating a recipient needs 'recipients.manage'; asserting "
+                    "their consent needs 'recipients.consent' as well. Omit "
+                    "consent_status, or grant the second permission."
+                ),
+            )
     try:
         return create_recipient(
             db=db,

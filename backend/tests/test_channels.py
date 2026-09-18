@@ -1488,12 +1488,37 @@ class TestADeviceContactCanBeSyncedIn:
     channel, because the default was always right.
     """
 
+    @staticmethod
+    @pytest.fixture(scope="class", autouse=True)
+    def _api(request):
+        """A machine principal, because /recipients/ is the machine plane now.
+
+        The grants are exactly what a real CRM connector would hold, and the
+        pair is the point: `recipients.manage` creates the contact,
+        `recipients.consent` asserts what it agreed to. ADR-150 point 5 keeps
+        them separate so an importer cannot assert consent on its own, and the
+        create route enforces that against the payload rather than the URL.
+        """
+        from app.auth.permissions import (
+            RECIPIENTS_CONSENT, RECIPIENTS_MANAGE, VIEW,
+        )
+        from tests.machine import machine
+
+        with machine([VIEW, RECIPIENTS_MANAGE, RECIPIENTS_CONSENT]) as headers:
+            request.cls._api_headers = headers
+            yield
+            request.cls._api_headers = None
+
     def _client(self):
         from fastapi.testclient import TestClient
 
         from main import app
 
-        return TestClient(app, follow_redirects=False, raise_server_exceptions=False)
+        client = TestClient(
+            app, follow_redirects=False, raise_server_exceptions=False,
+        )
+        client.headers.update(self._api_headers or {})
+        return client
 
     def test_a_device_contact_is_created_with_a_push_address(self, db):
         from app.recipients.db_models import AddressabilityDB, RecipientDB
@@ -2349,6 +2374,17 @@ class TestNoSurfaceQuietlyRendersAPushAsAnEmail:
     and reported success.
     """
 
+    @staticmethod
+    @pytest.fixture(scope="class", autouse=True)
+    def _api(request):
+        from app.auth.permissions import SENDS_PLAN, VIEW
+        from tests.machine import machine
+
+        with machine([VIEW, SENDS_PLAN]) as headers:
+            request.cls._api_headers = headers
+            yield
+            request.cls._api_headers = None
+
     def _push_variant(self, db, campaign):
         from app.content.service import create_content
 
@@ -2391,8 +2427,12 @@ class TestNoSurfaceQuietlyRendersAPushAsAnEmail:
         from main import app
 
         variant = self._push_variant(db, campaign)
-        response = TestClient(app, raise_server_exceptions=False).get(
-            f"/rendering/variants/{variant.id}")
+        # Reading the JSON API needs `view`, and `view` is NOT implied for a
+        # machine the way it is for every role — an integration that only
+        # writes engagement events cannot read this.
+        _api_client = TestClient(app, raise_server_exceptions=False)
+        _api_client.headers.update(self._api_headers or {})
+        response = _api_client.get(f"/rendering/variants/{variant.id}")
 
         assert response.status_code == 200, response.text
         payload = response.json()
@@ -2462,8 +2502,9 @@ class TestNoSurfaceQuietlyRendersAPushAsAnEmail:
                                created_by="test")
         snapshot = create_snapshot_for_variant(db, variant_id=variant.id)
         try:
-            response = TestClient(app, raise_server_exceptions=False).get(
-                f"/snapshots/{snapshot.id}/html")
+            _api_client = TestClient(app, raise_server_exceptions=False)
+            _api_client.headers.update(self._api_headers or {})
+            response = _api_client.get(f"/snapshots/{snapshot.id}/html")
             assert response.status_code == 404
             assert "not an HTML document" in response.json()["detail"], (
                 "a present, complete push snapshot reported as simply missing"
