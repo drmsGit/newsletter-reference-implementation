@@ -32,19 +32,13 @@ class EmailRenderer(ChannelRenderer):
             mode=mode,
             collect_resolutions=True,
         )
-        # Read here rather than by the send path, so "what goes in the subject
-        # line" is answered once, by the thing that renders the email. ADR-162
-        # point 1 will move these into a `header` module; when it does, only
-        # this function changes.
-        from app.campaigns.db_models import VariantDB
+        # From the modules' manifests (ADR-162 point 1), not from variant
+        # columns — `envelope_fields_for_variant` still falls back to those
+        # while they exist, so this line did not have to change when the
+        # header module arrived and will not change when they are dropped.
+        from app.rendering.service import envelope_fields_for_variant
 
-        variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
-        envelope = {}
-        if variant is not None:
-            if variant.subject:
-                envelope["subject"] = variant.subject
-            if variant.preheader:
-                envelope["preheader"] = variant.preheader
+        envelope = envelope_fields_for_variant(db, variant_id, self.channel)
 
         return RenderedArtifact(
             role=ROLE_HTML,

@@ -40,6 +40,7 @@ from app.campaigns.db_models import (
     VariantDB,
 )
 from app.content.db_models import ContentCategoryAssignmentDB, ContentRecordDB
+from app.modules.registry import envelope_module_type
 
 #: What happens to the content the source campaign's modules point at.
 KEEP = "keep"      # same brand only — modules reference the same records
@@ -198,8 +199,10 @@ def duplicate_campaign(
             # copy whose modules came from a push variant is a push variant.
             channel=source_variant.channel,
             name=source_variant.name,
-            subject=source_variant.subject,
-            preheader=source_variant.preheader,
+            # Envelope copy is NOT carried here any more: it lives in the
+            # header module (ADR-162 point 1), which the module loop below
+            # copies like any other. Copying the columns too would restore the
+            # second source of truth that point exists to remove.
             status="draft",
         )
         db.add(variant)
@@ -237,7 +240,21 @@ def duplicate_campaign(
         # Positions are re-numbered from 1 rather than carried over: deleting a
         # module leaves a hole, and a copy is a fresh composition with no reason
         # to inherit one. Iterating in source order keeps the layout identical.
-        for index, source_module in enumerate(source_modules, start=1):
+        #
+        # **The envelope module keeps position 0**, which is where
+        # `set_envelope_fields` puts it on a fresh variant (ADR-162 point 1).
+        # Letting it renumber to 1 would work — the renderer only cares that it
+        # is first — but it would leave originals and copies structured
+        # differently for no reason, and "first" is easier to rely on when it is
+        # always the same number.
+        envelope_type = envelope_module_type(variant.channel)
+        next_position = 0
+        for source_module in source_modules:
+            if source_module.module_type == envelope_type:
+                index = 0
+            else:
+                next_position += 1
+                index = next_position
             content_record_id = _target_content_id(
                 db,
                 source_module.content_record_id,

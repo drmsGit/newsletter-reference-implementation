@@ -1,0 +1,10 @@
+{#
+  The preheader is the one envelope field that also leaves a mark on the body:
+  the standard technique is a hidden span at the very top, which clients read
+  as the inbox preview and nobody sees in the rendered mail. The subject has no
+  body representation at all and is carried on the artifact envelope only.
+
+  Rendered by this module rather than injected by `render_variant_html`, so the
+  markup lives with the field that produces it.
+#}
+{% if preheader %}<span class="preheader" style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;">{{ preheader }}</span>{% endif %}

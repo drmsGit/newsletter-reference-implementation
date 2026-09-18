@@ -5,7 +5,7 @@ from app.campaigns.db_models import CampaignDB, VariantDB, ModuleInstanceDB, Dec
 from app.campaigns.models import Campaign, CampaignWithVariants, Variant, ModuleInstance, DecisionSlot, DecisionResolution
 from app.channels.registry import get_channel, max_modules_for
 from app.content.db_models import ContentRecordDB, ContentVersionDB
-from app.modules.registry import get_manifest
+from app.modules.registry import envelope_module_type, get_manifest
 from app.recipients.db_models import RecipientDB
 
 
@@ -19,14 +19,29 @@ def to_campaign(record: CampaignDB) -> Campaign:
     )
 
 
-def to_variant(record: VariantDB) -> Variant:
+def to_variant(record: VariantDB, db: Session | None = None) -> Variant:
+    """`subject` and `preheader` are projected from the envelope module when a
+    session is available (ADR-162 point 1), and from the columns otherwise.
+
+    The optional session is the awkward part of this transition and is worth
+    naming: `to_variant` was a pure row-to-model mapper, and reading a field
+    that now lives in another table gives it a query. It keeps the columns as
+    the fallback so a caller without a session still gets the old answer rather
+    than None — which matters only until the contract migration.
+    """
+    envelope = {}
+    if db is not None:
+        from app.rendering.service import envelope_fields_for_variant
+
+        envelope = envelope_fields_for_variant(db, record.id, record.channel)
+
     return Variant(
         id=record.id,
         campaign_id=record.campaign_id,
         channel=record.channel,
         name=record.name,
-        subject=record.subject,
-        preheader=record.preheader,
+        subject=envelope.get("subject", record.subject),
+        preheader=envelope.get("preheader", record.preheader),
         status=record.status,
         created_at=record.created_at,
         updated_at=record.updated_at,
@@ -93,7 +108,7 @@ def create_campaign(
 
     return CampaignWithVariants(
         **to_campaign(campaign).model_dump(),
-        variants=[to_variant(initial_variant)],
+        variants=[to_variant(initial_variant, db)],
     )
 
 
@@ -107,7 +122,7 @@ def list_variants_for_campaign(
         .all()
     )
 
-    return [to_variant(record) for record in records]
+    return [to_variant(record, db) for record in records]
 
 
 def create_variant_for_campaign(
@@ -132,8 +147,6 @@ def create_variant_for_campaign(
         campaign_id=campaign_id,
         channel=channel,
         name=name,
-        subject=subject,
-        preheader=preheader,
         status=status,
     )
 
@@ -141,7 +154,12 @@ def create_variant_for_campaign(
     db.commit()
     db.refresh(variant)
 
-    return to_variant(variant)
+    # Into the module that declares them, not onto the row (ADR-162 point 1).
+    # The columns still exist and are deliberately no longer written: two
+    # places holding the same field is the failure mode that point rejects,
+    # and the read path stopped preferring the columns before this did.
+    set_envelope_fields(db, variant.id, {"subject": subject, "preheader": preheader})
+    return to_variant(variant, db)
 
 
 def update_variant(
@@ -155,11 +173,10 @@ def update_variant(
     if variant is None:
         return None
     variant.name = name
-    variant.subject = subject
-    variant.preheader = preheader
     db.commit()
+    set_envelope_fields(db, variant.id, {"subject": subject, "preheader": preheader})
     db.refresh(variant)
-    return to_variant(variant)
+    return to_variant(variant, db)
 
 
 def to_module_instance(record: ModuleInstanceDB) -> ModuleInstance:
@@ -188,6 +205,67 @@ def list_modules_for_variant(
     )
 
     return [to_module_instance(record) for record in records]
+
+
+def set_envelope_fields(db: Session, variant_id: int, fields: dict) -> None:
+    """Write this variant's envelope copy into the module that declares it.
+
+    ADR-162 point 1: subject and preheader are fields of an email, so they live
+    in the composition. This is the write half — `envelope_fields_for_variant`
+    is the read half, and neither of them names the module.
+
+    **Upserted at position 0** so the envelope module is always first, which is
+    where the ADR puts it and what keeps the preheader span at the top of the
+    body. Position 0 is free on every variant because
+    `create_module_for_variant` appends from 1.
+
+    Bypasses `create_module_for_variant` deliberately: that function appends,
+    and this one has a fixed slot. It also must not be refused by the
+    cardinality check — an envelope module is not a content module, and a push
+    variant is unaffected because push declares no envelope fields at all.
+    """
+    variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
+    if variant is None:
+        return
+    module_type = envelope_module_type(variant.channel)
+    if module_type is None:
+        # This channel has no envelope. Nothing to write, and nothing was lost
+        # — a push has no subject line by construction.
+        return
+
+    manifest = get_manifest(variant.channel, module_type)
+    allowed = {var.name for var in manifest.variables if var.envelope}
+    # Only what the manifest declares, and only what has a value. An empty
+    # string would read as "authored and left blank", which is a different
+    # claim from "never written".
+    data = {k: v for k, v in fields.items() if k in allowed and v}
+
+    existing = (
+        db.query(ModuleInstanceDB)
+        .filter(
+            ModuleInstanceDB.variant_id == variant_id,
+            ModuleInstanceDB.module_type == module_type,
+        )
+        .first()
+    )
+
+    if not data:
+        # Everything cleared: remove the module rather than keep an empty one.
+        if existing is not None:
+            db.delete(existing)
+            db.commit()
+        return
+
+    if existing is None:
+        db.add(ModuleInstanceDB(
+            variant_id=variant_id,
+            module_type=module_type,
+            position=0,
+            module_data=data,
+        ))
+    else:
+        existing.module_data = data
+    db.commit()
 
 
 def create_module_for_variant(

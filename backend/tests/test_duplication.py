@@ -251,11 +251,16 @@ def source(db, default_brand):
     made["campaigns"].append(campaign.id)
 
     variant = VariantDB(
-        campaign_id=campaign.id, channel="email", name="Variant A",
-        subject="Hello", preheader="Peek", status="sent",
+        campaign_id=campaign.id, channel="email", name="Variant A", status="sent",
     )
     db.add(variant)
     db.flush()
+    # Envelope copy lives in the header module since ADR-162 point 1, so the
+    # fixture writes it the way the application does rather than setting
+    # columns the code no longer reads.
+    from app.campaigns.service import set_envelope_fields
+
+    set_envelope_fields(db, variant.id, {"subject": "Hello", "preheader": "Peek"})
 
     slot = DecisionSlotDB(
         variant_id=variant.id,
@@ -548,9 +553,11 @@ class TestWhatTheCopyArrivesAs:
         )
         try:
             positions = [m.position for m in _modules(db, report.campaign_id)]
-            assert positions == [1, 2, 3], f"positions came across as {positions}"
+            # 0 is the header module, which keeps its slot; the content modules
+            # renumber from 1 and close the source's gaps.
+            assert positions == [0, 1, 2, 3], f"positions came across as {positions}"
             types = [m.module_type for m in _modules(db, report.campaign_id)]
-            assert types == ["single_stack", "cta", "single_stack"], (
+            assert types == ["header", "single_stack", "cta", "single_stack"], (
                 "renumbering reordered the layout"
             )
         finally:
@@ -597,9 +604,17 @@ class TestWhatTheCopyArrivesAs:
             )
             variants = db.query(VariantDB).filter(VariantDB.id.in_(variant_ids)).all()
             assert all(v.status == "draft" for v in variants)
-            assert variants[0].subject == "Hello" and variants[0].preheader == "Peek", (
-                "subject and preheader are the copy's starting point and must survive"
+            # Carried as a module now, not as columns — which is also why
+            # duplication needed no special case for it: the header module
+            # copies like any other.
+            from app.rendering.service import envelope_fields_for_variant
+
+            envelope = envelope_fields_for_variant(db, variant_ids[0], "email")
+            assert envelope.get("subject") == "Hello", (
+                "the copy lost its subject line — envelope copy is a module "
+                "since ADR-162 point 1, so it travels with the modules"
             )
+            assert envelope.get("preheader") == "Peek"
         finally:
             _purge_campaigns(db, [report.campaign_id])
 

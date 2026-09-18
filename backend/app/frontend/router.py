@@ -34,7 +34,7 @@ from app.content.service import create_category, create_category_relation
 from app.content.service import delete_content_record, delete_category, ContentRecordHasHistoryError, HasRelationsError
 from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB, ModuleInstanceDB, DecisionSlotDB
 from app.campaigns.service import create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant, update_decision_slot, update_variant, update_module, delete_module, move_module
-from app.rendering.service import UnpublishedContentError, render_variant_html
+from app.rendering.service import UnpublishedContentError, envelope_fields_for_variant, render_variant_html
 from app.snapshots.service import create_snapshot_for_variant
 from app.delivery.service import create_send_instance, prepare_send_from_audience, process_due_scheduled_sends, send_send_instance
 from app.delivery.providers.factory import get_provider
@@ -826,16 +826,32 @@ def campaign_detail(
                 }
             else:
                 active_override = None
-            modules.append({
-                "id": m.id,
-                "position": m.position,
-                "module_type": m.module_type,
-                "content_record_id": m.content_record_id,
-                "decision_slot_id": m.decision_slot_id,
-                "module_data_json": json.dumps(m.module_data) if m.module_data else "",
-                "overrideable": overrideable,
-                "active_override": active_override,
-            })
+            is_envelope = bool(manifest and any(v.envelope for v in manifest.variables))
+            # Envelope modules are storage, not composition. Showing one as a
+            # row in the module table — `{"subject": …}` sitting under the
+            # variant's own Subject field — would be the two-places confusion
+            # ADR-162 point 1 exists to remove, in the UI instead of the model.
+            #
+            # **Note what this does NOT yet unlock.** ADR-162 point 1 argues
+            # that moving these fields into a module means "a personalised
+            # subject line comes free" through the override layer. It does not,
+            # yet: `overrideable` below requires a module that *resolves
+            # content* — a content record or a decision slot — and an envelope
+            # module has neither, so it never reaches the override picker.
+            # Verified by rendering the page, not assumed. Closing that gap is
+            # an override-layer change (the `resolves_content` rule), logged
+            # rather than smuggled in here.
+            if not is_envelope:
+                modules.append({
+                    "id": m.id,
+                    "position": m.position,
+                    "module_type": m.module_type,
+                    "content_record_id": m.content_record_id,
+                    "decision_slot_id": m.decision_slot_id,
+                    "module_data_json": json.dumps(m.module_data) if m.module_data else "",
+                    "overrideable": overrideable,
+                    "active_override": active_override,
+                })
             if overrideable:
                 override_module_choices.append({
                     "id": m.id,
@@ -954,6 +970,7 @@ def campaign_detail(
             for snapshot in snapshot_records
         ]
 
+        variant_envelope = envelope_fields_for_variant(db, variant.id, variant.channel)
         variant_rows.append(
             {
                 "id": variant.id,
@@ -965,7 +982,15 @@ def campaign_detail(
                 # moment a second channel existed — which is the leak that made
                 # the directory restructure part of this work rather than a
                 # later tidy-up.
-                "module_templates": list_manifests(variant.channel),
+                # Envelope modules are excluded: they are authored through the
+                # variant's own subject/preheader fields (ADR-162 point 1), so
+                # offering one in the add-module picker would be a second way to
+                # create the same thing — and a manager who used it would get a
+                # duplicate the envelope writer then silently ignores.
+                "module_templates": [
+                    m for m in list_manifests(variant.channel)
+                    if not any(v.envelope for v in m.variables)
+                ],
                 # Cardinality, read from the channel manifest rather than known
                 # here. A full variant is offered no add-module form at all —
                 # but the service refuses it regardless, because a form that is
@@ -985,8 +1010,12 @@ def campaign_detail(
                     get_channel(variant.channel).label
                     if get_channel(variant.channel) else variant.channel
                 ),
-                "subject": variant.subject,
-                "preheader": variant.preheader,
+                # From the envelope module (ADR-162 point 1), not the row —
+                # the columns stopped being written when the write path moved,
+                # so reading them here would show the value as it was at
+                # migration time and never update.
+                "subject": variant_envelope.get("subject"),
+                "preheader": variant_envelope.get("preheader"),
                 "modules": modules,
                 "override_module_choices": override_module_choices,
                 "decision_slots": decision_slot_rows,

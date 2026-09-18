@@ -46,6 +46,16 @@ class ModuleVariable:
     #: exists so a channel added later gets a readable authoring surface from
     #: its manifest alone, rather than needing a hand-written form.
     label: str | None = None
+    #: Whether this field belongs on the delivery **envelope** rather than in
+    #: the rendered body. A subject line is the case that forces it: it is a
+    #: field of an email (ADR-162 point 1) but no part of the document.
+    #:
+    #: **Declared rather than inferred from the module's name.** A renderer
+    #: that special-cased a module called "header" would be the composition
+    #: code knowing about one module, which is exactly the shape ADR-160
+    #: point 2 refuses for push — the channel declares its capability, the
+    #: code reads the declaration.
+    envelope: bool = False
 
 
 @dataclass
@@ -88,6 +98,7 @@ def _load_manifest(json_path: Path, channel: str) -> ModuleManifest:
                 name=v["name"],
                 required=v.get("required", True),
                 label=v.get("label"),
+                envelope=v.get("envelope", False),
             )
             for v in data.get("variables", [])
         ],
@@ -192,3 +203,21 @@ def assert_manifests_load() -> None:
     class of late surprise the assertion exists to remove.
     """
     _ensure_fresh()
+
+
+def envelope_module_type(channel: str) -> str | None:
+    """Which of this channel's modules carries its envelope fields.
+
+    Found by reading the manifests for a variable declaring `envelope`, not by
+    looking for a module called "header" — the same reason the renderer does
+    not special-case it. A channel whose envelope copy lives in a module named
+    something else works without this function changing.
+
+    Returns None when the channel has no envelope fields at all, which is push:
+    a notification's title is body, not envelope, because the OS renders the
+    whole thing.
+    """
+    for manifest in list_manifests(channel):
+        if any(var.envelope for var in manifest.variables):
+            return manifest.name
+    return None

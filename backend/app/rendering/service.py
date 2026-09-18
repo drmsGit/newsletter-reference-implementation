@@ -97,13 +97,23 @@ def render_variant_html(
 
     brand_css = _load_brand_css()
 
-    # Preheader: the inbox preview text shown after the subject line. It lives
-    # on the variant and is emitted as a hidden span at the very top of the
-    # body (the standard email technique) so clients pick it up without it
-    # showing in the rendered email. Escaped — it's recipient-facing copy.
-    variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
+    # Preheader: the hidden span at the top of the body that clients read as
+    # the inbox preview. **The `header` module renders it now** (ADR-162
+    # point 1) — its own markup lives with the field that produces it.
+    #
+    # This legacy injection survives only for a variant that has no header
+    # module yet, which is every variant until the migration runs. Emitting it
+    # in both places would put the preview text in twice, so it is skipped the
+    # moment a module has contributed one.
+    has_module_preheader = any(
+        (m.module_data or {}).get("preheader")
+        for m in modules
+        if (get_manifest(channel, m.module_type) or None)
+        and any(v.name == "preheader" and v.envelope
+                for v in get_manifest(channel, m.module_type).variables)
+    )
     preheader_html = ""
-    if variant is not None and variant.preheader:
+    if not has_module_preheader and variant is not None and getattr(variant, "preheader", None):
         preheader_html = (
             '<span class="preheader" '
             'style="display:none!important;visibility:hidden;opacity:0;'
@@ -151,6 +161,49 @@ def render_module(
         return render_cms_module(db=db, module=module, manifest=manifest, channel=channel, recipient_id=recipient_id, mode=mode)
 
     return render_static_module(db=db, module=module, manifest=manifest, channel=channel, mode=mode), None
+
+
+def envelope_fields_for_variant(
+    db: Session, variant_id: int, channel: str
+) -> dict:
+    """Fields this variant's modules declare as belonging to the **envelope**
+    rather than to the rendered body — ADR-162 point 1.
+
+    Read from the manifests, so nothing here knows that email has a subject or
+    that the module carrying it happens to be called `header`. A channel whose
+    envelope needs a different field declares it and this function finds it.
+
+    **Transitional fallback.** While `variants.subject` / `preheader` still
+    exist, a variant with no header module falls back to them — the columns are
+    dropped in a later contract migration, and until then a half-migrated
+    database must not silently send mail with no subject line.
+    """
+    envelope: dict = {}
+    modules = (
+        db.query(ModuleInstanceDB)
+        .filter(ModuleInstanceDB.variant_id == variant_id)
+        .order_by(ModuleInstanceDB.position)
+        .all()
+    )
+    for module in modules:
+        manifest = get_manifest(channel, module.module_type)
+        if manifest is None:
+            continue
+        data = module.module_data or {}
+        for var in manifest.variables:
+            if var.envelope and data.get(var.name):
+                envelope[var.name] = data[var.name]
+
+    if not envelope:
+        from app.campaigns.db_models import VariantDB
+
+        variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
+        if variant is not None:
+            if getattr(variant, "subject", None):
+                envelope["subject"] = variant.subject
+            if getattr(variant, "preheader", None):
+                envelope["preheader"] = variant.preheader
+    return envelope
 
 
 def render_variant(

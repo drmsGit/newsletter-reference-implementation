@@ -1,0 +1,10 @@
+{
+  "label": "Header",
+  "channel": "email",
+  "description": "The email's envelope copy — what appears in the inbox rather than in the message. ADR-162 point 1: subject and preheader are fields of an email, so they live in the composition like every other field, not as columns on the variant.",
+  "cms": false,
+  "variables": [
+    { "name": "subject", "required": false, "label": "Subject line", "envelope": true },
+    { "name": "preheader", "required": false, "label": "Preheader (inbox preview)", "envelope": true }
+  ]
+}

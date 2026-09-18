@@ -423,7 +423,11 @@ def send_send_instance(
         .filter(VariantDB.id == snapshot.variant_id)
         .first()
     )
-    subject = (variant.subject if variant and variant.subject else send_instance.name)
+    # Only the fallback. The subject itself rides on the artifact's envelope,
+    # filled by the renderer from the envelope module (ADR-162 point 1) — this
+    # is what a variant with no envelope copy at all falls back to, and reading
+    # `variant.subject` here would read a column nothing writes any more.
+    subject = send_instance.name
 
     # Refused up front if the adapter cannot carry this channel, rather than
     # failing at the vendor with a message about a malformed request.

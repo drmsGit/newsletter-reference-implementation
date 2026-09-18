@@ -2105,3 +2105,135 @@ class TestTheSendFormOffersOnlyWhatTheChannelCanDo:
             self._cleanup_user(db, user)
             db.query(SnapshotDB).filter(SnapshotDB.id == snapshot.id).delete()
             db.commit()
+
+
+class TestEnvelopeFieldsLiveInAModule:
+    """ADR-162 point 1, built 2026-09-18: "The variant holds no channel fields
+    at all. Subject and preheader become module fields, declared in a manifest."
+
+    The design call the ADR does not make, and the one worth reading: a subject
+    is not part of the document, so the renderer has to know it belongs on the
+    envelope. That is **declared on the manifest variable**, not inferred from
+    a module called `header` — a renderer special-casing one module's name is
+    exactly the shape ADR-160 point 2 refuses for push.
+    """
+
+    def test_the_envelope_is_found_by_declaration_not_by_module_name(self):
+        from app.modules.registry import envelope_module_type, get_manifest
+
+        assert envelope_module_type("email") == "header"
+        assert envelope_module_type("push") is None, (
+            "push declares no envelope field — a notification's title is body, "
+            "because the OS renders the whole thing"
+        )
+        subject = [v for v in get_manifest("email", "header").variables
+                   if v.name == "subject"][0]
+        assert subject.envelope is True
+
+    def test_the_declaration_is_what_decides_not_a_hardcoded_name(self):
+        """**The test that makes "declared" mean something.** Asserting that
+        email resolves to `header` and push to None passes just as well against
+        a hardcoded `"header" if channel == "email"`, which a mutation proved.
+        Dropping a manifest that declares an envelope field onto a channel that
+        had none has to change the answer, or the declaration is decoration.
+        """
+        import json
+
+        from app.modules import registry
+
+        planted = registry.MODULES_DIR / "push" / f"{PREFIX}_envelope.json"
+        planted.write_text(json.dumps({
+            "label": "Planted", "channel": "push", "cms": False,
+            "has_template": False,
+            "variables": [{"name": "push_subject", "envelope": True}],
+        }))
+        try:
+            registry._registry_mtime = None
+            assert registry.envelope_module_type("push") == f"{PREFIX}_envelope", (
+                "a manifest declaring an envelope field was ignored — the "
+                "lookup is keyed on a name somebody wrote in code, not on what "
+                "the manifests say"
+            )
+        finally:
+            planted.unlink(missing_ok=True)
+            registry._registry_mtime = None
+        assert registry.envelope_module_type("push") is None
+
+    def test_creating_a_variant_writes_its_envelope_into_a_module(self, db, campaign):
+        from app.rendering.service import envelope_fields_for_variant
+
+        variant = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("v"), channel="email",
+            subject="Snow report", preheader="Two metres at Arosa")
+
+        module = db.query(ModuleInstanceDB).filter(
+            ModuleInstanceDB.variant_id == variant.id,
+            ModuleInstanceDB.module_type == "header").first()
+        assert module is not None, "the envelope copy went nowhere"
+        assert module.position == 0, "the envelope module must be first"
+        assert module.module_data == {
+            "subject": "Snow report", "preheader": "Two metres at Arosa"}
+        assert envelope_fields_for_variant(db, variant.id, "email")["subject"] == "Snow report"
+
+    def test_a_push_variant_gets_no_envelope_module(self, db, campaign):
+        """Push declares no envelope field, so there is nothing to write and no
+        empty module asserting that somebody wrote one."""
+        variant = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("p"), channel="push",
+            subject="ignored", preheader="ignored")
+        assert db.query(ModuleInstanceDB).filter(
+            ModuleInstanceDB.variant_id == variant.id).count() == 0
+
+    def test_the_subject_reaches_the_rendered_artifact(self, db, campaign):
+        from app.rendering.service import render_variant
+
+        variant = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("v"), channel="email",
+            subject="Snow report", preheader="Two metres")
+        artifact = render_variant(db, variant.id, mode="preview")
+        assert artifact.envelope["subject"] == "Snow report", (
+            "the subject did not reach the envelope, so the send path would "
+            "fall back to the send instance's name"
+        )
+
+    def test_the_preheader_is_emitted_once_not_twice(self, db, campaign):
+        """It is rendered by the header module's own template now. The legacy
+        injection in `render_variant_html` survives only for a variant with no
+        envelope module, and emitting both would put the inbox preview text in
+        the body twice."""
+        from app.rendering.service import render_variant
+
+        variant = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("v"), channel="email",
+            subject="S", preheader="Two metres at Arosa")
+        body = render_variant(db, variant.id, mode="preview").body
+        assert body.count('class="preheader"') == 1, (
+            f"the preheader span appears {body.count(chr(34) + 'preheader' + chr(34))} "
+            "times — the module template and the legacy injection are both firing"
+        )
+
+    def test_clearing_the_subject_removes_the_module(self, db, campaign):
+        """An empty envelope module would be a row asserting somebody wrote
+        envelope copy, which is a different claim from never having written
+        any — the same reason the migration skips variants with neither."""
+        from app.campaigns.service import update_variant
+
+        variant = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("v"), channel="email",
+            subject="Temporary", preheader="")
+        update_variant(db, variant.id, name="still here", subject="", preheader="")
+        assert db.query(ModuleInstanceDB).filter(
+            ModuleInstanceDB.variant_id == variant.id,
+            ModuleInstanceDB.module_type == "header").count() == 0
+
+    def test_the_envelope_module_is_not_offered_as_a_composable_module(self, db):
+        """It is authored through the variant's own subject field. Offering it
+        in the add-module picker would be a second way to create the same
+        thing, and the duplicate would then be silently ignored by the envelope
+        writer, which upserts by type."""
+        from app.modules.registry import list_manifests
+
+        offered = [m.name for m in list_manifests("email")
+                   if not any(v.envelope for v in m.variables)]
+        assert "header" not in offered
+        assert "single_stack" in offered, "the real modules must still be offered"
