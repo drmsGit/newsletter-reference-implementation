@@ -17,7 +17,10 @@ from app.auth.service import (
     SESSION_COOKIE, brands_for_user, brands_with_permission, has_permission,
     list_brands, safe_next, set_session_brand, user_for_token,
 )
-from app.auth.permissions import CAMPAIGNS_MANAGE, CONTENT_MANAGE
+from app.auth.dependencies import require_permission
+from app.auth.permissions import (
+    CAMPAIGNS_MANAGE, CONTENT_MANAGE, INTEGRATIONS_MANAGE,
+)
 from app.channels.registry import DEFAULT_CHANNEL, get_channel, max_modules_for
 from app.delivery.providers.factory import providers_for_channel
 from app.settings.service import available_channels, channel_available
@@ -3792,3 +3795,186 @@ def audience_group_recalculate(group_id: int, db: Session = Depends(get_db)):
             status_code=303,
         )
     return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
+
+
+# --- integrations: machine callers and their keys (ADR-166) -----------------
+#
+# These live in the frontend router rather than `auth_router` so they inherit
+# both `enforce_csrf` and `enforce_policy` from the one place those are wired.
+# `auth_router` carries explicit permission guards and no CSRF, which is a gap
+# in its own right; this feature does not extend it.
+#
+# Gated by `integrations.manage` through the policy table's `/ui/integrations`
+# prefix. ADR-166 point 4 makes that its own permission rather than a fold into
+# `credentials.manage` — that key is for credentials the platform HOLDS, and
+# these are credentials it ISSUES, a line ADR-152 drew itself.
+
+# **The GET needs its own guard**, and this is the trap the policy table sets
+# for a read-only admin surface: `required_permission` answers `view` for every
+# GET, so the `/ui/integrations` entry covers the writes and leaves the page
+# itself readable by anyone who can sign in. The users and roles screens carry
+# explicit guards for exactly this reason; the entry in the table made this one
+# *look* covered, which is worse than an obvious omission. Caught by a test
+# asserting a Manager is refused, not by reading the table.
+
+def _integration_rows(db: Session):
+    from app.auth.db_models import (
+        IntegrationCredentialDB, IntegrationDB, IntegrationGrantDB,
+    )
+
+    rows = []
+    for integration in db.query(IntegrationDB).order_by(IntegrationDB.id).all():
+        credentials = db.query(IntegrationCredentialDB).filter(
+            IntegrationCredentialDB.integration_id == integration.id
+        ).order_by(IntegrationCredentialDB.id).all()
+        grants = db.query(IntegrationGrantDB).filter(
+            IntegrationGrantDB.integration_id == integration.id
+        ).order_by(IntegrationGrantDB.permission).all()
+        rows.append({
+            "integration": integration,
+            "credentials": credentials,
+            "grants": grants,
+            "live_keys": sum(1 for c in credentials if c.revoked_at is None),
+        })
+    return rows
+
+
+def _integrations_context(request: Request, db: Session, **extra):
+    from app.auth.permissions import ALL_PERMISSIONS
+
+    context = {
+        "rows": _integration_rows(db),
+        "all_permissions": sorted(ALL_PERMISSIONS.items()),
+        "brands": list_brands(db),
+        "issued": None,
+        "issued_for": None,
+    }
+    context.update(extra)
+    return context
+
+
+@router.get("/ui/integrations")
+def integrations_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    _user=Depends(require_permission(INTEGRATIONS_MANAGE)),
+):
+    """The review surface ADR-166's Notes called "the obvious shape of an
+    answer" to the credential-outlives-its-issuer gap.
+
+    It is not a mitigation and the ADR is careful not to claim it is: a
+    credential still survives the deactivation of whoever created it. What this
+    gives is the thing ADR-151 §5 relies on for people — somewhere to *look*.
+    Each integration, what it may do, how many live keys it has, when each was
+    last used, and whether it may send without approval.
+    """
+    return templates.TemplateResponse(
+        request, "integrations.html", _integrations_context(request, db),
+    )
+
+
+@router.post("/ui/integrations")
+def integration_create(
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    from app.auth import integrations as ints
+
+    user = user_for_token(db, request.cookies.get(SESSION_COOKIE))
+    ints.create_integration(
+        db, name=name, description=description,
+        created_by_user_id=user.id if user else None,
+    )
+    return RedirectResponse(url="/ui/integrations", status_code=303)
+
+
+@router.post("/ui/integrations/{integration_id}/keys")
+def integration_issue_key(
+    request: Request,
+    integration_id: int,
+    label: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Issue a key and show the secret **once**, in this response.
+
+    Deliberately not a redirect. ADR-166 point 3 keeps the secret out of "a URL,
+    a query string or a path segment", because a referrer header, an access log
+    or an intermediary will capture any of them — and the redirect that would
+    otherwise be the idiomatic answer here is exactly how a secret ends up in a
+    query string. Rendering it directly means it exists in one response body and
+    nowhere else.
+    """
+    from app.auth import integrations as ints
+
+    issued = ints.issue_credential(db, integration_id, label=label)
+    extra = {}
+    if issued is not None:
+        credential, secret = issued
+        extra = {
+            "issued": f"{credential.key_id}.{secret}",
+            "issued_for": integration_id,
+        }
+    return templates.TemplateResponse(
+        request, "integrations.html", _integrations_context(request, db, **extra),
+    )
+
+
+@router.post("/ui/integrations/{integration_id}/keys/{credential_id}/revoke")
+def integration_revoke_key(
+    integration_id: int, credential_id: int, db: Session = Depends(get_db),
+):
+    from app.auth import integrations as ints
+
+    ints.revoke_credential(db, credential_id)
+    return RedirectResponse(url="/ui/integrations", status_code=303)
+
+
+@router.post("/ui/integrations/{integration_id}/grants")
+def integration_grant(
+    integration_id: int,
+    permission: str = Form(...),
+    brand_id: int = Form(...),
+    db: Session = Depends(get_db),
+):
+    from app.auth import integrations as ints
+
+    ints.grant(db, integration_id, permission, brand_id)
+    return RedirectResponse(url="/ui/integrations", status_code=303)
+
+
+@router.post("/ui/integrations/{integration_id}/grants/remove")
+def integration_revoke_grant(
+    integration_id: int,
+    permission: str = Form(...),
+    brand_id: int = Form(...),
+    db: Session = Depends(get_db),
+):
+    from app.auth import integrations as ints
+
+    ints.revoke_grant(db, integration_id, permission, brand_id)
+    return RedirectResponse(url="/ui/integrations", status_code=303)
+
+
+@router.post("/ui/integrations/{integration_id}/unattended")
+def integration_set_unattended(
+    integration_id: int, allowed: str = Form(""), db: Session = Depends(get_db),
+):
+    """ADR-166 point 5: switching this off is the control, so it is logged.
+
+    "The integration where someone switched it off is by construction the one
+    with the least oversight. Logging the change is the whole control."
+    """
+    from app.auth import integrations as ints
+
+    ints.set_unattended_sending(db, integration_id, allowed == "1")
+    return RedirectResponse(url="/ui/integrations", status_code=303)
+
+
+@router.post("/ui/integrations/{integration_id}/deactivate")
+def integration_deactivate(integration_id: int, db: Session = Depends(get_db)):
+    from app.auth import integrations as ints
+
+    ints.deactivate_integration(db, integration_id)
+    return RedirectResponse(url="/ui/integrations", status_code=303)

@@ -22,7 +22,9 @@ from sqlalchemy import text
 
 from app.auth import integrations as ints
 from app.auth import service as auth
-from app.auth.db_models import IntegrationAuthFailureDB
+from app.auth.db_models import (
+    IntegrationAuthFailureDB, IntegrationCredentialDB,
+)
 from app.auth.permissions import (
     CONTENT_MANAGE, RECIPIENTS_CONSENT, RECIPIENTS_MANAGE, VIEW,
 )
@@ -272,3 +274,56 @@ class TestNoRouteIsUnguarded:
             and required_permission(m, getattr(r, "path", "")) == PROVIDER_SIGNED
         ]
         assert exempt == ["POST /provider/webhooks/resend"], exempt
+
+
+class TestAMachineSendNeedsApproval:
+    """ADR-166 point 5, enforced rather than asserted.
+
+    The ADR says a machine-triggered send lands in ADR-142 §4's approval
+    surface unless the integration is flagged otherwise. That surface is not
+    built, so there is nowhere for it to land — and storing the flag, showing
+    it in the admin screen and letting the send through anyway would ship
+    something that looks like a control and is not.
+    """
+
+    def test_an_unflagged_integration_cannot_fire_a_send(self, db):
+        from app.auth.permissions import SENDS_EXECUTE, VIEW
+
+        with machine([VIEW, SENDS_EXECUTE]) as headers:
+            response = client.post(
+                "/delivery/send-instances/1/send", headers=headers,
+            )
+            assert response.status_code == 403
+            assert "without approval" in response.json()["detail"]
+
+    def test_the_flag_is_what_changes_it(self, db):
+        from app.auth.db_models import IntegrationDB
+        from app.auth.permissions import SENDS_EXECUTE, VIEW
+
+        with machine([VIEW, SENDS_EXECUTE]) as headers:
+            key_id = headers["Authorization"].split()[1].split(".")[0]
+            integration = db.query(IntegrationDB).join(
+                IntegrationCredentialDB,
+                IntegrationCredentialDB.integration_id == IntegrationDB.id,
+            ).filter(IntegrationCredentialDB.key_id == key_id).first()
+            ints.set_unattended_sending(db, integration.id, True)
+
+            response = client.post(
+                "/delivery/send-instances/1/send", headers=headers,
+            )
+            # Past the guard now: whatever happens next is the send path's
+            # business, and a missing send instance is not an authorisation
+            # answer.
+            assert response.status_code != 403 or (
+                "without approval" not in response.json().get("detail", "")
+            )
+
+    def test_planning_is_not_affected(self, db):
+        """The flag gates firing, not preparing. `sends.plan` reaches nobody."""
+        from app.auth.permissions import SENDS_PLAN, VIEW
+
+        with machine([VIEW, SENDS_PLAN]) as headers:
+            response = client.post(
+                "/delivery/send-instances", headers=headers, json={},
+            )
+            assert response.status_code != 403

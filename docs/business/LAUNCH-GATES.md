@@ -7,7 +7,7 @@ What must be true before public beta. Reviewed against commits and
 |---|---|---|---|
 | 1 | Positioning statement adopted | public beta, Phase 4C write & publish | ❌ open — `POSITIONING.md` |
 | 2 | P0 consent defect fixed | any public exposure (compliance) | ✅ done 2026-09-13 — send-time exclusion stack |
-| 3 | P0 inbound machine authentication | any public exposure | ❌ open |
+| 3 | P0 inbound machine authentication | any public exposure | ✅ done 2026-09-18 — ADR-166 accepted and built |
 | 4 | Auth enforcement flag switched on | any public exposure | ✅ CLOSED 2026-09-13 — default ON, CSRF on all 62 forms, code requests rate limited |
 | 4b | Sign-in code disclosure fixed (P0, security) | any public exposure | ✅ done 2026-09-13 — with the enumeration oracle, one change |
 | 5 | Real provider integration proven | the "no lock-in" claim | ✅ done — Resend, live, verified domain |
@@ -52,9 +52,46 @@ apart. From the 2026-08-07 external review:
   test modules uncollectable. It does not — the suite collects and passes. The
   real constraint is that several tests need a live seeded Postgres, which is
   the isolated-test-DB Needs-ADR item.
-- **Gate 3** — the JSON API routers are deliberately unguarded; that is machine
-  authentication, scoped as a Mode B prerequisite. It was raised to P0 because
-  it blocks public exposure, not just Mode B.
+- **Gate 3 — ✅ CLOSED 2026-09-18.** The JSON routers are guarded. Thirty-six
+  state-changing routes had no check at all while the UI above them was locked
+  — the state [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]]
+  calls worse than either alone, "because it looks protected". Among them one
+  that fires real mail, one that writes the consent record a UWG §7 complaint
+  is answered with, one that returns the recipient list, and one that writes
+  engagement straight into the signal layer.
+
+  Machine callers are principals in ADR-150's access model rather than a
+  parallel system: the same policy table decides which permission a route
+  needs, and the same `permissions_for` answers whether the caller holds it.
+  The permission vocabulary grew from nine keys to sixteen to make that
+  expressible, which improved the human model too — "may pin but may not
+  restructure the audience" and "may prepare a send but not fire it" are
+  ordinary descriptions of a junior marketer.
+
+  **This plane takes a platform-issued credential and not a session cookie**,
+  which settles CSRF here by construction: there is no ambient credential for a
+  cross-site request to carry. The one exempt route is
+  `POST /provider/webhooks/resend`, exempt by **policy** rather than by wiring,
+  so the exemption is legible where somebody auditing access control would
+  actually look; a test asserts it is the only one.
+
+  **What is closed is authentication, not everything that record designs.**
+  ADR-166 point 5 wants an unattended machine send to queue into ADR-142 §4's
+  approval surface, and **that surface is not built**. So an integration not
+  flagged for unattended sending is refused the send route outright rather than
+  let through — the honest reading of "defaults to requiring approval" while
+  there is nowhere to queue. It becomes a queue when the approval inbox lands,
+  and the default does not have to change.
+
+  Two defects surfaced during the build and were fixed with it. `enforce_csrf`
+  was wired onto the frontend router alone, leaving the thirteen user- and
+  role-administration forms — the most privileged in the system — as the only
+  ones with no CSRF protection, which contradicts what gate 4 below claims. And
+  `POST /recipients/` accepted `consent_status` under `recipients.manage`,
+  defeating ADR-150 point 5's separation through the payload rather than the
+  URL; that route now needs `recipients.consent` as well, and it is the only
+  route in the system requiring two permissions — because a route→permission
+  table has nothing to read a body with.
 - **Gate 4 — ✅ CLOSED 2026-09-13.** Enforcement now **defaults to ON**, and
   CSRF covers all 62 forms via one router-level dependency beside
   `enforce_policy`, failing closed so a new form without the hidden field is
@@ -103,8 +140,8 @@ apart. From the 2026-08-07 external review:
   otherwise mint a fresh rate-limit identity per request — the safe failure is
   a limit that is too broad, not one that does not exist.
 
-- **The security cluster is built but not accepted.** ADR-150–154 all carry
-  **Proposed** status, in the frontmatter and the body alike — so gates 4 and 4b
+- **The security cluster is built and, since 2026-09-18, accepted.** ADR-150–154
+  carried **Proposed** status until then, in the frontmatter and the body alike — so gates 4 and 4b
   were closed by implementing decisions the repo has not formally adopted. The
   code is not in question; the record is. Gate 7 already says "base built,
   proposed status", and this is the same fact seen from the other side. An

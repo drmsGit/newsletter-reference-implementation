@@ -23,7 +23,8 @@ ones they live inside.
 
 from app.auth.permissions import (
     AI_RUN, AUDIENCES_MANAGE, AUDIENCES_PIN, CAMPAIGNS_MANAGE, CONTENT_MANAGE,
-    INSIGHT_WRITE, OVERRIDES_MANAGE, RECIPIENTS_CONSENT, RECIPIENTS_MANAGE,
+    INSIGHT_WRITE, INTEGRATIONS_MANAGE, OVERRIDES_MANAGE,
+    RECIPIENTS_CONSENT, RECIPIENTS_MANAGE,
     SENDS_EXECUTE, SENDS_PLAN, SETTINGS_MANAGE, USERS_MANAGE, VIEW,
 )
 
@@ -96,6 +97,10 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
     # guards, so these entries are documentation rather than enforcement — the
     # table is meant to be readable as *the* policy, and omitting them would
     # make it look as though nothing protects them.
+    # Issuing a machine credential is its own grant, not a fold into
+    # `credentials.manage` — ADR-152 scopes that key to credentials the
+    # platform HOLDS, and these are ones it ISSUES (ADR-166 point 4).
+    ("/ui/integrations", INTEGRATIONS_MANAGE),
     ("/ui/settings", SETTINGS_MANAGE),
     ("/ui/users", USERS_MANAGE),
     ("/ui/roles", USERS_MANAGE),

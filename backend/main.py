@@ -144,7 +144,8 @@ from app.auth.db_models import (
     BrandDB, LoginCodeDB, RoleAssignmentDB, RoleDB, RolePermissionDB, SessionDB, UserDB,
 )
 from app.auth.dependencies import (
-    BrandNotDeclared, CsrfFailed, NotAuthenticated, NotAuthorised,
+    ApprovalRequired, BrandNotDeclared, CsrfFailed, NotAuthenticated,
+    NotAuthorised,
     auth_enforced, enforce_api_policy, enforce_csrf, enforce_policy,
 )
 from app.auth.router import router as auth_router
@@ -370,6 +371,20 @@ def _csrf_failed(request: Request, exc: CsrfFailed):
     )
 
 
+@app.exception_handler(ApprovalRequired)
+def _approval_required(request: Request, exc: ApprovalRequired):
+    return JSONResponse(
+        {"detail": (
+            "This integration is not permitted to send without approval. "
+            "ADR-166 point 5 defaults every integration to requiring it, and "
+            "the approval surface it would queue into is not built yet — so a "
+            "send it cannot queue is refused rather than let through. Enable "
+            "unattended sending for this integration if that is intended."
+        )},
+        status_code=403,
+    )
+
+
 @app.exception_handler(BrandNotDeclared)
 def _brand_not_declared(request: Request, exc: BrandNotDeclared):
     """Say which of the two refusals this is (ADR-166 point 8's mitigation).
@@ -405,7 +420,14 @@ def _not_authorised(request: Request, exc: NotAuthorised):
     )
 
 
-app.include_router(auth_router)
+# CSRF over the auth router too. It carries explicit `require_permission`
+# guards on thirteen user- and role-administration forms and had NO CSRF until
+# 2026-09-18, because `enforce_csrf` was wired onto the frontend router alone —
+# so the most privileged forms in the system were the only unprotected ones,
+# while launch gate 4 recorded "CSRF on all 62 forms". The sign-in routes below
+# it are unaffected: `enforce_csrf` skips a request with no session cookie,
+# which is what an anonymous sign-in POST is.
+app.include_router(auth_router, dependencies=[Depends(enforce_csrf)])
 
 # One guard over the whole UI, deriving the required permission from the route
 # via app/auth/policy.py: reads need `view`, writes are looked up in the policy

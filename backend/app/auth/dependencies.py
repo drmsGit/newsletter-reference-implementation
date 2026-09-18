@@ -24,7 +24,7 @@ from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
 from app.auth.db_models import UserDB
-from app.auth.permissions import is_brand_scoped
+from app.auth.permissions import SENDS_EXECUTE, is_brand_scoped
 from app.auth.policy import PROVIDER_SIGNED, UNMAPPED, required_permission
 from app.auth.integrations import authenticate, record_auth_failure
 from app.auth.service import (
@@ -221,6 +221,23 @@ def enforce_policy(request: Request, db: Session = Depends(get_db)) -> UserDB | 
 BRAND_HEADER = "X-Brand"
 
 
+class ApprovalRequired(Exception):
+    """A machine tried to fire a send it is not flagged to fire unattended.
+
+    ADR-166 point 5 says such a send "lands in ADR-142 §4's approval surface —
+    the same pending-action mechanism, the same inbox, the same history".
+    **That surface is not built.** The shared approval inbox is an open item,
+    so there is nowhere for the send to land.
+
+    Refusing is the only honest reading of "defaults to requiring approval"
+    while that is true. The alternative — storing the flag, showing it in the
+    UI and letting the send through anyway — ships something that looks like a
+    control and is not, which is worse than shipping no flag at all. When the
+    approval surface exists this becomes a queue instead of a refusal, and the
+    default does not have to change.
+    """
+
+
 class BrandNotDeclared(Exception):
     """Raised when a brand-scoped write arrives with no `X-Brand` header.
 
@@ -316,6 +333,15 @@ def enforce_api_policy(request: Request, db: Session = Depends(get_db)):
             request.method, template,
         )
         raise NotAuthorised(permission)
+
+    # ADR-166 point 5, enforced rather than asserted. Checked before the brand,
+    # because "you may not do this at all" outranks "you did not say where".
+    if permission == SENDS_EXECUTE and not integration.may_send_unattended:
+        logger.warning(
+            "api: refused a send for integration %s — not flagged for "
+            "unattended sending", integration.id,
+        )
+        raise ApprovalRequired()
 
     if is_brand_scoped(permission):
         brand_id = _declared_brand(request)
