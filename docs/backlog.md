@@ -160,6 +160,39 @@ _Found by the user 2026-09-16, switching brands while inside the app. All three 
 - 🔴 **[Feature] — LOW priority.** **A `performance-notes.md` for latent scaling findings.** Proposed by the user 2026-08-02 during `/interview-review` (AI Q5): reviews keep surfacing small "this is O(n) and n will grow" observations that are real but never "do next", and putting them in a prioritised backlog either buries them or inflates them. Collect them in one document instead. **Design note that decides whether it works:** give each entry a **trigger threshold** — the number at which it starts to matter (rows, recipients, runs/month) — alongside symptom, location, current cost and candidate fix. Without that column it becomes a graveyard of things nobody can tell are urgent; with it, a reader can scan for "have we crossed this yet?" Seed it with the AI ledger item above, and sweep the existing backlog for others already logged (the serial per-recipient send loop in `send_send_instance` is an obvious first candidate). **Two more from the 2026-08-07 code review, both P3 and both textbook entries for this document rather than the backlog:** every authenticated request writes — `user_for_token()` updates `last_seen_at` and commits on each call, turning read-heavy UI traffic into write traffic, so persist only when the stored value is older than 5–10 minutes (P3-01); and **many UI list views call `.all()` with no pagination** — categories, campaigns, users, assignments and the graph/report routes — which is fine on seed data and grows linearly, with the graph routes becoming expensive first (P3-02). Source: [[Interview Prep - AI]] → AI Layer Q5; code review 2026-08-07 P3-01, P3-02.
 
 - 🔴 **[Feature] — LOW priority, "pre-send safety net" bundle (park for now).** A set of checks that should run before a send actually fires, grouped as one "send hygiene / security before sending" concern. Not important now (POC default provider is mock; the recipient cap + consent floor + Trigger-send confirm already cover the worst accidents), but capture so they're designed together later. Includes: **(1) deduplication** — collapse duplicate recipients within a send (esp. once multiple include blocks / manual pins overlap; `resolve_audience` already dedupes by id, but cross-source email-level dupes from bad imports aren't caught since `RecipientDB.email` has no unique constraint); **(2) double-send protection across re-plans** — planning the same snapshot+audience twice creates two independent send instances; if both trigger, a recipient receives it twice. Needs either a warn-on-duplicate-plan, or the frequency-capping exclude ("not emailed in last N days", itself parked behind automation); **(3) suppression list** — a hard never-send set (past hard bounces, complaints, manual blocklist) applied as a final filter regardless of audience rules, tied to the inbound bounce/complaint→consent work (see the inbound-adapter Feature). These are the "security before sending" layer the user flagged alongside dedup (2026-07-26). Sequence after the send path is otherwise complete; some pieces (frequency cap, suppression from bounces) depend on the parked automation + inbound work. Source: user, 2026-07-26 (campaign→send link session).
+  
+  - 🔴 **[Feature] — the one plugin family that isn't drop-a-file.** **AI tasks
+  need a registry and a generated settings surface.** Noticed by the user
+  2026-09-17 while reading the code. `app/ai/tasks/` holds `__init__.py` and
+  `subject_preheader.py` and **no registry** — `frontend/router.py:236` imports
+  the task module directly and reads `subject_task.TASK_KEY` /
+  `subject_task.DEFAULT_PROMPT`, and `settings.html:177` hardcodes a card
+  headed "AI prompt — subject & preheader" bound to singular context keys
+  (`ai_prompt_body`, `ai_prompt_version`, `ai_prompt_versions`). So tasks only
+  *look* drop-a-file because there is exactly one: adding a second needs the
+  new `.py`, an import plus three context keys in the router, **and** a
+  duplicated card in the template.
+
+  **The user's framing:** replace the hardcoded settings section with an **AI
+  task library** that generates one entry per file in `app/ai/tasks/`, with the
+  form shape declared in a template stored alongside the file — "so we would
+  have a two files per new task solution". Either one template for all tasks or
+  one per task; that is the open question.
+
+  **Four precedents to copy, all with the same `_discover` + mtime shape:**
+  `decision/strategies/registry.py`, `modules/registry.py`,
+  `channels/registry.py`, `rendering/renderers/registry.py`. And the two-files
+  target is already the repo's stated standard — [[ADR-160 — Channel Model and
+  Composition]] point 6 chose "a channel manifest plus a provider adapter — two
+  files, no config step", for the reason that applies exactly here: "a third
+  pattern that needs registering in several places is the one that eventually
+  gets registered in two."
+
+  **Interacts with the parked per-task model selection item**, which proposes
+  putting model choice "beside the prompt, which is already per-task and
+  manager-owned" — that item assumes a per-task settings surface this one would
+  build. Sequence them together. **Not urgent** (user). Source: user,
+  2026-09-17.
 
 ## Needs ADR (blocked on design decision)
 
