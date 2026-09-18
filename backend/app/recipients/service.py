@@ -4,6 +4,9 @@ from app.recipients.consent import (
     CONSENTING_STATUS,
     DEFAULT_CHANNEL,
     address_key_for,
+    address_value,
+    addresses_for_many,
+    consent_grid_many,
     DEFAULT_PURPOSE,
     latest_consent_event,
     latest_consent_status,
@@ -19,10 +22,12 @@ from app.recipients.db_models import (
     RecipientDB,
 )
 from app.recipients.models import (
+    ConsentCell,
     ConsentDriftItem,
     ConsentStatus,
     ConsentSyncLog,
     Recipient,
+    RecipientAddress,
     RecipientPreference,
 )
 
@@ -120,17 +125,22 @@ def validate_recipient_attributes(attributes: dict | None) -> None:
 def to_recipient(db: Session, record: RecipientDB, brand_id: int) -> Recipient:
     """Project one recipient row for the API.
 
-    Neither `email` nor `consent_status` is a column any more. The address is
-    the recipient's email-channel addressability row (ADR-163 point 2, resolved
-    by the point 11 rules) and the consent status is the latest
-    (brand, email, marketing) event — so the same recipient projects a
-    different consent status depending on which brand is asking, which is the
-    point (ADR-163 addendum 2026-09-15). The API still exposes both as flat scalars,
-    because that is what one channel's callers need; the per-cell view is
-    `GET /recipients/consent/drift`, and a fuller grid belongs with the
-    per-channel UI that does not exist yet.
+    Neither the address nor the consent state is a column any more: the address
+    is an addressability row (ADR-163 point 2, resolved by the point 11 rules)
+    and the consent state is the latest event per cell — so the same recipient
+    projects differently depending on which brand is asking, which is the point
+    (ADR-163 addendum 2026-09-15).
 
-    Use `to_recipients` for more than one — this issues two queries per record.
+    **The projection is per channel.** `addresses` and `consent` are the whole
+    picture; `email` and `email_consent_status` are the email-channel views of
+    it, named for their scope. The old flat `consent_status` was the (email,
+    marketing) cell called "the" consent status, which was accurate while email
+    was the only channel and became a lie the moment push existed — a contact
+    that accepted notifications and was never asked about email projected as
+    `pending`, true of the email cell and false of the person.
+
+    Use `to_recipients` for more than one — this issues a fixed number of
+    queries for the whole set, not per record.
     """
     return to_recipients(db, [record], brand_id)[0]
 
@@ -145,21 +155,42 @@ def to_recipients(db: Session, records: list[RecipientDB], brand_id: int) -> lis
     """
     if not records:
         return []
+    from app.settings.service import available_channels
+
     ids = [record.id for record in records]
-    addresses = resolve_emails(db, ids)
+    channels = [c.name for c in available_channels(db)]
+    # Four set-wide lookups, not four per record. The docstring's fixed-query
+    # promise is the reason `consent_grid_many` and `addresses_for_many` exist
+    # at all rather than looping the single-recipient readers.
+    emails = resolve_emails(db, ids)
     consents = latest_consent_statuses(db, ids, brand_id)
+    grids = consent_grid_many(db, ids, brand_id, channels)
+    address_rows = addresses_for_many(db, ids)
+
     return [
         Recipient(
             id=record.id,
             external_id=record.external_id,
-            # "" rather than None when a recipient has no address: the field is
-            # non-optional in the API contract, and "unreachable" is already
-            # expressed by the exclusion stack rather than by a null here.
-            email=addresses.get(record.id, ""),
+            # "" rather than None when there is no email address: the field is
+            # non-optional in the API contract, and since ADR-167 a contact
+            # whose only contact point is a device token is an ordinary state
+            # rather than a broken record.
+            email=emails.get(record.id, ""),
             language=record.language,
             attributes=record.attributes,
             status=record.status,
-            consent_status=consents.get(record.id, ConsentStatus.pending.value),
+            email_consent_status=consents.get(record.id, ConsentStatus.pending.value),
+            addresses=[
+                RecipientAddress(
+                    channel=row.channel,
+                    # Through the channel's declared key, so a push row
+                    # projects its token rather than an empty string.
+                    value=address_value(row, address_key_for(row.channel)) or "",
+                    status=row.status,
+                )
+                for row in address_rows.get(record.id, [])
+            ],
+            consent=[ConsentCell(**cell) for cell in grids.get(record.id, [])],
             created_at=record.created_at,
             updated_at=record.updated_at,
         )

@@ -270,6 +270,85 @@ def consent_grid(
     return grid
 
 
+def consent_grid_many(
+    db: Session,
+    recipient_ids: list[int],
+    brand_id: int,
+    channels: list[str],
+) -> dict[int, list[dict]]:
+    """`consent_grid` for many recipients in one query.
+
+    Same reason `latest_consent_statuses` exists: a list view projecting N
+    recipients would otherwise issue N grid queries, which is the N+1 ADR-163
+    point 10 rules out for the exclusion stages and is just as avoidable here.
+    """
+    if not recipient_ids:
+        return {}
+
+    rows = (
+        db.query(ConsentEventDB)
+        .filter(
+            ConsentEventDB.recipient_id.in_(recipient_ids),
+            ConsentEventDB.brand_id == brand_id,
+        )
+        .order_by(ConsentEventDB.created_at.desc(), ConsentEventDB.id.desc())
+        .all()
+    )
+
+    # Newest first, so the first row seen per (recipient, cell) wins.
+    latest: dict[int, dict[tuple[str, str], ConsentEventDB]] = {}
+    for row in rows:
+        latest.setdefault(row.recipient_id, {}).setdefault(
+            (row.channel, row.purpose), row
+        )
+
+    purposes = sorted(
+        {p for cells in latest.values() for _, p in cells} | {DEFAULT_PURPOSE}
+    )
+    seen_channels = sorted({c for cells in latest.values() for c, _ in cells})
+    known = list(dict.fromkeys(list(channels) + seen_channels))
+
+    out: dict[int, list[dict]] = {}
+    for recipient_id in recipient_ids:
+        cells = latest.get(recipient_id, {})
+        out[recipient_id] = [
+            {
+                "channel": channel,
+                "purpose": purpose,
+                "status": cells[(channel, purpose)].status
+                if (channel, purpose) in cells else None,
+                "consenting": (channel, purpose) in cells
+                and cells[(channel, purpose)].status == CONSENTING_STATUS,
+            }
+            for channel in known
+            for purpose in purposes
+        ]
+    return out
+
+
+def addresses_for_many(
+    db: Session, recipient_ids: list[int]
+) -> dict[int, list[AddressabilityDB]]:
+    """Every contact point for each recipient, in one query.
+
+    Not filtered to active: an expired push token is a fact worth showing on a
+    recipient's page, and hiding it would make "this person has no device" and
+    "their token died" look the same. The send gate filters; this projects.
+    """
+    if not recipient_ids:
+        return {}
+    rows = (
+        db.query(AddressabilityDB)
+        .filter(AddressabilityDB.recipient_id.in_(recipient_ids))
+        .order_by(AddressabilityDB.channel.asc(), AddressabilityDB.id.asc())
+        .all()
+    )
+    out: dict[int, list[AddressabilityDB]] = {rid: [] for rid in recipient_ids}
+    for row in rows:
+        out.setdefault(row.recipient_id, []).append(row)
+    return out
+
+
 def is_consenting(
     db: Session,
     recipient_id: int,

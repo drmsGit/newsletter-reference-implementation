@@ -15,14 +15,47 @@ class ConsentStatus(str, Enum):
     pending = "pending"
 
 
+class RecipientAddress(BaseModel):
+    """One contact point. `value` is the deliverable scalar for its channel —
+    an address for email, a token for push — pulled out of the row's JSON by
+    the channel's declared key."""
+    channel: str
+    value: str
+    status: str
+
+
+class ConsentCell(BaseModel):
+    """One cell of the (channel × purpose) grid, for the brand that asked.
+
+    `status` is None when no event exists, which is **not** the same as a
+    refusal even though both are non-consenting: the absence of a decision is
+    not a decision, and only one of the two is fixable by asking.
+    """
+    channel: str
+    purpose: str
+    status: str | None = None
+    consenting: bool = False
+
+
 class Recipient(BaseModel):
     id: int
     external_id: str
+    # The EMAIL-channel address, and "" when there is none — which is now an
+    # ordinary state rather than a broken record: ADR-167 admits contacts whose
+    # only contact point is a device token.
     email: str
     language: str | None = None
     attributes: dict[str, Any] | None = None
     status: str
-    consent_status: ConsentStatus = ConsentStatus.pending
+    # **Renamed from `consent_status`, which was the defect.** It is the
+    # (email, marketing) cell and always was — but called "the" consent status
+    # it read as the whole answer, so a contact that accepted push and was
+    # never asked about email projected as `pending`, which is true of email
+    # and false of the person. The name now states its scope; `consent` below
+    # is the whole picture.
+    email_consent_status: ConsentStatus = ConsentStatus.pending
+    addresses: list[RecipientAddress] = []
+    consent: list[ConsentCell] = []
     created_at: datetime
     updated_at: datetime
 

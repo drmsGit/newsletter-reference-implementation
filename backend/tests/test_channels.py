@@ -1742,3 +1742,165 @@ class TestTheRecipientPageShowsEveryChannelsConsent:
             db.query(RecipientDB).filter(RecipientDB.id == recipient.id).delete()
             db.query(BrandDB).filter(BrandDB.id == other.id).delete()
             db.commit()
+
+
+class TestTheApiProjectsEveryChannel:
+    """The last email-shaped surface. `to_recipient` returned a flat `email`
+    and a `consent_status` that was the (email, marketing) cell called "the"
+    consent status — accurate while email was the only channel, and a lie the
+    moment push existed: a contact who accepted notifications and was never
+    asked about email projected as `pending`.
+    """
+
+    def _recipient_with(self, db, brand, channels: dict):
+        """A recipient holding one address and one consent grant per channel."""
+        from app.recipients.consent import record_consent
+        from app.recipients.db_models import AddressabilityDB, RecipientDB
+
+        recipient = RecipientDB(external_id=_name("r"), status="active")
+        db.add(recipient); db.commit(); db.refresh(recipient)
+        for channel, (value, status) in channels.items():
+            key = "email" if channel == "email" else "token"
+            db.add(AddressabilityDB(
+                recipient_id=recipient.id, channel=channel,
+                value={key: value}, status="active"))
+            db.commit()
+            record_consent(db, recipient.id, status, brand.id,
+                           channel=channel, source="test")
+        return recipient
+
+    def _cleanup(self, db, recipient):
+        from app.recipients.db_models import AddressabilityDB, ConsentEventDB, RecipientDB
+
+        db.query(ConsentEventDB).filter(
+            ConsentEventDB.recipient_id == recipient.id).delete(synchronize_session=False)
+        db.query(AddressabilityDB).filter(
+            AddressabilityDB.recipient_id == recipient.id).delete(synchronize_session=False)
+        db.query(RecipientDB).filter(RecipientDB.id == recipient.id).delete()
+        db.commit()
+
+    def test_a_push_only_contact_projects_its_token_and_its_grant(self, db):
+        from app.recipients.service import to_recipient
+
+        brand = auth.ensure_default_brand(db)
+        recipient = self._recipient_with(
+            db, brand, {"push": ("apns-abc123", "opted_in")})
+        try:
+            projected = to_recipient(db, recipient, brand.id)
+
+            assert projected.email == "", "a push-only contact has no inbox"
+            assert [(a.channel, a.value) for a in projected.addresses] == [
+                ("push", "apns-abc123")], (
+                "the contact's only address did not project — the projection "
+                "resolved the email channel and nothing else"
+            )
+            push = [c for c in projected.consent if c.channel == "push"]
+            assert push and push[0].consenting is True, (
+                "a contact who accepted notifications projected as having no "
+                "consent at all"
+            )
+        finally:
+            self._cleanup(db, recipient)
+
+    def test_the_flat_field_is_named_for_the_cell_it_actually_is(self, db):
+        """It is still exposed, because the email cell is what one channel's
+        callers want — but under a name that says so. A push-only contact is
+        `pending` on email, which is true of the cell and was a lie about the
+        person while the field was called `consent_status`."""
+        from app.recipients.service import to_recipient
+
+        brand = auth.ensure_default_brand(db)
+        recipient = self._recipient_with(
+            db, brand, {"push": ("apns-xyz", "opted_in")})
+        try:
+            projected = to_recipient(db, recipient, brand.id)
+            assert not hasattr(projected, "consent_status"), (
+                "the misleading name is still on the model"
+            )
+            assert projected.email_consent_status.value == "pending"
+            assert any(c.channel == "push" and c.consenting for c in projected.consent)
+        finally:
+            self._cleanup(db, recipient)
+
+    def test_projecting_many_recipients_does_not_issue_queries_per_record(self, db):
+        """`to_recipients` exists for this. Adding two per-channel lookups
+        naively would have made a list page issue 4N queries."""
+        from sqlalchemy import event
+
+        from app.recipients.service import to_recipients
+
+        brand = auth.ensure_default_brand(db)
+        made = [
+            self._recipient_with(db, brand, {"email": (f"{_name('a')}@x.invalid", "opted_in")})
+            for _ in range(6)
+        ]
+        counter = {"n": 0}
+
+        def count(conn, cursor, statement, params, context, executemany):
+            counter["n"] += 1
+
+        def queries_for(records):
+            # **Warm first, then measure.** `db.commit()` in the fixture
+            # expires every ORM object, so the first pass re-SELECTs each
+            # record as its attributes are touched — one query per record, from
+            # the test's own setup rather than from the code under test.
+            # Counting that pass makes this look like the N+1 it is checking
+            # for, which is how the first version of this test failed.
+            to_recipients(db, records, brand.id)
+            counter["n"] = 0
+            event.listen(db.get_bind(), "before_cursor_execute", count)
+            try:
+                assert len(to_recipients(db, records, brand.id)) == len(records)
+                return counter["n"]
+            finally:
+                event.remove(db.get_bind(), "before_cursor_execute", count)
+
+        try:
+            # **The property, not a magic number.** How many queries it takes
+            # is an implementation detail that will move; that it does not grow
+            # with the size of the set is the promise `to_recipients` makes.
+            two = queries_for(made[:2])
+            six = queries_for(made)
+            assert two == six, (
+                f"projecting 2 recipients cost {two} queries and 6 cost {six} — "
+                "a per-channel reader is being called per record, which is the "
+                "N+1 `to_recipients` exists to prevent"
+            )
+        finally:
+            for recipient in made:
+                self._cleanup(db, recipient)
+
+    def test_the_recipients_list_renders_a_badge_per_channel(self, db, monkeypatch):
+        """Jinja renders an undefined as empty, so a template still reading the
+        removed `consent_status` would show a blank badge and fail no test.
+        This is that test."""
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        brand = auth.ensure_default_brand(db)
+        recipient = self._recipient_with(
+            db, brand, {"email": (f"{_name('a')}@x.invalid", "opted_in"),
+                        "push": ("apns-list", "opted_out")})
+        user = UserDB(email=f"{PREFIX}-{uuid.uuid4().hex[:8]}@example.invalid", is_active=True)
+        db.add(user); db.commit(); db.refresh(user)
+        role = db.query(RoleDB).filter(RoleDB.key == ADMIN).first()
+        db.add(RoleAssignmentDB(user_id=user.id, role_id=role.id, brand_id=brand.id))
+        db.commit()
+        token = auth.create_session(db, user)
+        client = TestClient(app, follow_redirects=False, raise_server_exceptions=False)
+        client.cookies.set(auth.SESSION_COOKIE, token)
+        try:
+            page = client.get("/ui/recipients")
+            assert page.status_code == 200
+            assert 'bg-success">email' in page.text, "the email grant did not render"
+            assert 'bg-danger">push' in page.text, "the push refusal did not render"
+        finally:
+            db.query(SessionDB).filter(SessionDB.user_id == user.id).delete()
+            db.query(RoleAssignmentDB).filter(RoleAssignmentDB.user_id == user.id).delete()
+            db.query(AuditEventDB).filter(AuditEventDB.actor_id == user.id).delete(
+                synchronize_session=False)
+            db.query(UserDB).filter(UserDB.id == user.id).delete()
+            db.commit()
+            self._cleanup(db, recipient)
