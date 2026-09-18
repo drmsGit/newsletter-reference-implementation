@@ -26,8 +26,9 @@ from enum import Enum
 from sqlalchemy.orm import Session
 
 from app.auth.db_models import (
-    BrandDB, LoginCodeDB, LoginCodeRequestDB, RoleAssignmentDB, RoleDB,
-    RolePermissionDB, SessionDB, UserDB,
+    BrandDB, IntegrationDB, IntegrationGrantDB, LoginCodeDB,
+    LoginCodeRequestDB, RoleAssignmentDB, RoleDB, RolePermissionDB, SessionDB,
+    UserDB,
 )
 from app.auth.permissions import ALL_PERMISSIONS, BUILTIN_ROLES, IMPLIED, ADMIN
 
@@ -810,16 +811,55 @@ def revoke_all_sessions(db: Session, user_id: int) -> int:
 
 # --- permissions -----------------------------------------------------------
 
-def permissions_for(db: Session, user: UserDB, brand_id: int | None = None) -> set[str]:
-    """Every permission this user holds, optionally narrowed to one brand."""
-    if user is None or not user.is_active:
+# A principal is whoever a request is acting as. ADR-166 point 1: a machine
+# caller is one of these, in the same access model, not beside it.
+Principal = UserDB | IntegrationDB
+
+
+def permissions_for(
+    db: Session, principal: Principal | None, brand_id: int | None = None,
+) -> set[str]:
+    """Every permission this principal holds, optionally narrowed to one brand.
+
+    **Two storage shapes, one answer.** A person's permissions arrive through a
+    role (`role_permissions → roles → role_assignments`, ADR-150 §6); an
+    integration holds them directly (`integration_grants`, ADR-166 point 7 and
+    its 2026-09-18 addendum). The dispatch lives here, in the one function both
+    kinds of guard already call, so that "may this caller do this here" cannot
+    be answered two different ways — which is what ADR-166 point 1 is actually
+    protecting against. `has_permission`, `_permitted` and `enforce_policy`
+    need no knowledge that machines exist.
+
+    An inactive principal holds nothing, in either shape.
+    """
+    if principal is None:
+        return set()
+
+    if isinstance(principal, IntegrationDB):
+        if not principal.is_active:
+            return set()
+        query = db.query(IntegrationGrantDB.permission).filter(
+            IntegrationGrantDB.integration_id == principal.id
+        )
+        if brand_id is not None:
+            query = query.filter(IntegrationGrantDB.brand_id == brand_id)
+        # **`view` is NOT implied for an integration**, and that asymmetry is
+        # deliberate. Every *role* implies it, because a person who may edit
+        # and not read is not a case worth modelling. For a machine it is the
+        # ordinary case: n8n triggers a send and reads nothing, a website form
+        # pins a recipient and reads nothing. Implying `view` would hand every
+        # integration the recipient list — which is one of the four routes
+        # ADR-166's Context names as the reason this feature exists.
+        return {row[0] for row in query.all()}
+
+    if not principal.is_active:
         return set()
 
     query = (
         db.query(RolePermissionDB.permission)
         .join(RoleDB, RoleDB.id == RolePermissionDB.role_id)
         .join(RoleAssignmentDB, RoleAssignmentDB.role_id == RoleDB.id)
-        .filter(RoleAssignmentDB.user_id == user.id)
+        .filter(RoleAssignmentDB.user_id == principal.id)
     )
     if brand_id is not None:
         query = query.filter(RoleAssignmentDB.brand_id == brand_id)
@@ -827,9 +867,10 @@ def permissions_for(db: Session, user: UserDB, brand_id: int | None = None) -> s
 
 
 def has_permission(
-    db: Session, user: UserDB, permission: str, brand_id: int | None = None
+    db: Session, principal: Principal | None, permission: str,
+    brand_id: int | None = None,
 ) -> bool:
-    return permission in permissions_for(db, user, brand_id)
+    return permission in permissions_for(db, principal, brand_id)
 
 
 # --- user administration ---------------------------------------------------
