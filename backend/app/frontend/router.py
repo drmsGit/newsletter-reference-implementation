@@ -442,6 +442,12 @@ def send_test_submit(
     render_note = None
     if variant_id.strip():
         try:
+            # This page sends an EMAIL, so it renders through the email path on
+            # purpose — and that path now refuses a variant of another channel
+            # rather than returning an empty document. Before, a push variant
+            # rendered as a 252-character empty shell, which was mailed to a
+            # real address and reported as a success: the handler below never
+            # fired because nothing raised.
             html = render_variant_html(
                 db,
                 int(variant_id),

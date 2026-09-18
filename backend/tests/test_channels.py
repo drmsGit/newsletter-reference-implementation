@@ -2336,3 +2336,138 @@ class TestAChannelWithoutAnEnvelopeIsNotAskedForOne:
             )
         finally:
             self._cleanup(db, user)
+
+
+class TestNoSurfaceQuietlyRendersAPushAsAnEmail:
+    """A sweep after the channel work, rather than waiting for the next report.
+
+    `render_variant_html` assembles EMAIL modules. Handed a push variant it
+    found no email manifest for `notification`, rendered every module as an
+    HTML comment, and returned a 252-character empty document — with no error,
+    because nothing failed. Three surfaces called it without knowing the
+    channel, and the worst of them mailed that empty shell to a real address
+    and reported success.
+    """
+
+    def _push_variant(self, db, campaign):
+        from app.content.service import create_content
+
+        record = create_content(
+            db, title=_name("c"), brand_id=campaign.brand_id,
+            content={"push_title": "Ready", "push_body": "Go."})
+        variant = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+        create_module_for_variant(
+            db, variant_id=variant.id, module_type="notification",
+            content_record_id=record.id)
+        return variant
+
+    def test_the_email_assembler_refuses_a_variant_of_another_channel(self, db, campaign):
+        """**The root fix.** Returning an empty document for a push was worse
+        than raising, because every caller read it as a successful render."""
+        from app.rendering.service import render_variant_html
+
+        variant = self._push_variant(db, campaign)
+        with pytest.raises(ValueError, match="render_variant_html"):
+            render_variant_html(db, variant.id, mode="preview")
+
+    def test_an_email_variant_still_renders(self, db, campaign):
+        """Without this, the test above could pass by refusing everything."""
+        from app.rendering.service import render_variant_html
+
+        variant = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("email"), channel="email")
+        create_module_for_variant(db, variant_id=variant.id, module_type="cta",
+                                  module_data={"label": "Book", "url": "https://x"})
+        assert "<" in render_variant_html(db, variant.id, mode="preview")
+
+    def test_the_json_render_route_dispatches_by_channel(self, db, campaign):
+        """It returned a 200 with an empty document. It also, briefly, returned
+        a 500 — the route function is named `render_variant` too, so importing
+        the service function under its own name made the endpoint call itself.
+        The suite does not exercise this route; re-probing after the fix did."""
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        variant = self._push_variant(db, campaign)
+        response = TestClient(app, raise_server_exceptions=False).get(
+            f"/rendering/variants/{variant.id}")
+
+        assert response.status_code == 200, response.text
+        payload = response.json()
+        assert payload["channel"] == "push"
+        assert payload["role"] == "payload"
+        assert payload["html"] == "", "a push has no document"
+        assert payload["fields"]["push_title"] == "Ready", (
+            "the route returned nothing useful for a push — it rendered the "
+            "email path and got an empty shell"
+        )
+
+    def test_the_send_test_page_refuses_to_mail_a_push_variant(
+        self, db, campaign, monkeypatch
+    ):
+        """**The one that reached a real address.** The page sends an email, so
+        it renders through the email path on purpose — and now says so instead
+        of mailing an empty document and reporting success."""
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        variant = self._push_variant(db, campaign)
+        user = UserDB(email=f"{PREFIX}-{uuid.uuid4().hex[:8]}@example.invalid", is_active=True)
+        db.add(user); db.commit(); db.refresh(user)
+        role = db.query(RoleDB).filter(RoleDB.key == ADMIN).first()
+        db.add(RoleAssignmentDB(user_id=user.id, role_id=role.id,
+                                brand_id=auth.ensure_default_brand(db).id))
+        db.commit()
+        token = auth.create_session(db, user)
+        client = TestClient(app, follow_redirects=False, raise_server_exceptions=False)
+        client.cookies.set(auth.SESSION_COOKIE, token)
+        try:
+            response = client.post("/ui/send-test", data={
+                "to": "someone@example.invalid", "subject": "s", "provider": "mock",
+                "variant_id": str(variant.id), "recipient_id": "",
+                "csrf_token": auth.csrf_token_for(token)})
+            assert response.status_code == 200
+            assert "Could not render variant" in response.text, (
+                "a push variant was rendered as an email and sent with no "
+                "warning — the empty document raised nothing, so the fallback "
+                "handler never fired"
+            )
+        finally:
+            db.query(SessionDB).filter(SessionDB.user_id == user.id).delete()
+            db.query(RoleAssignmentDB).filter(RoleAssignmentDB.user_id == user.id).delete()
+            db.query(AuditEventDB).filter(AuditEventDB.actor_id == user.id).delete(
+                synchronize_session=False)
+            db.query(UserDB).filter(UserDB.id == user.id).delete()
+            db.commit()
+
+    def test_a_push_snapshot_says_why_it_has_no_html(self, db, campaign):
+        """"Not found" was true of the HTML and misleading about the snapshot,
+        which is present and complete — its artifact is a field payload."""
+        from fastapi.testclient import TestClient
+
+        from main import app
+        from app.content.service import create_content_version
+        from app.content.db_models import ContentRecordDB
+        from app.snapshots.db_models import SnapshotDB
+        from app.snapshots.service import create_snapshot_for_variant
+
+        variant = self._push_variant(db, campaign)
+        module = db.query(ModuleInstanceDB).filter(
+            ModuleInstanceDB.variant_id == variant.id).first()
+        create_content_version(db, content_record_id=module.content_record_id,
+                               created_by="test")
+        snapshot = create_snapshot_for_variant(db, variant_id=variant.id)
+        try:
+            response = TestClient(app, raise_server_exceptions=False).get(
+                f"/snapshots/{snapshot.id}/html")
+            assert response.status_code == 404
+            assert "not an HTML document" in response.json()["detail"], (
+                "a present, complete push snapshot reported as simply missing"
+            )
+        finally:
+            db.query(SnapshotDB).filter(SnapshotDB.id == snapshot.id).delete()
+            db.commit()

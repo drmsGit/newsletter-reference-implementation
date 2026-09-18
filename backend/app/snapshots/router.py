@@ -53,6 +53,22 @@ def get_snapshot_html_file(
     )
 
     if html is None:
+        # Distinguish "this snapshot has no HTML by nature" from "the file is
+        # missing". A push snapshot stores a field payload in its row
+        # (2026-09-17), so "not found" was true of the HTML and misleading
+        # about the snapshot, which is present and complete.
+        from app.snapshots.db_models import SnapshotDB
+
+        snapshot = db.query(SnapshotDB).filter(SnapshotDB.id == snapshot_id).first()
+        if snapshot is not None and snapshot.html_storage_type == "inline":
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    "This snapshot is not an HTML document — its artifact is a "
+                    "field payload stored in the snapshot row. Read it from the "
+                    "snapshot itself."
+                ),
+            )
         raise HTTPException(status_code=404, detail="Snapshot HTML not found")
 
     return HTMLResponse(content=html)

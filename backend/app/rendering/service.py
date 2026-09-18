@@ -79,6 +79,27 @@ def render_variant_html(
     variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
     channel = variant.channel if variant is not None else "email"
 
+    # **Refuses a variant that is not an email**, rather than producing an
+    # empty document. This function assembles email modules; handed a push
+    # variant it found no email manifest for `notification`, rendered every
+    # module as an HTML comment, and returned a 252-character empty shell —
+    # with no error, because nothing failed. The send-test page then mailed
+    # that shell to a real address and reported success, since its
+    # `except Exception` fallback never fired.
+    #
+    # Callers that do not know the channel should use `render_variant`, which
+    # dispatches (ADR-162 point 4). This one is the email path by name.
+    # The literal is deliberate: importing `EmailRenderer` here to read its
+    # `channel` would close a loop — `renderers/email.py` imports this module —
+    # that only survives because the reverse import is lazy. This function is
+    # the email path by name, so naming the channel is honest rather than a
+    # hardcoding the registry should own.
+    if channel != "email":
+        raise ValueError(
+            f"variant {variant_id} is a {channel} variant — render_variant_html "
+            f"assembles email modules. Use render_variant() to dispatch by channel."
+        )
+
     modules = (
         db.query(ModuleInstanceDB)
         .filter(ModuleInstanceDB.variant_id == variant_id)
