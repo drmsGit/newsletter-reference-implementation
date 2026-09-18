@@ -48,6 +48,23 @@ def create_group(
     db: Session, name: str, brand_id: int, description: str | None = None,
     source_campaign_id: int | None = None,
 ) -> AudienceGroupDB:
+    """A group belongs to a brand. **It deliberately does not belong to a
+    channel**, and that was considered on 2026-09-18 rather than overlooked.
+
+    The user asked whether groups should be created per channel. They should
+    not, for the reason [[ADR-160 — Channel Model and Composition]] point 7
+    gives about campaign coverage: a declared channel is *stored intent*, and
+    stored intent "would create a drift class where intent and reality
+    disagree with nobody clearing the stale state" — a group labelled push
+    whose members are mostly email-only is exactly that.
+
+    The alternative the user proposed is the one that is built: one group,
+    targeted per sending channel. `resolve_audience` takes the channel, the
+    consent floor is keyed to it (ADR-163 point 1), and the addressability
+    stage filters on it — so the same group resolves to different people for an
+    email send and a push send, and the send form shows both numbers. Nothing
+    is stored, so nothing can go stale.
+    """
     group = AudienceGroupDB(
         name=name, brand_id=brand_id, description=description,
         source_campaign_id=source_campaign_id,
@@ -500,6 +517,22 @@ def _brand_of_campaign(db: Session, campaign_id: int) -> int:
 
 
 def campaign_category_scores(db: Session, campaign_id: int) -> list[dict]:
+    """Category weights across **every variant** of the campaign, whatever its
+    channel — decided 2026-09-18 after the user asked whether suggestion should
+    check channels.
+
+    Kept channel-blind because [[ADR-160 — Channel Model and Composition]]
+    point 7 makes the campaign the *topic* and the channel a delivery
+    preference: a push variant of a hiking campaign is still about hiking, so
+    the audience it suggests is a hiking audience. The per-channel truth is
+    delivered where it changes a decision — the resolved count on the send
+    form, which differs per channel from the same group.
+
+    **The accepted cost:** a campaign whose push content is narrower than its
+    email content suggests a broader audience than that push needs. The manager
+    edits the blocks, which the suggestion is explicitly a proposal for rather
+    than a locked list.
+    """
     """Rank the categories a campaign's content is about, so a suggestion can
     target recipients interested in those topics. Content reaches a category two
     ways: a module bound directly to a content record, and a decision slot whose
