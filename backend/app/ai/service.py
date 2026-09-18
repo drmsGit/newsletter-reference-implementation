@@ -148,12 +148,20 @@ def run_task(
     max_output_tokens: int,
     system: str | None = None,
     provider_name: str | None = None,
+    model: str | None = None,
     target_type: str | None = None,
     target_id: int | None = None,
 ) -> TaskRun:
     """Execute one AI task, enforcing the cap before spending anything."""
 
     provider_name = provider_name or get_ai_provider_name(db)
+    # Which model THIS task runs on (ADR-144 §2). None means the deployment
+    # default, so a task nobody has configured behaves exactly as before.
+    # Resolved here rather than at the call site so every caller of a task
+    # inherits the choice without knowing it exists.
+    from app.settings.service import get_task_model
+
+    model = model or get_task_model(db, task_key)
     prompt_row = get_published_prompt(db, task_key)
 
     if prompt_row is None:
@@ -164,7 +172,7 @@ def run_task(
         )
         return TaskRun(ok=False, run_id=run.id, message=run.message)
 
-    provider = get_ai_provider(provider_name)
+    provider = get_ai_provider(provider_name, model=model)
 
     # --- the pre-call gate (ADR-144 §5) ---------------------------------
     cap = get_ai_spend_cap(db)

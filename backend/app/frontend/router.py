@@ -226,7 +226,7 @@ def settings_page(request: Request, saved: bool = False, db: Session = Depends(g
     from app.ai.service import (
         get_published_prompt, list_prompt_versions, spend_to_date, tokens_used,
     )
-    from app.ai.tasks import subject_preheader as subject_task
+    from app.ai.tasks.registry import list_tasks
     from app.ai.adapters.claude import DEFAULT_MODEL as CLAUDE_DEFAULT_MODEL
     from app.ai.adapters.factory import AVAILABLE_AI_PROVIDERS
     from app.settings.service import get_ai_provider_name, get_ai_spend_cap
@@ -234,8 +234,23 @@ def settings_page(request: Request, saved: bool = False, db: Session = Depends(g
     ai_cap = get_ai_spend_cap(db)
     ai_used = tokens_used(db)
     ai_spend = spend_to_date(db)
-    published = get_published_prompt(db, subject_task.TASK_KEY)
-    ai_prompt_versions = list_prompt_versions(db, subject_task.TASK_KEY)
+    # One entry per discovered task rather than the single task this page used
+    # to import by name. A second task now appears here by existing — no
+    # import, no context keys, no duplicated card.
+    from app.settings.service import get_task_model, governed_models
+
+    ai_tasks = []
+    for meta in list_tasks():
+        published = get_published_prompt(db, meta.key)
+        ai_tasks.append({
+            "meta": meta,
+            "body": published.body if published else meta.default_prompt,
+            "version": published.version if published else None,
+            "versions": list_prompt_versions(db, meta.key),
+            # None means "the deployment default", which is a real answer and
+            # not a missing one (ADR-144 §2).
+            "model": get_task_model(db, meta.key),
+        })
 
     return templates.TemplateResponse(
         request,
@@ -259,10 +274,8 @@ def settings_page(request: Request, saved: bool = False, db: Session = Depends(g
             "ai_tokens_remaining": max(0, ai_cap["hard_stop_tokens"] - ai_used),
             "ai_used_pct": min(100, round(ai_used / max(1, ai_cap["hard_stop_tokens"]) * 100)),
             "ai_over_warn": ai_used >= ai_cap["warn_tokens"],
-            "ai_prompt_task_key": subject_task.TASK_KEY,
-            "ai_prompt_body": published.body if published else subject_task.DEFAULT_PROMPT,
-            "ai_prompt_version": published.version if published else None,
-            "ai_prompt_versions": ai_prompt_versions,
+            "ai_tasks": ai_tasks,
+            "ai_governed_models": governed_models(),
         },
     )
 
@@ -327,6 +340,28 @@ async def settings_publish_ai_prompt(request: Request, db: Session = Depends(get
     body = (form.get("body") or "").strip()
     if task_key and body:
         publish_prompt(db, task_key, body)
+    return RedirectResponse(url="/ui/settings?saved=true", status_code=303)
+
+
+@router.post("/ui/settings/ai-task-model")
+async def settings_set_task_model(request: Request, db: Session = Depends(get_db)):
+    """Point one task at a model, or clear it back to the deployment default.
+
+    Separate from publishing a prompt on purpose. ADR-140 §3 makes a prompt
+    version immutable and audited; a model choice is a setting that can be
+    changed back. **Whether changing the model should mint a new prompt version
+    is an open question** the backlog records — the same prompt on a different
+    model is arguably a different thing — and it is not decided here.
+    """
+    from app.settings.service import set_task_model
+
+    form = await request.form()
+    task_key = (form.get("task_key") or "").strip()
+    model = (form.get("model") or "").strip()
+    if task_key:
+        # An empty selection clears it; `set_task_model` also refuses anything
+        # outside the governed list rather than storing it.
+        set_task_model(db, task_key, model or None)
     return RedirectResponse(url="/ui/settings?saved=true", status_code=303)
 
 

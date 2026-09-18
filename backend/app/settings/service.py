@@ -17,6 +17,7 @@ HALF_LIFE_DAYS_KEY = "half_life_days"
 MAX_SEND_RECIPIENTS_KEY = "max_send_recipients"
 AI_SPEND_CAP_KEY = "ai_spend_cap"
 AI_PROVIDER_KEY = "ai_provider"
+AI_TASK_MODELS_KEY = "ai_task_models"
 CHANNEL_AVAILABILITY_KEY = "channel_availability"
 
 # AI token budget (ADR-144 §5). Two numbers, not one: warn first, then hard stop.
@@ -180,3 +181,63 @@ def set_channel_available(db: Session, name: str, enabled: bool) -> dict[str, bo
     overrides[name] = bool(enabled)
     set_config(db, CHANNEL_AVAILABILITY_KEY, overrides)
     return overrides
+
+
+# --- per-task model choice (ADR-144 §2) ------------------------------------
+# §2 records per-task model selection as the documented direction, with the POC
+# shipping one model plus a guide. This is that build, and the argument for it
+# is arithmetic rather than taste: tasks sit at very different points on the
+# cost/capability curve, and one global setting forces them all to the most
+# expensive one.
+#
+# **A choice within a governed list, never free text** (ADR-140). The list is
+# `MODEL_PRICING` — a model the platform cannot price is one whose spend cap
+# cannot be enforced before the call, which is the whole basis of ADR-144 §5's
+# pre-call gate.
+
+
+def governed_models() -> list[str]:
+    """Models a task may be pointed at, in the order they are priced.
+
+    Excludes the mock adapter's pseudo-model: it exists in the rate table so a
+    zero reads as deliberate, not as a model somebody forgot, and it is not
+    something a manager selects.
+    """
+    from app.ai.pricing import MODEL_PRICING
+
+    return [name for name in MODEL_PRICING if not name.startswith("mock")]
+
+
+def task_models(db: Session) -> dict[str, str]:
+    stored = get_config(db, AI_TASK_MODELS_KEY, None)
+    return stored if isinstance(stored, dict) else {}
+
+
+def get_task_model(db: Session, task_key: str) -> str | None:
+    """The model this task is pointed at, or None for the deployment default.
+
+    None is a real answer rather than a missing one: a deployment that has
+    never thought about per-task models keeps behaving exactly as it did, with
+    the adapter's own default. Returning a concrete model here instead would
+    freeze today's default into every task the first time anyone opened
+    Settings.
+    """
+    chosen = task_models(db).get(task_key)
+    return chosen if chosen in governed_models() else None
+
+
+def set_task_model(db: Session, task_key: str, model: str | None) -> dict[str, str]:
+    """Point a task at a model, or clear it back to the deployment default.
+
+    An unknown model clears rather than stores. The list is governed, so a
+    value that is not in it is either a typo or a stale option from a page
+    loaded before a model was withdrawn — and storing it would mean a task
+    silently pinned to something the platform cannot price.
+    """
+    chosen = task_models(db)
+    if model and model in governed_models():
+        chosen[task_key] = model
+    else:
+        chosen.pop(task_key, None)
+    set_config(db, AI_TASK_MODELS_KEY, chosen)
+    return chosen

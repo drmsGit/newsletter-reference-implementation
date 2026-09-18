@@ -18,6 +18,7 @@ locally at render, so no identity leaves the platform.
 from sqlalchemy.orm import Session
 
 from app.ai.service import run_task
+from app.ai.tasks.base import TaskMeta
 from app.campaigns.db_models import ModuleInstanceDB, VariantDB
 from app.content.db_models import ContentRecordDB
 
@@ -59,6 +60,22 @@ Return exactly 3 options in this format, nothing else:
 The content:
 {content}
 """
+
+
+#: What the registry discovers. The constants above stay as they are — this
+#: gathers them into one declaration so the settings page can render a card for
+#: this task without importing it by name, which is what it used to do.
+META = TaskMeta(
+    key=TASK_KEY,
+    label="Subject & preheader",
+    description=(
+        "Suggests subject line and preheader pairs for an email variant, from "
+        "that edition's own content. The manager picks one; nothing is applied "
+        "automatically."
+    ),
+    default_prompt=DEFAULT_PROMPT,
+    max_output_tokens=MAX_OUTPUT_TOKENS,
+)
 
 
 def gather_inputs(db: Session, variant_id: int) -> str:
