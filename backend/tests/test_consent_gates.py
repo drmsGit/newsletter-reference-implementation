@@ -170,13 +170,26 @@ def db():
             would filter the opt-out out by accident, which is why the P0 hid
             for as long as it did.
             """
+            # **An EMAIL snapshot, specifically.** This picks up whatever is
+            # already in the shared dev database, and `ORDER BY id DESC` was
+            # unambiguous while every variant was email. Since ADR-160 point 4
+            # gave variants a channel, the newest snapshot may belong to a push
+            # variant — and `prepare_send_from_audience` derives the send's
+            # channel from it, so these email-consent tests would silently
+            # become push tests and every email-consenting recipient would be
+            # excluded for having no device token. That is exactly what
+            # happened the first time a push campaign was built by hand.
+            from app.campaigns.db_models import VariantDB
+
             snapshot = (
                 self.session.query(SnapshotDB)
+                .join(VariantDB, VariantDB.id == SnapshotDB.variant_id)
+                .filter(VariantDB.channel == "email")
                 .order_by(SnapshotDB.id.desc())
                 .first()
             )
             if snapshot is None:
-                pytest.skip("no snapshot in this database to send from")
+                pytest.skip("no email snapshot in this database to send from")
 
             send_instance = SendInstanceDB(
                 snapshot_id=snapshot.id,

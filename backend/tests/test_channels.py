@@ -1904,3 +1904,170 @@ class TestTheApiProjectsEveryChannel:
             db.query(UserDB).filter(UserDB.id == user.id).delete()
             db.commit()
             self._cleanup(db, recipient)
+
+
+class TestTheSendFormOffersOnlyWhatTheChannelCanDo:
+    """Reported by the user 2026-09-18: planning a push showed email options.
+
+    The mock provider had carried every channel since step 5 — what was still
+    email-shaped was the form in front of it. Four separate things, and only
+    one of them would have produced an error a manager could act on.
+    """
+
+    def _page(self, db, campaign_id, monkeypatch):
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        user = UserDB(email=f"{PREFIX}-{uuid.uuid4().hex[:8]}@example.invalid", is_active=True)
+        db.add(user); db.commit(); db.refresh(user)
+        role = db.query(RoleDB).filter(RoleDB.key == ADMIN).first()
+        db.add(RoleAssignmentDB(user_id=user.id, role_id=role.id,
+                                brand_id=auth.ensure_default_brand(db).id))
+        db.commit()
+        token = auth.create_session(db, user)
+        client = TestClient(app, follow_redirects=False, raise_server_exceptions=False)
+        client.cookies.set(auth.SESSION_COOKIE, token)
+        page = client.get(f"/ui/campaigns/{campaign_id}")
+        return page, user
+
+    def _cleanup_user(self, db, user):
+        db.query(SessionDB).filter(SessionDB.user_id == user.id).delete()
+        db.query(RoleAssignmentDB).filter(RoleAssignmentDB.user_id == user.id).delete()
+        db.query(AuditEventDB).filter(AuditEventDB.actor_id == user.id).delete(
+            synchronize_session=False)
+        db.query(UserDB).filter(UserDB.id == user.id).delete()
+        db.commit()
+
+    def test_a_real_provider_that_cannot_carry_the_channel_is_not_offered(self):
+        """ADR-161 point 1 has adapters declare their channels; the picker
+        reads the same declaration `get_provider` enforces. Offering resend for
+        a push produced a refusal at trigger time, about a channel the manager
+        was never asked to think about."""
+        from app.delivery.providers.factory import providers_for_channel
+
+        assert [p["name"] for p in providers_for_channel("email")] == ["mock", "resend"]
+        assert [p["name"] for p in providers_for_channel("push")] == ["mock"], (
+            "resend was offered for a push send — it carries email, and the "
+            "factory would refuse the plan the form had just accepted"
+        )
+
+    def test_the_mock_is_not_described_as_email(self):
+        """"mock (no real email)" was accurate while email was the only
+        channel and is wrong in front of a push."""
+        from app.delivery.providers.factory import providers_for_channel
+
+        label = providers_for_channel("push")[0]["label"]
+        assert "email" not in label.lower(), f"the mock is labelled {label!r} on push"
+
+    def test_the_audience_count_is_the_count_for_this_variants_channel(
+        self, db, campaign, monkeypatch
+    ):
+        """**The one that would have misled rather than errored.** The count
+        was resolved once per page with no channel, so a push variant's form
+        advertised the email-consenting number — pick a group reading forty,
+        reach three, and see the difference only as exclusions afterwards."""
+        from app.audience.service import add_member, create_group
+        from app.recipients.consent import record_consent
+        from app.recipients.db_models import AddressabilityDB, ConsentEventDB, RecipientDB
+
+        brand = auth.ensure_default_brand(db)
+        group = create_group(db, name=_name("group"), brand_id=brand.id)
+        # Two recipients who accepted email; only one of them accepted push.
+        made = []
+        for i in range(2):
+            r = RecipientDB(external_id=_name("r"), status="active")
+            db.add(r); db.commit(); db.refresh(r)
+            db.add(AddressabilityDB(recipient_id=r.id, channel="email",
+                                    value={"email": f"{_name('a')}@x.invalid"}))
+            db.commit()
+            record_consent(db, r.id, "opted_in", brand.id, channel="email", source="t")
+            if i == 0:
+                db.add(AddressabilityDB(recipient_id=r.id, channel="push",
+                                        value={"token": f"apns-{uuid.uuid4().hex[:8]}"}))
+                db.commit()
+                record_consent(db, r.id, "opted_in", brand.id, channel="push", source="t")
+            add_member(db, group.id, r.id)
+            made.append(r)
+
+        # The prepare-send form hangs off a SNAPSHOT, so both variants need
+        # one or the audience picker never renders at all.
+        from app.content.service import create_content, create_content_version
+        from app.snapshots.db_models import SnapshotDB
+        from app.snapshots.service import create_snapshot_for_variant
+
+        record = create_content(db, title=_name("c"), brand_id=brand.id,
+                                content={"push_title": "Hi", "push_body": "There"})
+        create_content_version(db, content_record_id=record.id, created_by="t")
+        push_variant = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+        create_module_for_variant(db, variant_id=push_variant.id,
+                                  module_type="notification", content_record_id=record.id)
+        email_variant = db.query(VariantDB).filter(
+            VariantDB.campaign_id == campaign.id, VariantDB.channel == "email").first()
+        snapshots = [
+            create_snapshot_for_variant(db, variant_id=email_variant.id),
+            create_snapshot_for_variant(db, variant_id=push_variant.id),
+        ]
+
+        page, user = self._page(db, campaign.id, monkeypatch)
+        try:
+            assert page.status_code == 200
+            assert f"{group.name} (2 on email)" in page.text, (
+                "the email variant should see both consenting recipients"
+            )
+            assert f"{group.name} (1 on push)" in page.text, (
+                "the push variant's form advertised the email count — consent "
+                "is per channel, so the same group is a different audience"
+            )
+        finally:
+            self._cleanup_user(db, user)
+            from pathlib import Path
+            for snap in snapshots:
+                row = db.get(SnapshotDB, snap.id)
+                if row and row.html_storage_type != "inline":
+                    Path(row.html_location).unlink(missing_ok=True)
+            db.query(SnapshotDB).filter(
+                SnapshotDB.id.in_([s.id for s in snapshots])).delete(synchronize_session=False)
+            db.commit()
+            ids = [r.id for r in made]
+            from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB
+            db.query(AudienceGroupMemberDB).filter(
+                AudienceGroupMemberDB.group_id == group.id).delete(synchronize_session=False)
+            db.query(AudienceGroupDB).filter(AudienceGroupDB.id == group.id).delete()
+            db.query(ConsentEventDB).filter(
+                ConsentEventDB.recipient_id.in_(ids)).delete(synchronize_session=False)
+            db.query(AddressabilityDB).filter(
+                AddressabilityDB.recipient_id.in_(ids)).delete(synchronize_session=False)
+            db.query(RecipientDB).filter(RecipientDB.id.in_(ids)).delete(synchronize_session=False)
+            db.commit()
+
+    def test_a_push_snapshot_is_not_offered_an_open_html_link(
+        self, db, campaign, monkeypatch
+    ):
+        """Its artifact lives in the row, so the link would reach a handler
+        that correctly answers nothing."""
+        from app.content.service import create_content, create_content_version
+        from app.snapshots.db_models import SnapshotDB
+        from app.snapshots.service import create_snapshot_for_variant
+
+        brand = auth.ensure_default_brand(db)
+        record = create_content(db, title=_name("c"), brand_id=brand.id,
+                                content={"push_title": "Ready", "push_body": "Go."})
+        create_content_version(db, content_record_id=record.id, created_by="t")
+        variant = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+        create_module_for_variant(db, variant_id=variant.id,
+                                  module_type="notification", content_record_id=record.id)
+        snapshot = create_snapshot_for_variant(db, variant_id=variant.id)
+        page, user = self._page(db, campaign.id, monkeypatch)
+        try:
+            assert f"/snapshots/{snapshot.id}/html" not in page.text, (
+                "a push snapshot was offered an Open HTML link"
+            )
+            assert "Ready" in page.text, "its payload should be shown instead"
+        finally:
+            self._cleanup_user(db, user)
+            db.query(SnapshotDB).filter(SnapshotDB.id == snapshot.id).delete()
+            db.commit()

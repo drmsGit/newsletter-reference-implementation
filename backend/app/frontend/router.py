@@ -18,7 +18,8 @@ from app.auth.service import (
     list_brands, safe_next, set_session_brand, user_for_token,
 )
 from app.auth.permissions import CAMPAIGNS_MANAGE, CONTENT_MANAGE
-from app.channels.registry import get_channel, max_modules_for
+from app.channels.registry import DEFAULT_CHANNEL, get_channel, max_modules_for
+from app.delivery.providers.factory import providers_for_channel
 from app.settings.service import available_channels, channel_available
 from app.audit import service as audit
 from app.campaigns import duplication
@@ -936,6 +937,11 @@ def campaign_detail(
             {
                 "id": snapshot.id,
                 "recipient_id": snapshot.recipient_id,
+                # A push artifact lives in the row, not on disk (2026-09-17),
+                # so "Open HTML" would link to a handler that correctly answers
+                # nothing. The template needs to know which it is.
+                "is_inline": snapshot.html_storage_type == "inline",
+                "artifact_fields": (snapshot.render_context or {}).get("artifact", {}).get("fields"),
                 "html_size": snapshot.html_size,
                 "created_at": snapshot.created_at,
                 "render_context": snapshot.render_context,
@@ -1010,18 +1016,39 @@ def campaign_detail(
 
     # Audience choices for the prepare-send form, each with its live resolved
     # (consent-gated) recipient count so a manager sees the reach before planning.
-    audience_choices = []
+    #
+    # **Per channel, because the count is.** Consent is keyed per channel
+    # (ADR-163 point 1), so one group resolves to different people for an email
+    # variant and a push variant. Computed once per distinct channel on this
+    # campaign rather than once per variant — a campaign has a handful of
+    # variants and at most a handful of channels, and `resolve_audience` is not
+    # free. Before this the form showed one email-gated number against every
+    # variant, so planning a push from a group reading "40 recipients" could
+    # reach three, with the difference only appearing as exclusions afterwards.
+    audience_choices_by_channel: dict[str, list[dict]] = {}
     # Scoped: these feed a picker on the campaign page, and a suggested group
     # is NAMED after the campaign that produced it ("Demo Campaign 1 —
     # suggested audience"). Unfiltered, the picker leaked another brand's
     # campaign names even though the campaign itself was correctly refused —
     # the page said no and the dropdown beside it said everything.
-    for group in audience_service.list_groups(db, brand_id=working_brand_id(request, db)):
-        audience_choices.append({
-            "id": group.id,
-            "name": group.name,
-            "count": len(audience_service.resolve_audience(db, group.id)),
-        })
+    groups = audience_service.list_groups(db, brand_id=working_brand_id(request, db))
+    for channel in {row["channel"] for row in variant_rows} or {DEFAULT_CHANNEL}:
+        audience_choices_by_channel[channel] = [
+            {
+                "id": group.id,
+                "name": group.name,
+                "count": len(
+                    audience_service.resolve_audience(db, group.id, channel=channel)
+                ),
+            }
+            for group in groups
+        ]
+    for row in variant_rows:
+        row["audience_choices"] = audience_choices_by_channel.get(row["channel"], [])
+        # From the adapters' own `channels` declaration, so the picker cannot
+        # offer something `get_provider` will refuse (ADR-161 point 1).
+        row["providers"] = providers_for_channel(row["channel"])
+
     default_from = os.environ.get("RESEND_FROM", "onboarding@resend.dev")
 
     # Read back an AI run from the redirect, if one just happened. The persisted
@@ -1061,7 +1088,8 @@ def campaign_detail(
             "channels": available_channels(db),
             "content_records": content_records,
             "strategies": strategies,
-            "audience_choices": audience_choices,
+            # Kept for the page-level default; each variant carries its own.
+            "audience_choices": audience_choices_by_channel.get(DEFAULT_CHANNEL, []),
             "default_from": default_from,
             "error": error,
             "ai_suggestions": ai_suggestions,
