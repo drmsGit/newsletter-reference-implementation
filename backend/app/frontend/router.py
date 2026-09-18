@@ -44,7 +44,7 @@ from app.settings.service import get_signal_weights, get_half_lives, get_max_sen
 from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB
 from app.audience import service as audience_service
 from app.decision.strategies.registry import list_strategies
-from app.modules.registry import list_manifests, get_manifest
+from app.modules.registry import envelope_module_type, get_manifest, list_manifests
 from app.overrides.service import (
     create_content_override,
     get_active_content_override,
@@ -996,6 +996,11 @@ def campaign_detail(
                 # but the service refuses it regardless, because a form that is
                 # not rendered is not a control.
                 "module_limit": max_modules_for(variant.channel),
+                # Whether this channel HAS envelope copy at all, asked of the
+                # manifests rather than tested against "email" (ADR-162 pt 1).
+                # A push has no subject line, so every surface that offers,
+                # displays or generates one is meaningless in front of it.
+                "has_envelope": envelope_module_type(variant.channel) is not None,
                 # What the notification will actually say. A push has no HTML
                 # to open in a new tab, so the only way to see one before
                 # sending is to render it here. Preview mode, so unpublished
@@ -1115,6 +1120,13 @@ def campaign_detail(
             "campaign": campaign,
             "variants": variant_rows,
             "channels": available_channels(db),
+            # Which channels carry envelope copy, so the add-variant form can
+            # show or hide the subject box as the channel is picked without the
+            # template knowing that email is the one with a subject.
+            "envelope_channels": [
+                c.name for c in available_channels(db)
+                if envelope_module_type(c.name) is not None
+            ],
             "content_records": content_records,
             "strategies": strategies,
             # Kept for the page-level default; each variant carries its own.
@@ -1406,6 +1418,20 @@ def variant_suggest_subject(
     row is what the next GET reads back.
     """
     from app.ai.tasks import subject_preheader as subject_task
+
+    # Refused for a channel with no envelope, not merely hidden. The button is
+    # gated in the template, but a hand-crafted POST never sees a template —
+    # and this one spends tokens against the budget (ADR-144 §5) to generate
+    # copy that has nowhere to be stored, since `set_envelope_fields` writes
+    # only into the module a channel declares.
+    variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
+    if variant is None or envelope_module_type(variant.channel) is None:
+        return RedirectResponse(
+            url=f"/ui/campaigns/{campaign_id}?error=" + quote(
+                "That channel has no subject line, so there is nothing to suggest."
+            ),
+            status_code=303,
+        )
 
     _, run = subject_task.suggest(db, variant_id)
     if run is None:

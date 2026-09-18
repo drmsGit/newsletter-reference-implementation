@@ -2244,3 +2244,95 @@ class TestEnvelopeFieldsLiveInAModule:
                    if not any(v.envelope for v in m.variables)]
         assert "header" not in offered
         assert "single_stack" in offered, "the real modules must still be offered"
+
+
+class TestAChannelWithoutAnEnvelopeIsNotAskedForOne:
+    """Reported by the user 2026-09-18: a push variant still asked for a
+    subject and preheader, and displayed "not set — send would fall back to
+    the send-instance label" — a warning about a field that cannot exist, on a
+    variant behaving correctly.
+
+    Every surface now asks the manifests whether the channel HAS envelope copy
+    (ADR-162 point 1) rather than testing against "email".
+    """
+
+    def _page(self, db, campaign_id, monkeypatch):
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        user = UserDB(email=f"{PREFIX}-{uuid.uuid4().hex[:8]}@example.invalid", is_active=True)
+        db.add(user); db.commit(); db.refresh(user)
+        role = db.query(RoleDB).filter(RoleDB.key == ADMIN).first()
+        db.add(RoleAssignmentDB(user_id=user.id, role_id=role.id,
+                                brand_id=auth.ensure_default_brand(db).id))
+        db.commit()
+        token = auth.create_session(db, user)
+        client = TestClient(app, follow_redirects=False, raise_server_exceptions=False)
+        client.cookies.set(auth.SESSION_COOKIE, token)
+        return client, token, user
+
+    def _cleanup(self, db, user):
+        db.query(SessionDB).filter(SessionDB.user_id == user.id).delete()
+        db.query(RoleAssignmentDB).filter(RoleAssignmentDB.user_id == user.id).delete()
+        db.query(AuditEventDB).filter(AuditEventDB.actor_id == user.id).delete(
+            synchronize_session=False)
+        db.query(UserDB).filter(UserDB.id == user.id).delete()
+        db.commit()
+
+    def test_a_push_variant_is_not_warned_about_a_subject_it_cannot_have(
+        self, db, campaign, monkeypatch
+    ):
+        create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+        client, _token, user = self._page(db, campaign.id, monkeypatch)
+        try:
+            page = client.get(f"/ui/campaigns/{campaign.id}")
+            assert page.status_code == 200
+            # The email variant from the fixture has no subject either, so the
+            # warning appears once — for the channel that can carry one.
+            assert page.text.count("send would fall back to the send-instance label") == 1, (
+                "the push variant was warned about a missing subject line; a "
+                "push has none by construction, so there is nothing to set"
+            )
+            assert page.text.count("Suggest subject") == 1, (
+                "the subject-suggestion button was offered on a push variant, "
+                "where it would spend tokens producing copy with nowhere to go"
+            )
+        finally:
+            self._cleanup(db, user)
+
+    def test_the_suggestion_route_refuses_a_channel_with_no_envelope(
+        self, db, campaign, monkeypatch
+    ):
+        """Hiding the button is not the control — and this one costs money."""
+        variant = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+        client, token, user = self._page(db, campaign.id, monkeypatch)
+        try:
+            response = client.post(
+                f"/ui/campaigns/{campaign.id}/variants/{variant.id}/suggest-subject",
+                data={"csrf_token": auth.csrf_token_for(token)})
+            assert response.status_code == 303
+            assert "error=" in response.headers["location"], (
+                "a subject-suggestion run was started for a push variant"
+            )
+        finally:
+            self._cleanup(db, user)
+
+    def test_the_form_reads_the_envelope_channels_from_the_manifests(self, db, campaign, monkeypatch):
+        """Not a hardcoded "email". A channel that declares an envelope field
+        later must show the subject box without this template changing."""
+        client, _token, user = self._page(db, campaign.id, monkeypatch)
+        try:
+            page = client.get(f"/ui/campaigns/{campaign.id}")
+            assert 'data-envelope-channels=' in page.text
+            assert '"email"' in page.text.split("data-envelope-channels=")[1][:40]
+            assert "!== 'email'" not in page.text, (
+                "the add-variant form still tests the channel against the "
+                "literal 'email' rather than asking which channels declare an "
+                "envelope"
+            )
+        finally:
+            self._cleanup(db, user)
