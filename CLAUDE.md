@@ -4,7 +4,7 @@ Open-source newsletter architecture MVP. Teachable and tailorable, not a fixed
 commercial product. Learnings feed the separate Condor use case.
 
 ## Where things live
-- ADRs: `docs/architecture/ADR/` — 81 records, numbered to 165 (sparse)
+- ADRs: `docs/architecture/ADR/` — 83 records, numbered to 167 (sparse)
 - ADR filenames: `ADR-NNN — Title Case Title.md` (em dash, spaces, NOT kebab-case)
 - Cross-references are Obsidian wikilinks: `[[ADR-101 — Provider Capabilities Are Explicit]]`
 - Strategy + decision log: `docs/playbook-strategy.md` — the live business record

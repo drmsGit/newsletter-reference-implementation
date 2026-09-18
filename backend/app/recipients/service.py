@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.recipients.consent import (
     CONSENTING_STATUS,
     DEFAULT_CHANNEL,
+    address_key_for,
     DEFAULT_PURPOSE,
     latest_consent_event,
     latest_consent_status,
@@ -170,14 +171,31 @@ def create_recipient(
     db: Session,
     brand_id: int,
     external_id: str,
-    email: str,
+    address: str = "",
+    channel: str = DEFAULT_CHANNEL,
     language: str | None = None,
     attributes: dict | None = None,
     status: str = "active",
     consent_status: str = ConsentStatus.pending.value,
 ) -> Recipient:
     """Upserts keyed on external_id — a repeat CRM sync updates in place
-    rather than hitting the unique constraint with a blind insert."""
+    rather than hitting the unique constraint with a blind insert.
+
+    **`address` and `channel`, not `email`.** [[ADR-167]] settles that a push
+    audience arrives as ordinary contacts minted by the source system, so this
+    path has to admit a recipient whose only contact point is a device token.
+    It could not: `email` was a required positional, the address row was always
+    written on the email channel, and — the sharper half — **the consent event
+    was recorded with no channel at all**, so a synced contact was granted
+    *email* consent whatever it had actually agreed to. That was invisible
+    while email was the only channel, because the default was always right.
+
+    **One address per call, deliberately.** A person with both an inbox and a
+    device is two calls: the upsert is keyed on `external_id`, so the second
+    updates the same recipient in place and asserts consent for its own
+    channel. A list of addresses would be more general and would need rules
+    for partial failure that nothing is asking for yet.
+    """
     validate_recipient_attributes(attributes)
 
     recipient = (
@@ -199,21 +217,25 @@ def create_recipient(
     # Consent is an event, not a field: only write one when this call actually
     # asserts a different state, so a routine re-sync does not pad the log with
     # rows saying nothing changed.
-    if latest_consent_status(db, recipient.id, brand_id) != consent_status:
+    # Compared AND written on the same channel. Comparing against email while
+    # writing email was self-consistent and wrong; comparing against one
+    # channel and writing another would be worse, so both take `channel`.
+    if latest_consent_status(db, recipient.id, brand_id, channel=channel) != consent_status:
         record_consent(
             db,
             recipient.id,
             consent_status,
             brand_id,
             source="import",
+            channel=channel,
             note=f"set via create_recipient for external_id={external_id}",
             commit=False,
         )
 
-    # The email argument is an address on the email channel (ADR-163 point 2),
-    # and since phase B this row is the only place it lives — there is no
-    # column on the recipient to keep in step with it.
-    _upsert_email_address(db, recipient.id, email)
+    # The address is a row on its channel (ADR-163 point 2), and since phase B
+    # it is the only place a contact point lives — there is no column on the
+    # recipient to keep in step with it.
+    _upsert_address(db, recipient.id, channel, address)
 
     db.commit()
     db.refresh(recipient)
@@ -221,21 +243,26 @@ def create_recipient(
     return to_recipient(db, recipient, brand_id)
 
 
-def _upsert_email_address(db: Session, recipient_id: int, email: str) -> None:
-    """Keep the recipient's email-channel address row in step with the projection.
+def _upsert_address(db: Session, recipient_id: int, channel: str, address: str) -> None:
+    """Keep this channel's address row in step with the projection.
 
     Updates the existing primary row rather than appending a second one: a CRM
     re-sync that repeats the same address is not the person acquiring another
     inbox. Several addresses per channel are allowed (point 2) — they just do
     not arrive this way.
+
+    The JSON key comes from `address_key_for`, so the shape of a push row
+    ({"token": …}) is not re-derived here. That mapping is the one place a new
+    channel's address shape is taught, and it says so.
     """
-    if not email:
+    if not address:
         return
+    value = {address_key_for(channel): address}
     existing = (
         db.query(AddressabilityDB)
         .filter(
             AddressabilityDB.recipient_id == recipient_id,
-            AddressabilityDB.channel == DEFAULT_CHANNEL,
+            AddressabilityDB.channel == channel,
         )
         .order_by(
             AddressabilityDB.is_primary.desc(), AddressabilityDB.id.asc()
@@ -246,14 +273,16 @@ def _upsert_email_address(db: Session, recipient_id: int, email: str) -> None:
         db.add(
             AddressabilityDB(
                 recipient_id=recipient_id,
-                channel=DEFAULT_CHANNEL,
-                value={"email": email},
+                channel=channel,
+                value=value,
                 status="active",
+                # Harmless on a fan-out channel: ADR-163 point 11 says push
+                # "ignores it entirely". It matters only for pick-one channels.
                 is_primary=True,
             )
         )
-    elif existing.value != {"email": email}:
-        existing.value = {"email": email}
+    elif existing.value != value:
+        existing.value = value
         existing.status = "active"
 
 

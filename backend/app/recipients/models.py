@@ -32,7 +32,19 @@ class RecipientCreate(BaseModel):
     # carries the same requirement as a CRM assertion for the same reason.
     brand_id: int
     external_id: str
-    email: str
+    # **`address` + `channel`, not `email`** — a breaking change to this
+    # payload, made deliberately. ADR-167 settles that a push audience arrives
+    # as ordinary contacts from the source system, so this route has to admit a
+    # contact whose only contact point is a device token. An `email` alias was
+    # rejected: this codebase is meant to be read, and an alias would teach the
+    # shape the model no longer has. The route is part of the unauthenticated
+    # JSON control plane gate 3 exists to close, so it has no external callers
+    # by design.
+    address: str = ""
+    # What that address IS. Consent is recorded on this channel too, which is
+    # the half that was silently wrong: a synced contact used to be granted
+    # email consent whatever it had agreed to.
+    channel: str = "email"
     language: str | None = None
     attributes: dict[str, Any] | None = None
     status: str = "active"

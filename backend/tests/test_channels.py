@@ -1467,3 +1467,129 @@ class TestAPushSendGoesOutAsAPush:
         # The mock carries everything, or push would be untestable without an
         # APNs certificate — which nobody has on a laptop.
         assert get_provider("mock", channel="push") is not None
+
+
+class TestADeviceContactCanBeSyncedIn:
+    """[[ADR-167]], accepted 2026-09-18: a push audience arrives as ordinary
+    contacts minted by the source system, so the sync path has to admit a
+    contact whose only contact point is a device token. It could not.
+
+    Three things were email-shaped and one of them was a compliance defect
+    rather than an inconvenience — `create_recipient` recorded its consent
+    event with no channel, so a synced contact was granted EMAIL consent
+    whatever it had actually agreed to. Invisible while email was the only
+    channel, because the default was always right.
+    """
+
+    def _client(self):
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        return TestClient(app, follow_redirects=False, raise_server_exceptions=False)
+
+    def test_a_device_contact_is_created_with_a_push_address(self, db):
+        from app.recipients.db_models import AddressabilityDB, RecipientDB
+
+        brand = auth.ensure_default_brand(db)
+        external_id = _name("device")
+        token = f"apns-{uuid.uuid4().hex[:10]}"
+
+        response = self._client().post("/recipients/", json={
+            "brand_id": brand.id, "external_id": external_id,
+            "address": token, "channel": "push", "consent_status": "opted_in",
+        })
+        assert response.status_code == 200, response.text
+
+        recipient = db.query(RecipientDB).filter(
+            RecipientDB.external_id == external_id).first()
+        assert recipient is not None, (
+            "a contact with a device token and no inbox could not be created — "
+            "`email` was a required positional on the only production path"
+        )
+        rows = db.query(AddressabilityDB).filter(
+            AddressabilityDB.recipient_id == recipient.id).all()
+        assert [r.channel for r in rows] == ["push"]
+        assert rows[0].value == {"token": token}, (
+            f"the address row holds {rows[0].value} — a push address is "
+            '{"token": ...}, and writing {"email": ...} would make the '
+            "recipient unaddressable on the only channel they have"
+        )
+
+    def test_a_device_contact_is_not_granted_email_consent(self, db):
+        """**The one that matters.** A grant nobody gave is a compliance
+        defect, not a shortcut — and it would have been written on every
+        device contact ever synced."""
+        from app.recipients.consent import latest_consent_status
+        from app.recipients.db_models import RecipientDB
+
+        brand = auth.ensure_default_brand(db)
+        external_id = _name("device")
+        self._client().post("/recipients/", json={
+            "brand_id": brand.id, "external_id": external_id,
+            "address": f"apns-{uuid.uuid4().hex[:10]}", "channel": "push",
+            "consent_status": "opted_in",
+        })
+        recipient = db.query(RecipientDB).filter(
+            RecipientDB.external_id == external_id).first()
+
+        assert latest_consent_status(
+            db, recipient.id, brand.id, channel="push") == "opted_in"
+        assert latest_consent_status(
+            db, recipient.id, brand.id, channel="email") is None, (
+            "a contact that agreed to notifications was recorded as having "
+            "granted email consent — the consent event was written with no "
+            "channel, so it landed on the default"
+        )
+
+    def test_an_email_contact_still_syncs_unchanged(self, db):
+        """Without this, the tests above could pass by breaking the path that
+        every existing recipient came through."""
+        from app.recipients.consent import latest_consent_status
+        from app.recipients.db_models import AddressabilityDB, RecipientDB
+
+        brand = auth.ensure_default_brand(db)
+        external_id = _name("person")
+        address = f"{_name('a')}@example.invalid"
+        response = self._client().post("/recipients/", json={
+            "brand_id": brand.id, "external_id": external_id,
+            "address": address, "consent_status": "opted_in",
+        })
+        assert response.status_code == 200, response.text
+
+        recipient = db.query(RecipientDB).filter(
+            RecipientDB.external_id == external_id).first()
+        row = db.query(AddressabilityDB).filter(
+            AddressabilityDB.recipient_id == recipient.id).first()
+        assert row.channel == "email" and row.value == {"email": address}, (
+            "the channel default stopped being email, which every existing "
+            "caller relies on"
+        )
+        assert latest_consent_status(db, recipient.id, brand.id) == "opted_in"
+
+    def test_a_person_with_an_inbox_and_a_device_is_two_calls_one_recipient(self, db):
+        """The design call this records: one address per call, upserted on
+        external_id. A list would be more general and would need rules for
+        partial failure that nothing is asking for."""
+        from app.recipients.consent import latest_consent_status
+        from app.recipients.db_models import AddressabilityDB, RecipientDB
+
+        brand = auth.ensure_default_brand(db)
+        external_id = _name("both")
+        client = self._client()
+        client.post("/recipients/", json={
+            "brand_id": brand.id, "external_id": external_id,
+            "address": f"{_name('a')}@example.invalid", "consent_status": "opted_in"})
+        client.post("/recipients/", json={
+            "brand_id": brand.id, "external_id": external_id,
+            "address": f"apns-{uuid.uuid4().hex[:10]}", "channel": "push",
+            "consent_status": "opted_in"})
+
+        matches = db.query(RecipientDB).filter(
+            RecipientDB.external_id == external_id).all()
+        assert len(matches) == 1, "the second call created a second recipient"
+        channels = sorted(r.channel for r in db.query(AddressabilityDB).filter(
+            AddressabilityDB.recipient_id == matches[0].id).all())
+        assert channels == ["email", "push"]
+        assert latest_consent_status(db, matches[0].id, brand.id, channel="email") == "opted_in"
+        assert latest_consent_status(db, matches[0].id, brand.id, channel="push") == "opted_in"

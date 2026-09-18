@@ -1,6 +1,6 @@
 ---
 type: adr
-status: proposed
+status: accepted
 topic:
   - architecture
   - channels
@@ -8,7 +8,7 @@ topic:
   - identity
   - boundaries
 created: 2026-09-17
-modified: 2026-09-17
+modified: 2026-09-18
 source:
   - "User decision, 2026-09-17 (raised immediately after push became sendable); recorded in `docs/backlog.md`, Needs ADR"
 depends_on:
@@ -23,7 +23,7 @@ enables:
 ---
 
 ## Status
-Proposed
+Accepted
 
 ## Context
 
