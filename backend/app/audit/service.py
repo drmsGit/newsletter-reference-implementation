@@ -99,8 +99,18 @@ def record_from_request(request, db: Session, action: str, **kwargs) -> AuditEve
     attributing the action to somebody who did not take it.
     """
     user = getattr(request.state, "current_user", None)
+    # **The resolved working brand first** (ADR-172 point 1). On the JSON
+    # plane `current_brand` is the middleware's presentation summary and the
+    # guard no longer overwrites it, so reading that alone would attribute a
+    # machine's audit entry to whatever brand the session happened to carry.
+    # Every caller of this is on the Jinja plane today, where the two agree —
+    # and the SPA migration moves them, at which point an omission here would
+    # be a very quiet wrong answer.
     brand = getattr(request.state, "current_brand", None)
-    kwargs.setdefault("brand_id", brand["id"] if brand else None)
+    resolved = getattr(request.state, "working_brand_id", None)
+    kwargs.setdefault(
+        "brand_id", resolved if resolved is not None else (brand["id"] if brand else None)
+    )
     return record(db, action, actor_id=user["id"] if user else None, **kwargs)
 
 

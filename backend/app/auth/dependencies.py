@@ -32,7 +32,9 @@ from app.auth.integrations import authenticate, record_auth_failure
 from app.auth.service import (
     SESSION_COOKIE,
     csrf_token_for,
+    ensure_default_brand,
     has_permission,
+    permissions_for,
     user_for_token,
 )
 from app.database import get_db
@@ -321,6 +323,31 @@ def _session_brand(request: Request) -> int | None:
     return brand["id"] if brand else None
 
 
+def working_brand(request: Request) -> int:
+    """The brand this request is working in (ADR-172 point 1).
+
+    The consumer half of the guard above: `enforce_api_policy` resolves the
+    brand once and writes it to `request.state.working_brand_id`, and a
+    brand-owned route asks for it with `Depends(working_brand)`.
+
+    **It raises rather than defaulting**, which is the whole point. The three
+    routers that needed a brand before this existed each grew a private
+    `_request_brand` helper falling back to `ensure_default_brand` — so a
+    request that could not say which brand it meant wrote to the default one
+    instead of being refused. ADR-172 point 3 forbids exactly that on this
+    plane: a fallback "would work right up until it holds two, and would fail
+    by silently acting on the wrong brand rather than by refusing".
+
+    `working_brand_id` is `None` only when nothing resolved one — no session
+    and no `X-Brand`. With enforcement off the guard sets it before returning,
+    so this is reachable there too.
+    """
+    brand_id = getattr(request.state, "working_brand_id", None)
+    if brand_id is None:
+        raise BrandNotDeclared()
+    return brand_id
+
+
 def _declared_brand(request: Request) -> int | None:
     raw = (request.headers.get(BRAND_HEADER) or "").strip()
     if not raw:
@@ -369,6 +396,24 @@ def enforce_api_policy(request: Request, db: Session = Depends(get_db)):
         return None
 
     if not auth_enforced(db):
+        # **The working brand still has to exist here.** ADR-172 point 3
+        # refuses a brand-owned operation that cannot resolve one, and nothing
+        # below this line runs with enforcement off — so without this, every
+        # brand-owned JSON route would refuse in the one posture that exists to
+        # make a broken deployment fixable.
+        #
+        # This is point 3's own carve-out — "access control is switched off" is
+        # one of the exactly two conditions it names as legitimate — applied
+        # where it is legitimate, rather than `working_brand_id`'s fallback
+        # lifted onto this plane wholesale. Decided 2026-09-19 alongside the
+        # ADR, because it is adjacent to point 3 rather than part of it.
+        #
+        # It is the ONLY path on this plane that chooses a default brand, and
+        # `test_the_auth_off_default_is_unreachable_with_enforcement_on` is
+        # what keeps it that way.
+        request.state.working_brand_id = (
+            _declared_brand(request) or ensure_default_brand(db).id
+        )
         return None
 
     credential = _machine_credential(request)
@@ -424,15 +469,58 @@ def enforce_api_policy(request: Request, db: Session = Depends(get_db)):
     # The brand moves up for the same reason. It was resolved after, so a queued
     # request would have carried `brand_id = NULL` and been invisible in every
     # brand's inbox — a send that looks accepted and that nobody can ever see.
-    brand_id = None
+    # **Context first, then authorisation — they are two questions.**
+    #
+    # Until 2026-09-19 they were one line: the brand was resolved only inside
+    # `if is_brand_scoped(permission)`, so a request whose permission was
+    # platform-level never resolved a brand at all. Every GET maps to `view`,
+    # `view` is platform-level, and the result was that no read on this plane
+    # had a working brand — which is why `GET /content/` returned every brand's
+    # rows to anybody. ADR-172 point 1 separates them: the brand a request is
+    # working in is established for EVERY request, and whether a permission is
+    # checked against that brand stays the question it was.
+    #
+    # **Where it comes from depends on the principal**, and that asymmetry is
+    # ADR-166 point 8's, not a new one: "a human's working brand comes from the
+    # brand switcher and rides in the session; a machine has no session to carry
+    # one, so it states one per request." The middleware has already resolved a
+    # person's onto `request.state`, so the SPA sends no `X-Brand` and must not
+    # be asked to.
+    brand_id = _declared_brand(request) if credential else _session_brand(request)
+
+    # **Resolved once and reused.** `permissions_for` narrowed to a brand is
+    # both "what may this principal do here" and — by being non-empty — "does
+    # it hold anything here at all". Asking once keeps the brand-scoped path at
+    # the single query it has always been; only the platform-level path pays a
+    # second, and only when a brand was declared.
+    held_here = permissions_for(db, principal, brand_id) if brand_id is not None else set()
+
+    # **ADR-172 point 2.** A brand-scoped permission implies this check —
+    # `has_permission` against the declared brand fails without a grant there.
+    # A platform-level one does not, because it is checked with no brand at
+    # all: without this, a machine holding nothing but `view` could declare any
+    # brand in `X-Brand` and read it, which replaces one leak with a more
+    # convincing one. On reads the FILTER enforces the boundary rather than the
+    # permission check, and this is the only thing standing between a declared
+    # brand and the rows selected against it.
+    if brand_id is not None and not held_here:
+        logger.warning(
+            "api: refused %s %s for principal %s — declared brand %s, holds no "
+            "grant on it",
+            request.method, template, getattr(principal, "id", None), brand_id,
+        )
+        raise NotAuthorised(permission)
+
+    # **Its own attribute, not `current_brand`.** The middleware builds
+    # `request.state.current_brand` as a presentation summary — it carries
+    # `switchable`, and `base.html` reads it. Overwriting that with `{"id": ...}`
+    # was survivable while it happened only on brand-scoped writes; under point
+    # 1 it would happen on every request, turning a rare shape collision into a
+    # universal one. The ADR's own split between context and authorisation,
+    # applied to the state object rather than only to this function.
+    request.state.working_brand_id = brand_id
+
     if is_brand_scoped(permission):
-        # **Where the working brand comes from depends on the principal**, and
-        # that asymmetry is ADR-166 point 8's, not a new one: "a human's working
-        # brand comes from the brand switcher and rides in the session; a
-        # machine has no session to carry one, so it states one per request."
-        # The middleware has already resolved a person's onto `request.state`,
-        # so the SPA sends no `X-Brand` and must not be asked to.
-        brand_id = _declared_brand(request) if credential else _session_brand(request)
         if brand_id is None:
             logger.warning(
                 "api: refused %s for principal %s — %s is brand-scoped and no "
@@ -440,16 +528,8 @@ def enforce_api_policy(request: Request, db: Session = Depends(get_db)):
                 permission, getattr(principal, "id", None), permission,
             )
             raise BrandNotDeclared()
-        if not has_permission(db, principal, permission, brand_id=brand_id):
+        if permission not in held_here:
             raise NotAuthorised(permission)
-        # **The RESOLVED brand, written back.** ADR-168's Notes: one path then
-        # serves both planes, so a router no longer has to choose between the
-        # brand the permission was checked against and the default brand it was
-        # writing to. Deriving it from the payload instead would let a request
-        # body pick the scope its own authorization was evaluated in, which is
-        # the defect ADR-166 point 8 rejects when it refuses to read the brand
-        # off the addressed resource.
-        request.state.current_brand = {"id": brand_id}
     elif not has_permission(db, principal, permission):
         raise NotAuthorised(permission)
 

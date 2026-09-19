@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.auth.service import ensure_default_brand
+from app.auth.dependencies import working_brand
 from app.database import get_db
 from app.content.models import (
     ContentRecord,
@@ -39,17 +39,6 @@ from app.content.service import (
     HasRelationsError,
 )
 
-
-
-def _request_brand(request: Request, db: Session) -> int:
-    """The brand this request was authorised for (ADR-168).
-
-    `enforce_api_policy` resolves it and writes it back, so both planes arrive
-    here by one path. Falls back to the default brand only when the permission
-    was not brand-scoped and nothing set one.
-    """
-    brand = getattr(request.state, "current_brand", None)
-    return brand["id"] if brand else ensure_default_brand(db).id
 
 
 router = APIRouter(prefix="/content", tags=["content"])
@@ -147,9 +136,9 @@ def get_content_categories(content_id: int, db: Session = Depends(get_db)):
 
 @router.post("/", response_model=ContentRecord)
 def create_content_record(
-    request: Request,
     payload: ContentCreate,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     # PROVISIONAL. This router is unauthenticated (main.py leaves the twelve
     # JSON routers unguarded — launch gate 3), so there is no session and no
@@ -164,7 +153,7 @@ def create_content_record(
         db=db,
         title=payload.title,
         content=payload.content,
-        brand_id=_request_brand(request, db),
+        brand_id=brand_id,
         description=payload.description,
     )
 

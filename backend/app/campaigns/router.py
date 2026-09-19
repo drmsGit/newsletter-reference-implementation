@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from app.auth.service import ensure_default_brand
+from app.auth.dependencies import working_brand
 from app.database import get_db
 from app.campaigns.models import (
     Campaign,
@@ -40,17 +40,6 @@ from app.campaigns.service import (
 
 
 
-def _request_brand(request: Request, db: Session) -> int:
-    """The brand this request was authorised for (ADR-168).
-
-    `enforce_api_policy` resolves it and writes it back, so both planes arrive
-    here by one path. Falls back to the default brand only when the permission
-    was not brand-scoped and nothing set one.
-    """
-    brand = getattr(request.state, "current_brand", None)
-    return brand["id"] if brand else ensure_default_brand(db).id
-
-
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
 
@@ -61,9 +50,9 @@ def get_campaigns(db: Session = Depends(get_db)):
 
 @router.post("/", response_model=CampaignWithVariants)
 def create_campaign_record(
-    request: Request,
     payload: CampaignCreate,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     # PROVISIONAL. This router is unauthenticated (main.py leaves the twelve
     # JSON routers unguarded — launch gate 3), so there is no session and no
@@ -77,7 +66,7 @@ def create_campaign_record(
     return create_campaign(
         db=db,
         name=payload.name,
-        brand_id=_request_brand(request, db),
+        brand_id=brand_id,
         # Same provisional posture as brand_id above: this router has no session
         # to read a choice from. Email is the honest default for a machine
         # caller until ADR-166's credentials arrive, and it is stated here

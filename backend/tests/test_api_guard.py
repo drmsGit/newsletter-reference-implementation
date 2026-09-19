@@ -325,6 +325,135 @@ class TestTheBrandHeader:
             ).status_code == 400
 
 
+class TestTheWorkingBrandIsResolvedForEveryRequest:
+    """ADR-172 points 1 and 2, built 2026-09-19.
+
+    Before this, the brand was resolved only inside `if is_brand_scoped(...)`.
+    Every GET maps to `view`, `view` is platform-level, so no read on this
+    plane ever had a working brand — which is why `GET /content/` returned
+    every brand's rows to anybody who could authenticate.
+    """
+
+    def test_a_platform_level_read_with_a_brand_it_holds_nothing_on_is_refused(self):
+        """**This returned 200 before ADR-172, and it is the only test that
+        pins point 2.**
+
+        Its brand-scoped twin — `test_declaring_a_brand_the_integration_holds_
+        nothing_on_is_refused` — passes through `has_permission` against the
+        declared brand, so it would keep passing even if point 2's explicit
+        grant check were deleted entirely. That makes it useless as a guard for
+        this. `recipients.manage` is platform-level, so nothing else here
+        checks the declared brand at all: if the explicit check goes, this goes
+        green and the machine reads a brand it holds nothing on.
+        """
+        with machine([VIEW]) as headers:
+            headers["X-Brand"] = "999999"
+            response = client.get("/content/categories", headers=headers)
+            assert response.status_code == 403, response.text
+
+    def test_a_machine_with_no_brand_still_reaches_a_platform_level_route(self):
+        """Point 2 did not make `X-Brand` universal, and that matters.
+
+        ADR-172's Negative says a machine must now declare a brand on reads
+        too. This is where the qualifier lives: on *brand-owned* reads. A
+        platform-level route with no declared brand resolves nothing, checks
+        nothing, and is admitted — otherwise every integration that reads the
+        recipient list would break for a reason unrelated to brands.
+        """
+        with machine([VIEW]) as headers:
+            headers.pop("X-Brand")
+            assert client.get("/content/categories", headers=headers).status_code == 200
+
+    def test_the_grant_check_and_the_permission_check_refuse_independently(self):
+        """Two guards that each refuse alone will mask each other otherwise.
+
+        A machine that holds nothing on the declared brand *and* lacks the
+        permission proves neither check exists. These two hold exactly one
+        thing wrong each, so deleting either guard turns exactly one of them
+        red.
+        """
+        # Holds the permission, but not on the brand it declares.
+        with machine([VIEW]) as headers:
+            headers["X-Brand"] = "999999"
+            assert client.get("/content/categories", headers=headers).status_code == 403
+
+        # Holds a grant on the brand it declares, but not this permission.
+        with machine([VIEW]) as headers:
+            assert client.post(
+                "/content/", json=_content_payload(), headers=headers,
+            ).status_code == 403
+
+
+class TestTheAuthOffCarveOut:
+    """Decided 2026-09-19 beside ADR-172, because point 3 does not cover it.
+
+    With enforcement off the guard returns before anything resolves a brand, so
+    point 3's refusal would make every brand-owned JSON route unusable in the
+    one posture that exists to make a broken deployment fixable. The carve-out
+    resolves a brand there and nowhere else.
+    """
+
+    @contextmanager
+    def _enforcement_off(self):
+        from app.auth.dependencies import AUTH_ENFORCED_KEY
+        from app.settings.service import get_config, set_config
+
+        db = SessionLocal()
+        try:
+            # Read the STORED value, not `auth_enforced()` — reading through
+            # the function under test is how a restore fixture once persisted
+            # a mutated answer into the running deployment.
+            previous = get_config(db, AUTH_ENFORCED_KEY, True)
+            set_config(db, AUTH_ENFORCED_KEY, False)
+            db.commit()
+        finally:
+            db.close()
+        try:
+            yield
+        finally:
+            db = SessionLocal()
+            try:
+                set_config(db, AUTH_ENFORCED_KEY, previous)
+                db.commit()
+            finally:
+                db.close()
+
+    def test_a_brand_owned_write_still_works_with_enforcement_off(self):
+        created = None
+        with self._enforcement_off():
+            response = client.post("/content/", json=_content_payload())
+            assert response.status_code in (200, 201), response.text
+            created = response.json()["id"]
+
+        db = SessionLocal()
+        try:
+            from app.auth.service import ensure_default_brand
+            from app.content.db_models import ContentRecordDB
+
+            row = db.query(ContentRecordDB).filter(ContentRecordDB.id == created).first()
+            assert row is not None
+            assert row.brand_id == ensure_default_brand(db).id, (
+                "the carve-out resolved something other than the default brand"
+            )
+            db.query(ContentRecordDB).filter(ContentRecordDB.id == created).delete()
+            db.commit()
+        finally:
+            db.close()
+
+    def test_the_default_brand_is_unreachable_the_moment_enforcement_returns(self):
+        """The other direction, and the reason this pair exists.
+
+        One test proves the carve-out works; deleting the `if not
+        auth_enforced` condition would leave it green while the default brand
+        became reachable for everybody. This is the test that goes red.
+        """
+        with machine([VIEW, CONTENT_MANAGE]) as headers:
+            headers.pop("X-Brand")
+            response = client.post("/content/", json=_content_payload(), headers=headers)
+            assert response.status_code == 400, response.text
+            assert "X-Brand" in response.json()["detail"]
+
+
 class TestTheSignedProviderDoorStaysOpen:
     """ADR-166 point 6: two inbound mechanisms coexist deliberately.
 

@@ -11,14 +11,8 @@ from app.audience.models import (
     AudienceRuleBlockUpdate,
     BulkAddRequest,
 )
-from app.auth.service import ensure_default_brand
+from app.auth.dependencies import working_brand
 from app.database import get_db
-
-
-def _request_brand(request: Request, db: Session) -> int:
-    """The brand this request was authorised for (ADR-168)."""
-    brand = getattr(request.state, "current_brand", None)
-    return brand["id"] if brand else ensure_default_brand(db).id
 
 
 router = APIRouter(prefix="/api/audience-groups", tags=["audience"])
@@ -31,9 +25,9 @@ def list_groups(db: Session = Depends(get_db)):
 
 @router.post("/", response_model=AudienceGroup, status_code=201)
 def create_group(
-    request: Request,
     payload: AudienceGroupCreate,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     try:
         # **Resolved 2026-09-19 (ADR-168).** `enforce_api_policy` writes the
@@ -43,7 +37,7 @@ def create_group(
         # same brand the caller was authorised for. Writing to the default brand
         # while checking against a declared one was the gap.
         return service.create_group(
-            db, payload.name, brand_id=_request_brand(request, db),
+            db, payload.name, brand_id=brand_id,
             description=payload.description,
         )
     except ValueError as error:

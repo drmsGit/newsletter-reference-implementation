@@ -88,3 +88,29 @@ def test_no_router_reaches_for_a_spanning_function():
         + "\n  ".join(offenders)
         + "\nA route has a working brand (ADR-172 point 1). Pass it."
     )
+
+
+def test_the_guard_leaves_the_presentation_brand_alone():
+    """`current_brand` and the working brand are two things (ADR-172 point 1).
+
+    The middleware builds `request.state.current_brand` as a presentation
+    summary — it carries `switchable`, and `base.html` reads it. Until
+    2026-09-19 the API guard overwrote that with `{"id": brand_id}`, which was
+    survivable only because it happened on brand-scoped writes and nowhere
+    else. Point 1 resolves a brand on *every* request, so the same line would
+    now run on every request: a rare shape collision becoming a universal one.
+
+    Asserted against the source rather than a response, because the failure is
+    invisible from outside — the JSON caller gets exactly what it expected and
+    a template three layers away loses a key.
+    """
+    source = (APP / "auth" / "dependencies.py").read_text()
+    offenders = [
+        source[: m.start()].count("\n") + 1
+        for m in re.finditer(r"request\.state\.current_brand\s*=", source)
+    ]
+    assert not offenders, (
+        f"the API guard assigns request.state.current_brand at line(s) {offenders}. "
+        "That attribute belongs to the middleware and carries a different shape; "
+        "the resolved working brand goes to request.state.working_brand_id."
+    )
