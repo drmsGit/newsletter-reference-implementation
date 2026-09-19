@@ -276,54 +276,268 @@ class TestNoRouteIsUnguarded:
         assert exempt == ["POST /provider/webhooks/resend"], exempt
 
 
-class TestAMachineSendNeedsApproval:
-    """ADR-166 point 5, enforced rather than asserted.
+class TestAHeldSendIsQueuedNotRefused:
+    """ADR-166 point 5 finally meaning what it says (2026-09-19).
 
-    The ADR says a machine-triggered send lands in ADR-142 §4's approval
-    surface unless the integration is flagged otherwise. That surface is not
-    built, so there is nowhere for it to land — and storing the flag, showing
-    it in the admin screen and letting the send through anyway would ship
-    something that looks like a control and is not.
+    Until the approval surface existed this path answered 403, because storing
+    the flag and letting the send through would have shipped something that
+    looks like a control and is not. It answers 202 now — "the flow calls an
+    action, receives pending approval, and finishes" (ADR-142 §4).
+
+    **The most important test in this class is the escalation one.** Moving the
+    flag check below `has_permission` is what stops an integration with no
+    `sends.execute` grant from minting a pending send for a human to approve.
+    While both answers were 403 the ordering did not matter; the moment one of
+    them hands out a queue slot, it does.
     """
 
-    def test_an_unflagged_integration_cannot_fire_a_send(self, db):
+    def _pending_rows(self, db):
+        from app.approvals.db_models import PendingActionDB
+
+        return db.query(PendingActionDB).filter(
+            PendingActionDB.action_key == "send.fire_send_instance",
+            PendingActionDB.requested_by_type == "integration",
+        ).all()
+
+    def _cleanup(self, db, integration_marker=None):
+        """Delete by what this class creates, not by diffing against a snapshot.
+
+        The first version diffed "rows now" against "rows before" — which leaks
+        the moment a run fails partway, because the next run's `before` then
+        includes the previous run's debris and the diff stops seeing it. One
+        leaked row was enough to make a later test hit the duplicate path and
+        fail for a reason that had nothing to do with what it tested.
+
+        Rows raised through the API carry a real `requested_by_id`; the seeded
+        demo rows use 0 and are deliberately left alone.
+        """
+        from app.approvals import service as approvals
+        from app.approvals.db_models import PendingActionDB
+        from app.audit.db_models import AuditEventDB
+
+        db.rollback()
+        ids = [
+            r.id for r in self._pending_rows(db)
+            if r.requested_by_id not in (None, 0)
+        ]
+        if ids:
+            db.query(AuditEventDB).filter(
+                AuditEventDB.subject_type == approvals.SUBJECT,
+                AuditEventDB.subject_id.in_(ids),
+            ).delete(synchronize_session=False)
+            db.query(PendingActionDB).filter(
+                PendingActionDB.id.in_(ids)
+            ).delete(synchronize_session=False)
+            db.commit()
+
+    @pytest.fixture
+    def draft_send(self, db):
+        """A send instance with **no open request already against it**.
+
+        One open request per subject is enforced by a partial unique index, so
+        picking an instance that already has one makes every test in this class
+        take the duplicate path and assert nothing it means to. The demo seed
+        puts requests on several instances, which is exactly the situation a
+        test must not be surprised by.
+        """
+        from app.approvals.db_models import PENDING, PendingActionDB
+        from app.delivery.db_models import SendInstanceDB
+
+        db.rollback()
+        taken = {
+            row.subject_id for row in db.query(PendingActionDB).filter(
+                PendingActionDB.action_key == "send.fire_send_instance",
+                PendingActionDB.status == PENDING,
+            ).all()
+        }
+        instance = db.query(SendInstanceDB).filter(
+            SendInstanceDB.brand_id == auth.ensure_default_brand(db).id,
+            SendInstanceDB.id.notin_(taken or {-1}),
+        ).order_by(SendInstanceDB.id).first()
+        if instance is None:
+            pytest.skip("every send instance already has a request waiting")
+        return instance
+
+    def test_an_unflagged_integration_gets_a_held_request(self, db, draft_send):
         from app.auth.permissions import SENDS_EXECUTE, VIEW
 
-        with machine([VIEW, SENDS_EXECUTE]) as headers:
-            response = client.post(
-                "/delivery/send-instances/1/send", headers=headers,
-            )
-            assert response.status_code == 403
-            assert "without approval" in response.json()["detail"]
+        before = [r.id for r in self._pending_rows(db)]
+        try:
+            with machine([VIEW, SENDS_EXECUTE]) as headers:
+                response = client.post(
+                    f"/delivery/send-instances/{draft_send.id}/send", headers=headers,
+                )
+                assert response.status_code == 202, response.text
+                body = response.json()
+                assert body["status"] == "pending_approval"
+                assert body["review"].startswith("/ui/approvals/")
+                # ADR-142 §4: pending actions expire.
+                assert body["expires_at"]
 
-    def test_the_flag_is_what_changes_it(self, db):
+                held = [r for r in self._pending_rows(db) if r.id not in before]
+                assert len(held) == 1
+                assert held[0].brand_id is not None, (
+                    "a brand-less held request is invisible in every inbox"
+                )
+                assert held[0].requested_by_id is not None
+        finally:
+            self._cleanup(db)
+
+    def test_an_integration_without_the_grant_mints_nothing(self, db, draft_send):
+        """**The escalation test.**
+
+        No `sends.execute` grant at all. Before the reorder this hit the
+        unattended-send flag first and would, as a queue, have produced a
+        pending send for a human to approve — access the integration was never
+        given, arriving through the approval surface.
+        """
+        from app.auth.permissions import VIEW
+
+        before = [r.id for r in self._pending_rows(db)]
+        try:
+            with machine([VIEW]) as headers:
+                response = client.post(
+                    f"/delivery/send-instances/{draft_send.id}/send", headers=headers,
+                )
+                assert response.status_code == 403, response.text
+                assert "sends.execute" in response.json()["detail"]
+                assert [r.id for r in self._pending_rows(db)] == before, (
+                    "a caller with no grant created a pending send"
+                )
+        finally:
+            self._cleanup(db)
+
+    def test_a_brand_scoped_send_without_the_header_mints_nothing(
+        self, db, draft_send
+    ):
+        """The brand moved above the flag for this: a held request with no
+        brand would be invisible in every inbox."""
+        from app.auth.permissions import SENDS_EXECUTE, VIEW
+
+        before = [r.id for r in self._pending_rows(db)]
+        try:
+            with machine([VIEW, SENDS_EXECUTE]) as headers:
+                headers.pop("X-Brand")
+                response = client.post(
+                    f"/delivery/send-instances/{draft_send.id}/send", headers=headers,
+                )
+                assert response.status_code == 400
+                assert [r.id for r in self._pending_rows(db)] == before
+        finally:
+            self._cleanup(db)
+
+    def test_a_retry_returns_the_same_held_request(self, db, draft_send):
+        """An orchestrator that retries must not see an error — the request is
+        pending, and saying so keeps the retry idempotent."""
+        from app.auth.permissions import SENDS_EXECUTE, VIEW
+
+        before = [r.id for r in self._pending_rows(db)]
+        try:
+            with machine([VIEW, SENDS_EXECUTE]) as headers:
+                first = client.post(
+                    f"/delivery/send-instances/{draft_send.id}/send", headers=headers,
+                )
+                second = client.post(
+                    f"/delivery/send-instances/{draft_send.id}/send", headers=headers,
+                )
+                assert second.status_code == 202
+                assert (second.json()["pending_action_id"]
+                        == first.json()["pending_action_id"])
+                assert len([r for r in self._pending_rows(db)
+                            if r.id not in before]) == 1
+        finally:
+            self._cleanup(db)
+
+    def test_a_flagged_integration_sends_without_being_held(self, db, draft_send):
+        """The flag is what changes it, and it must create NO pending row —
+        a send that both happens and waits would be the worst of both."""
         from app.auth.db_models import IntegrationDB
         from app.auth.permissions import SENDS_EXECUTE, VIEW
+        from app.auth import integrations as ints
+
+        before = [r.id for r in self._pending_rows(db)]
+        try:
+            with machine([VIEW, SENDS_EXECUTE]) as headers:
+                key_id = headers["Authorization"].split()[1].split(".")[0]
+                integration = db.query(IntegrationDB).join(
+                    IntegrationCredentialDB,
+                    IntegrationCredentialDB.integration_id == IntegrationDB.id,
+                ).filter(IntegrationCredentialDB.key_id == key_id).first()
+                ints.set_unattended_sending(db, integration.id, True)
+
+                response = client.post(
+                    f"/delivery/send-instances/{draft_send.id}/send", headers=headers,
+                )
+                assert response.status_code != 202, (
+                    "a flagged integration must not be held"
+                )
+                assert [r.id for r in self._pending_rows(db)] == before
+        finally:
+            self._cleanup(db)
+
+    def test_a_route_with_no_approvable_action_is_refused_not_queued(
+        self, db, draft_send, monkeypatch
+    ):
+        """Fail-closed by omission.
+
+        `APPROVABLE_ROUTES` is what grants a route a queue. A route missing from
+        it must go back to being refused outright — the behaviour every send had
+        before the approval surface existed — rather than reaching the handler
+        with nothing to build a request from.
+
+        The mapping is removed for the duration, because every send route in the
+        app is currently mapped and there is otherwise no way to reach this
+        branch. `delitem` mutates the dict the dependency imported, which is the
+        same object.
+        """
+        from app.auth.permissions import SENDS_EXECUTE, VIEW
+        from app.auth.policy import APPROVABLE_ROUTES
+
+        monkeypatch.delitem(
+            APPROVABLE_ROUTES, "/delivery/send-instances/{send_instance_id}/send",
+        )
+        before = [r.id for r in self._pending_rows(db)]
+        try:
+            with machine([VIEW, SENDS_EXECUTE]) as headers:
+                response = client.post(
+                    f"/delivery/send-instances/{draft_send.id}/send", headers=headers,
+                )
+                assert response.status_code == 403, response.text
+                assert "cannot be held" in response.json()["detail"]
+                assert [r.id for r in self._pending_rows(db)] == before
+        finally:
+            self._cleanup(db)
+
+    def test_there_is_no_way_to_approve_over_the_api(self, db):
+        """A machine that can approve its own held request has defeated the
+        mechanism. The approve route lives only on the UI plane."""
+        from app.auth.permissions import SENDS_EXECUTE, VIEW
 
         with machine([VIEW, SENDS_EXECUTE]) as headers:
-            key_id = headers["Authorization"].split()[1].split(".")[0]
-            integration = db.query(IntegrationDB).join(
-                IntegrationCredentialDB,
-                IntegrationCredentialDB.integration_id == IntegrationDB.id,
-            ).filter(IntegrationCredentialDB.key_id == key_id).first()
-            ints.set_unattended_sending(db, integration.id, True)
+            for path in ("/ui/approvals/1/approve", "/approvals/1/approve"):
+                response = client.post(path, headers=headers)
+                assert response.status_code in (401, 403, 404, 405), (
+                    f"{path} answered {response.status_code}"
+                )
 
-            response = client.post(
-                "/delivery/send-instances/1/send", headers=headers,
-            )
-            # Past the guard now: whatever happens next is the send path's
-            # business, and a missing send instance is not an authorisation
-            # answer.
-            assert response.status_code != 403 or (
-                "without approval" not in response.json().get("detail", "")
-            )
 
-    def test_planning_is_not_affected(self, db):
-        """The flag gates firing, not preparing. `sends.plan` reaches nobody."""
+class TestPlanningIsNotFiring:
+    """What the ADR-166 point 2 split bought, checked from the machine side.
+
+    This class used to assert that an unflagged integration was REFUSED a send.
+    That was true for one day. The approval surface now holds it instead, which
+    `TestAHeldSendIsQueuedNotRefused` covers — so the two tests that asserted a
+    403 are gone rather than adjusted, because their subject changed rather
+    than their expected value.
+    """
+
+    def test_planning_is_not_affected_by_the_unattended_flag(self, db):
+        """The flag gates firing, not preparing. `sends.plan` reaches nobody,
+        so it has nothing to be held for."""
         from app.auth.permissions import SENDS_PLAN, VIEW
 
         with machine([VIEW, SENDS_PLAN]) as headers:
             response = client.post(
                 "/delivery/send-instances", headers=headers, json={},
             )
-            assert response.status_code != 403
+            assert response.status_code not in (202, 403), response.status_code

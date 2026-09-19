@@ -388,16 +388,92 @@ def _csrf_failed(request: Request, exc: CsrfFailed):
 
 @app.exception_handler(ApprovalRequired)
 def _approval_required(request: Request, exc: ApprovalRequired):
-    return JSONResponse(
-        {"detail": (
-            "This integration is not permitted to send without approval. "
-            "ADR-166 point 5 defaults every integration to requiring it, and "
-            "the approval surface it would queue into is not built yet — so a "
-            "send it cannot queue is refused rather than let through. Enable "
-            "unattended sending for this integration if that is intended."
-        )},
-        status_code=403,
-    )
+    """Hold the action and tell the caller where it went (ADR-142 §4).
+
+    "An autonomous flow calls an action, receives 'pending approval', and
+    **finishes**." So this answers **202 Accepted** with the id of the held
+    request and a link into the inbox — not 403, and not a long-running
+    response the caller has to keep open.
+
+    **The row is created here, with a session of its own.** The dependency that
+    raised may have left its session in a rollback state, and a dependency with
+    a side effect is harder to reason about than one that only refuses.
+    """
+    if exc.action_key is None:
+        # No entry in APPROVABLE_ROUTES, so there is nothing to queue into.
+        # Fail closed — this is the behaviour every send had before the
+        # approval surface existed, kept deliberately rather than letting an
+        # unmapped route through.
+        return JSONResponse(
+            {"detail": (
+                "This integration is not permitted to send without approval, "
+                "and this route has no approvable action mapped to it, so the "
+                "request cannot be held for review. Enable unattended sending "
+                "for this integration, or add the route to APPROVABLE_ROUTES."
+            )},
+            status_code=403,
+        )
+
+    from app.approvals import service as approvals
+    from app.approvals.actions.registry import get_action, get_action_module
+    from app.approvals.db_models import PENDING, PendingActionDB
+    from app.audit.service import ACTOR_INTEGRATION
+
+    meta = get_action(exc.action_key)
+    module = get_action_module(exc.action_key)
+    # By convention the subject is the path parameter named after the action's
+    # declared subject type — `send_instance` → `send_instance_id`. Stated as a
+    # convention rather than inferred loosely, so an action whose subject is not
+    # in its path says so by declaring none.
+    subject_id = exc.payload.get(f"{meta.subject_type}_id") if meta else None
+
+    db = SessionLocal()
+    try:
+        summary = ""
+        if module is not None and hasattr(module, "summarise") and subject_id:
+            try:
+                summary = module.summarise(db, subject_id)
+            except Exception:  # pragma: no cover - a summary must not block
+                logger.warning("could not summarise %s", exc.action_key, exc_info=True)
+        try:
+            held = approvals.request_approval(
+                db, exc.action_key,
+                payload=exc.payload,
+                summary=summary or (meta.label if meta else exc.action_key),
+                requested_by_type=ACTOR_INTEGRATION,
+                requested_by_id=exc.integration_id,
+                brand_id=exc.brand_id,
+                subject_id=subject_id,
+            )
+        except approvals.DuplicateRequest:
+            # An orchestrator that retries a held call should get the same
+            # answer, not an error: the request IS pending, and saying so keeps
+            # the retry idempotent instead of making it look like a failure.
+            held = db.query(PendingActionDB).filter(
+                PendingActionDB.action_key == exc.action_key,
+                PendingActionDB.subject_type == (meta.subject_type if meta else None),
+                PendingActionDB.subject_id == subject_id,
+                PendingActionDB.status == PENDING,
+            ).first()
+            if held is None:
+                raise
+        return JSONResponse(
+            {
+                "status": "pending_approval",
+                "pending_action_id": held.id,
+                "expires_at": held.expires_at.isoformat() if held.expires_at else None,
+                "review": f"/ui/approvals/{held.id}",
+                "detail": (
+                    "This integration may not send without approval, so the "
+                    "send is held. A person with the right permission approves "
+                    "it in the app — there is deliberately no way to approve "
+                    "over the API."
+                ),
+            },
+            status_code=202,
+        )
+    finally:
+        db.close()
 
 
 @app.exception_handler(BrandNotDeclared)

@@ -163,6 +163,21 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
 )
 
 
+#: Which held action a refused route turns into (ADR-166 point 5, ADR-142 §4).
+#:
+#: Here rather than in `main.py` for this file's own stated reason: the policy
+#: has to be legible in one place, and "what happens when this route is refused
+#: for approval" is part of the policy. A mapping hiding in the wiring is one
+#: nobody auditing access control would find.
+#:
+#: **Fail-closed by omission.** A route with no entry cannot be queued, so it is
+#: refused outright — the behaviour every send had before the approval surface
+#: existed. Adding a route here is what grants it a queue.
+APPROVABLE_ROUTES: dict[str, str] = {
+    "/delivery/send-instances/{send_instance_id}/send": "send.fire_send_instance",
+}
+
+
 def required_permission(method: str, route_template: str) -> str:
     """The permission this request needs.
 

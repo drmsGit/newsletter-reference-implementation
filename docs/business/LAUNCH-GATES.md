@@ -75,13 +75,18 @@ apart. From the 2026-08-07 external review:
   so the exemption is legible where somebody auditing access control would
   actually look; a test asserts it is the only one.
 
-  **What is closed is authentication, not everything that record designs.**
-  ADR-166 point 5 wants an unattended machine send to queue into ADR-142 §4's
-  approval surface, and **that surface is not built**. So an integration not
-  flagged for unattended sending is refused the send route outright rather than
-  let through — the honest reading of "defaults to requiring approval" while
-  there is nowhere to queue. It becomes a queue when the approval inbox lands,
-  and the default does not have to change.
+  **Point 5 completed 2026-09-19.** ADR-166 point 5 wants an unattended machine
+  send to queue into ADR-142 §4's approval surface. That surface was unbuilt at
+  the time this gate closed, so the send was refused outright — the honest
+  reading of "defaults to requiring approval" while there is nowhere to queue.
+  The surface exists now: such a send is **held** and answers `202` with a link
+  into the inbox, and the default did not have to change.
+
+  Closing that gap also fixed an ordering defect the refusal had been hiding.
+  The unattended-send flag was checked before the caller's permission and before
+  the brand was resolved — correct for a refusal, and privilege escalation for a
+  queue, since an integration with no `sends.execute` grant would have minted a
+  pending send for a person to approve. Both checks now come first.
 
   Two defects surfaced during the build and were fixed with it. `enforce_csrf`
   was wired onto the frontend router alone, leaving the thirteen user- and

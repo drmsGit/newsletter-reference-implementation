@@ -25,7 +25,9 @@ from sqlalchemy.orm import Session
 
 from app.auth.db_models import UserDB
 from app.auth.permissions import SENDS_EXECUTE, is_brand_scoped
-from app.auth.policy import PROVIDER_SIGNED, UNMAPPED, required_permission
+from app.auth.policy import (
+    APPROVABLE_ROUTES, PROVIDER_SIGNED, UNMAPPED, required_permission,
+)
 from app.auth.integrations import authenticate, record_auth_failure
 from app.auth.service import (
     SESSION_COOKIE,
@@ -222,20 +224,40 @@ BRAND_HEADER = "X-Brand"
 
 
 class ApprovalRequired(Exception):
-    """A machine tried to fire a send it is not flagged to fire unattended.
+    """A machine asked to fire a send it is not flagged to fire unattended.
 
-    ADR-166 point 5 says such a send "lands in ADR-142 §4's approval surface —
-    the same pending-action mechanism, the same inbox, the same history".
-    **That surface is not built.** The shared approval inbox is an open item,
-    so there is nowhere for the send to land.
+    ADR-166 point 5: such a send "lands in ADR-142 §4's approval surface — the
+    same pending-action mechanism, the same inbox, the same history".
 
-    Refusing is the only honest reading of "defaults to requiring approval"
-    while that is true. The alternative — storing the flag, showing it in the
-    UI and letting the send through anyway — ships something that looks like a
-    control and is not, which is worse than shipping no flag at all. When the
-    approval surface exists this becomes a queue instead of a refusal, and the
-    default does not have to change.
+    **It is a queue now, not a refusal.** Between 2026-09-18 and 2026-09-19
+    this raised an outright 403, because the approval surface did not exist and
+    storing the flag while letting the send through would have shipped
+    something that looks like a control and is not. The surface exists, so the
+    default described in point 5 finally means what it says.
+
+    The exception carries what the handler needs to build the held request. It
+    is raised inside a dependency, and a session that has raised there may be in
+    a rollback state, so the row is created by the handler with a session of its
+    own rather than here.
     """
+
+    def __init__(
+        self,
+        *,
+        action_key: str | None = None,
+        payload: dict | None = None,
+        integration_id: int | None = None,
+        brand_id: int | None = None,
+    ):
+        super().__init__(action_key or "approval required")
+        #: None when the route has no entry in `APPROVABLE_ROUTES`. There is
+        #: then nothing to queue into, and the handler refuses outright — the
+        #: pre-2026-09-19 behaviour, kept as the fail-closed case rather than
+        #: quietly letting an unmapped send through.
+        self.action_key = action_key
+        self.payload = payload or {}
+        self.integration_id = integration_id
+        self.brand_id = brand_id
 
 
 class BrandNotDeclared(Exception):
@@ -334,15 +356,25 @@ def enforce_api_policy(request: Request, db: Session = Depends(get_db)):
         )
         raise NotAuthorised(permission)
 
-    # ADR-166 point 5, enforced rather than asserted. Checked before the brand,
-    # because "you may not do this at all" outranks "you did not say where".
-    if permission == SENDS_EXECUTE and not integration.may_send_unattended:
-        logger.warning(
-            "api: refused a send for integration %s — not flagged for "
-            "unattended sending", integration.id,
-        )
-        raise ApprovalRequired()
-
+    # **Authorisation first, then the approval gate.** The order here was the
+    # other way round until 2026-09-19, and it was correct for a refusal and
+    # wrong for a queue.
+    #
+    # The comment that stood here read "you may not do this at all outranks you
+    # did not say where", which argued for checking the unattended-send flag
+    # before anything else. That reasoning does not survive the flag becoming a
+    # queue: `ApprovalRequired` is not a "may not", it is a "not yet", and it
+    # now HANDS OUT something — a held request a human is asked to approve.
+    #
+    # Left in the old order it would be privilege escalation through the queue:
+    # an integration holding no `sends.execute` grant at all hit the flag check
+    # before `has_permission`, so as a queue it could mint a pending send for a
+    # person to approve. Harmless while both answers were 403; not harmless now.
+    #
+    # The brand moves up for the same reason. It was resolved after, so a queued
+    # request would have carried `brand_id = NULL` and been invisible in every
+    # brand's inbox — a send that looks accepted and that nobody can ever see.
+    brand_id = None
     if is_brand_scoped(permission):
         brand_id = _declared_brand(request)
         if brand_id is None:
@@ -354,8 +386,23 @@ def enforce_api_policy(request: Request, db: Session = Depends(get_db)):
             raise BrandNotDeclared()
         if not has_permission(db, integration, permission, brand_id=brand_id):
             raise NotAuthorised(permission)
-        return integration
-
-    if not has_permission(db, integration, permission):
+    elif not has_permission(db, integration, permission):
         raise NotAuthorised(permission)
+
+    # ADR-166 point 5. Reached only by a caller that is authenticated,
+    # authorised for this action on this brand, and has said which brand.
+    if permission == SENDS_EXECUTE and not integration.may_send_unattended:
+        logger.info(
+            "api: holding a send for integration %s — not flagged for "
+            "unattended sending", integration.id,
+        )
+        raise ApprovalRequired(
+            action_key=APPROVABLE_ROUTES.get(template),
+            # Path parameters only. The JSON body has already been consumed by
+            # the time a dependency runs, and re-reading it is its own problem.
+            payload=dict(request.scope.get("path_params") or {}),
+            integration_id=integration.id,
+            brand_id=brand_id,
+        )
+
     return integration
