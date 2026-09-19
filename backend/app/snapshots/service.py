@@ -32,6 +32,10 @@ def build_render_context(
     recipient_id: int | None = None,
     resolutions_by_module_id: dict[int, DecisionResolutionDB] | None = None,
 ) -> dict:
+    from app.campaigns.service import brand_of_variant
+
+    brand_id = brand_of_variant(db, variant_id)
+
     modules = (
         db.query(ModuleInstanceDB)
         .filter(ModuleInstanceDB.variant_id == variant_id)
@@ -77,9 +81,14 @@ def build_render_context(
                 module_context["resolution_status"] = "no_resolution"
 
         elif module.content_record_id is not None:
+            # The variant's own brand, resolved once above. A module whose
+            # content belongs to another brand yields no version rather than
+            # rendering it (ADR-172 point 5, and ADR-013's addendum: across a
+            # brand boundary a reference cannot be expressed at all).
             latest_version = get_latest_version_for_content(
                 db=db,
                 content_record_id=module.content_record_id,
+                brand_id=brand_id,
             )
 
             module_context["content_version_id"] = (

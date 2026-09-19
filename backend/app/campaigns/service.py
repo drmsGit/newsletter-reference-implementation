@@ -9,6 +9,29 @@ from app.modules.registry import envelope_module_type, get_manifest
 from app.recipients.db_models import RecipientDB
 
 
+def brand_of_variant(db: Session, variant_id: int) -> int | None:
+    """The brand a variant belongs to, via its campaign (ADR-172 point 5).
+
+    A **resolver**, not a scoped getter, and the distinction matters. A scoped
+    getter answers "give me this row if it is in my brand" and is how a request
+    addresses something. This answers "which brand does this row belong to",
+    which is what an internal caller holding a variant id and no request needs
+    — the same question `_brand_of_campaign` (`audience/service.py`) and
+    `sending_brand_id` (`decision/strategies/base.py`) already ask, in their own
+    corners, by walking the same two joins.
+
+    Returns `None` when the chain is broken. The caller must not read that as
+    "every brand": an unknown brand is not a wildcard, and ADR-150 point 8 is
+    explicit that widening is a deliberate act.
+    """
+    return (
+        db.query(CampaignDB.brand_id)
+        .join(VariantDB, VariantDB.campaign_id == CampaignDB.id)
+        .filter(VariantDB.id == variant_id)
+        .scalar()
+    )
+
+
 def to_campaign(record: CampaignDB) -> Campaign:
     return Campaign(
         id=record.id,

@@ -45,8 +45,11 @@ router = APIRouter(prefix="/content", tags=["content"])
 
 
 @router.get("/", response_model=list[ContentRecord])
-def get_content_records(db: Session = Depends(get_db)):
-    return list_content_records(db)
+def get_content_records(
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    return list_content_records(db, brand_id=brand_id)
 
 
 # These fixed-path routes (/categories, /category-relations) must be
@@ -82,16 +85,30 @@ def delete_category_record(
 
 
 @router.get("/{content_id}", response_model=ContentRecord)
-def get_content_record_by_id(content_id: int, db: Session = Depends(get_db)):
-    record = get_content_record(db, content_id)
+def get_content_record_by_id(
+    content_id: int,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    # A record in another brand is not found, and answers exactly as a deleted
+    # one does (ADR-172 point 6). A guessable integer id is not a secret.
+    record = get_content_record(db, content_id, brand_id=brand_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Content record not found")
     return to_content_record(record)
 
 
 @router.put("/{content_id}", response_model=ContentRecord)
-def update_content_record_by_id(content_id: int, payload: ContentCreate, db: Session = Depends(get_db)):
-    record = update_content_record(db, content_id, payload.title, payload.content, payload.description)
+def update_content_record_by_id(
+    content_id: int,
+    payload: ContentCreate,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    record = update_content_record(
+        db, content_id, payload.title, payload.content, payload.description,
+        brand_id=brand_id,
+    )
     if record is None:
         raise HTTPException(status_code=404, detail="Content record not found")
     return record
@@ -102,10 +119,11 @@ def set_content_record_status(
     content_id: int,
     payload: ContentStatusUpdate,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     """Activate/deactivate a content record — the safe alternative to deleting."""
     try:
-        record = set_content_status(db, content_id, payload.status)
+        record = set_content_status(db, content_id, payload.status, brand_id=brand_id)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
     if record is None:
@@ -118,9 +136,10 @@ def delete_content_record_by_id(
     content_id: int,
     force: bool = False,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     try:
-        deleted = delete_content_record(db, content_id, force=force)
+        deleted = delete_content_record(db, content_id, force=force, brand_id=brand_id)
     except ContentRecordHasHistoryError as error:
         raise HTTPException(status_code=409, detail=str(error))
     except HasRelationsError as error:
@@ -131,8 +150,12 @@ def delete_content_record_by_id(
 
 
 @router.get("/{content_id}/categories", response_model=list[Category])
-def get_content_categories(content_id: int, db: Session = Depends(get_db)):
-    return list_categories_for_content(db, content_id)
+def get_content_categories(
+    content_id: int,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    return list_categories_for_content(db, content_id, brand_id=brand_id)
 
 @router.post("/", response_model=ContentRecord)
 def create_content_record(
@@ -174,13 +197,22 @@ def assign_category(
     content_id: int,
     payload: ContentCategoryAssignmentCreate,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
+    # **Resolved here so the two refusals stay distinct.** The service answers
+    # `None` for "already assigned", which the 409 below reports — and it also
+    # refuses a record outside the brand. Letting both arrive as `None` would
+    # tell a caller its assignment was a duplicate when the record simply is
+    # not theirs, which is a worse answer than either.
+    if get_content_record(db, content_id, brand_id=brand_id) is None:
+        raise HTTPException(status_code=404, detail="Content record not found")
     try:
         assignment = assign_category_to_content(
             db=db,
             content_id=content_id,
             category_id=payload.category_id,
             score=payload.score,
+            brand_id=brand_id,
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
@@ -203,11 +235,13 @@ def assign_category(
 def create_version(
     payload: ContentVersionCreate,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     version = create_content_version(
         db=db,
         content_record_id=payload.content_record_id,
         created_by=payload.created_by,
+        brand_id=brand_id,
     )
     if version is None:
         raise HTTPException(status_code=404, detail="Content record not found")
@@ -218,10 +252,12 @@ def create_version(
 def get_content_versions(
     content_record_id: int,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     return list_versions_for_content(
         db=db,
         content_record_id=content_record_id,
+        brand_id=brand_id,
     )
 
 

@@ -28,7 +28,9 @@ from app.campaigns.db_models import CampaignDB, VariantDB
 from app.delivery.db_models import SendInstanceDB
 from app.campaigns.service import create_campaign, list_campaigns
 from app.content.db_models import ContentRecordDB
-from app.content.service import create_content, list_content_records
+from app.content.service import (
+    create_content, list_all_content_records, list_content_records,
+)
 from app.database import SessionLocal
 
 
@@ -229,22 +231,52 @@ class TestListsAreScopedToTheWorkingBrand:
             db.query(CampaignDB).filter(CampaignDB.id == campaign.id).delete()
             db.commit()
 
-    def test_no_brand_means_every_brand_and_is_not_the_default(
+    def test_forgetting_the_brand_is_now_an_error_not_everything(
+        self, db, default_brand, temp_content
+    ):
+        """**This replaces `test_no_brand_means_every_brand_and_is_not_the_default`,
+        and the replacement is the point of ADR-172 point 4.**
+
+        That test pinned the fail-open direction *because* it was fail-open:
+        its own docstring said "if a caller forgets to pass a brand they get
+        everything, so the behaviour should at least be deliberate and tested".
+        Deliberate it was; the JSON routers then forgot the argument at every
+        single call site, and `GET /content/` served every brand's records to
+        anybody who could authenticate.
+
+        So the behaviour is gone rather than the test. Forgetting the brand is
+        now a `TypeError` at the call site — which is what `is_consenting_filter`
+        chose twelve files away, on the reasoning that forgetting it should be
+        a `TypeError`, while these list functions took the other direction.
+        """
+        temp_content(default_brand)
+        with pytest.raises(TypeError):
+            list_content_records(db)
+
+    def test_spanning_every_brand_is_possible_and_has_to_say_so(
         self, db, default_brand, temp_brand, temp_content
     ):
-        """`brand_id=None` spans brands on purpose, for counts and migrations.
+        """The other half: the genuine spanning callers still have a road.
 
-        Pinned because it is the fail-open direction: if a caller forgets to
-        pass a brand they get everything, so the behaviour should at least be
-        deliberate and tested rather than incidental.
+        Platform counts, migrations and seeds legitimately have no working
+        brand. `list_all_content_records` serves them and announces itself in
+        its own name — and `test_brand_boundary.py` asserts the set of such
+        functions exactly, so a fourth is an edit somebody has to justify.
         """
         other = temp_brand()
         mine = temp_content(default_brand)
         theirs = create_content(db, title=f"brandtest-{uuid.uuid4().hex[:8]}",
                                 content={"headline_medium": "x"}, brand_id=other.id)
 
-        everything = [r.id for r in list_content_records(db)]
+        everything = [r.id for r in list_all_content_records(db)]
         assert mine in everything and theirs.id in everything
+
+        # And the scoped call does NOT span — asserted against the non-default
+        # brand, because every fallback here returns the default one and a
+        # test written against it could not tell a working filter from a
+        # deleted one.
+        theirs_only = [r.id for r in list_content_records(db, brand_id=other.id)]
+        assert theirs.id in theirs_only and mine not in theirs_only
 
 
 class TestTwoBrandsMayReuseAName:

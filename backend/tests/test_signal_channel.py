@@ -193,7 +193,10 @@ def test_the_engagement_path_records_the_executions_channel(db):
     category = create_category(db, name=f"{PREFIX}-{uuid.uuid4().hex[:8]}")
     record = create_content(db, title=f"{PREFIX}-{uuid.uuid4().hex[:8]}",
                             brand_id=brand.id, content={"headline_medium": "x"})
-    assign_category_to_content(db, content_id=record.id, category_id=category.id, score=10)
+    assign_category_to_content(
+        db, content_id=record.id, category_id=category.id, score=10,
+        brand_id=brand.id,
+    )
     recipient = RecipientDB(external_id=f"{PREFIX}-{uuid.uuid4().hex[:8]}", status="active")
     db.add(recipient); db.commit(); db.refresh(recipient)
 

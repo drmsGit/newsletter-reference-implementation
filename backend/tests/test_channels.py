@@ -792,7 +792,9 @@ class TestAPushSnapshotLivesInTheRowNotOnDisk:
         record = create_content(
             db, title=_name("pushcontent"), brand_id=campaign.brand_id,
             content={"push_title": "Ready", "push_body": "Go."})
-        create_content_version(db, content_record_id=record.id, created_by="test")
+        create_content_version(
+            db, content_record_id=record.id, created_by="test",
+            brand_id=campaign.brand_id)
         variant = create_variant_for_campaign(
             db, campaign_id=campaign.id, name=_name("push"), channel="push")
         create_module_for_variant(
@@ -844,7 +846,9 @@ class TestAPushSnapshotLivesInTheRowNotOnDisk:
             db, title=_name("both"), brand_id=campaign.brand_id,
             content={"push_title": "Hi", "push_body": "There",
                      "headline_medium": "Hi", "body_medium": "There"})
-        create_content_version(db, content_record_id=record.id, created_by="test")
+        create_content_version(
+            db, content_record_id=record.id, created_by="test",
+            brand_id=campaign.brand_id)
 
         push = create_variant_for_campaign(
             db, campaign_id=campaign.id, name=_name("push"), channel="push")
@@ -1316,7 +1320,9 @@ class TestAPushSendGoesOutAsAPush:
         record = create_content(
             db, title=_name("alert"), brand_id=brand.id,
             content={"push_title": "Fresh snow", "push_body": "2m base at Arosa."})
-        create_content_version(db, content_record_id=record.id, created_by="test")
+        create_content_version(
+            db, content_record_id=record.id, created_by="test",
+            brand_id=brand.id)
         campaign = create_campaign(
             db, name=_name("campaign"), brand_id=brand.id, channel="email")
         variant = create_variant_for_campaign(
@@ -2031,7 +2037,9 @@ class TestTheSendFormOffersOnlyWhatTheChannelCanDo:
 
         record = create_content(db, title=_name("c"), brand_id=brand.id,
                                 content={"push_title": "Hi", "push_body": "There"})
-        create_content_version(db, content_record_id=record.id, created_by="t")
+        create_content_version(
+            db, content_record_id=record.id, created_by="t",
+            brand_id=brand.id)
         push_variant = create_variant_for_campaign(
             db, campaign_id=campaign.id, name=_name("push"), channel="push")
         create_module_for_variant(db, variant_id=push_variant.id,
@@ -2121,7 +2129,9 @@ class TestTheSendFormOffersOnlyWhatTheChannelCanDo:
         brand = auth.ensure_default_brand(db)
         record = create_content(db, title=_name("c"), brand_id=brand.id,
                                 content={"push_title": "Ready", "push_body": "Go."})
-        create_content_version(db, content_record_id=record.id, created_by="t")
+        create_content_version(
+            db, content_record_id=record.id, created_by="t",
+            brand_id=brand.id)
         variant = create_variant_for_campaign(
             db, campaign_id=campaign.id, name=_name("push"), channel="push")
         create_module_for_variant(db, variant_id=variant.id,
@@ -2499,7 +2509,7 @@ class TestNoSurfaceQuietlyRendersAPushAsAnEmail:
         module = db.query(ModuleInstanceDB).filter(
             ModuleInstanceDB.variant_id == variant.id).first()
         create_content_version(db, content_record_id=module.content_record_id,
-                               created_by="test")
+                               created_by="test", brand_id=campaign.brand_id)
         snapshot = create_snapshot_for_variant(db, variant_id=variant.id)
         try:
             _api_client = TestClient(app, raise_server_exceptions=False)

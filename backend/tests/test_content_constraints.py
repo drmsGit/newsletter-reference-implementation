@@ -122,6 +122,7 @@ class TestDuplicateCategoryAssignment:
 
         result = content_service.assign_category_to_content(
             db, content_id=record.id, category_id=temp_category.id, score=10,
+            brand_id=record.brand_id,
         )
 
         assert result is None, (
@@ -142,10 +143,12 @@ class TestDuplicateCategoryAssignment:
         record = temp_record()
         first = content_service.assign_category_to_content(
             db, content_id=record.id, category_id=temp_category.id, score=10,
+            brand_id=record.brand_id,
         )
         assert first is not None
         assert content_service.assign_category_to_content(
             db, content_id=record.id, category_id=temp_category.id, score=10,
+            brand_id=record.brand_id,
         ) is None
 
 
@@ -162,7 +165,7 @@ class TestConcurrentPublishVersionNumbers:
         corruption into a conflict, and the retry resolves it.
         """
         record = temp_record()
-        first = content_service.create_content_version(db, record.id)
+        first = content_service.create_content_version(db, record.id, brand_id=record.brand_id)
         assert first is not None and first.version_number == 1
 
         # Somebody else publishes version 2 while we are deciding to.
@@ -172,7 +175,7 @@ class TestConcurrentPublishVersionNumbers:
             )
         ))
 
-        ours = content_service.create_content_version(db, record.id)
+        ours = content_service.create_content_version(db, record.id, brand_id=record.brand_id)
 
         assert ours is not None, "the retry gave up on an ordinary conflict"
         assert ours.version_number == 3, (
@@ -194,7 +197,7 @@ class TestConcurrentPublishVersionNumbers:
         """The retry loop must not disturb the ordinary path."""
         record = temp_record()
         numbers = [
-            content_service.create_content_version(db, record.id).version_number
+            content_service.create_content_version(db, record.id, brand_id=record.brand_id).version_number
             for _ in range(3)
         ]
         assert numbers == [1, 2, 3]

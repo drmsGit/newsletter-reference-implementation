@@ -241,7 +241,10 @@ def source(db, default_brand):
         description="A record the copy has to decide about",
     )
     made["content"].append(record.id)
-    assign_category_to_content(db, content_id=record.id, category_id=category.id, score=7)
+    assign_category_to_content(
+        db, content_id=record.id, category_id=category.id, score=7,
+        brand_id=default_brand.id,
+    )
 
     campaign = CampaignDB(
         name=_name("source"), status="sent", brand_id=default_brand.id

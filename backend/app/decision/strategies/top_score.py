@@ -38,6 +38,11 @@ class TopScoreStrategy(DecisionStrategy):
         candidate_filter = slot.candidate_filter or {}
         category_ids = candidate_filter.get("category_ids", [])
 
+        # Resolved once and reused: it filters the candidates below AND scopes
+        # the version lookup further down, which must agree with it. Two calls
+        # would be two chances for them to disagree.
+        brand_id = sending_brand_id(db, slot)
+
         query = (
             db.query(ContentRecordDB, ContentCategoryAssignmentDB.score)
             .join(
@@ -50,7 +55,7 @@ class TopScoreStrategy(DecisionStrategy):
             # configurable filter point 10 defers, not this default. A slot
             # whose campaign chain is broken resolves nothing rather than
             # every brand's content, because an unknown brand is not "any".
-            .filter(ContentRecordDB.brand_id == sending_brand_id(db, slot))
+            .filter(ContentRecordDB.brand_id == brand_id)
         )
 
         if category_ids:
@@ -68,7 +73,7 @@ class TopScoreStrategy(DecisionStrategy):
 
         content_record, score = result
         latest_version = get_latest_version_for_content(
-            db=db, content_record_id=content_record.id
+            db=db, content_record_id=content_record.id, brand_id=brand_id
         )
 
         return StrategyResult(

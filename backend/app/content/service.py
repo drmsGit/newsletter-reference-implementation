@@ -41,9 +41,42 @@ def to_content_record(record: ContentRecordDB) -> ContentRecord:
     )
 
 
-def get_content_record(db: Session, content_id: int) -> ContentRecordDB | None:
-    return db.query(ContentRecordDB).filter(ContentRecordDB.id == content_id).first()
+def get_content_record(
+    db: Session, content_id: int, *, brand_id: int
+) -> ContentRecordDB | None:
+    """One content record, **selected** within a brand (ADR-172 points 4-6).
 
+    The brand is part of the query rather than a check after it: a record
+    belonging to another brand is not found, rather than found and then
+    refused. There is no moment where the row is in hand and something still
+    has to remember to say no.
+
+    Keyword-only and without a default, because this function took no brand at
+    all until 2026-09-19 and could not be scoped by its callers even when they
+    wanted to. A positional would have let an existing argument slide into the
+    slot; a default would have reintroduced the thing being removed.
+    """
+    return (
+        db.query(ContentRecordDB)
+        .filter(
+            ContentRecordDB.id == content_id,
+            ContentRecordDB.brand_id == brand_id,
+        )
+        .first()
+    )
+
+
+# **The category vocabulary is deliberately NOT brand-scoped, and this file is
+# therefore deliberately swept in half.** ADR-150's 2026-09-15 addendum: the
+# vocabulary is global, and `content_category_assignments` carries no
+# `brand_id` because it hangs off `content_records` and is per-brand
+# transitively. So `list_categories`, `create_category`, `delete_category` and
+# the four relation functions take no brand and must not be "fixed" to take
+# one — ADR-172 point 5 refuses new brand columns on exactly this reasoning.
+#
+# Said here because a sweep that changes ten functions in a file and leaves
+# eight alone reads as an oversight to the next person, and the next person
+# will be right to check.
 
 # Content lifecycle statuses. Deliberately only two: deactivation exists to stop a
 # record being *newly selected* without breaking anything that already references
@@ -58,10 +91,12 @@ def update_content_record(
     title: str,
     content: dict,
     description: str | None = None,
+    *,
+    brand_id: int,
 ) -> ContentRecord | None:
     # `status` is intentionally not updatable here — editing a record must not be
     # able to silently reactivate it. Use set_content_status().
-    record = get_content_record(db, content_id)
+    record = get_content_record(db, content_id, brand_id=brand_id)
     if record is None:
         return None
     record.title = title
@@ -76,6 +111,8 @@ def set_content_status(
     db: Session,
     content_id: int,
     status: str,
+    *,
+    brand_id: int,
 ) -> ContentRecord | None:
     """Activate or deactivate a content record.
 
@@ -90,7 +127,7 @@ def set_content_status(
             f"Unknown content status '{status}'. "
             f"Expected one of: {', '.join(CONTENT_STATUSES)}"
         )
-    record = get_content_record(db, content_id)
+    record = get_content_record(db, content_id, brand_id=brand_id)
     if record is None:
         return None
     record.status = status
@@ -99,20 +136,40 @@ def set_content_status(
     return to_content_record(record)
 
 
-def list_content_records(db: Session, brand_id: int | None = None) -> list[ContentRecord]:
-    """Content records, scoped to one brand (ADR-150 point 2).
+def list_content_records(db: Session, *, brand_id: int) -> list[ContentRecord]:
+    """Content records for one brand (ADR-150 point 2, ADR-172 point 4).
 
-    **`brand_id=None` means every brand, and is not the caller's default.**
-    It exists for the places that genuinely span brands — a platform-wide
-    count, a migration, a test. Any surface a user looks at must pass the
-    working brand, because ADR-150 point 2 makes the switcher a hard boundary,
-    not a preference.
+    **The brand was optional until 2026-09-19 and defaulted to every brand.**
+    A forgotten argument did not fail; it returned the whole platform. The
+    JSON routers forgot it at every call site, which is how `GET /content/`
+    came to serve every brand's records to anybody who could authenticate.
+
+    Callers that genuinely span brands — platform counts, migrations, seeds —
+    want `list_all_content_records`, which says so in its name.
     """
-    query = db.query(ContentRecordDB)
-    if brand_id is not None:
-        query = query.filter(ContentRecordDB.brand_id == brand_id)
+    return [
+        to_content_record(record)
+        for record in db.query(ContentRecordDB)
+        .filter(ContentRecordDB.brand_id == brand_id)
+        .all()
+    ]
 
-    return [to_content_record(record) for record in query.all()]
+
+def list_all_content_records(db: Session) -> list[ContentRecord]:
+    """Every content record, across every brand.
+
+    The escape hatch ADR-172 point 4 owes to the callers that legitimately have
+    no working brand: a platform-wide count, a migration, a seed, a test.
+    Deliberately ugly to reach for, and counted — `test_brand_boundary.py`
+    asserts the set of `list_all_*` functions exactly, so a fourth is an edit
+    somebody has to justify rather than a convenience that arrives while
+    somebody was fixing something else.
+
+    **Not for routes.** Every request has a working brand (point 1), so a
+    router calling this is not a caller that spans brands; it is one that had a
+    brand and did not use it. A test asserts no router mentions it.
+    """
+    return [to_content_record(record) for record in db.query(ContentRecordDB).all()]
 
 
 def list_categories(db: Session) -> list[Category]:
@@ -128,14 +185,32 @@ def list_categories(db: Session) -> list[Category]:
     ]
 
 
-def list_categories_for_content(db: Session, content_id: int) -> list[Category]:
+def list_categories_for_content(
+    db: Session, content_id: int, *, brand_id: int
+) -> list[Category]:
+    """The categories assigned to one record, within a brand.
+
+    The assignment row carries no `brand_id` and does not need one — ADR-150's
+    2026-09-15 addendum: it hangs off `content_records`, so which content is
+    Beach is already per-brand transitively. ADR-172 point 5 is that principle
+    turned into a join: the chain `assignment -> content_record -> brand` is
+    walked in the selecting query, so a record in another brand yields an empty
+    list exactly as a record with no categories does.
+    """
     category_records = (
         db.query(CategoryDB)
         .join(
             ContentCategoryAssignmentDB,
             CategoryDB.id == ContentCategoryAssignmentDB.category_id,
         )
-        .filter(ContentCategoryAssignmentDB.content_id == content_id)
+        .join(
+            ContentRecordDB,
+            ContentRecordDB.id == ContentCategoryAssignmentDB.content_id,
+        )
+        .filter(
+            ContentCategoryAssignmentDB.content_id == content_id,
+            ContentRecordDB.brand_id == brand_id,
+        )
         .all()
     )
 
@@ -379,13 +454,25 @@ def assign_category_to_content(
     content_id: int,
     category_id: int,
     score: int = 10,
+    *,
+    brand_id: int,
 ) -> ContentCategoryAssignmentDB | None:
+    """Assign a category to a content record.
+
+    **The category is not brand-owned and the record is.** The vocabulary is
+    global by ADR-150's 2026-09-15 addendum, so `category_id` is checked
+    against nothing here; `content_id` is the brand-owned half and is resolved
+    through the scoped getter.
+    """
     # A score of exactly zero is degenerate/meaningless — "no relevance"
     # should mean no assignment row at all, not a stored zero. (The 0-10
     # range itself is a POC-only convention, not enforced here — that's
     # future config-layer work, Insight Q2.)
     if score == 0:
         raise ValueError("Category assignment score must not be zero — omit the assignment instead")
+
+    if get_content_record(db, content_id, brand_id=brand_id) is None:
+        return None
 
     existing = (
         db.query(ContentCategoryAssignmentDB)
@@ -435,9 +522,11 @@ def create_content_version(
     db: Session,
     content_record_id: int,
     created_by: str | None = None,
+    *,
+    brand_id: int,
 ) -> ContentVersion | None:
     """Freezes the record's current `content` into an immutable version (ADR-128)."""
-    record = get_content_record(db, content_record_id)
+    record = get_content_record(db, content_record_id, brand_id=brand_id)
     if record is None:
         return None
 
@@ -487,10 +576,19 @@ def create_content_version(
 def list_versions_for_content(
     db: Session,
     content_record_id: int,
+    *,
+    brand_id: int,
 ) -> list[ContentVersion]:
     records = (
         db.query(ContentVersionDB)
-        .filter(ContentVersionDB.content_record_id == content_record_id)
+        .join(
+            ContentRecordDB,
+            ContentRecordDB.id == ContentVersionDB.content_record_id,
+        )
+        .filter(
+            ContentVersionDB.content_record_id == content_record_id,
+            ContentRecordDB.brand_id == brand_id,
+        )
         .order_by(ContentVersionDB.version_number.desc())
         .all()
     )
@@ -501,10 +599,19 @@ def list_versions_for_content(
 def get_latest_version_for_content(
     db: Session,
     content_record_id: int,
+    *,
+    brand_id: int,
 ) -> ContentVersion | None:
     record = (
         db.query(ContentVersionDB)
-        .filter(ContentVersionDB.content_record_id == content_record_id)
+        .join(
+            ContentRecordDB,
+            ContentRecordDB.id == ContentVersionDB.content_record_id,
+        )
+        .filter(
+            ContentVersionDB.content_record_id == content_record_id,
+            ContentRecordDB.brand_id == brand_id,
+        )
         .order_by(ContentVersionDB.version_number.desc())
         .first()
     )
@@ -515,7 +622,9 @@ def get_latest_version_for_content(
     return to_content_version(record)
 
 
-def delete_content_record(db: Session, content_id: int, force: bool = False) -> bool:
+def delete_content_record(
+    db: Session, content_id: int, force: bool = False, *, brand_id: int
+) -> bool:
     """
     Deleting a content record that still has relations must not silently
     cascade. Decision-resolution / override history is a hard block (never
@@ -527,7 +636,7 @@ def delete_content_record(db: Session, content_id: int, force: bool = False) -> 
     pointing at this record has content_record_id cleared (the module slot
     survives as empty rather than campaign structure being destroyed).
     """
-    record = get_content_record(db, content_id)
+    record = get_content_record(db, content_id, brand_id=brand_id)
     if record is None:
         return False
 

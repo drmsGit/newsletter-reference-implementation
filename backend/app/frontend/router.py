@@ -2172,12 +2172,16 @@ def content_detail(
 
 @router.post("/ui/content/{content_record_id}/set-status")
 def content_set_status(
+    request: Request,
     content_record_id: int,
     status: str = Form(...),
     db: Session = Depends(get_db),
 ):
     try:
-        set_content_status(db, content_record_id, status)
+        set_content_status(
+            db, content_record_id, status,
+            brand_id=working_brand_id(request, db),
+        )
     except ValueError as error:
         return RedirectResponse(
             url=f"/ui/content/{content_record_id}?error={quote(str(error))}",
@@ -2188,12 +2192,16 @@ def content_set_status(
 
 @router.post("/ui/content/{content_record_id}/delete")
 def content_delete(
+    request: Request,
     content_record_id: int,
     force: bool = Form(False),
     db: Session = Depends(get_db),
 ):
     try:
-        delete_content_record(db, content_record_id, force=force)
+        delete_content_record(
+            db, content_record_id, force=force,
+            brand_id=working_brand_id(request, db),
+        )
     except ContentRecordHasHistoryError as error:
         return RedirectResponse(
             url=f"/ui/content/{content_record_id}?error={quote(str(error))}",
@@ -2327,6 +2335,7 @@ def content_duplicate(
 
 @router.post("/ui/content/{content_record_id}/edit")
 def content_edit(
+    request: Request,
     content_record_id: int,
     title: str = Form(...),
     description: str = Form(""),
@@ -2358,7 +2367,9 @@ def content_edit(
     # silently dropped — harmless while the form knew every field, and a
     # data-loss bug the moment a channel's fields are conditionally rendered:
     # editing a record while push is switched off would erase its push copy.
-    existing = get_content_record(db, content_record_id)
+    existing = get_content_record(
+        db, content_record_id, brand_id=working_brand_id(request, db)
+    )
     content = dict((existing.content if existing else None) or {})
     content.update({
         "headline_medium": headline_medium,
@@ -2385,6 +2396,7 @@ def content_edit(
     update_content_record(
         db,
         content_record_id,
+        brand_id=working_brand_id(request, db),
         title=title,
         description=description or None,
         content=content,
@@ -2394,6 +2406,7 @@ def content_edit(
 
 @router.post("/ui/content/{content_record_id}/publish-version")
 def content_publish_version(
+    request: Request,
     content_record_id: int,
     created_by: str = Form(""),
     db: Session = Depends(get_db),
@@ -2402,19 +2415,24 @@ def content_publish_version(
         db,
         content_record_id=content_record_id,
         created_by=created_by or None,
+        brand_id=working_brand_id(request, db),
     )
     return RedirectResponse(url=f"/ui/content/{content_record_id}", status_code=303)
 
 
 @router.post("/ui/content/{content_record_id}/assign-category")
 def content_assign_category(
+    request: Request,
     content_record_id: int,
     category_id: int = Form(...),
     score: int = Form(10),
     db: Session = Depends(get_db),
 ):
     try:
-        assign_category_to_content(db, content_id=content_record_id, category_id=category_id, score=score)
+        assign_category_to_content(
+            db, content_id=content_record_id, category_id=category_id, score=score,
+            brand_id=working_brand_id(request, db),
+        )
     except ValueError as error:
         return RedirectResponse(
             url=f"/ui/content/{content_record_id}?error={quote(str(error))}",
