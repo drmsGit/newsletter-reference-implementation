@@ -44,6 +44,18 @@
 -- Run with:
 --   psql "$DATABASE_URL" -f scripts/migrate_0008_consent_brand.sql
 
+-- **Known limit of the guard below, recorded 2026-09-19 (interview review,
+-- Brand Boundary Q8).** The precondition reads `min(created_at) FROM brands
+-- WHERE id <> default_brand_id`, so it can only see brands that STILL EXIST.
+-- A brand that was created and deleted before it captured consent leaves no
+-- row, so consent written while it existed passes the check and is assigned
+-- to the default brand silently.
+--
+-- Sound for this database and for the common single-brand install; not sound
+-- in general. Written here rather than only in the review file because this
+-- script ships in the repository, an adopter could run it, and the column it
+-- backfills decides the record that answers a UWG §7 complaint.
+
 BEGIN;
 
 -- ---------------------------------------------------------------------------
