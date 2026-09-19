@@ -9,7 +9,7 @@ What must be true before public beta. Reviewed against commits and
 | 2 | P0 consent defect fixed | any public exposure (compliance) | ✅ done 2026-09-13 — send-time exclusion stack |
 | 3 | P0 inbound machine authentication | any public exposure | ✅ done 2026-09-18 — ADR-166 accepted and built |
 | 4 | Auth enforcement flag switched on | any public exposure | ✅ CLOSED 2026-09-13 — default ON, CSRF on all 62 forms, code requests rate limited |
-| 4b | Sign-in code disclosure fixed (P0, security) | any public exposure | ✅ done 2026-09-13 — with the enumeration oracle, one change |
+| 4b | Sign-in code disclosure fixed (P0, security) | any public exposure | 🟡 response oracle closed 2026-09-13; **timing oracle found 2026-09-19** |
 | 5 | Real provider integration proven | the "no lock-in" claim | ✅ done — Resend, live, verified domain |
 | 6 | Inbound engagement loop proven | the signal-layer claim | ✅ done — signed webhooks, end-to-end |
 | 7 | Security model designed + base built | Phase 4C | ✅ ADR-150–154; base built, proposed status |
@@ -155,8 +155,24 @@ apart. From the 2026-08-07 external review:
   build on ADR-150's access model and ADR-153's actor, and building on a
   proposal is what makes a cluster hard to change later.
 
-- **Gate 4b — ✅ CLOSED 2026-09-13**, together with the P1 enumeration oracle
-  that was filed separately. They were the same three lines.
+- **Gate 4b — ✅ CLOSED 2026-09-13** for the response oracle, **and reopened
+  2026-09-19 for a timing one.** The response-level fix is real and stays: one
+  unconditional 303 for a known address, an unknown one, a deactivated user and
+  a failed send. But `request_login_code` runs inline, so a known address
+  supersedes codes, inserts, commits and makes a **synchronous outbound HTTPS
+  call** before that 303, while an unknown address returns after one SELECT —
+  a several-hundred-millisecond difference with a real provider, which is the
+  configuration public exposure uses. The oracle was not closed; it moved from
+  the response body into the response latency, which is the exact substitution
+  the comment at `auth/router.py:77-79` says was being avoided. Logged as a P1
+  in `docs/backlog.md`; queue the delivery or floor the response time.
+
+  Recorded here rather than quietly in the backlog because **a gate recorded as
+  closed and not closed is worse than one recorded as open** — the whole value
+  of this file is that its ✅ marks can be trusted.
+
+  The original text, kept: closed together with the P1 enumeration oracle that
+  was filed separately. They were the same three lines.
 
   `deliver_code()` returned False both when the dev path skipped sending and
   when a real send failed, so `request_login_code` could not distinguish them
