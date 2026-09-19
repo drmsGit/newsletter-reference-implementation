@@ -427,3 +427,70 @@ class TestTheAuditRelationship:
         granted = next(e for e in history if e.action == approvals.GRANTED)
         assert granted.actor_id == 99
         assert granted.detail.get("reason") == "why not"
+
+
+class TestTheSendAction:
+    """`send.fire_send_instance` — the first real action (ADR-166 point 5).
+
+    Shipped ahead of its caller: nothing raises a request for it yet, because
+    turning `ApprovalRequired` from a refusal into a queue means reordering
+    permission checks, which does not belong in the same commit as a new file.
+    So these tests drive it directly, the way the seed script and the inbox do.
+    """
+
+    def test_it_is_registered(self):
+        from app.approvals.actions.registry import get_action
+
+        meta = get_action("send.fire_send_instance")
+        assert meta is not None
+        assert meta.approve_permission == "sends.execute"
+        assert meta.subject_type == "send_instance"
+        assert meta.default_ttl_seconds > 0, "ADR-142 §4: pending actions expire"
+
+    def test_describing_a_vanished_send_warns_instead_of_raising(self, db):
+        """A request whose subject was deleted must still be rejectable.
+
+        Raising here would make the detail page unreachable, leaving the row
+        stuck: not approvable, and not refusable either.
+        """
+        from app.approvals.actions import send_fire
+
+        description = send_fire.describe(db, {"send_instance_id": 99999999})
+
+        assert description.warnings
+        assert "deleted" in " ".join(description.warnings).lower()
+
+    def test_executing_without_a_send_id_declines_rather_than_crashing(self, db):
+        from app.approvals.actions import send_fire
+
+        result = send_fire.execute(db, {})
+
+        assert not result.ok
+        assert "names no send" in (result.message or "")
+
+    def test_an_already_sent_instance_is_declined_not_raised(self, db):
+        """`send_send_instance` refuses a sent instance with a ValueError.
+
+        Caught and reported, because the approver did nothing wrong — the row
+        should read `failed` with a readable reason, not blow up the request.
+        """
+        from app.approvals.actions import send_fire
+        from app.delivery.db_models import SendInstanceDB
+
+        sent = db.query(SendInstanceDB).filter(
+            SendInstanceDB.status == "sent"
+        ).first()
+        if sent is None:
+            pytest.skip("no sent send instance in this database")
+
+        result = send_fire.execute(db, {"send_instance_id": sent.id})
+
+        assert not result.ok
+        assert "already" in (result.message or "").lower()
+
+    def test_the_summary_survives_its_subject(self, db):
+        """What gets frozen onto the row. It has to read after the send is gone,
+        which is why it is a string and not a join."""
+        from app.approvals.actions import send_fire
+
+        assert "no longer present" in send_fire.summarise(db, 99999999)

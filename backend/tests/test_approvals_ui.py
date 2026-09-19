@@ -325,11 +325,52 @@ class TestCsrf:
 class TestTheBadge:
 
     def test_it_counts_only_what_is_still_waiting(self, db, planted_action):
-        row = _held(db, planted_action)
-        client, user = _signed_in(db, "admin")
+        """Asserted as a DELTA, not an absolute.
 
-        assert ">1<" in client.get("/ui/approvals").text.replace(" ", "")
+        The first version asserted the badge read "1", which was true only while
+        the table happened to be empty — seeding four demo requests broke it.
+        A count test that depends on how much other data exists is testing the
+        database, not the badge.
+        """
+        import re
+
+        def badge(client):
+            match = re.search(
+                r'badge bg-warning text-dark">\s*(\d+)',
+                client.get("/ui/approvals").text,
+            )
+            return int(match.group(1)) if match else 0
+
+        client, user = _signed_in(db, "admin")
+        before = badge(client)
+
+        row = _held(db, planted_action)
+        assert badge(client) == before + 1, "a waiting request must be counted"
 
         approvals.reject(db, row.id, approver_type=ACTOR_USER, approver_id=None)
-        page = client.get("/ui/approvals").text
-        assert "badge bg-warning text-dark\">1" not in page
+        assert badge(client) == before, "a decided request must not be"
+
+    def test_a_request_past_its_deadline_stops_being_counted(
+        self, db, planted_action
+    ):
+        """The badge reads `expires_at`, not `status`, so it drops the moment a
+        deadline passes — with or without a sweep having run."""
+        import re
+
+        def badge(client):
+            match = re.search(
+                r'badge bg-warning text-dark">\s*(\d+)',
+                client.get("/ui/approvals").text,
+            )
+            return int(match.group(1)) if match else 0
+
+        client, user = _signed_in(db, "admin")
+        before = badge(client)
+        row = _held(db, planted_action)
+        assert badge(client) == before + 1
+
+        row.expires_at = approvals.now() - timedelta(minutes=1)
+        db.commit()
+
+        assert row.status == PENDING, "the column deliberately has not caught up"
+        assert badge(client) == before
