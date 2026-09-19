@@ -13,6 +13,8 @@ A living baseline of interview-style questions about the codebase as implemented
 
 **Status: the original 4 cluster files are fully reviewed and cleared** (Content/Campaigns/Audience, Decision/Overrides/Insight, Delivery/Providers/Recipients, Snapshots/Rendering/Email Modules) via `/interview-review`. Decisions logged to [[backlog]].
 
+**2026-09-19 — all three reviewed, 30/30.** Verdicts recorded in place; every act/fix is in `docs/backlog.md` with its source question. Six were taken out of file order first because they shape what the React client consumes and get more expensive once a scaffold exists. One finding reopened launch gate 4b: the sign-in enumeration oracle was not closed, it moved from the response body into the response latency. One question's own premise was wrong and is corrected in place rather than inherited — `uq_integration_auth_failure_window` does exist.
+
 **2026-09-18 — three new cluster files, unreviewed.** A second `/interview-prep-baseline` run covered what shipped between 2026-08-20 and 2026-09-18 (112 commits): multi-brand, channel-on-variant and push, the 9→16 permission split, machine principals, and the audit log. None of that existed at the first baseline. The module pages these were composed from ([[auth]], [[brand]], [[channels]], [[audit]], [[ai]]) were written in the same pass — the folder had no page for any of them.
 
 ## Reviews by cluster
