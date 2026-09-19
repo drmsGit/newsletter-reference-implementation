@@ -155,6 +155,7 @@ from app.auth.dependencies import (
     enforce_policy,
 )
 from app.auth.router import router as auth_router
+from app.auth.router import session_router
 from app.auth.service import (
     SESSION_COOKIE, bootstrap as bootstrap_auth, csrf_token_for,
     brands_for_user,
@@ -544,6 +545,12 @@ def _not_authorised(request: Request, exc: NotAuthorised):
 # it are unaffected: `enforce_csrf` skips a request with no session cookie,
 # which is what an anonymous sign-in POST is.
 app.include_router(auth_router, dependencies=[Depends(enforce_csrf)])
+
+# The JSON session surface (ADR-168), on its own router with the HEADER-borne
+# CSRF guard rather than the form one. Without this pair the manager client has
+# no way to *obtain* the session cookie ADR-168 decided it authenticates with,
+# which made that record unusable in practice until 2026-09-19.
+app.include_router(session_router, dependencies=[Depends(enforce_api_csrf)])
 
 # One guard over the whole UI, deriving the required permission from the route
 # via app/auth/policy.py: reads need `view`, writes are looked up in the policy

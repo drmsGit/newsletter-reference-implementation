@@ -12,7 +12,7 @@ bearing rather than cosmetic:
 
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Body, Depends, Form, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -23,6 +23,7 @@ from app.auth.db_models import RoleAssignmentDB, RoleDB
 from app.auth.service import (
     SESSION_COOKIE, SESSION_ABSOLUTE_HOURS, access_list, assign_role,
     client_identifier, cookie_secure, create_brand, create_role, create_user,
+    csrf_token_for,
     delete_brand, delete_role, dev_code_visible, list_brands,
     rename_brand,
     login_request_allowed, normalise_email, request_login_code,
@@ -430,3 +431,144 @@ def set_enforcement(
     """
     set_config(db, AUTH_ENFORCED_KEY, enforced == "1")
     return RedirectResponse(url="/ui/users", status_code=303)
+
+
+#: The JSON session surface lives on its own router, and the reason is a bug
+#: avoided rather than a preference. `auth_router` is included with
+#: `enforce_csrf`, which reads the request as a FORM — so a JSON sign-out,
+#: which does carry a session cookie, would find no token in an empty
+#: `FormData` and be refused every single time. These routes are wired with
+#: `enforce_api_csrf` instead: skipped when there is no cookie (sign-in), and
+#: requiring `X-CSRF-Token` when there is one (sign-out). Exactly the split
+#: ADR-168 point 2 drew.
+session_router = APIRouter(tags=["auth"])
+
+
+# --- the JSON session surface (ADR-168) ------------------------------------
+#
+# **These exist because ADR-168 is otherwise unusable.** That record decided the
+# manager client authenticates with the session cookie — and the only way to
+# obtain one was an HTML form that answers with a 303 to a page. A client that
+# renders its own screens cannot follow that, so the decision had no entry
+# point. Found 2026-09-19 while auditing what the JSON API cannot do.
+#
+# **They are siblings of the form routes, not a second implementation.** Same
+# service calls, same throttle, same audit write, same cookie attributes. The
+# difference is the shape of the answer, and where the form version leans on a
+# redirect to say nothing, these have to say nothing out loud.
+
+@session_router.post("/auth/session/request", status_code=202)
+def session_request(
+    request: Request,
+    payload: dict = Body(...),
+    db: Session = Depends(get_db),
+):
+    """Ask for a sign-in code. **One answer, always.**
+
+    202 with an identical body for a known address, an unknown one, a
+    deactivated user and a failed send — ADR-151 §2, and the property gate 4b
+    was opened to fix. A JSON surface makes this harder than the form did: a
+    redirect says nothing by construction, while a body has to be *written* to
+    say nothing, and every branch is a chance to say something.
+
+    Throttled **before** the lookup, for the same reason the form route is: a
+    limit applied afterwards costs different work for a known address than an
+    unknown one, which is a timing oracle replacing a response one. That
+    substitution is already an open P1 against this pair — `request_login_code`
+    still calls the provider synchronously — and this route inherits it rather
+    than adding a second instance of it.
+    """
+    email = (payload or {}).get("email") or ""
+    if login_request_allowed(
+        db, email,
+        client_identifier(
+            request.client.host if request.client else None,
+            request.headers.get("x-forwarded-for"),
+        ),
+    ):
+        # Return value deliberately unused: it carries the dev code, and
+        # returning it is the defect gate 4b closed.
+        request_login_code(db, email)
+
+    return {
+        "status": "code_requested",
+        "detail": (
+            "If that address belongs to an active account, a sign-in code is "
+            "on its way. Submit it to /auth/session/verify."
+        ),
+    }
+
+
+@session_router.post("/auth/session/verify")
+def session_verify(
+    payload: dict = Body(...),
+    db: Session = Depends(get_db),
+    response: Response = None,
+):
+    """Exchange a code for a session cookie.
+
+    **The failure side is uniform and the success side cannot be**: a wrong
+    code, an expired one, an address with no outstanding code and an address
+    with no account all answer the same 401 with the same body, while success
+    necessarily differs because it sets a cookie. That asymmetry is inherent —
+    the point of ADR-151 §2 is that *failures* must not distinguish accounts,
+    not that success is invisible.
+
+    The cookie is set with the attributes the form route uses, read from the
+    same helpers: `httponly` so script cannot read it, `samesite="lax"` which
+    ADR-168 point 3's same-origin requirement is what keeps viable, and
+    `secure` on by default.
+    """
+    email = (payload or {}).get("email") or ""
+    code = (payload or {}).get("code") or ""
+
+    token = verify_login_code(db, email, code)
+    if token is None:
+        # One body for every kind of failure. Naming which part was wrong is
+        # the oracle in a different costume.
+        raise HTTPException(
+            status_code=401,
+            detail="That code is not valid or has expired.",
+        )
+
+    user = user_for_token(db, token)
+    # ADR-153 point 2: a sign-in has no domain record anywhere, so this is the
+    # only place it is recorded. Successes individually, failures never —
+    # point 6 makes those an aggregate, because a row per failed attempt is a
+    # write primitive an unauthenticated caller controls.
+    audit.record(
+        db, audit.SIGNED_IN,
+        actor_id=user.id if user else None,
+        subject_type="user", subject_id=user.id if user else None,
+    )
+
+    response.set_cookie(
+        SESSION_COOKIE, token,
+        max_age=SESSION_ABSOLUTE_HOURS * 3600,
+        httponly=True, samesite="lax", secure=cookie_secure(),
+    )
+    return {
+        "status": "signed_in",
+        "user": {
+            "id": user.id if user else None,
+            "email": user.email if user else None,
+            "display_name": user.display_name if user else None,
+        },
+        # The SPA needs this for every subsequent write: `enforce_api_csrf`
+        # compares it against the token derived from the session. Handed over
+        # here rather than fetched separately, because the only moment it can
+        # be learned is the moment the session is created.
+        "csrf_token": csrf_token_for(token),
+    }
+
+
+@session_router.post("/auth/session", status_code=204)
+def session_end(request: Request, response: Response, db: Session = Depends(get_db)):
+    """Sign out. Unguarded, like its form sibling.
+
+    Signing out must work from any page and for any account, whatever that
+    account can or cannot reach — a Viewer once had no route to it at all
+    because the only control lived on a page their role was refused.
+    """
+    revoke_token(db, request.cookies.get(SESSION_COOKIE))
+    response.delete_cookie(SESSION_COOKIE)

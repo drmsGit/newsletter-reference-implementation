@@ -49,6 +49,17 @@ UNMAPPED = "unmapped.write"
 # lives in `main.py` is an exemption nobody auditing this file would find.
 PROVIDER_SIGNED = "provider.signed"
 
+# Returned for a route that is deliberately UNAUTHENTICATED because it is how
+# authentication begins. You cannot require a session in order to obtain one.
+#
+# A second sentinel rather than reusing `PROVIDER_SIGNED`, because the two are
+# exempt for unrelated reasons and a single list would say they are the same
+# kind of thing: one is a caller this platform cannot issue a credential to,
+# the other is the door every credential comes through. A test asserts each
+# list exactly, so widening either is an edit somebody has to justify —
+# which is what caught this being conflated in the first place.
+PUBLIC_AUTH = "auth.public"
+
 WRITE_POLICY: tuple[tuple[str, str], ...] = (
     # --- the working context -------------------------------------------------
     # Switching brand is not a capability, it is navigation: the route refuses
@@ -131,6 +142,18 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
     # Same rule as the UI half: first match wins, narrow above broad, and an
     # unlisted write is refused. Nothing here is a new capability; each entry
     # names the permission the equivalent UI act already required.
+
+    # **The JSON session surface is public, like the sign-in form it mirrors —
+    # you cannot require a session in order to obtain one.** This entry is
+    # DOCUMENTATION rather than enforcement, the same way the /ui/users and
+    # /ui/roles entries below are: `session_router` is wired with the CSRF
+    # guard alone and never reaches `required_permission`. It is written here
+    # because this table is meant to read as *the* policy, and a public
+    # authentication surface that appears nowhere in it would look like an
+    # omission rather than a decision. Those routes defend themselves the way
+    # the form routes do — a throttle before the lookup, one unconditional
+    # answer, and a code burned on use (ADR-151 §2).
+    ("/auth/session", PUBLIC_AUTH),
 
     # A provider signs its own callbacks. Above /provider so it wins.
     ("/provider/webhooks/", PROVIDER_SIGNED),

@@ -29,7 +29,9 @@ from app.auth.db_models import (
 from app.auth.permissions import (
     CONTENT_MANAGE, RECIPIENTS_CONSENT, RECIPIENTS_MANAGE, VIEW,
 )
-from app.auth.policy import PROVIDER_SIGNED, UNMAPPED, required_permission
+from app.auth.policy import (
+    PROVIDER_SIGNED, PUBLIC_AUTH, UNMAPPED, required_permission,
+)
 from app.database import SessionLocal
 from main import app
 from tests.machine import machine
@@ -432,17 +434,36 @@ class TestNoRouteIsUnguarded:
             + "\n  ".join(unmapped)
         )
 
-    def test_exactly_one_route_is_exempt_from_credentials(self):
-        """The exemption list is a security boundary. It should be one door,
-        and adding a second should require editing this assertion."""
-        exempt = [
+    def _exempt(self, sentinel):
+        return sorted(
             f"{m} {getattr(r, 'path', '')}"
             for r in app.routes
             for m in sorted(getattr(r, "methods", set()) or set())
             if m in {"POST", "PUT", "PATCH", "DELETE"}
-            and required_permission(m, getattr(r, "path", "")) == PROVIDER_SIGNED
+            and required_permission(m, getattr(r, "path", "")) == sentinel
+        )
+
+    def test_exactly_one_route_is_exempt_as_provider_signed(self):
+        """The exemption list is a security boundary. It should be one door,
+        and adding a second should require editing this assertion."""
+        assert self._exempt(PROVIDER_SIGNED) == ["POST /provider/webhooks/resend"]
+
+    def test_the_public_auth_surface_is_exactly_the_session_routes(self):
+        """**Two sentinels, asserted separately, because they are exempt for
+        unrelated reasons.**
+
+        This test is why they are separate at all: the JSON session routes were
+        first mapped to `PROVIDER_SIGNED`, which made the provider assertion
+        above fail — correctly, since it says the signed-callback door is one
+        door. A caller this platform cannot issue a credential to, and the door
+        every credential comes through, are not the same kind of exemption and
+        should not share a list.
+        """
+        assert self._exempt(PUBLIC_AUTH) == [
+            "POST /auth/session",
+            "POST /auth/session/request",
+            "POST /auth/session/verify",
         ]
-        assert exempt == ["POST /provider/webhooks/resend"], exempt
 
 
 class TestAHeldSendIsQueuedNotRefused:
