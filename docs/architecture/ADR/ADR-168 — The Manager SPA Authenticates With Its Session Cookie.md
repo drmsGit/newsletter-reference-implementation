@@ -101,6 +101,24 @@ Not silently preferred one way or the other. The cost of preferring is not ambig
   only by a bearer-authenticated caller — a person firing a send *is* the
   approval, which was implicit while people could not reach this plane at all.
 
+- **Addendum 2026-09-19 — approving over the API, decided and not yet built.** This record put people on
+  the JSON plane, which silently changed what "no approve over the API" means. It was written as an
+  absolute — the guard's own text says "there is deliberately no way to approve over the API" and a test
+  asserts no such route exists — and the reasoning was about machines: *a machine that can approve its
+  own held request has defeated the mechanism.* With a person on this plane, the absolute now says
+  something different and unintended: **the React client cannot show or work an approval inbox at all**,
+  which matters more since [[ADR-169 — Operational Flows Are Sequenced Variants, Not a Canvas]] made
+  that inbox close to the manager's home screen.
+
+  **Decided: approving requires a session-authenticated person, and is refused to a bearer credential.**
+  The original property is kept exactly — a machine still cannot approve anything, including its own
+  request — while the SPA gets the surface it needs. The assertion changes from "no such route exists"
+  to "a bearer credential is refused here", which is the sharper claim anyway, because it tests the
+  property rather than its absence.
+
+  Not built; logged in `docs/backlog.md`. What a machine may still do is unchanged: **request** approval,
+  which is the whole of ADR-166 point 5.
+
 - **The `enforce_csrf`-on-one-router shape this record warns about is now
   asserted, not just avoided.** A test walks every JSON write route the app
   registers and fails if one lacks `enforce_api_csrf`. Its first version read
