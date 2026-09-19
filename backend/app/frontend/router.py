@@ -3978,3 +3978,235 @@ def integration_deactivate(integration_id: int, db: Session = Depends(get_db)):
 
     ints.deactivate_integration(db, integration_id)
     return RedirectResponse(url="/ui/integrations", status_code=303)
+
+
+# --- the approval inbox (ADR-142 §4) ---------------------------------------
+#
+# **Who may see it, and who may act.** Seeing that a send is waiting is
+# operational visibility, not a secret, so the list needs only `view` — which is
+# how the policy table's `/ui/approvals` entry reads. Acting is a different
+# question, and it is answered **per row**, against the permission the action
+# itself declares: `approve_permission`. The table matches on a route template
+# and cannot express "the permission depends on which row you clicked", so the
+# real gate lives in the route and has its own test.
+#
+# That is a weaker-looking arrangement than a table entry and a stronger one in
+# practice, because two actions in one inbox can require different permissions —
+# a machine send needs `sends.execute`, applying an AI suggestion will need
+# `campaigns.manage`. A single route-level permission would have to be the union
+# of every action's, which is the widest grant rather than the right one.
+
+def _approval_rows(request: Request, db: Session, status: str):
+    """Inbox rows, each paired with its action declaration.
+
+    An action whose module has been removed still renders — its request happened
+    and its history is real — but it cannot be approved, because
+    `get_action_module` returns nothing and `approve()` refuses. A row that
+    disappears because somebody deleted a file would be worse than one that
+    reads "no longer available".
+    """
+    from app.approvals import service as approvals
+    from app.approvals.actions.registry import get_action
+
+    rows = []
+    for row in approvals.list_for_brand(db, working_brand_id(request, db), status):
+        meta = get_action(row.action_key)
+        rows.append({
+            "row": row,
+            "meta": meta,
+            "status": approvals.effective_status(row),
+            "can_decide": bool(meta) and _may_decide(request, db, meta, row),
+        })
+    return rows
+
+
+def _may_decide(request: Request, db: Session, meta, row) -> bool:
+    """Whether this user may approve or reject this particular request.
+
+    Brand-scoped permissions are checked against the request's own brand rather
+    than the working one. They are the same today — the inbox is filtered by
+    working brand — but reading the row's brand is what stays correct if the
+    inbox ever shows more than one.
+    """
+    user = user_for_token(db, request.cookies.get(SESSION_COOKIE))
+    if user is None:
+        # Access control switched off. `enforce_policy` already let the request
+        # through, so refusing here would break a deployment that has not turned
+        # enforcement on — and there is no principal to check anything against.
+        from app.auth.dependencies import auth_enforced
+
+        return not auth_enforced(db)
+    from app.auth.permissions import is_brand_scoped
+
+    if is_brand_scoped(meta.approve_permission):
+        return has_permission(
+            db, user, meta.approve_permission, brand_id=row.brand_id,
+        )
+    return has_permission(db, user, meta.approve_permission)
+
+
+@router.get("/ui/approvals")
+def approvals_list(
+    request: Request,
+    status: str = "pending",
+    notice: str | None = None,
+    error: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """One screen, filtered — pending by default.
+
+    Not two screens. ADR-142 §4 requires that "approved, rejected *and* expired
+    requests stay inspectable", so the history is mandatory rather than a later
+    nicety, and a filter is the cheapest honest way to carry it.
+    """
+    if status not in ("pending", "decided", "all"):
+        status = "pending"
+    return templates.TemplateResponse(request, "approvals.html", {
+        "rows": _approval_rows(request, db, status),
+        "status": status,
+        "notice": notice,
+        "error": error,
+    })
+
+
+@router.get("/ui/approvals/{pending_id}")
+def approval_detail(
+    request: Request, pending_id: int, db: Session = Depends(get_db),
+):
+    """The review screen — and the one place the frozen/live split is visible.
+
+    It shows `describe()` run **now**, beside the `summary` frozen when the
+    request was made, beside the audit trail. A reviewer needs current reality
+    to decide; a reader of history needs what was said at the time; and the
+    difference between them is often the reason to say no.
+    """
+    from app.approvals import service as approvals
+    from app.approvals.actions.registry import get_action, get_action_module
+    from app.approvals.db_models import PendingActionDB
+    from app.audit.service import events_for_subject
+
+    row = db.query(PendingActionDB).filter(
+        PendingActionDB.id == pending_id,
+        # Brand isolation, the same rule as every other detail page: a request
+        # belonging to another brand does not exist from here.
+        PendingActionDB.brand_id == working_brand_id(request, db),
+    ).first()
+    if row is None:
+        return templates.TemplateResponse(
+            request, "approvals.html",
+            {"rows": [], "status": "pending",
+             "error": f"Request {pending_id} does not exist in this brand."},
+            status_code=404,
+        )
+
+    meta = get_action(row.action_key)
+    module = get_action_module(row.action_key)
+    description = None
+    describe_error = None
+    if module is not None and hasattr(module, "describe"):
+        try:
+            description = module.describe(db, row.payload or {})
+        except Exception as failure:
+            # A description that raises must not hide the request. The reviewer
+            # still needs to see that something is waiting and still needs to be
+            # able to reject it.
+            describe_error = str(failure)
+            logger.warning(
+                "approval %s: describe() failed", pending_id, exc_info=True,
+            )
+
+    return templates.TemplateResponse(request, "approval_detail.html", {
+        "row": row,
+        "meta": meta,
+        "status": approvals.effective_status(row),
+        "description": description,
+        "describe_error": describe_error,
+        "can_decide": bool(meta) and _may_decide(request, db, meta, row),
+        "history": events_for_subject(db, approvals.SUBJECT, row.id),
+    })
+
+
+def _decide(request: Request, db: Session, pending_id: int):
+    """Shared preamble: find the row in this brand and check the row's own rule."""
+    from app.approvals.actions.registry import get_action
+    from app.approvals.db_models import PendingActionDB
+
+    row = db.query(PendingActionDB).filter(
+        PendingActionDB.id == pending_id,
+        PendingActionDB.brand_id == working_brand_id(request, db),
+    ).first()
+    if row is None:
+        return None, None, "That request does not exist in this brand."
+    meta = get_action(row.action_key)
+    if meta is None:
+        return row, None, (
+            f"'{row.action_key}' is no longer a registered action, so it cannot "
+            "be approved. Reject it, or restore the action module."
+        )
+    if not _may_decide(request, db, meta, row):
+        return row, meta, (
+            f"You need the '{meta.approve_permission}' permission to decide this."
+        )
+    return row, meta, None
+
+
+@router.post("/ui/approvals/{pending_id}/approve")
+def approval_approve(
+    request: Request,
+    pending_id: int,
+    reason: str = Form(""),
+    choice_index: int | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    from app.approvals import service as approvals
+    from app.audit.service import ACTOR_USER
+
+    row, meta, refusal = _decide(request, db, pending_id)
+    if refusal:
+        return RedirectResponse(
+            url=f"/ui/approvals?error={quote(refusal, safe='')}", status_code=303,
+        )
+
+    user = user_for_token(db, request.cookies.get(SESSION_COOKIE))
+    choice = None
+    if choice_index is not None:
+        # ADR-141 §4's "pick-one for options": N options are ONE request, and
+        # the index says which one the human chose.
+        choice = {"index": choice_index}
+    result = approvals.approve(
+        db, pending_id,
+        approver_type=ACTOR_USER, approver_id=user.id if user else None,
+        choice=choice, reason=reason.strip() or None,
+    )
+    key = "notice" if result.ok else "error"
+    message = result.message or ("Approved and executed." if result.ok else "Refused.")
+    return RedirectResponse(
+        url=f"/ui/approvals?{key}={quote(message, safe='')}", status_code=303,
+    )
+
+
+@router.post("/ui/approvals/{pending_id}/reject")
+def approval_reject(
+    request: Request,
+    pending_id: int,
+    reason: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    from app.approvals import service as approvals
+    from app.audit.service import ACTOR_USER
+
+    row, meta, refusal = _decide(request, db, pending_id)
+    if refusal:
+        return RedirectResponse(
+            url=f"/ui/approvals?error={quote(refusal, safe='')}", status_code=303,
+        )
+
+    user = user_for_token(db, request.cookies.get(SESSION_COOKIE))
+    approvals.reject(
+        db, pending_id,
+        approver_type=ACTOR_USER, approver_id=user.id if user else None,
+        reason=reason.strip() or None,
+    )
+    return RedirectResponse(
+        url="/ui/approvals?notice=" + quote("Rejected.", safe=""), status_code=303,
+    )

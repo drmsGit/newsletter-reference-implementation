@@ -109,6 +109,14 @@
                     <a class="nav-link" href="/ui/roles">Roles &amp; permissions</a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link" href="/ui/approvals">
+                        Approvals
+                        {% if request.state.pending_approvals %}
+                        <span class="badge bg-warning text-dark">{{ request.state.pending_approvals }}</span>
+                        {% endif %}
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link" href="/ui/integrations">Integrations</a>
                 </li>
             </ul>

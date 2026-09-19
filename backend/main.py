@@ -142,6 +142,7 @@ from app.audit.db_models import AuditEventDB  # noqa: F401
 # spine ships wired to nothing, so `create_all` needs the import to know the
 # table exists (ADR-142 §4).
 from app.approvals.db_models import PendingActionDB  # noqa: F401
+from app.approvals.service import pending_count as pending_approval_count
 from app.settings.db_models import AppConfigDB
 
 from app.auth.db_models import (
@@ -324,6 +325,16 @@ async def attach_current_user(request: Request, call_next):
             ]
             if request.state.current_brand and request.state.current_brand["switchable"]
             else []
+        )
+        # The approvals badge (ADR-142 §4). Computed here for the reason the
+        # three above are: the base layout needs it on every page, and there is
+        # no shared context helper to hang it off. One indexed COUNT against the
+        # working brand — never a load-and-filter — and it reads `expires_at`
+        # rather than `status`, so a request whose deadline has passed stops
+        # being counted the moment it passes, with or without a sweep.
+        request.state.pending_approvals = pending_approval_count(
+            db,
+            request.state.current_brand["id"] if request.state.current_brand else None,
         )
     finally:
         db.close()

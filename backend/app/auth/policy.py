@@ -97,6 +97,24 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
     # guards, so these entries are documentation rather than enforcement — the
     # table is meant to be readable as *the* policy, and omitting them would
     # make it look as though nothing protects them.
+    # **The approval inbox is guarded twice, and the weaker guard is here.**
+    # Seeing that a send is waiting is operational visibility rather than a
+    # secret, so the screen itself needs only `view`. Deciding is answered per
+    # row, against the permission the ACTION declares — this table matches on a
+    # route template and has no way to express "it depends which row you
+    # clicked".
+    #
+    # That is deliberate rather than a shortfall: two actions in one inbox
+    # legitimately need different permissions (a machine send wants
+    # `sends.execute`; applying an AI suggestion will want `campaigns.manage`),
+    # so a single route-level entry would have to be the *union* of every
+    # action's requirement — the widest grant rather than the right one.
+    #
+    # The real gate is `_may_decide` in `app/frontend/router.py`, and it has its
+    # own test. Same shape as the /ui/users and /ui/roles entries below: an
+    # entry that documents rather than enforces, said out loud.
+    ("/ui/approvals", VIEW),
+
     # Issuing a machine credential is its own grant, not a fold into
     # `credentials.manage` — ADR-152 scopes that key to credentials the
     # platform HOLDS, and these are ones it ISSUES (ADR-166 point 4).

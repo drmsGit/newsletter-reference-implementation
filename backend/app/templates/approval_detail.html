@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+        <h1 class="mb-1">{{ meta.label if meta else row.action_key }}</h1>
+        <p class="text-muted mb-0">Request #{{ row.id }}</p>
+    </div>
+    <a href="/ui/approvals" class="btn btn-sm btn-outline-secondary">Back to approvals</a>
+</div>
+
+<div class="row">
+    <div class="col-md-7">
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title">As it stands now</h5>
+                {% if describe_error %}
+                <div class="alert alert-warning mb-0">
+                    This request cannot describe itself: {{ describe_error }}.
+                    You can still reject it.
+                </div>
+                {% elif description %}
+                <p class="mb-2">{{ description.summary }}</p>
+                {% if description.rows %}
+                <table class="table table-sm mb-2">
+                    <tbody>
+                    {% for label, value in description.rows %}
+                    <tr><th class="w-25 fw-normal text-muted">{{ label }}</th><td>{{ value }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% endif %}
+                {% for warning in description.warnings %}
+                <div class="alert alert-warning py-2 mb-2">{{ warning }}</div>
+                {% endfor %}
+                {% if description.link %}
+                <a href="{{ description.link }}" class="btn btn-sm btn-outline-primary">
+                    Open the record
+                </a>
+                {% endif %}
+                {% else %}
+                <p class="text-muted mb-0">This action offers no description.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if row.summary != (description.summary if description else None) %}
+        <div class="card mb-3">
+            <div class="card-body">
+                <h6 class="card-title text-muted">As it was requested</h6>
+                <p class="mb-0 small">{{ row.summary }}</p>
+                <p class="text-muted small mb-0 mt-2">
+                    Kept as it read at the time, so this request stays legible
+                    even after the thing it refers to has changed or gone. If the
+                    two lines differ, the difference is worth reading before you
+                    decide.
+                </p>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if status == 'pending' and can_decide %}
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Decide</h5>
+                {% if description and description.options %}
+                <p class="small text-muted">Pick one. This is a single decision, not several.</p>
+                {% for option in description.options %}
+                <form method="post" action="/ui/approvals/{{ row.id }}/approve" class="mb-2">
+                    <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+                    <input type="hidden" name="choice_index" value="{{ loop.index0 }}">
+                    <div class="d-flex justify-content-between align-items-center border rounded p-2">
+                        <span>{{ option.get('label') or option.get('text') or option }}</span>
+                        <button type="submit" class="btn btn-sm btn-outline-success">Use this</button>
+                    </div>
+                </form>
+                {% endfor %}
+                {% else %}
+                <form method="post" action="/ui/approvals/{{ row.id }}/approve" class="mb-2">
+                    <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+                    <input type="text" name="reason" class="form-control form-control-sm mb-2"
+                           placeholder="Why (optional)">
+                    <button type="submit" class="btn btn-success">Approve and run it</button>
+                </form>
+                {% endif %}
+                <form method="post" action="/ui/approvals/{{ row.id }}/reject">
+                    <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+                    <input type="text" name="reason" class="form-control form-control-sm mb-2"
+                           placeholder="Why (optional)">
+                    <button type="submit" class="btn btn-outline-danger btn-sm">Reject</button>
+                </form>
+            </div>
+        </div>
+        {% elif status == 'pending' %}
+        <div class="alert alert-secondary">
+            You need the <code>{{ meta.approve_permission if meta else '?' }}</code>
+            permission to decide this.
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-md-5">
+        <div class="card mb-3">
+            <div class="card-body">
+                <h6 class="card-title text-muted">State</h6>
+                <table class="table table-sm mb-0">
+                    <tbody>
+                    <tr><th class="fw-normal text-muted">Status</th><td>{{ status }}</td></tr>
+                    <tr><th class="fw-normal text-muted">Asked by</th>
+                        <td>{{ row.requested_by_type }}{% if row.requested_by_id %} #{{ row.requested_by_id }}{% endif %}</td></tr>
+                    <tr><th class="fw-normal text-muted">Requested</th>
+                        <td>{{ row.created_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>
+                    <tr><th class="fw-normal text-muted">Expires</th>
+                        <td>{{ row.expires_at.strftime('%Y-%m-%d %H:%M') if row.expires_at else '—' }}</td></tr>
+                    {% if row.decision_reason %}
+                    <tr><th class="fw-normal text-muted">Reason</th><td>{{ row.decision_reason }}</td></tr>
+                    {% endif %}
+                    {% if row.execution_error %}
+                    <tr><th class="fw-normal text-muted">Error</th>
+                        <td class="text-danger small">{{ row.execution_error }}</td></tr>
+                    {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-title text-muted">History</h6>
+                <p class="small text-muted">
+                    From the audit log, not from this request. The request is what
+                    is waiting; the log is what happened — and it outlives the
+                    request.
+                </p>
+                <ul class="list-unstyled mb-0 small">
+                {% for event in history %}
+                    <li class="mb-1">
+                        <code>{{ event.action }}</code>
+                        — {{ event.actor_type }}{% if event.actor_id %} #{{ event.actor_id }}{% endif %}
+                        <span class="text-muted">{{ event.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                    </li>
+                {% else %}
+                    <li class="text-muted">Nothing recorded.</li>
+                {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
