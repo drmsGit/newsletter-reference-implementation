@@ -78,6 +78,33 @@ META = TaskMeta(
 )
 
 
+#: What `gather_inputs` returns when the variant carries no editorial content.
+#: A named constant rather than a literal because two places now depend on the
+#: exact string — the prompt builder and the pre-call refusal below — and a
+#: silent divergence between them would turn the refusal back into a paid call.
+NO_CONTENT = "(this variant has no content yet)"
+
+
+class NothingToWorkFrom(Exception):
+    """Raised INSTEAD of calling the model, when the inputs cannot support it.
+
+    The model handled this perfectly well on its own — asked for subject lines
+    for a variant with no content, it explained that writing any would mean
+    inventing specifics and declined. That is the right answer and it costs a
+    real request to obtain: run 231 spent 109 output tokens being told something
+    the database already knew.
+
+    ADR-140 §2 makes spend "a pre-call gate" rather than an after-the-fact
+    ledger entry. The budget check is not the only thing that belongs in front
+    of a call — so does "this request cannot succeed", when the system can see
+    it without asking.
+
+    Deliberately narrow: this refuses the one case that is knowable from the
+    inputs, not anything the model *might* decline. Guessing on the model's
+    behalf is how a helpful guard becomes a ceiling on what the task can do.
+    """
+
+
 def gather_inputs(db: Session, variant_id: int) -> str:
     """Collect the variant's editorial content — the task's declared input."""
     rows = (
@@ -93,7 +120,7 @@ def gather_inputs(db: Session, variant_id: int) -> str:
         headline = content.get("headline_medium") or title
         body = content.get("body_medium") or ""
         parts.append(f"- {headline}\n  {body}".rstrip())
-    return "\n".join(parts) if parts else "(this variant has no content yet)"
+    return "\n".join(parts) if parts else NO_CONTENT
 
 
 def parse_options(text: str) -> list[dict[str, str]]:
@@ -154,9 +181,22 @@ def suggest(db: Session, variant_id: int, provider_name: str | None = None):
 
     from app.ai.service import get_published_prompt
 
+    content = gather_inputs(db, variant_id)
+    if content == NO_CONTENT:
+        # Checked before the prompt is even built, let alone sent. Nothing is
+        # recorded in `ai_runs` either: a run row is the audit of a call that
+        # happened, and inventing one for a call that deliberately did not
+        # would put a zero-cost, zero-token entry in the ledger that has to be
+        # explained every time somebody reads it.
+        raise NothingToWorkFrom(
+            "This variant has no content yet, so there is nothing to write a "
+            "subject line about. Add at least one content module first — "
+            "asking anyway spends tokens to be told the same thing."
+        )
+
     prompt_row = get_published_prompt(db, TASK_KEY)
     template = prompt_row.body if prompt_row else DEFAULT_PROMPT
-    rendered = template.replace("{content}", gather_inputs(db, variant_id))
+    rendered = template.replace("{content}", content)
 
     run = run_task(
         db,

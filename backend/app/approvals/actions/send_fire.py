@@ -75,8 +75,10 @@ def describe(db: Session, payload: dict) -> ActionDescription:
     if send_instance is None:
         return ActionDescription(
             summary=f"Send #{send_instance_id} no longer exists.",
-            warnings=["The send this request refers to has been deleted. "
-                      "Rejecting it is the only sensible outcome."],
+            blocked_reason=(
+                "The send this request refers to has been deleted, so there is "
+                "nothing left to approve."
+            ),
         )
 
     planned = db.query(DeliveryExecutionDB).filter(
@@ -93,10 +95,14 @@ def describe(db: Session, payload: dict) -> ActionDescription:
     ]
 
     warnings = []
+    blocked_reason = None
     if send_instance.status in ("sending", "sent"):
-        warnings.append(
-            f"This send is already {send_instance.status}. Approving will be "
-            "refused rather than sending twice."
+        # Not a warning: `send_send_instance` refuses this outright, so
+        # approving can only produce a failed request. Saying so and disabling
+        # the button is more honest than letting somebody find out by clicking.
+        blocked_reason = (
+            f"This send is already {send_instance.status}, so it cannot be sent "
+            "again. Rejecting it is the only outcome left."
         )
     if send_instance.audience_resolution_mode == "rerun":
         warnings.append(
@@ -114,6 +120,7 @@ def describe(db: Session, payload: dict) -> ActionDescription:
         summary=f"Send “{send_instance.name}” to {planned} recipient(s).",
         rows=rows,
         warnings=warnings,
+        blocked_reason=blocked_reason,
         link=f"/ui/deliveries/send-instances/{send_instance.id}",
     )
 

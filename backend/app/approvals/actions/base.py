@@ -74,6 +74,19 @@ class ActionDescription:
     #: ADR-141 §4's "pick-one for options". N options are ONE pending action,
     #: never N of them — three proposed subject lines are a single decision.
     options: list[dict] | None = None
+    #: Set when the action **cannot** run right now, with the reason.
+    #:
+    #: Distinct from `warnings`, and the distinction is the point: a warning
+    #: says "think about this" and must not block, while this says "approving
+    #: will be refused". The first version of this contract had only warnings,
+    #: on the principle that "a warning that blocks is a guard wearing the wrong
+    #: clothes" — which is right for doubt and wrong for certainty. A request
+    #: against a send that has already gone out warned the reviewer and then
+    #: offered them the button anyway.
+    #:
+    #: Advisory to the UI, never the enforcement: `execute()` still refuses on
+    #: its own, because a disabled button is a courtesy and not a control.
+    blocked_reason: str | None = None
 
 
 @dataclass

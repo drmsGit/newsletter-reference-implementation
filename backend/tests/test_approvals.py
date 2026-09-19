@@ -447,7 +447,7 @@ class TestTheSendAction:
         assert meta.subject_type == "send_instance"
         assert meta.default_ttl_seconds > 0, "ADR-142 §4: pending actions expire"
 
-    def test_describing_a_vanished_send_warns_instead_of_raising(self, db):
+    def test_describing_a_vanished_send_blocks_instead_of_raising(self, db):
         """A request whose subject was deleted must still be rejectable.
 
         Raising here would make the detail page unreachable, leaving the row
@@ -457,8 +457,43 @@ class TestTheSendAction:
 
         description = send_fire.describe(db, {"send_instance_id": 99999999})
 
-        assert description.warnings
-        assert "deleted" in " ".join(description.warnings).lower()
+        assert description.blocked_reason
+        assert "deleted" in description.blocked_reason.lower()
+
+    def test_an_already_sent_send_is_blocked_not_merely_warned_about(self, db):
+        """The distinction that cost a real click.
+
+        A warning says "think about this" and must not block. This says
+        "approving will be refused" — and the first version of the contract had
+        only warnings, so the detail page cautioned the reviewer and then handed
+        them the button anyway.
+        """
+        from app.approvals.actions import send_fire
+        from app.delivery.db_models import SendInstanceDB
+
+        sent = db.query(SendInstanceDB).filter(
+            SendInstanceDB.status == "sent"
+        ).first()
+        if sent is None:
+            pytest.skip("no sent send instance in this database")
+
+        description = send_fire.describe(db, {"send_instance_id": sent.id})
+
+        assert description.blocked_reason, "already sent must block, not warn"
+        assert "already sent" in description.blocked_reason.lower()
+
+    def test_a_draft_send_is_not_blocked(self, db):
+        """The other direction, so `blocked_reason` cannot just always be set."""
+        from app.approvals.actions import send_fire
+        from app.delivery.db_models import SendInstanceDB
+
+        draft = db.query(SendInstanceDB).filter(
+            SendInstanceDB.status == "draft"
+        ).first()
+        if draft is None:
+            pytest.skip("no draft send instance in this database")
+
+        assert send_fire.describe(db, {"send_instance_id": draft.id}).blocked_reason is None
 
     def test_executing_without_a_send_id_declines_rather_than_crashing(self, db):
         from app.approvals.actions import send_fire

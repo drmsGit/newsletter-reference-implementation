@@ -1135,6 +1135,7 @@ def campaign_detail(
     ai_suggestions: list[dict] = []
     ai_suggestions_variant_id = None
     ai_error = None
+    ai_raw_reply = None
     ai_run_tokens = 0
     ai_notices: list[str] = []
     if ai_run is not None:
@@ -1152,7 +1153,18 @@ def campaign_detail(
                 # audit trail, who needs to know before applying an option.
                 ai_notices = subject_task.option_notices(ai_suggestions, row.message)
                 if not ai_suggestions:
-                    ai_error = "The model replied, but not in the requested format."
+                    # **Show what it actually said.** This used to report only
+                    # "the model replied, but not in the requested format" and
+                    # drop `output_text` on the floor — which threw away the
+                    # most useful reply the task has produced: asked for subject
+                    # lines on an empty variant, the model explained that
+                    # writing any would mean inventing specifics, and declined.
+                    # That was a better answer than the format allowed for, and
+                    # the manager never saw it.
+                    ai_error = (
+                        "No options could be read from the reply. The model said:"
+                    )
+                    ai_raw_reply = (row.output_text or "").strip()
             else:
                 ai_error = row.message or "The suggestion could not be generated."
 
@@ -1180,6 +1192,7 @@ def campaign_detail(
             "ai_suggestions": ai_suggestions,
             "ai_suggestions_variant_id": ai_suggestions_variant_id,
             "ai_error": ai_error,
+            "ai_raw_reply": ai_raw_reply,
             "ai_notices": ai_notices,
             "ai_run_tokens": ai_run_tokens,
         },
@@ -1491,7 +1504,16 @@ def variant_suggest_subject(
             status_code=303,
         )
 
-    _, run = subject_task.suggest(db, variant_id)
+    try:
+        _, run = subject_task.suggest(db, variant_id)
+    except subject_task.NothingToWorkFrom as refusal:
+        # Refused before the call, so no tokens were spent and no run row was
+        # written. The manager is told what to fix rather than being handed the
+        # model's (correct, and paid-for) version of the same sentence.
+        return RedirectResponse(
+            url=f"/ui/campaigns/{campaign_id}?error=" + quote(str(refusal), safe=""),
+            status_code=303,
+        )
     if run is None:
         return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
     return RedirectResponse(

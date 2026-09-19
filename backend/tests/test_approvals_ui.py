@@ -455,3 +455,98 @@ class TestTheBadge:
 
         assert row.status == PENDING, "the column deliberately has not caught up"
         assert badge(client) == before
+
+
+class TestAnActionThatCannotRun:
+    """`blocked_reason` — a certainty, not a doubt.
+
+    Found by the user approving a seeded request against an already-sent
+    campaign: the page warned them it would be refused and offered the button
+    anyway. Warnings must not block; this is not a warning.
+    """
+
+    @pytest.fixture
+    def blocking_action(self, tmp_path):
+        """A planted action that declares itself unable to run."""
+        package = Path(action_registry.__file__).parent
+        planted = package / f"{TAG}_blocked.py"
+        planted.write_text(
+            "from app.approvals.actions.base import ApprovableAction, "
+            "ActionDescription, ActionResult\n"
+            "from pathlib import Path\n"
+            "\n"
+            f"META = ApprovableAction(key='{TAG}.blocked', label='Blocked action',\n"
+            "                        approve_permission='sends.execute',\n"
+            "                        default_ttl_seconds=3600,\n"
+            "                        subject_type='marker')\n"
+            "\n"
+            "def describe(db, payload):\n"
+            "    return ActionDescription(summary='cannot run',\n"
+            "                             blocked_reason='the thing already happened')\n"
+            "\n"
+            "def execute(db, payload, *, choice=None):\n"
+            "    path = Path(payload['path'])\n"
+            "    with path.open('a') as handle:\n"
+            "        handle.write('ran')\n"
+            "    return ActionResult(ok=True)\n"
+        )
+        action_registry._registry_mtime = None
+        try:
+            yield {"path": str(tmp_path / "blocked.txt")}
+        finally:
+            planted.unlink(missing_ok=True)
+            action_registry._registry_mtime = None
+
+    def _held_blocked(self, db, payload):
+        row = approvals.request_approval(
+            db, f"{TAG}.blocked", payload=payload, summary="a blocked request",
+            requested_by_type="integration", requested_by_id=7,
+            brand_id=auth.ensure_default_brand(db).id,
+            subject_id=int(uuid.uuid4().int % 10**8),
+        )
+        _CREATED.append(row.id)
+        return row
+
+    def test_the_approve_button_is_disabled_and_says_why(self, db, blocking_action):
+        row = self._held_blocked(db, blocking_action)
+        client, user = _signed_in(db, "admin")
+
+        page = client.get(f"/ui/approvals/{row.id}").text
+
+        assert "the thing already happened" in page
+        approve_form = page.split('/approve"', 1)[1].split("</form>", 1)[0]
+        assert "disabled" in approve_form, (
+            "the page said it would be refused and offered the button anyway"
+        )
+
+    def test_rejecting_is_still_offered(self, db, blocking_action):
+        """A blocked request must stay refusable, or it is stuck forever."""
+        row = self._held_blocked(db, blocking_action)
+        client, user = _signed_in(db, "admin")
+
+        page = client.get(f"/ui/approvals/{row.id}").text
+        reject_form = page.split('/reject"', 1)[1].split("</form>", 1)[0]
+
+        assert "disabled" not in reject_form
+
+    def test_the_disabled_button_is_a_courtesy_not_a_control(
+        self, db, blocking_action
+    ):
+        """`execute()` still runs if somebody posts anyway.
+
+        A disabled attribute stops a click, not a request — so the point of
+        this test is that `blocked_reason` was never load-bearing. The action's
+        own refusal is, and an action that does not refuse itself is the one
+        with the bug.
+        """
+        row = self._held_blocked(db, blocking_action)
+        client, user = _signed_in(db, "admin")
+
+        client.post(f"/ui/approvals/{row.id}/approve",
+                    data={"csrf_token": _csrf(client)})
+
+        db.refresh(row)
+        assert row.status == APPROVED, (
+            "this planted action does not refuse itself, so it ran — which is "
+            "the point: the UI hint is not the guard"
+        )

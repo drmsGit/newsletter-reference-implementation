@@ -6,6 +6,8 @@ is DB-backed and covered by manual verification for now.
 """
 
 import re
+
+import pytest
 from pathlib import Path
 
 import jinja2
@@ -240,3 +242,164 @@ class TestTruncationNoticeReachesThePage:
                 db.query(AIRunDB).filter(AIRunDB.id == run.id).delete()
                 db.commit()
             db.close()
+
+
+class TestNothingToWorkFrom:
+    """Refuse before spending, not after (ADR-140 §2).
+
+    Reported by the user: asking for subject lines on a variant with no content
+    returned "The model replied, but not in the requested format" and no
+    suggestions. The model had in fact answered well — it explained that writing
+    subject lines with no content would mean inventing specifics, and declined —
+    and that answer cost 109 output tokens to obtain and was then hidden.
+
+    Two separate defects, fixed together: the request should not have been sent,
+    and the reply should not have been thrown away.
+    """
+
+    def test_the_sentinel_is_shared_and_not_duplicated(self):
+        """The refusal compares against the same constant the prompt builder
+        emits. Two copies of that string would let them drift, and the drift
+        would silently turn the refusal back into a paid call."""
+        from app.ai.tasks.subject_preheader import NO_CONTENT
+
+        assert NO_CONTENT == "(this variant has no content yet)"
+
+    def test_an_empty_variant_is_refused_before_any_call(self, monkeypatch):
+        """No adapter is reached, so nothing can be spent."""
+        from app.ai.tasks import subject_preheader
+
+        called = []
+
+        def _must_not_run(*args, **kwargs):
+            called.append(True)
+            raise AssertionError("a model was called for an empty variant")
+
+        monkeypatch.setattr(subject_preheader, "gather_inputs",
+                            lambda db, variant_id: subject_preheader.NO_CONTENT)
+        monkeypatch.setattr(subject_preheader, "run_task", _must_not_run)
+
+        class _Variant:
+            id = 1
+
+        class _Query:
+            def filter(self, *a, **k):
+                return self
+
+            def first(self):
+                return _Variant()
+
+        class _DB:
+            def query(self, *a, **k):
+                return _Query()
+
+        with pytest.raises(subject_preheader.NothingToWorkFrom) as refusal:
+            subject_preheader.suggest(_DB(), 1)
+
+        assert not called
+        assert "no content yet" in str(refusal.value)
+        assert "spends tokens" in str(refusal.value), (
+            "the refusal should say why it is worth avoiding, not just that it "
+            "happened"
+        )
+
+    def test_a_variant_with_content_is_not_refused(self, monkeypatch):
+        """The other direction, so the guard cannot simply always fire."""
+        from app.ai.tasks import subject_preheader
+
+        ran = []
+
+        class _Run:
+            ok = True
+            text = "1. SUBJECT: x\n   PREHEADER: y"
+            run_id = 1
+
+        monkeypatch.setattr(subject_preheader, "gather_inputs",
+                            lambda db, variant_id: "- A headline\n  Some body")
+        monkeypatch.setattr(subject_preheader, "run_task",
+                            lambda *a, **k: ran.append(True) or _Run())
+        # Patched where it LIVES, not where it is used: `suggest` imports it
+        # inside the function body, so rebinding the name on this module would
+        # be rebinding something that is never read.
+        import app.ai.service as ai_service
+
+        monkeypatch.setattr(ai_service, "get_published_prompt", lambda db, key: None)
+
+        class _Variant:
+            id = 1
+
+        class _Query:
+            def filter(self, *a, **k):
+                return self
+
+            def first(self):
+                return _Variant()
+
+        class _DB:
+            def query(self, *a, **k):
+                return _Query()
+
+        options, run = subject_preheader.suggest(_DB(), 1)
+
+        assert ran, "a variant with content must still reach the model"
+        assert options
+
+
+class TestAnUnparseableReplyIsShownNotHidden:
+    """The second half of the same report.
+
+    The router replaced the model's whole answer with a format complaint and
+    dropped `output_text`. The reply is the most useful thing the run produced
+    when the model declines, so it is what the manager needs to see.
+    """
+
+    @staticmethod
+    def _error_block() -> str:
+        """Extract the block by BALANCING its tags.
+
+        A lazy regex to the first `{% endif %}` stops inside the nested
+        `{% if ai_raw_reply %}`, and a greedy one runs past the block entirely.
+        The nesting is the whole point of the change, so the extractor has to
+        understand it.
+        """
+        templates = Path(subject_preheader.__file__).parent.parent.parent / "templates"
+        html = (templates / "campaign_detail.html").read_text()
+        start = html.index("{% if ai_error %}")
+        depth, index = 0, start
+        for match in re.finditer(r"\{%-?\s*(if|endif)\b", html[start:]):
+            depth += 1 if match.group(1) == "if" else -1
+            if depth == 0:
+                index = start + html[start:].index("%}", match.end()) + 2
+                break
+        else:  # pragma: no cover - unbalanced template
+            raise AssertionError("the ai_error block is not balanced")
+        return html[start:index]
+
+    def _render(self, **context) -> str:
+        env = jinja2.Environment(autoescape=True)
+        return env.from_string(self._error_block()).render(**context)
+
+    def test_the_reply_is_rendered_when_there_is_one(self):
+        out = self._render(
+            ai_error="No options could be read from the reply. The model said:",
+            ai_raw_reply="I don't have the newsletter content yet.",
+        )
+
+        assert "No options could be read" in out
+        assert "I don&#39;t have the newsletter content yet." in out or \
+               "I don't have the newsletter content yet." in out
+
+    def test_the_error_still_renders_alone(self):
+        out = self._render(ai_error="Something else went wrong.")
+
+        assert "Something else went wrong." in out
+
+    def test_the_router_actually_passes_it(self):
+        """The template and the router are both testable alone, and both pass
+        with the line that connects them removed — the exact shape of the
+        original defect."""
+        router = (Path(subject_preheader.__file__).parent.parent.parent
+                  / "frontend" / "router.py").read_text()
+
+        assert 'ai_raw_reply = (row.output_text or "").strip()' in router
+        assert '"ai_raw_reply": ai_raw_reply,' in router

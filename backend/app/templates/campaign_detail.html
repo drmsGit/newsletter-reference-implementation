@@ -190,7 +190,19 @@
 
             {% if ai_suggestions is defined and ai_suggestions_variant_id == variant.id %}
                 {% if ai_error %}
-                <div class="alert alert-warning mt-3 mb-0 py-2 small">{{ ai_error }}</div>
+                <div class="alert alert-warning mt-3 mb-0 py-2 small">
+                    {{ ai_error }}
+                    {% if ai_raw_reply %}
+                    <blockquote class="mb-0 mt-2 ps-2 border-start border-2">
+                        {{ ai_raw_reply }}
+                    </blockquote>
+                    <div class="text-muted mt-2">
+                        You paid for this reply, so here it is. If it is telling
+                        you something about the campaign rather than answering,
+                        it is usually right.
+                    </div>
+                    {% endif %}
+                </div>
                 {% endif %}
                 {# What the run row already knows and the page used to swallow:
                    a truncated output, and fewer options than were asked for.

@@ -30,6 +30,11 @@
                     </tbody>
                 </table>
                 {% endif %}
+                {% if description.blocked_reason %}
+                <div class="alert alert-danger py-2 mb-2">
+                    {{ description.blocked_reason }}
+                </div>
+                {% endif %}
                 {% for warning in description.warnings %}
                 <div class="alert alert-warning py-2 mb-2">{{ warning }}</div>
                 {% endfor %}
@@ -60,9 +65,16 @@
         {% endif %}
 
         {% if status == 'pending' and can_decide %}
+        {% set blocked = description.blocked_reason if description else None %}
         <div class="card mb-3">
             <div class="card-body">
                 <h5 class="card-title">Decide</h5>
+                {% if blocked %}
+                <p class="small text-muted">
+                    Approving is disabled because this action cannot run:
+                    {{ blocked }} Rejecting still records the decision.
+                </p>
+                {% endif %}
                 {% if description and description.options %}
                 <p class="small text-muted">Pick one. This is a single decision, not several.</p>
                 {% for option in description.options %}
@@ -80,7 +92,8 @@
                     <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                     <input type="text" name="reason" class="form-control form-control-sm mb-2"
                            placeholder="Why (optional)">
-                    <button type="submit" class="btn btn-success">Approve and run it</button>
+                    <button type="submit" class="btn btn-success"
+                            {% if blocked %}disabled{% endif %}>Approve and run it</button>
                 </form>
                 {% endif %}
                 <form method="post" action="/ui/approvals/{{ row.id }}/reject">
