@@ -207,3 +207,135 @@ def _ensure_send_instances_in_both_states() -> None:
         session.commit()
     finally:
         session.close()
+
+
+# --- the brand boundary (ADR-172) -------------------------------------------
+#
+# These four fixtures moved here from `test_brand_scoping.py` on 2026-09-19,
+# before any of ADR-172 was built, and that order is deliberate: the fixtures
+# must not be part of the change they are used to validate.
+#
+# **The rule they exist to make easy.** ADR-172's boundary is enforced by a
+# filter, and *every* fallback in this codebase returns the default brand — so
+# a cross-brand assertion written against the default brand cannot fail when
+# the filter is deleted. `test_api_guard.py` already records this happening:
+# "A fallback that equals the expected value is not a test." Reach for
+# `foreign_brand` and `foreign_api`, not `default_brand`, whenever the point of
+# the test is that a boundary holds.
+
+import uuid
+from contextlib import contextmanager
+
+
+@pytest.fixture
+def db():
+    """A session with the built-in roles present.
+
+    Files that already declare their own `db` keep it — pytest resolves the
+    closest definition — so this serves the files that had none.
+    """
+    from app.auth import service as auth
+    from app.database import SessionLocal
+
+    session = SessionLocal()
+    auth.bootstrap(session)
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+@pytest.fixture
+def default_brand(db):
+    from app.auth import service as auth
+
+    return auth.ensure_default_brand(db)
+
+
+@pytest.fixture
+def temp_brand(db):
+    """A second brand, so "multi-brand" is an actual state and not a theory."""
+    from app.audience.db_models import AudienceGroupDB
+    from app.auth.db_models import BrandDB, RoleAssignmentDB, SessionDB
+    from app.campaigns.db_models import CampaignDB, VariantDB
+    from app.content.db_models import ContentRecordDB
+    from app.delivery.db_models import SendInstanceDB
+    from app.recipients.db_models import ConsentEventDB
+
+    created: list[int] = []
+
+    def make(label: str = "second") -> "BrandDB":
+        brand = BrandDB(key=f"{label}-{uuid.uuid4().hex[:8]}", name=f"Test {label}")
+        db.add(brand)
+        db.commit()
+        db.refresh(brand)
+        created.append(brand.id)
+        return brand
+
+    yield make
+
+    # Every table that carries a brand FK, or the delete fails and the brand
+    # survives the run. That is not hypothetical: a MUTATION run left two
+    # brands behind, because disabling the guard under test let a POST that
+    # should have been refused create a campaign — and campaigns were missing
+    # from this list. Mutation testing deliberately breaks the code that
+    # refuses things, so cleanup here has to assume the test did the opposite
+    # of what it asserts.
+    #
+    # **`consent_events` was missing until 2026-09-19.** `ConsentEventDB`
+    # gained a NOT NULL `brand_id` (ADR-163's addendum) after this list was
+    # written, and nothing pointed the list at the change — the same shape of
+    # rot as `delete_brand`'s hand-kept `holders` dict, logged separately.
+    #
+    # ADR-172 point 5 adds no brand columns to any nested table, so this list
+    # is stable across the whole build: the roots it names are the roots.
+    for brand_id in created:
+        campaign_ids = [
+            c.id for c in db.query(CampaignDB).filter(CampaignDB.brand_id == brand_id).all()
+        ]
+        if campaign_ids:
+            db.query(VariantDB).filter(VariantDB.campaign_id.in_(campaign_ids)).delete(
+                synchronize_session=False
+            )
+            db.query(CampaignDB).filter(CampaignDB.id.in_(campaign_ids)).delete(
+                synchronize_session=False
+            )
+        db.query(SendInstanceDB).filter(SendInstanceDB.brand_id == brand_id).delete()
+        db.query(ContentRecordDB).filter(ContentRecordDB.brand_id == brand_id).delete()
+        db.query(AudienceGroupDB).filter(AudienceGroupDB.brand_id == brand_id).delete()
+        db.query(ConsentEventDB).filter(ConsentEventDB.brand_id == brand_id).delete()
+        db.query(RoleAssignmentDB).filter(RoleAssignmentDB.brand_id == brand_id).delete()
+        db.query(SessionDB).filter(SessionDB.brand_id == brand_id).update({"brand_id": None})
+        db.query(BrandDB).filter(BrandDB.id == brand_id).delete()
+    db.commit()
+
+
+@pytest.fixture
+def foreign_brand(temp_brand):
+    """A brand that is **not** the default one.
+
+    Named for what it is for rather than what it is: the brand a caller is not
+    authorised on. A test that wants "some other brand" should reach for this,
+    because the moment it reaches for the default one instead, the fallback it
+    is trying to catch returns the value it is asserting.
+    """
+    return temp_brand("foreign")
+
+
+@pytest.fixture
+def foreign_api(foreign_brand):
+    """`machine()` headers for a credential granted on the non-default brand.
+
+    Yields a factory taking the permission list, so a test says which powers
+    the machine holds and never has to remember to pass `brand_id=` — the
+    argument whose omission silently moves the test back onto the default
+    brand, where it proves nothing.
+    """
+    from tests.machine import machine
+
+    @contextmanager
+    def make(permissions):
+        with machine(permissions, brand_id=foreign_brand.id) as headers:
+            yield headers
+
+    return make

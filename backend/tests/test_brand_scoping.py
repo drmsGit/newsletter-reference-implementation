@@ -32,62 +32,11 @@ from app.content.service import create_content, list_content_records
 from app.database import SessionLocal
 
 
-@pytest.fixture
-def db():
-    session = SessionLocal()
-    auth.bootstrap(session)
-    try:
-        yield session
-    finally:
-        session.close()
-
-
-@pytest.fixture
-def default_brand(db):
-    return auth.ensure_default_brand(db)
-
-
-@pytest.fixture
-def temp_brand(db):
-    """A second brand, so "multi-brand" is an actual state and not a theory."""
-    created: list[int] = []
-
-    def make(label: str = "second") -> BrandDB:
-        brand = BrandDB(key=f"{label}-{uuid.uuid4().hex[:8]}", name=f"Test {label}")
-        db.add(brand)
-        db.commit()
-        db.refresh(brand)
-        created.append(brand.id)
-        return brand
-
-    yield make
-
-    # Every table that carries a brand FK, or the delete fails and the brand
-    # survives the run. That is not hypothetical: a MUTATION run left two
-    # brands behind in the shared dev database, because disabling the guard
-    # under test let a POST that should have been refused create a campaign —
-    # and campaigns were missing from this list. Mutation testing deliberately
-    # breaks the code that refuses things, so cleanup here has to assume the
-    # test did the opposite of what it asserts.
-    for brand_id in created:
-        campaign_ids = [
-            c.id for c in db.query(CampaignDB).filter(CampaignDB.brand_id == brand_id).all()
-        ]
-        if campaign_ids:
-            db.query(VariantDB).filter(VariantDB.campaign_id.in_(campaign_ids)).delete(
-                synchronize_session=False
-            )
-            db.query(CampaignDB).filter(CampaignDB.id.in_(campaign_ids)).delete(
-                synchronize_session=False
-            )
-        db.query(SendInstanceDB).filter(SendInstanceDB.brand_id == brand_id).delete()
-        db.query(ContentRecordDB).filter(ContentRecordDB.brand_id == brand_id).delete()
-        db.query(AudienceGroupDB).filter(AudienceGroupDB.brand_id == brand_id).delete()
-        db.query(RoleAssignmentDB).filter(RoleAssignmentDB.brand_id == brand_id).delete()
-        db.query(SessionDB).filter(SessionDB.brand_id == brand_id).update({"brand_id": None})
-        db.query(BrandDB).filter(BrandDB.id == brand_id).delete()
-    db.commit()
-
+# `db`, `default_brand` and `temp_brand` live in `conftest.py` since
+# 2026-09-19. They were always shared in spirit — this file was the only
+# place that had them — and ADR-172's build needs them from several files at
+# once. `foreign_brand` and `foreign_api` are there too, and are what a new
+# cross-brand test should reach for.
 
 @pytest.fixture
 def user_on(db):
