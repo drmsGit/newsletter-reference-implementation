@@ -127,6 +127,13 @@ def max_modules_for(name: str) -> int | None:
     An unregistered channel answers 1 rather than unbounded. Fail-closed: the
     caller is about to be refused anyway, and guessing "unlimited" for
     something nobody declared is the wrong direction to be wrong in.
+
+    **This is not fail-closed, and the distinction is load-bearing.** Answering 1
+    for an unregistered channel is fail-permissive-by-one: it still admits a single
+    module. What actually refuses an unregistered channel is the membership check in
+    `campaigns/service.py` — said out loud here (2026-09-19, interview review
+    Channels A-Q5) because a guard described as stronger than it is, is exactly the
+    one somebody deletes the real check in front of.
     """
     manifest = get_channel(name)
     if manifest is None:
