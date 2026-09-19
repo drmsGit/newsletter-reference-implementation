@@ -172,6 +172,15 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
 
     # Sending: preparing is not firing, the same split as the UI half.
     ("/delivery/send-instances/{send_instance_id}/send", SENDS_EXECUTE),
+    # Fires every scheduled send that is due, so people receive mail because
+    # of it. **Added above the broad prefix on 2026-09-19 after landing below
+    # it** — `/delivery/process-due` matched `("/delivery/", SENDS_PLAN)` and
+    # was silently downgraded to the permission that only PREPARES a send.
+    # That is the exact hazard the 2026-09-18 review logged about this table:
+    # order is semantics and nothing enforces it. Found by printing the
+    # resolved permission rather than by a failing test, which is the point of
+    # the logged item.
+    ("/delivery/process-due", SENDS_EXECUTE),
     ("/delivery/", SENDS_PLAN),
     ("/snapshots/", SENDS_PLAN),
 

@@ -15,6 +15,7 @@ from app.delivery.service import (
     list_delivery_executions_for_send_instance,
     list_send_instances_for_snapshot,
     send_send_instance,
+    process_due_scheduled_sends
 )
 
 
@@ -144,4 +145,29 @@ def send_instance(
 
     return {
         "status": "sent"
+    }
+
+@router.post("/process-due")
+def process_due(db: Session = Depends(get_db)):
+    """Fire every scheduled send whose time has arrived.
+
+    **The seam ADR-142 assumes exists.** That record has the orchestrator
+    driving the platform's actions over the documented REST API — and this
+    operation, the one a real deployment points cron at, was reachable only
+    from a button in the Jinja UI. An adopter running n8n had no way to call
+    the thing the architecture says they should be calling.
+
+    `sends.execute` rather than `sends.plan`, because people receive mail
+    because of this request. That is the line ADR-166 point 2 drew when it
+    split the two, and a scheduler is exactly the caller the split was for: it
+    prepares nothing and fires everything that is due.
+
+    Idempotent by the send path rather than by this route —
+    `send_send_instance` takes a row lock and refuses an instance already
+    `sending` or `sent`, so two schedulers overlapping cannot double-send.
+    """
+    triggered = process_due_scheduled_sends(db)
+    return {
+        "triggered": len(triggered),
+        "send_instance_ids": [getattr(s, "id", s) for s in triggered],
     }

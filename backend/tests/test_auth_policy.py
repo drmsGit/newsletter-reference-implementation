@@ -48,6 +48,13 @@ class TestWrites:
             "/ui/send-test",
             "/ui/deliveries/process-due",
             "/ui/send-instances/{send_instance_id}/send",
+            # The JSON siblings. `/delivery/process-due` landed BELOW the broad
+            # `/delivery/` prefix on 2026-09-19 and was silently downgraded to
+            # `sends.plan` — the permission that only prepares a send — which is
+            # the hazard this table's own review logged the day before. It is
+            # here so the next one fails a test rather than a print statement.
+            "/delivery/process-due",
+            "/delivery/send-instances/{send_instance_id}/send",
         ):
             assert required_permission("POST", route) == SENDS_EXECUTE, route
 
