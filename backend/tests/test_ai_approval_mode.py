@@ -48,9 +48,17 @@ def _restore_mode(db):
     It is one shared config row, so a test that flips it and dies leaves every
     later run — and the developer's own browser — in a state nobody chose.
     """
-    before = get_task_approval_mode(db, TASK)
+    # Read through the CONFIG, not through the accessor. A mutation run that
+    # forces `get_task_approval_mode` to answer `require_approval` makes this
+    # fixture read that as the original value and faithfully persist it — which
+    # is how a mutation session left the developer's own deployment holding
+    # every subject-line suggestion for approval. Reading the stored row cannot
+    # be fooled by the function under test.
+    from app.settings.service import task_approval_modes
+
+    before = task_approval_modes(db).get(TASK)
     yield
-    set_task_approval_mode(db, TASK, before if before == REQUIRE_APPROVAL else None)
+    set_task_approval_mode(db, TASK, before)
     db.rollback()
     if _CREATED:
         db.query(AuditEventDB).filter(
@@ -71,7 +79,25 @@ class TestTheSettingIsTheOnlyDifference:
         assert get_task_approval_mode(db, TASK) == AUTO_APPLY
 
     def test_an_unknown_mode_clears_rather_than_storing(self, db):
+        """Asserted against the STORED ROW, not the accessor.
+
+        `task_approval_modes` filters unrecognised values on read, so a write
+        that happily stores "sometimes_maybe" is invisible to anything that
+        reads through `get_task_approval_mode` — the read guard does the write
+        guard's job and hides its absence. Two guards, each refusing
+        independently, masking each other. Found by a mutation that stored the
+        junk and broke nothing.
+        """
+        from sqlalchemy import text
+
         set_task_approval_mode(db, TASK, "sometimes_maybe")
+
+        stored = db.execute(text(
+            "SELECT value FROM app_config WHERE key = 'ai_task_approval_modes'"
+        )).scalar() or {}
+        assert TASK not in stored, (
+            f"an unrecognised mode was written to the database: {stored}"
+        )
         assert get_task_approval_mode(db, TASK) == AUTO_APPLY
 
     def test_it_round_trips(self, db):
@@ -80,11 +106,27 @@ class TestTheSettingIsTheOnlyDifference:
         set_task_approval_mode(db, TASK, None)
         assert get_task_approval_mode(db, TASK) == AUTO_APPLY
 
-    def test_the_setting_is_per_task_not_global(self, db):
-        set_task_approval_mode(db, TASK, REQUIRE_APPROVAL)
-        assert get_task_approval_mode(db, "some_other_task") == AUTO_APPLY, (
-            "graduated trust means one task at a time"
-        )
+    def test_setting_one_task_leaves_the_others_alone(self, db):
+        """**Two tasks, because one proves nothing.**
+
+        The first version set a single task and checked that a different,
+        never-configured task still read as default — which passes even if the
+        setter throws away the whole dictionary on every write, since the
+        untouched task reads as default either way. Graduated trust means a
+        company turns tasks on one at a time and the earlier ones stay on.
+        """
+        other = f"{TAG}_other_task"
+        try:
+            set_task_approval_mode(db, TASK, REQUIRE_APPROVAL)
+            set_task_approval_mode(db, other, REQUIRE_APPROVAL)
+
+            assert get_task_approval_mode(db, TASK) == REQUIRE_APPROVAL, (
+                "configuring a second task wiped the first"
+            )
+            assert get_task_approval_mode(db, other) == REQUIRE_APPROVAL
+            assert get_task_approval_mode(db, "never_configured") == AUTO_APPLY
+        finally:
+            set_task_approval_mode(db, other, None)
 
 
 class TestTheActionIsPickOneNotYesNo:
