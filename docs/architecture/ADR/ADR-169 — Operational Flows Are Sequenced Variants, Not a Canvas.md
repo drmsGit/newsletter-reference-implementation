@@ -1,12 +1,13 @@
 ---
 type: adr
-status: proposed
+status: accepted
 topic:
   - architecture
   - automation
   - campaigns
   - consent
 created: 2026-09-19
+modified: 2026-09-19
 source:
   - "Journey/flow design conversation (2026-09-19)"
 depends_on:
@@ -20,7 +21,7 @@ enables:
 ---
 
 ## Status
-Proposed
+Accepted
 
 ## Context
 
@@ -95,6 +96,28 @@ When a cycle becomes *"people who did X get this, everyone else gets Y"* at real
 - **Conditions inherit the audience vocabulary's weaknesses along with its strengths**, including the consent subquery's cost growing with a recipient's history depth, now paid per step rather than per send.
 
 ## Notes
+
+- **Accepted 2026-09-19, with a trigger for the one negative that matters.** The `### Negative` section
+  says a true parallel fork cannot be expressed and asks that needing one be read as this record being
+  wrong. The acceptance sharpens that into a **two-part condition**, which is stricter than "we might
+  need it later" and stricter than what the Negative said on its own:
+
+  > A canvas becomes justified when a real case is found that **per-variant followups cannot express**
+  > *and* that **an orchestrator like n8n cannot cover either**.
+
+  Both halves are load-bearing. Most forks somebody asks for can be handled outside — that is
+  [[ADR-142 — Autonomous Workflows and the Automation Boundary]]'s boundary, and it means "we need a
+  canvas" will usually be answerable with "no, you need a flow in the tool you already run". A canvas is
+  only warranted where the platform must own the branch **and** cannot express it, which is a narrow
+  intersection and may well be empty.
+
+  Written down because the failure mode here is not building a canvas too late. It is building one
+  because a demo would look better with it, which is exactly what the design conversation rejected when
+  it observed that a canvas mostly displays a graph the manager could author one email at a time.
+
+- **Scoped as sufficient for beta and pilot**, not as sufficient forever. That is the claim being
+  accepted: enough to run the playbook's own newsletter and a first pilot, with the trigger above as
+  the honest condition for revisiting rather than a vague intention to.
 
 - **The recurring evaluation is a route a scheduler calls**, following `process_due_scheduled_sends` and the approvals expiry sweep. The architecture exposes the seam rather than baking in a scheduler, which is the established convention and the reason there is no background thread anywhere in this codebase.
 - **This record does not build anything.** The blocked items behind it — the unsubscribe surface, double opt-in, ADR-163's opt-out scope — become buildable as ordinary routes the moment point 1 is accepted, and `List-Unsubscribe` is independently a beta blocker tracked in `docs/backlog.md`.
