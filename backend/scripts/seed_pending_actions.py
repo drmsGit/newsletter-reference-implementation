@@ -12,6 +12,13 @@ rejected, and a seeded "expired" one really lapsed. Fabricating those states
 would make the one screen whose job is to show what happened show something
 that did not.
 
+**Re-run this after a mutation-testing session.** A mutation that disables a
+guard does not merely fail a test — it performs the action the guard was
+preventing, and that write is committed. Removing the deadline filter from the
+expiry sweep expired every demo request in the database, including ones whose
+deadline was a day away. The test caught the mutation; the data did not survive
+it.
+
 Two consequences worth knowing before clicking:
 
   * **Approving a seeded request really fires that send.** The demo instances

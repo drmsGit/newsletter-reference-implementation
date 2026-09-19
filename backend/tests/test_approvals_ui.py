@@ -308,6 +308,87 @@ class TestBrandIsolation:
             db.commit()
 
 
+class TestRetiringExpiredRequests:
+    """ADR-142 §4's bookkeeping half — stage 4.
+
+    **Nothing here is load-bearing, and that is the design.** `approve()`
+    refuses an expired request by reading `expires_at`, so a deployment that
+    never presses this button is safe; its status column merely lags the clock.
+    These tests pin that the button makes the column agree, writes the entry
+    §4 asks for, and — the part worth guarding — executes nothing.
+    """
+
+    def test_it_retires_what_is_due_and_runs_nothing(self, db, planted_action):
+        row = _held(db, planted_action)
+        row.expires_at = approvals.now() - timedelta(minutes=1)
+        db.commit()
+        client, user = _signed_in(db, "admin")
+
+        response = client.post("/ui/approvals/process-expired",
+                               data={"csrf_token": _csrf(client)})
+
+        assert response.status_code == 303
+        db.refresh(row)
+        assert row.status == "expired"
+        assert not Path(planted_action["path"]).exists(), (
+            "a sweep that sends anything is not a sweep"
+        )
+
+    def test_it_writes_a_system_actor_entry(self, db, planted_action):
+        """Nobody decided an expiry, so nobody is named as having."""
+        from app.audit.service import events_for_subject
+
+        row = _held(db, planted_action)
+        row.expires_at = approvals.now() - timedelta(minutes=1)
+        db.commit()
+        client, user = _signed_in(db, "admin")
+
+        client.post("/ui/approvals/process-expired",
+                    data={"csrf_token": _csrf(client)})
+
+        lapsed = [e for e in events_for_subject(db, approvals.SUBJECT, row.id)
+                  if e.action == approvals.LAPSED]
+        assert len(lapsed) == 1
+        assert lapsed[0].actor_type == approvals.ACTOR_SYSTEM
+        assert lapsed[0].actor_id is None
+        db.refresh(row)
+        assert row.decided_by_id is None and row.decided_by_type is None
+
+    def test_it_leaves_a_live_request_alone(self, db, planted_action):
+        row = _held(db, planted_action)
+        client, user = _signed_in(db, "admin")
+
+        client.post("/ui/approvals/process-expired",
+                    data={"csrf_token": _csrf(client)})
+
+        db.refresh(row)
+        assert row.status == PENDING
+
+    def test_the_button_is_disabled_when_nothing_is_due(self, db, planted_action):
+        _held(db, planted_action)
+        client, user = _signed_in(db, "admin")
+
+        page = client.get("/ui/approvals").text
+
+        assert "Retire expired" in page
+        assert "disabled" in page.split("Retire expired")[0][-400:], (
+            "an enabled button that does nothing invites a pointless click"
+        )
+
+    def test_the_button_is_enabled_and_counted_when_something_is(
+        self, db, planted_action
+    ):
+        row = _held(db, planted_action)
+        row.expires_at = approvals.now() - timedelta(minutes=1)
+        db.commit()
+        client, user = _signed_in(db, "admin")
+
+        page = client.get("/ui/approvals").text
+
+        head = page.split("Retire expired")[0][-400:]
+        assert "disabled" not in head
+
+
 class TestCsrf:
 
     def test_a_decision_without_a_token_is_refused(self, db, planted_action):

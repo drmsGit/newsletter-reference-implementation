@@ -355,6 +355,20 @@ def list_for_brand(
     return [r for r in rows if effective_status(r) in DECIDED]
 
 
+def due_count(db: Session) -> int:
+    """How many requests are past their deadline and not yet retired.
+
+    Not brand-scoped, because the sweep it labels is not: a deadline is a time,
+    not a brand, and an expired request is already refused in every brand
+    whatever this column says. The same shape as
+    `process_due_scheduled_sends`, which this borrows wholesale.
+    """
+    return db.query(func.count(PendingActionDB.id)).filter(
+        PendingActionDB.status == PENDING,
+        PendingActionDB.expires_at <= func.now(),
+    ).scalar() or 0
+
+
 def pending_count(db: Session, brand_id: int | None) -> int:
     """The nav badge. One indexed count, never a load-and-filter.
 

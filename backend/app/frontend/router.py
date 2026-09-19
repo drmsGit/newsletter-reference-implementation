@@ -4061,12 +4061,54 @@ def approvals_list(
     """
     if status not in ("pending", "decided", "all"):
         status = "pending"
+    from app.approvals import service as approvals
+
     return templates.TemplateResponse(request, "approvals.html", {
         "rows": _approval_rows(request, db, status),
         "status": status,
+        "due_count": approvals.due_count(db),
         "notice": notice,
         "error": error,
     })
+
+
+@router.post("/ui/approvals/process-expired")
+def approvals_process_expired(db: Session = Depends(get_db)):
+    """Retire every request past its deadline (ADR-142 §4).
+
+    **Bookkeeping, not enforcement.** `approve()` already refuses an expired
+    request by reading `expires_at`, so nothing here is load-bearing: a
+    deployment where this button is never pressed is safe, its inbox merely
+    shows a status column lagging behind the clock. Pressing it makes the
+    column agree, and writes the `approval.expired` entry that ADR-142 §4's
+    "approved, rejected *and* expired requests stay inspectable" asks for.
+
+    A manual button in the POC, exactly like "Run due scheduled sends" beside
+    it — a real deployment points cron or its orchestrator at this same
+    operation on an interval. The architecture exposes the seam rather than
+    baking in a scheduler (ADR-094), which is also why there is no background
+    thread: this codebase has no process model for one.
+
+    **Not brand-scoped**, and neither is the sweep it triggers. A deadline is a
+    time rather than a brand, the outcome is identical in every brand already,
+    and the operation is idempotent — it can only retire things that are
+    already dead.
+
+    Needs only `view`, by the `/ui/approvals` entry in the policy table. Same
+    reasoning as `("/ui/brand", VIEW)`: refusing to let a Viewer press a button
+    that changes nothing they could not already see would be theatre.
+    """
+    from app.approvals import service as approvals
+
+    expired = approvals.expire_due_pending_actions(db)
+    message = (
+        f"Retired {len(expired)} request(s) whose deadline had passed."
+        if expired else "Nothing had expired."
+    )
+    return RedirectResponse(
+        url=f"/ui/approvals?status=all&notice={quote(message, safe='')}",
+        status_code=303,
+    )
 
 
 @router.get("/ui/approvals/{pending_id}")

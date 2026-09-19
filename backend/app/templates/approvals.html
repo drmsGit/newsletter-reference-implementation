@@ -3,6 +3,15 @@
 
 <div class="d-flex justify-content-between align-items-start mb-1">
     <h1>Approvals</h1>
+    <div class="d-flex gap-2 align-items-center">
+    <form method="post" action="/ui/approvals/process-expired">
+        <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+        <button type="submit" class="btn btn-sm btn-outline-secondary"
+                {% if not due_count %}disabled{% endif %}
+                title="Retire requests whose deadline has passed. Bookkeeping only — an expired request is already refused whether or not this has run. In production a cron or your orchestrator calls this on an interval.">
+            ⏱ Retire expired{% if due_count %} ({{ due_count }}){% endif %}
+        </button>
+    </form>
     <div class="btn-group btn-group-sm" role="group">
         <a href="/ui/approvals?status=pending"
            class="btn {{ 'btn-primary' if status == 'pending' else 'btn-outline-secondary' }}">Waiting</a>
@@ -10,6 +19,7 @@
            class="btn {{ 'btn-primary' if status == 'decided' else 'btn-outline-secondary' }}">Decided</a>
         <a href="/ui/approvals?status=all"
            class="btn {{ 'btn-primary' if status == 'all' else 'btn-outline-secondary' }}">All</a>
+    </div>
     </div>
 </div>
 <p class="text-muted mb-4">
