@@ -9,12 +9,15 @@ from app.campaigns.models import (
     CampaignWithVariants,
     Variant,
     VariantCreate,
+    VariantUpdate,
     ModuleInstance,
     ModuleInstanceCreate,
+    ModuleInstanceUpdate,
     DecisionSlot,
     DecisionSlotCreate,
     DecisionResolution,
     DecisionResolutionCreate,
+    DecisionSlotUpdate,
 )
 from app.campaigns.service import (
     create_campaign,
@@ -29,6 +32,10 @@ from app.campaigns.service import (
     list_decision_slots_for_variant,
     create_decision_resolution,
     list_resolutions_for_decision_slot,
+    update_variant,
+    update_module,
+    update_decision_slot,
+    to_decision_slot
 )
 
 
@@ -219,3 +226,110 @@ def create_decision_slot_resolution(
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
+
+
+# --- editing (ADR-002) -----------------------------------------------------
+#
+# Added 2026-09-19. A variant, a module and a decision slot could each be
+# CREATED and DELETED over JSON and not edited, which made the campaign builder
+# — the first screen of the React MVP — impossible to build against the API.
+# The UI has had all three since the Jinja build; this closes the half of
+# ADR-002 that had quietly drifted.
+
+@router.put("/variants/{variant_id}", response_model=Variant)
+def update_variant_record(
+    variant_id: int,
+    payload: VariantUpdate,
+    db: Session = Depends(get_db),
+):
+    """Rename a variant and set its envelope copy.
+
+    `subject` and `preheader` are **not columns** — ADR-162 point 1 made them
+    fields of a `header` module and migration 0012 dropped them. `update_variant`
+    writes them through `set_envelope_fields`, so a channel that declares no
+    envelope simply has nowhere to put them and they are ignored rather than
+    refused.
+    """
+    updated = update_variant(
+        db,
+        variant_id=variant_id,
+        name=payload.name,
+        subject=payload.subject,
+        preheader=payload.preheader,
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Variant not found")
+    return updated
+
+
+@router.put("/modules/{module_id}", response_model=ModuleInstance)
+def update_module_record(
+    module_id: int,
+    payload: ModuleInstanceUpdate,
+    db: Session = Depends(get_db),
+):
+    """Edit a module's type, source and static data.
+
+    Position is not here: reordering moves through `/modules/{id}/move`,
+    because it is a different act and carries the `(variant_id, position)`
+    uniqueness constraint that a plain update would have to reason about.
+
+    The content-or-slot exclusivity is enforced by a CHECK constraint rather
+    than by this route, so a payload naming both is refused by the database —
+    which is where that rule belongs, since rendering silently prefers the
+    content record and ignores the slot.
+    """
+    try:
+        updated = update_module(
+            db,
+            module_id=module_id,
+            module_type=payload.module_type,
+            content_record_id=payload.content_record_id,
+            module_data=payload.module_data,
+            decision_slot_id=payload.decision_slot_id,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Module not found")
+    return updated
+
+
+@router.put("/decision-slots/{slot_id}", response_model=DecisionSlot)
+def update_decision_slot_record(
+    slot_id: int,
+    payload: DecisionSlotUpdate,
+    db: Session = Depends(get_db),
+):
+    """Change a slot's strategy and its configuration.
+
+    The strategy name is validated against the registry rather than stored on
+    trust: an unknown strategy resolves nothing at send time and reports it as
+    graceful degradation (ADR-086), which is the right answer for a strategy
+    that found no candidates and the wrong one for a typo.
+    """
+    from app.decision.strategies.registry import get_strategy
+
+    try:
+        # `get_strategy` RAISES on an unknown name rather than returning None —
+        # checked against the source rather than assumed, after assuming wrong
+        # once and turning a 400 into a 500.
+        get_strategy(payload.decision_strategy)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"'{payload.decision_strategy}' is not a registered decision "
+                "strategy"
+            ),
+        )
+    updated = update_decision_slot(
+        db,
+        slot_id=slot_id,
+        decision_strategy=payload.decision_strategy,
+        candidate_filter=payload.candidate_filter,
+        strategy_config=payload.strategy_config,
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Decision slot not found")
+    return to_decision_slot(updated)
