@@ -2,7 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.audience import service
-from app.audience.models import AudienceGroup, AudienceGroupCreate, AudienceGroupMember
+from app.audience.models import (
+    AudienceGroup,
+    AudienceGroupCreate,
+    AudienceGroupMember,
+    AudienceRuleBlock,
+    AudienceRuleBlockCreate,
+    AudienceRuleBlockUpdate,
+    BulkAddRequest,
+)
 from app.auth.service import ensure_default_brand
 from app.database import get_db
 
@@ -84,3 +92,110 @@ def add_member(group_id: int, recipient_id: int, db: Session = Depends(get_db)):
 def remove_member(group_id: int, recipient_id: int, db: Session = Depends(get_db)):
     if not service.remove_member(db, group_id, recipient_id):
         raise HTTPException(status_code=404, detail="Member not found")
+
+
+# --- rule blocks, pins and suggestion (ADR-002) ----------------------------
+#
+# Added 2026-09-19. Groups and individual members existed over JSON; **rule
+# blocks did not**, and a group's audience is evaluated live from its blocks
+# rather than stored — so the API could create a group and could not say who it
+# meant. That is most of what the audience screen does, and it is the second
+# screen of the React MVP.
+
+@router.get("/{group_id}/blocks", response_model=list[AudienceRuleBlock])
+def get_blocks(group_id: int, db: Session = Depends(get_db)):
+    return service.list_blocks(db, group_id)
+
+
+@router.post("/{group_id}/blocks", response_model=AudienceRuleBlock, status_code=201)
+def create_block(
+    group_id: int,
+    payload: AudienceRuleBlockCreate,
+    db: Session = Depends(get_db),
+):
+    """Add an include or exclude rule.
+
+    `source` is not accepted from the caller and is always `"manual"` here.
+    The distinction between a hand-authored block and one a system suggested is
+    provenance, and letting a request claim to be a suggestion would make the
+    "visibly editable, visibly suggested" trust model (ADR-040/041's) a thing a
+    caller can lie about.
+    """
+    if service.get_group(db, group_id) is None:
+        raise HTTPException(status_code=404, detail="Audience group not found")
+    try:
+        return service.add_block(
+            db, group_id=group_id, kind=payload.kind,
+            criteria=payload.criteria, label=payload.label,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+
+
+@router.patch("/{group_id}/blocks/{block_id}", response_model=AudienceRuleBlock)
+def edit_block(
+    group_id: int,
+    block_id: int,
+    payload: AudienceRuleBlockUpdate,
+    db: Session = Depends(get_db),
+):
+    block = service.get_block(db, block_id)
+    if block is None or block.group_id != group_id:
+        raise HTTPException(status_code=404, detail="Rule block not found")
+    try:
+        updated = service.update_block(
+            db, block_id=block_id, kind=payload.kind,
+            criteria=payload.criteria, label=payload.label,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    return updated
+
+
+@router.delete("/{group_id}/blocks/{block_id}", status_code=204)
+def remove_block(group_id: int, block_id: int, db: Session = Depends(get_db)):
+    block = service.get_block(db, block_id)
+    if block is None or block.group_id != group_id:
+        raise HTTPException(status_code=404, detail="Rule block not found")
+    service.delete_block(db, block_id)
+
+
+@router.post("/{group_id}/members", status_code=200)
+def bulk_add(
+    group_id: int,
+    payload: BulkAddRequest,
+    db: Session = Depends(get_db),
+):
+    """Pin several recipients in one call.
+
+    Returns how many were **added**, which is not the same as how many were
+    asked for: a recipient already in the group is not an error and is not
+    counted again. There is deliberately no bulk-remove counterpart yet — it is
+    a logged gap rather than an oversight, and adding one here without the
+    criteria-tracking that item asks for would make removal look symmetrical
+    when it is not.
+    """
+    if service.get_group(db, group_id) is None:
+        raise HTTPException(status_code=404, detail="Audience group not found")
+    added = service.bulk_add_members(db, group_id, payload.recipient_ids)
+    return {"added": added, "requested": len(payload.recipient_ids)}
+
+
+@router.post("/{group_id}/recalculate", response_model=AudienceGroup)
+def recalculate(group_id: int, db: Session = Depends(get_db)):
+    """Re-derive this group's **suggested** blocks from its source campaign.
+
+    Manual blocks are untouched — that is the whole point of `source` being on
+    the block rather than on the group. A group with no source campaign has
+    nothing to recalculate and says so rather than silently doing nothing.
+    """
+    updated = service.recalculate_suggested_blocks(db, group_id)
+    if updated is None:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "That group has no source campaign, so there are no suggested "
+                "blocks to re-derive."
+            ),
+        )
+    return updated
