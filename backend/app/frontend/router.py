@@ -240,7 +240,9 @@ def settings_page(request: Request, saved: bool = False, db: Session = Depends(g
     # One entry per discovered task rather than the single task this page used
     # to import by name. A second task now appears here by existing — no
     # import, no context keys, no duplicated card.
-    from app.settings.service import get_task_model, governed_models
+    from app.settings.service import (
+        get_task_approval_mode, get_task_model, governed_models,
+    )
 
     ai_tasks = []
     for meta in list_tasks():
@@ -253,6 +255,9 @@ def settings_page(request: Request, saved: bool = False, db: Session = Depends(g
             # None means "the deployment default", which is a real answer and
             # not a missing one (ADR-144 §2).
             "model": get_task_model(db, meta.key),
+            # playbook 2026-07-31: approval is a per-task setting, so graduated
+            # trust is expressible without a code change.
+            "approval_mode": get_task_approval_mode(db, meta.key),
         })
 
     return templates.TemplateResponse(
@@ -343,6 +348,30 @@ async def settings_publish_ai_prompt(request: Request, db: Session = Depends(get
     body = (form.get("body") or "").strip()
     if task_key and body:
         publish_prompt(db, task_key, body)
+    return RedirectResponse(url="/ui/settings?saved=true", status_code=303)
+
+
+@router.post("/ui/settings/ai-task-approval")
+async def settings_set_task_approval(request: Request, db: Session = Depends(get_db)):
+    """Whether this task's output is applied directly or held for review.
+
+    `playbook-strategy.md:120`: "direct write by default … NOT 'everything is a
+    pending proposal'. Approval is instead a **per-task setting** (auto-apply vs
+    require-approval), enabling graduated trust."
+
+    A setting rather than a field on `TaskMeta`, because which tasks a company
+    trusts is a manager's decision that changes as trust is earned — the same
+    split as permission keys being code and role composition being data.
+    """
+    from app.settings.service import set_task_approval_mode
+
+    form = await request.form()
+    task_key = (form.get("task_key") or "").strip()
+    mode = (form.get("mode") or "").strip()
+    if task_key:
+        # Anything other than `require_approval` clears back to the default,
+        # so a stale form cannot leave a task in a state nothing branches on.
+        set_task_approval_mode(db, task_key, mode or None)
     return RedirectResponse(url="/ui/settings?saved=true", status_code=303)
 
 
@@ -1477,6 +1506,7 @@ def variant_edit(
 
 @router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/suggest-subject")
 def variant_suggest_subject(
+    request: Request,
     campaign_id: int,
     variant_id: int,
     db: Session = Depends(get_db),
@@ -1516,6 +1546,42 @@ def variant_suggest_subject(
         )
     if run is None:
         return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
+
+    # Per-task approval mode (playbook 2026-07-31; ADR-141 §4). **Inline is the
+    # default** — ADR-140's Context rejects routing every AI action through an
+    # approval layer because it "buries managers in approvals", and a manager
+    # who asked for subject lines is looking at the page right now. A company
+    # that wants a second pair of eyes on this one task turns it on in
+    # Settings, and only then does the suggestion become a held request.
+    from app.settings.service import REQUIRE_APPROVAL, get_task_approval_mode
+
+    if get_task_approval_mode(db, subject_task.TASK_KEY) == REQUIRE_APPROVAL:
+        from app.approvals import service as approvals
+        from app.approvals.actions import ai_subject_apply
+        from app.audit.service import ACTOR_USER
+
+        user = user_for_token(db, request.cookies.get(SESSION_COOKIE))
+        try:
+            held = approvals.request_approval(
+                db, ai_subject_apply.META.key,
+                payload={"ai_run_id": run.run_id},
+                summary=ai_subject_apply.summarise(db, run.run_id),
+                requested_by_type=ACTOR_USER,
+                requested_by_id=user.id if user else None,
+                brand_id=working_brand_id(request, db),
+                subject_id=run.run_id,
+            )
+        except approvals.DuplicateRequest:
+            return RedirectResponse(
+                url=f"/ui/campaigns/{campaign_id}?error=" + quote(
+                    "A suggestion for this variant is already waiting for "
+                    "approval.", safe=""),
+                status_code=303,
+            )
+        return RedirectResponse(
+            url=f"/ui/approvals/{held.id}", status_code=303,
+        )
+
     return RedirectResponse(
         url=f"/ui/campaigns/{campaign_id}?ai_run={run.run_id}",
         status_code=303,

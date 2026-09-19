@@ -188,6 +188,35 @@
         <h5 class="card-title">AI task — {{ task.meta.label }}</h5>
         <p class="text-muted small">{{ task.meta.description }}</p>
 
+        {# ---- applied directly, or held for review (playbook 2026-07-31) ---- #}
+        <form method="post" action="/ui/settings/ai-task-approval" class="mb-3">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+            <input type="hidden" name="task_key" value="{{ task.meta.key }}">
+            <label class="form-label small mb-1">What happens to its output</label>
+            <div class="d-flex gap-2 align-items-start" style="max-width:36rem">
+                <select name="mode" class="form-select form-select-sm">
+                    <option value="auto_apply"
+                            {% if task.approval_mode != 'require_approval' %}selected{% endif %}>
+                        Apply it in the app (default)
+                    </option>
+                    <option value="require_approval"
+                            {% if task.approval_mode == 'require_approval' %}selected{% endif %}>
+                        Hold it for approval
+                    </option>
+                </select>
+                <button type="submit" class="btn btn-outline-secondary btn-sm">Set</button>
+            </div>
+            <div class="form-text">
+                Applying in the app is the default deliberately: routing every
+                AI action through an approval step buries managers in
+                approvals, and the person who asked for a suggestion is looking
+                at the page. Holding it sends the result to the approvals inbox
+                instead, for a second pair of eyes on a task you have not
+                learned to trust yet. Either way the run is audited and nothing
+                is written until a human picks an option.
+            </div>
+        </form>
+
         {# ---- which model runs it (ADR-144 §2) ---- #}
         <form method="post" action="/ui/settings/ai-task-model" class="mb-3">
             <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">

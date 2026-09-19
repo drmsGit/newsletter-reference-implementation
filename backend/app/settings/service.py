@@ -241,3 +241,56 @@ def set_task_model(db: Session, task_key: str, model: str | None) -> dict[str, s
         chosen.pop(task_key, None)
     set_config(db, AI_TASK_MODELS_KEY, chosen)
     return chosen
+
+
+# --- per-task approval mode (ADR-141 §4, playbook 2026-07-31) ---------------
+#
+# `playbook-strategy.md:120`: "direct write by default — reversible + audited +
+# a human can interfere — NOT 'everything is a pending proposal'. Approval is
+# instead a **per-task setting** (auto-apply vs require-approval), enabling
+# graduated trust."
+#
+# **A config row rather than a field on `TaskMeta`.** `TaskMeta` is the
+# developer-owned scaffold that ships with the task; which tasks a company
+# trusts is a manager's decision and changes as trust is earned. The same split
+# the permission vocabulary draws — keys are code, composition is data.
+AI_TASK_APPROVAL_KEY = "ai_task_approval_modes"
+
+AUTO_APPLY = "auto_apply"
+REQUIRE_APPROVAL = "require_approval"
+APPROVAL_MODES = (AUTO_APPLY, REQUIRE_APPROVAL)
+
+
+def task_approval_modes(db: Session) -> dict[str, str]:
+    stored = get_config(db, AI_TASK_APPROVAL_KEY, {}) or {}
+    return {k: v for k, v in stored.items() if v in APPROVAL_MODES}
+
+
+def get_task_approval_mode(db: Session, task_key: str) -> str:
+    """Whether this task's output is applied directly or held for review.
+
+    **Defaults to `auto_apply`**, and that default is the decision rather than
+    a convenience. ADR-140's Context rejects routing every AI action through an
+    approval layer because it "buries managers in approvals", and ADR-141 §5's
+    guard against the "80 records to approve" problem only holds if the normal
+    path does not queue. A company that wants a second pair of eyes on one task
+    turns it on for that task.
+    """
+    return task_approval_modes(db).get(task_key, AUTO_APPLY)
+
+
+def set_task_approval_mode(db: Session, task_key: str, mode: str | None) -> dict[str, str]:
+    """An unrecognised mode clears back to the default rather than storing.
+
+    Same rule as `set_task_model`: a value outside the vocabulary is a typo or a
+    stale form, and storing it would leave a task in a state no code branches
+    on — which reads as `auto_apply` anyway, but silently and by accident
+    rather than by decision.
+    """
+    modes = task_approval_modes(db)
+    if mode == REQUIRE_APPROVAL:
+        modes[task_key] = REQUIRE_APPROVAL
+    else:
+        modes.pop(task_key, None)
+    set_config(db, AI_TASK_APPROVAL_KEY, modes)
+    return modes
