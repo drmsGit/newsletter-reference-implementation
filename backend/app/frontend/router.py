@@ -1588,6 +1588,62 @@ def variant_suggest_subject(
     )
 
 
+@router.get("/ui/campaigns/{campaign_id}/variants/{variant_id}/suggestions")
+def variant_suggestion_history(
+    request: Request,
+    campaign_id: int,
+    variant_id: int,
+    db: Session = Depends(get_db),
+):
+    """Every AI suggestion ever made for this variant — `docs/backlog.md` #103.
+
+    **The data was never the problem.** Asking for subject lines, picking one
+    and leaving the page put the other two beyond reach: they lived in a
+    `?ai_run=` query string, and `AIRunDB` had quietly kept all three, the
+    prompt version that produced them and what they cost. ADR-140 §3 requires
+    these runs to be recorded and they were — the audit trail existed without
+    being readable by the person it is for.
+
+    A history rather than "keep the last options visible on the variant", which
+    was the cheaper option the backlog weighed and rejected: it covers every
+    run rather than the most recent one, and it is where "which prompt version
+    produced this?" naturally belongs.
+    """
+    from app.ai.service import runs_for_target
+    from app.ai.tasks import subject_preheader as subject_task
+
+    campaign = db.query(CampaignDB).filter(
+        CampaignDB.id == campaign_id,
+        CampaignDB.brand_id == working_brand_id(request, db),
+    ).first()
+    variant = db.query(VariantDB).filter(
+        VariantDB.id == variant_id, VariantDB.campaign_id == campaign_id,
+    ).first()
+    if campaign is None or variant is None:
+        return RedirectResponse(
+            url="/ui/campaigns?error=" + quote(
+                "That variant does not exist in this brand.", safe=""),
+            status_code=303,
+        )
+
+    runs = []
+    for run in runs_for_target(db, "variant", variant_id):
+        runs.append({
+            "run": run,
+            "options": subject_task.parse_options(run.output_text or ""),
+            # Kept for the case the options could not be read: the reply itself
+            # is often the useful part, which is the whole lesson of the empty-
+            # variant refusal.
+            "reply": (run.output_text or "").strip(),
+        })
+
+    return templates.TemplateResponse(request, "variant_suggestions.html", {
+        "campaign": campaign,
+        "variant": variant,
+        "runs": runs,
+    })
+
+
 @router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/apply-subject")
 def variant_apply_subject(
     campaign_id: int,
@@ -4137,6 +4193,7 @@ def _may_decide(request: Request, db: Session, meta, row) -> bool:
 def approvals_list(
     request: Request,
     status: str = "pending",
+    source: str = "requests",
     notice: str | None = None,
     error: str | None = None,
     db: Session = Depends(get_db),
@@ -4151,8 +4208,28 @@ def approvals_list(
         status = "pending"
     from app.approvals import service as approvals
 
+    # **A filter that changes the SOURCE, not a merged table.** An AI run that
+    # was applied inline has no pending action, and a sign-in has neither —
+    # writing rows for things nobody is being asked to approve would be the
+    # "everything is a pending proposal" posture ADR-140 rejects. So this is
+    # one screen over two stores rather than one store pretending to hold both.
+    ai_runs = []
+    if source == "ai":
+        from app.ai.service import runs_for_brand
+        from app.ai.tasks import subject_preheader as subject_task
+
+        for run in runs_for_brand(db, working_brand_id(request, db)):
+            variant = db.query(VariantDB).filter(VariantDB.id == run.target_id).first()
+            ai_runs.append({
+                "run": run,
+                "variant": variant,
+                "options": subject_task.parse_options(run.output_text or ""),
+            })
+
     return templates.TemplateResponse(request, "approvals.html", {
-        "rows": _approval_rows(request, db, status),
+        "rows": _approval_rows(request, db, status) if source != "ai" else [],
+        "ai_runs": ai_runs,
+        "source": source,
         "status": status,
         "due_count": approvals.due_count(db),
         "notice": notice,

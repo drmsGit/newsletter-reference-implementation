@@ -184,7 +184,9 @@
                   class="mt-3 pt-3 border-top">
                 <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                 <button type="submit" class="btn btn-outline-primary btn-sm">✨ Suggest subject &amp; preheader</button>
-                <span class="small text-muted ms-2">Uses the prompt from Settings. Nothing is applied until you pick one.</span>
+                <a href="/ui/campaigns/{{ campaign.id }}/variants/{{ variant.id }}/suggestions"
+                   class="btn btn-outline-secondary btn-sm">Past suggestions</a>
+                <span class="small text-muted ms-2">Uses the prompt from Settings. Nothing is applied until you pick one — and the ones you do not pick stay readable.</span>
             </form>
             {% endif %}
 

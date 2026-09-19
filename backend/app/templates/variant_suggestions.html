@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start mb-1">
+    <h1 class="mb-0">Past subject suggestions</h1>
+    <a href="/ui/campaigns/{{ campaign.id }}" class="btn btn-sm btn-outline-secondary">
+        Back to the campaign
+    </a>
+</div>
+<p class="text-muted mb-4">
+    Every set of options generated for <strong>{{ variant.name }}</strong>, newest
+    first — including the ones that were not used. You have already paid for all
+    of them.
+</p>
+
+{% for entry in runs %}
+{% set run = entry.run %}
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+            <div class="small text-muted">
+                {{ run.created_at.strftime('%Y-%m-%d %H:%M') }}
+                · {{ run.model or run.provider }}
+                · {{ run.input_tokens }} in / {{ run.output_tokens }} out
+                {% if run.prompt_id %}· prompt version #{{ run.prompt_id }}{% endif %}
+            </div>
+            {% if run.status != 'ok' %}
+            <span class="badge bg-danger">{{ run.status }}</span>
+            {% endif %}
+        </div>
+
+        {% if run.message %}
+        <div class="alert alert-warning py-2 small">{{ run.message }}</div>
+        {% endif %}
+
+        {% if entry.options %}
+        {% for option in entry.options %}
+        <form method="post"
+              action="/ui/campaigns/{{ campaign.id }}/variants/{{ variant.id }}/apply-subject"
+              class="mb-2">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+            <input type="hidden" name="subject" value="{{ option.subject }}">
+            <input type="hidden" name="preheader" value="{{ option.preheader }}">
+            <div class="d-flex justify-content-between align-items-center border rounded p-2">
+                <div>
+                    <div>{{ option.subject }}</div>
+                    <div class="text-muted small">{{ option.preheader }}</div>
+                </div>
+                <button type="submit" class="btn btn-sm btn-outline-success">Use this</button>
+            </div>
+        </form>
+        {% endfor %}
+        {% elif entry.reply %}
+        <div class="small text-muted mb-1">
+            No options could be read from this reply. It said:
+        </div>
+        <blockquote class="small mb-0 ps-2 border-start border-2">{{ entry.reply }}</blockquote>
+        {% else %}
+        <p class="text-muted small mb-0">This run produced nothing.</p>
+        {% endif %}
+    </div>
+</div>
+{% else %}
+<p class="text-muted">
+    Nothing has been suggested for this variant yet.
+</p>
+{% endfor %}
+
+{% endblock %}

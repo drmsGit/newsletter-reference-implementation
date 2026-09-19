@@ -241,3 +241,55 @@ def run_task(
         input_tokens=run.input_tokens,
         output_tokens=run.output_tokens,
     )
+
+
+def runs_for_target(
+    db: Session, target_type: str, target_id: int, limit: int = 25,
+) -> list[AIRunDB]:
+    """Every run this task made against one thing, newest first.
+
+    **The data was always here; only the surface was missing.** A manager who
+    asked for subject lines, picked one, and left the page could not reach the
+    other two again — even though `output_text`, the prompt version and the
+    token cost were all persisted at the time (`docs/backlog.md`, "recall past
+    AI suggestions"). ADR-140 §3 requires these runs to be recorded, and they
+    were; the only way to read them was SQL, so an audit trail existed without
+    being usable by the person it is meant to serve.
+
+    Bounded, because this is a review surface rather than an export. ADR-132's
+    posture applies: the operational system keeps a working window and the
+    adopter's warehouse keeps history.
+    """
+    return (
+        db.query(AIRunDB)
+        .filter(
+            AIRunDB.target_type == target_type,
+            AIRunDB.target_id == target_id,
+        )
+        .order_by(AIRunDB.created_at.desc(), AIRunDB.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+
+def runs_for_brand(db: Session, brand_id: int, limit: int = 50) -> list[AIRunDB]:
+    """Recent variant-targeted runs in one brand, newest first.
+
+    Joined through variant → campaign because `ai_runs` carries no brand of its
+    own, and deliberately not given one: a run is audited against the thing it
+    acted on, and duplicating the brand onto it would be a second place for the
+    answer to drift from (the argument ADR-164 point 9 had to answer the other
+    way for signal contributions, where the join was five tables deep and the
+    row could outlive it — here it is two and cannot).
+    """
+    from app.campaigns.db_models import CampaignDB, VariantDB
+
+    return (
+        db.query(AIRunDB)
+        .join(VariantDB, VariantDB.id == AIRunDB.target_id)
+        .join(CampaignDB, CampaignDB.id == VariantDB.campaign_id)
+        .filter(AIRunDB.target_type == "variant", CampaignDB.brand_id == brand_id)
+        .order_by(AIRunDB.created_at.desc(), AIRunDB.id.desc())
+        .limit(limit)
+        .all()
+    )

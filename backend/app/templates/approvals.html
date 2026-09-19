@@ -18,7 +18,10 @@
         <a href="/ui/approvals?status=decided"
            class="btn {{ 'btn-primary' if status == 'decided' else 'btn-outline-secondary' }}">Decided</a>
         <a href="/ui/approvals?status=all"
-           class="btn {{ 'btn-primary' if status == 'all' else 'btn-outline-secondary' }}">All</a>
+           class="btn {{ 'btn-primary' if status == 'all' and source != 'ai' else 'btn-outline-secondary' }}">All</a>
+        <a href="/ui/approvals?source=ai"
+           class="btn {{ 'btn-primary' if source == 'ai' else 'btn-outline-secondary' }}"
+           title="Everything the AI has proposed in this brand, applied or not.">AI runs</a>
     </div>
     </div>
 </div>
@@ -31,7 +34,46 @@
 {% if notice %}<div class="alert alert-info">{{ notice }}</div>{% endif %}
 {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
 
-{% if rows %}
+{% if source == 'ai' %}
+<p class="text-muted small">
+    Everything the AI has proposed in this brand, whether it was applied, held
+    for approval, or simply left. A run that was applied in the app has no
+    request here and never did — this is the other store, not the same rows
+    filtered differently.
+</p>
+{% if ai_runs %}
+<table class="table table-striped table-sm align-middle">
+    <thead>
+        <tr><th>Variant</th><th>When</th><th>Model</th><th>Cost</th><th>Options</th></tr>
+    </thead>
+    <tbody>
+    {% for entry in ai_runs %}
+    <tr>
+        <td>
+            {% if entry.variant %}
+            <a href="/ui/campaigns/{{ entry.variant.campaign_id }}/variants/{{ entry.variant.id }}/suggestions">
+                {{ entry.variant.name }}
+            </a>
+            {% else %}
+            <span class="text-muted">variant {{ entry.run.target_id }} (gone)</span>
+            {% endif %}
+        </td>
+        <td class="small">{{ entry.run.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td class="small">{{ entry.run.model or entry.run.provider }}</td>
+        <td class="small">{{ entry.run.input_tokens }} / {{ entry.run.output_tokens }}</td>
+        <td class="small">
+            {% if entry.options %}{{ entry.options | length }}
+            {% else %}<span class="text-muted">none readable</span>{% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="text-muted">Nothing has been proposed in this brand yet.</p>
+{% endif %}
+
+{% elif rows %}
 <table class="table table-striped table-sm align-middle">
     <thead>
         <tr>
