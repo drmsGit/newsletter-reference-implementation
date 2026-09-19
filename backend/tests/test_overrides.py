@@ -72,9 +72,21 @@ def _find_module(**criteria) -> int:
             query = query.filter(ModuleInstanceDB.decision_slot_id.is_(None))
         row = query.order_by(ModuleInstanceDB.id.asc()).first()
         if row is None:
-            pytest.skip(
-                f"no module instance matching {criteria} in this database",
-                allow_module_level=True,
+            # **A failure, not a skip.** This ran at import time and called
+            # `pytest.skip(allow_module_level=True)`, so an emptied database
+            # made all thirteen tests in this file vanish during collection —
+            # a green run that proved nothing about the override layer. The
+            # backlog entry that asked for an isolated test database named this
+            # as its known residual weakness: "a silent skip hides regressions
+            # as effectively as a broken test".
+            #
+            # With a database the suite owns and seeds, absence is no longer a
+            # legitimate state. It means the seed changed shape, and that is
+            # worth stopping for.
+            raise AssertionError(
+                f"no module instance matching {criteria} in the test database. "
+                "The suite seeds one; if that changed, fix the seed rather than "
+                "letting these tests disappear."
             )
         return row[0]
     finally:
@@ -139,7 +151,10 @@ def static_module():
             .first()
         )
         if variant_row is None or content_row is None:
-            pytest.skip("no variant or active content record to build a module from")
+            raise AssertionError(
+            "no variant or active content record to build a module from — the "
+            "test database is seeded with both, so this means the seed changed"
+        )
         # Position 9999 is a magic "out of the way" slot in a variant this
         # fixture does not own, and `(variant_id, position)` is unique — so a
         # run that dies before its teardown poisons every run after it with a

@@ -228,6 +228,15 @@ class TestPerTaskModelSelection:
         """The setting is worthless if `run_task` does not pass it on."""
         from app.ai import service as ai_service
 
+        # `run_task` returns early when the task has no published prompt, so
+        # without this the provider is never reached and the test passes for
+        # the wrong reason — or, on a database that has one lying around, for
+        # the right reason by luck. A test owns its preconditions.
+        from app.ai.service import get_published_prompt, publish_prompt
+
+        if get_published_prompt(db, "subject_preheader") is None:
+            publish_prompt(db, "subject_preheader", "Write something about {content}.")
+
         set_task_model(db, "subject_preheader", "claude-haiku-4-5")
         captured = {}
 

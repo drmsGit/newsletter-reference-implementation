@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    CheckConstraint, Column, DateTime, Integer, String, func, JSON,
+    CheckConstraint, Column, DateTime, Index, Integer, String, func, text, JSON,
 )
 
 from app.database import Base
@@ -116,11 +116,23 @@ class PendingActionDB(Base):
             "(status = 'pending') = (decided_at IS NULL)",
             name="ck_pending_actions_decided",
         ),
-        # NOTE: the "one open request per subject" rule is a PARTIAL unique
-        # index (`WHERE status = 'pending'`), which SQLAlchemy's
-        # UniqueConstraint cannot express. It lives in
-        # `scripts/migrate_0017_pending_actions.sql` only — so a database built
-        # by `create_all` alone does NOT have it, and the service's own
-        # duplicate check is what holds there. Both are tested separately,
-        # because either one alone would make the other's test pass.
+        # One open request per thing. A PARTIAL unique index, because a decided
+        # request must not block the next one — the same idiom as
+        # `ux_content_overrides_one_active_per_module`.
+        #
+        # **Declared here as well as in migration 0017, deliberately.** An
+        # earlier version of this comment said the partial clause "cannot be
+        # expressed" in the model and left it to the migration alone — which is
+        # wrong (`Index(..., postgresql_where=...)` expresses it exactly), and
+        # the cost of being wrong showed up the moment a database was built by
+        # `create_all` instead: the constraint was simply absent there, so the
+        # two creation paths disagreed about the schema and only one of them
+        # enforced the rule. The migration stays for databases that already
+        # exist; this is what every new one gets.
+        Index(
+            "ux_pending_actions_one_open_per_subject",
+            "action_key", "subject_type", "subject_id",
+            unique=True,
+            postgresql_where=text("status = 'pending'"),
+        ),
     )

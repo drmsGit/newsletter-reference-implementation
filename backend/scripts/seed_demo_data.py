@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqlalchemy import text
 
 from app.auth.service import ensure_default_brand
+from app.campaigns.service import set_envelope_fields
 from app.database import SessionLocal, engine
 from app.content.db_models import (
     CategoryDB,
@@ -190,6 +191,14 @@ def seed():
             db.add(
                 ConsentEventDB(
                     recipient_id=r.id,
+                    # Consent is per (recipient, BRAND, channel, purpose) —
+                    # ADR-163 point 1 as amended for brands. This line was
+                    # missing until 2026-09-19, so the seed had been broken
+                    # against the schema for as long as `brand_id` was NOT
+                    # NULL. Nobody saw it because nobody ran the seed against a
+                    # database that did not already have rows in it, which is
+                    # exactly what the isolated test database is for.
+                    brand_id=BRAND_ID,
                     channel="email",
                     purpose="marketing",
                     status="opted_in",
@@ -241,9 +250,18 @@ def seed():
         for ci in range(1, 5):
             camp = CampaignDB(name=f"Demo Campaign {ci}", status="draft", brand_id=BRAND_ID)
             db.add(camp); db.flush()
-            variant = VariantDB(campaign_id=camp.id, channel="email", name=f"Variant {ci}A",
-                                subject=f"Edition {ci}: picked for you", preheader="Your personalized selection", status="draft")
+            variant = VariantDB(campaign_id=camp.id, channel="email",
+                                name=f"Variant {ci}A", status="draft")
             db.add(variant); db.flush()
+            # Subject and preheader are NOT columns here any more — ADR-162
+            # point 1 made them fields of a `header` module, and migration 0012
+            # dropped them. This seed still passed them as keyword arguments
+            # until 2026-09-19, which nothing noticed because the seed was only
+            # ever run against a database that already had its rows.
+            set_envelope_fields(db, variant.id, {
+                "subject": f"Edition {ci}: picked for you",
+                "preheader": "Your personalized selection",
+            })
             slot = DecisionSlotDB(
                 variant_id=variant.id, name="Main Content Slot",
                 decision_type="content_recommendation", decision_strategy="recipient_top_score",
