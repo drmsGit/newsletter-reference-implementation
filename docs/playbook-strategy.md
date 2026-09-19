@@ -267,6 +267,63 @@ ADR-163 first was so this would be built once, in the right shape.
 
 **Status:** launch gates **2 and 4b are closed**, gate 4 is mostly closed (login rate limiting is the remaining piece and carries a storage decision), and ADR-163 is fully built. Gate 3 (machine auth) and gate 4 (auth enforcement + CSRF) remain open, and gate 1 (positioning) is still the named blocker on public beta.
 
+### 2026-09-16 — Brand scoping built; multi-brand is the ordinary case
+
+**Context:** [[ADR-150 — Tenancy and Access Model]] was accepted and the scope
+moved onto the resources. Logged retrospectively on 2026-09-19 from the ADRs,
+migrations and code, which are the record — this entry was missed at the time.
+
+1. **Brands are a scope, not a hierarchy, and the single-brand company pays a default value in a column.** Point 4's promise is the property the whole design rests on, and it is checked over HTTP rather than as a flag — `test_brand_scoping.py`'s `TestTheSingleBrandCompanyPaysNothing` loads the navbar, because a unit-level assertion proves nothing about what a manager sees. `brand_id` is explicitly **not** a tenant discriminator (point 1): one installation serves one company, and where GDPR forces separation between companies the answer is two installations, "and we ship no alternative" (point 3).
+
+2. **Scope is a property of the permission, not of the role** — the 2026-09-15 addendum. Said about the permission because roles are rows a company may rename or delete. The load-bearing consequence is in `_permitted`: a brand-scoped permission with **no** working brand is refused outright rather than checked without one, because `brand_id=None` means the union across every grant, which would let an Admin on brand A act as one on brand B. One default argument is the difference between correct and fail-open.
+
+3. **Consent carries a brand** ([[ADR-163 — Per-Channel Consent and Addressability]]'s addendum). The cell widened to `(recipient, brand, channel, purpose)`, closing a gap where the authoring side was scoped and the send side was not. **A newly created brand starts with zero reachable recipients** — correct, and the record says plainly it "will still surprise whoever creates their second brand". `brand_id` is a required positional with no default anywhere on the consent path: *a consent row whose brand was assumed is a consent record nobody gave.* Worth flagging that `purpose` beside it kept its `"marketing"` default, which is now a logged defect.
+
+4. **The boundary is the one place a copy is made** ([[ADR-013 — Content Reference Instead of Content Copy]]'s addendum). Reference wherever referencing is expressible; copy only where the NOT NULL brand makes it inexpressible. `content_modes_for` returns `[KEEP, LAYOUT]` within a brand and `[COPY, LAYOUT]` across one — not a preference list, since the excluded mode in each case cannot be built. Provenance lives in the audit log rather than a `copied_from_id` column, so the answer cannot go stale when the source is renamed or deleted.
+
+5. **What is deliberately not scoped is as decided as what is.** The category vocabulary stays global — "Beach means the same thing in every brand" — and is already per-brand transitively through content. Recipients carry no brand (the brand is the sender, not an attribute of the person), and neither do signal contributions: *what is scoped is which people are summed, and that is a query, not a column.* Duplication as the general answer was considered and rejected — "a synced copy is a copy that drifts."
+
+6. **Migrations assert their preconditions rather than assume them.** `migrate_0007` refuses when more than one brand exists with rows unassigned, because the correct brand per row would be unknowable and guessing it would invent evidence. `migrate_0008` could not reuse that guard — a second brand existed by then — so it substitutes a provable timestamp fact and re-derives it at run time rather than trusting a note.
+
+**Status:** brand scoping built in three steps; `HANDOFF.md`'s header still said "step 1 built" four days later, which is logged as a stale record.
+
+### 2026-09-18 — Launch gate 3 closed; a machine is a principal in the same access model
+
+**Context:** the JSON API was an unauthenticated control plane beneath a locked
+UI — 69 routes, 36 of them state-changing, including one that fires real mail
+and one that writes the consent record a UWG §7 complaint is answered with.
+[[ADR-166 — Inbound Machine Callers Are Authenticated Principals]] closed it.
+Logged retrospectively on 2026-09-19 from that record's own build notes.
+
+1. **One access model, not two.** A parallel authorization system for machines was the contested axis and was rejected on the same grounds ADR-150 §5 rejects modelling the average org chart: a company needing stricter separation can build it in a separate system, and shipping two authorization systems means every future permission question is answered twice. `permissions_for` dispatches on principal type — two storage shapes, one answer — which is where that promise is kept or quietly broken.
+
+2. **Nine permissions became sixteen, and the split is not an addition.** The nine were too coarse for the feature's own worked example — *n8n may trigger a send; a website form may only pin a recipient* — because pinning sat under `audiences.manage`, which also restructures the audience. **The splits serve humans too**, which is why they went into the shared vocabulary rather than a machine-only scope list, and why Manager explicitly gained the three new brand-scoped keys so the split was not a silent downgrade dressed as a refactor.
+
+3. **Credentials are key + secret, and the integration rather than the credential is the audit actor** — so "n8n triggered this send" still reads correctly across a key rotation. The secret is sha256 rather than a slow KDF, argued explicitly: KDFs exist for low-entropy human input and there is no dictionary of 32 random bytes. `may_send_unattended` defaults False.
+
+4. **Found while building, and worth more than the feature:** `enforce_csrf` had been wired onto the frontend router alone, so the thirteen user- and role-administration forms in `auth_router` — the most privileged forms in the system — were the only ones with no CSRF protection, while `LAUNCH-GATES.md` recorded gate 4 as "CSRF on all 62 forms". A gate that reads as closed over a plane that is open is the recurring failure shape in this codebase, and it is a one-line wiring list every time.
+
+5. **One narrowing taken during the build, reversed the next day.** The plane took a machine credential and **not** a session cookie, which settled CSRF by construction. See the 2026-09-19 entry — the narrowing left the React manager client with no way to authenticate.
+
+**Status:** gates 2, 3, 4 and 4b closed. **Gate 1 — positioning — is the only remaining blocker on public beta**, and it is not a code gate.
+
+### 2026-09-19 — The approval surface shipped, and a person may use the JSON API
+
+**Context:** two threads landed the same day — the ADR-142 §4 approval inbox,
+and the authentication question the React manager client was blocked on.
+
+1. **Point 5 became a queue, and the order of the checks changed with it.** The unattended-send flag had been tested before `has_permission` and before the brand was resolved, on the argument that "you may not do this at all outranks you did not say where". That argument does not survive the flag becoming a queue: `ApprovalRequired` stopped being a *may not* and became a *not yet* that hands out a held request, so in the old order an integration holding no `sends.execute` grant could have minted a pending send for a person to approve — privilege escalation through the approval surface. The brand moved up too, because a held request with a null brand is invisible in every brand's inbox.
+
+2. **Audit is now written from a service, deliberately.** `app/approvals/service.py` departs from `audit/service.py`'s written-from-routes rule on the grounds that an expiry has no request behind it at all — the revisit that module's own docstring named as "the first thing to revisit" — and adds a third actor type, `ACTOR_SYSTEM`, because attributing an expiry to a person would be the same dishonesty `audit.record` refuses when it writes a null actor rather than guessing one. **`ACTOR_INTEGRATION` still has no writer:** no audit row has yet named an integration as its actor, which is the half of ADR-166 point 3 that remains owed.
+
+3. **[[ADR-168 — The Manager SPA Authenticates With Its Session Cookie]] — the manager client uses its session cookie, served same-origin.** The previous day's narrowing and `BETA-SCOPE.md`'s description of an SPA "talking to an existing REST API from behind a login" could not both hold. `enforce_api_policy` takes two credential types, machine first; `policy.py` and `permissions_for` are untouched, because the second credential type is a second way to say *who* and not a second rule — the shape ADR-166 point 8 already gave the brand. Decided over a short-lived bearer token chiefly on the audit actor: the middleware already resolves the user on JSON-plane requests, so the log is correct with no new mechanism, where a token-bearing SPA would record a NULL actor silently. **The cost is booked rather than discharged:** CSRF returns as a control this codebase must keep right.
+
+4. **The review commands ran for the first time since 2026-08-20** — 112 commits, none of it reviewed by either lens. `/interview-prep-baseline` could not run as written: it delegates to `docs/architecture/Code/`, and that folder had no page for auth, brand, channels, ai or audit, so it would have swept the source blind through exactly the new subsystems. The pages came first, then three new interview clusters and a second business-assumption pass. Eight defects went to the backlog, the sharpest being same-day: the twelve JSON routers check the permission against the declared `X-Brand` and write the row to the default brand — **which is also a hard prerequisite for ADR-168**, since a cookie caller sends no such header and would be refused on every brand-scoped write.
+
+5. **The business record is in the wrong place, and that is the finding with the most leverage on gate 1.** `docs/business/decisions/` is empty while eleven business, legal and market positions sit in accepted ADRs and two docstrings — brands not sharing a lawful basis for contact, full erasure as the shipped default, two-installs-no-mixed-mode, "a weekend not half a year", the one-pot AI budget, the shipped subject-line editorial policy. `POSITIONING.md` blocks beta on a statement making no claim the repo cannot demonstrate today, and a positioning pass would read none of those files. The new material arrived through the ADR channel because the security and channel clusters ran as design interviews with no business-decision counterpart.
+
+**Status:** gate 1 unchanged and still the only blocker. This log itself was three entries behind when updated, which is the same failure the finding above describes.
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*
