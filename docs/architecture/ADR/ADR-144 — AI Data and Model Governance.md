@@ -128,6 +128,19 @@ scaffold, config for the prompt.**
 
 ## Notes
 
+- **The second worked adapter is not a blocker — decided 2026-09-19.** §1 commits to *two* worked model
+  examples so that "GDPR-friendly is possible" is demonstrated rather than claimed, and only one is
+  built. The user's position, adopted: the **mechanism** is proven — an adapter is a dropped file behind
+  an interface, and there is no reason to believe a second provider differs as long as it exposes an
+  API. One will be tested; nothing waits on it.
+
+  **What that does and does not settle, stated so the claim stays honest.** It settles the *engineering*
+  question, which was never really in doubt after the Claude adapter shipped against a real ledger and a
+  pre-call spend gate. It does not settle the *demonstration* — §1's two examples were about showing an
+  EU-hosted option is real, not about proving a second adapter can be written. So the honest phrasing
+  until one is connected is "the architecture admits an EU-hosted model and one has not been run", which
+  is weaker than §1 intended and stronger than nothing.
+
 - Applies to all three AI modes. Mode A ([[ADR-141 — In-App Assistive AI Actions]])
   is the first consumer; Mode B
   ([[ADR-142 — Autonomous Workflows and the Automation Boundary]]) and Mode C
