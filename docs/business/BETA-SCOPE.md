@@ -232,6 +232,18 @@ implementation"), it should get a short ADR in the Claude Code side recording
 the React-over-Next.js reasoning above, rather than living only in this
 business doc.
 
+**Done 2026-09-19: [[ADR-170 — The Manager Client Is a Plain React SPA, Not
+Next.js]].** It records the reasoning above and adds three things this section
+left open: the routing choice (React Router as a library, not its framework
+mode), the repository layout (`frontend/` beside `backend/`, because FastAPI
+serves the build output and the typed client is generated from the backend's
+own schema), and an argument that did not exist on 2026-08-22 — ADR-168 made
+FastAPI serve the client same-origin, and a Next.js app-router instance is a
+server, so serving it would mean either a second Node process reintroducing the
+CORS problem ADR-168 exists to avoid, or a static export that discards most of
+what Next.js is for. Step 2 of the MVP cut below — reuse the session or mint a
+token — is also answered and built: the session cookie, per ADR-168.
+
 **Sequencing against the omni-channel interview.** The omni-channel
 Needs-ADR item already warns, in its own text, that starting the React
 frontend before that interview risks designing the manager UI around
