@@ -8,7 +8,7 @@ topic:
   - automation
   - governance
 created: 2026-09-13
-modified: 2026-09-18
+modified: 2026-09-19
 source:
   - "Machine authentication design interview (2026-09-13)"
 depends_on:
@@ -24,6 +24,7 @@ depends_on:
   - "[[ADR-154 — Erasure and Retention]]"
 enables:
   - "[[ADR-164 — Channel Feedback and Signals]]"
+  - "[[ADR-168 — The Manager SPA Authenticates With Its Session Cookie]]"
 ---
 
 ## Status
@@ -154,6 +155,37 @@ The symmetry is the whole of it. One rule — *a brand-scoped permission is chec
   4. **Point 5 was enforced as a refusal between 2026-09-18 and 2026-09-19, and that is now history.** The point says a machine-triggered send lands in [[ADR-142 — Autonomous Workflows and the Automation Boundary]] §4's approval surface unless the integration is flagged otherwise. **That surface is not built.** Storing the flag, showing it in the admin screen and letting the send through anyway would ship something that looks like a control and is not, so an unflagged integration is refused the send route outright. When the approval surface exists this becomes a queue and the default does not have to change.
 - **Found while building, and fixed with it:** `enforce_csrf` was wired onto the frontend router alone, so the thirteen user- and role-administration forms in `auth_router` — the most privileged forms in the system — were the only ones with no CSRF protection, while `docs/business/LAUNCH-GATES.md` recorded gate 4 as "CSRF on all 62 forms". Also: `POST /recipients/` is mapped to `recipients.manage` and carries `consent_status` in its body, so [[ADR-150 — Tenancy and Access Model]] point 5's separation was defeated by the payload rather than the URL; that route now requires `recipients.consent` as well when consent is asserted, and it is the only route in the system needing two permissions — because a route→permission table has nothing to read a body with.
 - **Implementation status, 2026-09-14 (superseded by the note above):** **Nothing in this record is built.** It was written 2026-09-13 and designs launch gate 3; the gate is still open. There is no integration record and no machine-credential table in `backend/` (no such `__tablename__` in any `app/*/db_models.py`), `integrations.manage` is not in `backend/app/auth/permissions.py`, and the twelve JSON routers are still included in `backend/main.py` with no guard — including `POST /provider/events`. The one property point 6 leans on that does exist is the signed path: `verify_signature()` returns False when `RESEND_WEBHOOK_SECRET` is unset (`backend/app/providers/adapters/resend.py`).
+
+## Addendum 2026-09-19 — a person may use the JSON API after all, with their session cookie
+
+Prompted by scoping the React manager client, which had no way to authenticate
+under the narrowing below. **This reverses build-note 1 above. It does not touch
+the Decision**, which says nothing about cookies: point 1 makes a machine caller
+a principal in the same access model and explicitly leaves open whether a *person*
+may use the JSON API. The answer taken on 2026-09-18 was no; the answer as of
+2026-09-19 is yes, and it is recorded in full in
+[[ADR-168 — The Manager SPA Authenticates With Its Session Cookie]].
+
+**What changes.** `enforce_api_policy` accepts two credential types — the machine
+credential first, then the `nra_session` cookie resolved through `user_for_token`
+— so the principal it produces is the `UserDB | IntegrationDB` this record's own
+point 1 already required. `policy.py` and `permissions_for` are untouched: the
+second credential type is a second way to say *who*, and not a second rule, which
+is the same shape point 8 gave the brand.
+
+**What it costs, and it is the sentence worth keeping.** Build-note 1's claim that
+the narrowing "settles CSRF on this plane by construction — there is no ambient
+credential for a cross-site request to carry" was true and stops being true. CSRF
+returns as a control this codebase must get right and keep right, defended by an
+`X-CSRF-Token` header compared against `csrf_token_for(session_token)`. The
+existing `enforce_csrf` is not reused and cannot be: it reads the request as a
+form, which against a JSON body yields an empty `FormData` rather than an error,
+and it stands down when there is no session cookie. ADR-168's `### Negative`
+books the obligation rather than treating it as discharged.
+
+**Unchanged:** points 1 through 8, and build-notes 2, 3 and 4. A developer may
+still issue themselves an integration key, and that remains the right mechanism
+for a script; what changes is that a person at a browser is no longer required to.
 
 ## Related ADRs
 

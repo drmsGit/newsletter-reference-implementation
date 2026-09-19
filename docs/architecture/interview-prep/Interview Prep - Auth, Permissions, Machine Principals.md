@@ -22,7 +22,7 @@ depends_on:
 
 Generated 2026-09-18 via `/interview-prep-baseline`, for `backend/app/auth/` and the guards wired in `backend/main.py`. **This cluster has never been reviewed** — it did not exist at the 2026-07-04 baseline. Companion module page: [[auth]].
 
-Already logged, deliberately not raised here: the ADR-142 §4 approval inbox does not exist, so unattended machine sending is a refusal rather than a queue.
+Already logged, deliberately not raised here: unattended machine sending was a refusal rather than a queue when these questions were written. **Superseded 2026-09-19** — the ADR-142 §4 approval surface shipped (`backend/app/approvals/`), point 5 became a queue, and the check order in `enforce_api_policy` was reordered with it, because a flag that hands out a held request is a "not yet" rather than a "may not": left in the old order, an integration holding no `sends.execute` grant could have minted a pending send for a person to approve. See ADR-166's build-note 3.
 
 Check off each item once discussed, and record the outcome in **Resolution**.
 
