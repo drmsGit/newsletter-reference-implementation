@@ -1,10 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.audience import service
 from app.audience.models import AudienceGroup, AudienceGroupCreate, AudienceGroupMember
 from app.auth.service import ensure_default_brand
 from app.database import get_db
+
+
+def _request_brand(request: Request, db: Session) -> int:
+    """The brand this request was authorised for (ADR-168)."""
+    brand = getattr(request.state, "current_brand", None)
+    return brand["id"] if brand else ensure_default_brand(db).id
+
 
 router = APIRouter(prefix="/api/audience-groups", tags=["audience"])
 
@@ -15,16 +22,20 @@ def list_groups(db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=AudienceGroup, status_code=201)
-def create_group(payload: AudienceGroupCreate, db: Session = Depends(get_db)):
+def create_group(
+    request: Request,
+    payload: AudienceGroupCreate,
+    db: Session = Depends(get_db),
+):
     try:
-        # PROVISIONAL. This router is unauthenticated (main.py leaves the twelve
-        # JSON routers unguarded — launch gate 3), so there is no session and no
-        # working brand to read. ADR-166 decides the real answer: one credential
-        # per brand, so the brand arrives with the caller's identity. Until that
-        # lands, a machine-created row goes to the default brand rather than this
-        # API inventing a brand argument ADR-166 will replace.
+        # **Resolved 2026-09-19 (ADR-168).** `enforce_api_policy` writes the
+        # brand it actually checked the permission against onto
+        # `request.state.current_brand` — the declared `X-Brand` for a machine,
+        # the session's working brand for a person — so this row lands in the
+        # same brand the caller was authorised for. Writing to the default brand
+        # while checking against a declared one was the gap.
         return service.create_group(
-            db, payload.name, brand_id=ensure_default_brand(db).id,
+            db, payload.name, brand_id=_request_brand(request, db),
             description=payload.description,
         )
     except ValueError as error:

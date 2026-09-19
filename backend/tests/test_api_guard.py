@@ -15,6 +15,7 @@ Runs against the shared dev database like the rest of the suite, and removes
 everything it creates.
 """
 import uuid
+from contextlib import contextmanager
 
 import pytest
 from fastapi.testclient import TestClient
@@ -34,6 +35,31 @@ from main import app
 from tests.machine import machine
 
 client = TestClient(app, raise_server_exceptions=False)
+
+
+@contextmanager
+def signed_in(db, role_key="admin"):
+    """A browser session against the JSON API — what the SPA will be.
+
+    Yields (client, session token, csrf token). The CSRF token is derived from
+    the session token rather than stored, so the test computes it the same way
+    the SPA will: from a value the server handed it.
+    """
+    user = auth.create_user(
+        db, email=f"apitest-{uuid.uuid4().hex[:8]}@example.invalid", role_key=role_key,
+    )
+    token = auth.create_session(db, user)
+    cookied = TestClient(app, raise_server_exceptions=False)
+    cookied.cookies.set(auth.SESSION_COOKIE, token)
+    try:
+        yield cookied, token, auth.csrf_token_for(token)
+    finally:
+        db.rollback()
+        for table in ("login_codes", "auth_sessions", "role_assignments"):
+            db.execute(text(f"DELETE FROM {table} WHERE user_id = :u"), {"u": user.id})
+        db.execute(text("DELETE FROM users WHERE id = :u"), {"u": user.id})
+        db.commit()
+
 
 
 @pytest.fixture
@@ -74,29 +100,172 @@ class TestNothingGetsInWithoutACredential:
             )
             assert response.status_code == 401, header
 
-    def test_a_session_cookie_does_not_authenticate_the_machine_plane(self, db):
-        """The narrowing that makes CSRF a non-question here.
+    def test_a_session_cookie_without_a_csrf_token_is_refused(self, db):
+        """A cookie is an ambient credential; a header is not.
 
-        An Admin's browser session is a perfectly good credential for /ui and
-        is deliberately not one for the JSON API: there is no ambient
-        credential on this plane for a cross-site request to carry.
+        ADR-168 put people back on this plane, so CSRF returned with them —
+        carried in `X-CSRF-Token` rather than a form field, because the existing
+        form-borne guard reads a JSON body as an empty FormData and would refuse
+        every write while doing nothing at all on a bearer request.
         """
-        user = auth.create_user(
-            db, email=f"apitest-{uuid.uuid4().hex[:8]}@example.invalid",
-            role_key="admin",
-        )
-        token = auth.create_session(db, user)
+        with signed_in(db, "admin") as (cookied, _token, _csrf):
+            response = cookied.post("/content/", json=_content_payload())
+            assert response.status_code == 403
+            assert "CSRF" in response.json()["detail"]
+
+    def test_both_credentials_at_once_is_refused(self, db):
+        """ADR-168 point 4, and the reason is about the audit row.
+
+        A guard can always pick. What it cannot do is leave "who acted"
+        derivable from what was sent, once it has picked silently.
+        """
+        from app.auth.permissions import CONTENT_MANAGE, VIEW
+
+        with signed_in(db, "admin") as (cookied, _token, csrf):
+            with machine([VIEW, CONTENT_MANAGE]) as headers:
+                response = cookied.post(
+                    "/content/", json=_content_payload(),
+                    headers={**headers, "X-CSRF-Token": csrf},
+                )
+                assert response.status_code == 400
+                assert "both" in response.json()["detail"].lower()
+
+
+class TestAPersonMayUseTheJsonApi:
+    """ADR-168 — what makes a React manager client possible at all.
+
+    Between 2026-09-18 and 2026-09-19 this plane took machine credentials only,
+    and the narrowing left the SPA with no way to authenticate. These tests pin
+    the two halves of the answer: a session is accepted, and it brings its own
+    working brand rather than being asked for a header it has no reason to send.
+    """
+
+    def test_a_session_with_a_csrf_token_is_admitted(self, db):
+        with signed_in(db, "admin") as (cookied, _token, csrf):
+            payload = _content_payload()
+            payload["brand_id"] = auth.ensure_default_brand(db).id
+            response = cookied.post(
+                "/content/", json=payload, headers={"X-CSRF-Token": csrf},
+            )
+            assert response.status_code in (200, 201), response.text
+            created = response.json()
+        db.execute(text("DELETE FROM content_records WHERE id = :i"),
+                   {"i": created["id"]})
+        db.commit()
+
+    def test_no_x_brand_header_is_needed(self, db):
+        """**The prerequisite ADR-168's Notes call out.**
+
+        `enforce_api_policy` raises `BrandNotDeclared` when a brand-scoped
+        permission arrives without a working brand. A person sends no `X-Brand`
+        — theirs is in the session — so landing the cookie half alone would have
+        refused every brand-scoped SPA write with a 400: the whole campaign,
+        content and audience surface.
+        """
+        with signed_in(db, "admin") as (cookied, _token, csrf):
+            response = cookied.post(
+                "/content/", json=_content_payload(),
+                headers={"X-CSRF-Token": csrf},
+            )
+            assert response.status_code != 400, (
+                "a person was asked for the header only a machine should send"
+            )
+            if response.status_code in (200, 201):
+                db.execute(text("DELETE FROM content_records WHERE id = :i"),
+                           {"i": response.json()["id"]})
+                db.commit()
+
+    def test_the_row_lands_in_the_brand_the_caller_was_authorised_for(self, db):
+        """The other half of the same prerequisite.
+
+        The routers used to check the permission against the declared brand and
+        then write the row to the DEFAULT brand — authorising a caller for
+        brand B and putting the row in brand A.
+
+        **Asserted against a NON-DEFAULT brand, and that is the whole test.**
+        The first version used the default brand, so deleting the write-back
+        entirely still passed: `_request_brand` falls back to
+        `ensure_default_brand`, which returned exactly the id being asserted. A
+        fallback that equals the expected value is not a test.
+        """
+        from app.auth.db_models import BrandDB
+        from app.auth.permissions import CONTENT_MANAGE, VIEW
+        from app.content.db_models import ContentRecordDB
+
+        other = BrandDB(key=f"apitest-{uuid.uuid4().hex[:8]}", name="Second brand")
+        db.add(other)
+        db.commit()
+        db.refresh(other)
+        created = None
         try:
-            cookied = TestClient(app, raise_server_exceptions=False)
-            cookied.cookies.set(auth.SESSION_COOKIE, token)
-            assert cookied.post(
-                "/content/", json=_content_payload()
-            ).status_code == 401
+            with machine([VIEW, CONTENT_MANAGE], brand_id=other.id) as headers:
+                assert int(headers["X-Brand"]) == other.id
+                response = client.post(
+                    "/content/", json=_content_payload(), headers=headers,
+                )
+                assert response.status_code in (200, 201), response.text
+                created = response.json()["id"]
+            row = db.query(ContentRecordDB).filter(
+                ContentRecordDB.id == created
+            ).first()
+            assert row.brand_id == other.id, (
+                f"authorised for brand {other.id}, wrote to {row.brand_id}"
+            )
         finally:
-            db.execute(text("DELETE FROM auth_sessions WHERE user_id = :u"), {"u": user.id})
-            db.execute(text("DELETE FROM role_assignments WHERE user_id = :u"), {"u": user.id})
-            db.execute(text("DELETE FROM users WHERE id = :u"), {"u": user.id})
+            db.rollback()
+            if created:
+                db.execute(text("DELETE FROM content_records WHERE id = :i"),
+                           {"i": created})
+            db.query(BrandDB).filter(BrandDB.id == other.id).delete()
             db.commit()
+
+    def test_a_machine_still_needs_no_csrf_token(self, db):
+        """A cross-site page cannot make a browser attach an Authorization
+        header it does not know, so there is nothing for a token to defend."""
+        from app.auth.permissions import CONTENT_MANAGE, VIEW
+
+        with machine([VIEW, CONTENT_MANAGE]) as headers:
+            response = client.post(
+                "/content/", json=_content_payload(), headers=headers,
+            )
+            assert response.status_code in (200, 201), response.text
+            db.execute(text("DELETE FROM content_records WHERE id = :i"),
+                       {"i": response.json()["id"]})
+            db.commit()
+
+    def test_every_json_router_carries_the_csrf_guard(self):
+        """**The line ADR-168's Negative section names as the dangerous one.**
+
+        `enforce_csrf` was once wired onto the frontend router alone, leaving
+        the thirteen most privileged forms in the system unprotected while the
+        gate record said "CSRF on all 62 forms". A guard on eleven of twelve
+        routers fails identically and reports identically.
+        """
+        from app.auth.dependencies import enforce_api_csrf
+
+        guarded, unguarded = [], []
+        for route in app.routes:
+            path = getattr(route, "path", "")
+            methods = getattr(route, "methods", set()) or set()
+            if path.startswith("/ui") or path.startswith("/static"):
+                continue
+            if not (methods & {"POST", "PUT", "PATCH", "DELETE"}):
+                continue
+            # Read the resolved `dependant`, not `route.dependencies`: FastAPI
+            # merges router-level dependencies into the former, and the latter
+            # holds only what the route declared for itself. Asserting against
+            # the wrong one produced an empty list and a test that could never
+            # have caught the bug it is named after.
+            deps = [
+                d.call for d in route.dependant.dependencies
+                if getattr(d, "call", None)
+            ]
+            (guarded if enforce_api_csrf in deps else unguarded).append(path)
+
+        assert guarded, "no JSON write route carries the API CSRF guard at all"
+        assert not unguarded, (
+            "JSON write routes with no CSRF guard:\n  " + "\n  ".join(sorted(unguarded))
+        )
 
 
 class TestPermissionsDecideTheRest:

@@ -149,9 +149,10 @@ from app.auth.db_models import (
     BrandDB, LoginCodeDB, RoleAssignmentDB, RoleDB, RolePermissionDB, SessionDB, UserDB,
 )
 from app.auth.dependencies import (
-    ApprovalRequired, BrandNotDeclared, CsrfFailed, NotAuthenticated,
-    NotAuthorised,
-    auth_enforced, enforce_api_policy, enforce_csrf, enforce_policy,
+    AmbiguousPrincipal, ApiCsrfFailed, ApprovalRequired, BrandNotDeclared,
+    CsrfFailed, NotAuthenticated, NotAuthorised,
+    auth_enforced, enforce_api_csrf, enforce_api_policy, enforce_csrf,
+    enforce_policy,
 )
 from app.auth.router import router as auth_router
 from app.auth.service import (
@@ -386,6 +387,30 @@ def _csrf_failed(request: Request, exc: CsrfFailed):
     )
 
 
+@app.exception_handler(AmbiguousPrincipal)
+def _ambiguous_principal(request: Request, exc: AmbiguousPrincipal):
+    return JSONResponse(
+        {"detail": (
+            "This request carried both a machine credential and a session "
+            "cookie. Send one. Preferring either would make the audit trail "
+            "name a principal you cannot predict from reading the request."
+        )},
+        status_code=400,
+    )
+
+
+@app.exception_handler(ApiCsrfFailed)
+def _api_csrf_failed(request: Request, exc: ApiCsrfFailed):
+    return JSONResponse(
+        {"detail": (
+            "This request was refused because its CSRF token was missing or "
+            "stale. A session-authenticated write to the JSON API must send "
+            "the X-CSRF-Token header. A machine credential needs no token."
+        )},
+        status_code=403,
+    )
+
+
 @app.exception_handler(ApprovalRequired)
 def _approval_required(request: Request, exc: ApprovalRequired):
     """Hold the action and tell the caller where it went (ADR-142 §4).
@@ -543,22 +568,30 @@ app.include_router(
 # state-changing, including one that fires real mail and one that writes the
 # consent record a UWG §7 complaint is answered with.
 #
-# `enforce_api_policy` accepts a platform-issued integration credential and
-# **not** a session cookie. The comment that stood here previously already said
-# why — "a human session cookie would be the wrong mechanism" — and the
-# narrowing is what makes CSRF a non-question on this plane: there is no
-# ambient credential for a cross-site request to carry.
+# `enforce_api_policy` accepts **either** a platform-issued integration
+# credential or a person's session cookie (ADR-168), never both at once. The
+# narrowing that stood here from 2026-09-18 to 2026-09-19 — machine credentials
+# only — was what left the React manager client unable to authenticate at all.
 #
-# No `enforce_csrf` here, deliberately. It reads the request as a form, which
-# a JSON body is not, and it would protect against an attack this plane cannot
-# suffer.
+# **`enforce_api_csrf` is on EVERY router in this list, and that is the line to
+# be careful about.** ADR-168's own Negative section names it: `enforce_csrf`
+# was once wired onto the frontend router alone, which left the thirteen most
+# privileged forms in the system unprotected while LAUNCH-GATES recorded gate 4
+# as "CSRF on all 62 forms". A guard on eleven of twelve routers fails
+# identically and reports identically. It is one line and it is the line that
+# matters.
+#
+# It is a *header*-borne token rather than the form-borne one, because
+# `enforce_csrf` reads the request as a form — against a JSON body that yields
+# an empty FormData rather than an error, so reusing it would refuse every JSON
+# write while doing nothing at all on a bearer request.
 #
 # `POST /provider/webhooks/resend` is inside `provider_router` and is exempt by
 # policy rather than by wiring: the table maps it to PROVIDER_SIGNED and the
 # guard stands aside so the route's own Svix check runs (ADR-166 point 6). The
 # exemption is legible in `app/auth/policy.py` — where somebody auditing the
 # policy would actually look — instead of hiding here.
-_api = [Depends(enforce_api_policy)]
+_api = [Depends(enforce_api_csrf), Depends(enforce_api_policy)]
 app.include_router(content_router, dependencies=_api)
 app.include_router(campaigns_router, dependencies=_api)
 app.include_router(rendering_router, dependencies=_api)

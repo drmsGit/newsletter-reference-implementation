@@ -260,6 +260,21 @@ class ApprovalRequired(Exception):
         self.brand_id = brand_id
 
 
+class AmbiguousPrincipal(Exception):
+    """A request carried both a machine credential and a session cookie.
+
+    ADR-168 point 4: refused outright rather than silently preferring one. The
+    cost of preferring is not ambiguity in the guard — a guard can always pick —
+    it is that the audit row then names a principal nobody can predict from
+    reading the request. Refusing is the only answer that keeps "who acted"
+    derivable from what was sent.
+    """
+
+
+class ApiCsrfFailed(Exception):
+    """A cookie-authenticated JSON write arrived without a valid CSRF token."""
+
+
 class BrandNotDeclared(Exception):
     """Raised when a brand-scoped write arrives with no `X-Brand` header.
 
@@ -295,6 +310,17 @@ def _machine_credential(request: Request) -> tuple[str, str] | None:
     return key_id, secret
 
 
+def _session_brand(request: Request) -> int | None:
+    """A person's working brand, already resolved by the middleware.
+
+    Read rather than recomputed: `attach_current_user` resolves it onto
+    `request.state` for every request including these, so asking again would be
+    a second query for an answer the request is already carrying.
+    """
+    brand = getattr(request.state, "current_brand", None)
+    return brand["id"] if brand else None
+
+
 def _declared_brand(request: Request) -> int | None:
     raw = (request.headers.get(BRAND_HEADER) or "").strip()
     if not raw:
@@ -309,21 +335,27 @@ def _declared_brand(request: Request) -> int | None:
 
 
 def enforce_api_policy(request: Request, db: Session = Depends(get_db)):
-    """One guard over the JSON API — the machine plane (ADR-166).
+    """One guard over the JSON API, for **two kinds of principal** (ADR-168).
 
-    **Only machine credentials are accepted here; a session cookie is not.**
-    That is a deliberate narrowing and it buys the CSRF question outright:
-    there is no ambient credential on this plane, so a cross-site request
-    carries nothing to abuse. It also keeps `enforce_csrf` — which reads the
-    request as a form — away from JSON bodies. A developer who wants to call
-    the API issues themselves an integration key, which is attributable and
-    revocable in a way a browser session is not.
+    A machine credential first — `Authorization: Bearer <key_id>.<secret>` —
+    and failing that the `nra_session` cookie, resolved through
+    `user_for_token`. The principal that comes out is the `UserDB |
+    IntegrationDB` union `permissions_for` already dispatches on, so adding a
+    second way to say *who* changes the credential reader and nothing below it.
+    `policy.py` and `permissions_for` are untouched, which is ADR-166 point 1's
+    promise kept in fact rather than in intent.
 
-    Everything else is shared with the human path on purpose: the same policy
-    table decides which permission a route needs, and the same
-    `permissions_for` answers whether the caller holds it. ADR-166 point 1
-    refuses a parallel authorization system, and this is where that promise is
-    either kept or quietly broken.
+    **This docstring used to say the opposite, and celebrated it.** Between
+    2026-09-18 and 2026-09-19 the plane took machine credentials only, on the
+    reasoning that refusing cookies "buys the CSRF question outright" — no
+    ambient credential, nothing for a cross-site request to abuse. That was
+    true and it left the React manager client with no way to authenticate at
+    all, which ADR-168 answers. The sentence is removed rather than softened:
+    CSRF is now a control this codebase must get right and keep right, defended
+    by `enforce_api_csrf` beside this guard, and a docstring that still read as
+    reassurance would be the most expensive kind of stale comment.
+
+    **Both credentials at once is refused** (point 4), not silently resolved.
     """
     route = request.scope.get("route")
     template = getattr(route, "path", None) or request.url.path
@@ -340,14 +372,32 @@ def enforce_api_policy(request: Request, db: Session = Depends(get_db)):
         return None
 
     credential = _machine_credential(request)
-    if credential is None:
-        raise NotAuthenticated()
+    session_token = request.cookies.get(SESSION_COOKIE)
 
-    key_id, secret = credential
-    integration = authenticate(db, key_id, secret)
-    if integration is None:
-        record_auth_failure(db, key_id, request.client.host if request.client else None)
+    # ADR-168 point 4. Checked before either is resolved, so the refusal does
+    # not depend on which one happened to be valid.
+    if credential is not None and session_token:
+        logger.warning(
+            "api: refused %s %s — both a machine credential and a session "
+            "cookie were sent", request.method, template,
+        )
+        raise AmbiguousPrincipal()
+
+    principal = None
+    if credential is not None:
+        key_id, secret = credential
+        principal = authenticate(db, key_id, secret)
+        if principal is None:
+            record_auth_failure(
+                db, key_id, request.client.host if request.client else None,
+            )
+            raise NotAuthenticated()
+    elif session_token:
+        principal = user_for_token(db, session_token)
+
+    if principal is None:
         raise NotAuthenticated()
+    integration = principal  # the name the rest of this function already uses
 
     if permission == UNMAPPED:
         logger.warning(
@@ -376,22 +426,42 @@ def enforce_api_policy(request: Request, db: Session = Depends(get_db)):
     # brand's inbox — a send that looks accepted and that nobody can ever see.
     brand_id = None
     if is_brand_scoped(permission):
-        brand_id = _declared_brand(request)
+        # **Where the working brand comes from depends on the principal**, and
+        # that asymmetry is ADR-166 point 8's, not a new one: "a human's working
+        # brand comes from the brand switcher and rides in the session; a
+        # machine has no session to carry one, so it states one per request."
+        # The middleware has already resolved a person's onto `request.state`,
+        # so the SPA sends no `X-Brand` and must not be asked to.
+        brand_id = _declared_brand(request) if credential else _session_brand(request)
         if brand_id is None:
             logger.warning(
-                "api: refused %s for integration %s — %s is brand-scoped and no "
-                "%s header was sent",
-                permission, integration.id, permission, BRAND_HEADER,
+                "api: refused %s for principal %s — %s is brand-scoped and no "
+                "working brand could be resolved",
+                permission, getattr(principal, "id", None), permission,
             )
             raise BrandNotDeclared()
-        if not has_permission(db, integration, permission, brand_id=brand_id):
+        if not has_permission(db, principal, permission, brand_id=brand_id):
             raise NotAuthorised(permission)
-    elif not has_permission(db, integration, permission):
+        # **The RESOLVED brand, written back.** ADR-168's Notes: one path then
+        # serves both planes, so a router no longer has to choose between the
+        # brand the permission was checked against and the default brand it was
+        # writing to. Deriving it from the payload instead would let a request
+        # body pick the scope its own authorization was evaluated in, which is
+        # the defect ADR-166 point 8 rejects when it refuses to read the brand
+        # off the addressed resource.
+        request.state.current_brand = {"id": brand_id}
+    elif not has_permission(db, principal, permission):
         raise NotAuthorised(permission)
 
     # ADR-166 point 5. Reached only by a caller that is authenticated,
     # authorised for this action on this brand, and has said which brand.
-    if permission == SENDS_EXECUTE and not integration.may_send_unattended:
+    # Only an integration can be held for approval — a person firing a send is
+    # the approval. `may_send_unattended` does not exist on a user.
+    if (
+        credential
+        and permission == SENDS_EXECUTE
+        and not integration.may_send_unattended
+    ):
         logger.info(
             "api: holding a send for integration %s — not flagged for "
             "unattended sending", integration.id,
@@ -406,3 +476,47 @@ def enforce_api_policy(request: Request, db: Session = Depends(get_db)):
         )
 
     return integration
+
+
+API_CSRF_HEADER = "X-CSRF-Token"
+
+
+async def enforce_api_csrf(request: Request) -> None:
+    """CSRF for the JSON plane, carried in a header (ADR-168 point 2).
+
+    Compares `X-CSRF-Token` against `csrf_token_for(session_token)` with
+    `secrets.compare_digest`. No storage, no column, no new secret to rotate:
+    the token is derived from the session token rather than kept server-side,
+    and is already domain-separated from `hash_secret` so it cannot collide
+    with the session hash in `auth_sessions.token_hash`.
+
+    **Skipped when there is no session cookie**, because a bearer-authenticated
+    request carries no ambient credential — a cross-site page cannot make a
+    browser attach an `Authorization` header it does not know. And
+    `enforce_api_policy` refuses a request carrying both, so "has a cookie" and
+    "is a machine" are mutually exclusive by the time this runs.
+
+    **Why `enforce_csrf` could not be reused, in two independent ways.** It
+    calls `await request.form()`, which against a JSON body returns an empty
+    `FormData` rather than raising — so it would find no token and refuse every
+    JSON write. And it returns early when there is no session cookie, so on a
+    bearer-only request it is silently inert. A guard that refuses everything on
+    one plane and does nothing on the other is not a guard that was reused; it
+    is two bugs sharing a name.
+    """
+    if request.method not in _UNSAFE_METHODS:
+        return
+
+    session_token = request.cookies.get(SESSION_COOKIE)
+    if not session_token:
+        return
+
+    submitted = (request.headers.get(API_CSRF_HEADER) or "").strip()
+    expected = csrf_token_for(session_token)
+    if not submitted or not secrets.compare_digest(submitted, expected):
+        logger.warning(
+            "api csrf: refused %s %s — token %s",
+            request.method, request.url.path,
+            "missing" if not submitted else "mismatched",
+        )
+        raise ApiCsrfFailed()

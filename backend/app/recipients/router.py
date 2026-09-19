@@ -52,9 +52,14 @@ def create_recipient_record(
     this re-declaration resolves from FastAPI's per-request cache rather than
     authenticating a second time.
 
-    A cookie-authenticated caller cannot reach this route at all (the machine
-    plane takes no cookies), so `principal` is an integration or the guard has
-    already refused.
+    **That last sentence used to read differently and was made false by
+    ADR-168.** It said a cookie-authenticated caller could not reach this route
+    at all, because the machine plane took no cookies. It now takes them, so
+    `principal` here may be a person as well as an integration — and the check
+    is correct either way, since it asks `has_permission` rather than asking
+    what kind of principal this is. A false comment about who can reach a
+    consent-writing route is the expensive kind, which is why it is corrected
+    rather than left to age.
     """
     declared = payload.consent_status.value
     if declared and principal is not None:

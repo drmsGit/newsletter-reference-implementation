@@ -81,6 +81,33 @@ Not silently preferred one way or the other. The cost of preferring is not ambig
 
 ## Notes
 
+- **Built 2026-09-19.** All four points, plus the prerequisite this record's own
+  Notes identify as non-optional. Three things are worth recording because they
+  were decided during the build rather than in the record:
+
+  **The brand asymmetry is ADR-166 point 8's, reused rather than invented.** A
+  person's working brand comes from the session — already on `request.state`,
+  put there by middleware that runs for these routes too — and a machine states
+  one per request. The SPA therefore sends no `X-Brand` and is never asked for
+  one, which is what stops part 1 refusing every brand-scoped write with a 400.
+
+  **The guard writes the resolved brand back onto `request.state.current_brand`,**
+  as this record's Notes prescribe, so `content`, `campaigns` and `audience`
+  stop writing rows to the default brand while checking the permission against
+  a declared one. Their PROVISIONAL comments are replaced rather than amended.
+
+  **The approval gate became machine-only.** `may_send_unattended` is a column
+  on an integration and does not exist on a user, so the check is now reached
+  only by a bearer-authenticated caller — a person firing a send *is* the
+  approval, which was implicit while people could not reach this plane at all.
+
+- **The `enforce_csrf`-on-one-router shape this record warns about is now
+  asserted, not just avoided.** A test walks every JSON write route the app
+  registers and fails if one lacks `enforce_api_csrf`. Its first version read
+  `route.dependencies` and found nothing at all — FastAPI merges router-level
+  dependencies into `route.dependant`, so the test could never have caught the
+  bug it is named after. Reading the resolved dependant is what makes it real.
+
 - **This is a dated addendum to [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]], not a supersession, and the distinction is load-bearing.** What it reverses — *"The JSON API takes a machine credential and not a session cookie"* — sits in that record's build-notes section, not in its Decision. ADR-166's Decision says nothing about cookies; point 1 says a machine caller is a principal in the same access model, and explicitly does not say whether a person may use the JSON API. The narrowing was an implementation answer taken on 2026-09-18, and it is the implementation answer that changes here. **This repository has had exactly one supersession ever — [[ADR-165 — Core Scope Is Channel-Neutral Content Orchestration]] over ADR-001, on 2026-09-12 — and this is deliberately not a second.** The addendum text ADR-166 needs is reported with this record rather than applied to it.
 - **Sequencing: the open P1 in `docs/backlog.md` is a prerequisite, not a preference — part 1 does not function without it.** `enforce_api_policy` calls `_declared_brand(request)` unconditionally for a brand-scoped permission and raises `BrandNotDeclared()` when the header is absent (`backend/app/auth/dependencies.py:377-386`). A cookie-authenticated person sends no `X-Brand` — their brand is in the session — so landing part 1 alone refuses **every brand-scoped SPA write with a 400**, which is the whole campaign, content and audience surface. Verified 2026-09-19. The same P1 also has the routers checking the permission against the declared brand and then writing the row to the default brand — `brand_id=ensure_default_brand(db).id` at `backend/app/content/router.py:151`, `backend/app/campaigns/router.py:57` and `backend/app/audience/router.py:27`, each under a PROVISIONAL comment whose first clause is now false. The fix that serves both planes is to have the guard write the **resolved** brand onto `request.state.current_brand`: for a machine, the declared header after the grant check has passed; for a human, already set by the middleware. One path then serves both. Fixing it instead with an unvalidated `payload.brand_id` would let a payload choose the scope its own authorization was evaluated in, which is the defect [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]] point 8 explicitly rejects when it refuses to derive the brand from the addressed resource.
 - **Unblocked by this but deliberately not decided here:** `enforce_api_policy` setting `request.state.principal` and a derived actor type, with `record_from_request` preferring it over `current_user`. That is also what [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]] point 3's `ACTOR_INTEGRATION` needs: the constant is defined at `backend/app/audit/service.py:43` and **nothing writes it**, so no audit row in this system has ever named an integration as its actor. Note the shape changed on 2026-09-19, the same day: `backend/app/approvals/service.py` writes audit entries **from a service with an explicit actor**, departing deliberately from `audit/service.py`'s written-from-routes rule on the grounds that an expiry has no request behind it at all — which is the revisit that module's own docstring named as "the first thing to revisit" — and it adds a third actor type, `ACTOR_SYSTEM`. So the machine plane is no longer silent; it is specifically the *integration as actor* that remains unwritten.

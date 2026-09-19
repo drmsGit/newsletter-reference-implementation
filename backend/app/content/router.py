@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth.service import ensure_default_brand
@@ -38,6 +38,18 @@ from app.content.service import (
     ContentRecordHasHistoryError,
     HasRelationsError,
 )
+
+
+
+def _request_brand(request: Request, db: Session) -> int:
+    """The brand this request was authorised for (ADR-168).
+
+    `enforce_api_policy` resolves it and writes it back, so both planes arrive
+    here by one path. Falls back to the default brand only when the permission
+    was not brand-scoped and nothing set one.
+    """
+    brand = getattr(request.state, "current_brand", None)
+    return brand["id"] if brand else ensure_default_brand(db).id
 
 
 router = APIRouter(prefix="/content", tags=["content"])
@@ -135,20 +147,24 @@ def get_content_categories(content_id: int, db: Session = Depends(get_db)):
 
 @router.post("/", response_model=ContentRecord)
 def create_content_record(
+    request: Request,
     payload: ContentCreate,
     db: Session = Depends(get_db),
 ):
     # PROVISIONAL. This router is unauthenticated (main.py leaves the twelve
     # JSON routers unguarded — launch gate 3), so there is no session and no
-    # working brand to read. ADR-166 decides the real answer: one credential
-    # per brand, so the brand arrives with the caller's identity. Until that
-    # lands, a machine-created row goes to the default brand rather than this
-    # API inventing a brand argument ADR-166 will replace.
+    # working brand. **Resolved 2026-09-19 (ADR-168).** `enforce_api_policy`
+    # now writes the brand it actually checked the permission against onto
+    # `request.state.current_brand` — the declared `X-Brand` for a machine, the
+    # session's working brand for a person — so this row is written to the same
+    # brand the caller was authorised for. Writing to the default brand while
+    # checking against a declared one was the gap: it authorised a caller for
+    # brand B and then put the row in brand A.
     return create_content(
         db=db,
         title=payload.title,
         content=payload.content,
-        brand_id=ensure_default_brand(db).id,
+        brand_id=_request_brand(request, db),
         description=payload.description,
     )
 
