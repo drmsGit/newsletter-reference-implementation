@@ -11,6 +11,10 @@ commercial product. Learnings feed the separate Condor use case.
 - Queue: `docs/backlog.md` (Bugs / Features / Needs ADR)
 - Business context: `docs/business/` — brief, positioning, gates, assumptions
 - Business decisions: `docs/business/decisions/` — same shape as ADRs
+- Technology explainers: `docs/implementation/` — one file per technology,
+  pitched below the ADRs: what it is, why it was chosen, what was rejected.
+  **This tier has its own template and it is NOT an ADR** — it carries an
+  `## Alternatives Considered` section, which ADRs must never have.
 - `docs/` is an Obsidian vault; `backend/` is outside it, so code paths are
   written as inline code, never wikilinked.
 

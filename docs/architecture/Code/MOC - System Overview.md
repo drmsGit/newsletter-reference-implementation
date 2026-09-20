@@ -21,14 +21,21 @@ modified: 2026-07-27
 
 ## How the documentation is layered
 
-There are three places code is documented. Each answers a different question —
+There are four places code is documented. Each answers a different question —
 know which one to open:
 
 | Layer | Answers | Where |
 |---|---|---|
+| **Technology explainers** | "What *is* this thing, why is it here, and what was rejected instead?" | `docs/implementation/` |
 | **Module & flow pages** (this folder) | "How do the parts connect? What owns what? If I change X, what else breaks?" | `docs/architecture/Code/` (Obsidian) |
 | **Swagger / OpenAPI** | "What HTTP endpoints exist, with what request/response shape?" | Run the app → `http://localhost:8000/docs` |
 | **Docstrings & comments** | "How does *this function* work internally, and why?" | The code itself |
+
+**The first row was missing from this table until 2026-09-20**, and the tier it
+names had been unreferenced since it was written — no index, no CLAUDE.md line,
+no link from anywhere. It assumes no prior architecture knowledge, which is the
+one reader these pages do not serve: this folder's own stated audience is an
+engineer ready to take the codebase over.
 
 **Design rule that keeps this low-maintenance:** we document at the **module
 level**, not the function level. There are ~290 functions — a page per function
