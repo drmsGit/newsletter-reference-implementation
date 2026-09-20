@@ -12,7 +12,7 @@ bearing rather than cosmetic:
 
 from urllib.parse import quote
 
-from fastapi import APIRouter, Body, Depends, Form, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -456,6 +456,70 @@ class BrandSwitch(BaseModel):
     brand_id: int
 
 
+# --- typed shapes for the JSON session surface (ADR-170 point 4) ------------
+#
+# **These exist so the generated client has types at all.** Every route below
+# returned a bare dict and took `payload: dict = Body(...)`, so a client
+# generated from the schema got `object` in and `object` out for the whole
+# sign-in flow — the one surface the SPA cannot start without. Added 2026-09-20
+# before the generator was first run, because a schema is only a contract to
+# the extent it says something.
+
+
+class SessionCodeRequest(BaseModel):
+    email: str
+
+
+class SessionCodeRequested(BaseModel):
+    """Deliberately says nothing about the address. ADR-151 §2."""
+
+    status: str
+    detail: str
+
+
+class SessionVerifyRequest(BaseModel):
+    email: str
+    code: str
+
+
+class SessionUser(BaseModel):
+    id: int | None = None
+    email: str | None = None
+    display_name: str | None = None
+
+
+class SessionVerified(BaseModel):
+    status: str
+    user: SessionUser
+    csrf_token: str
+
+
+class SessionBrand(BaseModel):
+    id: int
+    key: str
+    name: str
+    #: False for a single-brand deployment, which is what lets the shell render
+    #: no switcher at all — ADR-150 point 4.
+    switchable: bool
+
+
+class BrandOption(BaseModel):
+    id: int
+    name: str
+
+
+class SessionContext(BaseModel):
+    user: SessionUser | None = None
+    brand: SessionBrand | None = None
+    brands: list[BrandOption] = []
+    #: **The only way a browser client can obtain this after a page reload.**
+    #: It is otherwise handed over exactly once, in the `/auth/session/verify`
+    #: response, so a reload or a new tab left the SPA holding a valid session
+    #: it could not write with. Empty for a bearer-authenticated caller, which
+    #: sends no cookie and needs no CSRF token.
+    csrf_token: str = ""
+
+
 session_router = APIRouter(tags=["auth"])
 
 
@@ -472,10 +536,14 @@ session_router = APIRouter(tags=["auth"])
 # difference is the shape of the answer, and where the form version leans on a
 # redirect to say nothing, these have to say nothing out loud.
 
-@session_router.post("/auth/session/request", status_code=202)
+@session_router.post(
+    "/auth/session/request",
+    status_code=202,
+    response_model=SessionCodeRequested,
+)
 def session_request(
     request: Request,
-    payload: dict = Body(...),
+    payload: SessionCodeRequest,
     db: Session = Depends(get_db),
 ):
     """Ask for a sign-in code. **One answer, always.**
@@ -493,7 +561,7 @@ def session_request(
     still calls the provider synchronously — and this route inherits it rather
     than adding a second instance of it.
     """
-    email = (payload or {}).get("email") or ""
+    email = payload.email or ""
     if login_request_allowed(
         db, email,
         client_identifier(
@@ -514,9 +582,9 @@ def session_request(
     }
 
 
-@session_router.post("/auth/session/verify")
+@session_router.post("/auth/session/verify", response_model=SessionVerified)
 def session_verify(
-    payload: dict = Body(...),
+    payload: SessionVerifyRequest,
     db: Session = Depends(get_db),
     response: Response = None,
 ):
@@ -534,8 +602,8 @@ def session_verify(
     ADR-168 point 3's same-origin requirement is what keeps viable, and
     `secure` on by default.
     """
-    email = (payload or {}).get("email") or ""
-    code = (payload or {}).get("code") or ""
+    email = payload.email or ""
+    code = payload.code or ""
 
     token = verify_login_code(db, email, code)
     if token is None:
@@ -570,9 +638,14 @@ def session_verify(
             "display_name": user.display_name if user else None,
         },
         # The SPA needs this for every subsequent write: `enforce_api_csrf`
-        # compares it against the token derived from the session. Handed over
-        # here rather than fetched separately, because the only moment it can
-        # be learned is the moment the session is created.
+        # compares it against the token derived from the session.
+        #
+        # **This is no longer the only moment it can be learned**, and the
+        # comment here said it was until 2026-09-20. `GET /auth/session`
+        # returns it too, which is what makes a page reload survivable — see
+        # ADR-168's addendum of that date. Handing it over here as well is not
+        # redundant: it saves the shell a round trip on the one load where it
+        # already knows the answer.
         "csrf_token": csrf_token_for(token),
     }
 
@@ -606,25 +679,51 @@ context_router = APIRouter(tags=["auth"])
 
 @context_router.get(
     "/auth/session",
-    summary="Who is signed in, and which brand they are working in",
+    response_model=SessionContext,
+    summary="Who is signed in, which brand they are working in, and the CSRF token",
     description=(
         "The shell's first call. Returns the signed-in user, the working "
-        "brand, and the brands they may switch to — which is exactly the "
+        "brand, the brands they may switch to — which is exactly the "
         "brands they hold a grant on, so listing them reveals nothing they "
-        "could not already discover."
+        "could not already discover — and the CSRF token for subsequent "
+        "writes."
     ),
 )
-def get_session_context(request: Request, db: Session = Depends(get_db)):
+def get_session_context(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    """**Returns the CSRF token, and that is why a reload works.**
+
+    `/auth/session/verify` hands the token over once, at the moment the session
+    is created. A browser that reloads the page, opens a second tab or restores
+    a session therefore held a valid cookie and no token, and could not perform
+    a single write — the cookie is `httponly`, so it could not derive one
+    either. This route is the shell's first call on every load, so answering
+    with the token here costs no round trip and needs no new mechanism.
+
+    This does not revisit ADR-168 point 2, which decides how the token is
+    *compared* — `X-CSRF-Token` against `csrf_token_for(session_token)` — and
+    says nothing about how a client learns it.
+
+    **Not cacheable.** The response carries a per-session secret, so a shared
+    cache holding it would hand one person's token to another.
+    """
     from app.auth.service import brands_for_user, current_brand_summary, current_user_summary
 
     token = request.cookies.get(SESSION_COOKIE)
     user = user_for_token(db, token)
+    response.headers["Cache-Control"] = "no-store"
     return {
         "user": current_user_summary(db, token),
         "brand": current_brand_summary(db, token),
         # `brands_for_user`, not every brand: a switcher offering something the
         # user cannot switch to would be a list of other people's brands.
         "brands": [{"id": b.id, "name": b.name} for b in brands_for_user(db, user)],
+        # Empty for a bearer-authenticated machine, which sends no cookie and
+        # is not subject to CSRF at all.
+        "csrf_token": csrf_token_for(token),
     }
 
 

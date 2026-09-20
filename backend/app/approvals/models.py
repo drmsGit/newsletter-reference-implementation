@@ -70,3 +70,11 @@ class DecisionResult(BaseModel):
     ok: bool
     message: str
     status: str
+
+
+class ProcessExpiredResult(BaseModel):
+    """What retiring the overdue requests did. Bookkeeping only — approving
+    refuses an expired request whatever this has or has not done."""
+
+    expired: int
+    pending_action_ids: list[int] = []

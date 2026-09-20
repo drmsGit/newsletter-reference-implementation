@@ -19,7 +19,11 @@ class RenderedVariant(BaseModel):
     role: str
     #: The document, for a channel that renders one. Empty for a push, whose
     #: artifact is a field payload — the OS does the rendering (ADR-160 pt 2).
-    html: str = ""
+    #:
+    #: Named `artifact_body` rather than `html` because rendering does not
+    #: always produce HTML — ADR-162 point 3 renamed the snapshot columns
+    #: `html_*` → `artifact_*` for exactly this reason and missed this model.
+    artifact_body: str = ""
     #: The structured payload, for a channel that has one.
     fields: dict | None = None
 
@@ -48,6 +52,6 @@ def render_variant(
         variant_id=variant_id,
         channel=variant.channel if variant else "",
         role=artifact.role,
-        html=artifact.body or "",
+        artifact_body=artifact.body or "",
         fields=artifact.fields,
     )

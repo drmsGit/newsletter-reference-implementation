@@ -54,3 +54,30 @@ class TestSendRequest(BaseModel):
     provider: str = "resend"
     variant_id: int | None = None
     recipient_id: int | None = None
+
+
+class TestSendResponse(BaseModel):
+    """What one test send did, as the API answers it.
+
+    **Named `...Response`, not `...Result`, deliberately.**
+    `delivery.service.TestSendResult` is the dataclass this mirrors, and
+    the router imports from both modules — a shared name would shadow one
+    silently. `app/rendering/router.py` carries a comment about the 500
+    that shape already caused once.
+    """
+
+    success: bool
+    to: str
+    provider: str
+    provider_message_id: str | None = None
+    message: str | None = None
+    #: Set when the chosen variant could not be rendered and a plain body went
+    #: instead. **Not an error** — the send still happened.
+    render_note: str | None = None
+
+
+class ProcessDueResult(BaseModel):
+    """What firing the due scheduled sends did."""
+
+    triggered: int
+    send_instance_ids: list[int] = []

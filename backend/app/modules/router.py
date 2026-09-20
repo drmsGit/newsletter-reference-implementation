@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from app.modules.registry import ModuleManifest, list_manifests, get_manifest
 
 
-router = APIRouter(prefix="/email-modules", tags=["email-modules"])
+router = APIRouter(prefix="/modules", tags=["modules"])
 
 
 class ModuleVariableOut(BaseModel):

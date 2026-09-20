@@ -2,6 +2,10 @@ from datetime import datetime
 from pydantic import BaseModel
 from typing import Any
 
+# Module-scope is safe: `app.ai.orchestration` imports nothing from `app`
+# at module scope, so this cannot cycle.
+from app.ai.orchestration import Outcome
+
 
 class Variant(BaseModel):
     id: int
@@ -163,3 +167,22 @@ class DecisionResolutionCreate(BaseModel):
     content_version_id: int | None = None
     reason: str | None = None
     score: float | None = None
+
+
+class SubjectSuggestionResult(BaseModel):
+    """The outcome of an AI subject/preheader suggestion (ADR-141 §3 Mode A).
+
+    `outcome` reuses `app.ai.orchestration.Outcome` rather than restating the
+    vocabulary, so the generated client cannot drift from the service that
+    produces it. The refused outcomes never reach here — they are raised as a
+    409 — but they stay in the type because the union is the service's, not
+    this route's.
+    """
+
+    outcome: Outcome
+    message: str | None = None
+    #: The persisted run. The options are read back from it; they are not
+    #: returned here, because the run row is the record.
+    ai_run_id: int | None = None
+    #: The held request, for the approval case.
+    pending_action_id: int | None = None

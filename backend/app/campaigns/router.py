@@ -5,6 +5,7 @@ from app.auth.dependencies import working_brand
 from app.database import get_db
 from app.campaigns.models import (
     Campaign,
+    SubjectSuggestionResult,
     CampaignCreate,
     CampaignWithVariants,
     Variant,
@@ -191,6 +192,7 @@ def move_variant_module(
 
 @router.post(
     "/variants/{variant_id}/suggest-subject",
+    response_model=SubjectSuggestionResult,
     summary="Ask the model for subject/preheader options",
     description=(
         "Runs ADR-141 §3's Mode A task. Nothing is written to the variant — AI "

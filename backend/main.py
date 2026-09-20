@@ -127,7 +127,7 @@ from app.providers.db_models import ProviderEventQuarantineDB
 from app.ai.db_models import AIPromptDB, AIRunDB
 from app.providers.router import router as provider_router
 
-from app.modules.router import router as email_modules_router
+from app.modules.router import router as modules_router
 from app.approvals.router import router as approvals_router
 from app.auth.router import context_router
 
@@ -185,7 +185,7 @@ end-to-end flows, and the internal service functions, see the Obsidian docs in
 live in the code's docstrings.
 
 Endpoints are grouped by module, following the data flow: **sources** (content,
-recipients) → **compose** (campaigns, email-modules) → **personalize** (decision,
+recipients) → **compose** (campaigns, modules) → **personalize** (decision,
 overrides) → **audience** → **render** (rendering, snapshots) → **deliver**
 (delivery, provider) → **learn** (insight). The **frontend** section at the end is
 the server-rendered HTML admin UI (post/redirect/get), not a JSON API — it is
@@ -198,7 +198,7 @@ TAGS_METADATA = [
     {"name": "content", "description": "Content catalog: reusable records, the category taxonomy, and content versions. Source of truth for *what can be said*."},
     {"name": "recipients", "description": "Local projection of CRM contacts + marketing consent + the signal-contribution log. Not a CRM."},
     {"name": "campaigns", "description": "Composition: campaigns, variants, module instances, decision slots, and the decision-resolution audit. Structure, not content."},
-    {"name": "email-modules", "description": "The file-based email-module template registry (drop-a-file plugins). Read-only over `storage/modules/<channel>/`."},
+    {"name": "modules", "description": "The file-based module template registry (drop-a-file plugins). Read-only over `storage/modules/<channel>/`. Serves every channel — it takes a `channel` parameter that merely defaults to email."},
     {"name": "decision", "description": "The personalization engine: resolve a decision slot to content via pluggable strategies."},
     {"name": "overrides", "description": "Manager field-level edits on a module, logged against the system's original pick (trust loop)."},
     {"name": "audience", "description": "Audience groups from live rule blocks + manual pins, resolved consent-gated. (Prefix `/api/audience-groups`.)"},
@@ -636,7 +636,7 @@ app.include_router(insight_router, dependencies=_api)
 app.include_router(decision_router, dependencies=_api)
 app.include_router(recipients_router, dependencies=_api)
 app.include_router(provider_router, dependencies=_api)
-app.include_router(email_modules_router, dependencies=_api)
+app.include_router(modules_router, dependencies=_api)
 app.include_router(overrides_router, dependencies=_api)
 app.include_router(audience_router, dependencies=_api)
 # **Thirteenth, and the only one with a route a machine may not reach.**

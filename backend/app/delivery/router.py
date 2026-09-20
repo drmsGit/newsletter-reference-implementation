@@ -6,6 +6,8 @@ from app.auth.dependencies import working_brand
 from app.database import get_db
 from app.delivery.models import (
     TestSendRequest,
+    TestSendResponse,
+    ProcessDueResult,
     DeliveryExecution,
     DeliveryExecutionCreate,
     SendInstance,
@@ -162,6 +164,7 @@ def send_instance(
 
 @router.post(
     "/send-test",
+    response_model=TestSendResponse,
     summary="Send one real test email",
     description=(
         "Renders the chosen variant through the email path and mails it to one "
@@ -200,7 +203,7 @@ def send_test(
     }
 
 
-@router.post("/process-due")
+@router.post("/process-due", response_model=ProcessDueResult)
 def process_due(db: Session = Depends(get_db)):
     """Fire every scheduled send whose time has arrived.
 

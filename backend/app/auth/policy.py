@@ -340,7 +340,7 @@ BRAND_OWNED: dict[str, str] = {
         "point 1 separated from authorisation. A route that sets the context "
         "cannot itself be scoped by it."
     ),
-    "/email-modules": (
+    "/modules": (
         "no — module manifests read from disk. They describe what the "
         "deployment can compose, which is the same for every brand."
     ),

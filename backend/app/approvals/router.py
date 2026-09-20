@@ -23,7 +23,7 @@ from app.approvals import service as approvals
 from app.approvals.actions.registry import get_action, get_action_module
 from app.approvals.models import (
     DecisionRequest, DecisionResult, DescriptionRow, PendingActionDetail,
-    PendingActionRow,
+    PendingActionRow, ProcessExpiredResult,
 )
 from app.audit.service import ACTOR_USER, events_for_subject
 from app.auth.dependencies import require_person, working_brand
@@ -239,6 +239,7 @@ def reject(
 
 @router.post(
     "/process-expired",
+    response_model=ProcessExpiredResult,
     summary="Retire every request past its deadline",
     description=(
         "The cron seam, for the same reason `/delivery/process-due` has one: a "
