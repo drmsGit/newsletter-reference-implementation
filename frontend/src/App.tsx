@@ -1,5 +1,12 @@
 import { Route, Routes } from 'react-router'
 
+import ApprovalDetail from './screens/ApprovalDetail'
+import Approvals from './screens/Approvals'
+import AudienceDetail from './screens/AudienceDetail'
+import Audiences from './screens/Audiences'
+import Campaigns from './screens/Campaigns'
+import Content from './screens/Content'
+import ContentDetail from './screens/ContentDetail'
 import RequireSession from './routes/RequireSession'
 import SignIn from './screens/SignIn'
 import Shell from './shell/Shell'
@@ -23,17 +30,30 @@ export default function App() {
           </RequireSession>
         }
       >
-        <Route path="/" element={<Home />} />
+        {/*
+          The approval inbox is the home screen. ADR-169 put it close to one,
+          and it is the screen that answers "is anything waiting for me" --
+          which is what a manager opens this client to find out.
+        */}
+        <Route path="/" element={<Approvals />} />
+        <Route path="/approvals" element={<Approvals />} />
+        <Route path="/approvals/:id" element={<ApprovalDetail />} />
+        <Route path="/campaigns" element={<Campaigns />} />
+        <Route path="/content" element={<Content />} />
+        <Route path="/content/:id" element={<ContentDetail />} />
+        <Route path="/audiences" element={<Audiences />} />
+        <Route path="/audiences/:id" element={<AudienceDetail />} />
+        <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
   )
 }
 
-function Home() {
+function NotFound() {
   return (
     <>
-      <h1>Signed in</h1>
-      <p>The core loop screens land in Phase 2.</p>
+      <h1>Not found</h1>
+      <p>That screen does not exist in this client yet.</p>
     </>
   )
 }

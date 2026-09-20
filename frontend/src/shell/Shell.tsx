@@ -5,6 +5,7 @@ import { Navigate, Outlet, useNavigate } from 'react-router'
 import { useSession, useSignOut } from '../api/session'
 import { PRODUCT_NAME } from '../branding'
 import BrandSwitcher from './BrandSwitcher'
+import Nav from './Nav'
 
 /**
  * The frame every signed-in screen sits inside.
@@ -55,6 +56,7 @@ export default function Shell() {
           Sign out
         </Button>
       </header>
+      <Nav />
       <main className="shell__main">
         <Outlet />
       </main>

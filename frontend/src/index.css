@@ -157,3 +157,84 @@ input[data-focus-visible] {
 .shell__main {
   padding: calc(var(--brand-space) * 3);
 }
+
+/* --- navigation and lists ------------------------------------------------- */
+
+.nav {
+  border-bottom: 1px solid var(--brand-line);
+  padding: 0 calc(var(--brand-space) * 2);
+}
+
+.nav ul {
+  display: flex;
+  gap: calc(var(--brand-space) * 2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.nav a {
+  display: inline-block;
+  padding: var(--brand-space) 0;
+  color: var(--brand-muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+}
+
+/* React Router sets aria-current on the active link; style the real state
+   rather than a class we would have to keep in step with it. */
+.nav a[aria-current='page'] {
+  color: var(--brand-fg);
+  border-bottom-color: var(--brand-accent);
+}
+
+.react-aria-Table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: calc(var(--brand-space) * 2);
+}
+
+.react-aria-Table th,
+.react-aria-Table td {
+  text-align: left;
+  padding: var(--brand-space);
+  border-bottom: 1px solid var(--brand-line);
+}
+
+.react-aria-Table th {
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--brand-muted);
+}
+
+.react-aria-Row[data-hovered] {
+  background: color-mix(in srgb, var(--brand-accent) 6%, transparent);
+  cursor: pointer;
+}
+
+.react-aria-Row[data-focus-visible] {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: -2px;
+}
+
+.muted {
+  color: var(--brand-muted);
+}
+
+/* A label/value grid. `display: contents` on the wrapper lets a mapped pair
+   participate in the parent grid instead of forming a row of its own. */
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: calc(var(--brand-space) / 2) calc(var(--brand-space) * 2);
+  margin: calc(var(--brand-space) * 2) 0;
+}
+
+.facts dt {
+  color: var(--brand-muted);
+}
+
+.facts dd {
+  margin: 0;
+}
