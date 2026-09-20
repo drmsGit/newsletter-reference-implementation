@@ -1,6 +1,6 @@
 ---
 type: adr
-status: proposed
+status: accepted
 topic:
   - architecture
   - frontend
@@ -15,7 +15,7 @@ depends_on:
 ---
 
 ## Status
-Proposed
+Accepted
 
 ## Context
 
@@ -75,7 +75,9 @@ That record already places compilation in the frontend layer and keeps the Pytho
 - **This ADR records a decision rather than making one.** The reasoning is BETA-SCOPE §5's, taken 2026-08-22 and confirmed with the user the same day; what is added here is the ADR-168 argument, the repository layout, and the routing choice BETA-SCOPE left as "React + Vite, **or** React Router in SPA mode". React Router's framework mode was the live alternative and would also have produced a static bundle — it was set aside for conventions rather than capability.
 - **Deliberately not decided:** which generator produces the typed client, the styling approach, and the test tooling. All three are scaffold-time choices that a record made before the scaffold would be guessing at, and none of them is hard to change later.
 - **The brand/theming split is already decided elsewhere** and this record does not touch it: email keeps a full plain-CSS `brand.css` owned by designers, while the management UI gets a small palette of colours, fonts, sizes and logos applied through CSS custom properties. That is a `docs/backlog.md` item scoped for the final MVP package, and it constrains the styling choice above.
-- **Open, and worth knowing before the first screen:** three items logged on 2026-09-19 sit in the layer this client leans on hardest — `brand_id` defaulting to every brand on three list functions, the session resolving four or five times per request with a write each time, and machine reads falling through to a platform-level `view`. The second one matters most here: a Jinja page is one request and a React screen is five to fifteen.
+- **Open before the first screen — updated at acceptance, 2026-09-20.** Three items in the layer this client leans on hardest were logged on 2026-09-19. **Two are closed.** `brand_id` defaulting to every brand, and machine reads falling through to a platform-level `view`, both went with [[ADR-172 — The Working Brand Is Resolved Once and Carried Into Every Query]]: the working brand is now resolved for every request, `brand_id` is a required argument on every brand-owned service function, and a declared brand the caller holds no grant on is refused explicitly.
+
+  **One remains, and it is the one this record said matters most.** Every page view still runs four or five `SELECT`+`UPDATE`+`COMMIT` cycles against the same `auth_sessions` row, because `user_for_token` writes `last_seen_at` and commits on every call and five call sites reach it. A Jinja page is one request; a React screen is five to fifteen, and this is write amplification rather than read — a user with several tabs open already serialises on that row's lock. The property being paid for is real and must survive any fix: the session's `brand_id` is a cache revalidated against the grant table on every resolution, which is what makes a revoked grant stop working immediately. Logged in `docs/backlog.md`; **not a blocker for scaffolding the client, and a blocker for judging it under load.**
 
 ## Related ADRs
 
