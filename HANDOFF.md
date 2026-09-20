@@ -1,6 +1,21 @@
 # HANDOFF — Newsletter Blueprint
 
-**Last updated:** 2026-09-15 · **Branch:** `main` · **Brand scoping step 1 built; five security ADRs accepted**
+**Last updated:** 2026-09-20 · **Branch:** `main` · **Backend phase complete — the SPA is buildable**
+
+> **If you are starting the React client, do not use the paste block below.**
+> Use `docs/react-session-brief.md`, which is written for that session and
+> deliberately tells it *not* to read the Jinja router. This file remains the
+> general backend handoff, and the sections under it are accurate as history
+> but predate the 2026-09-19/20 work summarised here:
+>
+> - **ADR-172** written, accepted and built across seven stages — the JSON
+>   plane now has a brand boundary in both directions.
+> - Both P1s from the external code review closed and mutation-verified.
+> - Every backend rule that lived only in `app/frontend/router.py` moved behind
+>   the service boundary (`docs/react-migration-inventory.md` has the ledger).
+> - ADR-150 amended; ADR-170 and ADR-171 accepted; the `artifact_*` rename done
+>   before the typed client rather than after.
+> - **567 → 635 tests.**
 
 The account migration this file was originally written for (2026-09-04) is
 **done** — sessions now run on the business account, and nothing is left
