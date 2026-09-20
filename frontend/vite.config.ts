@@ -45,7 +45,23 @@ const API_PREFIXES = [
   '/ui',
 ]
 
+/**
+ * The path the client is served from.
+ *
+ * FastAPI mounts the built client under `/app` because the Jinja UI still owns
+ * `/` (see `backend/main.py`). Vite has to know, or the built index would ask
+ * for `/assets/...` when the files are actually at `/app/assets/...`.
+ *
+ * The dev server honours it too, so development and production have the same
+ * shape of URL: http://localhost:5173/app/ rather than http://localhost:5173/.
+ *
+ * **When `backend/app/frontend/router.py` is deleted, this becomes '/'** -- here,
+ * in `main.tsx`'s router basename, and in `SPA_MOUNT` in `backend/main.py`.
+ */
+const BASE = '/app/'
+
 export default defineConfig({
+  base: BASE,
   plugins: [react()],
   test: {
     // A browser-like DOM in Node. React Testing Library renders into it, so

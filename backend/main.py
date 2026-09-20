@@ -4,8 +4,9 @@ import re
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import Depends, FastAPI, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 logging.basicConfig(level=logging.INFO)
@@ -649,6 +650,70 @@ app.include_router(approvals_router, dependencies=_api)
 # because you cannot require a session in order to obtain one. These read and
 # change a session that already exists.
 app.include_router(context_router, dependencies=_api)
+
+
+# --- the manager client (ADR-170 point 1, ADR-168 point 3) ------------------
+#
+# **This is what makes same-origin true in production rather than aspirational.**
+# ADR-168 point 3 states that FastAPI serves the built SPA, which is what keeps
+# the session cookie at `samesite="lax"` and `CORSMiddleware` out of this file.
+# Vite proxies to this app in development; here the app serves Vite's output, so
+# the browser sees one origin in both cases.
+#
+# **Mounted under `/app`, not `/`, because the Jinja UI still owns the front
+# door.** `frontend/router.py` registers a `dashboard` route at `/` and is
+# registered first, so it wins whatever is written here -- taking `/` would mean
+# moving the existing product's home page before the SPA has screens to replace
+# it with. `/app` lets both run untouched, and the day `frontend/router.py` is
+# deleted this prefix goes with it.
+#
+# Scoping under one prefix also removes a problem the root-level version had:
+# a catch-all at `/` has to refuse every path the API owns, or an unknown API
+# route quietly answers with HTML to a caller parsing JSON. Under `/app` that
+# collision cannot arise.
+SPA_MOUNT = "/app"
+SPA_DIR = Path(__file__).parent.parent / "frontend" / "dist"
+SPA_INDEX = SPA_DIR / "index.html"
+
+if SPA_INDEX.exists():
+    app.mount(
+        f"{SPA_MOUNT}/assets",
+        StaticFiles(directory=SPA_DIR / "assets"),
+        name="spa-assets",
+    )
+
+
+def _spa_index() -> FileResponse:
+    """The built SPA's entry document.
+
+    **A backend-only checkout must keep working.** `frontend/dist` is generated
+    and not committed, so its absence is the ordinary state of a fresh clone,
+    and somebody who has never run `npm install` should get a clear 404 here
+    rather than a 500 about a missing directory.
+    """
+    if not SPA_INDEX.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="The manager client is not built. Run `npm install && npm run build` in frontend/.",
+        )
+    return FileResponse(SPA_INDEX)
+
+
+@app.get(SPA_MOUNT, include_in_schema=False)
+def spa_root():
+    return _spa_index()
+
+
+@app.get(SPA_MOUNT + "/{spa_path:path}", include_in_schema=False)
+def spa_fallback(spa_path: str):
+    """Serve the SPA's own index for a client-side route.
+
+    The SPA owns paths like `/app/sign-in` that exist only in the browser.
+    Reloading one sends the browser here, and answering with the index lets
+    React Router resolve it -- without this, a reload on any screen but the
+    first is a 404.
+    """
+    return _spa_index()
 
 
 @app.get("/")

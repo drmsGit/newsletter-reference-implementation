@@ -33,7 +33,13 @@ if (!root) throw new Error('index.html is missing #root')
 createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      {/*
+        `basename` keeps the route table free of the mount path: App.tsx says
+        '/sign-in' and the browser shows '/app/sign-in'. Moving the client is
+        then this one string plus Vite's `base` and the backend's SPA_MOUNT,
+        rather than an edit to every route.
+      */}
+      <BrowserRouter basename="/app">
         <App />
       </BrowserRouter>
     </QueryClientProvider>
