@@ -96,12 +96,21 @@ BRAND_SCOPED: frozenset[str] = frozenset({
     AUDIENCES_PIN,
     SENDS_PLAN,
     OVERRIDES_MANAGE,
+    # Moved here 2026-09-20 (ADR-150's addendum of that date). It was filed
+    # platform-level because "recipients carry no brand" — true, and not the
+    # question. The rows this permission guards are **consent events**, and
+    # `consent_events.brand_id` became NOT NULL the same day the rule was
+    # written. Eight and eight, not seven and nine.
+    RECIPIENTS_CONSENT,
 })
 
 # Platform-level by omission, and each for a reason from ADR-150 point 5:
 # recipients carry no brand (point 9) and neither do signal contributions
-# (point 8), so `recipients.manage`, `recipients.consent` and `insight.write`
-# have no brand to be checked against. `integrations.manage` joins
+# (point 8), so `recipients.manage` and `insight.write` have no brand to be
+# checked against. **`recipients.consent` used to be on this list and is not
+# any more** — it guards consent events rather than recipients, and those have
+# carried a brand since ADR-163's 2026-09-15 addendum. The justification was
+# correct about recipients and wrong about which rows the permission guards. `integrations.manage` joins
 # `users.manage` for the same reason that one is platform-level — scoping the
 # power to mint credentials per brand would be theatre, since a holder could
 # mint a credential granted on any brand they can already reach.

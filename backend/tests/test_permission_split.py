@@ -52,11 +52,19 @@ class TestTheVocabularyIsComplete:
         assert len(ALL_PERMISSIONS) == 16, sorted(ALL_PERMISSIONS)
 
     def test_every_key_is_classified_exactly_once(self):
-        """ADR-150 point 5 lists 7 brand-scoped and 9 platform-level.
+        """**Eight brand-scoped and eight platform-level** since 2026-09-20.
 
         Asserted as a partition of the vocabulary rather than as two lists, so
         adding a key without classifying it fails here instead of silently
         answering "platform-level" — which is the permissive answer.
+
+        ADR-150 point 5 shipped 7 and 9, and its 2026-09-20 addendum moves
+        `recipients.consent` across. The rule never changed — "a permission is
+        brand-scoped if the rows it guards carry a `brand_id`" — but the rows
+        this one guards are **consent events**, not recipients, and those
+        gained a NOT NULL brand the same day the rule was written. This test
+        going red was the correct behaviour, and updating it is the edit the
+        addendum exists to justify.
         """
         brand_scoped = {k for k in ALL_PERMISSIONS if is_brand_scoped(k)}
         platform = set(ALL_PERMISSIONS) - brand_scoped
@@ -64,8 +72,14 @@ class TestTheVocabularyIsComplete:
         assert brand_scoped == {
             "content.manage", "campaigns.manage", "audiences.manage",
             "audiences.pin", "sends.plan", "sends.execute", "overrides.manage",
+            "recipients.consent",
         }
-        assert len(platform) == 9
+        assert "recipients.manage" in platform, (
+            "recipients themselves carry no brand (ADR-150 point 9) — only "
+            "their consent does. Moving this one too would be the overreach "
+            "the addendum was careful not to make."
+        )
+        assert len(platform) == 8
         assert brand_scoped | platform == set(ALL_PERMISSIONS)
 
     def test_brand_scoped_contains_nothing_unknown(self):

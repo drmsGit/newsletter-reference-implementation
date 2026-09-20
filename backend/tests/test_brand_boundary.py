@@ -25,9 +25,11 @@ from fastapi.testclient import TestClient
 
 from app.auth.permissions import (
     AUDIENCES_MANAGE, AUDIENCES_PIN, CAMPAIGNS_MANAGE, CONTENT_MANAGE,
-    SENDS_EXECUTE, VIEW,
+    RECIPIENTS_CONSENT, RECIPIENTS_MANAGE, SENDS_EXECUTE, VIEW,
 )
+from app.auth.service import ensure_default_brand
 from main import app
+from tests.machine import machine
 
 client = TestClient(app, raise_server_exceptions=False)
 
@@ -749,3 +751,175 @@ def test_the_partial_routers_say_what_the_exception_is():
                 f"{prefix} is classified 'partial' with no explanation of "
                 "which part. That is the only thing a reader needs from it."
             )
+
+
+# --- consent, 2026-09-20 ----------------------------------------------------
+
+class TestAConsentRecordLandsOnTheBrandItWasAuthorisedFor:
+    """ADR-150's 2026-09-20 addendum.
+
+    `recipients.consent` guards `consent_events`, which have carried a brand
+    since ADR-163's addendum — so it is brand-scoped by ADR-150's own rule, and
+    was filed platform-level on a justification about recipients that was true
+    and about the wrong table.
+
+    A consent record is the row ADR-142 §7 names as the answer to a UWG §7
+    complaint, so "somebody wrote it to a brand nobody checked" is the
+    expensive version of this bug.
+    """
+
+    def _external_id(self):
+        from app.database import SessionLocal
+        from app.recipients.db_models import RecipientDB
+
+        db = SessionLocal()
+        try:
+            return db.query(RecipientDB).order_by(RecipientDB.id).first().external_id
+        finally:
+            db.close()
+
+    def _payload(self, brand_id):
+        return {
+            "consent_status": "opted_in",
+            "brand_id": brand_id,
+            "source": "boundary-test",
+        }
+
+    def test_the_body_and_the_header_must_agree(self, foreign_brand):
+        """The sharp one: both are present, and they disagree.
+
+        A caller legitimately authorised on its own brand asserts consent for
+        another. Reading the body would write a record nobody checked; reading
+        the header would silently overwrite what the CRM actually said. Neither
+        is acceptable, so it refuses.
+        """
+        from app.database import SessionLocal
+        from app.recipients.db_models import ConsentEventDB
+
+        external_id = self._external_id()
+        db = SessionLocal()
+        try:
+            before = db.query(ConsentEventDB).filter(
+                ConsentEventDB.source == "boundary-test").count()
+
+            with machine([VIEW, RECIPIENTS_CONSENT], brand_id=foreign_brand.id) as headers:
+                response = client.post(
+                    f"/recipients/{external_id}/consent",
+                    json=self._payload(ensure_default_brand(db).id),
+                    headers=headers,
+                )
+                assert response.status_code == 409, response.text
+
+            assert db.query(ConsentEventDB).filter(
+                ConsentEventDB.source == "boundary-test"
+            ).count() == before, "a consent event was written despite the refusal"
+        finally:
+            db.close()
+
+    def test_asserting_for_a_brand_the_caller_holds_nothing_on_is_refused(self):
+        """The permission check, now that it has a brand to check against.
+
+        The caller declares the brand it is asserting for — so body and header
+        agree — but holds no grant there. Before 2026-09-20 this was admitted,
+        because a platform-level permission is checked without a brand at all.
+        """
+        from app.database import SessionLocal
+
+        external_id = self._external_id()
+        db = SessionLocal()
+        try:
+            default = ensure_default_brand(db).id
+        finally:
+            db.close()
+
+        with machine([VIEW, RECIPIENTS_CONSENT], brand_id=default) as headers:
+            headers["X-Brand"] = "999999"
+            response = client.post(
+                f"/recipients/{external_id}/consent",
+                json=self._payload(999999), headers=headers,
+            )
+            assert response.status_code == 403, response.text
+
+    def test_holding_the_permission_on_another_brand_is_not_holding_it_here(
+        self, foreign_brand
+    ):
+        """**The only test that proves the reclassification.**
+
+        Written after the obvious two failed to: reverting
+        `recipients.consent` to platform-level left both of them green, because
+        ADR-172 point 2 already refuses a declared brand the caller holds
+        *nothing* on, and the missing-header 400 comes from the dependency. Two
+        guards each refusing independently, so neither test could see the one
+        under examination — the masking pattern this repo keeps finding.
+
+        This caller holds `view` on the brand it declares, so point 2 is
+        satisfied and stays out of the way. It holds `recipients.consent` only
+        on a *different* brand. Platform-level, that is enough — the permission
+        is checked with no brand at all and it does hold the key somewhere.
+        Brand-scoped, it is not.
+        """
+        from app.auth import integrations as ints
+        from app.auth.db_models import IntegrationCredentialDB, IntegrationDB
+        from app.database import SessionLocal
+        from app.recipients.db_models import ConsentEventDB
+
+        external_id = self._external_id()
+        db = SessionLocal()
+        try:
+            default = ensure_default_brand(db).id
+            before = db.query(ConsentEventDB).filter(
+                ConsentEventDB.source == "boundary-test").count()
+
+            with machine([VIEW], brand_id=foreign_brand.id) as headers:
+                key_id = headers["Authorization"].split()[1].split(".")[0]
+                integration = db.query(IntegrationDB).join(
+                    IntegrationCredentialDB,
+                    IntegrationCredentialDB.integration_id == IntegrationDB.id,
+                ).filter(IntegrationCredentialDB.key_id == key_id).first()
+                # The permission, but on the brand it is NOT declaring.
+                ints.grant(db, integration.id, RECIPIENTS_CONSENT, default)
+
+                response = client.post(
+                    f"/recipients/{external_id}/consent",
+                    json=self._payload(foreign_brand.id), headers=headers,
+                )
+                assert response.status_code == 403, response.text
+
+            assert db.query(ConsentEventDB).filter(
+                ConsentEventDB.source == "boundary-test"
+            ).count() == before
+        finally:
+            db.close()
+
+    def test_no_declared_brand_is_refused_rather_than_defaulted(self):
+        from app.database import SessionLocal
+
+        external_id = self._external_id()
+        db = SessionLocal()
+        try:
+            default = ensure_default_brand(db).id
+        finally:
+            db.close()
+
+        with machine([VIEW, RECIPIENTS_CONSENT], brand_id=default) as headers:
+            headers.pop("X-Brand")
+            response = client.post(
+                f"/recipients/{external_id}/consent",
+                json=self._payload(default), headers=headers,
+            )
+            assert response.status_code == 400, response.text
+            assert "X-Brand" in response.json()["detail"]
+
+
+def test_listing_recipients_returns_rather_than_raising():
+    """`GET /recipients/` raised `TypeError` for as long as consent had a brand.
+
+    `list_recipients` passed two arguments to a three-argument
+    `to_recipients`. No test called the route, so a route that could not return
+    looked fine — it was found by an unrelated test reaching for a
+    platform-level route to assert something else against.
+    """
+    with machine([VIEW, RECIPIENTS_MANAGE]) as headers:
+        response = client.get("/recipients/", headers=headers)
+        assert response.status_code == 200, response.text
+        assert isinstance(response.json(), list)

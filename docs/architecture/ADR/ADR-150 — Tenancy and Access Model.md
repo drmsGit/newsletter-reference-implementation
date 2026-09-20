@@ -204,6 +204,76 @@ It was posed as "does a person have different affinities per brand". The answer 
 **Parked, named, and out of scope:** seeing **how subscribers who unsubscribed behaved** — whether particular categories drove them away. The want is real and is recorded here so it is not lost, but it belongs to an analytics scope not yet discussed (report building), not to the brand filter decided above.
 
 
+## Addendum 2026-09-20 — `recipients.consent` moves to brand-scoped
+
+**The 2026-09-15 addendum's own rule decides this, and the list it shipped with
+got it wrong.** That rule reads: *"A permission is **brand-scoped** if the rows
+it guards carry a `brand_id`."* `recipients.consent` was filed platform-level on
+the stated grounds that *"recipients carry no brand (point 9) and neither do
+signal contributions (point 8), so `recipients.manage`, `recipients.consent` and
+`insight.write` have no brand to be checked against."*
+
+That was true when it was written. It stopped being true when
+`consent_events.brand_id` became NOT NULL under [[ADR-163 — Per-Channel Consent
+and Addressability]]'s own 2026-09-15 addendum — the same day. The rows this
+permission guards are consent events, not recipients, and consent events have
+carried a brand ever since.
+
+**The lists are therefore 8 and 8**, not 7 and 9. `recipients.consent` joins the
+brand-scoped set; `recipients.manage` and `insight.write` stay platform-level,
+and their justification is unchanged and still correct — recipients and signal
+contributions genuinely carry no brand.
+
+### What was actually wrong
+
+`policy.py` maps `POST /recipients/{external_id}/consent` to
+`recipients.consent`; `_permitted` took the non-scoped branch; and the route
+read the brand it wrote from **`ConsentSyncRequest.brand_id`, a field in the
+request body**. So a principal granted `recipients.consent` on brand A could
+write brand B's consent record — and the compliance record is the one
+[[ADR-142 — Autonomous Workflows and the Automation Boundary]] §7 names as the
+answer to a UWG §7 complaint.
+
+It is also the shape [[ADR-166 — Inbound Machine Callers Are Authenticated
+Principals]] point 8 refuses by name: *"that would let a payload choose the
+scope against which its own authorization is checked."*
+
+### The decision
+
+**The declared brand authorises; the body's `brand_id` must agree with it.**
+
+Both halves matter, and they answer different questions. `X-Brand` (or the
+session's working brand) says *which brand this caller may act in*, and the
+grant is checked against it exactly as for every other brand-scoped write. The
+body field says *which brand the CRM is asserting about*, which is ADR-120's
+point and the reason `ConsentSyncRequest`'s docstring gives for requiring it:
+"an assertion that does not say which brand is not an assertion about consent".
+
+A mismatch is refused loudly rather than resolved in either direction. The
+payload never chooses the scope; it only has to match it. Keeping both fields is
+redundancy on purpose — the redundancy is what makes a disagreement visible
+instead of silently picking a winner.
+
+### Consequences
+
+- **`X-Brand` becomes required on this route**, and an existing integration that
+  omits it starts receiving a 400 until it is updated. That is a breaking change
+  to a documented contract, taken deliberately: the alternative is a consent
+  record written to a brand nobody checked.
+- **`GET /recipients/` requires a working brand too**, and this is a consequence
+  rather than a second decision. Consent is per-brand, so a recipient's consent
+  status is not a fact until a brand is named — `to_recipients` has required a
+  `brand_id` since the 2026-09-15 work. Note the split
+  [[ADR-172 — The Working Brand Is Resolved Once and Carried Into Every Query]]
+  point 1 makes available here: the route needs a brand as **context** to
+  project consent, while `recipients.manage` stays platform-level as
+  **authorisation**. The two are no longer the same question.
+- **This also fixes a route that could not return.** `list_recipients` called
+  `to_recipients(db, records)` with two arguments where three were required, so
+  `GET /recipients/` has been raising `TypeError` for as long as consent carried
+  a brand. Nothing in the repo called it, which is why a route that cannot
+  return has looked fine.
+
 ## Related ADRs
 
 ### Depends On

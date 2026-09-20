@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import enforce_api_policy
 from app.auth.permissions import RECIPIENTS_CONSENT
 from app.auth.service import has_permission
+from app.auth.dependencies import working_brand
 from app.database import get_db
 from app.recipients.models import (
     ConsentDriftItem,
@@ -89,8 +90,14 @@ def create_recipient_record(
 
 
 @router.get("/", response_model=list[Recipient])
-def get_recipients(db: Session = Depends(get_db)):
-    return list_recipients(db)
+def get_recipients(
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    # A brand as CONTEXT, not authorisation: `recipients.manage` stays
+    # platform-level because recipients carry no brand, but their consent does,
+    # so projecting it needs one named (ADR-150's 2026-09-20 addendum).
+    return list_recipients(db, brand_id=brand_id)
 
 
 # --- Consent (CRM-synced) -------------------------------------------------
@@ -119,8 +126,34 @@ def sync_recipient_consent(
     external_id: str,
     payload: ConsentSyncRequest,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
-    """Apply a CRM consent assertion to the local projection and log it."""
+    """Apply a CRM consent assertion to the local projection and log it.
+
+    **Two brands arrive here and they answer different questions.** The
+    declared brand — `X-Brand`, or a person's working brand — says which brand
+    this caller may act in, and `recipients.consent` is checked against it like
+    any other brand-scoped write since ADR-150's 2026-09-20 addendum. The
+    body's `brand_id` says which brand the CRM is asserting about, which is
+    ADR-120's point and why that field is required and undefaulted.
+
+    **They must agree, and a disagreement is refused rather than resolved.**
+    Picking either one silently is how a consent record lands on a brand nobody
+    checked — reading the body would be the payload choosing the scope its own
+    authorisation was evaluated against, which ADR-166 point 8 refuses by name;
+    reading the header would quietly overwrite what the CRM actually asserted.
+    Keeping both is redundancy on purpose: it is what makes the disagreement
+    visible.
+    """
+    if payload.brand_id != brand_id:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"This request declares brand {brand_id} and asserts consent "
+                f"for brand {payload.brand_id}. Refusing rather than choosing "
+                "one: a consent record is a compliance record."
+            ),
+        )
     try:
         return sync_consent_from_crm(
             db=db,
