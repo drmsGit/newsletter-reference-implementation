@@ -259,3 +259,84 @@ class TestSigningOut:
         assert auth.user_for_token(db, token) is not None, (
             "a CSRF-less sign-out revoked the session anyway"
         )
+
+
+class TestTheTokenSurvivesAReload:
+    """**The blocker nobody had written down.**
+
+    `/auth/session/verify` hands the CSRF token over exactly once, at the moment
+    the session is created. Everything else about the session is in an
+    `httponly` cookie the SPA cannot read, so a browser that reloaded the page,
+    opened a second tab or restored a session held a valid session and no token
+    — and could not perform a single write until it signed out and back in.
+
+    Found 2026-09-20 while planning the React client. The screen inventory lists
+    three gaps blocking the first screen; this was a fourth, in the auth spine
+    itself. `GET /auth/session` now answers with the token, which costs no round
+    trip because the shell calls that route on every load anyway.
+
+    These tests are the fix's only guard: nothing else would notice if the field
+    were dropped, and the failure would look like a permissions bug.
+    """
+
+    def _sign_in_and_forget_the_token(self, db, user):
+        """Sign in, then keep **only the cookie** — exactly what a browser has
+        after the page is reloaded."""
+        import hashlib
+
+        client.post("/auth/session/request", json={"email": user.email})
+        row = _latest_code(db, user.id)
+        row.code_hash = hashlib.sha256(b"424242").hexdigest()
+        db.commit()
+        signed = client.post(
+            "/auth/session/verify", json={"email": user.email, "code": "424242"},
+        )
+        assert signed.status_code == 200, signed.text
+
+        reloaded = TestClient(app, raise_server_exceptions=False)
+        reloaded.cookies.set(auth.SESSION_COOKIE, signed.cookies[auth.SESSION_COOKIE])
+        return reloaded
+
+    def test_the_context_route_hands_back_a_csrf_token(self, db, user):
+        reloaded = self._sign_in_and_forget_the_token(db, user)
+
+        response = reloaded.get("/auth/session")
+
+        assert response.status_code == 200, response.text
+        assert response.json()["csrf_token"], (
+            "a reloaded SPA has the cookie and nothing else — without this it "
+            "cannot write at all"
+        )
+
+    def test_that_token_actually_authorises_a_write(self, db, user):
+        """End to end, and the half that matters: a token that is returned but
+        does not work would pass the test above."""
+        reloaded = self._sign_in_and_forget_the_token(db, user)
+        token = reloaded.get("/auth/session").json()["csrf_token"]
+
+        response = reloaded.post(
+            "/content/",
+            json={
+                "brand_id": auth.ensure_default_brand(db).id,
+                "title": f"{TAG}-{uuid.uuid4().hex[:8]}",
+                "content_type": "cms",
+                "content": {"headline": "x", "body_medium": "y"},
+            },
+            headers={"X-CSRF-Token": token},
+        )
+
+        assert response.status_code in (200, 201), response.text
+        db.execute(text("DELETE FROM content_records WHERE id = :i"),
+                   {"i": response.json()["id"]})
+        db.commit()
+
+    def test_the_response_is_not_cacheable(self, db, user):
+        """It carries a per-session secret, so a shared cache holding it would
+        hand one person's token to another."""
+        reloaded = self._sign_in_and_forget_the_token(db, user)
+
+        response = reloaded.get("/auth/session")
+
+        assert response.headers.get("cache-control") == "no-store", (
+            "a response carrying a CSRF token must not be cacheable"
+        )

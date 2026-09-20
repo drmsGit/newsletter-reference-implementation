@@ -2461,7 +2461,7 @@ class TestNoSurfaceQuietlyRendersAPushAsAnEmail:
         payload = response.json()
         assert payload["channel"] == "push"
         assert payload["role"] == "payload"
-        assert payload["html"] == "", "a push has no document"
+        assert payload["artifact_body"] == "", "a push has no document"
         assert payload["fields"]["push_title"] == "Ready", (
             "the route returned nothing useful for a push — it rendered the "
             "email path and got an empty shell"
