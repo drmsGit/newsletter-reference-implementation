@@ -20,6 +20,7 @@ from app.campaigns.models import (
     DecisionSlotUpdate,
 )
 from app.campaigns.service import (
+    ChannelUnavailable,
     create_campaign,
     create_variant_for_campaign,
     list_campaigns,
@@ -57,27 +58,30 @@ def create_campaign_record(
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
-    # PROVISIONAL. This router is unauthenticated (main.py leaves the twelve
-    # JSON routers unguarded — launch gate 3), so there is no session and no
-    # working brand. **Resolved 2026-09-19 (ADR-168).** `enforce_api_policy`
-    # now writes the brand it actually checked the permission against onto
-    # `request.state.current_brand` — the declared `X-Brand` for a machine, the
-    # session's working brand for a person — so this row is written to the same
-    # brand the caller was authorised for. Writing to the default brand while
-    # checking against a declared one was the gap: it authorised a caller for
-    # brand B and then put the row in brand A.
-    return create_campaign(
-        db=db,
-        name=payload.name,
-        brand_id=brand_id,
-        # Same provisional posture as brand_id above: this router has no session
-        # to read a choice from. Email is the honest default for a machine
-        # caller until ADR-166's credentials arrive, and it is stated here
-        # rather than defaulted in `create_campaign`, which refuses to guess.
-        channel=payload.channel,
-        status=payload.status,
-        initial_variant_name=payload.initial_variant_name,
-    )
+    """Create a campaign and its first variant.
+
+    The channel is refused server-side when this deployment has not enabled it
+    (ADR-160 point 8). That check used to exist only on the Jinja form, so this
+    route happily created campaigns on switched-off channels until 2026-09-20.
+    """
+    # The brand is the one the guard authorised (ADR-168), and the channel is
+    # refused if this deployment has not enabled it (ADR-160 point 8).
+    #
+    # The PROVISIONAL note that stood here is gone rather than amended: it
+    # described a router with no guard and no working brand, which stopped
+    # being true when gate 3 closed, and a stale caveat about authentication is
+    # the kind a reader trusts.
+    try:
+        return create_campaign(
+            db=db,
+            name=payload.name,
+            brand_id=brand_id,
+            channel=payload.channel,
+            status=payload.status,
+            initial_variant_name=payload.initial_variant_name,
+        )
+    except ChannelUnavailable as error:
+        raise HTTPException(status_code=400, detail=str(error))
 
 
 @router.get("/{campaign_id}/variants", response_model=list[Variant])
@@ -113,6 +117,10 @@ def create_campaign_variant(
             status=payload.status,
             brand_id=brand_id,
         )
+    except ChannelUnavailable as error:
+        # 400, not 404: the campaign is right there and the request is
+        # well-formed — the channel is switched off (ADR-160 point 8).
+        raise HTTPException(status_code=400, detail=str(error))
     except ValueError as error:
         raise HTTPException(status_code=404, detail=str(error))
 

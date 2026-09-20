@@ -23,7 +23,7 @@ from app.auth.permissions import (
 )
 from app.channels.registry import DEFAULT_CHANNEL, get_channel, max_modules_for
 from app.delivery.providers.factory import providers_for_channel
-from app.settings.service import available_channels, channel_available
+from app.settings.service import available_channels
 from app.audit import service as audit
 from app.campaigns import duplication
 from app.recipients.consent import consent_grid, consent_history, resolve_emails
@@ -36,7 +36,7 @@ from app.content.service import create_content, get_content_record, update_conte
 from app.content.service import create_category, create_category_relation
 from app.content.service import delete_content_record, delete_category, ContentRecordHasHistoryError, HasRelationsError
 from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB, ModuleInstanceDB, DecisionSlotDB
-from app.campaigns.service import create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant, update_decision_slot, update_variant, update_module, delete_module, move_module
+from app.campaigns.service import ChannelUnavailable, create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant, update_decision_slot, update_variant, update_module, delete_module, move_module
 from app.rendering.service import UnpublishedContentError, envelope_fields_for_variant, render_variant_html
 from app.snapshots.service import create_snapshot_for_variant
 from app.delivery.service import create_send_instance, prepare_send_from_audience, process_due_scheduled_sends, send_send_instance
@@ -1249,16 +1249,19 @@ def campaign_create(
     channel — the invariant that a campaign always has a variant makes that
     unavoidable. The channel belongs to the variant, never to the campaign
     (ADR-160 point 4); this form is simply the first place one is chosen."""
-    # ADR-160 point 8: a channel this deployment has not turned on is "refused
-    # server-side if requested directly", not merely absent from the dropdown.
-    if not channel_available(db, channel):
+    # ADR-160 point 8's refusal moved into `create_campaign` on 2026-09-20.
+    # It was here and only here, so the JSON plane created campaigns on
+    # switched-off channels without complaint — and this screen has a deletion
+    # date, which would have taken the enforcement with it.
+    try:
+        campaign = create_campaign(
+            db, name=name, brand_id=working_brand_id(request, db), channel=channel
+        )
+    except ChannelUnavailable as error:
         return RedirectResponse(
-            url="/ui/campaigns?error=" + quote("That channel is not available."),
+            url="/ui/campaigns?error=" + quote(str(error)),
             status_code=303,
         )
-    campaign = create_campaign(
-        db, name=name, brand_id=working_brand_id(request, db), channel=channel
-    )
     return RedirectResponse(url=f"/ui/campaigns/{campaign.id}", status_code=303)
 
 
@@ -1464,26 +1467,32 @@ def variant_create(
 ):
     """The "what channel?" question. Asked once, here, and never again —
     ADR-160 point 5 fixes it at creation."""
-    if not channel_available(db, channel):
-        return RedirectResponse(
-            url=f"/ui/campaigns/{campaign_id}?error=" + quote("That channel is not available."),
-            status_code=303,
-        )
+
     # Passed through as given. The channel check that used to live here is
     # gone, not forgotten: ADR-162 point 1 landed, so envelope copy is written
     # by `set_envelope_fields`, which finds the module a channel *declares* for
     # it — and push declares none, so a subject posted to a push variant has
     # nowhere to go and is discarded by the model rather than by a guard. A
     # redundant check that reads as load-bearing is worse than no check.
-    create_variant_for_campaign(
-        db,
-        campaign_id=campaign_id,
-        name=name,
-        channel=channel,
-        subject=subject.strip() or None,
-        preheader=preheader.strip() or None,
-        brand_id=working_brand_id(request, db),
-    )
+    # The channel refusal lives in `create_variant_for_campaign` since
+    # 2026-09-20 (ADR-160 point 8). This is the call site that matters most:
+    # the channel belongs to the variant and is fixed at creation, so this is
+    # the only moment it can be refused at all.
+    try:
+        create_variant_for_campaign(
+            db,
+            campaign_id=campaign_id,
+            name=name,
+            channel=channel,
+            subject=subject.strip() or None,
+            preheader=preheader.strip() or None,
+            brand_id=working_brand_id(request, db),
+        )
+    except ChannelUnavailable as error:
+        return RedirectResponse(
+            url=f"/ui/campaigns/{campaign_id}?error=" + quote(str(error)),
+            status_code=303,
+        )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 

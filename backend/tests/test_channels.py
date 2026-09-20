@@ -2686,3 +2686,82 @@ class TestTheMergeRuleIsReachableFromBothPlanes:
         finally:
             db.query(ContentRecordDB).filter(ContentRecordDB.id == record.id).delete()
             db.commit()
+
+
+class TestTheJsonPlaneRefusesWhatTheFormRefused:
+    """B12/B13 from `docs/react-migration-inventory.md`, closed 2026-09-20.
+
+    **`channel_available` had exactly two call sites, both in the Jinja
+    router.** ADR-160 point 8 says a channel this deployment has not enabled is
+    "refused server-side if requested directly" — and the JSON routers created
+    campaigns and variants on switched-off channels without complaint. Since
+    that screen has a deletion date, retiring it would have deleted the
+    enforcement rather than moved it: the only item in the inventory where that
+    was true.
+    """
+
+    def _headers(self):
+        from app.auth.permissions import CAMPAIGNS_MANAGE, VIEW
+        from tests.machine import machine
+
+        return machine([VIEW, CAMPAIGNS_MANAGE])
+
+    def test_a_campaign_cannot_be_created_on_an_unregistered_channel(self, db):
+        from app.campaigns.db_models import CampaignDB
+
+        name = _name("smuggled")
+        with self._headers() as headers:
+            response = _client().post(
+                "/campaigns/",
+                json={"name": name, "channel": "carrier-pigeon"},
+                headers=headers,
+            )
+            assert response.status_code == 400, response.text
+
+        assert db.query(CampaignDB).filter(CampaignDB.name == name).first() is None, (
+            "the refusal left a campaign behind — the guard must run before "
+            "anything is written"
+        )
+
+    def test_a_variant_cannot_be_created_on_a_disabled_channel(self, db, campaign):
+        """The call site that matters most: the channel is fixed at creation
+        (ADR-160 point 5), so this is the only moment it can be refused."""
+        from app.campaigns.db_models import VariantDB
+        from app.settings.service import set_channel_available
+
+        set_channel_available(db, "push", False)
+        try:
+            name = _name("disabled")
+            with self._headers() as headers:
+                response = _client().post(
+                    f"/campaigns/{campaign.id}/variants",
+                    json={"name": name, "channel": "push"},
+                    headers=headers,
+                )
+                # 400 and not 404: the campaign is right there and the request
+                # is well-formed. Before this, both refusals were ValueError
+                # and the route answered 404 to each, which made one of the two
+                # answers a lie.
+                assert response.status_code == 400, response.text
+
+            assert db.query(VariantDB).filter(VariantDB.name == name).first() is None
+        finally:
+            set_channel_available(db, "push", True)
+
+    def test_an_enabled_channel_is_still_accepted(self, db, campaign):
+        """The other direction, or the two tests above pass against a guard
+        that refuses everything."""
+        from app.campaigns.db_models import VariantDB
+
+        name = _name("allowed")
+        try:
+            with self._headers() as headers:
+                response = _client().post(
+                    f"/campaigns/{campaign.id}/variants",
+                    json={"name": name, "channel": "push"},
+                    headers=headers,
+                )
+                assert response.status_code == 200, response.text
+        finally:
+            db.query(VariantDB).filter(VariantDB.name == name).delete()
+            db.commit()

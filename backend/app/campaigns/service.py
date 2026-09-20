@@ -9,6 +9,38 @@ from app.modules.registry import envelope_module_type, get_manifest
 from app.recipients.db_models import RecipientDB
 
 
+class ChannelUnavailable(ValueError):
+    """The requested channel is not enabled in this deployment.
+
+    **A `ValueError` subclass on purpose.** Both routers already catch
+    `ValueError` from these functions, so this stays caught by everything that
+    caught it before — but a route that wants to answer 400 rather than 404 can
+    name it. Without the distinction, "this campaign is not in your brand" and
+    "that channel is switched off" arrive as the same exception and get the
+    same status code, and one of the two answers is then a lie.
+    """
+
+
+def _refuse_unavailable_channel(db: Session, channel: str) -> None:
+    """Refuse a channel this deployment has not enabled (ADR-160 point 8).
+
+    Two gates inside `channel_available`, and both matter: the channel must
+    exist on disk at all, and this deployment must not have switched it off.
+
+    **Raises rather than returning a bool**, because every caller's correct
+    response is the same one and a bool is a thing a caller can ignore — which
+    is precisely how the JSON routers came to ignore it. `ValueError` rather
+    than an HTTP error, so the service stays unaware of which plane called it;
+    both routers already map `ValueError` from these functions.
+    """
+    from app.settings.service import channel_available
+
+    if not channel_available(db, channel):
+        raise ChannelUnavailable(
+            f"'{channel}' is not an available channel in this deployment."
+        )
+
+
 def brand_of_variant(db: Session, variant_id: int) -> int | None:
     """The brand a variant belongs to, via its campaign (ADR-172 point 5).
 
@@ -168,6 +200,17 @@ def create_campaign(
     email would mean a caller that never thought about channel silently produces
     an email variant, which is harmless exactly until it is not.
     """
+    # **ADR-160 point 8, enforced here rather than in a form.** A channel this
+    # deployment has not turned on is "refused server-side if requested
+    # directly", not merely absent from a dropdown. Until 2026-09-20 the check
+    # lived at the two `app/frontend/router.py` call sites and nowhere else, so
+    # the JSON plane created campaigns on disabled channels without complaint —
+    # and retiring the Jinja UI would have deleted the enforcement rather than
+    # moved it.
+    #
+    # Before anything is written, so a refusal leaves no row behind.
+    _refuse_unavailable_channel(db, channel)
+
     # A campaign must always have a variant (invariant) — flush (not commit)
     # after the campaign insert so campaign.id is assigned without ending
     # the transaction, then commit both inserts atomically in one go. A
@@ -240,6 +283,11 @@ def create_variant_for_campaign(
     # variant cannot be hung off another brand's campaign (ADR-172 point 5).
     if get_campaign(db, campaign_id, brand_id=brand_id) is None:
         raise ValueError(f"Campaign {campaign_id} not found")
+
+    # ADR-160 point 8 again, and this is the call site that matters most: the
+    # channel belongs to the variant (point 4) and is fixed at creation (point
+    # 5), so this is the only moment it can be refused at all.
+    _refuse_unavailable_channel(db, channel)
 
     variant = VariantDB(
         campaign_id=campaign_id,
