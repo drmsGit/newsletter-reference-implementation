@@ -94,6 +94,35 @@ The router passes the brand; the query binds it. ADR-150 point 2 says the brand 
 - **The category vocabulary stays global and unbranded.** Already settled by ADR-150's 2026-09-15 addendum, and point 5's refusal of new `brand_id` columns is the same principle, not a reopening of it.
 - **The `X-Brand` header spelling.** That is ADR-166's to decide and it has decided it; this record only extends when it must be sent.
 
+**Addendum 2026-09-20 — the three-join cost was measured, and this record
+overstated it.**
+
+`### Negative` says "nested queries gain up to three joins on the hot path" and
+that "the deepest chain in point 5 is paid on every resolution read". Measured
+before stage 4 was built, against 96,040 decision resolutions over 1,204 slots,
+604 variants and 204 campaigns in the test database, that is **wrong**:
+
+| | execution | buffers |
+|---|---|---|
+| today, resolutions by slot with no join | 3.45 ms | 801 |
+| scoped by the full three-hop chain | 2.89 ms | 809 |
+
+The joins cost **eight buffers and nothing measurable in time**, because all
+three hops land on primary keys — `ix_decision_slots_id`, `ix_variants_id`,
+`ix_campaigns_id`, one row each. Point 5 is cheaper than this record feared.
+
+**What the measurement did find is a defect that predates this ADR.**
+`decision_resolutions.decision_slot_id` carries no index, so *both* queries
+above sequentially scan 96,040 rows to return 80. Adding that index and one on
+`variants.campaign_id` takes the scoped query to **0.080 ms and 12 buffers** —
+36× faster, and it is the *unscoped* query today that is slow. Logged in
+`docs/backlog.md`; not built here, because it is a migration and a schema
+change rather than part of this decision.
+
+The correction is worth recording rather than quietly not mentioning: the
+Negative was written from the shape of the query and not from a plan, and the
+shape of a query is not evidence.
+
 **Code facts verified 2026-09-19** against `auth/dependencies.py`, `content/router.py`, `content/service.py`, `campaigns/router.py`, `audience/router.py` and `frontend/router.py`. Line numbers in this record are as of that date and will move.
 
 ## Related ADRs
