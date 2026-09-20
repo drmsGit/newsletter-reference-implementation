@@ -18,6 +18,7 @@ from app.campaigns.models import (
     DecisionResolution,
     DecisionResolutionCreate,
     DecisionSlotUpdate,
+    DecisionSlotPatch,
 )
 from app.campaigns.service import (
     ChannelUnavailable,
@@ -36,6 +37,7 @@ from app.campaigns.service import (
     update_variant,
     update_module,
     update_decision_slot,
+    get_decision_slot,
     to_decision_slot
 )
 
@@ -334,7 +336,16 @@ def update_decision_slot_record(
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
-    """Change a slot's strategy and its configuration.
+    """Change a slot's strategy and its configuration. **Both are replaced.**
+
+    That is what PUT means and it is left meaning it — but note what replacing
+    `strategy_config` does: `_normalize_section` fills a declared key that is
+    absent with its spec default, so a caller that sends only a candidate
+    filter does not leave the config alone, it resets it. `recipient_top_score`
+    has two tunable weights, and a manager's tuning is what gets reset.
+
+    **Use `PATCH` for a partial edit.** It leaves a section the caller did not
+    send exactly as stored.
 
     The strategy name is validated against the registry rather than stored on
     trust: an unknown strategy resolves nothing at send time and reports it as
@@ -364,6 +375,75 @@ def update_decision_slot_record(
         strategy_config=payload.strategy_config,
         brand_id=brand_id,
     )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Decision slot not found")
+    return to_decision_slot(updated)
+
+
+@router.patch("/decision-slots/{slot_id}", response_model=DecisionSlot)
+def patch_decision_slot_record(
+    slot_id: int,
+    payload: DecisionSlotPatch,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    """Edit a slot, leaving untouched whatever the caller did not send.
+
+    Added 2026-09-20 (inventory B16). The rule it protects is narrower than the
+    inventory first described and is worth stating exactly: **"empty means all"
+    was never at risk** — `_normalize_section` fills `category_ids` with its
+    `[]` default and both strategies read `if category_ids:`, so an empty list
+    and an absent key already behave identically. What was at risk is
+    `strategy_config`, because absent declared keys are filled with defaults
+    rather than left alone, so a partial PUT resets tuned weights.
+
+    The Jinja form never had this problem: it round-trips both sections as
+    pre-populated JSON, so everything it did not change it sent back unchanged.
+    A JSON client has no such hidden state, which is precisely why the rule had
+    to become explicit rather than remain a property of one form.
+    """
+    from app.decision.strategies.registry import get_strategy
+
+    existing = get_decision_slot(db, slot_id, brand_id=brand_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Decision slot not found")
+
+    strategy = (
+        payload.decision_strategy
+        if payload.sent("decision_strategy") and payload.decision_strategy
+        else existing.decision_strategy
+    )
+    try:
+        get_strategy(strategy)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"'{strategy}' is not a registered decision strategy",
+        )
+
+    try:
+        updated = update_decision_slot(
+            db,
+            slot_id=slot_id,
+            decision_strategy=strategy,
+            candidate_filter=(
+                payload.candidate_filter if payload.sent("candidate_filter")
+                else existing.candidate_filter
+            ),
+            strategy_config=(
+                payload.strategy_config if payload.sent("strategy_config")
+                else existing.strategy_config
+            ),
+            brand_id=brand_id,
+        )
+    except ValueError as error:
+        # The filter or config did not match the chosen strategy's declared
+        # shape. Surfaced now rather than crashing later at resolution time —
+        # and note it can fire on a section the caller did not send, when the
+        # strategy changed underneath it. That is the right answer: the stored
+        # config is genuinely invalid for the new strategy.
+        raise HTTPException(status_code=400, detail=str(error))
+
     if updated is None:
         raise HTTPException(status_code=404, detail="Decision slot not found")
     return to_decision_slot(updated)

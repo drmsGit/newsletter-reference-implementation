@@ -109,6 +109,30 @@ class ModuleInstanceUpdate(BaseModel):
     decision_slot_id: int | None = None
 
 
+class DecisionSlotPatch(BaseModel):
+    """A partial edit: what is not sent is left as it is.
+
+    **The section that matters is `strategy_config`.** `recipient_top_score`
+    declares two tunable weights with defaults, and `_normalize_section` fills
+    a declared key that is absent with its default — so replacing the section
+    wholesale is not "leave it alone", it is "reset it". A client editing the
+    candidate filter with `PUT` silently undoes whatever a manager tuned.
+
+    **Absent and `null` are different here**, and Pydantic's `model_fields_set`
+    is what tells them apart: omitting `strategy_config` keeps the stored one,
+    sending `null` clears it. A single `| None = None` could not express both,
+    which is the reason this model exists rather than reusing the PUT one.
+    """
+
+    decision_strategy: str | None = None
+    candidate_filter: dict | None = None
+    strategy_config: dict | None = None
+
+    def sent(self, field: str) -> bool:
+        """Whether the caller actually sent this field, null or not."""
+        return field in self.model_fields_set
+
+
 class DecisionSlotUpdate(BaseModel):
     """Edit a slot's strategy and configuration.
 

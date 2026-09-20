@@ -18,6 +18,7 @@ from app.auth import service as auth
 from app.campaigns.db_models import CampaignDB, DecisionSlotDB, ModuleInstanceDB, VariantDB
 from app.campaigns.service import create_module_for_variant
 from app.database import SessionLocal
+from app.campaigns.service import brand_of_variant
 from tests.machine import machine
 from tests.test_api_guard import client
 
@@ -229,3 +230,103 @@ class TestEditingADecisionSlot:
         assert "not a registered decision strategy" in response.json()["detail"]
         db.refresh(slot)
         assert slot.decision_strategy == "top_score", "the typo was stored anyway"
+
+
+class TestPatchingADecisionSlotLeavesTunedSettingsAlone:
+    """Inventory B16, closed 2026-09-20 — and narrower than it was described.
+
+    The inventory said the risk was the category picker's "empty means all".
+    It was not: `_normalize_section` fills `category_ids` with its `[]` default
+    and both strategies read `if category_ids:`, so an empty list and an absent
+    key already behave identically. That half is presentation — two form inputs
+    for one field, which a JSON client does not have.
+
+    The real risk is `strategy_config`. A declared key that is absent is filled
+    with its **spec default**, so replacing the section wholesale does not
+    leave it alone — it resets it. `recipient_top_score` has two tunable
+    weights, and a client editing the candidate filter with PUT silently undoes
+    whatever a manager set.
+
+    The Jinja form never had the problem because it round-trips both sections
+    as pre-populated JSON. A JSON client has no such hidden state, which is why
+    the rule had to become explicit instead of remaining a property of a form.
+    """
+
+    @pytest.fixture
+    def tuned_slot(self, db, variant):
+        from app.campaigns.service import create_decision_slot_for_variant
+
+        slot = create_decision_slot_for_variant(
+            db, variant_id=variant.id, name="tuned",
+            decision_strategy="recipient_top_score",
+            candidate_filter={"category_ids": [1]},
+            strategy_config={"content_score_weight": 0.9,
+                             "preference_score_weight": 0.1},
+            brand_id=brand_of_variant(db, variant.id),
+        )
+        return slot
+
+    def test_patching_the_filter_keeps_the_tuned_weights(self, db, tuned_slot, api):
+        from app.campaigns.db_models import DecisionSlotDB
+
+        response = client.patch(
+            f"/campaigns/decision-slots/{tuned_slot.id}",
+            json={"candidate_filter": {"category_ids": [2]}},
+            headers=api,
+        )
+        assert response.status_code == 200, response.text
+
+        db.expire_all()
+        stored = db.query(DecisionSlotDB).filter(
+            DecisionSlotDB.id == tuned_slot.id).first()
+        assert stored.candidate_filter["category_ids"] == [2]
+        assert stored.strategy_config["content_score_weight"] == 0.9, (
+            "the tuned weight was reset by an edit that never mentioned it"
+        )
+
+    def test_put_still_replaces_and_that_is_deliberate(self, db, tuned_slot, api):
+        """Pinned so the difference between the verbs is a decision.
+
+        PUT replaces, and replacing a section means every declared key it omits
+        comes back as its default. The route says so and points at PATCH.
+        """
+        from app.campaigns.db_models import DecisionSlotDB
+
+        response = client.put(
+            f"/campaigns/decision-slots/{tuned_slot.id}",
+            json={"decision_strategy": "recipient_top_score",
+                  "candidate_filter": {"category_ids": [2]}},
+            headers=api,
+        )
+        assert response.status_code == 200, response.text
+
+        db.expire_all()
+        stored = db.query(DecisionSlotDB).filter(
+            DecisionSlotDB.id == tuned_slot.id).first()
+        assert stored.strategy_config["content_score_weight"] != 0.9
+
+    def test_an_empty_category_list_and_an_absent_one_agree(self, db, tuned_slot, api):
+        """The half that was never broken, pinned so nobody 'fixes' it.
+
+        Both mean "consider every category". If they ever stop agreeing, the
+        form's remove-the-key behaviour and the API's send-an-empty-list
+        behaviour start meaning different things, and only one of them is
+        documented.
+        """
+        from app.campaigns.db_models import DecisionSlotDB
+
+        assert client.patch(
+            f"/campaigns/decision-slots/{tuned_slot.id}",
+            json={"candidate_filter": {"category_ids": []}}, headers=api,
+        ).status_code == 200
+
+        db.expire_all()
+        stored = db.query(DecisionSlotDB).filter(
+            DecisionSlotDB.id == tuned_slot.id).first()
+        assert (stored.candidate_filter or {}).get("category_ids", []) == []
+
+    def test_an_unknown_strategy_is_refused_rather_than_stored(self, db, tuned_slot, api):
+        assert client.patch(
+            f"/campaigns/decision-slots/{tuned_slot.id}",
+            json={"decision_strategy": "astrology"}, headers=api,
+        ).status_code == 400
