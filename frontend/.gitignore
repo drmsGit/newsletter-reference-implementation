@@ -1,0 +1,13 @@
+# Installed packages. The lockfile is the record; this is the checkout.
+node_modules/
+
+# Build output. FastAPI serves this; it is generated, never edited.
+dist/
+
+# Vite's dependency pre-bundling cache
+.vite/
+
+*.local
+
+# TypeScript incremental build cache
+*.tsbuildinfo

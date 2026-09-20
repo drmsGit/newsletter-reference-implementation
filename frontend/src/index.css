@@ -1,0 +1,41 @@
+/*
+ * Brand tokens.
+ *
+ * **These values are placeholders and are known to be.** ADR-170's Notes record
+ * the brand/theming split -- email keeps a full plain-CSS `brand.css` owned by
+ * designers, and the management UI gets a small palette of colours, fonts,
+ * sizes and logos applied through CSS custom properties. ADR-173 point 1 picks
+ * plain CSS over those properties, which is why they are here.
+ *
+ * The backlog item that defines the actual palette is still open. Every value
+ * below is a neutral stand-in chosen to be obviously provisional rather than
+ * plausibly final: nothing downstream should read as designed until that item
+ * closes, and a screen that looks finished is harder to revisit than one that
+ * does not.
+ */
+:root {
+  --brand-fg: #1a1a1a;
+  --brand-bg: #ffffff;
+  --brand-muted: #6b6b6b;
+  --brand-line: #d8d8d8;
+  --brand-accent: #2a5db0;
+  --brand-danger: #b3261e;
+
+  --brand-font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --brand-radius: 4px;
+  --brand-space: 8px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--brand-font);
+  color: var(--brand-fg);
+  background: var(--brand-bg);
+  line-height: 1.5;
+}
