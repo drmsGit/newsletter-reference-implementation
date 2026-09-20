@@ -263,7 +263,10 @@ def source(db, default_brand):
     # columns the code no longer reads.
     from app.campaigns.service import set_envelope_fields
 
-    set_envelope_fields(db, variant.id, {"subject": "Hello", "preheader": "Peek"})
+    set_envelope_fields(
+        db, variant.id, {"subject": "Hello", "preheader": "Peek"},
+        brand_id=default_brand.id,
+    )
 
     slot = DecisionSlotDB(
         variant_id=variant.id,
@@ -906,7 +909,8 @@ class TestChoosingWhichVariantsComeAcross:
 
         push = create_variant_for_campaign(
             db, campaign_id=source["campaign"].id,
-            name=_name("push"), channel="push")
+            name=_name("push"), channel="push",
+            brand_id=source["campaign"].brand_id)
         return source["variant"], push
 
     def test_only_the_chosen_variants_are_copied(self, db, source, default_brand):

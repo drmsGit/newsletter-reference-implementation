@@ -87,8 +87,15 @@ def execute_decision_slot(
         db.refresh(latest)
         return to_decision_resolution(latest)
 
+    # **Resolved from the slot, not from a caller.** Executing a slot happens
+    # at send time and from the UI, neither of which should be able to tell a
+    # resolution which brand it belongs to — the slot's own campaign already
+    # knows (ADR-172 point 5's resolver half).
+    from app.campaigns.service import brand_of_variant
+
     return create_decision_resolution(
         db=db,
+        brand_id=brand_of_variant(db, slot.variant_id),
         decision_slot_id=slot.id,
         recipient_id=effective_recipient_id,
         content_record_id=result.content_record_id,

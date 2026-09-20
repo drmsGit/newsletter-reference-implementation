@@ -24,6 +24,7 @@ from app.auth.db_models import RoleAssignmentDB, RoleDB, SessionDB, UserDB
 from app.auth.permissions import ADMIN
 from app.campaigns import duplication
 from app.campaigns.db_models import CampaignDB, ModuleInstanceDB, VariantDB
+from app.campaigns.service import brand_of_variant
 from app.campaigns.service import (
     create_campaign, create_module_for_variant, create_variant_for_campaign,
 )
@@ -230,8 +231,7 @@ class TestTheColumnIsFailClosed:
 
     def test_a_variant_keeps_the_channel_it_was_created_with(self, db, campaign):
         variant = create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("push"), channel="push"
-        )
+            db, campaign_id=campaign.id, name=_name("push"), channel="push", brand_id=campaign.brand_id)
         assert variant.channel == "push"
         assert db.get(VariantDB, variant.id).channel == "push"
 
@@ -397,8 +397,7 @@ class TestDuplicationCarriesTheChannel:
         re-choose it — and a copy of a push variant whose modules are push
         modules is a push variant by construction."""
         create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("original"), channel="push"
-        )
+            db, campaign_id=campaign.id, name=_name("original"), channel="push", brand_id=campaign.brand_id)
         report = duplication.duplicate_campaign(
             db,
             campaign_id=campaign.id,
@@ -500,8 +499,7 @@ class TestAChannelOnlyOffersItsOwnModules:
         from main import app
 
         create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("push"), channel="push"
-        )
+            db, campaign_id=campaign.id, name=_name("push"), channel="push", brand_id=campaign.brand_id)
         user = UserDB(email=f"{PREFIX}-{uuid.uuid4().hex[:8]}@example.invalid", is_active=True)
         db.add(user); db.commit(); db.refresh(user)
         role = db.query(RoleDB).filter(RoleDB.key == ADMIN).first()
@@ -548,19 +546,16 @@ class TestCardinalityIsDeclaredNotCodedIn:
 
     def test_a_push_variant_refuses_a_second_module(self, db, campaign):
         variant = create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("push"), channel="push"
-        )
+            db, campaign_id=campaign.id, name=_name("push"), channel="push", brand_id=campaign.brand_id)
         first = create_module_for_variant(
             db, variant_id=variant.id, module_type="notification",
-            module_data={"push_title": "Snow is here"},
-        )
+            module_data={"push_title": "Snow is here"}, brand_id=brand_of_variant(db, variant.id))
         assert first is not None
 
         with pytest.raises(ValueError, match="already does"):
             create_module_for_variant(
                 db, variant_id=variant.id, module_type="notification",
-                module_data={"push_title": "And again"},
-            )
+                module_data={"push_title": "And again"}, brand_id=brand_of_variant(db, variant.id))
         assert db.query(ModuleInstanceDB).filter(
             ModuleInstanceDB.variant_id == variant.id
         ).count() == 1
@@ -569,12 +564,10 @@ class TestCardinalityIsDeclaredNotCodedIn:
         """Without this, the test above could pass by refusing every second
         module on every channel."""
         variant = create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("email"), channel="email"
-        )
+            db, campaign_id=campaign.id, name=_name("email"), channel="email", brand_id=campaign.brand_id)
         for _ in range(3):
             create_module_for_variant(
-                db, variant_id=variant.id, module_type="cta", module_data={},
-            )
+                db, variant_id=variant.id, module_type="cta", module_data={}, brand_id=brand_of_variant(db, variant.id))
         assert db.query(ModuleInstanceDB).filter(
             ModuleInstanceDB.variant_id == variant.id
         ).count() == 3, "email declares no limit, so three modules must fit"
@@ -589,8 +582,7 @@ class TestCardinalityIsDeclaredNotCodedIn:
         path = channel_registry.CHANNELS_DIR / "email.json"
         original = path.read_text()
         variant = create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("capped"), channel="email"
-        )
+            db, campaign_id=campaign.id, name=_name("capped"), channel="email", brand_id=campaign.brand_id)
         try:
             data = json.loads(original)
             data["max_modules"] = 1
@@ -598,10 +590,10 @@ class TestCardinalityIsDeclaredNotCodedIn:
             channel_registry._registry_mtime = None
 
             create_module_for_variant(
-                db, variant_id=variant.id, module_type="cta", module_data={})
+                db, variant_id=variant.id, module_type="cta", module_data={}, brand_id=brand_of_variant(db, variant.id))
             with pytest.raises(ValueError, match="already does"):
                 create_module_for_variant(
-                    db, variant_id=variant.id, module_type="cta", module_data={})
+                    db, variant_id=variant.id, module_type="cta", module_data={}, brand_id=brand_of_variant(db, variant.id))
         finally:
             path.write_text(original)
             channel_registry._registry_mtime = None
@@ -614,30 +606,28 @@ class TestAModuleMustBelongToItsVariantsChannel:
         not a control, and a hand-crafted POST never sees it. Same shape as the
         channel-availability hole one level up."""
         variant = create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("email"), channel="email"
-        )
+            db, campaign_id=campaign.id, name=_name("email"), channel="email", brand_id=campaign.brand_id)
         with pytest.raises(ValueError, match="not a Email module"):
             create_module_for_variant(
-                db, variant_id=variant.id, module_type="notification", module_data={})
+                db, variant_id=variant.id, module_type="notification", module_data={}, brand_id=brand_of_variant(db, variant.id))
 
     def test_an_email_module_cannot_be_added_to_a_push_variant(self, db, campaign):
         variant = create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("push"), channel="push"
-        )
+            db, campaign_id=campaign.id, name=_name("push"), channel="push", brand_id=campaign.brand_id)
         with pytest.raises(ValueError, match="not a Push notification module"):
             create_module_for_variant(
-                db, variant_id=variant.id, module_type="single_stack", module_data={})
+                db, variant_id=variant.id, module_type="single_stack", module_data={}, brand_id=brand_of_variant(db, variant.id))
 
     def test_each_channel_still_accepts_its_own(self, db, campaign):
         """Without this, both tests above could pass by refusing everything."""
         email = create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("email"), channel="email")
+            db, campaign_id=campaign.id, name=_name("email"), channel="email", brand_id=campaign.brand_id)
         push = create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+            db, campaign_id=campaign.id, name=_name("push"), channel="push", brand_id=campaign.brand_id)
         assert create_module_for_variant(
-            db, variant_id=email.id, module_type="single_stack", module_data={}) is not None
+            db, variant_id=email.id, module_type="single_stack", module_data={}, brand_id=brand_of_variant(db, email.id)) is not None
         assert create_module_for_variant(
-            db, variant_id=push.id, module_type="notification", module_data={}) is not None
+            db, variant_id=push.id, module_type="notification", module_data={}, brand_id=brand_of_variant(db, push.id)) is not None
 
     def test_a_full_variant_is_not_offered_the_add_module_form(
         self, db, campaign, monkeypatch
@@ -648,7 +638,7 @@ class TestAModuleMustBelongToItsVariantsChannel:
         from main import app
 
         variant = create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+            db, campaign_id=campaign.id, name=_name("push"), channel="push", brand_id=campaign.brand_id)
         user = UserDB(email=f"{PREFIX}-{uuid.uuid4().hex[:8]}@example.invalid", is_active=True)
         db.add(user); db.commit(); db.refresh(user)
         role = db.query(RoleDB).filter(RoleDB.key == ADMIN).first()
@@ -664,7 +654,7 @@ class TestAModuleMustBelongToItsVariantsChannel:
 
             create_module_for_variant(
                 db, variant_id=variant.id, module_type="notification",
-                module_data={"push_title": "Full now"})
+                module_data={"push_title": "Full now"}, brand_id=brand_of_variant(db, variant.id))
 
             page = client.get(f"/ui/campaigns/{campaign.id}")
             assert "already does" in page.text, (
@@ -698,10 +688,10 @@ class TestEachChannelRendersItsOwnShape:
                      "push_link": "https://winter.example/snow", **content},
         )
         variant = create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+            db, campaign_id=campaign.id, name=_name("push"), channel="push", brand_id=campaign.brand_id)
         create_module_for_variant(
             db, variant_id=variant.id, module_type="notification",
-            content_record_id=record.id)
+            content_record_id=record.id, brand_id=brand_of_variant(db, variant.id))
         return variant, record
 
     def test_a_push_variant_renders_fields_not_html(self, db, campaign):
@@ -726,10 +716,10 @@ class TestEachChannelRendersItsOwnShape:
         from app.rendering.service import render_variant
 
         variant = create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("email"), channel="email")
+            db, campaign_id=campaign.id, name=_name("email"), channel="email", brand_id=campaign.brand_id)
         create_module_for_variant(
             db, variant_id=variant.id, module_type="cta",
-            module_data={"label": "Book", "url": "https://x.example"})
+            module_data={"label": "Book", "url": "https://x.example"}, brand_id=brand_of_variant(db, variant.id))
         artifact = render_variant(db, variant.id, mode="preview")
         assert artifact.role == ROLE_HTML
         assert artifact.fields is None
@@ -743,7 +733,7 @@ class TestEachChannelRendersItsOwnShape:
         from app.rendering.service import render_variant
 
         variant = create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("orphan"), channel="push")
+            db, campaign_id=campaign.id, name=_name("orphan"), channel="push", brand_id=campaign.brand_id)
         db.query(VariantDB).filter(VariantDB.id == variant.id).update(
             {"channel": "letterpress"})
         db.commit()
@@ -796,10 +786,10 @@ class TestAPushSnapshotLivesInTheRowNotOnDisk:
             db, content_record_id=record.id, created_by="test",
             brand_id=campaign.brand_id)
         variant = create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+            db, campaign_id=campaign.id, name=_name("push"), channel="push", brand_id=campaign.brand_id)
         create_module_for_variant(
             db, variant_id=variant.id, module_type="notification",
-            content_record_id=record.id)
+            content_record_id=record.id, brand_id=brand_of_variant(db, variant.id))
 
         before = set(SNAPSHOT_STORAGE_DIR.glob("*")) if SNAPSHOT_STORAGE_DIR.exists() else set()
         snapshot = create_snapshot_for_variant(db, variant_id=variant.id)
@@ -829,10 +819,10 @@ class TestAPushSnapshotLivesInTheRowNotOnDisk:
             db, title=_name("unpublished"), brand_id=campaign.brand_id,
             content={"push_title": "Draft", "push_body": "Not frozen."})
         variant = create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+            db, campaign_id=campaign.id, name=_name("push"), channel="push", brand_id=campaign.brand_id)
         create_module_for_variant(
             db, variant_id=variant.id, module_type="notification",
-            content_record_id=record.id)
+            content_record_id=record.id, brand_id=brand_of_variant(db, variant.id))
 
         with pytest.raises(UnpublishedContentError):
             create_snapshot_for_variant(db, variant_id=variant.id)
@@ -851,13 +841,13 @@ class TestAPushSnapshotLivesInTheRowNotOnDisk:
             brand_id=campaign.brand_id)
 
         push = create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+            db, campaign_id=campaign.id, name=_name("push"), channel="push", brand_id=campaign.brand_id)
         create_module_for_variant(db, variant_id=push.id,
-                                  module_type="notification", content_record_id=record.id)
+                                  module_type="notification", content_record_id=record.id, brand_id=brand_of_variant(db, push.id))
         email = create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("email"), channel="email")
+            db, campaign_id=campaign.id, name=_name("email"), channel="email", brand_id=campaign.brand_id)
         create_module_for_variant(db, variant_id=email.id,
-                                  module_type="single_stack", content_record_id=record.id)
+                                  module_type="single_stack", content_record_id=record.id, brand_id=brand_of_variant(db, email.id))
 
         push_snap = create_snapshot_for_variant(db, variant_id=push.id)
         email_snap = create_snapshot_for_variant(db, variant_id=email.id)
@@ -1326,10 +1316,10 @@ class TestAPushSendGoesOutAsAPush:
         campaign = create_campaign(
             db, name=_name("campaign"), brand_id=brand.id, channel="email")
         variant = create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+            db, campaign_id=campaign.id, name=_name("push"), channel="push", brand_id=brand.id)
         create_module_for_variant(
             db, variant_id=variant.id, module_type="notification",
-            content_record_id=record.id)
+            content_record_id=record.id, brand_id=brand_of_variant(db, variant.id))
         return campaign, variant
 
     def _recipients(self, db, brand, with_push_token: bool):
@@ -2041,9 +2031,9 @@ class TestTheSendFormOffersOnlyWhatTheChannelCanDo:
             db, content_record_id=record.id, created_by="t",
             brand_id=brand.id)
         push_variant = create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+            db, campaign_id=campaign.id, name=_name("push"), channel="push", brand_id=campaign.brand_id)
         create_module_for_variant(db, variant_id=push_variant.id,
-                                  module_type="notification", content_record_id=record.id)
+                                  module_type="notification", content_record_id=record.id, brand_id=brand_of_variant(db, push_variant.id))
         email_variant = db.query(VariantDB).filter(
             VariantDB.campaign_id == campaign.id, VariantDB.channel == "email").first()
         snapshots = [
@@ -2133,9 +2123,9 @@ class TestTheSendFormOffersOnlyWhatTheChannelCanDo:
             db, content_record_id=record.id, created_by="t",
             brand_id=brand.id)
         variant = create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+            db, campaign_id=campaign.id, name=_name("push"), channel="push", brand_id=campaign.brand_id)
         create_module_for_variant(db, variant_id=variant.id,
-                                  module_type="notification", content_record_id=record.id)
+                                  module_type="notification", content_record_id=record.id, brand_id=brand_of_variant(db, variant.id))
         snapshot = create_snapshot_for_variant(db, variant_id=variant.id)
         page, user = self._page(db, campaign.id, monkeypatch)
         try:
@@ -2206,7 +2196,7 @@ class TestEnvelopeFieldsLiveInAModule:
 
         variant = create_variant_for_campaign(
             db, campaign_id=campaign.id, name=_name("v"), channel="email",
-            subject="Snow report", preheader="Two metres at Arosa")
+            subject="Snow report", preheader="Two metres at Arosa", brand_id=campaign.brand_id)
 
         module = db.query(ModuleInstanceDB).filter(
             ModuleInstanceDB.variant_id == variant.id,
@@ -2222,7 +2212,7 @@ class TestEnvelopeFieldsLiveInAModule:
         empty module asserting that somebody wrote one."""
         variant = create_variant_for_campaign(
             db, campaign_id=campaign.id, name=_name("p"), channel="push",
-            subject="ignored", preheader="ignored")
+            subject="ignored", preheader="ignored", brand_id=campaign.brand_id)
         assert db.query(ModuleInstanceDB).filter(
             ModuleInstanceDB.variant_id == variant.id).count() == 0
 
@@ -2231,7 +2221,7 @@ class TestEnvelopeFieldsLiveInAModule:
 
         variant = create_variant_for_campaign(
             db, campaign_id=campaign.id, name=_name("v"), channel="email",
-            subject="Snow report", preheader="Two metres")
+            subject="Snow report", preheader="Two metres", brand_id=campaign.brand_id)
         artifact = render_variant(db, variant.id, mode="preview")
         assert artifact.envelope["subject"] == "Snow report", (
             "the subject did not reach the envelope, so the send path would "
@@ -2247,7 +2237,7 @@ class TestEnvelopeFieldsLiveInAModule:
 
         variant = create_variant_for_campaign(
             db, campaign_id=campaign.id, name=_name("v"), channel="email",
-            subject="S", preheader="Two metres at Arosa")
+            subject="S", preheader="Two metres at Arosa", brand_id=campaign.brand_id)
         body = render_variant(db, variant.id, mode="preview").body
         assert body.count('class="preheader"') == 1, (
             f"the preheader span appears {body.count(chr(34) + 'preheader' + chr(34))} "
@@ -2262,8 +2252,11 @@ class TestEnvelopeFieldsLiveInAModule:
 
         variant = create_variant_for_campaign(
             db, campaign_id=campaign.id, name=_name("v"), channel="email",
-            subject="Temporary", preheader="")
-        update_variant(db, variant.id, name="still here", subject="", preheader="")
+            subject="Temporary", preheader="", brand_id=campaign.brand_id)
+        update_variant(
+            db, variant.id, name="still here", subject="", preheader="",
+            brand_id=brand_of_variant(db, variant.id),
+        )
         assert db.query(ModuleInstanceDB).filter(
             ModuleInstanceDB.variant_id == variant.id,
             ModuleInstanceDB.module_type == "header").count() == 0
@@ -2320,7 +2313,7 @@ class TestAChannelWithoutAnEnvelopeIsNotAskedForOne:
         self, db, campaign, monkeypatch
     ):
         create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+            db, campaign_id=campaign.id, name=_name("push"), channel="push", brand_id=campaign.brand_id)
         client, _token, user = self._page(db, campaign.id, monkeypatch)
         try:
             page = client.get(f"/ui/campaigns/{campaign.id}")
@@ -2343,7 +2336,7 @@ class TestAChannelWithoutAnEnvelopeIsNotAskedForOne:
     ):
         """Hiding the button is not the control — and this one costs money."""
         variant = create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+            db, campaign_id=campaign.id, name=_name("push"), channel="push", brand_id=campaign.brand_id)
         client, token, user = self._page(db, campaign.id, monkeypatch)
         try:
             response = client.post(
@@ -2402,10 +2395,10 @@ class TestNoSurfaceQuietlyRendersAPushAsAnEmail:
             db, title=_name("c"), brand_id=campaign.brand_id,
             content={"push_title": "Ready", "push_body": "Go."})
         variant = create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("push"), channel="push")
+            db, campaign_id=campaign.id, name=_name("push"), channel="push", brand_id=campaign.brand_id)
         create_module_for_variant(
             db, variant_id=variant.id, module_type="notification",
-            content_record_id=record.id)
+            content_record_id=record.id, brand_id=brand_of_variant(db, variant.id))
         return variant
 
     def test_the_email_assembler_refuses_a_variant_of_another_channel(self, db, campaign):
@@ -2422,9 +2415,9 @@ class TestNoSurfaceQuietlyRendersAPushAsAnEmail:
         from app.rendering.service import render_variant_html
 
         variant = create_variant_for_campaign(
-            db, campaign_id=campaign.id, name=_name("email"), channel="email")
+            db, campaign_id=campaign.id, name=_name("email"), channel="email", brand_id=campaign.brand_id)
         create_module_for_variant(db, variant_id=variant.id, module_type="cta",
-                                  module_data={"label": "Book", "url": "https://x"})
+                                  module_data={"label": "Book", "url": "https://x"}, brand_id=brand_of_variant(db, variant.id))
         assert "<" in render_variant_html(db, variant.id, mode="preview")
 
     def test_the_json_render_route_dispatches_by_channel(self, db, campaign):

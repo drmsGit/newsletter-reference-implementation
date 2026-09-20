@@ -23,7 +23,7 @@ import uuid
 
 from fastapi.testclient import TestClient
 
-from app.auth.permissions import CONTENT_MANAGE, VIEW
+from app.auth.permissions import CAMPAIGNS_MANAGE, CONTENT_MANAGE, VIEW
 from main import app
 
 client = TestClient(app, raise_server_exceptions=False)
@@ -37,15 +37,18 @@ APP = pathlib.Path(__file__).resolve().parent.parent / "app"
 #: nowhere to go. `list_all_*()` is that somewhere, and its whole value is that
 #: it says in its own name what it is doing.
 #:
-#: The remaining entries arrive with stages 4 and 5: `list_all_campaigns`,
-#: `list_all_audience_groups`. A further one is not forbidden — it is a diff
+#: The remaining entry arrives with stage 5: `list_all_audience_groups`.
+#: A further one is not forbidden — it is a diff
 #: that has to be argued for, which is the entire mechanism.
 #:
 #: `list_all_content_records` (stage 3, 2026-09-19) replaces
 #: `list_content_records(db)` with no brand, which returned every brand's rows
 #: to anyone who forgot an argument. The callers that genuinely span brands are
 #: the demo seed and the platform counts on the dashboard.
-SPANNING_FUNCTIONS: set[str] = {"list_all_content_records"}
+SPANNING_FUNCTIONS: set[str] = {
+    "list_all_content_records",
+    "list_all_campaigns",
+}
 
 
 def _service_sources() -> dict[pathlib.Path, str]:
@@ -225,3 +228,163 @@ class TestContentIsAddressableOnlyWithinItsBrand:
                 db.close()
         finally:
             self._remove(record_id)
+
+
+# --- campaigns and the nested chain, stage 4 --------------------------------
+
+class TestTheNestedChainIsWalkedNotTrusted:
+    """ADR-172 point 5 over `campaign -> variant -> module / slot / resolution`.
+
+    Nothing below `campaigns` carries a `brand_id`, so every one of these is a
+    join rather than a column comparison. The deepest is three hops, and the
+    2026-09-20 addendum measured it at eight buffers — the joins are not the
+    expensive part, a missing index on `decision_slot_id` is.
+    """
+
+    def _campaign_in_default_brand(self):
+        from app.auth.service import ensure_default_brand
+        from app.campaigns.service import (
+            create_campaign, create_decision_slot_for_variant,
+            create_module_for_variant,
+        )
+        from app.database import SessionLocal
+
+        db = SessionLocal()
+        try:
+            brand = ensure_default_brand(db).id
+            campaign = create_campaign(
+                db, name=f"boundary-{uuid.uuid4().hex[:8]}", brand_id=brand,
+                channel="email",
+            )
+            variant = campaign.variants[0]
+            module = create_module_for_variant(
+                db, variant_id=variant.id, module_type="cta",
+                module_data={"label": "not yours"}, brand_id=brand,
+            )
+            slot = create_decision_slot_for_variant(
+                db, variant_id=variant.id, name="slot", brand_id=brand,
+            )
+            return {
+                "campaign": campaign.id, "variant": variant.id,
+                "module": module.id, "slot": slot.id,
+            }
+        finally:
+            db.close()
+
+    def _remove(self, ids):
+        from app.campaigns.db_models import (
+            CampaignDB, DecisionSlotDB, ModuleInstanceDB, VariantDB,
+        )
+        from app.database import SessionLocal
+
+        db = SessionLocal()
+        try:
+            db.query(ModuleInstanceDB).filter(
+                ModuleInstanceDB.variant_id == ids["variant"]).delete()
+            db.query(DecisionSlotDB).filter(
+                DecisionSlotDB.variant_id == ids["variant"]).delete()
+            db.query(VariantDB).filter(VariantDB.campaign_id == ids["campaign"]).delete()
+            db.query(CampaignDB).filter(CampaignDB.id == ids["campaign"]).delete()
+            db.commit()
+        finally:
+            db.close()
+
+    def test_a_module_two_hops_away_is_not_reachable(self, foreign_api):
+        """`module -> variant -> campaign -> brand`, and the module carries none
+        of it. Deleting is the sharpest verb available on this route."""
+        from app.campaigns.db_models import ModuleInstanceDB
+        from app.database import SessionLocal
+
+        ids = self._campaign_in_default_brand()
+        try:
+            with foreign_api([VIEW, CAMPAIGNS_MANAGE]) as headers:
+                response = client.delete(
+                    f"/campaigns/modules/{ids['module']}", headers=headers)
+                assert response.status_code == 404, response.text
+
+            db = SessionLocal()
+            try:
+                assert db.query(ModuleInstanceDB).filter(
+                    ModuleInstanceDB.id == ids["module"]
+                ).first() is not None, "the module was deleted across the boundary"
+            finally:
+                db.close()
+        finally:
+            self._remove(ids)
+
+    def test_a_variants_modules_are_not_listable_from_another_brand(self, foreign_api):
+        ids = self._campaign_in_default_brand()
+        try:
+            with foreign_api([VIEW]) as headers:
+                response = client.get(
+                    f"/campaigns/variants/{ids['variant']}/modules", headers=headers)
+                assert response.status_code == 200, response.text
+                assert response.json() == [], (
+                    "another brand's modules were listed"
+                )
+        finally:
+            self._remove(ids)
+
+    def test_a_variant_cannot_be_renamed_from_another_brand(self, foreign_api):
+        from app.campaigns.db_models import VariantDB
+        from app.database import SessionLocal
+
+        ids = self._campaign_in_default_brand()
+        try:
+            with foreign_api([VIEW, CAMPAIGNS_MANAGE]) as headers:
+                response = client.put(
+                    f"/campaigns/variants/{ids['variant']}",
+                    json={"name": "seized"}, headers=headers)
+                assert response.status_code == 404, response.text
+
+            db = SessionLocal()
+            try:
+                assert db.query(VariantDB).filter(
+                    VariantDB.id == ids["variant"]).first().name != "seized"
+            finally:
+                db.close()
+        finally:
+            self._remove(ids)
+
+    def test_a_variant_cannot_be_hung_off_another_brands_campaign(self, foreign_api):
+        """The create direction, which no filter on a read would catch.
+
+        `create_variant_for_campaign` resolves the parent within the brand
+        before it writes, so the row is refused rather than created and then
+        found to be unreachable — which would leave a variant nobody can see
+        attached to a campaign nobody meant.
+        """
+        from app.campaigns.db_models import VariantDB
+        from app.database import SessionLocal
+
+        ids = self._campaign_in_default_brand()
+        try:
+            with foreign_api([VIEW, CAMPAIGNS_MANAGE]) as headers:
+                response = client.post(
+                    f"/campaigns/{ids['campaign']}/variants",
+                    json={"name": "smuggled", "channel": "email"}, headers=headers)
+                assert response.status_code in (400, 404), response.text
+
+            db = SessionLocal()
+            try:
+                assert db.query(VariantDB).filter(
+                    VariantDB.campaign_id == ids["campaign"],
+                    VariantDB.name == "smuggled",
+                ).first() is None, "the variant was created across the boundary"
+            finally:
+                db.close()
+        finally:
+            self._remove(ids)
+
+    def test_resolutions_three_hops_away_are_not_listable(self, foreign_api):
+        """The deepest chain: `resolution -> slot -> variant -> campaign`."""
+        ids = self._campaign_in_default_brand()
+        try:
+            with foreign_api([VIEW]) as headers:
+                response = client.get(
+                    f"/campaigns/decision-slots/{ids['slot']}/resolutions",
+                    headers=headers)
+                assert response.status_code == 200, response.text
+                assert response.json() == []
+        finally:
+            self._remove(ids)

@@ -155,10 +155,21 @@ def execute(db: Session, payload: dict, *, choice: dict | None = None) -> Action
     if variant is None:
         return ActionResult(ok=False, message="that variant no longer exists")
 
+    # **Resolved from the variant, not from the approver's session.** This runs
+    # inside `approvals.approve`, which has no request — and the brand that
+    # matters is the one the variant belongs to, not whichever brand the
+    # approver happened to be looking at. `brand_of_variant` answers exactly
+    # that question (ADR-172 point 5's resolver half).
+    from app.campaigns.service import brand_of_variant
+
+    brand_id = brand_of_variant(db, variant.id)
+    if brand_id is None:
+        return ActionResult(ok=False, message="that variant has no brand")
+
     set_envelope_fields(db, variant.id, {
         "subject": picked.get("subject", ""),
         "preheader": picked.get("preheader", ""),
-    })
+    }, brand_id=brand_id)
     return ActionResult(
         ok=True,
         message=f"Applied: {picked.get('subject', '')}",

@@ -261,7 +261,7 @@ def seed():
             set_envelope_fields(db, variant.id, {
                 "subject": f"Edition {ci}: picked for you",
                 "preheader": "Your personalized selection",
-            })
+            }, brand_id=BRAND_ID)
             slot = DecisionSlotDB(
                 variant_id=variant.id, name="Main Content Slot",
                 decision_type="content_recommendation", decision_strategy="recipient_top_score",

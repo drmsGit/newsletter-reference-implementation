@@ -1454,6 +1454,7 @@ def campaign_duplicate(
 
 @router.post("/ui/campaigns/{campaign_id}/variants")
 def variant_create(
+    request: Request,
     campaign_id: int,
     name: str = Form(...),
     channel: str = Form(...),
@@ -1481,12 +1482,14 @@ def variant_create(
         channel=channel,
         subject=subject.strip() or None,
         preheader=preheader.strip() or None,
+        brand_id=working_brand_id(request, db),
     )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
 @router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/edit")
 def variant_edit(
+    request: Request,
     campaign_id: int,
     variant_id: int,
     name: str = Form(...),
@@ -1500,6 +1503,7 @@ def variant_edit(
         name=name,
         subject=subject.strip() or None,
         preheader=preheader.strip() or None,
+        brand_id=working_brand_id(request, db),
     )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
@@ -1646,6 +1650,7 @@ def variant_suggestion_history(
 
 @router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/apply-subject")
 def variant_apply_subject(
+    request: Request,
     campaign_id: int,
     variant_id: int,
     subject: str = Form(""),
@@ -1661,12 +1666,14 @@ def variant_apply_subject(
             name=variant.name,
             subject=subject.strip() or None,
             preheader=preheader.strip() or None,
+            brand_id=working_brand_id(request, db),
         )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
 @router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/modules")
 def module_create(
+    request: Request,
     campaign_id: int,
     variant_id: int,
     module_type: str = Form(...),
@@ -1695,6 +1702,7 @@ def module_create(
             content_record_id=content_record_id or None,
             decision_slot_id=decision_slot_id or None,
             module_data=module_data,
+            brand_id=working_brand_id(request, db),
         )
     except ValueError as error:
         return RedirectResponse(
@@ -1706,6 +1714,7 @@ def module_create(
 
 @router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/modules/{module_id}/edit")
 def module_edit(
+    request: Request,
     campaign_id: int,
     variant_id: int,
     module_id: int,
@@ -1732,6 +1741,7 @@ def module_edit(
             content_record_id=content_record_id or None,
             decision_slot_id=decision_slot_id or None,
             module_data=module_data,
+            brand_id=working_brand_id(request, db),
         )
     except ValueError as error:
         return RedirectResponse(
@@ -1742,13 +1752,14 @@ def module_edit(
 
 
 @router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/modules/{module_id}/delete")
-def module_delete(campaign_id: int, variant_id: int, module_id: int, db: Session = Depends(get_db)):
-    delete_module(db, module_id)
+def module_delete(request: Request, campaign_id: int, variant_id: int, module_id: int, db: Session = Depends(get_db)):
+    delete_module(db, module_id, brand_id=working_brand_id(request, db))
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
 @router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/modules/{module_id}/move")
 def module_move(
+    request: Request,
     campaign_id: int,
     variant_id: int,
     module_id: int,
@@ -1756,7 +1767,10 @@ def module_move(
     db: Session = Depends(get_db),
 ):
     try:
-        move_module(db, module_id, direction)
+        move_module(
+            db, module_id, direction,
+            brand_id=working_brand_id(request, db),
+        )
     except ValueError:
         pass
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
@@ -1764,6 +1778,7 @@ def module_move(
 
 @router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/decision-slots")
 def decision_slot_create(
+    request: Request,
     campaign_id: int,
     variant_id: int,
     name: str = Form(...),
@@ -1775,6 +1790,7 @@ def decision_slot_create(
         variant_id=variant_id,
         name=name,
         decision_strategy=decision_strategy,
+        brand_id=working_brand_id(request, db),
     )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
@@ -1901,6 +1917,7 @@ def send_instance_create(
 
 @router.post("/ui/decisions/slots/{slot_id}/edit")
 def decision_slot_edit(
+    request: Request,
     slot_id: int,
     decision_strategy: str = Form(...),
     candidate_filter_json: str = Form("{}"),
@@ -1930,7 +1947,10 @@ def decision_slot_edit(
         candidate_filter.pop("category_ids", None)
     candidate_filter = candidate_filter or None
     try:
-        update_decision_slot(db, slot_id, decision_strategy, candidate_filter, strategy_config)
+        update_decision_slot(
+            db, slot_id, decision_strategy, candidate_filter, strategy_config,
+            brand_id=working_brand_id(request, db),
+        )
     except ValueError as error:
         # The config/filter didn't match the chosen strategy's declared shape —
         # surface it now instead of letting it crash later at resolution time.

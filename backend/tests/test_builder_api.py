@@ -111,9 +111,12 @@ class TestEditingAModule:
 
     @pytest.fixture
     def module(self, db, variant):
+        from app.campaigns.service import brand_of_variant
+
         return create_module_for_variant(
             db, variant_id=variant.id, module_type="cta",
             module_data={"label": "Original"},
+            brand_id=brand_of_variant(db, variant.id),
         )
 
     def test_static_data_can_be_changed(self, db, variant, module, api):

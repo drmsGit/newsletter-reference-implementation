@@ -32,6 +32,60 @@ def brand_of_variant(db: Session, variant_id: int) -> int | None:
     )
 
 
+# --- scoped getters (ADR-172 point 5) ---------------------------------------
+#
+# Nothing below `campaigns` carries a `brand_id` of its own, and none of them
+# should: ADR-150's addendum settles that a child is per-brand transitively,
+# and point 5 refuses new columns on that reasoning. So the chain is walked in
+# the **selecting** query rather than checked after it — a row outside the
+# brand is not found, so there is no moment where it is in hand and something
+# still has to remember to refuse it.
+#
+# Measured before they were written (ADR-172's 2026-09-20 addendum): all three
+# hops land on primary keys, and the deepest chain costs eight buffers.
+
+
+def get_variant(db: Session, variant_id: int, *, brand_id: int) -> VariantDB | None:
+    """One variant, if it belongs to this brand. Otherwise None."""
+    return (
+        db.query(VariantDB)
+        .join(CampaignDB, CampaignDB.id == VariantDB.campaign_id)
+        .filter(VariantDB.id == variant_id, CampaignDB.brand_id == brand_id)
+        .first()
+    )
+
+
+def get_module(db: Session, module_id: int, *, brand_id: int) -> ModuleInstanceDB | None:
+    """One module instance, via `module -> variant -> campaign -> brand`."""
+    return (
+        db.query(ModuleInstanceDB)
+        .join(VariantDB, VariantDB.id == ModuleInstanceDB.variant_id)
+        .join(CampaignDB, CampaignDB.id == VariantDB.campaign_id)
+        .filter(ModuleInstanceDB.id == module_id, CampaignDB.brand_id == brand_id)
+        .first()
+    )
+
+
+def get_decision_slot(db: Session, slot_id: int, *, brand_id: int) -> DecisionSlotDB | None:
+    """One decision slot, via `slot -> variant -> campaign -> brand`."""
+    return (
+        db.query(DecisionSlotDB)
+        .join(VariantDB, VariantDB.id == DecisionSlotDB.variant_id)
+        .join(CampaignDB, CampaignDB.id == VariantDB.campaign_id)
+        .filter(DecisionSlotDB.id == slot_id, CampaignDB.brand_id == brand_id)
+        .first()
+    )
+
+
+def get_campaign(db: Session, campaign_id: int, *, brand_id: int) -> CampaignDB | None:
+    """One campaign, within a brand. The root of every chain above."""
+    return (
+        db.query(CampaignDB)
+        .filter(CampaignDB.id == campaign_id, CampaignDB.brand_id == brand_id)
+        .first()
+    )
+
+
 def to_campaign(record: CampaignDB) -> Campaign:
     return Campaign(
         id=record.id,
@@ -70,7 +124,7 @@ def to_variant(record: VariantDB, db: Session) -> Variant:
     )
 
 
-def list_campaigns(db: Session, brand_id: int | None = None) -> list[Campaign]:
+def list_campaigns(db: Session, *, brand_id: int) -> list[Campaign]:
     """Campaigns, scoped to one brand (ADR-150 point 2).
 
     **`brand_id=None` means every brand, and is not the caller's default.**
@@ -79,10 +133,22 @@ def list_campaigns(db: Session, brand_id: int | None = None) -> list[Campaign]:
     working brand, because ADR-150 point 2 makes the switcher a hard boundary,
     not a preference.
     """
-    query = db.query(CampaignDB)
-    if brand_id is not None:
-        query = query.filter(CampaignDB.brand_id == brand_id)
-    return [to_campaign(record) for record in query.all()]
+    return [
+        to_campaign(record)
+        for record in db.query(CampaignDB)
+        .filter(CampaignDB.brand_id == brand_id)
+        .all()
+    ]
+
+
+def list_all_campaigns(db: Session) -> list[Campaign]:
+    """Every campaign, across every brand — the ADR-172 point 4 escape hatch.
+
+    For the callers that legitimately have no working brand: platform counts,
+    migrations, seeds. Counted by `test_brand_boundary.py`, and no router may
+    reach for it, because every request has a brand.
+    """
+    return [to_campaign(record) for record in db.query(CampaignDB).all()]
 
 
 def create_campaign(
@@ -137,10 +203,13 @@ def create_campaign(
 def list_variants_for_campaign(
     db: Session,
     campaign_id: int,
+    *,
+    brand_id: int,
 ) -> list[Variant]:
     records = (
         db.query(VariantDB)
-        .filter(VariantDB.campaign_id == campaign_id)
+        .join(CampaignDB, CampaignDB.id == VariantDB.campaign_id)
+        .filter(VariantDB.campaign_id == campaign_id, CampaignDB.brand_id == brand_id)
         .all()
     )
 
@@ -155,6 +224,8 @@ def create_variant_for_campaign(
     subject: str | None = None,
     preheader: str | None = None,
     status: str = "draft",
+    *,
+    brand_id: int,
 ) -> Variant:
     """Add a variant. **The channel is chosen here and never again** (ADR-160
     point 5): switching an email variant to push would invalidate its modules,
@@ -165,6 +236,11 @@ def create_variant_for_campaign(
     ADR-162 point 1 moves them into a `header` module and is not built. A push
     variant leaves them NULL.
     """
+    # The parent is resolved within the brand before anything is written, so a
+    # variant cannot be hung off another brand's campaign (ADR-172 point 5).
+    if get_campaign(db, campaign_id, brand_id=brand_id) is None:
+        raise ValueError(f"Campaign {campaign_id} not found")
+
     variant = VariantDB(
         campaign_id=campaign_id,
         channel=channel,
@@ -180,7 +256,10 @@ def create_variant_for_campaign(
     # The columns still exist and are deliberately no longer written: two
     # places holding the same field is the failure mode that point rejects,
     # and the read path stopped preferring the columns before this did.
-    set_envelope_fields(db, variant.id, {"subject": subject, "preheader": preheader})
+    set_envelope_fields(
+        db, variant.id, {"subject": subject, "preheader": preheader},
+        brand_id=brand_id,
+    )
     return to_variant(variant, db)
 
 
@@ -190,13 +269,18 @@ def update_variant(
     name: str,
     subject: str | None = None,
     preheader: str | None = None,
+    *,
+    brand_id: int,
 ) -> Variant | None:
-    variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
+    variant = get_variant(db, variant_id, brand_id=brand_id)
     if variant is None:
         return None
     variant.name = name
     db.commit()
-    set_envelope_fields(db, variant.id, {"subject": subject, "preheader": preheader})
+    set_envelope_fields(
+        db, variant.id, {"subject": subject, "preheader": preheader},
+        brand_id=brand_id,
+    )
     db.refresh(variant)
     return to_variant(variant, db)
 
@@ -218,10 +302,17 @@ def to_module_instance(record: ModuleInstanceDB) -> ModuleInstance:
 def list_modules_for_variant(
     db: Session,
     variant_id: int,
+    *,
+    brand_id: int,
 ) -> list[ModuleInstance]:
     records = (
         db.query(ModuleInstanceDB)
-        .filter(ModuleInstanceDB.variant_id == variant_id)
+        .join(VariantDB, VariantDB.id == ModuleInstanceDB.variant_id)
+        .join(CampaignDB, CampaignDB.id == VariantDB.campaign_id)
+        .filter(
+            ModuleInstanceDB.variant_id == variant_id,
+            CampaignDB.brand_id == brand_id,
+        )
         .order_by(ModuleInstanceDB.position)
         .all()
     )
@@ -229,7 +320,9 @@ def list_modules_for_variant(
     return [to_module_instance(record) for record in records]
 
 
-def set_envelope_fields(db: Session, variant_id: int, fields: dict) -> None:
+def set_envelope_fields(
+    db: Session, variant_id: int, fields: dict, *, brand_id: int
+) -> None:
     """Write this variant's envelope copy into the module that declares it.
 
     ADR-162 point 1: subject and preheader are fields of an email, so they live
@@ -246,7 +339,7 @@ def set_envelope_fields(db: Session, variant_id: int, fields: dict) -> None:
     cardinality check — an envelope module is not a content module, and a push
     variant is unaffected because push declares no envelope fields at all.
     """
-    variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
+    variant = get_variant(db, variant_id, brand_id=brand_id)
     if variant is None:
         return
     module_type = envelope_module_type(variant.channel)
@@ -297,6 +390,8 @@ def create_module_for_variant(
     content_record_id: int | None = None,
     module_data: dict | None = None,
     decision_slot_id: int | None = None,
+    *,
+    brand_id: int,
 ) -> ModuleInstance:
     """Append a module to a variant, within what its channel permits.
 
@@ -310,7 +405,7 @@ def create_module_for_variant(
             "rendering would silently prefer content_record_id and ignore the decision slot"
         )
 
-    variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
+    variant = get_variant(db, variant_id, brand_id=brand_id)
     if variant is None:
         raise ValueError(f"variant {variant_id} does not exist")
 
@@ -376,6 +471,8 @@ def update_module(
     content_record_id: int | None = None,
     module_data: dict | None = None,
     decision_slot_id: int | None = None,
+    *,
+    brand_id: int,
 ) -> ModuleInstance | None:
     """Update a module's type, content source and static field data in place.
     Position is untouched (reorder via move_module). Same mutual-exclusion
@@ -387,7 +484,7 @@ def update_module(
             "rendering would silently prefer content_record_id and ignore the decision slot"
         )
 
-    module = db.query(ModuleInstanceDB).filter(ModuleInstanceDB.id == module_id).first()
+    module = get_module(db, module_id, brand_id=brand_id)
     if module is None:
         return None
 
@@ -401,13 +498,13 @@ def update_module(
     return to_module_instance(module)
 
 
-def delete_module(db: Session, module_id: int) -> bool:
+def delete_module(db: Session, module_id: int, *, brand_id: int) -> bool:
     """Remove a module from its variant. Positions of the remaining modules are
     left as-is — the (variant_id, position) uniqueness only requires no
     duplicates, not a contiguous sequence, and rendering orders by position, so
     a gap is harmless. Any content overrides on the module go with it (they're
     meaningless once the module is gone)."""
-    module = db.query(ModuleInstanceDB).filter(ModuleInstanceDB.id == module_id).first()
+    module = get_module(db, module_id, brand_id=brand_id)
     if module is None:
         return False
 
@@ -421,13 +518,15 @@ def delete_module(db: Session, module_id: int) -> bool:
     return True
 
 
-def move_module(db: Session, module_id: int, direction: str) -> ModuleInstance | None:
+def move_module(
+    db: Session, module_id: int, direction: str, *, brand_id: int
+) -> ModuleInstance | None:
     """Move a module one step up or down within its variant by swapping its
     position with the adjacent module. No-op if already at the top/bottom."""
     if direction not in ("up", "down"):
         raise ValueError("direction must be 'up' or 'down'")
 
-    module = db.query(ModuleInstanceDB).filter(ModuleInstanceDB.id == module_id).first()
+    module = get_module(db, module_id, brand_id=brand_id)
     if module is None:
         return None
 
@@ -487,8 +586,10 @@ def update_decision_slot(
     decision_strategy: str,
     candidate_filter: dict | None,
     strategy_config: dict | None,
+    *,
+    brand_id: int,
 ) -> DecisionSlotDB | None:
-    slot = db.query(DecisionSlotDB).filter(DecisionSlotDB.id == slot_id).first()
+    slot = get_decision_slot(db, slot_id, brand_id=brand_id)
     if slot is None:
         return None
     # Lock the config/filter structure to the (possibly newly-chosen) strategy
@@ -523,10 +624,17 @@ def to_decision_slot(record: DecisionSlotDB) -> DecisionSlot:
 def list_decision_slots_for_variant(
     db: Session,
     variant_id: int,
+    *,
+    brand_id: int,
 ) -> list[DecisionSlot]:
     records = (
         db.query(DecisionSlotDB)
-        .filter(DecisionSlotDB.variant_id == variant_id)
+        .join(VariantDB, VariantDB.id == DecisionSlotDB.variant_id)
+        .join(CampaignDB, CampaignDB.id == VariantDB.campaign_id)
+        .filter(
+            DecisionSlotDB.variant_id == variant_id,
+            CampaignDB.brand_id == brand_id,
+        )
         .all()
     )
 
@@ -542,7 +650,14 @@ def create_decision_slot_for_variant(
     candidate_filter: dict | None = None,
     strategy_config: dict | None = None,
     max_results: int = 1,
+    *,
+    brand_id: int,
 ) -> DecisionSlot:
+    # The parent is resolved within the brand before the slot is written, the
+    # same guard `create_variant_for_campaign` takes one level up.
+    if get_variant(db, variant_id, brand_id=brand_id) is None:
+        raise ValueError(f"variant {variant_id} does not exist")
+
     candidate_filter, strategy_config = _normalize_for_strategy(
         decision_strategy, candidate_filter, strategy_config
     )
@@ -584,15 +699,24 @@ def create_decision_resolution(
     recipient_id: int | None = None,
     reason: str | None = None,
     score: float | None = None,
+    *,
+    brand_id: int,
 ) -> DecisionResolution:
     # No orphan row should ever be silently accepted, regardless of whether
     # the DB engine happens to enforce FK constraints — validate referenced
     # IDs exist before insert rather than only failing later at rendering's
     # join-based lookup.
-    if db.query(DecisionSlotDB.id).filter(DecisionSlotDB.id == decision_slot_id).first() is None:
+    # **Both parents are resolved within the brand**, not merely proved to
+    # exist. A resolution binds a slot to a content record, and ADR-013's
+    # addendum is explicit that across a brand boundary that reference cannot
+    # be expressed at all — so "exists" was never the question worth asking.
+    if get_decision_slot(db, decision_slot_id, brand_id=brand_id) is None:
         raise ValueError(f"DecisionSlot {decision_slot_id} not found")
 
-    if db.query(ContentRecordDB.id).filter(ContentRecordDB.id == content_record_id).first() is None:
+    if db.query(ContentRecordDB.id).filter(
+        ContentRecordDB.id == content_record_id,
+        ContentRecordDB.brand_id == brand_id,
+    ).first() is None:
         raise ValueError(f"ContentRecord {content_record_id} not found")
 
     if content_version_id is not None:
@@ -622,10 +746,18 @@ def create_decision_resolution(
 def list_resolutions_for_decision_slot(
     db: Session,
     decision_slot_id: int,
+    *,
+    brand_id: int,
 ) -> list[DecisionResolution]:
     records = (
         db.query(DecisionResolutionDB)
-        .filter(DecisionResolutionDB.decision_slot_id == decision_slot_id)
+        .join(DecisionSlotDB, DecisionSlotDB.id == DecisionResolutionDB.decision_slot_id)
+        .join(VariantDB, VariantDB.id == DecisionSlotDB.variant_id)
+        .join(CampaignDB, CampaignDB.id == VariantDB.campaign_id)
+        .filter(
+            DecisionResolutionDB.decision_slot_id == decision_slot_id,
+            CampaignDB.brand_id == brand_id,
+        )
         .all()
     )
 
