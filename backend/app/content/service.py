@@ -85,6 +85,86 @@ def get_content_record(
 CONTENT_STATUSES = ("active", "inactive")
 
 
+#: The channel field groups a caller can claim authority over.
+#:
+#: **A caller may only clear what it was offering.** That is the whole rule,
+#: and it exists because an absent field and a cleared one are indistinguishable
+#: otherwise: a screen rendered with push switched off sends no push fields, and
+#: rebuilding `content` from what arrived would erase push copy on every edit
+#: made while push was off. The Jinja form carries the same signal as
+#: `channel_sections_present`; the JSON plane carries it as `groups`.
+#:
+#: Declared here rather than derived from the channel manifests, which is where
+#: it belongs and is not cheap today: the manifests describe modules and their
+#: templates, not a flat list of the content keys a channel reads. When that
+#: list exists, this table should read from it rather than repeat it.
+CONTENT_FIELD_GROUPS: dict[str, tuple[str, ...]] = {
+    "email": (
+        "headline_medium", "body_medium",
+        "button_label", "button_url",
+        "image_url", "image_alt",
+    ),
+    "push": ("push_title", "push_body", "push_image_url", "push_link"),
+}
+
+#: Groups where an EMPTY value means "remove the key", not "store an empty one".
+#:
+#: ADR-161 point 7's rider makes catalogue readiness exactly "push fields not
+#: empty", so a stored `""` would leave every record looking push-ready — the
+#: difference between "not prepared for push" and "prepared with nothing in
+#: it". Email carries no such predicate, so an empty string there is merely an
+#: empty string and is stored as written.
+#:
+#: This asymmetry is deliberate and was preserved rather than tidied when the
+#: rule moved out of the router: unifying on "always remove" would be simpler
+#: and would change what `create_content` and the render path see, which is a
+#: separate decision from where the rule lives.
+PRESENCE_SIGNIFICANT_GROUPS = frozenset({"push"})
+
+
+def merge_content_fields(
+    existing: dict | None, incoming: dict, *, groups: list[str],
+) -> dict:
+    """Merge submitted fields onto stored content, honouring what was offered.
+
+    `groups` names the field groups the caller is authoritative for. A key in a
+    group that was not offered is left exactly as it was found; a key in an
+    offered group is written, or removed when the group is presence-significant
+    and the value is empty. Keys in no group at all are always preserved —
+    content is an open dict and a merge must not be a silent schema.
+
+    Pure: takes dicts and returns a new one, so the rule can be tested without
+    a database or a request. It was reachable only through a form until
+    2026-09-20, which is why a JSON client could not have honoured it.
+    """
+    merged = dict(existing or {})
+    for group in groups:
+        fields = CONTENT_FIELD_GROUPS.get(group)
+        if fields is None:
+            raise ValueError(
+                f"'{group}' is not a content field group. Known groups: "
+                f"{', '.join(sorted(CONTENT_FIELD_GROUPS))}."
+            )
+        presence_significant = group in PRESENCE_SIGNIFICANT_GROUPS
+        for name in fields:
+            if name not in incoming:
+                continue
+            value = incoming[name]
+            if not presence_significant:
+                # Stored as written. **Not stripped**, because it was not
+                # stripped before this rule moved out of the router and moving
+                # a rule is not the moment to change it. Whether email copy
+                # should be trimmed is a real question and a separate one.
+                merged[name] = value
+                continue
+            text = value.strip() if isinstance(value, str) else value
+            if not text:
+                merged.pop(name, None)
+            else:
+                merged[name] = text
+    return merged
+
+
 def update_content_record(
     db: Session,
     content_id: int,

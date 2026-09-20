@@ -166,6 +166,16 @@ def campaign(db):
     return db.get(CampaignDB, made.id)
 
 
+def _client():
+    """A fresh API client. Declared here rather than at import time because the
+    module-level one in this file follows redirects for the Jinja tests."""
+    from fastapi.testclient import TestClient
+
+    from main import app
+
+    return TestClient(app, raise_server_exceptions=False)
+
+
 class TestTheManifestIsTheChannel:
     """ADR-160 point 6 — two files, no config step, no registry table."""
 
@@ -2525,4 +2535,154 @@ class TestNoSurfaceQuietlyRendersAPushAsAnEmail:
             )
         finally:
             db.query(SnapshotDB).filter(SnapshotDB.id == snapshot.id).delete()
+            db.commit()
+
+
+class TestTheMergeRuleIsReachableFromBothPlanes:
+    """B19 from `docs/react-migration-inventory.md`, closed 2026-09-20.
+
+    "A caller may only clear what it was offering" lived inside
+    `POST /ui/content/{id}/edit` and nowhere else. `PUT /content/{id}` replaces
+    the dict wholesale — correct for a PUT — so an SPA screen rendered with
+    push switched off would have erased push copy on every edit, which is
+    precisely the bug the form was taught to avoid on 2026-09-17, reintroduced
+    one plane over.
+    """
+
+    def test_a_group_the_caller_did_not_offer_is_left_alone(self):
+        from app.content.service import merge_content_fields
+
+        # **The incoming dict carries push keys and they must still be
+        # ignored.** An earlier version of this test omitted them, which made
+        # it assert only that absent keys survive — a much weaker claim, and it
+        # stayed green when the group check was mutated away. `groups` is the
+        # authority, not the presence of a key.
+        merged = merge_content_fields(
+            {"headline_medium": "Spa", "push_title": "Keep me"},
+            {"headline_medium": "Sauna", "push_title": ""},
+            groups=["email"],
+        )
+
+        assert merged["headline_medium"] == "Sauna"
+        assert merged["push_title"] == "Keep me", (
+            "push was never offered, so it was not the caller's to clear — "
+            "even though the caller sent an empty push_title"
+        )
+
+    def test_an_offered_group_left_empty_is_cleared(self):
+        """The other direction, and it is why the signal has to exist at all.
+
+        Same incoming dict as a caller who simply did not render push — the
+        only difference is that this one says it was offering it.
+        """
+        from app.content.service import merge_content_fields
+
+        merged = merge_content_fields(
+            {"headline_medium": "Spa", "push_title": "Remove me"},
+            {"push_title": ""},
+            groups=["push"],
+        )
+
+        assert "push_title" not in merged, (
+            "an empty push field must be removed, not stored as '' — ADR-161 "
+            "point 7 makes readiness 'push fields not empty', so a blank string "
+            "leaves the record looking push-ready"
+        )
+
+    def test_an_empty_email_field_is_stored_rather_than_removed(self):
+        """The asymmetry, pinned so it is not tidied away by accident.
+
+        Email carries no readiness predicate, so `""` there is merely an empty
+        string. Unifying the two would be defensible and is a different
+        decision from where the rule lives.
+        """
+        from app.content.service import merge_content_fields
+
+        merged = merge_content_fields(
+            {"headline_medium": "Spa"}, {"headline_medium": ""}, groups=["email"],
+        )
+        assert merged["headline_medium"] == ""
+
+    def test_keys_in_no_group_survive_every_edit(self):
+        """`content` is an open dict; a merge must not become a silent schema."""
+        from app.content.service import merge_content_fields
+
+        merged = merge_content_fields(
+            {"something_a_future_channel_added": "x"},
+            {"headline_medium": "Spa"},
+            groups=["email", "push"],
+        )
+        assert merged["something_a_future_channel_added"] == "x"
+
+    def test_an_unknown_group_is_refused_rather_than_ignored(self):
+        import pytest as _pytest
+
+        from app.content.service import merge_content_fields
+
+        with _pytest.raises(ValueError):
+            merge_content_fields({}, {}, groups=["carrier-pigeon"])
+
+    def test_patch_over_json_honours_the_rule(self, db):
+        """The whole point: an SPA can now edit without destroying copy."""
+        from app.auth.permissions import CONTENT_MANAGE, VIEW
+        from app.content.db_models import ContentRecordDB
+        from app.content.service import create_content
+        from tests.machine import machine
+
+        brand = auth.ensure_default_brand(db)
+        record = create_content(
+            db, title=_name("merge"), brand_id=brand.id,
+            content={"headline_medium": "Spa", "push_title": "Keep me"},
+        )
+        try:
+            with machine([VIEW, CONTENT_MANAGE]) as headers:
+                response = _client().patch(
+                    f"/content/{record.id}",
+                    json={"content": {"headline_medium": "Sauna"}, "groups": ["email"]},
+                    headers=headers,
+                )
+                assert response.status_code == 200, response.text
+
+            db.expire_all()
+            stored = db.query(ContentRecordDB).filter(
+                ContentRecordDB.id == record.id).first()
+            assert stored.content["headline_medium"] == "Sauna"
+            assert stored.content["push_title"] == "Keep me"
+        finally:
+            db.query(ContentRecordDB).filter(ContentRecordDB.id == record.id).delete()
+            db.commit()
+
+    def test_put_still_replaces_and_that_is_deliberate(self, db):
+        """Pinned so the difference between the two verbs is a decision.
+
+        PUT means replace and is left meaning it. The danger is real, which is
+        why the route's docstring says so and points at PATCH — but a PUT that
+        quietly merged would be a worse trap than one that does what it says.
+        """
+        from app.auth.permissions import CONTENT_MANAGE, VIEW
+        from app.content.db_models import ContentRecordDB
+        from app.content.service import create_content
+        from tests.machine import machine
+
+        brand = auth.ensure_default_brand(db)
+        record = create_content(
+            db, title=_name("replace"), brand_id=brand.id,
+            content={"headline_medium": "Spa", "push_title": "Gone after PUT"},
+        )
+        try:
+            with machine([VIEW, CONTENT_MANAGE]) as headers:
+                response = _client().put(
+                    f"/content/{record.id}",
+                    json={"title": record.title,
+                          "content": {"headline_medium": "Sauna"}},
+                    headers=headers,
+                )
+                assert response.status_code == 200, response.text
+
+            db.expire_all()
+            stored = db.query(ContentRecordDB).filter(
+                ContentRecordDB.id == record.id).first()
+            assert "push_title" not in stored.content
+        finally:
+            db.query(ContentRecordDB).filter(ContentRecordDB.id == record.id).delete()
             db.commit()

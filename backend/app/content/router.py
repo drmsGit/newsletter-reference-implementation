@@ -15,8 +15,10 @@ from app.content.models import (
     ContentVersion,
     ContentVersionCreate,
     ContentStatusUpdate,
+    ContentPatch,
 )
 from app.content.service import (
+    merge_content_fields,
     list_content_records,
     get_content_record,
     to_content_record,
@@ -105,8 +107,61 @@ def update_content_record_by_id(
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
+    """Replace a content record wholesale. **`content` is replaced, not merged.**
+
+    That is what PUT means and it is left meaning it — but it is a loaded gun
+    for a client that renders fields conditionally. A screen with push switched
+    off sends no push keys, and this route will then remove them, which is
+    exactly the data-loss bug the Jinja form was taught to avoid in 2026-09-17.
+
+    **Use `PATCH` for a partial edit.** It takes the groups the caller was
+    authoritative for and merges accordingly, which is the rule
+    `content.service.merge_content_fields` holds for both planes.
+    """
     record = update_content_record(
         db, content_id, payload.title, payload.content, payload.description,
+        brand_id=brand_id,
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Content record not found")
+    return record
+
+
+@router.patch("/{content_id}", response_model=ContentRecord)
+def patch_content_record(
+    content_id: int,
+    payload: ContentPatch,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    """Edit a content record, merging onto what is stored.
+
+    The rule, in one sentence: **a caller may only clear what it was
+    offering.** `groups` says what that was; a key in a group the caller did
+    not name is left exactly as found, and a key in no group at all is always
+    preserved, because `content` is an open dict and a merge must not quietly
+    become a schema.
+
+    Added 2026-09-20. Until then this behaviour existed only inside
+    `POST /ui/content/{id}/edit`, so the SPA had no way to edit a record
+    without destroying the copy for whichever channel its screen was not
+    showing.
+    """
+    existing = get_content_record(db, content_id, brand_id=brand_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Content record not found")
+    try:
+        merged = merge_content_fields(
+            existing.content, payload.content, groups=payload.groups,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+
+    record = update_content_record(
+        db, content_id,
+        payload.title if payload.title is not None else existing.title,
+        merged,
+        payload.description if payload.description is not None else existing.description,
         brand_id=brand_id,
     )
     if record is None:

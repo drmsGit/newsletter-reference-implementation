@@ -2400,31 +2400,33 @@ def content_edit(
     # silently dropped — harmless while the form knew every field, and a
     # data-loss bug the moment a channel's fields are conditionally rendered:
     # editing a record while push is switched off would erase its push copy.
-    existing = get_content_record(
-        db, content_record_id, brand_id=working_brand_id(request, db)
+    # The rule itself moved to `content.service.merge_content_fields` on
+    # 2026-09-20 (ADR-172 point 7). It lived only here, which meant a JSON
+    # client could not honour it and would have erased push copy on every edit
+    # — the bug this form was taught to avoid, reintroduced one plane over.
+    #
+    # The email group is always offered because this form always renders it;
+    # push only when `channel_sections_present` says it was on screen.
+    from app.content.service import merge_content_fields
+
+    brand_id = working_brand_id(request, db)
+    existing = get_content_record(db, content_record_id, brand_id=brand_id)
+    content = merge_content_fields(
+        existing.content if existing else None,
+        {
+            "headline_medium": headline_medium,
+            "body_medium": body_medium,
+            "button_label": button_label,
+            "button_url": button_url,
+            "image_url": image_url,
+            "image_alt": image_alt,
+            "push_title": push_title,
+            "push_body": push_body,
+            "push_image_url": push_image_url,
+            "push_link": push_link,
+        },
+        groups=["email"] + (["push"] if "push" in channel_sections_present else []),
     )
-    content = dict((existing.content if existing else None) or {})
-    content.update({
-        "headline_medium": headline_medium,
-        "body_medium": body_medium,
-        "button_label": button_label,
-        "button_url": button_url,
-        "image_url": image_url,
-        "image_alt": image_alt,
-    })
-    if "push" in channel_sections_present:
-        for name, value in (
-            ("push_title", push_title), ("push_body", push_body),
-            ("push_image_url", push_image_url), ("push_link", push_link),
-        ):
-            if value.strip():
-                content[name] = value.strip()
-            else:
-                # Asked and left empty means the author cleared it. Removed
-                # rather than stored as "" — ADR-161 point 7's rider makes
-                # catalogue readiness "push fields not empty", so a blank
-                # string would leave the record looking push-ready.
-                content.pop(name, None)
 
     update_content_record(
         db,
