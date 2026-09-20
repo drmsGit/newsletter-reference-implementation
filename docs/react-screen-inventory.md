@@ -43,7 +43,7 @@ Each row says what the screen needs and whether the API can serve it today.
 | Screen | Needs | Status |
 |---|---|---|
 | Sign in | `POST /auth/session/request`, `POST /auth/session/verify` | ✅ built 2026-09-19 |
-| Brand switcher (not a screen — a control in the shell) | `POST /ui/brand` equivalent | ❌ **gap C1.** `set_session_brand` has no JSON route. A cookie-authenticated SPA cannot change brand. **Blocks the shell, so it blocks everything.** |
+| Shell context + brand switcher | `GET /auth/session`, `POST /auth/session/brand` | ✅ **built 2026-09-20 (was gap C1).** `GET` returns the user, the working brand and the brands they may switch to; `POST` answers **204 whether or not the switch was accepted**, so a refusal cannot be used to discover brands. Re-read `GET /auth/session` to see where you are. |
 
 ### Core loop
 
@@ -78,8 +78,9 @@ Each row says what the screen needs and whether the API can serve it today.
 
 In order, and only three things:
 
-1. **C1, the brand switcher.** One route. Without it the shell cannot work and
-   every brand-scoped screen is stuck on whatever brand the session landed on.
+1. ~~**C1, the brand switcher.**~~ ✅ **Closed 2026-09-20**, and it was two routes
+   rather than one: the shell also had no way to ask who it is and which brand
+   it is in.
 2. **C8, planning a send.** Without it "deliveries" is a read-only list of sends
    the SPA cannot create, which is most of the product's point.
 3. **C2, settings.** Not blocking the core loop; blocking a usable product.

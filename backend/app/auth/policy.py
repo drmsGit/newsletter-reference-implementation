@@ -66,6 +66,10 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
     # any brand the user holds no grant on, so `view` (implied by every role)
     # is the honest requirement rather than inventing a permission for it.
     ("/ui/brand", VIEW),
+    # The JSON twin (gap C1, 2026-09-20). Same reasoning: switching is
+    # navigation, not a capability — `set_session_brand` refuses any brand the
+    # user holds no grant on, so `view` is the honest requirement.
+    ("/auth/session/brand", VIEW),
 
     # --- narrow cases that live inside broader prefixes ---------------------
     # Spends real money, so it is gated on AI rather than on owning the campaign.
@@ -326,6 +330,15 @@ BRAND_OWNED: dict[str, str] = {
         "authorised in. The inbox filters on it and `may_decide` checks the "
         "action's permission against the ROW's brand, not the reader's, which "
         "is what stays correct if an inbox ever spans more than one."
+    ),
+    "/auth": (
+        "no, and it is the interesting 'no'. These two routes are ABOUT brands "
+        "— `GET /auth/session` reports the working one and `POST "
+        "/auth/session/brand` changes it — but the rows they touch are "
+        "sessions and role assignments, which are platform-level. The brand "
+        "here is the session's working CONTEXT, which is the thing ADR-172 "
+        "point 1 separated from authorisation. A route that sets the context "
+        "cannot itself be scoped by it."
     ),
     "/email-modules": (
         "no — module manifests read from disk. They describe what the "

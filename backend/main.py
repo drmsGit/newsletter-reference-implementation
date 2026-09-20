@@ -129,6 +129,7 @@ from app.providers.router import router as provider_router
 
 from app.modules.router import router as email_modules_router
 from app.approvals.router import router as approvals_router
+from app.auth.router import context_router
 
 from app.overrides.db_models import ContentOverrideDB
 from app.overrides.router import router as overrides_router
@@ -643,6 +644,11 @@ app.include_router(audience_router, dependencies=_api)
 # inbox is readable by anything that may read, and it is granting that ADR-166
 # point 5 reserves for people.
 app.include_router(approvals_router, dependencies=_api)
+# The session's own context — who is signed in and which brand they work in.
+# **Guarded, unlike the three `session_router` routes**, which are PUBLIC_AUTH
+# because you cannot require a session in order to obtain one. These read and
+# change a session that already exists.
+app.include_router(context_router, dependencies=_api)
 
 
 @app.get("/")

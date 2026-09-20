@@ -979,3 +979,86 @@ class TestRoutesThatMailAPersonAreNotDowngradedByAPrefix:
             "mail, add it here. If it does not, it should not be "
             "`sends.execute`."
         )
+
+
+class TestTheShellCanReadAndChangeItsBrand:
+    """Gap C1, closed 2026-09-20 — the SPA's shell could not work without it.
+
+    `set_session_brand` had no JSON route, so a cookie-authenticated client was
+    stuck on whichever brand the session landed on, and every brand-scoped
+    screen with it.
+    """
+
+    def test_the_session_reports_who_and_where(self, db):
+        with signed_in(db) as (cookied, token, csrf):
+            response = cookied.get("/auth/session")
+            assert response.status_code == 200, response.text
+            body = response.json()
+            assert body["user"]["email"]
+            assert body["brand"]["id"]
+            # The brands offered are the ones the user holds a grant on, not
+            # every brand that exists. A switcher offering the rest would be a
+            # list of other people's brands.
+            assert [b["id"] for b in body["brands"]] == [body["brand"]["id"]]
+
+    def test_switching_to_a_brand_you_hold_actually_moves_you(self, db):
+        from app.auth.db_models import BrandDB, RoleAssignmentDB, RoleDB
+        from app.auth.permissions import ADMIN
+
+        other = BrandDB(key=f"c1-{uuid.uuid4().hex[:8]}", name="Second")
+        db.add(other); db.commit(); db.refresh(other)
+        try:
+            with signed_in(db) as (cookied, token, csrf):
+                user = auth.user_for_token(db, token)
+                role = db.query(RoleDB).filter(RoleDB.key == ADMIN).first()
+                db.add(RoleAssignmentDB(
+                    user_id=user.id, role_id=role.id, brand_id=other.id))
+                db.commit()
+
+                response = cookied.post(
+                    "/auth/session/brand", json={"brand_id": other.id},
+                    headers={"X-CSRF-Token": csrf},
+                )
+                assert response.status_code == 204, response.text
+                assert cookied.get("/auth/session").json()["brand"]["id"] == other.id
+        finally:
+            db.query(RoleAssignmentDB).filter(
+                RoleAssignmentDB.brand_id == other.id).delete()
+            db.query(BrandDB).filter(BrandDB.id == other.id).delete()
+            db.commit()
+
+    def test_a_refused_switch_answers_exactly_like_an_accepted_one(self, db):
+        """**The property worth being careful about.**
+
+        A distinct response would tell a signed-in user which brands exist
+        beyond their own grants — the enumeration shape ADR-151 point 2 closes
+        on the login form, arriving somewhere else. The Jinja route keeps this
+        by redirecting unconditionally; this one keeps it by saying nothing.
+
+        So the assertion is not "it refuses" — it is that the refusal is
+        *indistinguishable*, and that the working brand did not move.
+        """
+        with signed_in(db) as (cookied, token, csrf):
+            before = cookied.get("/auth/session").json()["brand"]["id"]
+
+            response = cookied.post(
+                "/auth/session/brand", json={"brand_id": 999999},
+                headers={"X-CSRF-Token": csrf},
+            )
+
+            assert response.status_code == 204, response.text
+            assert response.content == b"", "a refusal said something an acceptance does not"
+            assert cookied.get("/auth/session").json()["brand"]["id"] == before
+
+    def test_a_machine_cannot_switch_a_brand_it_does_not_have(self, db):
+        """A bearer credential has no session, so there is nothing to change.
+        ADR-166 point 8 has it declare a brand per request instead."""
+        from app.auth.permissions import VIEW
+
+        with machine([VIEW]) as headers:
+            response = client.post(
+                "/auth/session/brand", json={"brand_id": 1}, headers=headers,
+            )
+            assert response.status_code == 403, response.text
+            assert "may not grant" in response.json()["detail"] or "person" in \
+                response.json()["detail"].lower()

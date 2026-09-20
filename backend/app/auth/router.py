@@ -15,12 +15,16 @@ from urllib.parse import quote
 from fastapi import APIRouter, Body, Depends, Form, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import AUTH_ENFORCED_KEY, auth_enforced, require_permission
+from app.auth.dependencies import (
+    AUTH_ENFORCED_KEY, auth_enforced, require_permission, require_person,
+)
 from app.auth.permissions import ALL_PERMISSIONS, BUILTIN_ROLES, USERS_MANAGE
 from app.auth.db_models import RoleAssignmentDB, RoleDB
 from app.auth.service import (
+    set_session_brand,
     SESSION_COOKIE, SESSION_ABSOLUTE_HOURS, access_list, assign_role,
     client_identifier, cookie_secure, create_brand, create_role, create_user,
     csrf_token_for,
@@ -441,6 +445,17 @@ def set_enforcement(
 #: `enforce_api_csrf` instead: skipped when there is no cookie (sign-in), and
 #: requiring `X-CSRF-Token` when there is one (sign-out). Exactly the split
 #: ADR-168 point 2 drew.
+class BrandSwitch(BaseModel):
+    """Which brand to work in next.
+
+    One field and no `next` URL: the Jinja form carries one because a redirect
+    has to land somewhere, and a client that renders its own screens decides
+    that for itself.
+    """
+
+    brand_id: int
+
+
 session_router = APIRouter(tags=["auth"])
 
 
@@ -572,3 +587,80 @@ def session_end(request: Request, response: Response, db: Session = Depends(get_
     """
     revoke_token(db, request.cookies.get(SESSION_COOKIE))
     response.delete_cookie(SESSION_COOKIE)
+
+
+# --- the session's working context (ADR-150 point 2, ADR-168) ---------------
+#
+# **A separate router because these are not public.** The three routes above
+# are `PUBLIC_AUTH`: you cannot require a session in order to obtain one. These
+# two are the opposite — they read and change a session that already exists, so
+# they are wired through `enforce_api_policy` like every other guarded router.
+# Putting them on `session_router` would have made them unauthenticated, and
+# "anyone may set the working brand on any session" is not a small mistake.
+#
+# Found 2026-09-20 as gap C1 in `docs/react-screen-inventory.md`: the SPA's
+# shell cannot work without them, so they block every brand-scoped screen.
+
+context_router = APIRouter(tags=["auth"])
+
+
+@context_router.get(
+    "/auth/session",
+    summary="Who is signed in, and which brand they are working in",
+    description=(
+        "The shell's first call. Returns the signed-in user, the working "
+        "brand, and the brands they may switch to — which is exactly the "
+        "brands they hold a grant on, so listing them reveals nothing they "
+        "could not already discover."
+    ),
+)
+def get_session_context(request: Request, db: Session = Depends(get_db)):
+    from app.auth.service import brands_for_user, current_brand_summary, current_user_summary
+
+    token = request.cookies.get(SESSION_COOKIE)
+    user = user_for_token(db, token)
+    return {
+        "user": current_user_summary(db, token),
+        "brand": current_brand_summary(db, token),
+        # `brands_for_user`, not every brand: a switcher offering something the
+        # user cannot switch to would be a list of other people's brands.
+        "brands": [{"id": b.id, "name": b.name} for b in brands_for_user(db, user)],
+    }
+
+
+@context_router.post(
+    "/auth/session/brand",
+    status_code=204,
+    dependencies=[Depends(require_person)],
+    summary="Change the working brand",
+    description=(
+        "Answers 204 whether or not the switch was accepted. A refused switch "
+        "leaves you in the brand you were already in; re-read `GET "
+        "/auth/session` to see where you are."
+    ),
+)
+def set_working_brand(
+    request: Request,
+    payload: BrandSwitch,
+    db: Session = Depends(get_db),
+):
+    """Change the working brand (ADR-150 point 2's switcher).
+
+    **Not a permission.** Any signed-in person may switch to a brand they
+    already hold a grant on, and `set_session_brand` refuses anything else — so
+    the policy entry is `view`, which every role implies. That is the same
+    reasoning the `/ui/brand` entry carries.
+
+    **Answers identically whether accepted or refused**, which is the property
+    worth being careful about. A distinct response would tell a signed-in user
+    which brands exist beyond their own grants — the enumeration shape ADR-151
+    point 2 closes on the login form, arriving somewhere else. The Jinja route
+    keeps this by redirecting unconditionally; this one keeps it by returning
+    204 and saying nothing.
+
+    **Refused to a bearer credential** by `require_person`, and not because of
+    permissions: a machine has no session, so there is nothing for this route
+    to change. ADR-166 point 8 has it declare a brand per request instead.
+    """
+    set_session_brand(db, request.cookies.get(SESSION_COOKIE), payload.brand_id)
+    return Response(status_code=204)
