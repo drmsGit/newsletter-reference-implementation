@@ -210,6 +210,91 @@ APPROVABLE_ROUTES: dict[str, str] = {
 }
 
 
+#: **Which of the twelve JSON routers own brand-scoped rows** (ADR-172).
+#:
+#: Not enforcement — nothing reads this at request time. It is the answer to
+#: the hazard [[ADR-168]]'s `### Negative` names: "a guard added to eleven of
+#: twelve routers fails identically and reports identically: a gate that reads
+#: as closed over a plane that is open." A rollout across twelve routers has
+#: exactly that shape while it is in progress, and the only thing that
+#: distinguishes "not done yet" from "decided not to" is a list that names
+#: every router, including the ones the rule does not apply to and why.
+#:
+#: Here rather than in `main.py` for this file's own stated reason: the policy
+#: has to be legible in one place, and a classification hiding in the wiring is
+#: one nobody auditing access control would find.
+#:
+#: The values are deliberately prose rather than an enum. "Partial" is the
+#: interesting state and an enum would flatten *why* — which is the only part
+#: worth reading.
+BRAND_OWNED: dict[str, str] = {
+    "/campaigns": (
+        "yes — `campaigns.brand_id`. Variants, modules, decision slots and "
+        "resolutions carry none and are reached by joining back to it."
+    ),
+    "/content": (
+        "partial — `content_records.brand_id`, but `/categories` and "
+        "`/category-relations` are the global vocabulary ADR-150's 2026-09-15 "
+        "addendum settles as unbranded. Content is per-brand; what a category "
+        "MEANS is not."
+    ),
+    "/api/audience-groups": (
+        "yes — `audience_groups.brand_id`. Members and rule blocks join back "
+        "to it. Note the group's brand gates consent at resolution time, not "
+        "the caller's (ADR-163's addendum)."
+    ),
+    "/delivery": (
+        "yes — `send_instances.brand_id`, NOT NULL since migration 0007. The "
+        "predicate lives INSIDE `send_send_instance`'s `FOR UPDATE`, because "
+        "checking it separately is a check-then-act window on the one query "
+        "where that matters most."
+    ),
+    "/snapshots": (
+        "yes — transitively, `snapshot -> variant -> campaign`. No column."
+    ),
+    "/rendering": (
+        "yes — `variant -> campaign`. The service takes the brand optionally "
+        "and the route passes `Depends(working_brand)`, so the request path "
+        "cannot forget while the send path does not re-derive what it holds."
+    ),
+    "/overrides": (
+        "yes — the longest chain in the codebase, `override -> module -> "
+        "variant -> campaign`. Scoped by subquery rather than join, because "
+        "both lookups take `FOR UPDATE` and a join would lock campaign rows."
+    ),
+    "/decision": (
+        "partial — `/slots/{id}/execute` is brand-owned via the slot's "
+        "variant; `/strategies` lists a code-level registry and is not. What "
+        "strategies EXIST is a property of the deployment, not of a brand."
+    ),
+    "/insight": (
+        "partial — reading a delivery execution's events is brand-owned via "
+        "its send instance. Writing events feeds signal contributions, which "
+        "carry no brand by ADR-150 point 8, because a recipient does not "
+        "either (point 9)."
+    ),
+    "/recipients": (
+        "partial, and the unresolved one. Recipients carry no brand (ADR-150 "
+        "point 9), so most of this router is genuinely platform-level. But "
+        "`POST /{external_id}/consent` writes `consent_events.brand_id` and "
+        "takes that brand FROM THE REQUEST BODY, while `recipients.consent` is "
+        "platform-level and so is checked against no brand at all. That is the "
+        "shape ADR-166 point 8 refuses. Logged in `docs/backlog.md`; the fix "
+        "is a decision about whether consent capture is a brand-scoped act, "
+        "not an edit."
+    ),
+    "/provider": (
+        "no — provider configuration and signed callbacks. A webhook arrives "
+        "from a vendor with no notion of brands, and is exempt from the guard "
+        "entirely via `PROVIDER_SIGNED`."
+    ),
+    "/email-modules": (
+        "no — module manifests read from disk. They describe what the "
+        "deployment can compose, which is the same for every brand."
+    ),
+}
+
+
 def required_permission(method: str, route_template: str) -> str:
     """The permission this request needs.
 

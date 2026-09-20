@@ -601,6 +601,10 @@ app.include_router(
 # guard stands aside so the route's own Svix check runs (ADR-166 point 6). The
 # exemption is legible in `app/auth/policy.py` — where somebody auditing the
 # policy would actually look — instead of hiding here.
+# **Which of these own brand-scoped rows is recorded in `app/auth/policy.py`'s
+# `BRAND_OWNED`**, not here — the classification is policy, and this is wiring.
+# A test asserts the two agree, so a thirteenth router cannot arrive unclassified
+# and leave the boundary looking uniform while it is not (ADR-172 point 7).
 _api = [Depends(enforce_api_csrf), Depends(enforce_api_policy)]
 app.include_router(content_router, dependencies=_api)
 app.include_router(campaigns_router, dependencies=_api)

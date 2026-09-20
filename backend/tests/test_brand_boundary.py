@@ -670,3 +670,82 @@ class TestASendCannotBeFiredFromAnotherBrand:
                 assert response.json() == []
         finally:
             self._remove(send_id)
+
+
+# --- the classification table, stage 7 --------------------------------------
+
+def _guarded_router_prefixes() -> set[str]:
+    """Every router `enforce_api_policy` is actually wired onto.
+
+    Read from the resolved `dependant`, not from `route.dependencies` — FastAPI
+    merges router-level dependencies into the former and the latter holds only
+    what a route declared for itself. Asserting against the wrong one produced
+    an empty list once, and a test that could never have caught its own bug.
+    """
+    from main import app
+
+    prefixes = set()
+    for route in app.routes:
+        dependant = getattr(route, "dependant", None)
+        names = {
+            getattr(d.call, "__name__", "")
+            for d in getattr(dependant, "dependencies", [])
+        }
+        if "enforce_api_policy" not in names:
+            continue
+        parts = getattr(route, "path", "").strip("/").split("/")
+        prefixes.add("/" + ("/".join(parts[:2]) if parts[0] == "api" else parts[0]))
+    return prefixes
+
+
+def test_every_guarded_router_is_classified_as_brand_owned_or_not():
+    """**The answer to ADR-168's eleven-of-twelve hazard.**
+
+    That record's `### Negative` names the failure precisely: "a guard added to
+    eleven of twelve routers fails identically and reports identically: a gate
+    that reads as closed over a plane that is open." A brand-boundary rollout
+    across twelve routers has exactly that shape for as long as it is in
+    progress — and the thing that distinguishes "not done yet" from "decided
+    not to" is a list naming every router, including the ones the rule does not
+    apply to.
+
+    So the list has to be exhaustive, and nothing but this makes it so. A
+    thirteenth router added without a line in `BRAND_OWNED` turns this red,
+    which is the whole point: classifying it is a sentence somebody writes, not
+    a thing they can omit by not thinking about it.
+    """
+    from app.auth.policy import BRAND_OWNED
+
+    guarded = _guarded_router_prefixes()
+    unclassified = guarded - set(BRAND_OWNED)
+    stale = set(BRAND_OWNED) - guarded
+
+    assert not unclassified, (
+        f"these routers are guarded but not classified: {sorted(unclassified)}. "
+        "Add a line to BRAND_OWNED in app/auth/policy.py saying whether the "
+        "router owns brand-scoped rows, and why."
+    )
+    assert not stale, (
+        f"BRAND_OWNED names routers that no longer exist: {sorted(stale)}. "
+        "A classification table describing a plane that has moved is worse "
+        "than none, because it reads as current."
+    )
+
+
+def test_the_partial_routers_say_what_the_exception_is():
+    """"Partial" is the only interesting value, so it has to carry a reason.
+
+    A table that reduced to yes/no would flatten exactly the part worth
+    reading — that `/content` is brand-owned except for the global category
+    vocabulary, and that `/recipients` has one route writing a brand off the
+    request body. Those two sentences are the table's actual content.
+    """
+    from app.auth.policy import BRAND_OWNED
+
+    for prefix, reason in BRAND_OWNED.items():
+        if reason.startswith("partial"):
+            assert "—" in reason or "-" in reason, prefix
+            assert len(reason) > 80, (
+                f"{prefix} is classified 'partial' with no explanation of "
+                "which part. That is the only thing a reader needs from it."
+            )
