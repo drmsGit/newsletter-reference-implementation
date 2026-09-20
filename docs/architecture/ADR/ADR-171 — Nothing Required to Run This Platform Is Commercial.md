@@ -1,6 +1,6 @@
 ---
 type: adr
-status: proposed
+status: accepted
 topic:
   - architecture
   - governance
@@ -17,7 +17,7 @@ depends_on:
 ---
 
 ## Status
-Proposed
+Accepted
 
 ## Context
 
@@ -64,7 +64,11 @@ An adopter is free to reimplement this in another language, taking the ADRs and 
 ## Notes
 
 - **Not about avoiding vendors.** Resend is a real integration, proven live against a verified domain, and Anthropic runs the only built AI task. The rule constrains what happens when the bill is not paid, not whether a bill is ever paid.
-- **The adjacent gap this does not cover:** the JSON API cannot currently run the product — 73 UI write routes against 33 JSON ones, measured 2026-09-19 — so "take the backend and bring your own client" is blocked by completeness rather than by licensing. Logged separately in `docs/backlog.md` against [[ADR-002 — API First Architecture]], because it is a different failure with a different fix.
+- **The adjacent gap this does not cover:** the JSON API could not run the product — 73 UI write routes against 33 JSON ones when this was written — so "take the backend and bring your own client" was blocked by completeness rather than by licensing. Logged separately in `docs/backlog.md` against [[ADR-002 — API First Architecture]], because it is a different failure with a different fix. **Remeasured at acceptance, 2026-09-20: 73 against 55.** The gap has closed by two thirds and has not closed.
+
+- **Point 3 has a test as of acceptance.** `backend/tests/test_no_commercial_dependency.py`. The record says a claim about what is optional "is worth exactly as much as the test that proves it", so accepting it without one would have failed its own standard in the same sentence that sets it. Five checks: both factories default to something free, a send and an AI generation each complete with every paid key unset, and **no module in `app/` imports a commercial SDK at module scope** — an adapter imported at module scope is a requirement wearing an adapter's clothes, since the package must then be installed for the app to start whether or not anybody pays for the service.
+
+  Writing it turned up a stronger fact than the record claims: **neither `resend` nor `anthropic` is installed in the environment at all.** Both live adapters import their SDK inside the call, so the commercial packages are not merely optional at runtime — they are not dependencies. That is point 2 held more tightly than it is stated, and the structural test is what keeps it that way once somebody does install one.
 
 ## Related ADRs
 
