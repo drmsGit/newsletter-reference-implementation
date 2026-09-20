@@ -69,7 +69,7 @@ Two more of the same shape:
   cannot express this and that the real gate is in the route. The real gate is in
   the file with the deletion date.
 
-## The second: a documented rule with two call sites, both here
+## The second: a documented rule with two call sites, both here — ✅ CLOSED 2026-09-20
 
 `channel_available` enforces ADR-160 point 8 — a deployment may not use a channel
 it has not enabled. Verified: **exactly two call sites, both in
@@ -77,6 +77,17 @@ it has not enabled. Verified: **exactly two call sites, both in
 `campaigns/router.py:63` creates a campaign on a disabled channel without
 complaint today. Deleting the Jinja UI removes the server-side enforcement of that
 ADR entirely.
+
+**Closed 2026-09-20.** The refusal moved into `create_campaign` and
+`create_variant_for_campaign`, before anything is written, as a
+`ChannelUnavailable` exception rather than a bool — every caller's correct
+response was the same one, and a bool is a thing a caller can ignore, which is
+exactly how the JSON routers came to ignore it. It subclasses `ValueError` so
+that everything which caught it before still does, while a route that wants a
+400 rather than a 404 can name it.
+
+`channel_available` now has one call site, in the service. The Jinja
+campaign-create refusal had no test at all before the move; it has one now.
 
 ---
 
