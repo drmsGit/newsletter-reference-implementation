@@ -131,6 +131,51 @@ Not silently preferred one way or the other. The cost of preferring is not ambig
 - **Unblocked by this but deliberately not decided here:** `enforce_api_policy` setting `request.state.principal` and a derived actor type, with `record_from_request` preferring it over `current_user`. That is also what [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]] point 3's `ACTOR_INTEGRATION` needs: the constant is defined at `backend/app/audit/service.py:43` and **nothing writes it**, so no audit row in this system has ever named an integration as its actor. Note the shape changed on 2026-09-19, the same day: `backend/app/approvals/service.py` writes audit entries **from a service with an explicit actor**, departing deliberately from `audit/service.py`'s written-from-routes rule on the grounds that an expiry has no request behind it at all — which is the revisit that module's own docstring named as "the first thing to revisit" — and it adds a third actor type, `ACTOR_SYSTEM`. So the machine plane is no longer silent; it is specifically the *integration as actor* that remains unwritten.
 - **The framework choice is a separate record and is owed.** React over the alternatives is not decided by this ADR and must not be read into it; this record decides only how the manager client authenticates and where it is served from.
 
+## Addendum 2026-09-20 — the token had no way to survive a reload
+
+Prompted by planning the React client against this record, which turned up an
+implementation gap in the mechanism point 2 decides.
+
+**This amends an implementation answer, not the Decision.** Point 2 decided how
+the CSRF token is *compared* — an `X-CSRF-Token` header against
+`csrf_token_for(session_token)`, using `secrets.compare_digest`, with no
+storage and no new secret. It said nothing about how a client *learns* the
+token, because the Jinja plane never had to: a template renders the token into
+the form. Point 2 stands exactly as written. This is emphatically not a
+supersession.
+
+**The gap, found 2026-09-20.** The token was obtainable from exactly one place:
+the `POST /auth/session/verify` response body. It is not a cookie of any kind,
+`GET /auth/session` did not return it, and the session cookie is `httponly`, so
+the client could not derive one either. **Any page reload, new tab or restored
+session therefore held a valid session and no CSRF token, and could not perform
+a single write** — the SPA's only recovery would have been to sign out and back
+in, which is not a recovery, it is the bug wearing a workflow. Session tokens do
+not rotate, so this is not a race that resolves itself: `create_session` writes
+`token_hash` once (`backend/app/auth/service.py:756`) and `user_for_token` only
+touches `last_seen_at` thereafter (`backend/app/auth/service.py:790`), so the
+token is stable for the session's whole life and the client simply never sees it
+again.
+
+**Fixed 2026-09-20.** `GET /auth/session` now returns `csrf_token`, with
+`Cache-Control: no-store` because the response carries a per-session secret and
+a shared cache holding it would hand one person's token to another. That route
+is the shell's first call on every load, so this **costs no extra round trip and
+adds no mechanism** — it hands over a value the server could already derive.
+Empty for a bearer-authenticated machine caller, which sends no cookie and is
+not subject to CSRF at all.
+
+Three tests in `backend/tests/test_json_session.py`, class
+`TestTheTokenSurvivesAReload`, cover it: the route hands back a token, that
+token actually authorises a write, and the response is not cacheable. All three
+were mutation-checked — each fails with the fix removed.
+
+**Worth saying plainly:** `docs/react-screen-inventory.md` listed three gaps
+blocking the first screen. This was a fourth, it sat in the auth spine rather
+than in a screen, and **nobody had written it down**. A gap inventory that
+misses the mechanism every write depends on is a reminder that the inventory
+was taken screen by screen, and this defect belongs to none of them.
+
 ## Related ADRs
 
 ### Depends On
