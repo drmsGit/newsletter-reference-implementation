@@ -39,3 +39,18 @@ class SendInstanceCreate(BaseModel):
     status: str = "draft"
     provider: str | None = None
     scheduled_at: datetime | None = None
+
+class TestSendRequest(BaseModel):
+    """One real email to one typed address.
+
+    `variant_id` is optional: without it a plain test body goes, which is the
+    question "does mail leave the building at all" asked on its own. With it,
+    the variant is rendered through the email path — and if that fails the send
+    still happens with `render_note` explaining what the recipient got instead.
+    """
+
+    to: str
+    subject: str = "Test from the newsletter reference build"
+    provider: str = "resend"
+    variant_id: int | None = None
+    recipient_id: int | None = None

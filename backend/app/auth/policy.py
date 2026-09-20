@@ -100,6 +100,19 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
     ("/ui/send-instances/", SENDS_PLAN),
     ("/ui/deliveries/process-due", SENDS_EXECUTE),
     ("/ui/send-test", SENDS_EXECUTE),
+    # The JSON twin, and it needs its own line **above** the broad `/delivery`
+    # entry, which would price it as `sends.plan` — "may prepare a send" rather
+    # than "may put mail in front of a person". A test send reaches a real
+    # inbox through a real provider; that it goes to one address the operator
+    # typed rather than to an audience makes it smaller, not different.
+    #
+    # **Third time.** `/delivery/process-due` resolved to `sends.plan` on
+    # 2026-09-19 and `/campaigns/…/suggest-subject` to `campaigns.manage` on
+    # 2026-09-20, both through a broad prefix sitting above a narrow route.
+    # `test_every_route_that_mails_a_person_is_priced_as_such` now asserts the
+    # set exactly, so a fourth is an edit somebody has to justify rather than
+    # a silent downgrade.
+    ("/delivery/send-test", SENDS_EXECUTE),
 
     # --- editorial and audience --------------------------------------------
     # Adding or removing one member is `audiences.pin`; changing the rules that

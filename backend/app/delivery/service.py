@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import logging
 
 from sqlalchemy import func
@@ -439,6 +440,110 @@ def list_send_instances_for_snapshot(
     )
 
     return [to_send_instance(record) for record in records]
+
+
+@dataclass
+class TestSendResult:
+    """What a test send did, for a caller to render."""
+
+    success: bool
+    to: str
+    provider: str
+    provider_message_id: str | None = None
+    message: str | None = None
+    #: Set when the chosen variant could not be rendered and a plain body went
+    #: instead. **Not an error** — the send still happened, and the operator
+    #: needs to know they are looking at the fallback rather than their
+    #: newsletter. Losing this note would make a failed render look like a
+    #: successful preview.
+    render_note: str | None = None
+
+
+def send_test_email(
+    db: Session,
+    *,
+    to: str,
+    subject: str,
+    provider: str,
+    brand_id: int,
+    variant_id: int | None = None,
+    recipient_id: int | None = None,
+) -> TestSendResult:
+    """Send one real email, optionally rendering a variant into it.
+
+    Composed in `app/frontend/router.py` until 2026-09-20 (inventory B9) with
+    no service function at all — the only remaining item where a client would
+    have had to reimplement orchestration rather than call something. Three
+    decisions live here:
+
+    **It renders through the EMAIL path on purpose.** This sends an email, so a
+    variant of another channel is refused by that path rather than returning an
+    empty document. Before the email renderer learned to refuse, a push variant
+    rendered as a 252-character empty shell, was mailed to a real address, and
+    was reported as a success — because nothing raised, the handler below never
+    fired.
+
+    **A render failure never blocks the send.** The point of this screen is to
+    prove the provider path works; a broken variant should not stop an operator
+    finding out whether mail leaves the building at all. The fallback body goes
+    instead and `render_note` says so.
+
+    **An unknown provider is a failed result, not an exception.** The operator
+    typed a name; being told it is wrong is the answer, not a stack trace.
+
+    `brand_id` is required and the variant is resolved through the rendering
+    path's own scoped check: the router passed a bare id, so this was a small
+    brand gap as well — the same shape B15 had, and for the same reason.
+    """
+    from app.rendering.renderers.base import RenderedArtifact
+    from app.rendering.service import render_variant_html
+
+    to = to.strip()
+    fallback = (
+        f"<h1>{subject}</h1>"
+        "<p>Test email from the newsletter reference build.</p>"
+    )
+    render_note = None
+    html = fallback
+
+    if variant_id is not None:
+        from app.campaigns.service import get_variant
+
+        if get_variant(db, variant_id, brand_id=brand_id) is None:
+            render_note = (
+                f"Variant {variant_id} is not available here; sent a plain test "
+                "body instead."
+            )
+        else:
+            try:
+                html = render_variant_html(
+                    db, variant_id, recipient_id=recipient_id, mode="preview",
+                )
+            except Exception as error:  # never block the send on a render hiccup
+                render_note = (
+                    f"Could not render variant ({error}); sent a plain test body "
+                    "instead."
+                )
+                html = fallback
+
+    try:
+        sent = get_provider(provider).send(
+            to, RenderedArtifact.email(html=html, subject=subject),
+        )
+    except ValueError as error:  # unknown provider
+        return TestSendResult(
+            success=False, to=to, provider=provider,
+            message=str(error), render_note=render_note,
+        )
+
+    return TestSendResult(
+        success=sent.success,
+        to=to,
+        provider=provider,
+        provider_message_id=sent.provider_message_id,
+        message=sent.message,
+        render_note=render_note,
+    )
 
 
 def send_send_instance(

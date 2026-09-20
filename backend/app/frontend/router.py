@@ -471,43 +471,30 @@ def send_test_submit(
     """Trigger a real send through the configured provider — renders a variant
     (if chosen) so a genuine personalized newsletter goes out, else a simple
     test body. Shows the provider's result (message id or error) inline."""
-    render_note = None
-    if variant_id.strip():
-        try:
-            # This page sends an EMAIL, so it renders through the email path on
-            # purpose — and that path now refuses a variant of another channel
-            # rather than returning an empty document. Before, a push variant
-            # rendered as a 252-character empty shell, which was mailed to a
-            # real address and reported as a success: the handler below never
-            # fired because nothing raised.
-            html = render_variant_html(
-                db,
-                int(variant_id),
-                recipient_id=int(recipient_id) if recipient_id.strip() else None,
-                mode="preview",
-            )
-        except Exception as error:  # never block the send on a render hiccup
-            render_note = f"Could not render variant ({error}); sent a plain test body instead."
-            html = f"<h1>{subject}</h1><p>Test email from the newsletter reference build.</p>"
-    else:
-        html = f"<h1>{subject}</h1><p>Test email from the newsletter reference build.</p>"
+    # **The orchestration moved to `delivery.service.send_test_email` on
+    # 2026-09-20** (inventory B9). It was composed here and had no service
+    # function at all, which made it the one remaining thing a client would
+    # have had to reimplement rather than call. What is left is this plane's
+    # rendering: form strings in, a template out.
+    from app.delivery.service import send_test_email
 
-    try:
-        from app.rendering.renderers.base import RenderedArtifact
-
-        send_result = get_provider(provider).send(
-            to.strip(), RenderedArtifact.email(html=html, subject=subject)
-        )
-        result = {
-            "success": send_result.success,
-            "provider_message_id": send_result.provider_message_id,
-            "message": send_result.message,
-            "to": to.strip(),
-            "provider": provider,
-            "render_note": render_note,
-        }
-    except ValueError as error:  # unknown provider
-        result = {"success": False, "message": str(error), "to": to.strip(), "provider": provider, "render_note": render_note}
+    sent = send_test_email(
+        db,
+        to=to,
+        subject=subject,
+        provider=provider,
+        brand_id=working_brand_id(request, db),
+        variant_id=int(variant_id) if variant_id.strip() else None,
+        recipient_id=int(recipient_id) if recipient_id.strip() else None,
+    )
+    result = {
+        "success": sent.success,
+        "provider_message_id": sent.provider_message_id,
+        "message": sent.message,
+        "to": sent.to,
+        "provider": sent.provider,
+        "render_note": sent.render_note,
+    }
 
     ctx = {"title": "Send test email", "result": result, **_send_test_context(db)}
     return templates.TemplateResponse(request, "send_test.html", ctx)

@@ -904,3 +904,78 @@ class TestPlanningIsNotFiring:
                 "/delivery/send-instances", headers=headers, json={},
             )
             assert response.status_code not in (202, 403), response.status_code
+
+
+class TestRoutesThatMailAPersonAreNotDowngradedByAPrefix:
+    """**Three times is a pattern, so this is a control rather than a comment.**
+
+    `app/auth/policy.py` matches by prefix, first match wins, and order is
+    semantics with nothing enforcing it. A narrow route that sits *below* a
+    broad prefix is silently repriced, and the failure is invisible: the route
+    works, the caller is authorised, and the permission asked for is the wrong
+    one.
+
+    It has now happened three times:
+
+    * `/delivery/process-due` resolved to `sends.plan` through `/delivery/`
+      (2026-09-19) — hours after the ordering hazard was logged;
+    * `/campaigns/…/suggest-subject` resolved to `campaigns.manage` through
+      `/campaigns` (2026-09-20), pricing a token spend as a structural edit;
+    * `/delivery/send-test` would have resolved to `sends.plan` (2026-09-20),
+      pricing a real email to a real person as "may prepare a send".
+
+    Each was caught by looking. This asserts the set exactly instead, so the
+    fourth is an edit somebody has to justify.
+    """
+
+    #: Every route template that can put mail in front of a person.
+    #:
+    #: `process-due` is on the list because firing due scheduled sends is
+    #: sending, whatever the verb in the URL suggests. Approving a held request
+    #: is NOT on it: the approve routes are mapped to `view` on purpose and the
+    #: real gate is the action's own `approve_permission`, which for the send
+    #: action is `sends.execute` — so the property holds there by a different
+    #: mechanism, tested separately.
+    MAILS_A_PERSON = {
+        "/ui/send-instances/{send_instance_id}/send",
+        "/ui/deliveries/process-due",
+        "/ui/send-test",
+        "/delivery/send-instances/{send_instance_id}/send",
+        "/delivery/process-due",
+        "/delivery/send-test",
+    }
+
+    def test_every_route_that_mails_a_person_is_priced_as_such(self):
+        from app.auth.permissions import SENDS_EXECUTE
+
+        wrong = {
+            route: required_permission("POST", route)
+            for route in self.MAILS_A_PERSON
+            if required_permission("POST", route) != SENDS_EXECUTE
+        }
+        assert not wrong, (
+            f"these routes mail a real person and are not priced as "
+            f"`sends.execute`: {wrong}. Almost certainly a narrow entry has "
+            "drifted below a broad prefix in WRITE_POLICY — order is semantics "
+            "in that table and nothing else enforces it."
+        )
+
+    def test_the_list_is_every_sends_execute_route_and_no_others(self):
+        """The other direction, and it is the half that keeps the list honest.
+
+        A list of routes that mail people is only a control while it is
+        complete. If a new `sends.execute` entry appears in the policy table
+        and nobody adds it here, this list quietly stops covering the thing it
+        exists to cover — so the set is asserted both ways.
+        """
+        from app.auth.permissions import SENDS_EXECUTE
+        from app.auth.policy import WRITE_POLICY
+
+        in_table = {route for route, permission in WRITE_POLICY
+                    if permission == SENDS_EXECUTE}
+        assert in_table == self.MAILS_A_PERSON, (
+            f"the policy table and this list disagree: "
+            f"{in_table ^ self.MAILS_A_PERSON}. If a new route genuinely sends "
+            "mail, add it here. If it does not, it should not be "
+            "`sends.execute`."
+        )

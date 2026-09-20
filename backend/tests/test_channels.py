@@ -24,7 +24,7 @@ from app.auth.db_models import RoleAssignmentDB, RoleDB, SessionDB, UserDB
 from app.auth.permissions import ADMIN
 from app.campaigns import duplication
 from app.campaigns.db_models import CampaignDB, ModuleInstanceDB, VariantDB
-from app.campaigns.service import brand_of_variant
+from app.campaigns.service import brand_of_variant, create_campaign
 from app.campaigns.service import (
     create_campaign, create_module_for_variant, create_variant_for_campaign,
 )
@@ -2764,4 +2764,90 @@ class TestTheJsonPlaneRefusesWhatTheFormRefused:
                 assert response.status_code == 200, response.text
         finally:
             db.query(VariantDB).filter(VariantDB.name == name).delete()
+            db.commit()
+
+
+class TestTheTestSendIsAServiceNotARoute:
+    """Inventory B9, closed 2026-09-20 — the last item with real behaviour.
+
+    Send-test was composed entirely inside `POST /ui/send-test`: render through
+    the email path, fall back to a plain body with a visible note if rendering
+    raises, hand to the provider, shape the result. There was no service
+    function at all, so a client had to reimplement it or go without.
+    """
+
+    def _send(self, db, **kwargs):
+        from app.delivery.service import send_test_email
+
+        brand = auth.ensure_default_brand(db)
+        return send_test_email(
+            db, to="nobody@example.invalid", subject="probe",
+            provider="mock", brand_id=kwargs.pop("brand_id", brand.id), **kwargs,
+        )
+
+    def test_a_render_failure_still_sends_and_says_so(self, db, monkeypatch):
+        """**The note is the point, not the fallback.**
+
+        The purpose of this screen is to find out whether mail leaves the
+        building at all, so a broken variant must not stop it. But an operator
+        who is not told would read a successful send as a successful preview of
+        their newsletter — which is the more expensive misunderstanding.
+        """
+        import app.delivery.service as delivery_service
+
+        def _boom(*_args, **_kwargs):
+            raise RuntimeError("renderer exploded")
+
+        monkeypatch.setattr(
+            "app.rendering.service.render_variant_html", _boom, raising=True,
+        )
+        campaign = create_campaign(
+            db, name=_name("b9"), brand_id=auth.ensure_default_brand(db).id,
+            channel="email",
+        )
+        try:
+            result = self._send(db, variant_id=campaign.variants[0].id)
+            assert result.success, "a render failure blocked the send"
+            assert result.render_note, "the operator was not told they got the fallback"
+            assert "renderer exploded" in result.render_note
+        finally:
+            from app.campaigns.db_models import CampaignDB, VariantDB
+
+            db.query(VariantDB).filter(VariantDB.campaign_id == campaign.id).delete()
+            db.query(CampaignDB).filter(CampaignDB.id == campaign.id).delete()
+            db.commit()
+
+    def test_an_unknown_provider_is_a_failed_result_not_an_exception(self, db):
+        """The operator typed a name. Being told it is wrong is the answer."""
+        result = self._send(db, **{})  # provider overridden below
+        assert result.success or result.message is not None
+
+        from app.delivery.service import send_test_email
+
+        bad = send_test_email(
+            db, to="nobody@example.invalid", subject="probe",
+            provider="carrier-pigeon",
+            brand_id=auth.ensure_default_brand(db).id,
+        )
+        assert bad.success is False
+        assert bad.message
+
+    def test_another_brands_variant_falls_back_rather_than_rendering(self, db):
+        """The router looked the variant up by bare id, so this was a brand gap
+        too — the same shape B15 had, and found the same way."""
+        campaign = create_campaign(
+            db, name=_name("b9x"), brand_id=auth.ensure_default_brand(db).id,
+            channel="email",
+        )
+        try:
+            result = self._send(
+                db, variant_id=campaign.variants[0].id, brand_id=999999,
+            )
+            assert result.render_note, "another brand's variant was rendered"
+            assert "not available here" in result.render_note
+        finally:
+            from app.campaigns.db_models import CampaignDB, VariantDB
+
+            db.query(VariantDB).filter(VariantDB.campaign_id == campaign.id).delete()
+            db.query(CampaignDB).filter(CampaignDB.id == campaign.id).delete()
             db.commit()

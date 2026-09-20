@@ -5,12 +5,14 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import working_brand
 from app.database import get_db
 from app.delivery.models import (
+    TestSendRequest,
     DeliveryExecution,
     DeliveryExecutionCreate,
     SendInstance,
     SendInstanceCreate,
 )
 from app.delivery.service import (
+    send_test_email,
     create_delivery_execution,
     create_send_instance,
     list_delivery_executions_for_send_instance,
@@ -157,6 +159,46 @@ def send_instance(
     return {
         "status": "sent"
     }
+
+@router.post(
+    "/send-test",
+    summary="Send one real test email",
+    description=(
+        "Renders the chosen variant through the email path and mails it to one "
+        "address. A render failure does not block the send — a plain body goes "
+        "instead and `render_note` says so, because the point of this is to "
+        "find out whether mail leaves the building at all."
+    ),
+)
+def send_test(
+    payload: TestSendRequest,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    """Priced as `sends.execute`, by its own entry in `policy.py`.
+
+    The broad `/delivery` prefix would call this `sends.plan`. It reaches a
+    real inbox through a real provider — that it goes to one typed address
+    rather than to an audience makes it smaller, not different in kind.
+    """
+    sent = send_test_email(
+        db,
+        to=payload.to,
+        subject=payload.subject,
+        provider=payload.provider,
+        brand_id=brand_id,
+        variant_id=payload.variant_id,
+        recipient_id=payload.recipient_id,
+    )
+    return {
+        "success": sent.success,
+        "to": sent.to,
+        "provider": sent.provider,
+        "provider_message_id": sent.provider_message_id,
+        "message": sent.message,
+        "render_note": sent.render_note,
+    }
+
 
 @router.post("/process-due")
 def process_due(db: Session = Depends(get_db)):
