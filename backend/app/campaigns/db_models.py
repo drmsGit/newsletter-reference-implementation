@@ -24,7 +24,10 @@ class VariantDB(Base):
     __tablename__ = "variants"
 
     id = Column(Integer, primary_key=True, index=True)
-    campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=False)
+    # Indexed: every variant lookup filters on it, and Postgres does not
+    # index a foreign key for you. Measured 2026-09-20 at 60,004 variants —
+    # 1.335 ms and 617 buffers unindexed, 0.016 ms and 3 with (migration 0018).
+    campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=False, index=True)
     # ADR-160 point 4: **channel is an attribute on the variant.** Not on the
     # campaign — a campaign ("Hiking") carries email, push and paid-social
     # variants, and a channel-plan level between the two was considered and
@@ -102,7 +105,8 @@ class DecisionSlotDB(Base):
     __tablename__ = "decision_slots"
 
     id = Column(Integer, primary_key=True, index=True)
-    variant_id = Column(Integer, ForeignKey("variants.id"), nullable=False)
+    # Indexed for the same reason as `variants.campaign_id`: 1.554 ms -> 0.014 ms.
+    variant_id = Column(Integer, ForeignKey("variants.id"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     decision_type = Column(String(100), nullable=False, default="content_recommendation")
     decision_strategy = Column(String(100), nullable=False, default="top_score")
@@ -122,7 +126,11 @@ class DecisionResolutionDB(Base):
     __tablename__ = "decision_resolutions"
 
     id = Column(Integer, primary_key=True, index=True)
-    decision_slot_id = Column(Integer, ForeignKey("decision_slots.id"), nullable=False)
+    # **The one that matters most.** This table grows at one row per recipient
+    # per slot — the fastest-growing table in the schema — and an unindexed
+    # lookup scans all of it to return the handful it wants. Measured at
+    # 96,040 rows: 3.45 ms and 801 buffers, against 0.080 ms and 12 with.
+    decision_slot_id = Column(Integer, ForeignKey("decision_slots.id"), nullable=False, index=True)
     recipient_id = Column(Integer, ForeignKey("recipients.id"), nullable=True)
     content_record_id = Column(Integer, ForeignKey("content_records.id"), nullable=False)
     content_version_id = Column(Integer, ForeignKey("content_versions.id"), nullable=True)
