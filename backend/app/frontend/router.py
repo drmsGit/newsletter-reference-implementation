@@ -3690,14 +3690,14 @@ def audience_groups_create(
 
 @router.get("/ui/audience-groups/{group_id}")
 def audience_group_detail(group_id: int, request: Request, error: str | None = None, db: Session = Depends(get_db)):
-    group = audience_service.get_group(db, group_id)
+    group = audience_service.get_group(db, group_id, brand_id=working_brand_id(request, db))
     if group and group.brand_id != working_brand_id(request, db):
         group = None  # another brand's group: indistinguishable from absent
     if not group:
         return RedirectResponse("/ui/audience-groups", status_code=303)
 
-    member_ids = audience_service.get_member_recipient_ids(db, group_id)
-    raw_members = audience_service.list_members(db, group_id)
+    member_ids = audience_service.get_member_recipient_ids(db, group_id, brand_id=working_brand_id(request, db))
+    raw_members = audience_service.list_members(db, group_id, brand_id=working_brand_id(request, db))
 
     members = []
     member_addresses = resolve_emails(db, [m.recipient_id for m in raw_members])
@@ -3732,7 +3732,7 @@ def audience_group_detail(group_id: int, request: Request, error: str | None = N
     # Rule blocks (live) shown on top, each with its own count so a manager sees
     # the impact of every include/exclude before sending.
     blocks = []
-    for b in audience_service.list_blocks(db, group_id):
+    for b in audience_service.list_blocks(db, group_id, brand_id=working_brand_id(request, db)):
         crit = b.criteria or {}
         parts = []
         if crit.get("category_id"):
@@ -3784,6 +3784,7 @@ def audience_group_detail(group_id: int, request: Request, error: str | None = N
 
 @router.post("/ui/audience-groups/{group_id}/edit")
 def audience_group_edit(
+    request: Request,
     group_id: int,
     name: str = Form(...),
     description: str = Form(""),
@@ -3791,31 +3792,32 @@ def audience_group_edit(
 ):
     desc = description.strip() or None
     try:
-        audience_service.update_group(db, group_id, name.strip(), desc)
+        audience_service.update_group(db, group_id, name.strip(), desc, brand_id=working_brand_id(request, db))
     except ValueError as error:
         return RedirectResponse(f"/ui/audience-groups/{group_id}?error={quote(str(error))}", status_code=303)
     return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
 
 
 @router.post("/ui/audience-groups/{group_id}/delete")
-def audience_group_delete(group_id: int, db: Session = Depends(get_db)):
-    audience_service.delete_group(db, group_id)
+def audience_group_delete(request: Request, group_id: int, db: Session = Depends(get_db)):
+    audience_service.delete_group(db, group_id, brand_id=working_brand_id(request, db))
     return RedirectResponse("/ui/audience-groups", status_code=303)
 
 
 @router.post("/ui/audience-groups/{group_id}/members")
 def audience_group_add_member(
+    request: Request,
     group_id: int,
     recipient_id: int = Form(...),
     db: Session = Depends(get_db),
 ):
-    audience_service.add_member(db, group_id, recipient_id)
+    audience_service.add_member(db, group_id, recipient_id, brand_id=working_brand_id(request, db))
     return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
 
 
 @router.post("/ui/audience-groups/{group_id}/members/{recipient_id}/remove")
-def audience_group_remove_member(group_id: int, recipient_id: int, db: Session = Depends(get_db)):
-    audience_service.remove_member(db, group_id, recipient_id)
+def audience_group_remove_member(request: Request, group_id: int, recipient_id: int, db: Session = Depends(get_db)):
+    audience_service.remove_member(db, group_id, recipient_id, brand_id=working_brand_id(request, db))
     return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
 
 
@@ -3830,14 +3832,14 @@ def audience_group_criteria_preview(
     db: Session = Depends(get_db),
 ):
     from fastapi.responses import JSONResponse
-    member_ids = audience_service.get_member_recipient_ids(db, group_id)
+    member_ids = audience_service.get_member_recipient_ids(db, group_id, brand_id=working_brand_id(request, db))
     cat_id = int(preference_category_id) if preference_category_id else None
     min_score = float(min_preference_score) if min_preference_score else None
     matches = audience_service.find_by_criteria(
         db,
         # The group's brand, not the viewer's: a preview must count the same
         # people the resolve will, or it advertises reach the send refuses.
-        audience_service.get_group(db, group_id).brand_id,
+        audience_service.get_group(db, group_id, brand_id=working_brand_id(request, db)).brand_id,
         language=language or None,
         status=status or None,
         preference_category_id=cat_id,
@@ -3855,6 +3857,7 @@ def audience_group_criteria_preview(
 
 @router.post("/ui/audience-groups/{group_id}/bulk-add")
 def audience_group_bulk_add(
+    request: Request,
     group_id: int,
     language: str = Form(""),
     status: str = Form(""),
@@ -3862,21 +3865,21 @@ def audience_group_bulk_add(
     min_preference_score: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    member_ids = audience_service.get_member_recipient_ids(db, group_id)
+    member_ids = audience_service.get_member_recipient_ids(db, group_id, brand_id=working_brand_id(request, db))
     cat_id = int(preference_category_id) if preference_category_id else None
     min_score = float(min_preference_score) if min_preference_score else None
     matches = audience_service.find_by_criteria(
         db,
         # The group's brand, not the viewer's: a preview must count the same
         # people the resolve will, or it advertises reach the send refuses.
-        audience_service.get_group(db, group_id).brand_id,
+        audience_service.get_group(db, group_id, brand_id=working_brand_id(request, db)).brand_id,
         language=language or None,
         status=status or None,
         preference_category_id=cat_id,
         min_preference_score=min_score,
         exclude_ids=member_ids,
     )
-    audience_service.bulk_add_members(db, group_id, [r.id for r in matches])
+    audience_service.bulk_add_members(db, group_id, [r.id for r in matches], brand_id=working_brand_id(request, db))
     return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
 
 
@@ -3897,6 +3900,7 @@ def _block_criteria_from_form(category_id: str, min_score: str, language: str, s
 
 @router.post("/ui/audience-groups/{group_id}/blocks")
 def audience_block_add(
+    request: Request,
     group_id: int,
     kind: str = Form("include"),
     label: str = Form(""),
@@ -3914,6 +3918,7 @@ def audience_block_add(
             criteria=_block_criteria_from_form(category_id, min_score, language, status),
             label=label.strip() or None,
             source="manual",
+            brand_id=working_brand_id(request, db),
         )
     except ValueError as error:
         return RedirectResponse(f"/ui/audience-groups/{group_id}?error={quote(str(error))}", status_code=303)
@@ -3922,6 +3927,7 @@ def audience_block_add(
 
 @router.post("/ui/audience-groups/{group_id}/blocks/{block_id}/edit")
 def audience_block_edit(
+    request: Request,
     group_id: int,
     block_id: int,
     kind: str = Form("include"),
@@ -3939,6 +3945,7 @@ def audience_block_edit(
             kind=kind,
             criteria=_block_criteria_from_form(category_id, min_score, language, status),
             label=label.strip() or None,
+            brand_id=working_brand_id(request, db),
         )
     except ValueError as error:
         return RedirectResponse(f"/ui/audience-groups/{group_id}?error={quote(str(error))}", status_code=303)
@@ -3946,13 +3953,13 @@ def audience_block_edit(
 
 
 @router.post("/ui/audience-groups/{group_id}/blocks/{block_id}/delete")
-def audience_block_delete(group_id: int, block_id: int, db: Session = Depends(get_db)):
-    audience_service.delete_block(db, block_id)
+def audience_block_delete(request: Request, group_id: int, block_id: int, db: Session = Depends(get_db)):
+    audience_service.delete_block(db, block_id, brand_id=working_brand_id(request, db))
     return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
 
 
 @router.post("/ui/campaigns/{campaign_id}/suggest-audience")
-def campaign_suggest_audience(campaign_id: int, db: Session = Depends(get_db)):
+def campaign_suggest_audience(request: Request, campaign_id: int, db: Session = Depends(get_db)):
     """Use case 1: turn the campaign's content categories into a live, editable
     suggested audience (include blocks, one per top category), then drop the
     manager on the group so they can tighten/extend/delete it."""
@@ -3967,10 +3974,10 @@ def campaign_suggest_audience(campaign_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/ui/audience-groups/{group_id}/recalculate")
-def audience_group_recalculate(group_id: int, db: Session = Depends(get_db)):
+def audience_group_recalculate(request: Request, group_id: int, db: Session = Depends(get_db)):
     """Re-derive the suggested blocks from the source campaign's current content
     (after its slots/content changed). Manual blocks and pins are preserved."""
-    result = audience_service.recalculate_suggested_blocks(db, group_id)
+    result = audience_service.recalculate_suggested_blocks(db, group_id, brand_id=working_brand_id(request, db))
     if result is None:
         return RedirectResponse(
             f"/ui/audience-groups/{group_id}?error={quote('This group is not linked to a campaign, so there is nothing to recalculate.')}",

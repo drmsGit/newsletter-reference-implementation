@@ -23,7 +23,9 @@ import uuid
 
 from fastapi.testclient import TestClient
 
-from app.auth.permissions import CAMPAIGNS_MANAGE, CONTENT_MANAGE, VIEW
+from app.auth.permissions import (
+    AUDIENCES_MANAGE, AUDIENCES_PIN, CAMPAIGNS_MANAGE, CONTENT_MANAGE, VIEW,
+)
 from main import app
 
 client = TestClient(app, raise_server_exceptions=False)
@@ -37,7 +39,6 @@ APP = pathlib.Path(__file__).resolve().parent.parent / "app"
 #: nowhere to go. `list_all_*()` is that somewhere, and its whole value is that
 #: it says in its own name what it is doing.
 #:
-#: The remaining entry arrives with stage 5: `list_all_audience_groups`.
 #: A further one is not forbidden — it is a diff
 #: that has to be argued for, which is the entire mechanism.
 #:
@@ -48,6 +49,7 @@ APP = pathlib.Path(__file__).resolve().parent.parent / "app"
 SPANNING_FUNCTIONS: set[str] = {
     "list_all_content_records",
     "list_all_campaigns",
+    "list_all_audience_groups",
 }
 
 
@@ -387,4 +389,123 @@ class TestTheNestedChainIsWalkedNotTrusted:
                 assert response.status_code == 200, response.text
                 assert response.json() == []
         finally:
+            self._remove(ids)
+
+
+# --- audience, stage 5 ------------------------------------------------------
+
+class TestAudienceGroupsAreOwnedByOneBrand:
+    """ADR-172 points 4-6 for `audience_groups` and its two child tables.
+
+    `get_group` is the choke point here — update, delete, the member functions
+    and the block functions all resolve through it — so the interesting test is
+    not that one route refuses but that the children refuse with it.
+    """
+
+    def _group_in_default_brand(self):
+        from app.audience import service
+        from app.auth.service import ensure_default_brand
+        from app.database import SessionLocal
+
+        db = SessionLocal()
+        try:
+            brand = ensure_default_brand(db).id
+            group = service.create_group(
+                db, f"boundary-{uuid.uuid4().hex[:8]}", brand_id=brand)
+            block = service.add_block(
+                db, group_id=group.id, kind="include",
+                criteria={"language": "de"}, label="not yours", brand_id=brand)
+            return {"group": group.id, "block": block.id, "brand": brand}
+        finally:
+            db.close()
+
+    def _remove(self, ids):
+        from app.audience.db_models import (
+            AudienceGroupDB, AudienceGroupMemberDB, AudienceRuleBlockDB,
+        )
+        from app.database import SessionLocal
+
+        db = SessionLocal()
+        try:
+            db.query(AudienceRuleBlockDB).filter(
+                AudienceRuleBlockDB.group_id == ids["group"]).delete()
+            db.query(AudienceGroupMemberDB).filter(
+                AudienceGroupMemberDB.group_id == ids["group"]).delete()
+            db.query(AudienceGroupDB).filter(
+                AudienceGroupDB.id == ids["group"]).delete()
+            db.commit()
+        finally:
+            db.close()
+
+    def test_a_group_in_another_brand_answers_as_absent(self, foreign_api):
+        ids = self._group_in_default_brand()
+        try:
+            with foreign_api([VIEW]) as headers:
+                assert client.get(
+                    f"/api/audience-groups/{ids['group']}", headers=headers
+                ).status_code == 404
+        finally:
+            self._remove(ids)
+
+    def test_its_blocks_are_not_listable_either(self, foreign_api):
+        """The child follows the parent, which is the whole of point 5.
+
+        A rule block is the sentence that says who a group means. Listing
+        another brand's blocks would leak the targeting rules even if the group
+        row itself stayed hidden.
+        """
+        ids = self._group_in_default_brand()
+        try:
+            with foreign_api([VIEW]) as headers:
+                response = client.get(
+                    f"/api/audience-groups/{ids['group']}/blocks", headers=headers)
+                assert response.status_code == 200, response.text
+                assert response.json() == []
+        finally:
+            self._remove(ids)
+
+    def test_a_block_cannot_be_edited_across_the_boundary(self, foreign_api):
+        from app.audience.db_models import AudienceRuleBlockDB
+        from app.database import SessionLocal
+
+        ids = self._group_in_default_brand()
+        try:
+            with foreign_api([VIEW, AUDIENCES_MANAGE]) as headers:
+                response = client.patch(
+                    f"/api/audience-groups/{ids['group']}/blocks/{ids['block']}",
+                    json={"label": "hijacked"}, headers=headers)
+                assert response.status_code == 404, response.text
+
+            db = SessionLocal()
+            try:
+                assert db.query(AudienceRuleBlockDB).filter(
+                    AudienceRuleBlockDB.id == ids["block"]
+                ).first().label == "not yours", "the edit landed anyway"
+            finally:
+                db.close()
+        finally:
+            self._remove(ids)
+
+    def test_a_recipient_cannot_be_pinned_into_another_brands_group(self, foreign_api):
+        """The write direction. A read filter would not catch this: the pin
+        would be created and only then be unreachable."""
+        from app.audience.db_models import AudienceGroupMemberDB
+        from app.database import SessionLocal
+        from app.recipients.db_models import RecipientDB
+
+        ids = self._group_in_default_brand()
+        db = SessionLocal()
+        try:
+            recipient = db.query(RecipientDB).order_by(RecipientDB.id).first()
+            with foreign_api([VIEW, AUDIENCES_PIN]) as headers:
+                response = client.post(
+                    f"/api/audience-groups/{ids['group']}/members/{recipient.id}",
+                    headers=headers)
+                assert response.status_code == 404, response.text
+
+            assert db.query(AudienceGroupMemberDB).filter(
+                AudienceGroupMemberDB.group_id == ids["group"]
+            ).count() == 0, "the pin was written across the boundary"
+        finally:
+            db.close()
             self._remove(ids)

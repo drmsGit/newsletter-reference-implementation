@@ -66,7 +66,7 @@ class TestRuleBlocks:
         )
 
         assert response.status_code == 201, response.text
-        blocks = service.list_blocks(db, group.id)
+        blocks = service.list_blocks(db, group.id, brand_id=group.brand_id)
         assert len(blocks) == 1
         assert blocks[0].kind == "include"
         assert blocks[0].label == "Hikers"
@@ -83,7 +83,7 @@ class TestRuleBlocks:
             headers=api,
         )
 
-        assert service.list_blocks(db, group.id)[0].source == "manual"
+        assert service.list_blocks(db, group.id, brand_id=group.brand_id)[0].source == "manual"
 
     def test_an_invalid_kind_is_refused(self, db, group, api):
         response = client.post(
@@ -92,7 +92,7 @@ class TestRuleBlocks:
         )
 
         assert response.status_code == 400
-        assert service.list_blocks(db, group.id) == []
+        assert service.list_blocks(db, group.id, brand_id=group.brand_id) == []
 
     def test_a_block_can_be_edited_and_deleted(self, db, group, api):
         created = client.post(
@@ -104,13 +104,13 @@ class TestRuleBlocks:
             f"/api/audience-groups/{group.id}/blocks/{created['id']}",
             json={"label": "After"}, headers=api,
         )
-        assert service.get_block(db, created["id"]).label == "After"
+        assert service.get_block(db, created["id"], brand_id=group.brand_id).label == "After"
 
         assert client.delete(
             f"/api/audience-groups/{group.id}/blocks/{created['id']}",
             headers=api,
         ).status_code == 204
-        assert service.get_block(db, created["id"]) is None
+        assert service.get_block(db, created["id"], brand_id=group.brand_id) is None
 
     def test_a_block_from_another_group_is_not_reachable(self, db, group, api):
         """The block id alone is not authority — it has to belong to the group
@@ -120,13 +120,14 @@ class TestRuleBlocks:
             brand_id=auth.ensure_default_brand(db).id,
         )
         try:
-            stray = service.add_block(db, group_id=other.id, kind="include")
+            stray = service.add_block(
+                db, group_id=other.id, kind="include", brand_id=other.brand_id)
             response = client.patch(
                 f"/api/audience-groups/{group.id}/blocks/{stray.id}",
                 json={"label": "hijacked"}, headers=api,
             )
             assert response.status_code == 404
-            assert service.get_block(db, stray.id).label != "hijacked"
+            assert service.get_block(db, stray.id, brand_id=other.brand_id).label != "hijacked"
         finally:
             db.rollback()
             db.execute(text("DELETE FROM audience_rule_blocks WHERE group_id = :g"),

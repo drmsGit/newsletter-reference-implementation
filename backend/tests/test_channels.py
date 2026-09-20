@@ -1348,7 +1348,7 @@ class TestAPushSendGoesOutAsAPush:
 
         group = create_group(db, name=_name("group"), brand_id=brand.id)
         for recipient in recipients:
-            add_member(db, group.id, recipient.id)
+            add_member(db, group.id, recipient.id, brand_id=group.brand_id)
         snapshot = create_snapshot_for_variant(db, variant_id=variant.id)
         return prepare_send_from_audience(
             db, snapshot_id=snapshot.id, name=_name("send"),
@@ -2016,7 +2016,7 @@ class TestTheSendFormOffersOnlyWhatTheChannelCanDo:
                                         value={"token": f"apns-{uuid.uuid4().hex[:8]}"}))
                 db.commit()
                 record_consent(db, r.id, "opted_in", brand.id, channel="push", source="t")
-            add_member(db, group.id, r.id)
+            add_member(db, group.id, r.id, brand_id=group.brand_id)
             made.append(r)
 
         # The prepare-send form hangs off a SNAPSHOT, so both variants need

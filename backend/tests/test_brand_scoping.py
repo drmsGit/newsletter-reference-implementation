@@ -834,6 +834,7 @@ class TestConsentIsScopedToTheSendingBrand:
         audience_service.add_block(
             db, group_id=group.id, kind="include",
             criteria={"language": "test-brand-consent"}, label="by language",
+            brand_id=other.id,
         )
         try:
             resolved = audience_service.resolve_audience(db, group.id)
@@ -898,7 +899,8 @@ class TestConsentIsScopedToTheSendingBrand:
         group = audience_service.create_group(
             db, f"pinned-{uuid.uuid4().hex[:8]}", brand_id=other.id
         )
-        audience_service.add_member(db, group.id, consenting_recipient.id)
+        audience_service.add_member(
+            db, group.id, consenting_recipient.id, brand_id=group.brand_id)
         try:
             resolved = audience_service.resolve_audience(db, group.id)
 

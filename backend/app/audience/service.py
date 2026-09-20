@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_SUGGESTION_MIN_SCORE = 1.0
 
 
-def list_groups(db: Session, brand_id: int | None = None) -> list[AudienceGroupDB]:
+def list_groups(db: Session, *, brand_id: int) -> list[AudienceGroupDB]:
     """Audience groups, scoped to one brand (ADR-150 point 2).
 
     Brand here is **ownership, not membership**: the criteria behind a group
@@ -28,20 +28,57 @@ def list_groups(db: Session, brand_id: int | None = None) -> list[AudienceGroupD
     carries no brand (point 9) and consent does not carry one yet. Making
     membership differ per brand is the Phase 2 consent work.
 
-    **`brand_id=None` means every brand, and is not the caller's default.**
-    It exists for the places that genuinely span brands — a platform-wide
-    count, a migration, a test. Any surface a user looks at must pass the
-    working brand, because ADR-150 point 2 makes the switcher a hard boundary,
-    not a preference.
+    **The brand is required since 2026-09-19** (ADR-172 point 4). It used to
+    default to every brand, which meant a forgotten argument returned the whole
+    platform rather than failing. `list_all_audience_groups` is the road for
+    callers that genuinely span brands.
     """
-    query = db.query(AudienceGroupDB)
-    if brand_id is not None:
-        query = query.filter(AudienceGroupDB.brand_id == brand_id)
-    return query.order_by(AudienceGroupDB.name.asc()).all()
+    return (
+        db.query(AudienceGroupDB)
+        .filter(AudienceGroupDB.brand_id == brand_id)
+        .order_by(AudienceGroupDB.name.asc())
+        .all()
+    )
 
 
-def get_group(db: Session, group_id: int) -> AudienceGroupDB | None:
+def list_all_audience_groups(db: Session) -> list[AudienceGroupDB]:
+    """Every group, across every brand — the ADR-172 point 4 escape hatch.
+
+    For callers that legitimately have no working brand. Counted by
+    `test_brand_boundary.py`; no router may reach for it.
+    """
+    return db.query(AudienceGroupDB).order_by(AudienceGroupDB.name.asc()).all()
+
+
+def group_regardless_of_brand(db: Session, group_id: int) -> AudienceGroupDB | None:
+    """A group without asking which brand the caller is in.
+
+    **Deliberately unscoped, and there is exactly one legitimate use**:
+    `resolve_audience`, which gates on the group's OWN brand and therefore has
+    to find the group before it knows which brand that is. Scoping it there
+    would be circular, and passing the caller's brand in would be wrong — a
+    manager who switched brand between building a send and firing it must not
+    change whose consent was checked.
+
+    Every other caller wants `get_group`, which takes a brand and refuses
+    outside it. This one is named at length so that reaching for it is a
+    decision rather than an autocomplete.
+    """
     return db.query(AudienceGroupDB).filter(AudienceGroupDB.id == group_id).first()
+
+
+def get_group(db: Session, group_id: int, *, brand_id: int) -> AudienceGroupDB | None:
+    """One group, selected within a brand (ADR-172 points 4-6).
+
+    The choke point for this module: update, delete, the member functions and
+    the block functions all resolve through here, so scoping it once scopes
+    them. A group in another brand is not found.
+    """
+    return (
+        db.query(AudienceGroupDB)
+        .filter(AudienceGroupDB.id == group_id, AudienceGroupDB.brand_id == brand_id)
+        .first()
+    )
 
 
 def create_group(
@@ -80,9 +117,10 @@ def create_group(
 
 
 def update_group(
-    db: Session, group_id: int, name: str, description: str | None = None
+    db: Session, group_id: int, name: str, description: str | None = None,
+    *, brand_id: int,
 ) -> AudienceGroupDB | None:
-    group = get_group(db, group_id)
+    group = get_group(db, group_id, brand_id=brand_id)
     if not group:
         return None
     group.name = name
@@ -96,8 +134,8 @@ def update_group(
     return group
 
 
-def delete_group(db: Session, group_id: int) -> bool:
-    group = get_group(db, group_id)
+def delete_group(db: Session, group_id: int, *, brand_id: int) -> bool:
+    group = get_group(db, group_id, brand_id=brand_id)
     if not group:
         return False
     # Clear both children first — members and rule blocks both FK to the group,
@@ -109,15 +147,33 @@ def delete_group(db: Session, group_id: int) -> bool:
     return True
 
 
-def list_members(db: Session, group_id: int) -> list[AudienceGroupMemberDB]:
+def list_members(
+    db: Session, group_id: int, *, brand_id: int
+) -> list[AudienceGroupMemberDB]:
+    """Pinned members, joined to the owning group (ADR-172 point 5).
+
+    The membership row carries no brand and needs none — it hangs off the
+    group, which has one.
+    """
     return (
         db.query(AudienceGroupMemberDB)
-        .filter(AudienceGroupMemberDB.group_id == group_id)
+        .join(AudienceGroupDB, AudienceGroupDB.id == AudienceGroupMemberDB.group_id)
+        .filter(
+            AudienceGroupMemberDB.group_id == group_id,
+            AudienceGroupDB.brand_id == brand_id,
+        )
         .all()
     )
 
 
-def add_member(db: Session, group_id: int, recipient_id: int) -> AudienceGroupMemberDB | None:
+def add_member(
+    db: Session, group_id: int, recipient_id: int, *, brand_id: int
+) -> AudienceGroupMemberDB | None:
+    # The group is resolved within the brand before a pin is written, so a
+    # recipient cannot be pinned into another brand's list.
+    if get_group(db, group_id, brand_id=brand_id) is None:
+        return None
+
     existing = (
         db.query(AudienceGroupMemberDB)
         .filter(
@@ -149,7 +205,11 @@ def add_member(db: Session, group_id: int, recipient_id: int) -> AudienceGroupMe
     return member
 
 
-def remove_member(db: Session, group_id: int, recipient_id: int) -> bool:
+def remove_member(
+    db: Session, group_id: int, recipient_id: int, *, brand_id: int
+) -> bool:
+    if get_group(db, group_id, brand_id=brand_id) is None:
+        return False
     member = (
         db.query(AudienceGroupMemberDB)
         .filter(
@@ -165,10 +225,14 @@ def remove_member(db: Session, group_id: int, recipient_id: int) -> bool:
     return True
 
 
-def get_member_recipient_ids(db: Session, group_id: int) -> set[int]:
+def get_member_recipient_ids(db: Session, group_id: int, *, brand_id: int) -> set[int]:
     rows = (
         db.query(AudienceGroupMemberDB.recipient_id)
-        .filter(AudienceGroupMemberDB.group_id == group_id)
+        .join(AudienceGroupDB, AudienceGroupDB.id == AudienceGroupMemberDB.group_id)
+        .filter(
+            AudienceGroupMemberDB.group_id == group_id,
+            AudienceGroupDB.brand_id == brand_id,
+        )
         .all()
     )
     return {r.recipient_id for r in rows}
@@ -295,8 +359,12 @@ def _deduplicate_by_address(
     return kept
 
 
-def bulk_add_members(db: Session, group_id: int, recipient_ids: list[int]) -> int:
-    existing = get_member_recipient_ids(db, group_id)
+def bulk_add_members(
+    db: Session, group_id: int, recipient_ids: list[int], *, brand_id: int
+) -> int:
+    if get_group(db, group_id, brand_id=brand_id) is None:
+        return 0
+    existing = get_member_recipient_ids(db, group_id, brand_id=brand_id)
     added = 0
     for rid in recipient_ids:
         if rid not in existing:
@@ -351,17 +419,29 @@ def count_for_criteria(db: Session, criteria: dict, brand_id: int) -> int:
     return len(_recipients_for_criteria(db, criteria, brand_id))
 
 
-def list_blocks(db: Session, group_id: int) -> list[AudienceRuleBlockDB]:
+def list_blocks(
+    db: Session, group_id: int, *, brand_id: int
+) -> list[AudienceRuleBlockDB]:
     return (
         db.query(AudienceRuleBlockDB)
-        .filter(AudienceRuleBlockDB.group_id == group_id)
+        .join(AudienceGroupDB, AudienceGroupDB.id == AudienceRuleBlockDB.group_id)
+        .filter(
+            AudienceRuleBlockDB.group_id == group_id,
+            AudienceGroupDB.brand_id == brand_id,
+        )
         .order_by(AudienceRuleBlockDB.kind.asc(), AudienceRuleBlockDB.position.asc(), AudienceRuleBlockDB.id.asc())
         .all()
     )
 
 
-def get_block(db: Session, block_id: int) -> AudienceRuleBlockDB | None:
-    return db.query(AudienceRuleBlockDB).filter(AudienceRuleBlockDB.id == block_id).first()
+def get_block(db: Session, block_id: int, *, brand_id: int) -> AudienceRuleBlockDB | None:
+    """One rule block, via `block -> group -> brand` (ADR-172 point 5)."""
+    return (
+        db.query(AudienceRuleBlockDB)
+        .join(AudienceGroupDB, AudienceGroupDB.id == AudienceRuleBlockDB.group_id)
+        .filter(AudienceRuleBlockDB.id == block_id, AudienceGroupDB.brand_id == brand_id)
+        .first()
+    )
 
 
 def add_block(
@@ -371,9 +451,13 @@ def add_block(
     criteria: dict | None = None,
     label: str | None = None,
     source: str = "manual",
+    *,
+    brand_id: int,
 ) -> AudienceRuleBlockDB:
     if kind not in ("include", "exclude"):
         raise ValueError("kind must be 'include' or 'exclude'")
+    if get_group(db, group_id, brand_id=brand_id) is None:
+        raise ValueError(f"Audience group {group_id} not found")
     next_pos = (
         db.query(AudienceRuleBlockDB)
         .filter(AudienceRuleBlockDB.group_id == group_id)
@@ -399,8 +483,10 @@ def update_block(
     kind: str | None = None,
     criteria: dict | None = None,
     label: str | None = None,
+    *,
+    brand_id: int,
 ) -> AudienceRuleBlockDB | None:
-    block = get_block(db, block_id)
+    block = get_block(db, block_id, brand_id=brand_id)
     if not block:
         return None
     if kind is not None:
@@ -416,8 +502,8 @@ def update_block(
     return block
 
 
-def delete_block(db: Session, block_id: int) -> bool:
-    block = get_block(db, block_id)
+def delete_block(db: Session, block_id: int, *, brand_id: int) -> bool:
+    block = get_block(db, block_id, brand_id=brand_id)
     if not block:
         return False
     db.delete(block)
@@ -455,12 +541,14 @@ def resolve_audience(
     # gates on that brand's consent — and a manager who switched brand between
     # building a send and firing it cannot change whose consent was checked.
     # Same reasoning as `brand_for_snapshot` on the delivery side.
-    group = get_group(db, group_id)
+    group = group_regardless_of_brand(db, group_id)
     if group is None:
         return []
     brand_id = group.brand_id
 
-    blocks = list_blocks(db, group_id)
+    # The group's brand, not the caller's — so the blocks read here are the
+    # ones that belong to the group being resolved.
+    blocks = list_blocks(db, group_id, brand_id=brand_id)
 
     include_ids: set[int] = set()
     exclude_ids: set[int] = set()
@@ -474,7 +562,9 @@ def resolve_audience(
     # Excludes subtract from the rule-driven set only; manual pins are then
     # unioned back in so they survive excludes ("always included", except
     # consent below). "keep both" — hand-picked recipients alongside the rules.
-    final_ids = (include_ids - exclude_ids) | get_member_recipient_ids(db, group_id)
+    final_ids = (include_ids - exclude_ids) | get_member_recipient_ids(
+        db, group_id, brand_id=brand_id
+    )
     if not final_ids:
         return []
 
@@ -650,11 +740,14 @@ def create_suggested_group_for_campaign(db: Session, campaign_id: int, campaign_
             criteria=suggestion["criteria"],
             label=suggestion["label"],
             source="suggested",
+            brand_id=brand_id,
         )
     return group
 
 
-def recalculate_suggested_blocks(db: Session, group_id: int) -> AudienceGroupDB | None:
+def recalculate_suggested_blocks(
+    db: Session, group_id: int, *, brand_id: int
+) -> AudienceGroupDB | None:
     """Re-derive a group's suggested include blocks from its source campaign's
     *current* content — for after a manager adjusts slots/content. Applies only
     the delta so nothing else is disturbed:
@@ -664,14 +757,17 @@ def recalculate_suggested_blocks(db: Session, group_id: int) -> AudienceGroupDB 
         threshold the manager already tuned on it
     Manual blocks and manual member pins are never touched. Returns None if the
     group has no source campaign to recalculate against."""
-    group = get_group(db, group_id)
+    group = get_group(db, group_id, brand_id=brand_id)
     if not group or not group.source_campaign_id:
         return None
 
     desired = suggest_include_blocks_for_campaign(db, group.source_campaign_id)
     desired_by_cat = {s["criteria"]["category_id"]: s for s in desired}
 
-    existing_suggested = [b for b in list_blocks(db, group_id) if b.source == "suggested"]
+    existing_suggested = [
+        b for b in list_blocks(db, group_id, brand_id=brand_id)
+        if b.source == "suggested"
+    ]
     existing_cats = {(b.criteria or {}).get("category_id") for b in existing_suggested}
 
     # Remove suggested blocks whose category dropped out of the campaign.
@@ -694,6 +790,7 @@ def recalculate_suggested_blocks(db: Session, group_id: int) -> AudienceGroupDB 
                 criteria=suggestion["criteria"],
                 label=suggestion["label"],
                 source="suggested",
+                brand_id=brand_id,
             )
             added += 1
 

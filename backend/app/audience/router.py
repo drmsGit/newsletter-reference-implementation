@@ -19,8 +19,8 @@ router = APIRouter(prefix="/api/audience-groups", tags=["audience"])
 
 
 @router.get("/", response_model=list[AudienceGroup])
-def list_groups(db: Session = Depends(get_db)):
-    return service.list_groups(db)
+def list_groups(db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
+    return service.list_groups(db, brand_id=brand_id)
 
 
 @router.post("/", response_model=AudienceGroup, status_code=201)
@@ -45,17 +45,17 @@ def create_group(
 
 
 @router.get("/{group_id}", response_model=AudienceGroup)
-def get_group(group_id: int, db: Session = Depends(get_db)):
-    group = service.get_group(db, group_id)
+def get_group(group_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
+    group = service.get_group(db, group_id, brand_id=brand_id)
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
     return group
 
 
 @router.patch("/{group_id}", response_model=AudienceGroup)
-def update_group(group_id: int, payload: AudienceGroupCreate, db: Session = Depends(get_db)):
+def update_group(group_id: int, payload: AudienceGroupCreate, db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
     try:
-        group = service.update_group(db, group_id, payload.name, payload.description)
+        group = service.update_group(db, group_id, payload.name, payload.description, brand_id=brand_id)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error))
     if not group:
@@ -64,27 +64,27 @@ def update_group(group_id: int, payload: AudienceGroupCreate, db: Session = Depe
 
 
 @router.delete("/{group_id}", status_code=204)
-def delete_group(group_id: int, db: Session = Depends(get_db)):
-    if not service.delete_group(db, group_id):
+def delete_group(group_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
+    if not service.delete_group(db, group_id, brand_id=brand_id):
         raise HTTPException(status_code=404, detail="Group not found")
 
 
 @router.get("/{group_id}/members", response_model=list[AudienceGroupMember])
-def list_members(group_id: int, db: Session = Depends(get_db)):
-    return service.list_members(db, group_id)
+def list_members(group_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
+    return service.list_members(db, group_id, brand_id=brand_id)
 
 
 @router.post("/{group_id}/members/{recipient_id}", response_model=AudienceGroupMember, status_code=201)
-def add_member(group_id: int, recipient_id: int, db: Session = Depends(get_db)):
-    member = service.add_member(db, group_id, recipient_id)
+def add_member(group_id: int, recipient_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
+    member = service.add_member(db, group_id, recipient_id, brand_id=brand_id)
     if not member:
         raise HTTPException(status_code=404, detail="Group or recipient not found")
     return member
 
 
 @router.delete("/{group_id}/members/{recipient_id}", status_code=204)
-def remove_member(group_id: int, recipient_id: int, db: Session = Depends(get_db)):
-    if not service.remove_member(db, group_id, recipient_id):
+def remove_member(group_id: int, recipient_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
+    if not service.remove_member(db, group_id, recipient_id, brand_id=brand_id):
         raise HTTPException(status_code=404, detail="Member not found")
 
 
@@ -97,8 +97,8 @@ def remove_member(group_id: int, recipient_id: int, db: Session = Depends(get_db
 # screen of the React MVP.
 
 @router.get("/{group_id}/blocks", response_model=list[AudienceRuleBlock])
-def get_blocks(group_id: int, db: Session = Depends(get_db)):
-    return service.list_blocks(db, group_id)
+def get_blocks(group_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
+    return service.list_blocks(db, group_id, brand_id=brand_id)
 
 
 @router.post("/{group_id}/blocks", response_model=AudienceRuleBlock, status_code=201)
@@ -106,6 +106,7 @@ def create_block(
     group_id: int,
     payload: AudienceRuleBlockCreate,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     """Add an include or exclude rule.
 
@@ -115,12 +116,13 @@ def create_block(
     "visibly editable, visibly suggested" trust model (ADR-040/041's) a thing a
     caller can lie about.
     """
-    if service.get_group(db, group_id) is None:
+    if service.get_group(db, group_id, brand_id=brand_id) is None:
         raise HTTPException(status_code=404, detail="Audience group not found")
     try:
         return service.add_block(
             db, group_id=group_id, kind=payload.kind,
             criteria=payload.criteria, label=payload.label,
+            brand_id=brand_id,
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
@@ -132,14 +134,16 @@ def edit_block(
     block_id: int,
     payload: AudienceRuleBlockUpdate,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
-    block = service.get_block(db, block_id)
+    block = service.get_block(db, block_id, brand_id=brand_id)
     if block is None or block.group_id != group_id:
         raise HTTPException(status_code=404, detail="Rule block not found")
     try:
         updated = service.update_block(
             db, block_id=block_id, kind=payload.kind,
             criteria=payload.criteria, label=payload.label,
+            brand_id=brand_id,
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
@@ -147,11 +151,11 @@ def edit_block(
 
 
 @router.delete("/{group_id}/blocks/{block_id}", status_code=204)
-def remove_block(group_id: int, block_id: int, db: Session = Depends(get_db)):
-    block = service.get_block(db, block_id)
+def remove_block(group_id: int, block_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
+    block = service.get_block(db, block_id, brand_id=brand_id)
     if block is None or block.group_id != group_id:
         raise HTTPException(status_code=404, detail="Rule block not found")
-    service.delete_block(db, block_id)
+    service.delete_block(db, block_id, brand_id=brand_id)
 
 
 @router.post("/{group_id}/members", status_code=200)
@@ -159,6 +163,7 @@ def bulk_add(
     group_id: int,
     payload: BulkAddRequest,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     """Pin several recipients in one call.
 
@@ -169,21 +174,21 @@ def bulk_add(
     criteria-tracking that item asks for would make removal look symmetrical
     when it is not.
     """
-    if service.get_group(db, group_id) is None:
+    if service.get_group(db, group_id, brand_id=brand_id) is None:
         raise HTTPException(status_code=404, detail="Audience group not found")
-    added = service.bulk_add_members(db, group_id, payload.recipient_ids)
+    added = service.bulk_add_members(db, group_id, payload.recipient_ids, brand_id=brand_id)
     return {"added": added, "requested": len(payload.recipient_ids)}
 
 
 @router.post("/{group_id}/recalculate", response_model=AudienceGroup)
-def recalculate(group_id: int, db: Session = Depends(get_db)):
+def recalculate(group_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
     """Re-derive this group's **suggested** blocks from its source campaign.
 
     Manual blocks are untouched — that is the whole point of `source` being on
     the block rather than on the group. A group with no source campaign has
     nothing to recalculate and says so rather than silently doing nothing.
     """
-    updated = service.recalculate_suggested_blocks(db, group_id)
+    updated = service.recalculate_suggested_blocks(db, group_id, brand_id=brand_id)
     if updated is None:
         raise HTTPException(
             status_code=400,
