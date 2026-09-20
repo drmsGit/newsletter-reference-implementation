@@ -342,6 +342,73 @@ def expire_due_pending_actions(db: Session) -> list[int]:
 
 # --- reading ----------------------------------------------------------------
 
+def may_decide(db: Session, user, meta, row: PendingActionDB) -> bool:
+    """Whether this person may approve or reject this particular request.
+
+    **The real gate, and it lives here rather than in a router.** `policy.py`
+    records why the policy table cannot express it: the permission depends on
+    the *row* — every approvable action declares its own `approve_permission` —
+    so the table maps the approve routes to `view` with a comment and this is
+    what actually decides. Moved out of `app/frontend/router.py` on 2026-09-20,
+    when the JSON plane needed the same answer: two planes asking one question
+    is the whole point, and a second copy in a second router is how they start
+    answering it differently.
+
+    Brand-scoped permissions are checked against **the request's own brand**
+    rather than the working one. They are the same today, because the inbox is
+    filtered by working brand — but reading the row's brand is what stays
+    correct if the inbox ever shows more than one, and it is the same rule
+    `approve()` follows when it hands `execute` the row's brand.
+
+    `user` is `None` only with access control switched off, where there is no
+    principal to check anything against and the guard has already let the
+    request through.
+    """
+    if user is None:
+        from app.auth.dependencies import auth_enforced
+
+        return not auth_enforced(db)
+
+    from app.auth.permissions import is_brand_scoped
+    from app.auth.service import has_permission
+
+    if is_brand_scoped(meta.approve_permission):
+        return has_permission(db, user, meta.approve_permission, brand_id=row.brand_id)
+    return has_permission(db, user, meta.approve_permission)
+
+
+def resolve_for_decision(db: Session, pending_id: int, *, brand_id: int, user):
+    """Find a request in this brand and say whether this person may decide it.
+
+    Returns `(row, meta, refusal)`. `refusal` is a readable sentence when the
+    answer is no, and `None` when the caller may proceed — so both planes
+    render the same reason rather than inventing their own wording.
+
+    A row outside the brand answers exactly as a missing one (ADR-172 point 6).
+    """
+    from app.approvals.actions.registry import get_action
+
+    row = (
+        db.query(PendingActionDB)
+        .filter(PendingActionDB.id == pending_id, PendingActionDB.brand_id == brand_id)
+        .first()
+    )
+    if row is None:
+        return None, None, "That request does not exist in this brand."
+
+    meta = get_action(row.action_key)
+    if meta is None:
+        return row, None, (
+            f"'{row.action_key}' is no longer a registered action, so it cannot "
+            "be approved. Reject it, or restore the action module."
+        )
+    if not may_decide(db, user, meta, row):
+        return row, meta, (
+            f"You need the '{meta.approve_permission}' permission to decide this."
+        )
+    return row, meta, None
+
+
 def list_for_brand(
     db: Session, brand_id: int | None, status: str = PENDING,
 ) -> list[PendingActionDB]:

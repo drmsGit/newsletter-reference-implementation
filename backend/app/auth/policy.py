@@ -121,10 +121,20 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
     # so a single route-level entry would have to be the *union* of every
     # action's requirement — the widest grant rather than the right one.
     #
-    # The real gate is `_may_decide` in `app/frontend/router.py`, and it has its
-    # own test. Same shape as the /ui/users and /ui/roles entries below: an
-    # entry that documents rather than enforces, said out loud.
+    # The real gate is `approvals.service.may_decide`, which both planes call —
+    # it moved out of `app/frontend/router.py` on 2026-09-20 when the JSON
+    # plane needed the same answer. It has its own test. Same shape as the
+    # /ui/users and /ui/roles entries below: an entry that documents rather
+    # than enforces, said out loud.
     ("/ui/approvals", VIEW),
+    # The JSON twin, and the same reasoning applies to it unchanged.
+    #
+    # **What this entry does NOT express is that a machine may not approve at
+    # all.** That is `require_person` on the two decision routes, because it is
+    # not a permission question — a credential holding every grant there is is
+    # still refused. Putting it in this table would say the opposite: that
+    # some permission could unlock it.
+    ("/approvals", VIEW),
 
     # Issuing a machine credential is its own grant, not a fold into
     # `credentials.manage` — ADR-152 scopes that key to credentials the
@@ -287,6 +297,12 @@ BRAND_OWNED: dict[str, str] = {
         "no — provider configuration and signed callbacks. A webhook arrives "
         "from a vendor with no notion of brands, and is exempt from the guard "
         "entirely via `PROVIDER_SIGNED`."
+    ),
+    "/approvals": (
+        "yes — `pending_actions.brand_id`, set to the brand the request was "
+        "authorised in. The inbox filters on it and `may_decide` checks the "
+        "action's permission against the ROW's brand, not the reader's, which "
+        "is what stays correct if an inbox ever spans more than one."
     ),
     "/email-modules": (
         "no — module manifests read from disk. They describe what the "

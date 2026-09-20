@@ -550,3 +550,126 @@ class TestAnActionThatCannotRun:
             "this planted action does not refuse itself, so it ran — which is "
             "the point: the UI hint is not the guard"
         )
+
+
+class TestTheInboxOverJson:
+    """ADR-168's 2026-09-19 addendum, built 2026-09-20.
+
+    The same inbox the Jinja screens above work, reached the way the React
+    client will: a session cookie and a CSRF header, no bearer. These tests sit
+    beside the UI ones on purpose — one rule, two planes, and if they ever
+    disagree it should be visible in one file.
+    """
+
+    def _api(self, db, role_key="admin"):
+        client, user = _signed_in(db, role_key)
+        token = client.cookies.get(auth.SESSION_COOKIE)
+        client.headers.update({"X-CSRF-Token": auth.csrf_token_for(token)})
+        return client, user
+
+    def test_a_signed_in_person_can_approve(self, db, planted_action, tmp_path):
+        """The whole point of the addendum: the SPA can work an inbox.
+
+        Asserted through the action's own side effect rather than through the
+        response, because a route that answered `{"ok": true}` without running
+        anything would satisfy a status-code test perfectly.
+        """
+        marker = tmp_path / f"{uuid.uuid4().hex[:8]}.marker"
+        row = _held(db, {"path": str(marker)})
+        client, _user = self._api(db)
+
+        response = client.post(f"/approvals/{row.id}/approve", json={"reason": "fine"})
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["ok"] is True, body
+        assert body["status"] == "approved", body
+        assert marker.exists(), "approving returned ok and did not run the action"
+
+    def test_a_person_without_the_actions_permission_is_refused(self, db, planted_action):
+        """403 and a message naming the permission — a different refusal from
+        the machine one, which is not about permissions at all."""
+        row = _held(db, {"path": "/tmp/never"})
+        client, _user = self._api(db, role_key="viewer")
+
+        response = client.post(f"/approvals/{row.id}/approve", json={})
+
+        assert response.status_code == 403, response.text
+        assert "permission" in response.json()["detail"].lower()
+
+    def test_a_request_in_another_brand_is_not_found(self, db, planted_action):
+        """404, exactly as a request that never existed (ADR-172 point 6)."""
+        from app.auth.db_models import BrandDB
+
+        other = BrandDB(key=f"{TAG}-{uuid.uuid4().hex[:8]}", name="Elsewhere")
+        db.add(other); db.commit(); db.refresh(other)
+        try:
+            row = _held(db, {"path": "/tmp/never"}, brand_id=other.id)
+            client, _user = self._api(db)
+
+            assert client.get(f"/approvals/{row.id}").status_code == 404
+            assert client.post(
+                f"/approvals/{row.id}/approve", json={}).status_code == 404
+        finally:
+            db.query(BrandDB).filter(BrandDB.id == other.id).delete()
+            db.commit()
+
+    def test_the_detail_carries_the_live_description_and_the_frozen_line(
+        self, db, planted_action
+    ):
+        """Both, because they answer different questions — the same split the
+        detail screen makes, and the reason `describe` is a function."""
+        row = _held(db, {"path": "/tmp/never"})
+        client, _user = self._api(db)
+
+        body = client.get(f"/approvals/{row.id}").json()
+
+        assert body["summary"] == "a held marker"
+        assert body["may_decide"] is True
+        assert isinstance(body["rows"], list)
+
+    def test_the_payload_is_not_a_field_of_the_response(self, db, planted_action):
+        """ADR-153 §5 binds what may be published about an action, and a
+        payload is an open dict the action author controls — so it is not a
+        field of the API response, on either endpoint.
+
+        **What an action's own `describe()` puts in its rows is a different
+        question, and deliberately not this one.** Choosing what a reviewer
+        needs to see is the entire job of `describe`; an action may well show
+        an id or a path from its payload because that is what makes the request
+        reviewable. The rule is that the payload is not published *wholesale*,
+        not that its contents are secret — and the first version of this test
+        asserted the latter and failed, correctly.
+        """
+        row = _held(db, {"path": "/tmp/secret-looking-path"})
+        client, _user = self._api(db)
+
+        listed = [r for r in client.get("/approvals/").json() if r["id"] == row.id][0]
+        assert "payload" not in listed, listed
+        # The list carries no description at all, so nothing of the payload
+        # reaches it even by an action's choice.
+        assert "secret-looking-path" not in str(listed)
+
+        detail = client.get(f"/approvals/{row.id}").json()
+        assert "payload" not in detail, detail
+
+    def test_the_expiry_sweep_has_a_cron_seam(self, db, planted_action):
+        """The reason `/delivery/process-due` has one. Bookkeeping only —
+        approving already refuses an expired request whatever this has done."""
+        from datetime import timedelta
+
+        from app.approvals.db_models import PendingActionDB
+
+        row = _held(db, {"path": "/tmp/never"})
+        db.query(PendingActionDB).filter(PendingActionDB.id == row.id).update(
+            {"expires_at": approvals.now() - timedelta(hours=1)}
+        )
+        db.commit()
+
+        client, _user = self._api(db)
+        response = client.post("/approvals/process-expired")
+
+        assert response.status_code == 200, response.text
+        assert row.id in response.json()["pending_action_ids"]
+        db.refresh(row)
+        assert row.status == "expired"

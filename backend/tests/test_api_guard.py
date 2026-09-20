@@ -827,17 +827,61 @@ class TestAHeldSendIsQueuedNotRefused:
         finally:
             self._cleanup(db)
 
-    def test_there_is_no_way_to_approve_over_the_api(self, db):
-        """A machine that can approve its own held request has defeated the
-        mechanism. The approve route lives only on the UI plane."""
+    def test_a_machine_is_refused_at_the_approve_route(self, db, draft_send):
+        """**Rewritten 2026-09-20, and the rewrite is the point.**
+
+        This used to assert that no such route existed — "the approve route
+        lives only on the UI plane" — which was true of the machine plane and
+        became wrong for people when ADR-168 put them on it. The property it
+        was protecting never changed: a machine may **request** approval
+        (ADR-166 point 5) and may never grant it, because one that can approve
+        its own held request has defeated the mechanism holding it.
+
+        So the assertion moves from an absence to the property itself, which is
+        strictly sharper — an absence stops testing anything the day somebody
+        adds the route, and says nothing about *why* it should not be reachable.
+
+        Three things, and the third is the one that matters: the route exists,
+        a bearer is refused with a reason that is not about permissions, and
+        the held request is still pending afterwards. A refusal that arrives
+        after the action ran would satisfy the first two.
+        """
+        from app.approvals.db_models import PENDING, PendingActionDB
         from app.auth.permissions import SENDS_EXECUTE, VIEW
 
-        with machine([VIEW, SENDS_EXECUTE]) as headers:
-            for path in ("/ui/approvals/1/approve", "/approvals/1/approve"):
-                response = client.post(path, headers=headers)
-                assert response.status_code in (401, 403, 404, 405), (
-                    f"{path} answered {response.status_code}"
+        try:
+            with machine([VIEW, SENDS_EXECUTE]) as headers:
+                # Mint a held request the honest way: the machine asks to send.
+                queued = client.post(
+                    f"/delivery/send-instances/{draft_send.id}/send", headers=headers,
                 )
+                assert queued.status_code == 202, queued.text
+                pending_id = queued.json()["pending_action_id"]
+
+                # ...and is refused when it tries to grant its own request.
+                refused = client.post(f"/approvals/{pending_id}/approve", headers=headers)
+                assert refused.status_code == 403, refused.text
+                detail = refused.json()["detail"]
+                assert "may not grant" in detail, detail
+                # Not a permission refusal. This credential holds
+                # `sends.execute`, which is precisely the permission approving
+                # this action requires — so a message sending an operator off
+                # to widen a grant would send them to fix something correct.
+                assert "permission" not in detail.lower(), detail
+
+                db.rollback()
+                row = db.query(PendingActionDB).filter(
+                    PendingActionDB.id == pending_id).first()
+                assert row.status == PENDING, (
+                    f"the action ran before the refusal — status {row.status!r}"
+                )
+
+                # The UI plane refuses it too, for its own reason: no session.
+                assert client.post(
+                    f"/ui/approvals/{pending_id}/approve", headers=headers,
+                ).status_code in (401, 403)
+        finally:
+            self._cleanup(db)
 
 
 class TestPlanningIsNotFiring:

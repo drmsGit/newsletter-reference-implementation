@@ -348,6 +348,43 @@ def working_brand(request: Request) -> int:
     return brand_id
 
 
+class MachineRefused(Exception):
+    """Raised when a bearer credential reaches a route only a person may use.
+
+    Its own exception rather than a `NotAuthorised`, because it is not about
+    permissions at all: the credential may hold every grant there is and still
+    be refused here. Conflating the two would tell an operator to go and fix a
+    permission that is already correct.
+    """
+
+
+def require_person(request: Request, db: Session = Depends(get_db)) -> None:
+    """Refuse a machine credential on a route that only a person may use.
+
+    **The one place this applies is approving** (ADR-166 point 5, as ADR-168's
+    2026-09-19 addendum re-read it). A machine may *request* approval and may
+    never grant it — an integration that can approve its own held request has
+    defeated the mechanism it was held by.
+
+    That property was previously kept by there being no route at all, which was
+    true of the machine plane and became wrong for people when ADR-168 put them
+    on it: it said the React client could not work an approval inbox. The
+    property is the same; what enforces it is now a guard rather than an
+    absence, which is also the sharper thing to test.
+
+    Checked from the request rather than from whatever `enforce_api_policy`
+    resolved, deliberately: this reads as "is there a bearer credential here",
+    which is the actual question, and does not depend on the guard having run
+    first or on a shape it might later stop writing.
+    """
+    if _machine_credential(request) is not None:
+        logger.warning(
+            "api: refused %s %s — a machine credential may not approve",
+            request.method, request.url.path,
+        )
+        raise MachineRefused()
+
+
 def _declared_brand(request: Request) -> int | None:
     raw = (request.headers.get(BRAND_HEADER) or "").strip()
     if not raw:

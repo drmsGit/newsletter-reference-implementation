@@ -128,6 +128,7 @@ from app.ai.db_models import AIPromptDB, AIRunDB
 from app.providers.router import router as provider_router
 
 from app.modules.router import router as email_modules_router
+from app.approvals.router import router as approvals_router
 
 from app.overrides.db_models import ContentOverrideDB
 from app.overrides.router import router as overrides_router
@@ -150,6 +151,7 @@ from app.auth.db_models import (
 )
 from app.auth.dependencies import (
     AmbiguousPrincipal, ApiCsrfFailed, ApprovalRequired, BrandNotDeclared,
+    MachineRefused,
     CsrfFailed, NotAuthenticated, NotAuthorised,
     auth_enforced, enforce_api_csrf, enforce_api_policy, enforce_csrf,
     enforce_policy,
@@ -505,6 +507,24 @@ def _approval_required(request: Request, exc: ApprovalRequired):
         db.close()
 
 
+@app.exception_handler(MachineRefused)
+def _machine_refused(request: Request, exc: MachineRefused):
+    """403, and it says which kind of refusal it is.
+
+    Not a permission problem — the credential may hold every grant there is and
+    still be refused — so the message must not send an operator off to widen a
+    grant that is already correct.
+    """
+    return JSONResponse(
+        {"detail": (
+            "A machine credential may request approval and may not grant it "
+            "(ADR-166 point 5). Approving requires a signed-in person; sign in "
+            "and decide it in the app."
+        )},
+        status_code=403,
+    )
+
+
 @app.exception_handler(BrandNotDeclared)
 def _brand_not_declared(request: Request, exc: BrandNotDeclared):
     """Say which of the two refusals this is (ADR-166 point 8's mitigation).
@@ -618,6 +638,11 @@ app.include_router(provider_router, dependencies=_api)
 app.include_router(email_modules_router, dependencies=_api)
 app.include_router(overrides_router, dependencies=_api)
 app.include_router(audience_router, dependencies=_api)
+# **Thirteenth, and the only one with a route a machine may not reach.**
+# `require_person` sits on approve and reject rather than on the router: the
+# inbox is readable by anything that may read, and it is granting that ADR-166
+# point 5 reserves for people.
+app.include_router(approvals_router, dependencies=_api)
 
 
 @app.get("/")

@@ -4223,28 +4223,16 @@ def _approval_rows(request: Request, db: Session, status: str):
 
 
 def _may_decide(request: Request, db: Session, meta, row) -> bool:
-    """Whether this user may approve or reject this particular request.
+    """This plane's adapter over `approvals.may_decide`.
 
-    Brand-scoped permissions are checked against the request's own brand rather
-    than the working one. They are the same today — the inbox is filtered by
-    working brand — but reading the row's brand is what stays correct if the
-    inbox ever shows more than one.
+    The rule moved into `app/approvals/service.py` on 2026-09-20 when the JSON
+    plane needed the same answer. What is left here is turning a cookie into a
+    user — which is the only part that was ever about this plane.
     """
+    from app.approvals.service import may_decide
+
     user = user_for_token(db, request.cookies.get(SESSION_COOKIE))
-    if user is None:
-        # Access control switched off. `enforce_policy` already let the request
-        # through, so refusing here would break a deployment that has not turned
-        # enforcement on — and there is no principal to check anything against.
-        from app.auth.dependencies import auth_enforced
-
-        return not auth_enforced(db)
-    from app.auth.permissions import is_brand_scoped
-
-    if is_brand_scoped(meta.approve_permission):
-        return has_permission(
-            db, user, meta.approve_permission, brand_id=row.brand_id,
-        )
-    return has_permission(db, user, meta.approve_permission)
+    return may_decide(db, user, meta, row)
 
 
 @router.get("/ui/approvals")
@@ -4394,27 +4382,15 @@ def approval_detail(
 
 
 def _decide(request: Request, db: Session, pending_id: int):
-    """Shared preamble: find the row in this brand and check the row's own rule."""
-    from app.approvals.actions.registry import get_action
-    from app.approvals.db_models import PendingActionDB
+    """Shared preamble, now a two-line adapter over the service (ADR-172 pt 7)."""
+    from app.approvals.service import resolve_for_decision
 
-    row = db.query(PendingActionDB).filter(
-        PendingActionDB.id == pending_id,
-        PendingActionDB.brand_id == working_brand_id(request, db),
-    ).first()
-    if row is None:
-        return None, None, "That request does not exist in this brand."
-    meta = get_action(row.action_key)
-    if meta is None:
-        return row, None, (
-            f"'{row.action_key}' is no longer a registered action, so it cannot "
-            "be approved. Reject it, or restore the action module."
-        )
-    if not _may_decide(request, db, meta, row):
-        return row, meta, (
-            f"You need the '{meta.approve_permission}' permission to decide this."
-        )
-    return row, meta, None
+    user = user_for_token(db, request.cookies.get(SESSION_COOKIE))
+    return resolve_for_decision(
+        db, pending_id,
+        brand_id=working_brand_id(request, db),
+        user=user,
+    )
 
 
 @router.post("/ui/approvals/{pending_id}/approve")
