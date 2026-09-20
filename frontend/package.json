@@ -1,9 +1,9 @@
 {
-  "name": "newsletter-manager-client",
+  "name": "manager-client",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "The manager client for the Newsletter Blueprint. Plain React SPA per ADR-170; dependencies per ADR-173.",
+  "description": "The manager client for this reference architecture. Plain React SPA per ADR-170; dependencies per ADR-173. Deliberately not named after the product, whose name is undecided -- see src/branding.ts.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

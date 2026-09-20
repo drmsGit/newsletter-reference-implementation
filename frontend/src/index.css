@@ -39,3 +39,121 @@ body {
   background: var(--brand-bg);
   line-height: 1.5;
 }
+
+/*
+ * Layout and controls.
+ *
+ * React Aria ships behaviour and no appearance -- every rule below is ours,
+ * which is ADR-173 point 1's tradeoff made visible: the library gives focus
+ * management, keyboard handling and ARIA wiring, and holds no opinion about
+ * how any of it looks. These are provisional like the tokens above.
+ */
+
+button {
+  font: inherit;
+  padding: var(--brand-space) calc(var(--brand-space) * 2);
+  border: 1px solid var(--brand-line);
+  border-radius: var(--brand-radius);
+  background: var(--brand-bg);
+  color: var(--brand-fg);
+  cursor: pointer;
+}
+
+button[data-pressed] {
+  background: var(--brand-line);
+}
+
+button[data-disabled] {
+  color: var(--brand-muted);
+  cursor: not-allowed;
+}
+
+/* React Aria sets data-focus-visible only for keyboard focus, so a mouse click
+   does not leave a ring behind while a Tab press still shows one. */
+button[data-focus-visible],
+input[data-focus-visible] {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 2px;
+}
+
+.react-aria-TextField {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--brand-space) / 2);
+  margin-bottom: calc(var(--brand-space) * 2);
+}
+
+.react-aria-TextField input {
+  font: inherit;
+  padding: var(--brand-space);
+  border: 1px solid var(--brand-line);
+  border-radius: var(--brand-radius);
+}
+
+.react-aria-FieldError {
+  color: var(--brand-danger);
+  font-size: 0.875rem;
+}
+
+.react-aria-Popover {
+  background: var(--brand-bg);
+  border: 1px solid var(--brand-line);
+  border-radius: var(--brand-radius);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+  min-width: var(--trigger-width);
+}
+
+.react-aria-ListBox {
+  padding: calc(var(--brand-space) / 2);
+  outline: none;
+}
+
+.react-aria-ListBoxItem {
+  padding: var(--brand-space);
+  border-radius: var(--brand-radius);
+  cursor: pointer;
+  outline: none;
+}
+
+.react-aria-ListBoxItem[data-focused],
+.react-aria-ListBoxItem[data-selected] {
+  background: var(--brand-accent);
+  color: var(--brand-bg);
+}
+
+.react-aria-Select {
+  display: flex;
+  align-items: center;
+  gap: var(--brand-space);
+}
+
+.signin {
+  max-width: 24rem;
+  margin: calc(var(--brand-space) * 8) auto;
+  padding: 0 calc(var(--brand-space) * 2);
+}
+
+.signin .error {
+  color: var(--brand-danger);
+}
+
+.shell__bar {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--brand-space) * 2);
+  padding: var(--brand-space) calc(var(--brand-space) * 2);
+  border-bottom: 1px solid var(--brand-line);
+}
+
+.shell__brand {
+  font-weight: 600;
+}
+
+.shell__user {
+  margin-left: auto;
+  color: var(--brand-muted);
+}
+
+.shell__main {
+  padding: calc(var(--brand-space) * 3);
+}
