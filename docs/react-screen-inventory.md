@@ -76,16 +76,32 @@ Each row says what the screen needs and whether the API can serve it today.
 
 ## What blocks the first screen
 
-In order, and only three things:
+**This list said three things and was wrong — there were four.** The fourth was
+in the auth spine, which is why nothing above it caught it.
 
 1. ~~**C1, the brand switcher.**~~ ✅ **Closed 2026-09-20**, and it was two routes
    rather than one: the shell also had no way to ask who it is and which brand
    it is in.
-2. **C8, planning a send.** Without it "deliveries" is a read-only list of sends
+2. ~~**C15, the CSRF token after a reload.**~~ ✅ **Closed 2026-09-20.** Found
+   while planning the client, not while auditing the API. The token was
+   obtainable from exactly one place — the `POST /auth/session/verify` response
+   body — and is not a cookie, so a reload, a new tab or a restored session held
+   a valid session and **no way to perform a single write**. `GET /auth/session`
+   now returns it. Recorded as a dated addendum to
+   [[ADR-168 — The Manager SPA Authenticates With Its Session Cookie]], because
+   point 2 decides how the token is *compared* and never said how a client
+   learns it.
+3. **C8, planning a send.** Without it "deliveries" is a read-only list of sends
    the SPA cannot create, which is most of the product's point.
-3. **C2, settings.** Not blocking the core loop; blocking a usable product.
+4. **C2, settings.** Not blocking the core loop; blocking a usable product.
 
 Everything else in the core loop is already reachable.
+
+**The lesson worth keeping:** C1, C8 and C2 were all found by reading the API
+for what it cannot do. C15 was invisible to that method, because every route
+involved existed and worked — what was missing was a sequence a browser
+performs and a test suite does not. Auditing the surface does not find it;
+walking the client's own lifecycle does.
 
 ---
 
@@ -95,16 +111,25 @@ Everything else in the core loop is already reachable.
 contract cannot silently fork, because the client's types are generated from the
 schema rather than transcribed from it."
 
-**Two things were renamed before the generator ever ran**, deliberately, because
-renaming afterwards means regenerating the client and touching every call site:
+**Renamed before the generator ever ran**, deliberately, because renaming
+afterwards means regenerating the client and touching every call site:
 
 - `snapshots.html_*` → `artifact_*` (2026-09-20, ADR-162 point 3)
-- nothing else is pending — that was the only known one
+- `RenderedVariant.html` → `artifact_body` (2026-09-20) — the same rename,
+  finished. The snapshot columns went and this response model was missed.
+- `GET /email-modules` → `GET /modules` (2026-09-20), with the tag description
+  rewritten to say it serves every channel
 
-**Before generating, check the schema is honest.** Several routes return bare
-dicts rather than declared response models (`process-due`, `process-expired`,
-`send-test`, `suggest-subject`), so the generator will type them as `object`.
-That is a small, mechanical piece of work and it is much cheaper now than later.
+✅ **The schema honesty pass is done (2026-09-20).** Seven routes returned bare
+dicts and now carry declared response models: `process-due`, `process-expired`,
+`send-test`, `suggest-subject` — **and the five session routes, which this
+document did not list.** Those were the worse omission: `/auth/session/request`
+and `/auth/session/verify` also took `payload: dict = Body(...)`, so a generated
+client had neither input nor output types for the entire sign-in flow, which is
+the one surface the SPA cannot start without.
+
+Verified by diffing `/openapi.json` before and after: twelve schemas added, none
+removed, path count unchanged.
 
 ---
 
@@ -130,13 +155,18 @@ and say "email".** They are accurate about what they carry and wrong about what
 they imply, so a client generated from the schema will happily build an
 email-only UI. Measured 2026-09-20: twelve email-shaped names reach the schema,
 nine of which are FastAPI's auto-named Jinja form bodies and do not matter.
-These four do.
+These four did.
+
+**Two of the four were fixed on 2026-09-20 and two were deliberately not.** The
+split is not about which names are worst — it is about which are *renames*. The
+two that went were renames and cost eight lines. The two that stayed are not
+naming problems at all, and calling them one is what kept them on this list.
 
 | Name | What it looks like | What it is |
 |---|---|---|
 | `Variant.subject`, `Variant.preheader` (and on `VariantCreate` / `VariantUpdate`) | a variant has a subject line | **It does not.** ADR-162 point 1 moved both into a `header` module and migration 0012 dropped the columns; they are synthesised on read and written through `set_envelope_fields`. A push variant has no envelope at all, so these are null and a Subject input on a push form is a field that cannot be saved. **Ask the channel, not the variant** — `envelope_module_type(channel)` returns `None` when there is nothing to show. |
-| `GET /email-modules` | the module catalogue is email-only | It takes a `channel` parameter that **defaults** to email and serves every channel. A module picker built from its name will silently be email-only. |
-| `RenderedVariant.html` | rendering produces HTML | For push it produces a field payload. Snapshots already carry this correctly as `artifact_*`; this response model was not renamed with them. |
+| ~~`GET /email-modules`~~ | the module catalogue is email-only | ✅ **Renamed to `GET /modules`, 2026-09-20.** It takes a `channel` parameter that **defaults** to email and serves every channel. Zero references in the Jinja router, templates or tests — the whole cost was the router prefix, the `BRAND_OWNED` key and three lines of `main.py`. |
+| ~~`RenderedVariant.html`~~ | rendering produces HTML | ✅ **Renamed to `artifact_body`, 2026-09-20.** For push it produces a field payload. Snapshots already carried this correctly as `artifact_*`; this response model was not renamed with them, so this was finishing ADR-162 point 3 rather than a new decision. The value it holds was already `artifact.body`. |
 | `Recipient.email`, `Recipient.email_consent_status` | a recipient has an address and a consent status | A recipient has **addresses per channel** (ADR-163 point 2) and a **consent grid** of `(brand, channel, purpose)`. These two fields are the email cell of each, flattened for convenience. Do not build a single "Consent: yes/no" control from them. |
 
 **The rule underneath all four:** where the SPA needs to know whether something
@@ -144,10 +174,23 @@ applies, ask the channel's manifest rather than inferring from a field name.
 That is ADR-160/161's whole design — a channel declares what it accepts — and
 it is the one thing a generated type cannot tell you.
 
-Renaming these is logged in `docs/backlog.md` and deliberately **not** done
-before the client: the four above are documented, and renaming a schema field
-after a typed client exists costs more than doing it now only if nobody wrote
-this table.
+**Why the other two stayed, decided 2026-09-20.**
+
+`Variant.subject`/`preheader` is **not a naming problem** and renaming it would
+not help. The defect is that an envelope field exists on a channel-neutral type
+at all; the honest fix is an envelope shaped by the channel's manifest, which
+reopens [[ADR-162 — Channel Rendering and Artifacts]] point 1. That is design
+work and it belongs beside campaign detail (inventory B11), not in a rename
+pass. It was misfiled here as a name.
+
+`Recipient.email`/`email_consent_status` **already has a decision against it**,
+written into `backend/app/recipients/models.py` — an `email` alias was weighed
+and rejected as a breaking change, and `address` + `channel` already exists on
+the sibling model. Renaming it now would have silently reversed a recorded call.
+
+Both remain documented above, which is what this table is for. The rule
+underneath all four is unchanged, and the two survivors are exactly the cases
+where it bites hardest.
 
 ## Related
 
