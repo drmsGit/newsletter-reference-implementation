@@ -138,8 +138,8 @@ def _sweep():
     # A snapshot that wrote a file leaves one behind too — an inline one does
     # not, which is half the point of storing it in the row.
     for row in session.query(SnapshotDB).filter(SnapshotDB.variant_id.in_(vids or [-1])).all():
-        if row.html_storage_type != "inline" and row.html_location not in ("pending", ""):
-            Path(row.html_location).unlink(missing_ok=True)
+        if row.artifact_storage_type != "inline" and row.artifact_location not in ("pending", ""):
+            Path(row.artifact_location).unlink(missing_ok=True)
     session.query(SnapshotDB).filter(
         SnapshotDB.variant_id.in_(vids or [-1])).delete(synchronize_session=False)
     session.query(ModuleInstanceDB).filter(
@@ -800,12 +800,12 @@ class TestAPushSnapshotLivesInTheRowNotOnDisk:
             assert after == before, f"a push snapshot wrote files: {after - before}"
 
             row = db.get(SnapshotDB, snapshot.id)
-            assert row.html_storage_type == "inline"
-            assert row.html_location == "inline:render_context"
+            assert row.artifact_storage_type == "inline"
+            assert row.artifact_location == "inline:render_context"
             stored = row.render_context["artifact"]
             assert stored["role"] == "payload"
             assert stored["fields"]["push_title"] == "Ready"
-            assert row.html_size > 0, "an inline artifact still has a size"
+            assert row.artifact_size > 0, "an inline artifact still has a size"
         finally:
             db.query(SnapshotDB).filter(SnapshotDB.id == snapshot.id).delete()
             db.commit()
@@ -865,8 +865,8 @@ class TestAPushSnapshotLivesInTheRowNotOnDisk:
         finally:
             from pathlib import Path
             row = db.get(SnapshotDB, email_snap.id)
-            if row and row.html_location not in ("pending", "inline:render_context"):
-                Path(row.html_location).unlink(missing_ok=True)
+            if row and row.artifact_location not in ("pending", "inline:render_context"):
+                Path(row.artifact_location).unlink(missing_ok=True)
             db.query(SnapshotDB).filter(
                 SnapshotDB.id.in_([push_snap.id, email_snap.id])).delete(
                     synchronize_session=False)
@@ -2065,8 +2065,8 @@ class TestTheSendFormOffersOnlyWhatTheChannelCanDo:
             from pathlib import Path
             for snap in snapshots:
                 row = db.get(SnapshotDB, snap.id)
-                if row and row.html_storage_type != "inline":
-                    Path(row.html_location).unlink(missing_ok=True)
+                if row and row.artifact_storage_type != "inline":
+                    Path(row.artifact_location).unlink(missing_ok=True)
             db.query(SnapshotDB).filter(
                 SnapshotDB.id.in_([s.id for s in snapshots])).delete(synchronize_session=False)
             db.commit()

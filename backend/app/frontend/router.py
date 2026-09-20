@@ -1029,9 +1029,9 @@ def campaign_detail(
                 # A push artifact lives in the row, not on disk (2026-09-17),
                 # so "Open HTML" would link to a handler that correctly answers
                 # nothing. The template needs to know which it is.
-                "is_inline": snapshot.html_storage_type == "inline",
+                "is_inline": snapshot.artifact_storage_type == "inline",
                 "artifact_fields": (snapshot.render_context or {}).get("artifact", {}).get("fields"),
-                "html_size": snapshot.html_size,
+                "artifact_size": snapshot.artifact_size,
                 "created_at": snapshot.created_at,
                 "render_context": snapshot.render_context,
                 "render_context_pretty": json.dumps(

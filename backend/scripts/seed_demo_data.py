@@ -305,8 +305,8 @@ def seed():
         db.commit()
 
         # --- engagement: clicks -> click contributions (event_id set) ----
-        snap = SnapshotDB(variant_id=slots[0][1].id, html_storage_type="file",
-                          html_location="/tmp/demo.html", html_size=0)
+        snap = SnapshotDB(variant_id=slots[0][1].id, artifact_storage_type="file",
+                          artifact_location="/tmp/demo.html", artifact_size=0)
         db.add(snap); db.flush()
         si = SendInstanceDB(snapshot_id=snap.id, name="Demo send", status="sent",
                             provider="mock", brand_id=BRAND_ID)

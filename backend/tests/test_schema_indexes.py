@@ -8,10 +8,15 @@ skips a table that already exists — the harness quietly enforced a different
 schema from production and two tests started passing against a database that
 could not have refused them.
 
-This file checks the narrow version of that for migration 0018: the three
-campaign-chain indexes exist in the database the suite is running against, and
-the migration names the same three. It is not a general models-versus-migrations
-check; that is a larger piece of work and is logged.
+This file checks the narrow version of that for two migrations: 0018's three
+campaign-chain indexes, and 0019's three column renames. It is not a general
+models-versus-migrations check; that is a larger piece of work and is logged.
+
+A rename is the sharpest case of the drift, which is why 0019 is here. A
+`create_all` database gets the new names because the models declare them; an
+existing database gets them only if the migration runs. Nothing else would
+notice the difference until a query on a deployed database failed on a column
+that the whole test suite says exists.
 """
 import pathlib
 
@@ -78,4 +83,60 @@ def test_the_migration_names_the_same_three():
     assert not missing, (
         f"migration 0018 does not create an index on {missing}, but the models "
         "declare one. An existing deployment would never get it."
+    )
+
+
+# --- migration 0019, the snapshot artifact rename ---------------------------
+
+MIGRATION_0019 = (
+    pathlib.Path(__file__).resolve().parent.parent
+    / "scripts" / "migrate_0019_snapshot_artifact_columns.sql"
+)
+
+#: ADR-162 point 3. `html_*` described one of the two storage shapes and lied
+#: about the other: a push payload's byte count in a column called `html_size`
+#: is a name the next reader has to decode. Both branches write
+#: `artifact.size_bytes()`, so the value always meant "the serialised
+#: artifact", and only the name was channel-specific.
+ARTIFACT_COLUMNS = {
+    "html_storage_type": "artifact_storage_type",
+    "html_location": "artifact_location",
+    "html_size": "artifact_size",
+}
+
+
+def _snapshot_columns() -> set[str]:
+    with engine.connect() as conn:
+        return {
+            row[0] for row in conn.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'snapshots'"
+            )).fetchall()
+        }
+
+
+def test_the_snapshot_columns_are_named_for_what_they_hold():
+    columns = _snapshot_columns()
+    missing = [new for new in ARTIFACT_COLUMNS.values() if new not in columns]
+    lingering = [old for old in ARTIFACT_COLUMNS if old in columns]
+
+    assert not missing, f"snapshots is missing {missing} — was it rebuilt from the models?"
+    assert not lingering, (
+        f"snapshots still has {lingering}. Both names existing at once is worse "
+        "than either alone: two columns holding the same fact, and nothing "
+        "saying which one a reader should trust."
+    )
+
+
+def test_migration_0019_renames_the_same_three():
+    """The other creation path. A model-only rename leaves every existing
+    deployment on the old names, and a migration-only rename leaves every new
+    one on the new — either way the two disagree and only one is tested."""
+    sql = MIGRATION_0019.read_text()
+    missing = [
+        f"{old} -> {new}" for old, new in ARTIFACT_COLUMNS.items()
+        if f"RENAME COLUMN {old} TO {new}" not in sql
+    ]
+    assert not missing, (
+        f"migration 0019 does not rename {missing}, but the models expect it."
     )

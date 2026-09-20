@@ -569,7 +569,7 @@
                 <tr>
                     <td>{{ snapshot.id }}</td>
                     <td>{{ snapshot.recipient_id or "—" }}</td>
-                    <td>{{ snapshot.html_size }} bytes</td>
+                    <td>{{ snapshot.artifact_size }} bytes</td>
                     <td>{{ snapshot.created_at.strftime("%Y-%m-%d %H:%M") if snapshot.created_at else "—" }}</td>
                     <td>
                         {% if snapshot.is_inline %}

@@ -17,9 +17,9 @@ def to_snapshot(record: SnapshotDB) -> Snapshot:
         id=record.id,
         variant_id=record.variant_id,
         recipient_id=record.recipient_id,
-        html_storage_type=record.html_storage_type,
-        html_location=record.html_location,
-        html_size=record.html_size,
+        artifact_storage_type=record.artifact_storage_type,
+        artifact_location=record.artifact_location,
+        artifact_size=record.artifact_size,
         created_at=record.created_at,
         render_context=record.render_context,
     )
@@ -103,7 +103,7 @@ def build_render_context(
 
     return context
 
-#: What `html_location` says for an artifact that is not a file. The column is
+#: What `artifact_location` says for an artifact that is not a file. The column is
 #: NOT NULL and named for HTML because it predates channels; renaming it is
 #: part of the open snapshot-storage question, not of this change.
 INLINE_LOCATION = "inline:render_context"
@@ -135,7 +135,7 @@ def create_snapshot_for_variant(
     **Two storage shapes, and the split is deliberate rather than tidy.** Email
     keeps writing an HTML file, exactly as before. A non-HTML artifact — push,
     today — is stored *in the row*, under `render_context["artifact"]`, with
-    `html_storage_type="inline"` and no file at all.
+    `artifact_storage_type="inline"` and no file at all.
 
     Decided 2026-09-17 (user). Writing a push payload to a `.json` beside the
     `.html` files was the smaller diff and was rejected: it would harden the
@@ -183,9 +183,9 @@ def create_snapshot_for_variant(
         snapshot = SnapshotDB(
             variant_id=variant_id,
             recipient_id=recipient_id,
-            html_storage_type="inline",
-            html_location=INLINE_LOCATION,
-            html_size=artifact.size_bytes(),
+            artifact_storage_type="inline",
+            artifact_location=INLINE_LOCATION,
+            artifact_size=artifact.size_bytes(),
             render_context=render_context,
         )
         db.add(snapshot)
@@ -198,9 +198,9 @@ def create_snapshot_for_variant(
     snapshot = SnapshotDB(
         variant_id=variant_id,
         recipient_id=recipient_id,
-        html_storage_type="file",
-        html_location="pending",
-        html_size=artifact.size_bytes(),
+        artifact_storage_type="file",
+        artifact_location="pending",
+        artifact_size=artifact.size_bytes(),
         render_context=render_context,
     )
 
@@ -218,7 +218,7 @@ def create_snapshot_for_variant(
     file_path = SNAPSHOT_STORAGE_DIR / file_name
     file_path.write_text(artifact.body, encoding="utf-8")
 
-    snapshot.html_location = str(file_path)
+    snapshot.artifact_location = str(file_path)
     db.commit()
     db.refresh(snapshot)
 
@@ -251,14 +251,14 @@ def get_snapshot_html(db: Session, snapshot_id: int, *, brand_id: int) -> str | 
     if snapshot is None:
         return None
 
-    if snapshot.html_storage_type == "inline":
+    if snapshot.artifact_storage_type == "inline":
         # Not a file, and not a failure either. Returning None here would be
         # indistinguishable from "the file went missing", which is the state
         # this function was written to report — so the caller is told plainly
         # via `get_snapshot_artifact` instead.
         return None
 
-    file_path = Path(snapshot.html_location)
+    file_path = Path(snapshot.artifact_location)
 
     if not file_path.exists():
         return None
@@ -277,7 +277,7 @@ def get_snapshot_artifact(db: Session, snapshot_id: int, *, brand_id: int) -> di
     if snapshot is None:
         return None
 
-    if snapshot.html_storage_type == "inline":
+    if snapshot.artifact_storage_type == "inline":
         stored = (snapshot.render_context or {}).get("artifact")
         return dict(stored) if stored else None
 

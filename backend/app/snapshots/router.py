@@ -67,7 +67,7 @@ def get_snapshot_html_file(
         from app.snapshots.db_models import SnapshotDB
 
         snapshot = db.query(SnapshotDB).filter(SnapshotDB.id == snapshot_id).first()
-        if snapshot is not None and snapshot.html_storage_type == "inline":
+        if snapshot is not None and snapshot.artifact_storage_type == "inline":
             raise HTTPException(
                 status_code=404,
                 detail=(
