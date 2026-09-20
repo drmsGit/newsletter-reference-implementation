@@ -340,3 +340,87 @@ class TestTheTokenSurvivesAReload:
         assert response.headers.get("cache-control") == "no-store", (
             "a response carrying a CSRF token must not be cacheable"
         )
+
+
+class TestAStaleCookieDoesNotLockYouOut:
+    """**The deadlock, found by a user who simply could not sign in.**
+
+    `enforce_api_csrf` skipped only when there was no cookie *string*. A browser
+    holding a revoked or expired `nra_session` — from a signed-out tab, an idle
+    timeout, or the Jinja UI — still sent one, so CSRF was enforced against a
+    session that no longer existed.
+
+    The SPA could not satisfy it. `GET /auth/session` answered 401, so it never
+    received a token, and the cookie is `httponly` so it could neither read nor
+    clear one. Every write refused with 403 **including the sign-in routes**, so
+    the only escape was deleting the cookie by hand in developer tools. The
+    symptom reported was "401 and 403, no code in the terminal, no code screen"
+    — no code, because the request never reached the service.
+
+    The Jinja plane never had this, which is why nobody hit it earlier: its
+    template renders a token derived server-side from whatever cookie is
+    present, so a stale cookie still produces a matching one.
+    """
+
+    def test_an_unknown_cookie_does_not_block_asking_for_a_code(self, db, user):
+        blocked = TestClient(app, raise_server_exceptions=False)
+        blocked.cookies.set(auth.SESSION_COOKIE, "not-a-real-session-token")
+
+        response = blocked.post("/auth/session/request", json={"email": user.email})
+
+        assert response.status_code == 202, (
+            "a cookie that resolves to nothing is not a session, and treating "
+            "it as one makes signing in impossible from the client"
+        )
+
+    def test_a_revoked_session_does_not_block_signing_in_again(self, db, user):
+        """The realistic version: signed out in another tab, then sign in here.
+
+        The session is minted directly rather than through the code flow --
+        these tests only need a cookie, and requesting a code per test walks
+        into the per-client sign-in throttle.
+        """
+        token = auth.create_session(db, user)
+        auth.revoke_token(db, token)
+
+        stale = TestClient(app, raise_server_exceptions=False)
+        stale.cookies.set(auth.SESSION_COOKIE, token)
+        response = stale.post("/auth/session/request", json={"email": user.email})
+
+        assert response.status_code == 202
+
+    def test_a_live_session_still_needs_its_token(self, db, user):
+        """**The other half, and the one that must not regress.**
+
+        Skipping CSRF for a dead session is correct; skipping it for a live one
+        would remove the control ADR-168 point 2 exists to add.
+        """
+        token = auth.create_session(db, user)
+
+        live = TestClient(app, raise_server_exceptions=False)
+        live.cookies.set(auth.SESSION_COOKIE, token)
+        response = live.post("/auth/session")  # sign out, a write, no header
+
+        assert response.status_code == 403
+        assert auth.user_for_token(db, token) is not None
+
+    def test_asking_does_not_extend_the_session(self, db, user):
+        """`session_is_live` must not touch `last_seen_at`.
+
+        The guard runs on every write. If asking whether a session exists also
+        kept it alive, the idle timeout would stop meaning anything -- and it
+        would add a sixth write per request to an already-logged write
+        amplification defect.
+        """
+        from app.auth.db_models import SessionDB
+
+        token = auth.create_session(db, user)
+        session_row = db.query(SessionDB).filter(
+            SessionDB.token_hash == auth.hash_secret(token)
+        ).first()
+        before = session_row.last_seen_at
+
+        assert auth.session_is_live(db, token) is True
+
+        db.refresh(session_row)
+        assert session_row.last_seen_at == before, "the read-only check wrote"

@@ -35,6 +35,7 @@ from app.auth.service import (
     ensure_default_brand,
     has_permission,
     permissions_for,
+    session_is_live,
     user_for_token,
 )
 from app.database import get_db
@@ -598,7 +599,7 @@ def enforce_api_policy(request: Request, db: Session = Depends(get_db)):
 API_CSRF_HEADER = "X-CSRF-Token"
 
 
-async def enforce_api_csrf(request: Request) -> None:
+async def enforce_api_csrf(request: Request, db: Session = Depends(get_db)) -> None:
     """CSRF for the JSON plane, carried in a header (ADR-168 point 2).
 
     Compares `X-CSRF-Token` against `csrf_token_for(session_token)` with
@@ -607,11 +608,30 @@ async def enforce_api_csrf(request: Request) -> None:
     and is already domain-separated from `hash_secret` so it cannot collide
     with the session hash in `auth_sessions.token_hash`.
 
-    **Skipped when there is no session cookie**, because a bearer-authenticated
+    **Skipped when there is no live session**, because a bearer-authenticated
     request carries no ambient credential — a cross-site page cannot make a
     browser attach an `Authorization` header it does not know. And
     `enforce_api_policy` refuses a request carrying both, so "has a cookie" and
     "is a machine" are mutually exclusive by the time this runs.
+
+    **"No live session" and not "no cookie string", and the difference was a
+    lockout.** This asked only whether a cookie was present until 2026-09-20.
+    A browser holding a revoked or expired `nra_session` — from a signed-out
+    tab, an idle timeout, or the Jinja UI — still sent one, so CSRF was
+    enforced against a session that no longer existed. The SPA could not
+    satisfy it: `GET /auth/session` answered 401, so it had no token, and the
+    cookie is `httponly` so it could not clear or derive one. Every write
+    refused with 403, **including the sign-in routes and sign-out**, and the
+    only escape was deleting the cookie by hand in developer tools.
+
+    The Jinja plane never had this, which is why it went unnoticed: its
+    template renders a token derived server-side from whatever cookie is
+    present, so a stale cookie still produces a matching token.
+
+    Skipping here adds no exposure. A cookie that resolves to nothing is not a
+    principal, so `enforce_api_policy` refuses the request separately for
+    anything requiring a session — and CSRF exists to protect authenticated
+    actions, which this caller cannot perform.
 
     **Why `enforce_csrf` could not be reused, in two independent ways.** It
     calls `await request.form()`, which against a JSON body returns an empty
@@ -626,6 +646,13 @@ async def enforce_api_csrf(request: Request) -> None:
 
     session_token = request.cookies.get(SESSION_COOKIE)
     if not session_token:
+        return
+
+    # Read-only: `session_is_live` deliberately does not extend the session,
+    # because asking whether one exists must not be the thing that keeps it
+    # alive — and `user_for_token` would add a sixth write per request to an
+    # already-logged write-amplification defect.
+    if not session_is_live(db, session_token):
         return
 
     submitted = (request.headers.get(API_CSRF_HEADER) or "").strip()

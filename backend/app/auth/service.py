@@ -764,8 +764,14 @@ def create_session(db: Session, user: UserDB) -> str:
     return token
 
 
-def user_for_token(db: Session, token: str | None) -> UserDB | None:
-    """Resolve a session cookie to a user, enforcing both expiries."""
+def _session_user(db: Session, token: str | None, *, touch: bool) -> UserDB | None:
+    """Resolve a session cookie to a user, enforcing both expiries.
+
+    `touch` is the only difference between the two public callers, and it is
+    kept as one function so the expiry rules cannot drift into two versions.
+    With `touch=False` this performs no write and no commit, which is what lets
+    a guard ask "is this a session?" without extending it.
+    """
     if not token:
         return None
 
@@ -787,9 +793,37 @@ def user_for_token(db: Session, token: str | None) -> UserDB | None:
     if user is None or not user.is_active:
         return None
 
-    row.last_seen_at = current
-    db.commit()
+    if touch:
+        row.last_seen_at = current
+        db.commit()
     return user
+
+
+def user_for_token(db: Session, token: str | None) -> UserDB | None:
+    """Resolve a session cookie to a user, enforcing both expiries.
+
+    Extends the idle timeout as a side effect, which is what makes the timeout
+    sliding rather than absolute.
+    """
+    return _session_user(db, token, touch=True)
+
+
+def session_is_live(db: Session, token: str | None) -> bool:
+    """Whether this cookie is a usable session, **without extending it**.
+
+    For a guard that must distinguish "no session" from "a session", where
+    asking the question must not itself be an answer. Read-only on purpose:
+    `user_for_token` writes `last_seen_at` and commits on every call, and that
+    write amplification is already a logged defect -- a guard that ran it a
+    sixth time per request would make it worse to ask a question it does not
+    need the answer to.
+
+    Returns False for exactly the cases `user_for_token` returns None,
+    including a deactivated user, because a guard that treated those
+    differently would answer differently for a deactivated account than for an
+    unknown one -- which is the account oracle ADR-151 §2 exists to close.
+    """
+    return _session_user(db, token, touch=False) is not None
 
 
 def revoke_token(db: Session, token: str | None) -> None:
