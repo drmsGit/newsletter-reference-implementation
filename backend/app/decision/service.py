@@ -13,9 +13,19 @@ def execute_decision_slot(
     db: Session,
     decision_slot_id: int,
     recipient_id: int | None = None,
+    *,
+    brand_id: int | None = None,
 ) -> DecisionResolution | None:
+    # **Optional here and required by the route**, the same split rendering
+    # takes. A request resolving a slot must not reach another brand's; the
+    # send path already holds the brand it locked and would only be
+    # re-deriving it. `Depends(working_brand)` means the route cannot forget.
+    from app.campaigns.service import get_decision_slot
+
     slot = (
-        db.query(DecisionSlotDB)
+        get_decision_slot(db, decision_slot_id, brand_id=brand_id)
+        if brand_id is not None
+        else db.query(DecisionSlotDB)
         .filter(DecisionSlotDB.id == decision_slot_id)
         .first()
     )

@@ -65,12 +65,12 @@ def _validate_field_overrides(manifest, module: ModuleInstanceDB, field_override
         )
 
 
-def create_content_override(db: Session, data: ContentOverrideCreate) -> ContentOverrideDB:
-    module = (
-        db.query(ModuleInstanceDB)
-        .filter(ModuleInstanceDB.id == data.module_instance_id)
-        .first()
-    )
+def create_content_override(
+    db: Session, data: ContentOverrideCreate, *, brand_id: int
+) -> ContentOverrideDB:
+    from app.campaigns.service import get_module
+
+    module = get_module(db, data.module_instance_id, brand_id=brand_id)
     if module is None:
         raise ValueError(f"module_instance_id={data.module_instance_id} does not exist")
 
@@ -124,13 +124,18 @@ def get_active_content_override(db: Session, module_instance_id: int) -> Content
     )
 
 
-def reset_content_override(db: Session, override_id: int) -> ContentOverrideDB | None:
+def reset_content_override(
+    db: Session, override_id: int, *, brand_id: int
+) -> ContentOverrideDB | None:
     """Reset-to-original (ADR-041): deactivate the override so rendering falls
     back to system-governed content. The row is kept as history so the
     trust-loop comparison and any recorded outcome survive the reset."""
     override = (
         db.query(ContentOverrideDB)
-        .filter(ContentOverrideDB.id == override_id)
+        .filter(
+            ContentOverrideDB.id == override_id,
+            ContentOverrideDB.id.in_(_override_ids_in_brand(db, brand_id)),
+        )
         .with_for_update()
         .first()
     )
@@ -144,8 +149,47 @@ def reset_content_override(db: Session, override_id: int) -> ContentOverrideDB |
     return override
 
 
-def get_content_override(db: Session, override_id: int) -> ContentOverrideDB | None:
-    return db.query(ContentOverrideDB).filter(ContentOverrideDB.id == override_id).first()
+def _override_ids_in_brand(db: Session, brand_id: int):
+    """A subquery of the override ids this brand owns.
+
+    **A subquery rather than a join, because both callers take `FOR UPDATE`.**
+    Joining `campaigns` into a locking query would lock the campaign rows too —
+    a lock nobody asked for, on a row every other request touches. A subquery
+    in the WHERE clause scopes the selection without widening what is locked,
+    so the brand is still resolved in the same statement that claims the row.
+    """
+    from app.campaigns.db_models import CampaignDB, ModuleInstanceDB, VariantDB
+
+    return (
+        db.query(ContentOverrideDB.id)
+        .join(ModuleInstanceDB, ModuleInstanceDB.id == ContentOverrideDB.module_instance_id)
+        .join(VariantDB, VariantDB.id == ModuleInstanceDB.variant_id)
+        .join(CampaignDB, CampaignDB.id == VariantDB.campaign_id)
+        .filter(CampaignDB.brand_id == brand_id)
+        .subquery()
+        .select()
+    )
+
+
+def get_content_override(
+    db: Session, override_id: int, *, brand_id: int
+) -> ContentOverrideDB | None:
+    """One override, via `override -> module -> variant -> campaign -> brand`.
+
+    The longest chain in the codebase — four hops — and it needs no column of
+    its own for exactly the reason ADR-150's addendum gives: an override hangs
+    off a module, which is already per-brand transitively.
+    """
+    from app.campaigns.db_models import CampaignDB, ModuleInstanceDB, VariantDB
+
+    return (
+        db.query(ContentOverrideDB)
+        .join(ModuleInstanceDB, ModuleInstanceDB.id == ContentOverrideDB.module_instance_id)
+        .join(VariantDB, VariantDB.id == ModuleInstanceDB.variant_id)
+        .join(CampaignDB, CampaignDB.id == VariantDB.campaign_id)
+        .filter(ContentOverrideDB.id == override_id, CampaignDB.brand_id == brand_id)
+        .first()
+    )
 
 
 def list_content_overrides(
@@ -153,8 +197,18 @@ def list_content_overrides(
     module_instance_id: int | None = None,
     send_instance_id: int | None = None,
     active: bool | None = None,
+    *,
+    brand_id: int,
 ) -> list[ContentOverrideDB]:
-    q = db.query(ContentOverrideDB)
+    from app.campaigns.db_models import CampaignDB, ModuleInstanceDB, VariantDB
+
+    q = (
+        db.query(ContentOverrideDB)
+        .join(ModuleInstanceDB, ModuleInstanceDB.id == ContentOverrideDB.module_instance_id)
+        .join(VariantDB, VariantDB.id == ModuleInstanceDB.variant_id)
+        .join(CampaignDB, CampaignDB.id == VariantDB.campaign_id)
+        .filter(CampaignDB.brand_id == brand_id)
+    )
     if module_instance_id is not None:
         q = q.filter(ContentOverrideDB.module_instance_id == module_instance_id)
     if send_instance_id is not None:
@@ -164,14 +218,19 @@ def list_content_overrides(
     return q.order_by(ContentOverrideDB.created_at.desc()).all()
 
 
-def record_outcome_delta(db: Session, override_id: int, data: OutcomeDeltaUpdate) -> ContentOverrideDB | None:
+def record_outcome_delta(
+    db: Session, override_id: int, data: OutcomeDeltaUpdate, *, brand_id: int
+) -> ContentOverrideDB | None:
     # Row lock: two concurrent PATCH calls computing outcome deltas for the
     # same override (e.g. an open-rate job and a click-rate job overlapping)
     # would otherwise both read the same starting outcome_delta and the second
     # commit would silently clobber the first's write.
     override = (
         db.query(ContentOverrideDB)
-        .filter(ContentOverrideDB.id == override_id)
+        .filter(
+            ContentOverrideDB.id == override_id,
+            ContentOverrideDB.id.in_(_override_ids_in_brand(db, brand_id)),
+        )
         .with_for_update()
         .first()
     )

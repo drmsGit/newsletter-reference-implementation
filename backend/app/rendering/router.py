@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.auth.dependencies import working_brand
 from app.database import get_db
 from app.campaigns.db_models import VariantDB
 # Aliased: the route function below is also called `render_variant`, so
@@ -31,13 +32,15 @@ def render_variant(
     variant_id: int,
     recipient_id: int | None = None,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     # Through the channel's renderer (ADR-162 point 4). Calling the email path
     # directly returned a 200 with a 252-character empty document for a push
     # variant — no error, because nothing failed; the email assembler simply
     # found no email manifest for a push module and rendered comments.
     artifact = render_channel_artifact(
-        db=db, variant_id=variant_id, recipient_id=recipient_id
+        db=db, variant_id=variant_id, recipient_id=recipient_id,
+        brand_id=brand_id,
     )
     variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
 

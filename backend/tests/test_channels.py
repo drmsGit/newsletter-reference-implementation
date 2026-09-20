@@ -756,7 +756,8 @@ class TestEachChannelRendersItsOwnShape:
             module_instance_id=module.id,
             field_overrides={"push_title": "Overridden title"},
             overridden_by="test",
-        ))
+        ),
+            brand_id=brand_of_variant(db, variant.id))
         artifact = render_variant(db, variant.id, mode="preview")
         assert artifact.fields["push_title"] == "Overridden title", (
             "the override layer did not reach a push field — push is resolving "
@@ -792,7 +793,8 @@ class TestAPushSnapshotLivesInTheRowNotOnDisk:
             content_record_id=record.id, brand_id=brand_of_variant(db, variant.id))
 
         before = set(SNAPSHOT_STORAGE_DIR.glob("*")) if SNAPSHOT_STORAGE_DIR.exists() else set()
-        snapshot = create_snapshot_for_variant(db, variant_id=variant.id)
+        snapshot = create_snapshot_for_variant(
+                db, variant_id=variant.id, brand_id=brand_of_variant(db, variant.id))
         try:
             after = set(SNAPSHOT_STORAGE_DIR.glob("*")) if SNAPSHOT_STORAGE_DIR.exists() else set()
             assert after == before, f"a push snapshot wrote files: {after - before}"
@@ -825,7 +827,8 @@ class TestAPushSnapshotLivesInTheRowNotOnDisk:
             content_record_id=record.id, brand_id=brand_of_variant(db, variant.id))
 
         with pytest.raises(UnpublishedContentError):
-            create_snapshot_for_variant(db, variant_id=variant.id)
+            create_snapshot_for_variant(
+                db, variant_id=variant.id, brand_id=brand_of_variant(db, variant.id))
 
     def test_the_artifact_reads_back_for_both_shapes(self, db, campaign):
         from app.snapshots.db_models import SnapshotDB
@@ -849,11 +852,13 @@ class TestAPushSnapshotLivesInTheRowNotOnDisk:
         create_module_for_variant(db, variant_id=email.id,
                                   module_type="single_stack", content_record_id=record.id, brand_id=brand_of_variant(db, email.id))
 
-        push_snap = create_snapshot_for_variant(db, variant_id=push.id)
-        email_snap = create_snapshot_for_variant(db, variant_id=email.id)
+        push_snap = create_snapshot_for_variant(
+                db, variant_id=push.id, brand_id=brand_of_variant(db, push.id))
+        email_snap = create_snapshot_for_variant(
+                db, variant_id=email.id, brand_id=brand_of_variant(db, email.id))
         try:
-            assert get_snapshot_artifact(db, push_snap.id)["role"] == "payload"
-            assert get_snapshot_artifact(db, email_snap.id)["role"] == "html", (
+            assert get_snapshot_artifact(db, push_snap.id, brand_id=brand_of_variant(db, push_snap.variant_id))["role"] == "payload"
+            assert get_snapshot_artifact(db, email_snap.id, brand_id=brand_of_variant(db, email_snap.variant_id))["role"] == "html", (
                 "email's snapshot stopped reading back — the inline branch is "
                 "catching a case it should not"
             )
@@ -1349,10 +1354,12 @@ class TestAPushSendGoesOutAsAPush:
         group = create_group(db, name=_name("group"), brand_id=brand.id)
         for recipient in recipients:
             add_member(db, group.id, recipient.id, brand_id=group.brand_id)
-        snapshot = create_snapshot_for_variant(db, variant_id=variant.id)
+        snapshot = create_snapshot_for_variant(
+                db, variant_id=variant.id, brand_id=brand_of_variant(db, variant.id))
         return prepare_send_from_audience(
             db, snapshot_id=snapshot.id, name=_name("send"),
-            audience_group_id=group.id, provider="mock")
+            audience_group_id=group.id, provider="mock",
+            brand_id=group.brand_id)
 
     def test_executions_carry_the_variants_channel_not_the_default(self, db):
         from app.delivery.db_models import DeliveryExecutionDB
@@ -1392,7 +1399,7 @@ class TestAPushSendGoesOutAsAPush:
 
         mock_module.MockProvider.send = capture
         try:
-            send_send_instance(db, send.id)
+            send_send_instance(db, send.id, brand_id=send.brand_id)
         finally:
             mock_module.MockProvider.send = original
 
@@ -1417,7 +1424,7 @@ class TestAPushSendGoesOutAsAPush:
         reachable = self._recipients(db, brand, with_push_token=True)
         unreachable = self._recipients(db, brand, with_push_token=False)
         send = self._plan(db, brand, variant, [reachable, unreachable])
-        send_send_instance(db, send.id)
+        send_send_instance(db, send.id, brand_id=send.brand_id)
         db.expire_all()
 
         rows = {
@@ -2037,8 +2044,10 @@ class TestTheSendFormOffersOnlyWhatTheChannelCanDo:
         email_variant = db.query(VariantDB).filter(
             VariantDB.campaign_id == campaign.id, VariantDB.channel == "email").first()
         snapshots = [
-            create_snapshot_for_variant(db, variant_id=email_variant.id),
-            create_snapshot_for_variant(db, variant_id=push_variant.id),
+            create_snapshot_for_variant(
+                db, variant_id=email_variant.id, brand_id=brand_of_variant(db, email_variant.id)),
+            create_snapshot_for_variant(
+                db, variant_id=push_variant.id, brand_id=brand_of_variant(db, push_variant.id)),
         ]
 
         page, user = self._page(db, campaign.id, monkeypatch)
@@ -2126,7 +2135,8 @@ class TestTheSendFormOffersOnlyWhatTheChannelCanDo:
             db, campaign_id=campaign.id, name=_name("push"), channel="push", brand_id=campaign.brand_id)
         create_module_for_variant(db, variant_id=variant.id,
                                   module_type="notification", content_record_id=record.id, brand_id=brand_of_variant(db, variant.id))
-        snapshot = create_snapshot_for_variant(db, variant_id=variant.id)
+        snapshot = create_snapshot_for_variant(
+                db, variant_id=variant.id, brand_id=brand_of_variant(db, variant.id))
         page, user = self._page(db, campaign.id, monkeypatch)
         try:
             assert f"/snapshots/{snapshot.id}/html" not in page.text, (
@@ -2503,7 +2513,8 @@ class TestNoSurfaceQuietlyRendersAPushAsAnEmail:
             ModuleInstanceDB.variant_id == variant.id).first()
         create_content_version(db, content_record_id=module.content_record_id,
                                created_by="test", brand_id=campaign.brand_id)
-        snapshot = create_snapshot_for_variant(db, variant_id=variant.id)
+        snapshot = create_snapshot_for_variant(
+                db, variant_id=variant.id, brand_id=brand_of_variant(db, variant.id))
         try:
             _api_client = TestClient(app, raise_server_exceptions=False)
             _api_client.headers.update(self._api_headers or {})

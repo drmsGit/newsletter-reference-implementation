@@ -8,6 +8,19 @@ settings, not a record") absorbed without a special path. A settings action
 declares no subject, describes itself in rows, and writes through the settings
 service. Nothing in the spine changes to accommodate it.
 
+**Every action module exposes three things**: a module-level `META`, a
+`describe(db, payload, *, brand_id)` and an
+`execute(db, payload, *, choice=None, brand_id)`.
+
+`brand_id` was added to both 2026-09-20 with [[ADR-172]] point 4, and which brand it
+carries is the decision rather than the argument: it is **the brand the request
+was authorised in**, read off the pending row, and never the approver's working
+brand. An approver may hold grants on several brands and be looking at any of
+them; the held action belongs to the one it was requested for. Letting where
+somebody happened to be standing decide what a queued send may touch is the
+same defect ADR-166 point 8 refuses when it will not read the brand off the
+addressed resource.
+
 **A separate registry, not a field on `TaskMeta`.** An AI task and an approvable
 action are orthogonal: running a task is never the approvable act, applying its
 output is. Fusing them would force every approvable action — a machine send, a

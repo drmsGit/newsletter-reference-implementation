@@ -44,7 +44,7 @@ META = ApprovableAction(
 )
 
 
-def summarise(db: Session, send_instance_id: int) -> str:
+def summarise(db: Session, send_instance_id: int, *, brand_id: int) -> str:
     """The one line frozen onto the request at the moment it is made.
 
     Deliberately plain text and no identifiers a person cannot read: this is
@@ -52,14 +52,15 @@ def summarise(db: Session, send_instance_id: int) -> str:
     send instance it names may have been deleted.
     """
     send_instance = db.query(SendInstanceDB).filter(
-        SendInstanceDB.id == send_instance_id
+        SendInstanceDB.id == send_instance_id,
+        SendInstanceDB.brand_id == brand_id,
     ).first()
     if send_instance is None:
         return f"Send #{send_instance_id} (no longer present)"
     return f"Send “{send_instance.name}” (#{send_instance.id})"
 
 
-def describe(db: Session, payload: dict) -> ActionDescription:
+def describe(db: Session, payload: dict, *, brand_id: int) -> ActionDescription:
     """What the approver sees, computed **now**.
 
     The recipient count is read live rather than carried in the payload,
@@ -68,8 +69,16 @@ def describe(db: Session, payload: dict) -> ActionDescription:
     to say no.
     """
     send_instance_id = payload.get("send_instance_id")
+    # **Scoped to the brand the request was raised in** (ADR-172 point 6).
+    # A held request can name a send in another brand — the approval gate fires
+    # in the guard, before any service resolves the addressed row — and without
+    # this the review panel would show an approver that other brand's send
+    # name, provider, from-address and live recipient count. It answers exactly
+    # as a deleted send does instead, which is also the truthful answer: there
+    # is nothing here this approver can act on.
     send_instance = db.query(SendInstanceDB).filter(
-        SendInstanceDB.id == send_instance_id
+        SendInstanceDB.id == send_instance_id,
+        SendInstanceDB.brand_id == brand_id,
     ).first()
 
     if send_instance is None:
@@ -125,7 +134,9 @@ def describe(db: Session, payload: dict) -> ActionDescription:
     )
 
 
-def execute(db: Session, payload: dict, *, choice: dict | None = None) -> ActionResult:
+def execute(
+    db: Session, payload: dict, *, choice: dict | None = None, brand_id: int,
+) -> ActionResult:
     """Approving is what sends it (ADR-142 §4).
 
     `send_send_instance` takes its own row lock and refuses an instance that is
@@ -141,7 +152,7 @@ def execute(db: Session, payload: dict, *, choice: dict | None = None) -> Action
         return ActionResult(ok=False, message="this request names no send")
 
     try:
-        send_send_instance(db, send_instance_id)
+        send_send_instance(db, send_instance_id, brand_id=brand_id)
     except ValueError as refusal:
         # A clean refusal from the send path — already sent, snapshot missing,
         # audience unresolvable. Not an exception the approver caused, so it is

@@ -26,6 +26,7 @@ from app.settings.service import (
     AUTO_APPLY, REQUIRE_APPROVAL, get_task_approval_mode, set_task_approval_mode,
 )
 from main import app
+from app.auth.service import ensure_default_brand
 
 TAG = "aimode"
 TASK = "subject_preheader"
@@ -169,7 +170,8 @@ class TestTheActionIsPickOneNotYesNo:
         row = approvals.request_approval(
             db, ai_subject_apply.META.key,
             payload={"ai_run_id": run.id},
-            summary=ai_subject_apply.summarise(db, run.id),
+            summary=ai_subject_apply.summarise(
+                db, run.id, brand_id=ensure_default_brand(db).id),
             requested_by_type="user", requested_by_id=None,
             brand_id=auth.ensure_default_brand(db).id,
             subject_id=run.id,
@@ -181,7 +183,7 @@ class TestTheActionIsPickOneNotYesNo:
         run, _ = run_with_options
         row = self._held(db, run)
 
-        description = ai_subject_apply.describe(db, {"ai_run_id": run.id})
+        description = ai_subject_apply.describe(db, {"ai_run_id": run.id}, brand_id=ensure_default_brand(db).id)
 
         assert len(description.options) == 3
         assert row.subject_type == "ai_run", (
@@ -238,7 +240,7 @@ class TestTheActionIsPickOneNotYesNo:
         assert ai_subject_apply.META.approve_permission == "campaigns.manage"
 
     def test_a_vanished_run_blocks_rather_than_raising(self, db):
-        description = ai_subject_apply.describe(db, {"ai_run_id": 99999999})
+        description = ai_subject_apply.describe(db, {"ai_run_id": 99999999}, brand_id=ensure_default_brand(db).id)
 
         assert description.blocked_reason
         assert description.options is None
@@ -265,7 +267,7 @@ class TestTheActionIsPickOneNotYesNo:
         run.prompt_id = prompt.id
         db.commit()
         try:
-            rows = dict(ai_subject_apply.describe(db, {"ai_run_id": run.id}).rows)
+            rows = dict(ai_subject_apply.describe(db, {"ai_run_id": run.id}, brand_id=ensure_default_brand(db).id).rows)
             assert rows.get("Prompt version") == f"#{prompt.id}"
         finally:
             db.rollback()

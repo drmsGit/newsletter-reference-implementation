@@ -47,6 +47,7 @@ from app.overrides.db_models import ContentOverrideDB
 # with a mapper error that reads like a database problem and is not one.
 from app.recipients.db_models import RecipientDB  # noqa: F401
 from app.snapshots.db_models import SnapshotDB
+from app.campaigns.service import brand_of_variant
 
 
 #: Every campaign and content record these tests create carries this prefix, and
@@ -652,7 +653,9 @@ class TestWhatTheCopyArrivesAs:
                 .first()
             )
             with pytest.raises(UnpublishedContentError):
-                create_snapshot_for_variant(db, variant_id=variant.id)
+                create_snapshot_for_variant(
+                    db, variant_id=variant.id,
+                    brand_id=brand_of_variant(db, variant.id))
 
             new_id = report.content_records_copied[source["record"].id]
             assert db.query(ContentVersionDB).filter(

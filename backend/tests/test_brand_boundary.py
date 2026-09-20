@@ -24,7 +24,8 @@ import uuid
 from fastapi.testclient import TestClient
 
 from app.auth.permissions import (
-    AUDIENCES_MANAGE, AUDIENCES_PIN, CAMPAIGNS_MANAGE, CONTENT_MANAGE, VIEW,
+    AUDIENCES_MANAGE, AUDIENCES_PIN, CAMPAIGNS_MANAGE, CONTENT_MANAGE,
+    SENDS_EXECUTE, VIEW,
 )
 from main import app
 
@@ -509,3 +510,163 @@ class TestAudienceGroupsAreOwnedByOneBrand:
         finally:
             db.close()
             self._remove(ids)
+
+
+# --- the derived plane, stage 6 ---------------------------------------------
+
+class TestASendCannotBeFiredFromAnotherBrand:
+    """**The external review's P1-02 in its sharpest form.**
+
+    The finding: "an integration with `sends.execute` on brand A can send
+    `X-Brand: A` while addressing a known send-instance ID belonging to brand
+    B." Nothing downstream would have noticed — the send instance carries its
+    own brand and the send loop reads it, so brand B's list gets brand B's
+    content, sent by a credential that holds nothing in brand B.
+    """
+
+    def _draft_send_in_default_brand(self):
+        from app.database import SessionLocal
+        from app.delivery.db_models import SendInstanceDB
+
+        db = SessionLocal()
+        try:
+            source = db.query(SendInstanceDB).order_by(SendInstanceDB.id).first()
+            instance = SendInstanceDB(
+                snapshot_id=source.snapshot_id,
+                brand_id=source.brand_id,
+                name=f"boundary-{uuid.uuid4().hex[:8]}",
+                status="draft",
+                provider="mock",
+            )
+            db.add(instance)
+            db.commit()
+            db.refresh(instance)
+            return instance.id
+        finally:
+            db.close()
+
+    def _remove(self, send_id):
+        from app.database import SessionLocal
+        from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
+
+        db = SessionLocal()
+        try:
+            db.query(DeliveryExecutionDB).filter(
+                DeliveryExecutionDB.send_instance_id == send_id).delete()
+            db.query(SendInstanceDB).filter(SendInstanceDB.id == send_id).delete()
+            db.commit()
+        finally:
+            db.close()
+
+    def test_an_unattended_machine_cannot_fire_another_brands_send(self, foreign_api):
+        """**The external review's P1-02, directly.**
+
+        A credential flagged for unattended sending goes straight past the
+        approval gate into `send_send_instance` — so this is the path where the
+        brand predicate inside the locked query is the only thing standing
+        between brand A's credential and brand B's mail.
+
+        The status code alone would not prove it. `send_send_instance` commits
+        `status='sending'` as its very first act, so a boundary enforced after
+        the row was loaded would leave this instance wedged in `sending`
+        forever. Asserting it is still `draft` is what separates "refused" from
+        "refused too late".
+        """
+        from app.auth import integrations as ints
+        from app.auth.db_models import IntegrationCredentialDB, IntegrationDB
+        from app.database import SessionLocal
+        from app.delivery.db_models import SendInstanceDB
+
+        send_id = self._draft_send_in_default_brand()
+        db = SessionLocal()
+        try:
+            with foreign_api([VIEW, SENDS_EXECUTE]) as headers:
+                key_id = headers["Authorization"].split()[1].split(".")[0]
+                integration = db.query(IntegrationDB).join(
+                    IntegrationCredentialDB,
+                    IntegrationCredentialDB.integration_id == IntegrationDB.id,
+                ).filter(IntegrationCredentialDB.key_id == key_id).first()
+                ints.set_unattended_sending(db, integration.id, True)
+
+                response = client.post(
+                    f"/delivery/send-instances/{send_id}/send", headers=headers)
+                assert response.status_code != 202, "it should not have been held"
+                assert response.status_code in (404, 409), response.text
+
+            db.expire_all()
+            row = db.query(SendInstanceDB).filter(SendInstanceDB.id == send_id).first()
+            assert row.status == "draft", (
+                f"the send was claimed across the brand boundary — status {row.status!r}"
+            )
+            assert row.sent_count == 0
+        finally:
+            db.close()
+            self._remove(send_id)
+
+    def test_a_held_request_naming_another_brands_send_discloses_nothing(self, foreign_api):
+        """The other half of P1-02, and it does NOT refuse — it queues.
+
+        An unflagged machine hits `ApprovalRequired` **in the guard**, which
+        runs before any service resolves the addressed row. So a caller in
+        brand A can still mint a held request whose payload names brand B's
+        send, and a 202 here is the documented behaviour of ADR-166 point 5
+        rather than a hole.
+
+        What must not happen is disclosure: the frozen summary and the live
+        review panel both resolve the send within the brand the request was
+        raised in, so an approver sees "no longer present" rather than another
+        brand's send name, provider and recipient count. And approving it
+        cannot send, because `execute` is handed the row's brand.
+        """
+        from app.approvals.actions import send_fire
+        from app.database import SessionLocal
+
+        send_id = self._draft_send_in_default_brand()
+        db = SessionLocal()
+        try:
+            with foreign_api([VIEW, SENDS_EXECUTE]) as headers:
+                response = client.post(
+                    f"/delivery/send-instances/{send_id}/send", headers=headers)
+                assert response.status_code == 202, response.text
+                pending_id = response.json()["pending_action_id"]
+
+            from app.approvals.db_models import PendingActionDB
+
+            row = db.query(PendingActionDB).filter(
+                PendingActionDB.id == pending_id).first()
+
+            summary = send_fire.summarise(db, send_id, brand_id=row.brand_id)
+            assert "no longer present" in summary, (
+                f"the frozen summary quoted another brand's send: {summary!r}"
+            )
+            described = send_fire.describe(
+                db, {"send_instance_id": send_id}, brand_id=row.brand_id)
+            assert described.blocked_reason, "the review panel offered the button"
+            assert "mock" not in str(described.rows), "the panel leaked the provider"
+
+            result = send_fire.execute(
+                db, {"send_instance_id": send_id}, brand_id=row.brand_id)
+            assert not result.ok, "approving fired another brand's send"
+
+            from app.delivery.db_models import SendInstanceDB
+
+            db.expire_all()
+            assert db.query(SendInstanceDB).filter(
+                SendInstanceDB.id == send_id).first().status == "draft"
+
+            db.query(PendingActionDB).filter(PendingActionDB.id == pending_id).delete()
+            db.commit()
+        finally:
+            db.close()
+            self._remove(send_id)
+
+    def test_its_executions_are_not_listable_from_another_brand(self, foreign_api):
+        send_id = self._draft_send_in_default_brand()
+        try:
+            with foreign_api([VIEW]) as headers:
+                response = client.get(
+                    f"/delivery/send-instances/{send_id}/executions", headers=headers)
+                assert response.status_code == 200, response.text
+                assert response.json() == []
+        finally:
+            self._remove(send_id)

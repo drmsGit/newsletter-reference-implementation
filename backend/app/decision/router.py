@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.campaigns.models import DecisionResolution
+from app.auth.dependencies import working_brand
 from app.database import get_db
 from app.decision.service import execute_decision_slot
 from app.decision.strategies.base import StrategyMeta
@@ -26,12 +27,14 @@ def execute_slot(
     decision_slot_id: int,
     payload: DecisionExecutionRequest | None = None,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     try:
         return execute_decision_slot(
             db=db,
             decision_slot_id=decision_slot_id,
             recipient_id=payload.recipient_id if payload else None,
+            brand_id=brand_id,
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))

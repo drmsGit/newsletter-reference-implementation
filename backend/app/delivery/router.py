@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.auth.dependencies import working_brand
 from app.database import get_db
 from app.delivery.models import (
     DeliveryExecution,
@@ -36,6 +37,7 @@ router = APIRouter(prefix="/delivery", tags=["delivery"])
 def create_execution(
     payload: DeliveryExecutionCreate,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     try:
         return create_delivery_execution(
@@ -45,6 +47,7 @@ def create_execution(
             status=payload.status,
             provider=payload.provider,
             provider_message_id=payload.provider_message_id,
+            brand_id=brand_id,
         )
     except IntegrityError:
         db.rollback()
@@ -67,6 +70,7 @@ def create_execution(
 def create_send_instance_record(
     payload: SendInstanceCreate,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     return create_send_instance(
         db=db,
@@ -75,6 +79,7 @@ def create_send_instance_record(
         status=payload.status,
         provider=payload.provider,
         scheduled_at=payload.scheduled_at,
+        brand_id=brand_id,
     )
 
 
@@ -86,10 +91,12 @@ def create_send_instance_record(
 def get_send_instances_for_snapshot(
     snapshot_id: int,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     return list_send_instances_for_snapshot(
         db=db,
         snapshot_id=snapshot_id,
+        brand_id=brand_id,
     )
 
 
@@ -101,10 +108,12 @@ def get_send_instances_for_snapshot(
 def get_executions_for_send_instance(
     send_instance_id: int,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     return list_delivery_executions_for_send_instance(
         db=db,
         send_instance_id=send_instance_id,
+        brand_id=brand_id,
     )
 
 
@@ -134,11 +143,13 @@ def get_executions_for_send_instance(
 def send_instance(
     send_instance_id: int,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     try:
         send_send_instance(
             db=db,
             send_instance_id=send_instance_id,
+            brand_id=brand_id,
         )
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error))

@@ -211,7 +211,15 @@ def approve(
         )
 
     try:
-        result = module.execute(db, row.payload or {}, choice=choice)
+        # **The brand the request was authorised in, not the approver's.**
+        # An approver may hold grants on several brands and be looking at any
+        # of them; the held action belongs to the one it was requested for,
+        # which is the column on this row. Passing the approver's working brand
+        # instead would let where somebody happened to be standing decide what
+        # a queued send was allowed to touch.
+        result = module.execute(
+            db, row.payload or {}, choice=choice, brand_id=row.brand_id,
+        )
     except Exception as error:  # the action blew up
         db.rollback()
         row = _claim(db, pending_id)

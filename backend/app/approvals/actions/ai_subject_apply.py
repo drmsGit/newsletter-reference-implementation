@@ -49,11 +49,20 @@ META = ApprovableAction(
 )
 
 
-def summarise(db: Session, run_id: int) -> str:
+def summarise(db: Session, run_id: int, *, brand_id: int) -> str:
+    """The frozen line, naming only what this brand may see (ADR-172 point 6).
+
+    `ai_runs` carries no brand of its own — it targets a variant, which does,
+    transitively. So the variant is resolved through the scoped getter and an
+    out-of-brand one falls back to the bare id rather than quoting a name the
+    reader has no business seeing.
+    """
+    from app.campaigns.service import get_variant
+
     run = db.query(AIRunDB).filter(AIRunDB.id == run_id).first()
     if run is None:
         return f"Subject suggestions from run #{run_id} (no longer present)"
-    variant = db.query(VariantDB).filter(VariantDB.id == run.target_id).first()
+    variant = get_variant(db, run.target_id, brand_id=brand_id)
     label = variant.name if variant else f"variant {run.target_id}"
     return f"Subject line options for “{label}”"
 
@@ -64,9 +73,16 @@ def _options(db: Session, run: AIRunDB) -> list[dict]:
     return subject_preheader.parse_options(run.output_text or "")
 
 
-def describe(db: Session, payload: dict) -> ActionDescription:
+def describe(db: Session, payload: dict, *, brand_id: int) -> ActionDescription:
     run_id = payload.get("ai_run_id")
     run = db.query(AIRunDB).filter(AIRunDB.id == run_id).first()
+    if run is not None:
+        from app.campaigns.service import get_variant
+
+        # The run exists; whether this brand may look at it is a separate
+        # question, answered by its target variant.
+        if get_variant(db, run.target_id, brand_id=brand_id) is None:
+            run = None
     if run is None:
         return ActionDescription(
             summary=f"AI run #{run_id} no longer exists.",
@@ -100,7 +116,7 @@ def describe(db: Session, payload: dict) -> ActionDescription:
         )
 
     return ActionDescription(
-        summary=summarise(db, run.id),
+        summary=summarise(db, run.id, brand_id=brand_id),
         rows=rows,
         warnings=(
             [run.message] if run.message else []
@@ -117,7 +133,9 @@ def describe(db: Session, payload: dict) -> ActionDescription:
     )
 
 
-def execute(db: Session, payload: dict, *, choice: dict | None = None) -> ActionResult:
+def execute(
+    db: Session, payload: dict, *, choice: dict | None = None, brand_id: int,
+) -> ActionResult:
     """Write the chosen option onto the variant.
 
     **Refuses without a choice rather than defaulting to the first.** A

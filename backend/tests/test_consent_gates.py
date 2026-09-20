@@ -552,7 +552,8 @@ class TestSendTimeConsentRevocation:
         )
         db.session.commit()
 
-        send_send_instance(db.session, send_instance.id)
+        send_send_instance(
+            db.session, send_instance.id, brand_id=send_instance.brand_id)
         db.session.refresh(execution)
 
         assert execution.status == "excluded", (
@@ -570,7 +571,8 @@ class TestSendTimeConsentRevocation:
         recipient = db.recipient("opted_in")
         send_instance, execution = db.send_to(recipient)
 
-        send_send_instance(db.session, send_instance.id)
+        send_send_instance(
+            db.session, send_instance.id, brand_id=send_instance.brand_id)
         db.session.refresh(execution)
 
         assert execution.status == "sent", (
@@ -590,7 +592,8 @@ class TestSendTimeConsentRevocation:
         recipient = db.recipient("opted_in")
         send_instance, execution = db.send_to(recipient)
 
-        send_send_instance(db.session, send_instance.id)
+        send_send_instance(
+            db.session, send_instance.id, brand_id=send_instance.brand_id)
         db.session.refresh(send_instance)
 
         assert send_instance.status == "sent"
@@ -614,7 +617,8 @@ class TestSendTimeConsentRevocation:
         )
         db.session.commit()
 
-        send_send_instance(db.session, send_instance.id)
+        send_send_instance(
+            db.session, send_instance.id, brand_id=send_instance.brand_id)
         db.session.refresh(send_instance)
 
         assert send_instance.status == "no_recipients", (
@@ -641,7 +645,8 @@ class TestSendTimeConsentRevocation:
         ).delete(synchronize_session=False)
         db.session.commit()
 
-        send_send_instance(db.session, send_instance.id)
+        send_send_instance(
+            db.session, send_instance.id, brand_id=send_instance.brand_id)
         db.session.refresh(execution)
 
         assert execution.status == "excluded"

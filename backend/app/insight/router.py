@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.auth.dependencies import working_brand
 from app.database import get_db
 from app.insight.models import EngagementEvent, EngagementEventCreate, PreferenceUpdateResult
 from app.insight.service import (
@@ -18,6 +19,7 @@ router = APIRouter(prefix="/insight", tags=["insight"])
 def create_event(
     payload: EngagementEventCreate,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     try:
         return create_engagement_event(
@@ -41,10 +43,12 @@ def create_event(
 def get_events_for_delivery_execution(
     delivery_execution_id: int,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     return list_events_for_delivery_execution(
         db=db,
         delivery_execution_id=delivery_execution_id,
+        brand_id=brand_id,
     )
 
 
@@ -52,6 +56,7 @@ def get_events_for_delivery_execution(
 def apply_signals_from_event(
     event_id: int,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     try:
         return apply_event_to_signals(

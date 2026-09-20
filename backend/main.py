@@ -458,7 +458,10 @@ def _approval_required(request: Request, exc: ApprovalRequired):
         summary = ""
         if module is not None and hasattr(module, "summarise") and subject_id:
             try:
-                summary = module.summarise(db, subject_id)
+                # The brand the request is being raised in, so a summary
+                # frozen onto the row cannot quote another brand's record
+                # (ADR-172 point 6).
+                summary = module.summarise(db, subject_id, brand_id=exc.brand_id)
             except Exception:  # pragma: no cover - a summary must not block
                 logger.warning("could not summarise %s", exc.action_key, exc_info=True)
         try:

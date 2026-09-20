@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
+from app.auth.dependencies import working_brand
 from app.database import get_db
 from app.rendering.service import UnpublishedContentError
 from app.snapshots.models import Snapshot
@@ -20,12 +21,14 @@ def create_variant_snapshot(
     variant_id: int,
     recipient_id: int | None = None,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     try:
         return create_snapshot_for_variant(
             db=db,
             variant_id=variant_id,
             recipient_id=recipient_id,
+            brand_id=brand_id,
         )
     except UnpublishedContentError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
@@ -35,10 +38,12 @@ def create_variant_snapshot(
 def get_variant_snapshots(
     variant_id: int,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     return list_snapshots_for_variant(
         db=db,
         variant_id=variant_id,
+        brand_id=brand_id,
     )
 
 
@@ -46,10 +51,12 @@ def get_variant_snapshots(
 def get_snapshot_html_file(
     snapshot_id: int,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     html = get_snapshot_html(
         db=db,
         snapshot_id=snapshot_id,
+        brand_id=brand_id,
     )
 
     if html is None:

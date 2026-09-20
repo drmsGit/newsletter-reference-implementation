@@ -25,6 +25,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
+from app.auth.service import ensure_default_brand
 from app.approvals import service as approvals
 from app.approvals.actions import registry as action_registry
 from app.approvals.db_models import (
@@ -68,11 +69,11 @@ def planted_action(tmp_path):
         "                        default_ttl_seconds=3600,\n"
         "                        subject_type='marker')\n"
         "\n"
-        "def describe(db, payload):\n"
+        "def describe(db, payload, *, brand_id=None):\n"
         "    return ActionDescription(summary='writes a marker file',\n"
         "                             rows=[('Path', payload.get('path', ''))])\n"
         "\n"
-        "def execute(db, payload, *, choice=None):\n"
+        "def execute(db, payload, *, choice=None, brand_id=None):\n"
         "    if payload.get('explode'):\n"
         "        raise RuntimeError('the action blew up')\n"
         "    if payload.get('decline'):\n"
@@ -455,7 +456,7 @@ class TestTheSendAction:
         """
         from app.approvals.actions import send_fire
 
-        description = send_fire.describe(db, {"send_instance_id": 99999999})
+        description = send_fire.describe(db, {"send_instance_id": 99999999}, brand_id=ensure_default_brand(db).id)
 
         assert description.blocked_reason
         assert "deleted" in description.blocked_reason.lower()
@@ -477,7 +478,7 @@ class TestTheSendAction:
         if sent is None:
             pytest.skip("no sent send instance in this database")
 
-        description = send_fire.describe(db, {"send_instance_id": sent.id})
+        description = send_fire.describe(db, {"send_instance_id": sent.id}, brand_id=ensure_default_brand(db).id)
 
         assert description.blocked_reason, "already sent must block, not warn"
         assert "already sent" in description.blocked_reason.lower()
@@ -493,12 +494,13 @@ class TestTheSendAction:
         if draft is None:
             pytest.skip("no draft send instance in this database")
 
-        assert send_fire.describe(db, {"send_instance_id": draft.id}).blocked_reason is None
+        assert send_fire.describe(db, {"send_instance_id": draft.id}, brand_id=ensure_default_brand(db).id).blocked_reason is None
 
     def test_executing_without_a_send_id_declines_rather_than_crashing(self, db):
         from app.approvals.actions import send_fire
+        from app.auth.service import ensure_default_brand
 
-        result = send_fire.execute(db, {})
+        result = send_fire.execute(db, {}, brand_id=ensure_default_brand(db).id)
 
         assert not result.ok
         assert "names no send" in (result.message or "")
@@ -518,7 +520,9 @@ class TestTheSendAction:
         if sent is None:
             pytest.skip("no sent send instance in this database")
 
-        result = send_fire.execute(db, {"send_instance_id": sent.id})
+        result = send_fire.execute(
+            db, {"send_instance_id": sent.id}, brand_id=sent.brand_id,
+        )
 
         assert not result.ok
         assert "already" in (result.message or "").lower()
@@ -528,4 +532,5 @@ class TestTheSendAction:
         which is why it is a string and not a join."""
         from app.approvals.actions import send_fire
 
-        assert "no longer present" in send_fire.summarise(db, 99999999)
+        assert "no longer present" in send_fire.summarise(
+            db, 99999999, brand_id=ensure_default_brand(db).id)

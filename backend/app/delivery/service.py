@@ -36,7 +36,12 @@ def create_delivery_execution(
     status: str = "created",
     provider: str | None = None,
     provider_message_id: str | None = None,
+    *,
+    brand_id: int,
 ) -> DeliveryExecution:
+    if get_send_instance(db, send_instance_id, brand_id=brand_id) is None:
+        raise ValueError(f"SendInstance {send_instance_id} not found")
+
     execution = DeliveryExecutionDB(
         send_instance_id=send_instance_id,
         recipient_id=recipient_id,
@@ -55,15 +60,40 @@ def create_delivery_execution(
 def list_delivery_executions_for_send_instance(
     db: Session,
     send_instance_id: int,
+    *,
+    brand_id: int,
 ) -> list[DeliveryExecution]:
     records = (
         db.query(DeliveryExecutionDB)
-        .filter(DeliveryExecutionDB.send_instance_id == send_instance_id)
+        .join(SendInstanceDB, SendInstanceDB.id == DeliveryExecutionDB.send_instance_id)
+        .filter(
+            DeliveryExecutionDB.send_instance_id == send_instance_id,
+            SendInstanceDB.brand_id == brand_id,
+        )
         .order_by(DeliveryExecutionDB.created_at.desc())
         .all()
     )
 
     return [to_delivery_execution(record) for record in records]
+
+
+def get_send_instance(
+    db: Session, send_instance_id: int, *, brand_id: int
+) -> SendInstanceDB | None:
+    """One send instance, selected within a brand (ADR-172 points 4-6).
+
+    `send_instances.brand_id` has been NOT NULL since migration 0007, so this
+    is a column comparison rather than a join — the one place on the derived
+    plane where the chain is a single hop.
+    """
+    return (
+        db.query(SendInstanceDB)
+        .filter(
+            SendInstanceDB.id == send_instance_id,
+            SendInstanceDB.brand_id == brand_id,
+        )
+        .first()
+    )
 
 
 def to_send_instance(record: SendInstanceDB) -> SendInstance:
@@ -119,10 +149,22 @@ def create_send_instance(
     scheduled_at=None,
     audience_group_id: int | None = None,
     from_address: str | None = None,
+    *,
+    brand_id: int,
 ) -> SendInstance:
+    # **The snapshot decides the brand; the caller only proves it may act
+    # there.** `brand_for_snapshot` has always been the arbiter of which brand
+    # a send belongs to, and that does not change — what is new is refusing a
+    # caller who is working in a different one. Reading the brand off the
+    # caller instead would let a request in brand A mint a send that renders
+    # brand B's snapshot.
+    snapshot_brand = brand_for_snapshot(db, snapshot_id)
+    if snapshot_brand != brand_id:
+        raise ValueError(f"Snapshot {snapshot_id} not found")
+
     send_instance = SendInstanceDB(
         snapshot_id=snapshot_id,
-        brand_id=brand_for_snapshot(db, snapshot_id),
+        brand_id=snapshot_brand,
         name=name,
         status=status,
         provider=provider,
@@ -138,6 +180,17 @@ def create_send_instance(
     return to_send_instance(send_instance)
 
 
+def _audience_group_in_brand(db: Session, group_id: int, brand_id: int):
+    """The audience service's scoped getter, imported where it is used.
+
+    Named locally because `get_group` reads ambiguously in a delivery module —
+    there are several kinds of group a send could mean.
+    """
+    from app.audience.service import get_group
+
+    return get_group(db, group_id, brand_id=brand_id)
+
+
 def prepare_send_from_audience(
     db: Session,
     snapshot_id: int,
@@ -147,6 +200,8 @@ def prepare_send_from_audience(
     from_address: str | None = None,
     audience_resolution_mode: str = "freeze",
     scheduled_at=None,
+    *,
+    brand_id: int,
 ) -> SendInstanceDB:
     """Materialize a planned send: resolve the audience group to its live
     recipient set (consent-gated) and create one DeliveryExecution per
@@ -188,6 +243,17 @@ def prepare_send_from_audience(
     )
     plan_channel = plan_variant.channel if plan_variant else DEFAULT_CHANNEL
 
+    # **Both halves are checked against the caller's brand before anything is
+    # materialised.** A send binds a snapshot to an audience group, and either
+    # one reaching across the boundary produces a send that renders one brand's
+    # content to another brand's list. Refused here rather than filtered later,
+    # because this function writes one execution per recipient.
+    snapshot_brand = brand_for_snapshot(db, snapshot_id)
+    if snapshot_brand != brand_id:
+        raise ValueError(f"Snapshot {snapshot_id} not found")
+    if _audience_group_in_brand(db, audience_group_id, brand_id) is None:
+        raise ValueError(f"Audience group {audience_group_id} not found")
+
     recipients = resolve_audience(db, audience_group_id, channel=plan_channel)
     if not recipients:
         raise ValueError(
@@ -203,7 +269,7 @@ def prepare_send_from_audience(
 
     send_instance = SendInstanceDB(
         snapshot_id=snapshot_id,
-        brand_id=brand_for_snapshot(db, snapshot_id),
+        brand_id=snapshot_brand,
         name=name,
         status="scheduled" if scheduled_at else "draft",
         provider=provider,
@@ -339,7 +405,17 @@ def process_due_scheduled_sends(db: Session) -> list[int]:
     triggered = []
     for send_instance in due:
         try:
-            send_send_instance(db, send_instance_id=send_instance.id)
+            # **Not a `list_all_*` case, deliberately.** The SELECT spans
+            # brands because a scheduler has no working brand — but each fire
+            # already knows its own, from the column `brand_for_snapshot` set
+            # when the instance was created. So the sweep hands the send its
+            # own brand rather than an escape hatch, and the whitelist of
+            # spanning functions stays three entries that all mean the same
+            # thing.
+            send_send_instance(
+                db, send_instance_id=send_instance.id,
+                brand_id=send_instance.brand_id,
+            )
             triggered.append(send_instance.id)
         except Exception:
             logger.exception("scheduled send failed: send_instance_id=%s", send_instance.id)
@@ -349,10 +425,15 @@ def process_due_scheduled_sends(db: Session) -> list[int]:
 def list_send_instances_for_snapshot(
     db: Session,
     snapshot_id: int,
+    *,
+    brand_id: int,
 ) -> list[SendInstance]:
     records = (
         db.query(SendInstanceDB)
-        .filter(SendInstanceDB.snapshot_id == snapshot_id)
+        .filter(
+            SendInstanceDB.snapshot_id == snapshot_id,
+            SendInstanceDB.brand_id == brand_id,
+        )
         .order_by(SendInstanceDB.created_at.desc())
         .all()
     )
@@ -363,6 +444,8 @@ def list_send_instances_for_snapshot(
 def send_send_instance(
     db: Session,
     send_instance_id: int,
+    *,
+    brand_id: int,
 ):
     # Row lock + status guard: two concurrent calls both reading "draft"
     # before either commits would otherwise both proceed to send. FOR UPDATE
@@ -372,7 +455,14 @@ def send_send_instance(
     send_instance = (
         db.query(SendInstanceDB)
         .filter(
-            SendInstanceDB.id == send_instance_id
+            SendInstanceDB.id == send_instance_id,
+            # **Inside the locked query, not before or after it.** ADR-172
+            # point 5 wants the brand in the SELECTING query everywhere; here
+            # it matters more than anywhere else, because checking the brand
+            # separately would reintroduce exactly the check-then-act window
+            # this `FOR UPDATE` exists to close. An instance in another brand
+            # is not found, so it is never locked and never sent.
+            SendInstanceDB.brand_id == brand_id,
         )
         .with_for_update()
         .first()

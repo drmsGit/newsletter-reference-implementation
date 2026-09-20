@@ -205,8 +205,19 @@ def render_variant(
     variant_id: int,
     recipient_id: int | None = None,
     mode: RenderMode = "preview",
+    *,
+    brand_id: int | None = None,
 ):
     """Render a variant through its channel's renderer — ADR-162 point 4.
+
+    **`brand_id` is optional here and required by its routes, deliberately.**
+    Rendering is reached two ways: from a request, which has a working brand
+    and passes it so another brand's variant cannot be previewed; and from the
+    send path, which already resolved the brand when it locked the send
+    instance and would only be re-deriving what it holds. Requiring it in both
+    would push a redundant argument through `send_send_instance`; defaulting it
+    in the route would be the fail-open ADR-172 point 3 refuses. The route
+    passes `Depends(working_brand)` and therefore cannot forget.
 
     `render_variant_html` remains the email path and its four callers are
     untouched; this is the channel-neutral entry point, and for email it simply
@@ -218,6 +229,12 @@ def render_variant(
     to email. A fallback would render a push variant as an HTML email and
     deliver something nobody composed.
     """
+    if brand_id is not None:
+        from app.campaigns.service import get_variant
+
+        if get_variant(db, variant_id, brand_id=brand_id) is None:
+            raise ValueError(f"variant {variant_id} does not exist")
+
     from app.campaigns.db_models import VariantDB
     from app.rendering.renderers.registry import get_renderer
 

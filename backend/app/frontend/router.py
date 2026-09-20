@@ -1569,7 +1569,8 @@ def variant_suggest_subject(
             held = approvals.request_approval(
                 db, ai_subject_apply.META.key,
                 payload={"ai_run_id": run.run_id},
-                summary=ai_subject_apply.summarise(db, run.run_id),
+                summary=ai_subject_apply.summarise(
+                    db, run.run_id, brand_id=working_brand_id(request, db)),
                 requested_by_type=ACTOR_USER,
                 requested_by_id=user.id if user else None,
                 brand_id=working_brand_id(request, db),
@@ -1797,6 +1798,7 @@ def decision_slot_create(
 
 @router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/overrides")
 def content_override_create(
+    request: Request,
     campaign_id: int,
     variant_id: int,
     module_instance_id: int = Form(...),
@@ -1833,22 +1835,29 @@ def content_override_create(
 
 @router.post("/ui/campaigns/{campaign_id}/overrides/{override_id}/reset")
 def content_override_reset(
+    request: Request,
     campaign_id: int,
     override_id: int,
     db: Session = Depends(get_db),
 ):
-    reset_content_override(db, override_id)
+    reset_content_override(
+        db, override_id, brand_id=working_brand_id(request, db)
+    )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
 @router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/snapshots")
 def snapshot_create(
+    request: Request,
     campaign_id: int,
     variant_id: int,
     db: Session = Depends(get_db),
 ):
     try:
-        create_snapshot_for_variant(db, variant_id=variant_id)
+        create_snapshot_for_variant(
+            db, variant_id=variant_id,
+            brand_id=working_brand_id(request, db),
+        )
     except UnpublishedContentError as exc:
         return RedirectResponse(
             url=f"/ui/campaigns/{campaign_id}?error={quote(str(exc))}",
@@ -1906,6 +1915,7 @@ def send_instance_create(
             from_address=from_address.strip() or None,
             audience_resolution_mode=audience_resolution_mode,
             scheduled_at=scheduled,
+            brand_id=working_brand_id(request, db),
         )
     except ValueError as error:
         return RedirectResponse(
@@ -1967,7 +1977,10 @@ def send_instance_trigger(
     db: Session = Depends(get_db),
 ):
     try:
-        send_send_instance(db, send_instance_id=send_instance_id)
+        send_send_instance(
+            db, send_instance_id=send_instance_id,
+            brand_id=working_brand_id(request, db),
+        )
     except ValueError as error:
         # e.g. re-resolved "rerun" audience exceeds the send cap, or already sent.
         return RedirectResponse(
@@ -4357,7 +4370,9 @@ def approval_detail(
     describe_error = None
     if module is not None and hasattr(module, "describe"):
         try:
-            description = module.describe(db, row.payload or {})
+            description = module.describe(
+                db, row.payload or {}, brand_id=row.brand_id,
+            )
         except Exception as failure:
             # A description that raises must not hide the request. The reviewer
             # still needs to see that something is waiting and still needs to be
