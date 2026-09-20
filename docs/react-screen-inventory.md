@@ -122,6 +122,32 @@ doing any of the following, something has been missed:
 
 The client's job is to show what the API returns and to say what the user did.
 
+## Names that lie — read before building a form
+
+**The platform is omni-channel; several names in the schema are older than that
+and say "email".** They are accurate about what they carry and wrong about what
+they imply, so a client generated from the schema will happily build an
+email-only UI. Measured 2026-09-20: twelve email-shaped names reach the schema,
+nine of which are FastAPI's auto-named Jinja form bodies and do not matter.
+These four do.
+
+| Name | What it looks like | What it is |
+|---|---|---|
+| `Variant.subject`, `Variant.preheader` (and on `VariantCreate` / `VariantUpdate`) | a variant has a subject line | **It does not.** ADR-162 point 1 moved both into a `header` module and migration 0012 dropped the columns; they are synthesised on read and written through `set_envelope_fields`. A push variant has no envelope at all, so these are null and a Subject input on a push form is a field that cannot be saved. **Ask the channel, not the variant** — `envelope_module_type(channel)` returns `None` when there is nothing to show. |
+| `GET /email-modules` | the module catalogue is email-only | It takes a `channel` parameter that **defaults** to email and serves every channel. A module picker built from its name will silently be email-only. |
+| `RenderedVariant.html` | rendering produces HTML | For push it produces a field payload. Snapshots already carry this correctly as `artifact_*`; this response model was not renamed with them. |
+| `Recipient.email`, `Recipient.email_consent_status` | a recipient has an address and a consent status | A recipient has **addresses per channel** (ADR-163 point 2) and a **consent grid** of `(brand, channel, purpose)`. These two fields are the email cell of each, flattened for convenience. Do not build a single "Consent: yes/no" control from them. |
+
+**The rule underneath all four:** where the SPA needs to know whether something
+applies, ask the channel's manifest rather than inferring from a field name.
+That is ADR-160/161's whole design — a channel declares what it accepts — and
+it is the one thing a generated type cannot tell you.
+
+Renaming these is logged in `docs/backlog.md` and deliberately **not** done
+before the client: the four above are documented, and renaming a schema field
+after a typed client exists costs more than doing it now only if nobody wrote
+this table.
+
 ## Related
 
 - `docs/react-migration-inventory.md` — what the Jinja router contains
