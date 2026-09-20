@@ -660,7 +660,7 @@ app.include_router(context_router, dependencies=_api)
 # Vite proxies to this app in development; here the app serves Vite's output, so
 # the browser sees one origin in both cases.
 #
-# **Mounted under `/app`, not `/`, because the Jinja UI still owns the front
+# **Mounted under `/manager`, not `/`, because the Jinja UI still owns the front
 # door.** `frontend/router.py` registers a `dashboard` route at `/` and is
 # registered first, so it wins whatever is written here -- taking `/` would mean
 # moving the existing product's home page before the SPA has screens to replace
@@ -669,9 +669,18 @@ app.include_router(context_router, dependencies=_api)
 #
 # Scoping under one prefix also removes a problem the root-level version had:
 # a catch-all at `/` has to refuse every path the API owns, or an unknown API
-# route quietly answers with HTML to a caller parsing JSON. Under `/app` that
-# collision cannot arise.
-SPA_MOUNT = "/app"
+# route quietly answers with HTML to a caller parsing JSON. Under one prefix
+# that collision cannot arise.
+#
+# **The word is `manager`, and `/app` was rejected for two reasons.** It read
+# ambiguously against `backend/app/`, which is this codebase's Python package
+# and not a URL. And `/app` is a `startswith` prefix of `/approvals`, which
+# matters because `policy.py` matches route templates with a bare `startswith`
+# where order is semantics -- so a single `("/app", ...)` line added to
+# `WRITE_POLICY` would silently reprice every approvals route. That shape has
+# already produced three defects in this table; `test_policy_prefixes.py` now
+# refuses the whole class.
+SPA_MOUNT = "/manager"
 SPA_DIR = Path(__file__).parent.parent / "frontend" / "dist"
 SPA_INDEX = SPA_DIR / "index.html"
 
@@ -708,7 +717,7 @@ def spa_root():
 def spa_fallback(spa_path: str):
     """Serve the SPA's own index for a client-side route.
 
-    The SPA owns paths like `/app/sign-in` that exist only in the browser.
+    The SPA owns paths like `/manager/sign-in` that exist only in the browser.
     Reloading one sends the browser here, and answering with the index lets
     React Router resolve it -- without this, a reload on any screen but the
     first is a 404.

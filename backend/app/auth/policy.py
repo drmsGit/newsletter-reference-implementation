@@ -62,6 +62,23 @@ PUBLIC_AUTH = "auth.public"
 
 WRITE_POLICY: tuple[tuple[str, str], ...] = (
     # --- the working context -------------------------------------------------
+    # **`/ui/brands` must stay above `/ui/brand`, and the reason is the table's
+    # own matching rule.** Entries are compared with a bare `startswith`, so
+    # `/ui/brand` matches `/ui/brands`, `/ui/brands/{id}/rename` and
+    # `/ui/brands/{id}/delete` — creating, renaming and deleting a brand would
+    # all resolve to `view`, which is implied by every role.
+    #
+    # That was inert when it was found (2026-09-20) and inert is not the same as
+    # correct. Those three routes live in `auth_router`, which is wired with
+    # `enforce_csrf` and **not** `enforce_policy`, so the table was never
+    # consulted for them — their real guard is a `require_permission(
+    # USERS_MANAGE)` dependency on each route. The table simply disagreed with
+    # the code, silently, and would have become the answer the day that router
+    # was wired like every other one.
+    #
+    # Stated here rather than left to ordering luck. `test_policy_prefixes.py`
+    # now refuses any entry that matches part-way through a path segment.
+    ("/ui/brands", USERS_MANAGE),
     # Switching brand is not a capability, it is navigation: the route refuses
     # any brand the user holds no grant on, so `view` (implied by every role)
     # is the honest requirement rather than inventing a permission for it.
