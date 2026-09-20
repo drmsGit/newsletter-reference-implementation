@@ -70,6 +70,16 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
     # --- narrow cases that live inside broader prefixes ---------------------
     # Spends real money, so it is gated on AI rather than on owning the campaign.
     ("/ui/campaigns/{campaign_id}/variants/{variant_id}/suggest-subject", AI_RUN),
+    # The JSON twin, and it needs its own line for the same reason: the broad
+    # `/campaigns` entry below would resolve it to `campaigns.manage`, which is
+    # "may restructure a campaign" and not "may spend money on the model".
+    #
+    # This is the second time that shape has been caught. `/delivery/process-due`
+    # resolved to `sends.plan` through the broad `/delivery/` prefix on
+    # 2026-09-19, hours after the ordering hazard was logged. Order is semantics
+    # in this table and nothing enforces it — a narrow entry that drifts below
+    # its prefix is silently downgraded, and the test below pins this pair.
+    ("/campaigns/variants/{variant_id}/suggest-subject", AI_RUN),
     # Creates an audience group; it is filed under campaigns only by URL.
     ("/ui/campaigns/{campaign_id}/suggest-audience", AUDIENCES_MANAGE),
     # Overriding a system pick is its own act, not a campaign edit (ADR-166

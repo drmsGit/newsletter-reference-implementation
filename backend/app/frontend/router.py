@@ -1531,73 +1531,35 @@ def variant_suggest_subject(
     survive the redirect without server-side session state; the persisted run
     row is what the next GET reads back.
     """
-    from app.ai.tasks import subject_preheader as subject_task
+    # **The decisions moved to `app/ai/orchestration.py` on 2026-09-20.** The
+    # envelope guard, the approval mode and the duplicate case all lived here
+    # and nowhere else — so a JSON client would have spent tokens on a channel
+    # with no subject line, which is the one thing a spend guard exists to
+    # stop. What is left below is this plane's rendering: redirects and
+    # query-string messages.
+    from app.ai.orchestration import suggest_subject_for_variant
+    from app.audit.service import ACTOR_USER
 
-    # Refused for a channel with no envelope, not merely hidden. The button is
-    # gated in the template, but a hand-crafted POST never sees a template —
-    # and this one spends tokens against the budget (ADR-144 §5) to generate
-    # copy that has nowhere to be stored, since `set_envelope_fields` writes
-    # only into the module a channel declares.
-    variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
-    if variant is None or envelope_module_type(variant.channel) is None:
+    user = user_for_token(db, request.cookies.get(SESSION_COOKIE))
+    result = suggest_subject_for_variant(
+        db, variant_id,
+        brand_id=working_brand_id(request, db),
+        requested_by_type=ACTOR_USER,
+        requested_by_id=user.id if user else None,
+    )
+
+    if result.outcome in ("refused", "nothing_to_work_from", "duplicate"):
         return RedirectResponse(
-            url=f"/ui/campaigns/{campaign_id}?error=" + quote(
-                "That channel has no subject line, so there is nothing to suggest."
-            ),
+            url=f"/ui/campaigns/{campaign_id}?error="
+                + quote(result.message or "", safe=""),
             status_code=303,
         )
-
-    try:
-        _, run = subject_task.suggest(db, variant_id)
-    except subject_task.NothingToWorkFrom as refusal:
-        # Refused before the call, so no tokens were spent and no run row was
-        # written. The manager is told what to fix rather than being handed the
-        # model's (correct, and paid-for) version of the same sentence.
+    if result.outcome == "held":
         return RedirectResponse(
-            url=f"/ui/campaigns/{campaign_id}?error=" + quote(str(refusal), safe=""),
-            status_code=303,
+            url=f"/ui/approvals/{result.pending_action_id}", status_code=303,
         )
-    if run is None:
-        return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
-
-    # Per-task approval mode (playbook 2026-07-31; ADR-141 §4). **Inline is the
-    # default** — ADR-140's Context rejects routing every AI action through an
-    # approval layer because it "buries managers in approvals", and a manager
-    # who asked for subject lines is looking at the page right now. A company
-    # that wants a second pair of eyes on this one task turns it on in
-    # Settings, and only then does the suggestion become a held request.
-    from app.settings.service import REQUIRE_APPROVAL, get_task_approval_mode
-
-    if get_task_approval_mode(db, subject_task.TASK_KEY) == REQUIRE_APPROVAL:
-        from app.approvals import service as approvals
-        from app.approvals.actions import ai_subject_apply
-        from app.audit.service import ACTOR_USER
-
-        user = user_for_token(db, request.cookies.get(SESSION_COOKIE))
-        try:
-            held = approvals.request_approval(
-                db, ai_subject_apply.META.key,
-                payload={"ai_run_id": run.run_id},
-                summary=ai_subject_apply.summarise(
-                    db, run.run_id, brand_id=working_brand_id(request, db)),
-                requested_by_type=ACTOR_USER,
-                requested_by_id=user.id if user else None,
-                brand_id=working_brand_id(request, db),
-                subject_id=run.run_id,
-            )
-        except approvals.DuplicateRequest:
-            return RedirectResponse(
-                url=f"/ui/campaigns/{campaign_id}?error=" + quote(
-                    "A suggestion for this variant is already waiting for "
-                    "approval.", safe=""),
-                status_code=303,
-            )
-        return RedirectResponse(
-            url=f"/ui/approvals/{held.id}", status_code=303,
-        )
-
     return RedirectResponse(
-        url=f"/ui/campaigns/{campaign_id}?ai_run={run.run_id}",
+        url=f"/ui/campaigns/{campaign_id}?ai_run={result.run_id}",
         status_code=303,
     )
 

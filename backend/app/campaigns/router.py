@@ -189,6 +189,62 @@ def move_variant_module(
     return result
 
 
+@router.post(
+    "/variants/{variant_id}/suggest-subject",
+    summary="Ask the model for subject/preheader options",
+    description=(
+        "Runs ADR-141 §3's Mode A task. Nothing is written to the variant — AI "
+        "output is a proposal until a person picks one. Refused without "
+        "spending tokens when the channel has no subject line at all, or when "
+        "there is no content to write one from."
+    ),
+)
+def suggest_subject_for_variant_record(
+    request: Request,
+    variant_id: int,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    """The JSON twin of the Jinja button (inventory B15).
+
+    **The guards are in `app/ai/orchestration.py`, not here**, which is the
+    whole point of the item: they lived in the Jinja route and nowhere else, so
+    this route could not have existed without either duplicating them or
+    spending tokens on requests that cannot succeed.
+
+    Mapped to `ai.run` by its own entry in `policy.py` — the broad `/campaigns`
+    prefix would otherwise call this "may restructure a campaign" rather than
+    "may spend money on the model".
+    """
+    from app.ai.orchestration import suggest_subject_for_variant
+    from app.audit.service import ACTOR_USER
+    from app.auth.service import SESSION_COOKIE, user_for_token
+
+    user = user_for_token(db, request.cookies.get(SESSION_COOKIE))
+    result = suggest_subject_for_variant(
+        db, variant_id,
+        brand_id=brand_id,
+        requested_by_type=ACTOR_USER,
+        requested_by_id=user.id if user else None,
+    )
+
+    if result.outcome in ("refused", "nothing_to_work_from"):
+        # 409 rather than 400: the request is well-formed and the caller is
+        # allowed to make it — the variant is simply not in a state where the
+        # answer can exist. And no tokens were spent, which is what the caller
+        # most wants to know.
+        raise HTTPException(
+            status_code=409,
+            detail={"reason": result.outcome, "message": result.message},
+        )
+    return {
+        "outcome": result.outcome,
+        "message": result.message,
+        "ai_run_id": result.run_id,
+        "pending_action_id": result.pending_action_id,
+    }
+
+
 @router.get("/variants/{variant_id}/decision-slots", response_model=list[DecisionSlot])
 def get_variant_decision_slots(
     variant_id: int,

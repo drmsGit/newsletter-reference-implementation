@@ -74,6 +74,14 @@ def _restore_mode(db):
     db.commit()
 
 
+def _api_client():
+    from fastapi.testclient import TestClient
+
+    from main import app
+
+    return TestClient(app, raise_server_exceptions=False)
+
+
 class TestTheSettingIsTheOnlyDifference:
 
     def test_it_defaults_to_applying_in_the_app(self, db):
@@ -274,4 +282,103 @@ class TestTheActionIsPickOneNotYesNo:
             run.prompt_id = None
             db.commit()
             db.query(AIPromptDB).filter(AIPromptDB.id == prompt.id).delete()
+            db.commit()
+
+
+class TestTheSpendGuardsReachBothPlanes:
+    """Inventory B15, closed 2026-09-20.
+
+    The envelope guard, the approval-mode branch and the duplicate case lived
+    inside `POST /ui/campaigns/.../suggest-subject` and nowhere else. A JSON
+    client would therefore have spent tokens on a channel with no subject line
+    — which is the one thing a spend guard exists to stop, and the reason Mode
+    A was asked for in the first place.
+    """
+
+    def _headers(self):
+        from app.auth.permissions import AI_RUN, VIEW
+        from tests.machine import machine
+
+        return machine([VIEW, AI_RUN])
+
+    def test_the_route_is_priced_as_ai_not_as_a_campaign_edit(self):
+        """**The narrow entry has to sit above the broad prefix.**
+
+        `/campaigns` resolves to `campaigns.manage` — "may restructure a
+        campaign", which is not "may spend money on the model". This is the
+        second time that shape has been caught: `/delivery/process-due`
+        resolved to `sends.plan` through the broad `/delivery/` prefix hours
+        after the ordering hazard was logged. Order is semantics in that table
+        and nothing enforces it, so the pair is pinned here.
+        """
+        from app.auth.permissions import AI_RUN, CAMPAIGNS_MANAGE
+        from app.auth.policy import required_permission
+
+        assert required_permission(
+            "POST", "/campaigns/variants/{variant_id}/suggest-subject"
+        ) == AI_RUN
+        assert required_permission("POST", "/campaigns/") == CAMPAIGNS_MANAGE
+
+    def test_a_channel_with_no_subject_line_is_refused_without_spending(self, db):
+        """A push variant has no envelope module, so there is nowhere to put a
+        subject even if the model wrote one. Refused before the call."""
+        from app.ai.db_models import AIRunDB
+        from app.auth import service as auth
+        from app.campaigns.service import create_campaign, create_variant_for_campaign
+
+        brand = auth.ensure_default_brand(db)
+        campaign = create_campaign(
+            db, name=f"{TAG}-b15-{uuid.uuid4().hex[:6]}",
+            brand_id=brand.id, channel="email",
+        )
+        push = create_variant_for_campaign(
+            db, campaign_id=campaign.id, name="push", channel="push",
+            brand_id=brand.id,
+        )
+        before = db.query(AIRunDB).count()
+        try:
+            with self._headers() as headers:
+                response = _api_client().post(
+                    f"/campaigns/variants/{push.id}/suggest-subject", headers=headers,
+                )
+                assert response.status_code == 409, response.text
+                assert response.json()["detail"]["reason"] == "refused"
+
+            assert db.query(AIRunDB).count() == before, (
+                "a run row was written for a channel that cannot carry a subject "
+                "— which means the model was called and tokens were spent"
+            )
+        finally:
+            from app.campaigns.db_models import CampaignDB, VariantDB
+
+            db.query(VariantDB).filter(VariantDB.campaign_id == campaign.id).delete()
+            db.query(CampaignDB).filter(CampaignDB.id == campaign.id).delete()
+            db.commit()
+
+    def test_another_brands_variant_is_not_reachable(self, db):
+        """The lookup was `VariantDB` by bare id in the router, so this was a
+        small brand gap too — one ADR-172 would have missed, because it lived
+        in a router rather than a service."""
+        from app.ai.orchestration import suggest_subject_for_variant
+        from app.audit.service import ACTOR_USER
+        from app.auth import service as auth
+        from app.campaigns.service import create_campaign
+
+        brand = auth.ensure_default_brand(db)
+        campaign = create_campaign(
+            db, name=f"{TAG}-b15x-{uuid.uuid4().hex[:6]}",
+            brand_id=brand.id, channel="email",
+        )
+        try:
+            result = suggest_subject_for_variant(
+                db, campaign.variants[0].id,
+                brand_id=999999,
+                requested_by_type=ACTOR_USER, requested_by_id=None,
+            )
+            assert result.outcome == "refused"
+        finally:
+            from app.campaigns.db_models import CampaignDB, VariantDB
+
+            db.query(VariantDB).filter(VariantDB.campaign_id == campaign.id).delete()
+            db.query(CampaignDB).filter(CampaignDB.id == campaign.id).delete()
             db.commit()
