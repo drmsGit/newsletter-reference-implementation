@@ -10,7 +10,7 @@ status: open
 ---
 
 > **Status: interview OPEN.** Clustering approved 2026-09-21. All five clusters
-> written out — 45 questions, 1 resolved. **No further frontend work before
+> written out — 47 questions, 9 resolved (Cluster 2's authoring half is closed). **No further frontend work before
 > Cluster 2 closes**; its questions decide screens that are already built.
 
 # Manager Workflow — design interview (forward-looking)
@@ -390,8 +390,7 @@ Screens: **content list**, **content detail**, **categories**, **category detail
    ready creates a held action; a person decides it. A **person** marking a record
    ready is not held — the same shape as firing a send, where a person doing it
    *is* the approval.
-   **Established with it:** this reuses [[ADR-142 — Autonomous Workflows and the
-   Automation Boundary]] §4's held-action machinery rather than inventing a review
+   **Established with it:** this reuses [[ADR-142 — Autonomous Workflows and the Automation Boundary]] §4's held-action machinery rather than inventing a review
    concept, and it honours [[ADR-082 — AI May Recommend but Not Publish]] without
    needing an exception — the machine still recommends, the person still publishes.
    **Third backend requirement from this cluster, and it is concrete.** A new
