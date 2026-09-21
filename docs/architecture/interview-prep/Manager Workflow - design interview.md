@@ -10,7 +10,7 @@ status: open
 ---
 
 > **Status: interview OPEN.** Clustering approved 2026-09-21. All five clusters
-> written out — 41 questions, 1 resolved. **No further frontend work before
+> written out — 45 questions, 1 resolved. **No further frontend work before
 > Cluster 2 closes**; its questions decide screens that are already built.
 
 # Manager Workflow — design interview (forward-looking)
@@ -98,6 +98,30 @@ asks for — and the duplicate list in `backend/scripts/import_content_csv.py:33
 goes with it. No ADR needed; this implements ADR-161 point 7.
 **Not covered by this**: the descriptive/filtering metadata in questions 2.8–2.10,
 which is a different concept and remains open.
+
+**Established 2026-09-21 (user) — categories are for affinity, and nothing else.**
+> *"CategoryDB and the whole 'categorize content' is ONLY meant for the 'build a
+> dynamic affinities profile of each recipient'. Anything that shows up in
+> CategoryDB is meant to be used to build this profile (main/sub)."*
+
+Consistent with [[ADR-080 — Human-governed Taxonomy Before AI Selection]], which
+makes categories the governed taxonomy for content *selection* and says nothing
+about finding anything. Categories are consumed by `insight/signals.py`, both
+decision strategies, and audience rules — all machine-facing.
+
+**The requirement this leaves uncovered, and it is a different concept.** A
+manager cannot work a flat table of a hundred thousand content records, and the
+campaign builder currently offers *"a dropdown with all content record ids"*.
+Free-text search helps and is not enough; what is needed is **filtering along the
+manager's own way of grouping content** — the user's examples: B2C versus B2B,
+IATA destinations or countries or regions, product information versus company
+information. *"Only they can decide how they typically group content."*
+
+**The boundary is the load-bearing part.** If such a label can reach the decision
+engine it *is* a category and ADR-080 already governs it. If it must never, the
+separation has to be structural rather than conventional — nothing stops somebody
+reusing `CategoryDB` today, and a manager tagging content "B2B" there would
+silently make "B2B" an affinity dimension. Questions 2.8–2.13 are open.
 
 **The screen cut.** Sixteen screens (core loop plus supporting), per the
 inventory. Diagnostics and sub-pages are out. Administration is last.
@@ -214,30 +238,52 @@ Screens: **content list**, **content detail**, **categories**, **category detail
    content, not in the campaign context"* (user). **Established with it:**
    categories stay in this cluster rather than moving to Cluster 3, and the
    category screens are an authoring surface rather than administration.
-8. **Is there content metadata that exists only for finding and tracking — not
-   for rendering, and explicitly not for affinity?**
-   The user named: *"labels about 'is in feedbackloop / Waiting for feedback',
-   some approval comments, different producttypes or categories that are not
-   interesting for the affinity profile, but is for filtering."*
-   *Constraint, and it is the crux: `CategoryDB` exists to feed decision-slot
-   candidate filtering — i.e. affinity. Its `type` column is `main`/`sub`, a
-   **hierarchy level**, not a purpose, so there is no seam for a non-affinity
-   label today.* A label that must **not** influence what the decision engine
-   picks is a different concept from a category, and nothing models it.
-   Is this a second kind of category, a workflow status on the record, free tags,
-   or something else?
-9. **Where does that metadata have to be visible, and does it have to persist?**
-   The user named two places: finding a record **in the content table**, and
-   finding one **while building a variant in a campaign**. The second is the
-   harder requirement — it means the metadata travels into Cluster 3's screens.
-   *This is the question that decides backend or frontend.* A saved view or a
-   client-side filter needs no backend at all; a shared label that another person
-   sees, or one that persists across devices, is a backend concept.
-10. **Is "in feedback loop / waiting for feedback" a lifecycle, or a label?**
+### Finding content at scale — questions 8–14
+
+*Possibly its own cluster.* These share a surface with the questions above and
+nothing else: they are about **finding** a record, not authoring one, and they
+reach into Cluster 3's campaign builder and arguably Cluster 4's audience list.
+Split them out if that reads better — the clustering is still yours to change.
+
+8. **Is the grouping one flat set of tags, or several named dimensions?**
+   *The examples are not one list.* B2C/B2B is one axis; IATA destination →
+   country → region is another, and it is hierarchical; product versus company
+   information is a third. One free-tag pool, several declared dimensions each
+   with its own values, or something between?
+   *This decides the data model more than anything else in this cluster.*
+9. **Who administers the vocabulary, and is it shared or personal?**
+   Set up once by an administrator, or added ad hoc by whoever is authoring?
+   *Constraint, and it is the backend-or-frontend question: a personal saved
+   filter needs no backend at all. A shared vocabulary another person sees is a
+   governed list needing the same care categories get — naming, merging,
+   retiring, and what happens to content when a value is deleted.*
+10. **How many content records, realistically, and over what period?**
+    *Constraint, and it may outrank tags: `GET /content/` calls `.all()` with no
+    limit, offset or filter, and so does every other list route the client uses.
+    At a hundred thousand records the screen does not get slow, it stops
+    working.* Hundreds means client-side filtering is adequate; tens of thousands
+    makes server-side filtering and pagination a precondition for this screen
+    existing at all, tags or no tags.
+11. **What should the campaign content picker be, instead of a dropdown of every
+    id?** Search, filtered browse, recently used, or narrowed to what the module
+    or decision slot can actually accept?
+    *This is the same requirement as question 3.5 and they should be answered
+    together — it is the harder of the two surfaces, because the manager is
+    mid-composition and not browsing.*
+12. **Does the same grouping apply to anything other than content?** Campaigns
+    and audience groups have the same findability problem at scale. If one scheme
+    serves all three it is a platform concept; if content-only, it lives in the
+    content module.
+13. **What is this called?**
+    *Constraint: "category" is taken by ADR-080's governed taxonomy, and this
+    repo's vocabulary should not carry one word for two concepts.* The user's
+    suggestion is **tags**. Labels, facets and keywords are the alternatives, and
+    the word chosen ends up in the API, the UI and the playbook.
+14. **Is "in feedback loop / waiting for feedback" one of these, or a lifecycle?**
     *Constraint: `status` on a content record is already a lifecycle, constrained
-    to `active`/`inactive` (`content/service.py:85`).* Is the feedback state a
-    third value of that, a parallel field, or one of the free labels in question 8?
-    A lifecycle implies transitions and who may make them; a label does not.
+    to `active`/`inactive` (`content/service.py:85`).* A lifecycle implies
+    transitions and who may make them; a tag does not. The original example named
+    both in one breath, and they may not be the same thing.
 
 ---
 
@@ -263,8 +309,11 @@ Screens: **campaigns list**, **campaign detail** (inventory B11), **decisions**,
    fill them? Or find content first and compose around it?
    *Constraint: channel is fixed at variant creation and has no setter.*
 5. **How does a manager find the right content record while composing?**
-   *This is where question 2.9's metadata has to arrive.* Search, category filter,
-   recently used, or something the campaign already knows?
+   *Answered together with questions 2.8–2.13, not separately.* The picker is a
+   dropdown of every content record id today, which the user names as not working
+   past a few hundred records. This is the harder of the two surfaces: the
+   manager is mid-composition, not browsing, and may only want content the module
+   or slot can actually accept.
 6. **When does a manager reach for a decision slot instead of fixed content?**
    Is personalisation a deliberate act per slot, or the default for some module
    types?
