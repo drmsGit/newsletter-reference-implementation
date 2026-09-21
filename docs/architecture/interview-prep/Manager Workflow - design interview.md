@@ -10,7 +10,7 @@ status: open
 ---
 
 > **Status: interview OPEN.** Clustering approved 2026-09-21. All five clusters
-> written out — 47 questions, 9 resolved (Cluster 2's authoring half is closed). **No further frontend work before
+> written out. **Cluster 2 CLOSED 2026-09-21, 18/18.** 49 questions total, 18 answered. **No further frontend work before
 > Cluster 2 closes**; its questions decide screens that are already built.
 
 # Manager Workflow — design interview (forward-looking)
@@ -200,7 +200,7 @@ Screens: **approvals**, **approval detail**, the shell itself.
 
 ---
 
-## Cluster 2 — Authoring content across channels
+## Cluster 2 — Authoring content across channels  ✅ CLOSED 2026-09-21
 
 > **A principle emerged across questions 2, 3, 3b, 4b and 5 rather than being
 > asked for, and it should be checked against every remaining screen decision:
@@ -246,9 +246,14 @@ Screens: **content list**, **content detail**, **categories**, **category detail
    the same reason — they put "push is empty" behind a click.
    **Known cost accepted:** the page grows with every channel added, which manual
    collapse mitigates rather than solves.
-   **Rider, still open:** field order within a group is currently **JSON insertion
-   order** — an accident of how the record was written. The manifest declares an
-   order; using it is the obvious fix but has not been decided.
+   **Rider, resolved (2026-09-21): fields appear in the manifest's declared
+   order.** Today it is JSON insertion order — an accident of how each record was
+   written, so two records can show the same fields in different places. The
+   manifest already lists its variables in an order somebody chose; using it makes
+   every record consistent and makes reordering a form an edit to a manifest
+   rather than to code. Consistent with the ruling that manifests are the source
+   for grouping. Required fields are **not** sorted to the top: that would
+   override a deliberate sequence with a mechanical one.
 3. ✅ **What makes a content record "ready for push", and who needs to know?**
    **Resolution (2026-09-21): asserted by the manager, per channel, like
    publishing.** Filling the fields is not the same as saying the record is ready
@@ -411,6 +416,14 @@ Screens: **content list**, **content detail**, **categories**, **category detail
 
 ### Finding content at scale — questions 8–14
 
+> **Vocabulary note.** These questions were asked using the word *dimension*, and
+> question 13 later settled the term as **facet**. The questions are left as they
+> were asked rather than rewritten, so the record shows how the name was arrived
+> at — but **"facet" is the agreed word** for the API, the UI and the playbook.
+> Read *dimension* below as *facet*, except where it says *system dimensions*
+> versus *manager dimensions*, which is a distinction about who declares a facet
+> rather than two different things.
+
 *Possibly its own cluster.* These share a surface with the questions above and
 nothing else: they are about **finding** a record, not authoring one, and they
 reach into Cluster 3's campaign builder and arguably Cluster 4's audience list.
@@ -456,7 +469,7 @@ Split them out if that reads better — the clustering is still yours to change.
    surface is UI-only. This work now has a dependency on closing that gap.
    **Known cost accepted:** setup before value. An adopter gets nothing from this
    until somebody has declared the axes they think in.
-9b. **Are dimensions global, or per brand?**
+9b. ✅ **Are dimensions global, or per brand?**
    *Raised by question 9, and there is precedent pointing both ways.*
    [[ADR-150 — Tenancy and Access Model]]'s 2026-09-15 addendum makes categories
    deliberately **unbranded** — `CategoryDB` carries no `brand_id`, and the policy
@@ -516,28 +529,140 @@ Split them out if that reads better — the clustering is still yours to change.
     **Known cost accepted:** an adopter with two hundred records pays for
     machinery they do not need. Accepted because the alternative is that somebody
     hits a wall silently, having copied an architecture that looked fine.
-11. **What should the campaign content picker be, instead of a dropdown of every
-    id?** Search, filtered browse, recently used, or narrowed to what the module
-    or decision slot can actually accept?
-    *This is the same requirement as question 3.5 and they should be answered
-    together — it is the harder of the two surfaces, because the manager is
-    mid-composition and not browsing.*
-12. **Does the same grouping apply to anything other than content?** Campaigns
-    and audience groups have the same findability problem at scale. If one scheme
-    serves all three it is a platform concept; if content-only, it lives in the
-    content module.
-13. **What is this called?**
-    *Constraint: "category" is taken by ADR-080's governed taxonomy, and this
-    repo's vocabulary should not carry one word for two concepts.* The user's
-    suggestion is **tags**. Labels, facets and keywords are the alternatives, and
-    the word chosen ends up in the API, the UI and the playbook.
-14. **Is "in feedback loop / waiting for feedback" one of these, or a lifecycle?**
-    *Constraint: `status` on a content record is already a lifecycle, constrained
-    to `active`/`inactive` (`content/service.py:85`).* A lifecycle implies
-    transitions and who may make them; a tag does not. The original example named
-    both in one breath, and they may not be the same thing.
+11. ✅ **What replaces the dropdown of every content record id when a manager is
+    picking content mid-composition?**
+    **Resolution (2026-09-21): a picker pre-narrowed by what the slot can use —
+    and the narrowing is a default, not a restriction.** It opens showing content
+    ready for this variant's channel and matching what the module or slot
+    requires; dimensions and search narrow further. **There must be a visible,
+    reversible way to show content that is not currently choosable.** The user:
+
+    > *"Maybe a manager prepared content that is not fully ready yet but they
+    > already want to start building the campaign; it mustn't become a 'where's my
+    > content record, I can't find it'."*
+
+    **Established with it: this is the cluster's principle applied to a filter —
+    the system reports, the manager decides.** A pre-narrowed picker that silently
+    hides records is the system deciding what exists. The channel filter is
+    therefore a **removable chip that happens to start on**, and an unready record
+    appears marked as unready rather than absent.
+    **It is safe because of question 3b.** Picking unready content cannot quietly
+    ship an empty push, because a required-field check before firing is already
+    owed from that answer. The escape hatch and the send-time check are one
+    design: the earlier surface stays permissive precisely because the later one
+    refuses.
+    **Fallback recorded, if the pre-narrowing proves too complex to get right:**
+    search-first with filters secondary.
+    **Answered together with question 3.5**, which is the same requirement seen
+    from the campaign side.
+12. ✅ **Does the dimensions concept apply to anything other than content?**
+    **Resolution (2026-09-21): content and campaigns. Audiences get search and
+    paging only.** The axes mean the same thing for content and campaigns — a B2B
+    campaign uses B2B content — so filing both by them is coherent. An audience
+    group is *defined by its rules* rather than filed by topic, so tagging it
+    would be describing a thing that already describes itself.
+    **Established with it:** dimensions are **not a column on the content table**.
+    They attach to at least two entity types, so the model is a declared dimension,
+    its values, and links from taggable things to values. Whether that is one
+    polymorphic link table or one per entity is an implementation choice; this
+    repo's idiom favours the explicit version.
+    **Second-order effect on question 11, and a useful one.** If a campaign
+    carries dimensions too, the content picker can pre-narrow by *the campaign's
+    own axes* — building a B2B Lisbon campaign shows B2B Lisbon content first —
+    which makes "pre-narrowed by what the slot can use" much stronger than a
+    channel filter alone. Worth designing for; not required by this resolution.
+    **Known cost accepted:** two entity types means the tagging surface is built
+    twice unless it is shared from the start.
+13. ✅ **What is this concept called, in the API, the UI and the playbook?**
+    **Resolution (2026-09-21): facets, with facet values.** The user: *"it's best
+    to explain a new vocabulary than risking (system) confusion because of
+    comfortability."*
+    **Established with it, and it outlives this decision: precision beats
+    familiarity when the familiar word is already taken.** "Tag" was the original
+    suggestion and was rejected by its own connotation — it implies loose and
+    free-form, which is exactly what question 8 decided against. "Label" collides
+    with `ModuleVariable.label`, a form caption. "Attribute" collides with
+    `RecipientDB.attributes`, free-form recipient data. "Category" is ADR-080's
+    governed affinity taxonomy. **Facet** is the precise term for a declared axis
+    you filter along, composes correctly with AND, and collides with nothing.
+    **Known cost accepted:** it is jargon, and a manager or a playbook reader
+    needs it explained once. Accepted deliberately — a word that needs explaining
+    once is cheaper than a word that quietly means two things.
+    **Consequence:** the repository has **no glossary** — the `docs/implementation/`
+    tier defines no domain vocabulary at all. "Facet" is the first term that
+    demonstrably needs one, alongside campaign, variant, module instance, decision
+    slot, snapshot and signal contribution.
+14. ✅ **Is "in feedback loop / waiting for feedback" a facet, or a lifecycle
+    state?**
+    **Resolution (2026-09-21): neither — readiness already covers it.** The states
+    map onto what this cluster has already decided:
+    *not ready* = still being worked on · *ready* = the author is done ·
+    *pending action* = an integration asserted readiness and a person has not
+    decided yet (question 6b).
+    **Established with it:** no third state axis. `status` stays the record's own
+    lifecycle, per-channel readiness stays question 3's assertion, and nothing new
+    is built. **The original example conflated two things and the interview
+    separated them**: the *states* dissolve into readiness, while the *product
+    types, B2B/B2C and destinations* become facets. Asking whether the need was
+    already met before modelling a third thing is what avoided a workflow engine
+    nobody asked for.
+    **Known cost accepted:** an adopter whose editorial process has more than
+    "being worked on / done" gets no support for it. If that turns out to be
+    common, a single-select `Workflow` facet is the cheap next step — it needs no
+    lifecycle engine and each team names its own stages.
 
 ---
+
+### What Cluster 2 produced
+
+**Five backend requirements, none of which existed before the interview ran.**
+
+1. **A required-field check before a send fires** (Q3b). Nothing checks today —
+   `resolve_module_variables` defaults a missing field to `""` and
+   `ModuleVariable.required` is never enforced at render, so an empty push
+   notification ships to a real device. Belongs in Cluster 5's pre-flight.
+2. **A read-only candidate count for a decision slot** (Q4b). `POST
+   /decision/slots/{id}/execute` resolves for real and writes a
+   `DecisionResolution`, so there is no way to ask what a slot would choose
+   between without causing a decision.
+3. **A content-readiness approvable action**, plus its `APPROVABLE_ROUTES` entry
+   (Q6b). That table is fail-closed by omission, so without the entry a machine
+   asserting readiness gets a hard 403 rather than a hold.
+4. **The facet model** (Q8, 9, 9b, 12): declared facets, their values, and links
+   from content *and campaigns* to values — per brand, governed by an
+   administrator. Its administration surface belongs in Settings, which is
+   **gap C2** and has no router at all, so this work inherits that dependency.
+5. **Server-side filtering and pagination on every list route** (Q10). Reprices
+   **P3-02** from a latent scaling note to a blocker, and applies to content,
+   campaigns, audiences, recipients and approvals.
+
+**ADR work owed.**
+- [[ADR-161 — Channel Execution Shapes]] point 7's rider — *"catalogue readiness
+  is 'push fields not empty'"* — is **now false**; readiness is asserted, not
+  computed. A dated addendum, not a supersession.
+- [[ADR-150 — Tenancy and Access Model]]'s 2026-09-15 addendum needs a sentence
+  on why findability differs from affinity, so facets are per-brand while
+  categories stay global.
+- **Facets are a new first-class concept and need a record of their own**, or
+  several — the model, the per-brand decision, and the governance. Not yet
+  numbered or scoped.
+
+**Maintenance that falls out**, needing no ADR: `CONTENT_FIELD_GROUPS` reads from
+the manifests rather than repeating them, and the duplicate email field list in
+`backend/scripts/import_content_csv.py:33-41` goes with it.
+
+**Client work this invalidates.** The flat content-field list is wrong and marked
+❌ above. The four Phase 2 list screens fetch everything and render it, which
+will not survive requirement 5 — the cost of having built them before this
+interview ran.
+
+**Two principles established**, both of which should be checked against every
+remaining screen decision: **the system reports, the manager decides** (no
+auto-collapse, no inferred readiness, no un-asserting, no nagging — and where a
+signal is load-bearing it becomes a check at the point of action); and
+**precision beats familiarity in naming** (facet over tag, because a word that
+needs explaining once is cheaper than one that quietly means two things).
+
 
 ## Cluster 3 — Composing a campaign
 
