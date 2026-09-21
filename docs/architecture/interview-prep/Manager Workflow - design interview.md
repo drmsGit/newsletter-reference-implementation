@@ -171,6 +171,11 @@ Screens: **approvals**, **approval detail**, the shell itself.
    reaching a status, or nothing — the work being continuous?
    This decides whether any screen should show a completion signal at all.
 3. **What arrives in the approval inbox, and from whom?**
+   *Cluster 2 question 6b added a second input type: an integration asserting a
+   content record is ready for a channel. That may be high-volume — an agency
+   delivering forty records is forty held actions — and could swamp the send
+   approvals this inbox was built for. Grouping, filtering or separation may be
+   needed; the current single list has none.*
    *Constraint: [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]]
    point 3 makes "a person" and "an integration" durably different actors, and the
    inbox shows the type today.* Is that distinction something a manager acts on,
@@ -196,6 +201,17 @@ Screens: **approvals**, **approval detail**, the shell itself.
 ---
 
 ## Cluster 2 — Authoring content across channels
+
+> **A principle emerged across questions 2, 3, 3b, 4b and 5 rather than being
+> asked for, and it should be checked against every remaining screen decision:
+> the system reports, the manager decides.** The system does not collapse a
+> section because it looks empty, does not infer readiness from filled fields,
+> does not un-assert what a person asserted, and does not nag about a gap. It
+> makes facts visible — at the moment they bite — and leaves the judgement to the
+> person. Where a signal is genuinely load-bearing it becomes a **check at the
+> point of action** (question 3b's send-time required-field check), not a nag
+> earlier on.
+
 
 *How one message becomes email and push without the two being mixed up.*
 Screens: **content list**, **content detail**, **categories**, **category detail**.
@@ -302,24 +318,98 @@ Screens: **content list**, **content detail**, **categories**, **category detail
    explicitly outsourceable, to an agency or to an AI agent. So the author is not
    necessarily a manager with a session, and may not be a person at all — which
    makes authoring a **machine-plane** concern as well as a screen.
-4b. **Should the product show how deep the catalogue is?**
-   *Raised by question 4.* If the engine needs variety and campaign-first
-   authoring starves it, content starvation is a real failure mode that nobody is
-   told about. Is "you have 3 pushable records for this audience" something a
-   manager should see — on the content screen, when building a slot, or nowhere?
-5. **When a channel is added later, what happens to existing records?**
-   Adding a channel is two files. Several hundred records would have no fields for
-   it. A backlog a manager works through, a filter, or invisible until needed?
-   *No lean.*
-6. **Is the person writing email copy the same person writing push copy?**
-   Bears on one screen or two, and on whether channel authoring needs a permission
-   — today it has none. If they differ, "push is empty" is a **handoff**, not a
-   warning.
-7. ✅ **Are categories authored alongside content, or managed separately?**
-   **Resolution (2026-09-21): alongside content.** *"Categorizing happens on the
-   content, not in the campaign context"* (user). **Established with it:**
-   categories stay in this cluster rather than moving to Cluster 3, and the
-   category screens are an authoring surface rather than administration.
+4b. ✅ **Should the product show how deep the catalogue is, and where?**
+   **Resolution (2026-09-21): at the decision slot, and silent everywhere else.**
+   Show the candidate count where the decision is configured — *"this slot
+   resolves against 4 push-ready records"* — because that is the moment a manager
+   can see whether there is anything to personalise with. The content screen does
+   **not** carry a catalogue-health view; a number there addresses the wrong
+   reader at the wrong moment.
+   **Established with it:** starvation is now a named failure mode. A slot
+   resolving from two candidates is not broken and looks identical on screen to
+   one resolving from two hundred — it simply stops personalising. Making the
+   count visible at the slot is what turns that from invisible into obvious.
+   **This is the second hard gap the interview has found.** The decision module
+   exposes exactly two routes — `GET /decision/strategies` and
+   `POST /decision/slots/{id}/execute` — and **execute resolves for real and
+   writes a `DecisionResolution`**, so it cannot be used as a preview. There is no
+   way to ask "how many records would this slot choose between" without causing a
+   decision. A **read-only candidate count** is owed, and it belongs with the
+   decision slot detail screen in Cluster 3.
+   **Two things it needs that now exist because of question 3.** Counting
+   "push-ready" candidates requires the per-channel readiness that question 3 made
+   explicit state — before that resolution there was nothing to count. And
+   [[ADR-160 — Channel Model and Composition]] point 3's promise that slots filter
+   candidates to channel-ready records, which `top_score` declares
+   `candidate_filter_fields` for but does not implement, finally has something
+   concrete to filter on.
+   **Open, deliberately:** what counts as "thin". The count alone may be enough
+   and a threshold may be the system inferring again — the shape question 2
+   rejected.
+5. ✅ **A new channel is registered. Several hundred existing records have no
+   fields for it. What happens?**
+   **Resolution (2026-09-21): a filter — the gap is workable, not nagged about.**
+   Those records are simply not ready for the new channel, and a manager can
+   filter to "not ready for WhatsApp" when they decide to work on it. No banner,
+   no badge, no rollout queue, no progress bar.
+   **Established with it:** **per-channel readiness is a filter dimension**, which
+   ties question 3's asserted state to the findability work in questions 8–13.
+   Those are not two separate features — the filter surface must carry at least
+   two kinds of dimension: **system dimensions** (readiness per channel, `status`)
+   and **manager dimensions** (whatever questions 8–13 decide tags are). That is a
+   constraint on the filter model, and it arrived from a question that was not
+   about filtering at all.
+   **Sequencing that falls out:** this answer cannot be built before questions
+   8–13 are settled, because it is a filter and there is no filtering yet.
+   **Known cost accepted:** nothing prompts anyone, so a channel can stay
+   thinly-served indefinitely. Accepted because the prompt would be wrong more
+   often than right — question 4b already puts the signal where it bites, at the
+   decision slot.
+6. ✅ **Who authors content, and does authoring need its own permission?**
+   **Resolution (2026-09-21): the same people, no new permission — and
+   outsourcing goes through the machine plane.** A person who may edit content may
+   edit all of its channels; there is no per-channel authoring right and no split
+   between writing and governing. An agency or an AI agent authors as an
+   **integration**, with its own credential, grants and audit actor.
+   **Established with it:** nothing new enters the permission model, and adding a
+   channel stays the two files [[ADR-160 — Channel Model and Composition]] point 6
+   promises rather than also adding permissions, roles and grants.
+   [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]] already
+   carries this: an integration is a principal in the same access model, with a
+   durable audit identity, so "who wrote this push copy" has an answer without a
+   new concept. **Assignment and handoff are rejected with it** — the product does
+   not gain an ownership or "waiting on" concept.
+   **Consequence that is now a requirement, not an option: the content write API
+   must be complete enough for an agency to work through it**, because that is the
+   stated outsourcing path rather than a hypothetical one. Whatever the authoring
+   screen can do, the JSON plane must also do.
+6b. ✅ **May an integration mark a record ready for a channel, or is that a
+   human act?**
+   **Resolution (2026-09-21): an integration may assert it, and the assertion
+   routes through the approval inbox.** An agency or AI agent marking a record
+   ready creates a held action; a person decides it. A **person** marking a record
+   ready is not held — the same shape as firing a send, where a person doing it
+   *is* the approval.
+   **Established with it:** this reuses [[ADR-142 — Autonomous Workflows and the
+   Automation Boundary]] §4's held-action machinery rather than inventing a review
+   concept, and it honours [[ADR-082 — AI May Recommend but Not Publish]] without
+   needing an exception — the machine still recommends, the person still publishes.
+   **Third backend requirement from this cluster, and it is concrete.** A new
+   approvable action is owed in `backend/app/approvals/actions/`, which today holds
+   exactly two — `send.fire_send_instance` and `ai.apply_subject_preheader`. It
+   needs an `APPROVABLE_ROUTES` entry in `app/auth/policy.py` too: that table is
+   **fail-closed by omission**, so without one a machine asserting readiness gets a
+   hard 403 rather than a hold.
+   **Known cost accepted, and it lands on Cluster 1:** the approvals inbox gains a
+   second, potentially high-volume input. Content review could swamp the send
+   approvals the inbox was built for. **Cluster 1 questions 1, 3 and 8 must be
+   answered knowing this** — an inbox carrying both "approve this send" and
+   "forty records are ready for review" may need grouping, filtering, or a
+   separation the current single list does not have.
+   **It does validate one thing already built:** the approval detail screen renders
+   the server's `rows` generically rather than knowing action types. A second
+   action type arriving is exactly the case that design was for.
+
 ### Finding content at scale — questions 8–14
 
 *Possibly its own cluster.* These share a surface with the questions above and
