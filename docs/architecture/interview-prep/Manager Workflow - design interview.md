@@ -416,25 +416,106 @@ nothing else: they are about **finding** a record, not authoring one, and they
 reach into Cluster 3's campaign builder and arguably Cluster 4's audience list.
 Split them out if that reads better — the clustering is still yours to change.
 
-8. **Is the grouping one flat set of tags, or several named dimensions?**
-   *The examples are not one list.* B2C/B2B is one axis; IATA destination →
-   country → region is another, and it is hierarchical; product versus company
-   information is a third. One free-tag pool, several declared dimensions each
-   with its own values, or something between?
-   *This decides the data model more than anything else in this cluster.*
-9. **Who administers the vocabulary, and is it shared or personal?**
-   Set up once by an administrator, or added ad hoc by whoever is authoring?
-   *Constraint, and it is the backend-or-frontend question: a personal saved
-   filter needs no backend at all. A shared vocabulary another person sees is a
-   governed list needing the same care categories get — naming, merging,
-   retiring, and what happens to content when a value is deleted.*
-10. **How many content records, realistically, and over what period?**
-    *Constraint, and it may outrank tags: `GET /content/` calls `.all()` with no
-    limit, offset or filter, and so does every other list route the client uses.
-    At a hundred thousand records the screen does not get slow, it stops
-    working.* Hundreds means client-side filtering is adequate; tens of thousands
-    makes server-side filtering and pagination a precondition for this screen
-    existing at all, tags or no tags.
+8. ✅ **Is the manager's grouping one flat pool of tags, or several named
+   dimensions?**
+   **Resolution (2026-09-21): named dimensions, each with its own values.** The
+   adopter declares the axes they think in — *Audience: B2C · B2B*, *Destination:
+   Lisbon · Porto*, *Type: product · company* — and filtering composes across
+   them: "Audience is B2B **and** Destination is Lisbon". A flat tag pool was
+   rejected: it cannot express "which destination?", and nothing stops `lisbon`,
+   `Lisbon` and `LIS` coexisting.
+   **Established with it, and it settles a constraint from question 5: system
+   dimensions and manager dimensions share one model.** Readiness-per-channel and
+   `status` are further axes rather than a separate filtering mechanism, so there
+   is one filter surface and one way to think about it.
+   **Known cost accepted:** somebody must declare the dimensions before anybody
+   can tag, which is question 9.
+   **Rider, deliberately not assumed:** values are **flat within a dimension** —
+   the nested option was not taken. The IATA example *was* hierarchical, and the
+   two reconcile if Region, Country and Destination are modelled as three
+   dimensions rather than one nested one. **The tradeoff that creates:** a record
+   tagged `Destination: Lisbon` does not automatically satisfy `Country: Portugal`
+   unless it carries that too, so either the tagger repeats themselves or
+   something derives the broader value. Worth deciding before this is built;
+   flagged rather than resolved.
+9. ✅ **Who declares the dimensions and their values, and is the vocabulary
+   shared or personal?**
+   **Resolution (2026-09-21): shared and governed — an administrator declares
+   them.** Dimensions and their values are set up deliberately and everyone sees
+   the same ones. Personal saved views were rejected, and correctly: they would
+   have made an agency's tagging invisible to everyone else, which breaks the
+   outsourcing path question 6 established.
+   **This answers the backend-or-frontend question definitively: it is a backend
+   feature.** A new model is owed — dimensions, their values, and the links from
+   content records to values — plus lifecycle rules the flat-tag option was
+   rejected for needing anyway: renaming a value, merging two, retiring one, and
+   what happens to tagged content when a value is deleted.
+   **It needs an administration surface that does not exist.** Declaring
+   dimensions belongs in Settings, and Settings is **gap C2** — there is no
+   `app/settings/router.py` and no `app/ai/router.py`, so the entire settings
+   surface is UI-only. This work now has a dependency on closing that gap.
+   **Known cost accepted:** setup before value. An adopter gets nothing from this
+   until somebody has declared the axes they think in.
+9b. **Are dimensions global, or per brand?**
+   *Raised by question 9, and there is precedent pointing both ways.*
+   [[ADR-150 — Tenancy and Access Model]]'s 2026-09-15 addendum makes categories
+   deliberately **unbranded** — `CategoryDB` carries no `brand_id`, and the policy
+   table states the reasoning: *"Content is per-brand; what a category MEANS is
+   not."*
+   That argument is about **affinity semantics** and does not carry to
+   **findability**. Two brands share what "Beach" means as an interest; they do
+   not share how they file their work.
+   **Resolution (2026-09-21): per brand — with a named consequence for
+   duplication.** The user: *"Best would be per brand, but this means duplicating
+   campaigns/content is only possible if they have shared values or the
+   duplication wizard allows reassignment."*
+   **Established with it:** an airline brand's axes (Destination, Cabin) and a
+   hotel brand's (Property, Season) have no reason to be one list, and forcing a
+   shared vocabulary would couple brands [[ADR-150 — Tenancy and Access Model]]
+   otherwise keeps apart. This **departs from the category precedent
+   deliberately**, so the addendum that made categories unbranded needs a sentence
+   saying why findability differs from affinity — the reason being that a category
+   carries meaning about a *recipient*, while a dimension carries meaning about
+   *how a team works*.
+   **The duplication consequence is real, and the mechanism for it already
+   exists.** Cross-brand duplication is a built feature, not a hypothetical:
+   `duplicate_campaign` (`backend/app/campaigns/duplication.py:127`) takes
+   `source_brand_id` and `target_brand_id`, exposes a `crossed_brands()`
+   predicate, and runs two modes — `KEEP` within a brand, where modules reference
+   the same records, and `COPY` across brands, where records must be duplicated
+   because a record carries one `brand_id`. Per-brand dimensions mean a copied
+   record's tags may name values the target brand does not have.
+   **That is the same shape the duplication result already handles:** it reports
+   *"places a brand-specific URL came across verbatim, as readable labels"* — a
+   list of things that crossed and need a human look. Unresolvable dimension
+   values belong in exactly that list, so **the duplication wizard allows
+   reassignment** rather than refusing the copy or silently dropping the tags.
+   **Known cost accepted:** a multi-brand adopter redeclares common axes per
+   brand, and a cross-brand copy gains a reassignment step.
+10. ✅ **How many content records, realistically?**
+    **Resolution (2026-09-21): it varies, and the product must not assume.**
+    A reference architecture is copied by adopters of very different sizes, so the
+    API paginates and filters server-side regardless — including for the adopter
+    who will never need it.
+    **Fourth backend requirement from this cluster, and the broadest.** Every list
+    route the client uses calls `.all()` with no limit, offset or filter
+    (`content/service.py:219-235` and its equivalents). Pagination and server-side
+    filtering become a **precondition for these screens existing**, not an
+    optimisation — and every dimension filter, readiness filter and search from
+    questions 8–9 is a query parameter the backend must accept. **This shapes the
+    API before the screens are built**, which is Phase 0's lesson again: schema
+    changes are cheap before a typed client exists and expensive afterwards.
+    **It reprices an existing backlog item.** `.all()` with no pagination is
+    logged as **P3-02** from the 2026-08-07 review, scoped there as latent scaling
+    in a `performance-notes.md` that was never created. At this posture it is not
+    a performance note — it is a blocker on the core workflow, and it applies to
+    campaigns, audiences, recipients and approvals as well as content.
+    **It also invalidates part of what is already built.** Phase 2's four list
+    screens fetch everything and render it. They will need server-side filtering
+    and paging, which is the cost of having built them before this interview ran.
+    **Known cost accepted:** an adopter with two hundred records pays for
+    machinery they do not need. Accepted because the alternative is that somebody
+    hits a wall silently, having copied an architecture that looked fine.
 11. **What should the campaign content picker be, instead of a dropdown of every
     id?** Search, filtered browse, recently used, or narrowed to what the module
     or decision slot can actually accept?
