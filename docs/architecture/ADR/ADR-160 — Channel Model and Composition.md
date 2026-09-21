@@ -23,7 +23,7 @@ enables:
   - "[[ADR-163 — Per-Channel Consent and Addressability]]"
   - "[[ADR-164 — Channel Feedback and Signals]]"
 ---
-
+	
 ## Status
 Accepted
 

@@ -200,31 +200,113 @@ Screens: **approvals**, **approval detail**, the shell itself.
 *How one message becomes email and push without the two being mixed up.*
 Screens: **content list**, **content detail**, **categories**, **category detail**.
 
-1. **Is a content record one message expressed in several channels, or is a push
-   message a different record from the email message?**
-   *Constraint: [[ADR-160 — Channel Model and Composition]] point 3 makes channel
-   readiness a property of the record. Lean: one record — strengthened by the
-   2026-09-21 ruling that fields follow modules.*
-   The workflow question: *"write the beach article, then give it a push title"*,
-   or *"write the beach email; separately, write the beach push"*?
-2. **When a manager opens a content record, what do they see first?**
-   Grouping follows the module channels (settled). **The presentation does not:**
-   email and push as labelled sections both always visible, tabs one channel at a
-   time, or only the channels already filled?
-   *Lean: sections rather than tabs, so "push is empty" is visible without a
-   click — but that presumes emptiness is something a manager needs to see, which
-   is question 3.*
-   Field order within a group is currently **JSON insertion order**, an accident
-   of how the record was written. Should it follow the manifest's declared order?
-3. **What tells a manager a record is ready for push?**
-   *Constraint: [[ADR-161 — Channel Execution Shapes]] point 7's rider says
-   catalogue readiness is "push fields not empty" — **not implemented anywhere**.*
-   Computed and displayed, or asserted by the manager the way `status` is? And is
-   "not ready" a warning, a filter, or a neutral fact?
-4. **Does a manager fill channel fields speculatively, or only when a variant on
-   that channel is being composed?**
-   Decides whether the content screen is channel-shaped from the start, or whether
-   channel fields are authored from the campaign instead.
+1. ✅ **Is a content record one message expressed in several channels, or is a
+   push message a different record from the email message?**
+   **Resolution (2026-09-21): one record carries every channel's fields.** The
+   beach article is one record with email fields and push fields on it, and the
+   work reads *"write the beach article, then give it a push title"*.
+   **Established with it:** [[ADR-160 — Channel Model and Composition]] point 3
+   holds exactly as written — channel readiness is a property of the record, which
+   only parses because one record can be ready for some channels and not others.
+   No ADR change. The two alternatives are closed: separate per-channel records
+   would have left the "same story" relationship unmodelled, and a parent/child
+   structure would have added a level that decision slots, rendering and
+   [[ADR-128 — Version Content for Auditability and Restoration]]'s versioning all
+   have to learn.
+   **Known cost accepted:** a record accumulates every channel's fields, so the
+   authoring surface grows with each channel added — which is what makes
+   question 2 a real question rather than a styling choice.
+2. ✅ **When a manager opens a content record, how are the channel field groups
+   presented?**
+   **Resolution (2026-09-21): labelled sections, every channel always visible,
+   with manual collapse.** Sections down the page, not tabs. A manager may
+   collapse some or all of them — *"if a manager quickly needs to get to the last
+   section"* — and that is the only thing that ever collapses one.
+   **Established with it, and it is the part that generalises: collapse is a
+   navigation aid the manager controls, never a state the system infers.**
+   Explicitly **no auto-collapse on empty**. The system does not get to decide a
+   channel is irrelevant because it currently has no values, and hiding emptiness
+   is how a record comes to look finished when it is not. Tabs were rejected for
+   the same reason — they put "push is empty" behind a click.
+   **Known cost accepted:** the page grows with every channel added, which manual
+   collapse mitigates rather than solves.
+   **Rider, still open:** field order within a group is currently **JSON insertion
+   order** — an accident of how the record was written. The manifest declares an
+   order; using it is the obvious fix but has not been decided.
+3. ✅ **What makes a content record "ready for push", and who needs to know?**
+   **Resolution (2026-09-21): asserted by the manager, per channel, like
+   publishing.** Filling the fields is not the same as saying the record is ready
+   to go out on a channel. A manager marks it deliberately, and the decision
+   engine trusts that mark rather than inspecting fields.
+   **Established with it:** readiness becomes **explicit per-channel state on the
+   content record**, which strengthens [[ADR-160 — Channel Model and Composition]]
+   point 3 — readiness was already "a property of the content record", and is now
+   a stored property rather than a derived one. It is a **different axis from
+   `status`**, which stays the record's own lifecycle (`active`/`inactive`).
+   **This makes an ADR-161 rider wrong and it must be corrected rather than
+   quietly ignored.** [[ADR-161 — Channel Execution Shapes]] point 7 states
+   *"catalogue readiness is 'push fields not empty'"*. That is now false: readiness
+   is asserted, not computed. The rider was never implemented, so nothing breaks —
+   but the record says something this interview has decided against, and a dated
+   addendum is owed.
+   **Known cost accepted, and it needs a rule:** the fields and the flag can
+   disagree in both directions — filled but never marked, or marked and then a
+   required field emptied. Question 3b decides what happens in the second case.
+3b. ✅ **When a record is marked ready for a channel and a required field for
+   that channel is later emptied, what happens?**
+   **Resolution (2026-09-21): warn, keep the mark, and let the send catch it.**
+   The manager asserted readiness and the system does not silently overrule them.
+   The record shows a warning — *marked ready for Push, but `push_title` is
+   empty* — wherever it appears.
+   **Established with it:** this is question 2's principle applied
+   again — **the system does not infer state on a manager's behalf.** Auto-unmark
+   was rejected for exactly the reason auto-collapse was: it undoes a deliberate
+   act, and a manager clearing a field to retype it would silently lose the mark.
+   **This produces a backend requirement the interview discovered, and it is not
+   optional.** "Let the send catch it" presumes something checks, and **nothing
+   does**: `resolve_module_variables` defaults a missing field to `""` and
+   `ModuleVariable.required` is never enforced at render, so today an empty push
+   notification ships to a real device without a single warning. A required-field
+   check must exist **before a send fires**, and where it belongs is
+   Cluster 5 question 1's pre-flight. Logged as a gap, not a preference.
+   **Known cost accepted:** an unresolved warning can travel all the way to the
+   send, so the warning alone is not a control — the send-time check is.
+4. ✅ **Does a manager fill a channel's fields speculatively, or only once a
+   variant on that channel is being composed?**
+   **Resolution (2026-09-21): both must work, and the product should favour
+   catalogue-first without forcing it.** The user:
+
+   > *"This is 'today' — teams don't have time and think 'campaign first', so they
+   > start writing content for that campaign. More sustainable is content is
+   > created first and for all channels, so it's easier and faster for human or ai
+   > to build campaigns; also does a decision engine demand as much
+   > variety/options as possible. Content creation can also easily be outsourced
+   > to an agency or to an ai agent."*
+
+   **Established with it, and it is a product principle rather than a screen
+   decision: the decision engine's value is proportional to catalogue depth.**
+   Campaign-first authoring produces exactly enough content for one campaign,
+   which leaves a decision slot with nothing to choose between — the engine
+   degrades to a fixed pick and the personalisation the platform exists for
+   quietly stops happening. Nothing in the repo says this, and it explains why
+   [[ADR-084 — Decision Slots May Resolve One or Multiple Content Records]] and
+   the whole decision layer assume a catalogue rather than a campaign's worth of
+   content.
+   **Consequences for the client.** The **content screen is the primary authoring
+   surface** and stays full-featured; the **campaign builder needs an edit-in-place
+   path** as an accommodation for how teams actually work today, not as the
+   intended route. Neither screen may assume it owns authoring. Whether the
+   product should *show* catalogue depth — how much choosable content exists per
+   channel — is a new question, 4b.
+   **It also answers part of question 6 in advance:** content creation is
+   explicitly outsourceable, to an agency or to an AI agent. So the author is not
+   necessarily a manager with a session, and may not be a person at all — which
+   makes authoring a **machine-plane** concern as well as a screen.
+4b. **Should the product show how deep the catalogue is?**
+   *Raised by question 4.* If the engine needs variety and campaign-first
+   authoring starves it, content starvation is a real failure mode that nobody is
+   told about. Is "you have 3 pushable records for this audience" something a
+   manager should see — on the content screen, when building a slot, or nowhere?
 5. **When a channel is added later, what happens to existing records?**
    Adding a channel is two files. Several hundred records would have no fields for
    it. A backlog a manager works through, a filter, or invisible until needed?
@@ -362,6 +444,11 @@ Screens: **audience groups**, **audience detail**, **recipients**,
 Screens: **deliveries**, **delivery detail**.
 
 1. **What does a manager confirm before real mail leaves?**
+   *Cluster 2 question 3b landed a hard requirement here: a record can be marked
+   ready for a channel while a required field for it is empty, and nothing
+   currently checks — `ModuleVariable.required` is never enforced at render, so an
+   empty push ships silently. A required-field check before firing is owed, and
+   this is where it belongs.*
    The pre-flight list is the screen's whole reason to exist, and nothing records
    it. Snapshot, audience count, provider, from-address, schedule — all of them,
    or a subset with the rest available?
