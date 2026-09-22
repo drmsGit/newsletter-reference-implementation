@@ -5,13 +5,15 @@ topic:
   - frontend
   - design
 created: 2026-09-21
-modified: 2026-09-21
+modified: 2026-09-22
 status: open
 ---
 
 > **Status: interview OPEN.** Clustering approved 2026-09-21. All five clusters
-> written out. **Cluster 2 CLOSED 2026-09-21, 18/18.** 49 questions total, 18 answered. **No further frontend work before
-> Cluster 2 closes**; its questions decide screens that are already built.
+> written out — 49 questions, 18 answered.
+> **Cluster 2 CLOSED 2026-09-21, 18/18** — see *What Cluster 2 produced* for the
+> five backend requirements and the ADR work it owes.
+> **Cluster 1 in progress 2026-09-22.**
 
 # Manager Workflow — design interview (forward-looking)
 
@@ -137,7 +139,7 @@ implementer, not by anyone who uses this product**, and are in scope to overturn
 |---|---|
 | Sign-in, two-step code flow | Follows ADR-151 §2's uniform response. Not a workflow question. |
 | Shell, brand switcher, sign-out | Switcher hidden when `switchable` is false, per ADR-150 pt 4. |
-| ⚠️ **Approvals as the landing screen** | Justified from ADR-169, which is about the *model* of flows, not what a manager opens first. **A guess** — question 1.1. |
+| ✅ **Approvals as the landing screen** | **Confirmed by question 1.1 (2026-09-22)** — and on a stronger argument than the one it was built with: the manager's job is shifting from producing to deciding. Was a guess; is now a decision. |
 | ⚠️ **Table columns on all four lists** | Name/status/updated, chosen by the implementer. No basis — questions 2.1, 3.1. |
 | ⚠️ **Campaign rows do not navigate** | Defensible (B11 unbuilt) but a design call — question 3.1. |
 | ❌ **Content fields as one flat list** | **Confirmed wrong** by the 2026-09-21 ruling above: grouping follows the module channels. Fix is blocked only on question 2.2's presentation. |
@@ -161,28 +163,108 @@ A manager's day looks like *"what needs me?" → "make the thing" → "who gets 
 *What a manager opens this for, what is waiting, and what "done for today" means.*
 Screens: **approvals**, **approval detail**, the shell itself.
 
-1. **What does a manager open this client for on an ordinary day, and what is the
-   first question they need answered?**
-   *Lean, and it is the guess currently shipped: "does anything need me", which is
-   why approvals is the landing screen. If the honest answer is "I am working on
-   the October newsletter", the landing screen is wrong and the campaign is the
-   unit of work.*
-2. **Is there a state that means "done for today"?** An empty inbox, a campaign
-   reaching a status, or nothing — the work being continuous?
-   This decides whether any screen should show a completion signal at all.
-3. **What arrives in the approval inbox, and from whom?**
-   *Cluster 2 question 6b added a second input type: an integration asserting a
-   content record is ready for a channel. That may be high-volume — an agency
-   delivering forty records is forty held actions — and could swamp the send
-   approvals this inbox was built for. Grouping, filtering or separation may be
-   needed; the current single list has none.*
-   *Constraint: [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]]
-   point 3 makes "a person" and "an integration" durably different actors, and the
-   inbox shows the type today.* Is that distinction something a manager acts on,
-   or noise?
-4. **What must a person see before deciding?** The server describes each request
-   as label/value `rows`; the client renders them generically. Is a generic
-   description enough, or do specific request types need their own presentation?
+1. ✅ **What does a manager open this client for on an ordinary day, and what is
+   the first question they need answered?**
+   **Resolution (2026-09-22): "does anything need me?" — the approval inbox is the
+   landing screen.** The user:
+
+   > *"'Today' most platforms try to show a bit of everything but no manager uses
+   > them, they go directly to the area they have to work in. This is a 'future
+   > platform' — there will be more ai and more decisions to make so → 'Does
+   > anything need me?' The approval inbox is the perfect place to be on the first
+   > page. Even if it is not the way a manager works today, it will become the way
+   > they work in the future."*
+
+   **Established with it, and it is the sharpest statement of this product's
+   thesis anywhere in the repository: the manager's job is shifting from producing
+   to deciding, and the client is designed for where that ends up rather than
+   where it is now.** Everything Cluster 2 decided converges on it — content
+   authoring is outsourceable to an agency or an AI agent (question 2.4), an
+   integration's readiness assertion routes through this inbox (question 2.6b),
+   [[ADR-082 — AI May Recommend but Not Publish]] keeps publication human, and
+   [[ADR-142 — Autonomous Workflows and the Automation Boundary]] draws the
+   automation boundary at exactly this line. If production is increasingly
+   delegated, **what is left for a person is judgement, and the inbox is where
+   judgement happens.**
+   **A dashboard is rejected, explicitly and on evidence.** "A bit of everything"
+   is what most platforms show and what no manager uses. The landing screen
+   answers **one** question rather than several, so the overview option is closed
+   and no such screen enters the cut.
+   **This confirms rather than merely permits what is built** — approvals as the
+   landing screen stops being an implementer's guess and becomes a decision, and
+   the ⚠️ against it above is cleared.
+   **Known cost accepted, and it is deliberate:** this is not how most managers
+   work today, so an adopter evaluating the product against their current habits
+   may find the landing screen strange. Accepted as a bet on where the work is
+   going rather than a misreading of where it is.
+   **Worth carrying to the business side:** this is a positioning statement as
+   much as a design one, and `docs/business/POSITIONING.md` is the open gate.
+2. ✅ **Is there a state that means "done for today", and should the client show
+   it?**
+   **Resolution (2026-09-22): no completion signal at all.** The work is
+   continuous and the client never implies an end point. An empty inbox is an
+   empty list, not an achievement.
+   **Established with it:** this is Cluster 2's principle again — *the system
+   reports, the manager decides* — extended to judgement about the work itself.
+   The client has no way to know whether campaigns are on track; it only knows
+   whether anything is blocked on this person, and it must not let the second
+   masquerade as the first. **The cross-screen all-clear is rejected with it**, as
+   an overview by another name after question 1 closed that door.
+   **A line worth drawing carefully rather than assuming.** A factual
+   *"nothing is waiting for a decision"* describes the list; *"You're all caught
+   up ✓"* is a completion signal. The current empty state reads
+   **"Nothing is waiting for a decision."** — believed to be on the right side of
+   that line, but it is the implementer's copy and this resolution is the reason
+   to check it rather than defend it.
+   **Known cost accepted:** a manager gets no positive confirmation that they have
+   nothing to do, which some people find unsatisfying. Accepted because the
+   alternative is a reassurance the client cannot honestly give.
+3. ✅ **The inbox now carries send approvals and content-readiness reviews. How
+   should it handle two kinds of item at very different volumes?**
+   **Resolution (2026-09-22): one flat list, newest first, with filters by action
+   type and by requester.** Structural grouping was rejected in favour of
+   filtering.
+   **Established with it:** this is *the system reports, the manager decides*
+   applied to prioritisation — **the system does not decide which requests matter
+   enough to separate.** It presents them in arrival order and gives the manager
+   the means to narrow. Consistent with Cluster 2's answer to the same shape of
+   problem, where filtering beat imposed structure.
+   [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]] point 3's
+   durable actor distinction earns its keep here: **"requester" is a filter
+   dimension**, so "show me what Acme Agency sent" is a real question the data can
+   answer.
+   **Backend consequence, and it compounds question 2.10's.** `GET /approvals/`
+   accepts **only** `status` (`pending`/`decided`/`all`) — no action-type filter,
+   no requester filter, no pagination. Two query parameters and paging are owed
+   here, which is the same requirement as 2.10 arriving on another route rather
+   than a separate one.
+   **Known cost accepted, and it is real:** a single send approval can sit below
+   forty content items, and firing a send is the highest-consequence decision in
+   the product. Filters mitigate it; they do not prevent a manager who does not
+   filter from missing one. Accepted deliberately over grouping.
+4. ✅ **What must a person see before deciding a held request?**
+   **Resolution (2026-09-22): generic rows, plus a link to the subject — and the
+   link target depends on the action type.** A content-readiness request links to
+   the content record, a campaign-related one to the campaign, an audience one to
+   the group. The user: *"For the start: Generic row + link (to campaign / to
+   content / to audience group), improvements will become features."*
+   **Established with it:** the client **stays ignorant of action types**, which
+   was the point of the generic renderer. Mapping `subject_type` → a route is one
+   small table, not per-action presentation, so a new action type still needs no
+   client change — it needs a route for its subject, which the client already has.
+   **Explicitly deferred, and named rather than discovered later:** combinatorial
+   requests — the user's example, *"the three groups get these three campaigns"* —
+   will need a purpose-built screen. That is a later feature, not a reason to
+   abandon the generic approach now.
+   **Gap, and it is the same shape as one already found.** `PendingActionDB`
+   **stores** `subject_type` and `subject_id` (`app/approvals/db_models.py:79-80`)
+   and `PendingActionDetail` **exposes neither** — so the client cannot build the
+   link this resolution requires. The data exists; the response model drops it,
+   exactly as `ModuleVariableOut` drops `label` and `envelope`. Two fields on a
+   response model, and the second instance of this defect the interview has found.
+   **Known cost accepted:** a reviewer judging copy leaves the inbox to read it.
+   Accepted as the honest version — a summary that tries to be the record is worse
+   than a link to the record.
 5. **Do approvals need a comment or a conversation?**
    *Constraint: `PendingActionDB.decision_reason` exists (1000 chars, nullable) and
    is written **at decision time by the decider**. There is nothing for a
