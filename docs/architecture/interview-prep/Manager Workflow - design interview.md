@@ -14,7 +14,7 @@ status: open
 > **Cluster 2 CLOSED 2026-09-21, 18/18** — see *What Cluster 2 produced* for the
 > five backend requirements and the ADR work it owes.
 > **Cluster 1 ◐ 7 of 8 closed 2026-09-23** — question 5 deliberately reopened.
-> 49 questions, 26 answered.
+> **Cluster 3 ✅ CLOSED 2026-09-23, 10/10.** 53 questions, 36 answered.
 
 # Manager Workflow — design interview (forward-looking)
 
@@ -895,7 +895,7 @@ signal is load-bearing it becomes a check at the point of action); and
 needs explaining once is cheaper than one that quietly means two things).
 
 
-## Cluster 3 — Composing a campaign
+## Cluster 3 — Composing a campaign  ✅ CLOSED 2026-09-23, 10/10
 
 *What gets assembled, in what order, and what campaign detail is actually for.*
 Screens: **campaigns list**, **campaign detail** (inventory B11), **decisions**,
@@ -989,32 +989,207 @@ Screens: **campaigns list**, **campaign detail** (inventory B11), **decisions**,
    the substance of what a manager does all day, and this interview has one
    question about it. Whether it becomes a sixth cluster or a separate design
    interview is question 3b.
-3b. **Does the variant editor need its own design interview?**
-   *Raised by question 3.* It carries preview, module ordering, content selection,
-   inline override editing and channel-shaped forms — each of which had a question's
-   worth of substance in Cluster 2. Treating it as one bullet inside Cluster 3
-   would repeat the mistake this whole document exists to correct.
+3b. ✅ **Does the variant editor need its own design interview?**
+   **Resolution (2026-09-23): yes, its own interview — and it does not have to
+   wait for Clusters 4 and 5.** The user corrected the assumption built into the
+   question: *"It doesn't depend on audience or send."* It can therefore run in
+   parallel with the rest of this document rather than after it.
 
-4. **In what order does a manager build a variant?** Pick channel → add modules →
-   fill them? Or find content first and compose around it?
-   *Constraint: channel is fixed at variant creation and has no setter.*
-5. **How does a manager find the right content record while composing?**
-   *Answered together with questions 2.8–2.13, not separately.* The picker is a
-   dropdown of every content record id today, which the user names as not working
-   past a few hundred records. This is the harder of the two surfaces: the
-   manager is mid-composition, not browsing, and may only want content the module
-   or slot can actually accept.
-6. **When does a manager reach for a decision slot instead of fixed content?**
-   Is personalisation a deliberate act per slot, or the default for some module
-   types?
-7. **What does a manager need to see about how a slot resolved?**
-   *Constraint: [[ADR-085 — Decision Resolution Should Be Optionally Explainable]]
-   makes explainability optional.* Is the explanation something a manager reads
-   routinely, or only when something looks wrong?
-8. **Duplicating a campaign — when is it used, and what should it carry?**
-   The inventory treats it as a dialog rather than a screen.
+   **The brief, in the user's words, recorded so the future interview starts from
+   it rather than from my reading of it:**
+
+   > *"it's an editor to build the variant (mainly email as it's the most complex)
+   > to get the finished html(body) that goes to the send provider. It doesnt
+   > depend on audience or send, it's 'only' live rendering content / layout blocks
+   > (seeing what you've picked), options to override the content or to hide
+   > elemtns (like no button, no headline), if multiple designs are prepared maybe
+   > switching between designs. customizable functions. as we're doing beta /
+   > stage 1 — concept is the most important to find a way that companies can
+   > easily customize their frontend editor functions as the need it and how their
+   > managers work best."*
+
+   **The beta priority is the extensibility concept, not the editor.** What matters
+   for stage 1 is *how an adopter customises the editor's functions to how their
+   managers work* — which is the same posture as the drop-a-file module registry
+   and the provider adapters, applied to the client. That reframes it from "build
+   an editor" to "design the seam an editor is built on".
+   **Scope named:** email first as the most complex case; the output is the
+   finished HTML body the send provider receives; live rendering of the chosen
+   content and layout blocks; content override; **hiding elements**; and switching
+   between prepared designs.
+   **One gap already visible in that list.** *Hiding an element* has no model:
+   `ModuleInstanceDB` carries `variant_id`, `module_type`, `position`,
+   `content_record_id`, `module_data` and `decision_slot_id` — **no visibility
+   flag**. The only "hidden" in the codebase is
+   [[ADR-086 — Decision Slots Fail Gracefully]]'s *hidden slot*, where a slot that
+   resolves to nothing renders as an HTML comment — automatic degradation, not a
+   manager's choice. Whether "no button" is expressible by clearing a field
+   depends on each template, which makes it a template convention rather than a
+   guarantee. That is a question for the editor interview, flagged now so it is not
+   discovered mid-build.
+
+4. ✅ **In what order does a manager bring a variant into existence?**
+   **Resolution (2026-09-23): pick the channel, and the editor opens empty.**
+   Creating a variant is one decision. *"If they need an existing layout they can
+   start with duplicating an older campaign/variant."*
+   **Established with it:** the one **irreversible** choice is made deliberately
+   and alone. [[ADR-160 — Channel Model and Composition]] point 5 fixes channel at
+   creation and gives it no setter anywhere, so isolating it from everything
+   editable is the shape the model already wants.
+   **Duplication becomes the reuse path**, which makes question 8 load-bearing
+   rather than a footnote — "start from something" is not a creation option, it is
+   a copy. Note the limit that falls out: a variant's channel cannot change, so
+   duplication reuses a layout **within** a channel and an email variant can never
+   become a push one.
+   **Rejected with it:** a starting-design picker at creation time, since prepared
+   designs are a concept that does not exist yet and question 3b's editor
+   interview owns it; and content-first assembly, which would run against a model
+   where a variant owns modules and modules reference content.
+
+5. ✅ **How does a manager find the right content record while composing?**
+   **Resolution (2026-09-23): answered by Cluster 2 question 11 — a picker
+   pre-narrowed by what the slot can use, where the narrowing is a default and not
+   a restriction.** It opens showing content ready for this variant's channel and
+   matching what the module or slot requires; facets and search narrow further;
+   and there is a visible, reversible way to show content that is not currently
+   choosable, so a manager who prepared something unfinished can still reach it.
+   Safe because Cluster 2 question 3b owes a required-field check before a send
+   fires.
+   **Question 2.12's second-order effect applies here specifically:** because
+   campaigns carry facets too, this picker can pre-narrow by the **campaign's own
+   facets** — building a B2B Lisbon campaign surfaces B2B Lisbon content first —
+   which is a stronger default than the channel filter alone.
+   **Not repeated here on purpose.** This question existed because the campaign
+   side is the harder surface; the answer turned out to be one design serving both,
+   and recording it twice would create two places to keep in step.
+
+6. ✅ **When does a manager reach for a decision slot instead of fixed content?**
+   **Resolution (2026-09-23): a deliberate choice, made when the module is
+   created.** The user: *"when a manager creates a new module and picks the
+   layout, they can choose between 'content catalog record' or 'decision engine
+   strategy' — preview then shows either catalog input + override or a placeholder
+   for the personalized block (maybe with override options to put a headline over
+   it)."*
+   **Established with it, and it is a good sign: the interaction maps one-to-one
+   onto the data model.** `ModuleInstanceCreate` already carries
+   `content_record_id` **or** `decision_slot_id`, both nullable
+   (`campaigns/models.py:73-77`), so the fork the manager sees *is* the fork the
+   model expresses. No new concept, no translation layer.
+   **A personalised block still takes overrides**, per the user's aside about
+   putting a headline over it — consistent with
+   [[ADR-041 — Override Precedence]], where a field-level override wins over the
+   resolved content whether that content was picked or chosen by a strategy.
+   **Fixed is the default and personalisation is opt-in**, with the cost accepted:
+   the engine only runs where somebody chose it, so catalogue depth can feed an
+   engine nobody switched on. Question 2.4b's candidate count at the slot is the
+   counterweight — it makes the engine's state visible where it is configured.
+   **The preview behaviour belongs to question 3b's editor interview**, which is
+   where "what a placeholder for a personalised block looks like" gets designed.
+
+7. ✅ **What does a manager need to see about how a decision slot resolved?**
+   **Resolution (2026-09-23): the distribution — what got chosen and how often —
+   and not the individual resolutions.** Which records won, and how concentrated
+   the picks are.
+   **Established with it:** this is the shape that **exposes starvation directly**.
+   One record winning 90% of the time is visible at a glance, which is the failure
+   mode question 2.4b named and could not otherwise be seen — a slot resolving
+   badly and a slot resolving well look identical row by row. Distribution answers
+   *is the engine doing anything* without pretending to answer *is this right for
+   Anna*, which it deliberately does not.
+   **Two backend consequences, and the second is a hazard already in the code.**
+   A **distribution endpoint** is owed: an aggregate over `DecisionResolutionDB`
+   grouped by `content_record_id` with counts, which nothing exposes today.
+   And **`GET /campaigns/decision-slots/{id}/resolutions` returns every resolution
+   row, unpaginated** (`campaigns/router.py:286`,
+   `campaigns/service.py:794`) — on the table whose own model comment calls it
+   *"the fastest-growing table in the schema"*, measured at 96,040 rows. That route
+   is the worst instance of the pattern Cluster 2 question 10 ruled against, and it
+   exists on the one table where the row count is unbounded by design.
+   **`reason` and `score` are not wasted by this answer.** They stay what
+   [[ADR-085 — Decision Resolution Should Be Optionally Explainable]] made them: a
+   diagnostic for answering *why did this person get that* after the fact, rather
+   than something a manager browses. Question 1.5 established they are the
+   machine's reasoning, distinct from the human's `decision_reason`.
+   **Known cost accepted:** a distribution can look healthy while individual picks
+   are poor, and nothing routinely surfaces that.
+
+8. ✅ **When is duplication used, and what should the manager be asked or told?**
+   **Resolution (2026-09-23): a wizard, because cross-brand duplication has real
+   decisions.** Name and target brand, then content handling, then facet
+   reassignment, then a review. One flow for both cases rather than a fast path
+   and a slow one.
+   **Established with it:** question 4 made duplication the **only** route to
+   reusing a layout — "start from something" is a copy, not a creation option — so
+   this is a primary flow rather than a convenience, and the weight is justified by
+   what it carries.
+   **It completes question 2.9b's commitment.** Facets are per brand, and the
+   consequence the user named there was that duplicating across brands works *"only
+   if they have shared values or the duplication wizard allows reassignment"*. This
+   is the reassignment step, made explicit.
+   **What the service already gives it, and what it does not.** `duplicate_campaign`
+   (`campaigns/duplication.py:127`) already distinguishes the cases via
+   `crossed_brands()`, runs `KEEP` within a brand where modules reference the same
+   records and `COPY` across one where records must be duplicated, and already
+   reports what crossed verbatim as readable labels — which is the review step's
+   content. **What it cannot do is accept a mapping**: reassigning facet values on
+   the way across is new, and lands with the facet model from Cluster 2 rather than
+   as separate work.
+   **A limit worth stating in the wizard rather than discovering:** a variant's
+   channel is fixed at creation with no setter, so duplication reuses a layout
+   **within** a channel. An email variant cannot become a push one.
+   **Known cost accepted:** a wizard is heavy for the common same-brand copy, which
+   needs no decisions at all. Accepted over two divergent paths.
 
 ---
+
+### What Cluster 3 produced
+
+**The largest finding is an absence.** *"In the backend process the real editor
+was never discussed."* A manager will not compose by selecting content from a
+dropdown and a layout from another; what is needed is live rendering of the
+blocks they picked, module ordering, direct field editing rather than JSON, and
+element hiding. **That editor appears in no inventory**, it is where the weight
+of composing actually sits, and it gets **its own design interview** (question
+3b) which does *not* depend on Clusters 4 or 5.
+
+**Its beta priority is the seam, not the editor.** *"Concept is the most
+important to find a way that companies can easily customize their frontend editor
+functions as the need it and how their managers work best"* — the same posture as
+the drop-a-file module registry and the provider adapters, applied to the client.
+
+**Three backend gaps, bringing the running total to eleven.**
+
+9. **No distribution endpoint for a decision slot** (Q7). The answer is an
+   aggregate over `DecisionResolutionDB` grouped by content record; nothing
+   exposes one.
+10. **`GET /campaigns/decision-slots/{id}/resolutions` returns every row,
+    unpaginated** (Q7) — on the table its own model comment calls the
+    fastest-growing in the schema, measured at 96,040 rows. The worst instance of
+    what Cluster 2 question 10 ruled against, on the one table whose row count is
+    unbounded by design.
+11. **`duplicate_campaign` cannot accept a facet-value mapping** (Q8), which
+    question 2.9b's per-brand decision requires. Lands with the facet model.
+
+**A capability with no model, found in the editor brief:** *hiding an element*.
+`ModuleInstanceDB` has no visibility flag; the only "hidden" in the codebase is
+[[ADR-086 — Decision Slots Fail Gracefully]]'s hidden slot, which is automatic
+degradation rather than a manager's choice.
+
+**Two things the model got right, worth recording because so much else is
+missing.** The fixed-versus-personalised fork a manager sees maps one-to-one onto
+`ModuleInstanceCreate`'s `content_record_id` or `decision_slot_id` (Q6). And
+isolating channel as the single creation-time decision (Q4) is exactly the shape
+[[ADR-160 — Channel Model and Composition]] point 5 already wanted, fixing it with
+no setter anywhere.
+
+**The second structural principle was named here: a screen answers one question.**
+Cluster 1 rejected a dashboard for it and moved decision history out of the inbox
+for it; question 1 moved monitoring out of the campaign list for it. Three
+independent answers, one rule.
+
+**Screen count keeps growing** — seventeen after Cluster 1, plus a variant editor,
+plus a monitoring screen if question 1b decides it is not the deliveries screen.
+
 
 ## Cluster 4 — Choosing who receives it
 
