@@ -13,7 +13,8 @@ status: open
 > written out — 49 questions, 18 answered.
 > **Cluster 2 CLOSED 2026-09-21, 18/18** — see *What Cluster 2 produced* for the
 > five backend requirements and the ADR work it owes.
-> **Cluster 1 in progress 2026-09-22.**
+> **Cluster 1 ◐ 7 of 8 closed 2026-09-23** — question 5 deliberately reopened.
+> 49 questions, 26 answered.
 
 # Manager Workflow — design interview (forward-looking)
 
@@ -158,7 +159,7 @@ A manager's day looks like *"what needs me?" → "make the thing" → "who gets 
 
 ---
 
-## Cluster 1 — The daily loop and the home screen
+## Cluster 1 — The daily loop and the home screen  ◐ 7/8 CLOSED 2026-09-23 (Q5 reopened by request)
 
 *What a manager opens this for, what is waiting, and what "done for today" means.*
 Screens: **approvals**, **approval detail**, the shell itself.
@@ -322,15 +323,113 @@ Screens: **approvals**, **approval detail**, the shell itself.
    **Open, and deferred with question 5:** what the history says *about outcome* —
    whether an approved send that later failed is the approver's business — belongs
    to the question 5 revisit rather than being settled here.
-7. **When a request expires unnoticed, who needs to know?**
-   *Constraint: expiry is bookkeeping run by a scheduler; approving already
-   refuses an expired request whether or not it ran.* Is a missed approval a
-   failure a manager must see, or a non-event?
-8. **What is the nav order, and does the landing screen belong in it?**
-   Currently Approvals · Campaigns · Content · Audiences, with Approvals also the
-   landing screen. Both are the implementer's choice.
+7. ✅ **A held request expires without anyone deciding it. Who needs to know?**
+   **Resolution (2026-09-23): the question is wrong for content review — expiry
+   should not exist for it.** A deadline is right for firing a send, where the
+   moment genuinely passes. It is wrong for *"is this copy good"*, which does not
+   go stale. **The TTL belongs to the action type, not to approvals as a whole.**
+   **Half of that is already true, and the design anticipated variation.**
+   `default_ttl_seconds` is declared per action — 24 hours on
+   `send.fire_send_instance`, 8 hours on `ai.apply_subject_preheader`. What it did
+   **not** anticipate is *absence*, and the assumption is baked in three places:
+
+   - `PendingActionDB.expires_at` is `nullable=False` (`approvals/db_models.py:94`)
+     — every held action must carry a deadline;
+   - `default_ttl_seconds: int` on the action definition
+     (`approvals/actions/base.py:58`) — not `int | None`;
+   - `expire_due_pending_actions` and `approve()`'s expired check both compare
+     against it, as does the inbox's "pending excludes a request whose deadline has
+     passed".
+
+   **So this is a schema change, not a configuration one**, and in a repository
+   with no Alembic that means a hand-written migration beside `create_all`. Making
+   `expires_at` nullable also means every comparison against it must treat null as
+   *never expires* rather than *expired*, which is the direction that fails safe
+   but must be written deliberately.
+   **It touches [[ADR-142 — Autonomous Workflows and the Automation Boundary]] §4**,
+   whose held-action design assumes a deadline. Whether that needs an addendum
+   depends on how explicitly §4 requires one — to be checked when the ADR work is
+   done rather than asserted here.
+   **Established with it:** the content-readiness action from question 2.6b is the
+   first action type that should carry **no** TTL, so this lands as part of
+   building it rather than as separate work.
+   **The notification question is answered by not arising.** With no deadline on
+   content review there is nothing to expire unnoticed. For actions that *do*
+   expire, nobody is notified — the deadline is visible in the inbox before and in
+   the history after, consistent with question 2's no-completion-signal and the
+   cluster principle.
+
+8. ✅ **What order do the screens appear in the navigation, and does the landing
+   screen belong in it?**
+   **Resolution (2026-09-23): grouped — decide · make · send.** The user: *"this
+   is a platform with a high functionality and doesn't try to be a one pager. It's
+   only important that the nav is logically and user friendly."*
+   **Established with it:** structure is accepted **ahead of** the volume that
+   would force it, deliberately, because the screen count only grows from here —
+   History arrived in question 6, Deliveries is unbuilt, Settings is owed by
+   question 2.9's facet administration, and administration screens come last but
+   do come. A flat list that works at four items and fails at ten is a rework
+   scheduled for later.
+   **The grouping is the decision; the exact placement is not.** Approvals and
+   History are clearly *decide*; Content and Campaigns are clearly *make*.
+   **Audiences is the genuinely arguable one** — choosing who receives something
+   is arguably part of making it — and Recipients, Categories and Settings have no
+   obvious home yet. Those follow as each screen is built, against the stated
+   test: logical and user-friendly.
+   **Deferred as a future feature, named so it is not reinvented:** *"the option
+   that a manager creates their own nav bar like adding favorites next to
+   decide/make/send might be a good feature, but we don't need it from the
+   beginning."*
+   **The landing screen stays in the nav**, inside *decide*, since grouping
+   removes the oddity that made pulling it out attractive.
 
 ---
+
+### What Cluster 1 produced
+
+**The product's thesis, stated for the first time.** Question 1: *"This is a
+future platform — there will be more ai and more decisions to make."* **The
+manager's job is shifting from producing to deciding**, and the client is
+designed for where that ends up rather than where it is now. Everything Cluster 2
+decided converges on it. This is a positioning statement as much as a design one,
+and `docs/business/POSITIONING.md` is the open gate it bears on.
+
+**Three backend gaps, on top of Cluster 2's five.**
+
+6. **`PendingActionDetail` does not expose `subject_type` / `subject_id`** (Q4),
+   although `PendingActionDB` stores both — so the client cannot build the link to
+   the thing being decided. Second instance of a defect already seen once, where a
+   response model drops fields the table has.
+7. **`GET /approvals/` accepts only `status`** (Q3) — no action-type filter, no
+   requester filter, no pagination. The same requirement as Cluster 2's question
+   10 arriving on another route.
+8. **A held action cannot exist without a deadline** (Q7). `expires_at` is
+   `nullable=False` and `default_ttl_seconds: int` is not optional, so "content
+   review does not expire" is a schema change plus a hand-written migration, and
+   every comparison must then read null as *never expires* rather than *expired*.
+   Touches [[ADR-142 — Autonomous Workflows and the Automation Boundary]] §4.
+
+**One gap that belongs to Cluster 4 but was found here.** Audience membership
+records **no reason**, and the case that needs one is external automation, not the
+in-app suggestion function — an orchestrator selecting recipients daily for a
+reactivation send must say *why this recipient*, and with AI in the loop the
+platform cannot reconstruct it. `POST /api/audience-groups/{id}/members/{id}`
+takes **no request body at all**.
+
+**The screen count grew.** Seventeen, not sixteen: question 6 separated the
+decision **history** from the inbox, so log and queue stay apart.
+
+**What is settled about the shape of the client.** The landing screen answers
+**one** question and a dashboard is rejected on evidence. There is **no completion
+signal** — the client never tells anyone they are finished. The inbox is a flat
+list with filters rather than imposed grouping. The nav is **grouped: decide ·
+make · send**, accepted ahead of the volume that would force it, with per-screen
+placement to follow and manager-defined favourites deferred as a future feature.
+
+**Still open in this cluster:** question 5 is **◐ partial** at the user's request —
+not a ticket system and no thread are firm, a rejection reason is provisional, and
+the requester note plus the resubmission-overwrite behaviour are to be asked again.
+
 
 ## Cluster 2 — Authoring content across channels  ✅ CLOSED 2026-09-21
 
