@@ -304,8 +304,24 @@ Screens: **approvals**, **approval detail**, the shell itself.
    selection explains itself; **audience membership does not**. Recorded against
    Cluster 4 question 3.
 
-6. **After a decision, does the manager need to see what happened?** Approving a
-   send fires it. Is the outcome the approver's business, or the sender's?
+6. ✅ **After a decision, does the approver need to see what happened as a
+   result?**
+   **Resolution (2026-09-23): the decision history moves to its own screen — log
+   and queue stay separate.** The inbox holds what is waiting; a decided item
+   leaves it and appears in a history screen instead.
+   **Established with it:** this protects question 1's property directly. The
+   landing screen answers **one** question — *does anything need me* — and a
+   decided item answers a different one. It also avoids worsening question 3's
+   accepted risk: a send approval can already sit below forty content items, and
+   adding decided rows to that same list would make burial more likely, not less.
+   **Cheap on the backend, new on the client.** `GET /approvals/?status=decided`
+   already exists and is documented, so the history screen needs no new route —
+   but it **is a screen that appears in no inventory**, so the first cut grows
+   from sixteen to seventeen. Worth saying out loud rather than letting it arrive
+   unannounced.
+   **Open, and deferred with question 5:** what the history says *about outcome* —
+   whether an approved send that later failed is the approver's business — belongs
+   to the question 5 revisit rather than being settled here.
 7. **When a request expires unnoticed, who needs to know?**
    *Constraint: expiry is bookkeeping run by a scheduler; approving already
    refuses an expired request whether or not it ran.* Is a missed approval a
@@ -832,13 +848,22 @@ Screens: **audience groups**, **audience detail**, **recipients**,
    work does not.
 3. **What must a manager verify before trusting an audience?** A count, a sample
    of who is in it, or the rules restated in prose?
-   *Constraint found via Cluster 1 question 5: **audience membership does not
-   record why anybody is in it**. `AudienceGroupMemberDB`
-   (`audience/db_models.py:41-47`) carries `group_id`, `recipient_id` and
-   `added_at` and nothing else — no reason, no source, no record of whether a
-   recipient arrived by rule or by hand. Content selection explains itself through
-   `DecisionResolutionDB.reason` ([[ADR-085 — Decision Resolution Should Be Optionally Explainable]]); audience membership has no equivalent, so "why is
-   this person in this group" is unanswerable today.*
+   *Constraint found via Cluster 1 question 5, and sharpened by the user
+   2026-09-23: **audience membership records no reason, and the case that needs
+   one is external automation.** Not the in-app "suggest audience" function — the
+   user's examples are an orchestrator running daily: "select recipients each day
+   that should get a reactivation email", "select recipients each day that should
+   be on a temporary blocklist". Those need to say **why this recipient** —
+   because with AI in the loop the rule is not "90 days without engagement" but
+   "a negative trend on click rate AND …", which the platform cannot reconstruct.
+   **Only the caller knows.** Today there is nowhere to put it:
+   `POST /api/audience-groups/{group_id}/members/{recipient_id}` **takes no
+   request body at all**, and neither `add_member` nor `bulk_add_members`
+   (`audience/service.py:169`, `:362`) accepts a reason. `AudienceGroupMemberDB`
+   stores `group_id`, `recipient_id`, `added_at` and nothing else. Content
+   selection explains itself through `DecisionResolutionDB.reason`; audience
+   membership has no equivalent. Bears on [[ADR-142 — Autonomous Workflows and the Automation Boundary]], whose orchestrator is exactly the caller that would
+   supply it, and on [[ADR-093 — Audience Intelligence Is Derived, Not Authoritative]].*
 4. **The resolved count differs per channel, and the manager may not expect that.**
    *Constraint: `resolve_audience` is consent-gated and channel-dependent, so the
    same group yields different recipients for email and push.* Does a manager need
