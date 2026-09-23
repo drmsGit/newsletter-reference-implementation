@@ -901,18 +901,100 @@ needs explaining once is cheaper than one that quietly means two things).
 Screens: **campaigns list**, **campaign detail** (inventory B11), **decisions**,
 **decision slot detail**.
 
-1. **What is a manager looking for in the campaign list, and what should a row
-   click do?** Currently rows show name/status/updated and do not navigate.
-2. **What is the unit of work — the campaign, or a variant?**
-   *Constraint: [[ADR-169 — Operational Flows Are Sequenced Variants, Not a Canvas]]
-   makes a flow a sequence of variants, and a variant carries both "A/B version"
-   and "channel expression".* If the variant is the unit, campaign detail
-   is an index rather than a workspace.
-3. **Campaign detail is the largest derived-state screen in the product
-   (inventory B11). What must be visible at once, and what can be a click away?**
-   The derived state is: overrideability, module limits from the channel manifest,
-   audience counts per channel, and providers filtered by channel. All of it is
-   presentation the client computes for itself.
+1. ✅ **What is a manager looking for in the campaign list?**
+   **Resolution (2026-09-23): finding, not monitoring — and monitoring gets a
+   screen of its own.** The list is a way to reach a campaign: name, facets, last
+   touched. State belongs in the workspace where the work happens. The user:
+   *"Monitoring will need a separate screen → multiple campaigns with multiple
+   assets create a long list easily. If enough place it can be a left/right
+   placing or an easy to reach new place."*
+   **Row click navigates to the workspace**, settled by question 2. The ⚠️ against
+   "campaign rows do not navigate" is cleared as wrong.
+   **Established with it, and it is the second structural principle this interview
+   has produced: a screen answers one question.** Cluster 1 question 1 rejected a
+   dashboard because the landing screen answers *does anything need me*; question
+   6 moved decision history out of the inbox because a decided item answers a
+   different question; this moves monitoring out of the campaign list for the same
+   reason. **Three separate answers, one rule** — and it should be checked against
+   every remaining screen rather than rediscovered.
+   **The layout note is recorded rather than decided:** *left/right placing* if
+   there is room, otherwise somewhere easy to reach. That is a presentation
+   question for when the screen is designed.
+1b. **What is the monitoring screen, and is it the deliveries screen?**
+   *Raised by question 1, and it decides whether the cut grows again.* The user's
+   framing — *"multiple campaigns with multiple assets"* — spans campaigns,
+   their variants and their sends, which is broader than Cluster 5's **deliveries**
+   screen but overlaps it substantially. If monitoring **is** deliveries seen from
+   the campaign side, no new screen is needed. If it is a campaign-level view of
+   what is in flight, the first cut goes from seventeen to eighteen.
+   *Answer this together with Cluster 5 question 4, which asks what question the
+   deliveries list answers.*
+
+2. ✅ **What is the unit of work — the campaign, or the variant?**
+   **Resolution (2026-09-23): the campaign is the workspace; variants live inside
+   it.** A manager works on "the October newsletter", and its email variant, push
+   variant and A/B versions are all inside that one screen.
+   **Established with it: campaign detail — inventory B11 — is the product's main
+   screen**, not an index onto other screens. That is why it carries the largest
+   block of derived state in the application, and the weight is inherent rather
+   than accidental: overrideability, module limits from the channel manifest,
+   audience counts per channel and providers filtered by channel all belong to one
+   place because the manager is in one place.
+   **It settles half of question 1 in advance:** a campaign row must navigate, and
+   it navigates to the workspace. The ⚠️ against "campaign rows do not navigate" in
+   *Where the frontend already stands* is not merely unconfirmed — it is **wrong**,
+   and only defensible while B11 does not exist.
+   **Known cost accepted:** one screen holds a great deal, which makes question 3
+   — what is visible at once versus a click away — the hardest question in this
+   cluster rather than a layout detail.
+
+3. ✅ **Campaign detail is the workspace. What must be visible at once, and what
+   can be a click away?**
+   **Resolution (2026-09-23): variants are edited on their own screens, and the
+   real finding is that the editor has never been designed.** The user:
+
+   > *"In the backend process the real editor was never discussed. The manager will
+   > not work with a drop down selection content + layout. we will need to build a
+   > real editor with selection creating the preview, sorting buttons, override
+   > directly not with json structure etc. there's no need to push everything into
+   > one screen."*
+
+   **This refines question 2 rather than reversing it.** The campaign stays the
+   unit of work — it is what a manager is working *on* and where they orient — but
+   the variant editor is the tool they enter from it, the way a document is the
+   work and an editor is the tool. **The consequence is that B11 is lighter than
+   the inventory implies and the heavy screen is somewhere else**: campaign detail
+   shows the campaign's shape and state, and the composition weight moves to the
+   editor.
+   **That editor is in no inventory.** `docs/react-screen-inventory.md`'s sixteen
+   screens have *campaign detail* and no variant editor, because the Jinja UI
+   composes inside the campaign page. The first cut grows again.
+   **Named requirements, none of which the backend was designed against:**
+   selection that produces a **preview**, **sorting** controls for module order,
+   and **direct field editing** for overrides.
+   **The API is JSON-blob shaped today, which is the concrete version of "not with
+   json structure":** `ModuleInstanceCreate.module_data` and
+   `ContentOverrideCreate.field_overrides` are both `dict[str, Any]`
+   (`campaigns/models.py:76`, `overrides/models.py:11`). A client *can* assemble
+   those dicts — it knows the field names from the manifest, per Cluster 2 — so
+   this is not necessarily a new API. It does mean the editor does real work that
+   nothing has specified.
+   **Preview is the part that may not be servable today**, and it is worth
+   checking rather than assuming: `GET /rendering/variants/{variant_id}` renders
+   **saved** state. "Selection creating the preview" implies seeing a change before
+   committing it, which is either save-then-render or a render-with-unsaved-changes
+   endpoint that does not exist.
+   **This is large enough to deserve its own treatment.** A real editor — preview,
+   ordering, inline override, module picking — is not one screen decision; it is
+   the substance of what a manager does all day, and this interview has one
+   question about it. Whether it becomes a sixth cluster or a separate design
+   interview is question 3b.
+3b. **Does the variant editor need its own design interview?**
+   *Raised by question 3.* It carries preview, module ordering, content selection,
+   inline override editing and channel-shaped forms — each of which had a question's
+   worth of substance in Cluster 2. Treating it as one bullet inside Cluster 3
+   would repeat the mistake this whole document exists to correct.
+
 4. **In what order does a manager build a variant?** Pick channel → add modules →
    fill them? Or find content first and compose around it?
    *Constraint: channel is fixed at variant creation and has no setter.*
