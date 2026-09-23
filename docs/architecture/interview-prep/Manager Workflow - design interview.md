@@ -265,11 +265,45 @@ Screens: **approvals**, **approval detail**, the shell itself.
    **Known cost accepted:** a reviewer judging copy leaves the inbox to read it.
    Accepted as the honest version — a summary that tries to be the record is worse
    than a link to the record.
-5. **Do approvals need a comment or a conversation?**
-   *Constraint: `PendingActionDB.decision_reason` exists (1000 chars, nullable) and
-   is written **at decision time by the decider**. There is nothing for a
-   requester to say why, and no thread.* The user named "some approval comments"
-   as a want — is that the decider's reason, a requester's note, or a back-and-forth?
+5. ◐ **Do approvals need a comment or a conversation?**
+   **Partially resolved (2026-09-23), and deliberately reopened later at the
+   user's request:** *"Maybe ask this question at a later stage again because this
+   needs some thinking (how they work today doesn't mean they should in the
+   future; it's also possible that some day, the agency proposes and the manager
+   moves this to an ai to correct some details)."*
+
+   **Settled firmly and not to be revisited: this must not become or copy a ticket
+   system.** No thread, no replies. Humans and agencies already have structured
+   channels for that, and duplicating one inside a marketing platform is scope the
+   product should refuse.
+
+   **Settled provisionally:** a **rejection reason** makes workflow sense, because
+   *"an agency needs to know what they need to change, an ai needs to know how to
+   improve"*. The proposal already carries its own reasoning, so what is missing
+   is the human's answer back.
+
+   **Still open, to be asked again:** whether a requester note is needed at all,
+   and the resubmission behaviour sketched by the user — *"if an agency proposes
+   the same content again, the reason can be overwritten (maybe not cleared
+   before, so the manager can see what was wrong the first time)"*.
+
+   **The check the user asked for. There is exactly one `decision_reason` — but
+   the thing they half-remembered is real, under another name.**
+
+   | Field | Where | Written by | Says |
+   |---|---|---|---|
+   | `decision_reason` | `PendingActionDB`, `approvals/db_models.py:102` | the human decider | why I approved or rejected |
+   | `reason` + `score` | `DecisionResolutionDB`, `campaigns/db_models.py:137-138` | the strategy | why this recipient got this content record |
+
+   So a proposed decision **does** explain itself — that is [[ADR-085 — Decision Resolution Should Be Optionally Explainable]] — on a different table under a
+   different name, not a second `decision_reason`. **The human's reason and the
+   machine's reason are correctly separate**, which is what makes "the human sees
+   the proposed reasoning and answers it" possible at all.
+
+   **An asymmetry falls out of that check, and it belongs to Cluster 4.** Content
+   selection explains itself; **audience membership does not**. Recorded against
+   Cluster 4 question 3.
+
 6. **After a decision, does the manager need to see what happened?** Approving a
    send fires it. Is the outcome the approver's business, or the sender's?
 7. **When a request expires unnoticed, who needs to know?**
@@ -798,6 +832,13 @@ Screens: **audience groups**, **audience detail**, **recipients**,
    work does not.
 3. **What must a manager verify before trusting an audience?** A count, a sample
    of who is in it, or the rules restated in prose?
+   *Constraint found via Cluster 1 question 5: **audience membership does not
+   record why anybody is in it**. `AudienceGroupMemberDB`
+   (`audience/db_models.py:41-47`) carries `group_id`, `recipient_id` and
+   `added_at` and nothing else — no reason, no source, no record of whether a
+   recipient arrived by rule or by hand. Content selection explains itself through
+   `DecisionResolutionDB.reason` ([[ADR-085 — Decision Resolution Should Be Optionally Explainable]]); audience membership has no equivalent, so "why is
+   this person in this group" is unanswerable today.*
 4. **The resolved count differs per channel, and the manager may not expect that.**
    *Constraint: `resolve_audience` is consent-gated and channel-dependent, so the
    same group yields different recipients for email and push.* Does a manager need
