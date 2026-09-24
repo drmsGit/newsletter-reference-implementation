@@ -316,11 +316,23 @@ synced copy is a copy that drifts.
 adopter redeclares common axes per brand, and a cross-brand copy gains a facet-value
 reassignment step in `duplicate_campaign`.
 
-**Deliberately left open: which permission administers a facet vocabulary.** Facets are
-per brand while their administration surface sits in Settings, so a platform-level
-`settings.manage` would let any administrator declare facets in any brand. Whether that
-is right, or whether facet administration wants a brand-scoped grant, is not settled by
-this addendum and should not be settled by assertion in one.
+**Facet administration is platform-level, and the reason is worth stating because it
+generalises to every admin surface.** Facets are per brand while their administration
+sits in Settings, so a platform-level `settings.manage` lets an administrator declare
+facets in any brand. That is accepted deliberately: **there is no brand separation in the
+admin role, and there cannot usefully be one while an admin can grant themselves a
+role assignment on any brand.** Scoping an admin surface by brand would be theatre — the
+administrator simply grants themselves the brand first and proceeds — so the scoping
+would cost a permission and buy nothing. The decision recorded 2026-09-24 is that *an
+administrator is capable of not breaking anything, so it is acceptable that they see all
+settings.*
+
+**What would change it is a superadmin role, and that is the thing to build if this
+stops being acceptable** — a tier that can grant brand access and an admin tier that
+cannot. Until that exists, a brand-scoped admin permission describes a boundary the
+model does not enforce, which is worse than an honest platform-level one. Consistent
+with this record's 2026-09-15 addendum: permission scope is a property of the
+permission, and `settings.manage` is platform-level because what it governs is.
 
 **Nothing in this record's Decision changes.** The category vocabulary stays global and
 the classification of permissions is not affected.
