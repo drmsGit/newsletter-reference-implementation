@@ -1468,21 +1468,89 @@ audience terms, for what is a property of the send.
 *What a manager confirms before real mail leaves, and what they watch afterwards.*
 Screens: **deliveries**, **delivery detail**.
 
-1. **What does a manager confirm before real mail leaves?**
-   *Cluster 2 question 3b landed a hard requirement here: a record can be marked
-   ready for a channel while a required field for it is empty, and nothing
-   currently checks — `ModuleVariable.required` is never enforced at render, so an
-   empty push ships silently. A required-field check before firing is owed, and
-   this is where it belongs.*
-   The pre-flight list is the screen's whole reason to exist, and nothing records
-   it. Snapshot, audience count, provider, from-address, schedule — all of them,
-   or a subset with the rest available?
-2. **Is `freeze` versus `rerun` a manager's choice, or a deployment default?**
-   *Constraint: freeze fixes the recipients now; rerun re-resolves immediately
-   before firing.* If it is a choice, it needs explaining at the moment it is
-   made; if a default, it belongs in settings and not on this screen.
-3. **Does a manager schedule sends, or fire them?** Both exist. Which is the
-   normal path decides whether the screen leads with a date or a button.
+1. ✅ **What does a manager confirm before real mail leaves, and what should stop
+   them?**
+   **Resolution (2026-09-24): a review screen, with two tiers — hard failures
+   block, everything else informs.** It states what will happen: the snapshot, the
+   audience arithmetic per channel, provider, from-address and schedule. Things
+   that make the send broken or unlawful refuse outright; everything else is
+   stated and the manager decides.
+   **Established with it, and it resolves a tension that has been building: the
+   system blocks what is broken, and reports what is merely questionable.** The
+   cluster principle — *the system reports, the manager decides* — held everywhere
+   until question 2.3b asked for a real check, because an empty push notification
+   reaching a real device is not a judgement call. This is the reconciliation, and
+   it is narrow on purpose: blocking is reserved for *broken*, not for
+   *questionable*.
+   **It fits the model rather than needing a new one.**
+   `prepare_send_from_audience` already creates a `SendInstanceDB` in **`draft`**
+   with one execution per recipient, and firing is a separate call
+   (`POST /delivery/send-instances/{id}/send`). **The review screen is that
+   draft** — planning and firing were already two steps, and this is the screen
+   that was missing between them.
+   **What it needs from the backend**, and the first is C8 itself:
+   planning has no JSON route at all; the arithmetic from question 4.3, which
+   `resolve_audience` computes and discards; and the required-field check question
+   2.3b owes, which nothing performs.
+   **Open rider: the list of what blocks.** Empty required fields and zero
+   recipients are clearly blocking; the recipient cap already raises. Whether
+   anything else does — a thin decision slot, an excluded force-add — is not
+   settled, and getting that list wrong in either direction is how this screen
+   becomes either a rubber stamp or an obstacle.
+
+2. ✅ **"Recalculate before send": a per-send choice, or a deployment default?**
+   **Resolution (2026-09-24): always recalculate — the choice is removed.** A send
+   goes to whoever qualifies at the moment it goes out, not whoever qualified when
+   it was planned. Consent and exclusions are therefore always current at the only
+   moment that matters.
+   **Established with it:** one fewer mode, one fewer thing for a manager to
+   understand, and the lawful answer by construction rather than by configuration.
+   It also makes question 4.2's reversal meaningful in practice — an exclusion
+   segment applied after planning still removes the recipient, because the rules
+   are re-run.
+   **The current default is backwards relative to this.**
+   `prepare_send_from_audience` takes `audience_resolution_mode: str = "freeze"`
+   (`delivery/service.py:202`), `SendInstanceDB.audience_resolution_mode` defaults
+   to `"freeze"` too, and the function validates the value is one of the two. Under
+   this resolution **`freeze` is the mode that should never be used**, so either the
+   default flips or the concept goes. `reconcile_executions_to_audience`
+   (`delivery/service.py:350`) becomes the always-path rather than the exception.
+   **Whether the column survives is deliberately not decided here** — removing it
+   is a migration, keeping it is a setting nobody sets, and that is an
+   implementation call rather than a workflow one.
+   **The cost is real and lands on question 1.** The number a manager reviewed is
+   not necessarily the number that receives, because the audience is re-resolved
+   after they approved it. The review screen must say so rather than present a
+   figure it cannot honour — the arithmetic is *as of now*, and the send recomputes
+   it. Stating that is the honest version; showing a precise number that silently
+   changes is not.
+
+3. ✅ **Does a manager schedule sends, or fire them?**
+   **Resolution (2026-09-24): both, and one mechanism covers both — a schedule
+   datetime.** The user: *"a managers campaign is scheduled and rarely fired
+   directly, an automation / triggered is fired at the moment and rarely
+   scheduled; but — a triggered can always send a schedule datetime 'now + 5
+   minutes', so we can implement a schedule datetime."*
+   **Established with it:** the two cases split by **caller**, not by feature. A
+   manager's newsletter is scheduled, so the review screen leads with a date; an
+   automation wants immediacy and can express it as a near-future time. **There is
+   no separate "fire now" path to build for the machine plane**, which is a real
+   simplification — one field, one code path, two uses.
+   **Question 2 makes scheduling safe in a way it was not.** A send scheduled for
+   Tuesday resolves its audience on Tuesday. Without always-recalculate, a schedule
+   meant sending to a list fixed days earlier, which is exactly where consent goes
+   stale.
+   **The operational consequence, worth stating because it is the adopter's to
+   configure:** a scheduled send fires when `process_due_scheduled_sends` next
+   runs, and that is a **cron seam** the deployment drives rather than something
+   the platform guarantees. "Now + 5 minutes" is only as prompt as that interval.
+   An adopter polling hourly has an automation that reacts hourly, which may
+   surprise them.
+   **The direct route still exists** — `POST /delivery/send-instances/{id}/send`
+   fires immediately — so a manager pressing send in-app need not wait for a
+   scheduler. What this resolution removes is the need for an *automation* to use
+   it.
+
 4. **What question does the deliveries list answer?** What is scheduled, what went
    out, what failed — or all three in one list with a filter?
 5. **What does a manager watch during and after a send?**
