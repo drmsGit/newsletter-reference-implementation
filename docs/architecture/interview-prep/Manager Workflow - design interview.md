@@ -13,13 +13,16 @@ status: closed
 > written out — 49 questions, 18 answered.
 > **Cluster 2 CLOSED 2026-09-21, 18/18** — see *What Cluster 2 produced* for the
 > five backend requirements and the ADR work it owes.
-> **Cluster 1 ◐ 7 of 8 closed 2026-09-23** — question 5 deliberately reopened.
+> **Cluster 1 ✅ CLOSED 2026-09-24, 8/8.**
 > **Cluster 3 ✅ CLOSED 2026-09-23, 10/10.**
 > **Cluster 4 ✅ CLOSED 2026-09-24, 7/7.**
 > **Cluster 5 ✅ CLOSED 2026-09-24, 8/8.**
-> **All five clusters closed — 52 of 53 answered.** Only Cluster 1 question 5
-> remains, reopened at the user's request. Next: the ADRs this owes, and the
-> variant editor's own interview (question 3.3b).
+> **INTERVIEW COMPLETE — 53 of 53.** ADRs written 2026-09-24:
+> [[ADR-174 — Channel Readiness Is Asserted, Not Computed]],
+> [[ADR-175 — Facets Are the Manager's Own Taxonomy, Not the Engine's]],
+> [[ADR-176 — A Negative Decision Outranks a Positive One]], plus dated addenda to
+> ADR-142, ADR-150, ADR-161 and ADR-168. Next: the variant editor's own design
+> interview (question 3.3b).
 
 # Manager Workflow — design interview (forward-looking)
 
@@ -164,7 +167,7 @@ A manager's day looks like *"what needs me?" → "make the thing" → "who gets 
 
 ---
 
-## Cluster 1 — The daily loop and the home screen  ◐ 7/8 CLOSED 2026-09-23 (Q5 reopened by request)
+## Cluster 1 — The daily loop and the home screen  ✅ CLOSED 2026-09-24, 8/8
 
 *What a manager opens this for, what is waiting, and what "done for today" means.*
 Screens: **approvals**, **approval detail**, the shell itself.
@@ -271,44 +274,41 @@ Screens: **approvals**, **approval detail**, the shell itself.
    **Known cost accepted:** a reviewer judging copy leaves the inbox to read it.
    Accepted as the honest version — a summary that tries to be the record is worse
    than a link to the record.
-5. ◐ **Do approvals need a comment or a conversation?**
-   **Partially resolved (2026-09-23), and deliberately reopened later at the
-   user's request:** *"Maybe ask this question at a later stage again because this
-   needs some thinking (how they work today doesn't mean they should in the
-   future; it's also possible that some day, the agency proposes and the manager
-   moves this to an ai to correct some details)."*
-
-   **Settled firmly and not to be revisited: this must not become or copy a ticket
-   system.** No thread, no replies. Humans and agencies already have structured
-   channels for that, and duplicating one inside a marketing platform is scope the
-   product should refuse.
-
-   **Settled provisionally:** a **rejection reason** makes workflow sense, because
-   *"an agency needs to know what they need to change, an ai needs to know how to
-   improve"*. The proposal already carries its own reasoning, so what is missing
-   is the human's answer back.
-
-   **Still open, to be asked again:** whether a requester note is needed at all,
-   and the resubmission behaviour sketched by the user — *"if an agency proposes
-   the same content again, the reason can be overwritten (maybe not cleared
-   before, so the manager can see what was wrong the first time)"*.
-
-   **The check the user asked for. There is exactly one `decision_reason` — but
-   the thing they half-remembered is real, under another name.**
-
-   | Field | Where | Written by | Says |
-   |---|---|---|---|
-   | `decision_reason` | `PendingActionDB`, `approvals/db_models.py:102` | the human decider | why I approved or rejected |
-   | `reason` + `score` | `DecisionResolutionDB`, `campaigns/db_models.py:137-138` | the strategy | why this recipient got this content record |
-
-   So a proposed decision **does** explain itself — that is [[ADR-085 — Decision Resolution Should Be Optionally Explainable]] — on a different table under a
-   different name, not a second `decision_reason`. **The human's reason and the
-   machine's reason are correctly separate**, which is what makes "the human sees
-   the proposed reasoning and answers it" possible at all.
-
-   **An asymmetry falls out of that check, and it belongs to Cluster 4.** Content
-   selection explains itself; **audience membership does not**. Recorded against
-   Cluster 4 question 3.
+5. ✅ **Do approvals need a comment or a conversation?**
+   **Resolution (2026-09-24, reopened 2026-09-23 and now closed): comments exist
+   and are always optional. Never required.** The user: *"it doesn't make sense to
+   require it so a manager quickly will start to type in 'reason' or '---' just to
+   be able to approve it."*
+   **Established with it, and it generalises past approvals: a required free-text
+   field does not produce reasons, it produces `---`.** Junk data is worse than no
+   data because it looks like data — a rejection reason nobody can act on is
+   indistinguishable, in the database and in a report, from one somebody wrote
+   carefully. The requirement would have bought compliance with the form and
+   nothing else.
+   **Settled firmly and not to be revisited: this is not a ticket system.** No
+   thread, no replies. Humans and agencies already have structured channels for
+   that, and duplicating one inside a marketing platform is scope the product
+   should refuse.
+   **What stands:** a rejection reason is worth having, because *"an agency needs
+   to know what they need to change, an ai needs to know how to improve"* — and
+   `PendingActionDB.decision_reason` already exists, nullable, 1000 characters. So
+   the decider's side needs no new model at all. Whether a **requester** note is
+   added is the same shape of question and takes the same answer: optional if it
+   exists.
+   **The proposal already explains itself, which is why the comment is only half
+   the loop.** Question 1.5's own check established that the machine's reasoning
+   and the human's are correctly separate: `DecisionResolutionDB.reason` and
+   `score` say why a strategy chose something
+   ([[ADR-085 — Decision Resolution Should Be Optionally Explainable]]), and
+   `decision_reason` says why a person decided. The comment is the human's answer
+   back, not a restatement of the proposal.
+   **Left to the build rather than the design:** the resubmission sketch — *"if an
+   agency proposes the same content again, the reason can be overwritten (maybe
+   not cleared before, so the manager can see what was wrong the first time)"*.
+   That is field lifecycle on an optional column, not an open design question.
+   **Unchanged and still owed elsewhere:** audience membership records no reason at
+   all, and the case that needs one is external automation. That is Cluster 4
+   question 3's gap, not this one's.
 
 6. ✅ **After a decision, does the approver need to see what happened as a
    result?**
