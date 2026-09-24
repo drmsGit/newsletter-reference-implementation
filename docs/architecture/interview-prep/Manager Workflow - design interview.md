@@ -1197,11 +1197,77 @@ plus a monitoring screen if question 1b decides it is not the deliveries screen.
 Screens: **audience groups**, **audience detail**, **recipients**,
 **recipient detail**.
 
-1. **How does a manager arrive at an audience?** From scratch, by copying a
-   previous one, or from criteria the system suggests?
-2. **Rule blocks or explicit members — which is the normal case, and which is the
-   exception?** Both exist. The screens should not present them as equals if the
-   work does not.
+1. ✅ **How does a manager arrive at an audience for a campaign?**
+   **Resolution (2026-09-24): the system suggests and the manager adjusts — and
+   it starts on the campaign screen, not the audience screen.** The user: *"System
+   suggests and manager adjusts (or 'force adds' recipients) — this is started on
+   the campaign screen. On the audience screen manager can build audience 'from
+   scratch' (find_by_criteria) or with a button 'suggest from campaign'. But this
+   is hopefully not that necessary anymore in the future (system and ai suggestion
+   beats human decision)."*
+   **Established with it:** the primary path is **Cluster 1 question 1's thesis
+   applied to audiences** — the system proposes, the manager judges. Building an
+   audience by hand is the secondary path and is expected to **decline**, which is
+   a statement about where the product is going rather than a feature ranking.
+   **The machinery exists and is not on the JSON plane.**
+   `suggest_include_blocks_for_campaign` (`audience/service.py:680`),
+   `campaign_category_scores` (`:609`), `create_suggested_group_for_campaign`
+   (`:696`) and `recalculate_suggested_blocks` (`:748`) all exist and are reachable
+   only from `/ui/campaigns/{campaign_id}/suggest-audience`. **A JSON route is
+   owed**, and it is filed under campaigns rather than audiences — which matches
+   where the user says the flow starts.
+   **Two entry points, deliberately:** the campaign workspace triggers suggestion
+   as part of preparing a send; the audience screen offers *build from criteria*
+   and a *suggest from campaign* button for working on a group directly.
+   **"Force adds" is the load-bearing phrase**, and it pre-answers question 2:
+   explicit members are framed as an **override on top of the rules**, not as a
+   parallel way of building a group.
+
+2. ✅ **Are explicit members an override on the rules, and does a force-add
+   survive resolution?**
+   **Resolution (2026-09-24): inclusion is a union, and exclusion segments beat a
+   force-add. This reverses a dated decision.** The user: *"exclusion segments
+   always should be excluded (a manager who decides that this is the group that
+   shouldn't get it, because of reason X → they shouldn't get it as safety;
+   **Shouldn't get it by human beats Should get it by system/human**) suppression
+   like strict block lists are still a thing. Exclusion segments are more of an
+   attribute / topic / interest / temporary reason; block list is a legal / data
+   protection matter."*
+
+   **This is the third structural principle the interview has produced: a negative
+   decision outranks a positive one.** It generalises past audiences — wherever
+   someone has said *not this*, that beats anyone or anything saying *yes this*,
+   because the cost of wrongly including is higher than the cost of wrongly
+   omitting.
+
+   **Two kinds of exclusion, and the distinction is the decision:**
+
+   | | What it is | Beats a pin? |
+   |---|---|---|
+   | **Exclusion segment** | attribute, topic, interest, a temporary reason — editorial and operational | **yes, now** |
+   | **Blocklist / suppression** | legal and data-protection | yes, and always did |
+
+   **What is being reversed, and where it lives.** `resolve_audience`
+   (`audience/service.py:514`) implements
+   `((∪ include) − (∪ exclude)) ∪ pins`, and its docstring states the rule
+   **decided 2026-07-26**: *"a manual pin is a deliberate override and is always
+   included — exclude blocks shape the rule-driven audience but never remove a
+   hand-pinned recipient."* The new order is
+   `((∪ include) ∪ pins) − (∪ exclude)`, then the consent floor as before.
+   **It is not in an ADR — it is in a docstring and four documentation pages**
+   (`Flow - Audience resolution`, `audience`, `MOC - System Overview`, and
+   `docs/backlog.md`), plus the Jinja router and a template. **So this is not a
+   supersession**, but it is a deliberate architecture decision reversing a
+   recorded one, which is exactly the case that should now get a record rather
+   than another docstring.
+   **Blast radius, checked rather than assumed:** the tests that exist assert pins
+   against the **consent floor** — `test_consent_gates.py:298-309` and
+   `test_brand_scoping.py:881` — and that behaviour is **unchanged**. No test was
+   found asserting a pin survives an *exclude block*, so the reversal may cost
+   less than the number of documents implies. To be confirmed when it is built.
+   **The consent/suppression floor is untouched** and stays absolute, which is the
+   half of the old docstring that survives intact.
+
 3. **What must a manager verify before trusting an audience?** A count, a sample
    of who is in it, or the rules restated in prose?
    *Constraint found via Cluster 1 question 5, and sharpened by the user
