@@ -247,6 +247,54 @@ is a script somebody writes and runs rather than a generated step.
 Not built; logged in `docs/backlog.md`. Nothing in §4's other bullets changes — the
 inbox, the audit surface and the notification-only rule for email and push are untouched.
 
+## Addendum 2026-09-24 — the soft-suppression override moves up a level
+
+Prompted by [[ADR-176 — A Negative Decision Outranks a Positive One]], which removes the
+mechanism §7 names, and resolved the same day rather than left as a conflict.
+
+**What §7 relied on.** It makes recipient-level suppression *"soft and overridable by an
+explicit, logged act"*, and identifies that act as the **pin** — `resolve_audience`'s
+`… ∪ pins`, now callable from outside — with a website form firing *"this recipient must
+get the masterclass mail"* as its worked example. ADR-176 point 1 ends pin precedence: an
+exclusion segment now removes a hand-pinned recipient.
+
+**The override survives, at a different level, and the new level is better.** A manager
+who genuinely wants a suppressed recipient in a send does not pin past the exclusion —
+they **remove the exclusion segment from their audience group**. That is a deliberate act
+on a named list, visible to anyone who opens the group, rather than a quiet per-recipient
+exception nobody reviewing the audience would notice. §7's requirement that the override
+be *explicit and logged* is better served by it, not worse.
+
+**The distinction §7 needed and did not have, settled 2026-09-24:**
+
+- A **blocklist** is a legal and data-protection matter — GDPR, privacy law, a hard
+  suppression. It is not overridable by anybody, and it is not what §7 was describing.
+- A **system suggestion** — *"this recipient should not get newsletters at the moment"*,
+  news fatigue, over-mailing — is an **exclusion segment**. It wins over a manager's
+  *must get*, and it is removable from a group by a manager who decides otherwise.
+
+So §7's *"soft"* now means *removable from the group*, and its *"hard"* is the
+consent/suppression floor. Both beat a positive decision, which is
+[[ADR-176 — A Negative Decision Outranks a Positive One]]'s principle applied here.
+
+**It is better that the system writes its suggestion as an audience group or segment
+rather than as a per-recipient flag**, precisely because a list can be inspected,
+reasoned about and removed as a unit. That is the shape §2's *"the platform stays fully
+usable with no orchestrator at all"* wants too: a suggestion expressed as data a person
+can see and undo, not as behaviour they can only discover.
+
+**Two capabilities this needs that do not exist**, logged rather than solved here. An
+orchestrator writing a temporary exclusion must be able to **remove** audience members it
+added, and/or a membership must be able to **expire**: `AudienceGroupMemberDB` carries
+`group_id`, `recipient_id` and `added_at` and nothing else — no deletion date, no TTL, no
+record of who added it or why. A *temporary* exclusion with no expiry is a permanent one
+that somebody has to remember to undo. Logged in `docs/backlog.md`; a different topic
+from this addendum's subject.
+
+**Nothing in §7's other reasoning changes.** Suppression stays a platform concern rather
+than an orchestrator's, the exclusion stack still records why each recipient was
+excluded, and the automation boundary is untouched.
+
 ## Related ADRs
 
 ### Depends On
