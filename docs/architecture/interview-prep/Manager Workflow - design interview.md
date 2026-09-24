@@ -14,7 +14,8 @@ status: open
 > **Cluster 2 CLOSED 2026-09-21, 18/18** — see *What Cluster 2 produced* for the
 > five backend requirements and the ADR work it owes.
 > **Cluster 1 ◐ 7 of 8 closed 2026-09-23** — question 5 deliberately reopened.
-> **Cluster 3 ✅ CLOSED 2026-09-23, 10/10.** 53 questions, 36 answered.
+> **Cluster 3 ✅ CLOSED 2026-09-23, 10/10.**
+> **Cluster 4 ✅ CLOSED 2026-09-24, 7/7.** 53 questions, 43 answered — only Cluster 5 remains.
 
 # Manager Workflow — design interview (forward-looking)
 
@@ -1191,7 +1192,7 @@ independent answers, one rule.
 plus a monitoring screen if question 1b decides it is not the deliveries screen.
 
 
-## Cluster 4 — Choosing who receives it
+## Cluster 4 — Choosing who receives it  ✅ CLOSED 2026-09-24, 7/7
 
 *How a manager decides the audience, and what they must verify before trusting it.*
 Screens: **audience groups**, **audience detail**, **recipients**,
@@ -1268,40 +1269,199 @@ Screens: **audience groups**, **audience detail**, **recipients**,
    **The consent/suppression floor is untouched** and stays absolute, which is the
    half of the old docstring that survives intact.
 
-3. **What must a manager verify before trusting an audience?** A count, a sample
-   of who is in it, or the rules restated in prose?
-   *Constraint found via Cluster 1 question 5, and sharpened by the user
-   2026-09-23: **audience membership records no reason, and the case that needs
-   one is external automation.** Not the in-app "suggest audience" function — the
-   user's examples are an orchestrator running daily: "select recipients each day
-   that should get a reactivation email", "select recipients each day that should
-   be on a temporary blocklist". Those need to say **why this recipient** —
-   because with AI in the loop the rule is not "90 days without engagement" but
-   "a negative trend on click rate AND …", which the platform cannot reconstruct.
-   **Only the caller knows.** Today there is nowhere to put it:
-   `POST /api/audience-groups/{group_id}/members/{recipient_id}` **takes no
-   request body at all**, and neither `add_member` nor `bulk_add_members`
-   (`audience/service.py:169`, `:362`) accepts a reason. `AudienceGroupMemberDB`
-   stores `group_id`, `recipient_id`, `added_at` and nothing else. Content
-   selection explains itself through `DecisionResolutionDB.reason`; audience
-   membership has no equivalent. Bears on [[ADR-142 — Autonomous Workflows and the Automation Boundary]], whose orchestrator is exactly the caller that would
-   supply it, and on [[ADR-093 — Audience Intelligence Is Derived, Not Authoritative]].*
-4. **The resolved count differs per channel, and the manager may not expect that.**
-   *Constraint: `resolve_audience` is consent-gated and channel-dependent, so the
-   same group yields different recipients for email and push.* Does a manager need
-   to see exclusions and why, or only the final number?
-5. **Recipients are a projection of a CRM, not a CRM.** What does a manager
-   legitimately do on this screen that is not done in the source system?
-   *Constraint: [[ADR-120 — CRM as Customer Source of Truth]] and
-   [[ADR-126 — Maintain Local Recipient Projection]].*
-6. **What does a manager need from the consent grid?**
-   *Constraint: consent is per `(brand, channel, purpose)`; `Recipient.email` and
-   `email_consent_status` are the flattened email cell of each.* Is this a
-   read-only fact, a support-request surface, or something a manager edits?
-7. **When and why does a manager press Recalculate?** Is it routine, or does it
-   exist because something went wrong?
+3. ✅ **What must a manager see to trust an audience before sending to it?**
+   **Resolution (2026-09-24): the arithmetic — how the number was arrived at.**
+   Not *1,204* but the working: included by rules, added by hand, removed by
+   exclusion segments, dropped by consent, and the total that will actually
+   receive.
+   **Established with it:** this is what makes question 2's reversal **visible at
+   the moment it matters**. A manager who force-added four people and sees
+   *− exclusion segments −15* learns that their add was overridden, rather than
+   discovering it from a send that reached fewer people than expected. A bare
+   count could not have shown that, which is why the precedence change and this
+   answer belong together.
+   **The numbers already exist and are discarded.** `resolve_audience`
+   (`audience/service.py:514`) builds `include_ids`, `exclude_ids`, the pin set
+   from `get_member_recipient_ids`, and then applies the consent floor — every
+   term of the arithmetic is computed inside that function and **only the final
+   list is returned**. So this is not new logic; it is a return shape that keeps
+   what the function already knows.
+   **It subsumes the Q1.5 gap without depending on it.** The arithmetic explains
+   the *group*; the missing per-membership reason explains an *individual*. Both
+   are wanted, and the arithmetic is answerable today while the reason needs the
+   request body that `POST /api/audience-groups/{group_id}/members/{recipient_id}`
+   does not have.
+   **Rejected, with reasons worth keeping:** a sample of members is concrete but
+   **blind to absence**, and the people wrongly excluded are exactly those not in
+   it; rules-in-prose checks intent rather than outcome, and the outcome is what
+   a manager is about to send to.
+   **Per-channel is not a footnote here** — the consent line differs by channel,
+   which is question 4.
+
+4. ✅ **One group resolves to different people per channel. What does a manager
+   need to see about that?**
+   **Resolution (2026-09-24): the arithmetic is always per channel — there is no
+   channel-less number.** An audience count means nothing until a channel is
+   named, so the client never shows one without it.
+   **Established with it:** this removes a class of error the codebase has already
+   suffered. `resolve_audience`'s docstring records it: consent is keyed
+   `(recipient, brand, channel, purpose)`
+   ([[ADR-163 — Per-Channel Consent and Addressability]] point 1), and gating a
+   push send on email consent *"asks the wrong question twice over — it would
+   admit people who accepted email and never accepted notifications, and refuse
+   people who did the reverse"*. It defaulted to email while email was the only
+   channel, **which made a push send unplannable: the audience resolved to nobody
+   and the planner reported "0 consenting recipients"**.
+   **The concrete implementation rule that follows: the client always passes the
+   channel explicitly and never relies on the default.**
+   `resolve_audience(db, group_id, channel=DEFAULT_CHANNEL)` still defaults to
+   email, deliberately, for screens previewing an email audience. That default is
+   convenient for the service and a trap for a client that shows numbers — under
+   this resolution a defaulted channel is always wrong on screen.
+   **Where the channel comes from:** the variant, when planning a send. When a
+   manager opens an audience group directly there is no variant, so the screen
+   either asks or shows each registered channel. That is a presentation choice
+   left open; what is settled is that it may not show a bare number.
+   **Rejected:** flagging the difference only when it "surprises", since a
+   threshold is the system deciding what is notable — the shape turned down in
+   questions 2.2 and 1.3.
+
+5. ✅ **What does a manager legitimately do on the recipients screen?**
+   **Resolution (2026-09-24): look one person up — "why did Anna get this" — and
+   nothing else. Read-only, with a planned end of life.** The user: *"no editing
+   options (unless maybe an unsubscribe button in case of emergency, tho this can
+   be part of the gdpr package) — in the future 'Nothing' as soon as a crm can
+   take over and gets all recipient information from the platform."*
+   **Established with it:** this screen is **temporary by design**, which bounds
+   how much it is worth investing in. It exists because the reasoning lives here
+   and not in the CRM — [[ADR-120 — CRM as Customer Source of Truth]] owns the
+   person, this platform owns why they were chosen — and it goes away when the CRM
+   can receive that reasoning.
+   **Editing is refused**, which keeps [[ADR-126 — Maintain Local Recipient Projection]] honest: a projection that can be edited is a second source of
+   truth. The emergency unsubscribe is explicitly parked as *possibly* belonging
+   to the GDPR package instead — [[ADR-004 — Privacy Operations as a First-Class Architectural Concern]] and [[ADR-154 — Erasure and Retention]] are its natural
+   home, and putting it there keeps this screen read-only.
+   **The screen is not buildable as stated today, and the reason is structural
+   rather than a missing endpoint.** "Why did Anna get this" needs three things:
+   her consent per channel (exists), what was sent to her, and which audiences she
+   is in. There is **no per-recipient delivery query** and **no reverse membership
+   lookup** — and the second cannot simply be added, because **rule-based
+   membership is computed at resolution time and never stored**. Only *pins* are
+   rows in `AudienceGroupMemberDB`; everyone included by a rule exists as a set
+   inside `resolve_audience` and nowhere else. So "which groups is Anna in" is
+   answerable only by resolving every group, or only for hand-pinned membership.
+   **That is worth deciding rather than discovering**: either the screen answers a
+   narrower question than its name suggests, or resolution results become
+   durable — which is a significant model change and bears on
+   [[ADR-093 — Audience Intelligence Is Derived, Not Authoritative]], whose whole
+   point is that this data is derived.
+   **What is answerable today** is the decision side: `DecisionResolutionDB` stores
+   `recipient_id`, `content_record_id`, `reason` and `score`, so *why this content*
+   has an answer even where *which audience* does not.
+
+6. ✅ **What does a manager need from the consent grid, given the screen is
+   read-only?**
+   **Resolution (2026-09-24): only the cells that matter — the channels this brand
+   actually sends on — with drift against the CRM flagged.** Not the full
+   `(channel, purpose)` matrix.
+   **Established with it:** both halves already exist and neither is new work.
+   Channel availability is a per-deployment setting (`available_channels` and
+   `channel_available`, `settings/service.py:158-178`), and drift has an endpoint:
+   `GET /recipients/consent/drift`, alongside `GET /recipients/consent/sync-log`.
+   **Flagging drift is the point rather than a nicety** — on a projection, the
+   most likely way the screen lies is by being out of date, and
+   [[ADR-126 — Maintain Local Recipient Projection]] accepts that copy in exchange
+   for not depending on the CRM at send time.
+   **It honours the schema-names warning.** `Recipient.email` and
+   `email_consent_status` are the **flattened email cell** of a grid keyed
+   `(brand, channel, purpose)` ([[ADR-163 — Per-Channel Consent and Addressability]] point 2), and `docs/react-screen-inventory.md` warns against
+   building a single "Consent: yes/no" control from them. Showing cells per channel
+   — even a reduced set — is the shape that cannot collapse into that mistake.
+   **Known cost accepted, and it is sharper than it looks:** hiding channels not in
+   use hides one possible explanation for why a send skipped somebody. If a send
+   targets a channel the deployment has switched off, the consent grid will not say
+   so — the answer lives in settings instead. Worth remembering when question 5's
+   "why did Anna get this" is built.
+
+7. ✅ **When and why does a manager press Recalculate, and should they have to?**
+   **Resolution (2026-09-24): once a group exists, recalculation is always manual
+   — unless the send itself was set to re-resolve. And a significantly changed
+   campaign gets a new segment rather than a recalculated one.** The user: *"once
+   created recalculation is always a manual task unless in the send 'recalculate
+   before send' was activated. If the campaign changed significantly the manager
+   would simply create a new segment."*
+   **Two different operations, and keeping them apart is the point.** The answer
+   touches both and they must not be conflated:
+
+   | | What it re-does | When |
+   |---|---|---|
+   | **Re-suggest** (`recalculate_suggested_blocks`, `audience/service.py:748`) | derives the **rules** again from the campaign's content categories | manual only |
+   | **Re-resolve** (`audience_resolution_mode="rerun"`) | runs the **existing rules** against current recipients before firing | automatic, if the send says so |
+
+   Re-suggesting can overwrite rules a manager edited; re-resolving cannot,
+   because it changes no rules — it only asks who matches them now. That is why one
+   is manual and the other may be automatic, and it is consistent rather than an
+   exception.
+   **Established with it:** *create a new segment* is the normal response to a
+   campaign that moved, not *recalculate*. Re-suggestion is therefore a rare
+   operation, which argues against building much around it — and it keeps the
+   cluster principle intact, since the system never silently replaces rules a
+   person adjusted.
+   **This hands Cluster 5 question 2 a constraint rather than a free choice.**
+   `freeze` versus `rerun` is now *"recalculate before send"* from the manager's
+   side — a property of the send, phrased in audience terms — which is how that
+   question should be put rather than as two mode names.
 
 ---
+
+### What Cluster 4 produced
+
+**A dated decision is reversed** (Q2). `resolve_audience` implements
+`((∪ include) − (∪ exclude)) ∪ pins` and its docstring records, from 2026-07-26,
+that *"a manual pin is always included — exclude blocks never remove a hand-pinned
+recipient"*. That is now wrong: exclusion segments beat a force-add. The
+consent/suppression floor is untouched and stays absolute. **It is not in an ADR**
+— it lives in a docstring and four documentation pages — so this is no
+supersession, but it is a deliberate reversal that should get a record rather than
+another docstring. Tests assert pins against the *consent floor* only, so the
+blast radius is smaller than the document count suggests.
+
+**The third structural principle: a negative decision outranks a positive one.**
+*"Shouldn't get it by human beats Should get it by system/human."* Wrongly
+including costs more than wrongly omitting, and that generalises well past
+audiences.
+
+**A distinction the model does not have** (Q2): an **exclusion segment** is an
+attribute, topic, interest or temporary reason and is editorial; a **blocklist** is
+legal and data-protection. Both are `kind="exclude"` today.
+
+**Four backend gaps, bringing the running total to fifteen.**
+
+12. **No JSON route for audience suggestion** (Q1). `suggest_include_blocks_for_campaign`,
+    `campaign_category_scores`, `create_suggested_group_for_campaign` and
+    `recalculate_suggested_blocks` all exist and are reachable only from Jinja —
+    and Q1 makes suggestion the *primary* way an audience comes into being.
+13. **`resolve_audience` returns only the final list** (Q3), discarding the
+    arithmetic it computed: included by rules, added by hand, removed by
+    exclusions, dropped by consent. The numbers exist inside the function.
+14. **No per-recipient delivery query and no reverse membership lookup** (Q5) —
+    and the second is structural, not missing: rule-based membership is **computed
+    at resolution time and never stored**, so only pins are rows. "Which groups is
+    Anna in" is answerable only by resolving every group. Bears on
+    [[ADR-093 — Audience Intelligence Is Derived, Not Authoritative]].
+15. **`resolve_audience` defaults `channel` to email** (Q4) — convenient for the
+    service, a trap for a client that shows numbers, and the recorded cause of a
+    push send once resolving to nobody.
+
+**Screens with a planned end of life** (Q5). Recipients is read-only and
+**temporary by design** — it exists because the reasoning lives here rather than in
+the CRM, and it goes away when the CRM can receive that reasoning. That bounds
+how much it is worth building.
+
+**A constraint handed forward.** Cluster 5 question 2 should ask about *"recalculate
+before send"* rather than about `freeze` versus `rerun` — the manager's framing, in
+audience terms, for what is a property of the send.
+
 
 ## Cluster 5 — Planning, checking and firing a send
 
