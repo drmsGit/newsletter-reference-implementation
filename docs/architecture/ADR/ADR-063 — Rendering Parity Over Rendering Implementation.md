@@ -67,8 +67,7 @@ relationship email already has between browser-friendly markup and
 email-client HTML; a letter's on-screen preview versus its print-ready PDF is
 the same relationship again. "Parity between an email and a letter" was
 never this ADR's goal and is not newly out of scope — it was never in scope.
-That question is answered, and rejected, elsewhere: [[ADR-160 — Channel
-Model and Composition]]'s decision to give each channel its own variant
+That question is answered, and rejected, elsewhere: [[ADR-160 — Channel Model and Composition]]'s decision to give each channel its own variant
 (rather than one neutral composition each channel renders its own way) is
 what settles that cross-channel sameness is not wanted, not this ADR.
 

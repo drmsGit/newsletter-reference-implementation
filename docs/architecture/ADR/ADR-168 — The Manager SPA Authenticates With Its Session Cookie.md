@@ -176,6 +176,44 @@ than in a screen, and **nobody had written it down**. A gap inventory that
 misses the mechanism every write depends on is a reminder that the inventory
 was taken screen by screen, and this defect belongs to none of them.
 
+## Addendum 2026-09-24 — approval is available to people, not only machines
+
+Prompted by the Manager Workflow design interview (Cluster 5), which put a person in
+front of the approval inbox and found the reasoning underneath it out of date.
+
+**What this amends is a build note, not the Decision.** This record's Notes say the
+approval gate *"became machine-only"* because `may_send_unattended` is a column on an
+integration and does not exist on a user — *"a person firing a send **is** the approval,
+which was implicit while people could not reach this plane at all"*. That was correct on
+2026-09-19, and it was correct **because only machines could request**. It is
+insufficient now: a person may route their own send for a second pair of eyes, and the
+moment they can, *the requester firing the send is the approval* stops being a tautology
+and becomes a hole.
+
+**It opens a hole that must be closed with the feature, not after it.** `may_decide`
+(`backend/app/approvals/service.py:345`) checks the action's `approve_permission` against
+the request's own brand and **never compares the decider to the requester**. That was
+safe by construction while machines requested and could not approve — the two sets did
+not overlap. With people on both sides they overlap completely, and the most likely first
+user of a person-requested approval is the person who requested it. **A self-approval
+refusal is owed**, and it belongs in `may_decide` beside the permission check rather than
+in whichever router notices first, for the same reason that check was moved there on
+2026-09-20: two planes asking one question is the point, and a second copy in a second
+router is how they start answering it differently.
+
+**The person's side has no home for the request, which is the part that is not a
+one-line fix.** `may_send_unattended` is a column on an integration and does not exist on
+a user, so *"this send needs approval"* has nowhere to live for a human requester — there
+is no field, no role attribute and no per-send flag that says it. Whatever shape that
+takes is a data-model question this addendum does not settle; what it settles is that the
+absence is known and that the refusal above is owed with the feature rather than
+discovered by the first person who approves their own send.
+
+Consistent with the 2026-09-19 addendum above rather than a change to it: a machine still
+cannot approve anything, including its own request, and what a machine may still do —
+**request** approval — is unchanged. This adds the symmetric rule for the principal type
+that record admitted to the plane.
+
 ## Related ADRs
 
 ### Depends On

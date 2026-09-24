@@ -36,8 +36,7 @@ integration points, not core components.
 [[ADR-160 — Channel Model and Composition]] flagged, without resolving, that
 this framing no longer describes the architecture: roughly 80% of the system
 generalises to any API-reachable channel (email, push, letter, paid social)
-as a consequence of earlier decisions — [[ADR-012 — Content Records Represent
-Communication Units]] defines a record as a communication unit, not an email;
+as a consequence of earlier decisions — [[ADR-012 — Content Records Represent Communication Units]] defines a record as a communication unit, not an email;
 the decision, audience and signal layers are already channel-neutral; and
 ADR-160 through [[ADR-164 — Channel Feedback and Signals]] built the channel
 layer itself on that foundation rather than against it. "Newsletter-specific"
@@ -61,8 +60,7 @@ actually does.
 
 **1. The core is content management and orchestration for any API-reachable
 channel — not a newsletter system with channels bolted on.**
-The unit of work is a communication unit ([[ADR-012 — Content Records
-Represent Communication Units]]) composed, decided, personalised and rendered
+The unit of work is a communication unit ([[ADR-012 — Content Records Represent Communication Units]]) composed, decided, personalised and rendered
 for delivery through a channel. Email remains the first and most complete
 worked example, not the definition of the boundary. "Newsletter" describes
 the origin story and the primary reference implementation, not the

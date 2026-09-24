@@ -7,7 +7,7 @@ topic:
   - delivery
   - provider
 created: 2026-09-01
-modified: 2026-09-12
+modified: 2026-09-24
 source:
   - "Omni-Channel design interview (interview-prep, closed 2026-09-01), Cluster 2 / Q6–Q10"
 depends_on:
@@ -103,6 +103,43 @@ What remains a genuine risk is the **accidental** overlap — two variants of on
 - Provisional groupings named in the interview were narrower than the settled outcome: three interface families were sketched (addressed per-message, addressed batch, audience-delegated) before the letter question collapsed the middle one into the first. Two interfaces, not three.
 - The scope narrowing in point 7 supersedes nothing accepted; it narrows the description of a channel manifest given in [[ADR-160 — Channel Model and Composition]] point 6, and both records are written together.
 - Deferred to a later phase by explicit decision: **volume capping**, **letter integration**, and **cross-channel follow-up audiences**. Two further deferrals are recorded in [[ADR-164 — Channel Feedback and Signals]].
+
+## Addendum 2026-09-24 — catalogue readiness is asserted, not computed
+
+Prompted by the Manager Workflow design interview, Cluster 2 question 3
+(closed 2026-09-21), which asked what makes a content record "ready for push"
+and answered it differently from this record.
+
+**What changes, and it is a contradiction rather than a narrowing.** Point 7
+carries a rider: *"Catalogue readiness is 'push fields not empty'"*. That is
+now false. Readiness is **asserted by a person, per channel, and stored on the
+content record** — a deliberate act, the same shape as publishing — and the
+decision layer trusts that mark rather than inspecting fields. Filling the
+fields and declaring a record fit to go out on a channel are different claims,
+and only the second is a decision; computing readiness from emptiness makes a
+record selectable on the last keystroke, including mid-edit and including from
+an agency whose copy nobody here has read. See
+[[ADR-174 — Channel Readiness Is Asserted, Not Computed]].
+
+**Nothing breaks, because the rider was never implemented.** No code computes
+readiness from field emptiness today, so there is no data to migrate and no
+behaviour to change. What was wrong was the record, which is why this is worth
+a dated addendum rather than a silent correction.
+
+**The rest of point 7 stands exactly as written.** The authoring contract still
+lives in the module manifest and still exists before a provider is chosen;
+lengths are still enforced by the editor as an input constraint with a preview
+showing potential truncation, not as a validation gate and not from
+`provider.py`; and the settled split — provider `.py` = capabilities, module
+manifest = fields and limits, channel = an attribute on the variant plus which
+manifests it accepts, with cardinality as the only channel-level fact — is
+untouched. The independence the rider was protecting is also untouched:
+readiness still owes nothing to provider configuration.
+
+**This is an addendum and deliberately not a supersession.** One clause of one
+point is falsified; the other points of this record are in force and nothing
+else in it depends on the rider. This repository has had exactly one
+supersession ever — [[ADR-165 — Core Scope Is Channel-Neutral Content Orchestration]] over ADR-001, on 2026-09-12 — and this is not a second.
 
 ## Related ADRs
 

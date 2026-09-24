@@ -137,8 +137,7 @@ Restricting candidates to the sending brand, to a named list of brands, or to no
   addendum below. Detail-by-id routes are not scoped — the lists filter, but
   another brand's campaign opens by URL. `consent_events` carries no brand, so
   a send still reaches every consenting recipient whatever brand it claims;
-  that is the separate consent work and it needs an [[ADR-163 — Per-Channel
-  Consent and Addressability]] addendum first.
+  that is the separate consent work and it needs an [[ADR-163 — Per-Channel Consent and Addressability]] addendum first.
 
 ## Addendum 2026-09-15 — permission scope is a property of the permission, not of the role
 
@@ -214,8 +213,7 @@ signal contributions (point 8), so `recipients.manage`, `recipients.consent` and
 `insight.write` have no brand to be checked against."*
 
 That was true when it was written. It stopped being true when
-`consent_events.brand_id` became NOT NULL under [[ADR-163 — Per-Channel Consent
-and Addressability]]'s own 2026-09-15 addendum — the same day. The rows this
+`consent_events.brand_id` became NOT NULL under [[ADR-163 — Per-Channel Consent and Addressability]]'s own 2026-09-15 addendum — the same day. The rows this
 permission guards are consent events, not recipients, and consent events have
 carried a brand ever since.
 
@@ -234,8 +232,7 @@ write brand B's consent record — and the compliance record is the one
 [[ADR-142 — Autonomous Workflows and the Automation Boundary]] §7 names as the
 answer to a UWG §7 complaint.
 
-It is also the shape [[ADR-166 — Inbound Machine Callers Are Authenticated
-Principals]] point 8 refuses by name: *"that would let a payload choose the
+It is also the shape [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]] point 8 refuses by name: *"that would let a payload choose the
 scope against which its own authorization is checked."*
 
 ### The decision
@@ -273,6 +270,60 @@ instead of silently picking a winner.
   `GET /recipients/` has been raising `TypeError` for as long as consent carried
   a brand. Nothing in the repo called it, which is why a route that cannot
   return has looked fine.
+
+## Addendum 2026-09-24 — findability is not affinity, so facets are per brand while categories stay global
+
+Prompted by [[ADR-175 — Facets Are the Manager's Own Taxonomy, Not the Engine's]],
+which introduces a second kind of vocabulary over content and deliberately scopes it
+the opposite way to the one this record's 2026-09-15 addendum scopes categories.
+
+**That addendum's rule is unchanged and correct.** The category vocabulary is global —
+`categories` and `category_relations` carry no `brand_id` — on the stated grounds that
+*"Content is per-brand; what a category MEANS is not."* Two brands share what "Beach"
+means as an interest, each writes its own sentences in that shared language, and
+duplicating the vocabulary per brand would produce two "Beach" categories that cannot
+be compared. Nothing here touches that.
+
+**What is added is the boundary of the argument, which was never stated because
+nothing had tested it.** The reasoning above is about **affinity semantics**: a
+category is a claim about a *recipient* — what this person responds to — and a claim
+about a person does not change because a different brand is doing the sending.
+
+**Findability is a different claim and does not inherit that reasoning.** A facet is a
+claim about *how a team works* — which axes they file their content and campaigns along
+so they can find a record among many. That is a property of the team and its business,
+not of the person being mailed. An airline brand thinks in Destination and Cabin; a
+hotel brand thinks in Property and Season. There is no shared meaning being protected
+by forcing those into one list, because the two brands are not describing the same
+thing in the first place — and comparability, the whole reason the category vocabulary
+is global, buys nothing when there is nothing to compare.
+
+**So the rule this record now carries is a distinction rather than a list.** A
+vocabulary that describes a *recipient* is global, because a person is one person
+across brands. A vocabulary that describes *how a team files its work* is per brand,
+because a brand is a working context. Categories are the first; facets are the second.
+The test is what the term is a claim about, not which table it happens to sit next to.
+
+**Point 2 is not weakened by this, and the sentence that looks like it should be is
+worth quoting exactly.** Point 2 refuses "per-brand duplication of settings, strategies
+or taxonomy". Facets are per brand and are not a counterexample: the thing point 2
+protects is one shared, comparable *meaning*, and a per-brand facet has no shared
+meaning to fracture. The refusal of duplication-as-a-comfortable-default also stands —
+ADR-175 ships no sync between brands' facets, on exactly this record's reasoning that a
+synced copy is a copy that drifts.
+
+**The cost is booked in ADR-175 rather than here, and it is not nothing:** a multi-brand
+adopter redeclares common axes per brand, and a cross-brand copy gains a facet-value
+reassignment step in `duplicate_campaign`.
+
+**Deliberately left open: which permission administers a facet vocabulary.** Facets are
+per brand while their administration surface sits in Settings, so a platform-level
+`settings.manage` would let any administrator declare facets in any brand. Whether that
+is right, or whether facet administration wants a brand-scoped grant, is not settled by
+this addendum and should not be settled by assertion in one.
+
+**Nothing in this record's Decision changes.** The category vocabulary stays global and
+the classification of permissions is not affected.
 
 ## Related ADRs
 

@@ -209,6 +209,44 @@ invalidates. Revisit after 1.0.
 - **Status.** Decided in the design interview; implementation is phased with the
   Mode-A build. Accepted as a design decision, not as shipped code.
 
+## Addendum 2026-09-24 — a held action may carry no deadline
+
+Prompted by the Manager Workflow design interview (Cluster 1), which asked what the
+approval inbox actually holds and found an action type §4 cannot express.
+
+**§4 stands as written for the case it was written about.** *"Pending actions expire. A
+held 'send the morning campaign' is worthless three days later"* is correct, and it is
+correct for exactly the reason it gives: the value of that action decays because the
+moment it was chosen for passes. **Content review does not decay that way.** A variant
+waiting to be read is worth the same on Thursday as it was on Monday, and expiring it
+does not protect anybody — it silently drops a request a person was going to answer.
+
+**The TTL therefore belongs to the action type, and must be allowed to be absent.**
+Some actions expire because their moment passes; some do not, and the registry is the
+place that knows which. What §4 should be read as saying is that *an action that expires
+declares its own deadline*, not that every action has one.
+
+**Today this is not expressible, in two places at once.**
+`PendingActionDB.expires_at` is `nullable=False` (`backend/app/approvals/db_models.py:94`)
+under a comment that makes the reasoning explicit — *"No default and no nullability — the
+registry always supplies one, so a module that forgets cannot create an immortal held
+send"* — and `default_ttl_seconds: int` on the action contract
+(`backend/app/approvals/actions/base.py:58`) is not optional. The column's comment is
+defending against a forgetful module, which is a real risk; it happens to also forbid a
+deliberate absence, which is the case that now exists.
+
+**The cost is stated rather than left to the build, because it is larger than one
+nullable column.** Making `expires_at` nullable means **every comparison must read null
+as *never expires* rather than *expired*** — the expiry sweep, any inbox filter, any
+"is this still actionable" check — and a null that sorts or compares the wrong way in one
+of them produces the exact failure the NOT NULL was protecting against, from the other
+direction. It also needs a **hand-written migration**: there is no Alembic in this
+repository, tables come from `create_all` plus `backend/scripts/migrate_*.sql`, so this
+is a script somebody writes and runs rather than a generated step.
+
+Not built; logged in `docs/backlog.md`. Nothing in §4's other bullets changes — the
+inbox, the audit surface and the notification-only rule for email and push are untouched.
+
 ## Related ADRs
 
 ### Depends On

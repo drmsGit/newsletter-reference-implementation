@@ -148,8 +148,7 @@ Both are the same argument this ADR's existing 2026-08-02 addendum already
 made for SMTP — a capability declaration describes the configured provider
 instance — extended from email specifically to channel providers in general.
 Nothing above changes this ADR's Decision section; core and optional
-capabilities are unchanged, and the gating relationship with [[ADR-106 —
-Bounce and Complaint Feedback Is Mandatory]] is unchanged.
+capabilities are unchanged, and the gating relationship with [[ADR-106 — Bounce and Complaint Feedback Is Mandatory]] is unchanged.
 
 ## Related ADRs
 
