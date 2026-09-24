@@ -6,7 +6,7 @@ topic:
   - design
 created: 2026-09-21
 modified: 2026-09-22
-status: open
+status: closed
 ---
 
 > **Status: interview OPEN.** Clustering approved 2026-09-21. All five clusters
@@ -15,7 +15,11 @@ status: open
 > five backend requirements and the ADR work it owes.
 > **Cluster 1 ◐ 7 of 8 closed 2026-09-23** — question 5 deliberately reopened.
 > **Cluster 3 ✅ CLOSED 2026-09-23, 10/10.**
-> **Cluster 4 ✅ CLOSED 2026-09-24, 7/7.** 53 questions, 43 answered — only Cluster 5 remains.
+> **Cluster 4 ✅ CLOSED 2026-09-24, 7/7.**
+> **Cluster 5 ✅ CLOSED 2026-09-24, 8/8.**
+> **All five clusters closed — 52 of 53 answered.** Only Cluster 1 question 5
+> remains, reopened at the user's request. Next: the ADRs this owes, and the
+> variant editor's own interview (question 3.3b).
 
 # Manager Workflow — design interview (forward-looking)
 
@@ -921,7 +925,12 @@ Screens: **campaigns list**, **campaign detail** (inventory B11), **decisions**,
    **The layout note is recorded rather than decided:** *left/right placing* if
    there is room, otherwise somewhere easy to reach. That is a presentation
    question for when the screen is designed.
-1b. **What is the monitoring screen, and is it the deliveries screen?**
+1b. ✅ **What is the monitoring screen, and is it the deliveries screen?**
+   **Resolution (2026-09-24), answered as Cluster 5 question 4: no.** Monitoring
+   is campaign-level and deliveries is send-level, so they are two screens and the
+   first cut grows to nineteen. Full reasoning there.
+
+   *Original framing:*
    *Raised by question 1, and it decides whether the cut grows again.* The user's
    framing — *"multiple campaigns with multiple assets"* — spans campaigns,
    their variants and their sends, which is broader than Cluster 5's **deliveries**
@@ -1463,7 +1472,7 @@ before send"* rather than about `freeze` versus `rerun` — the manager's framin
 audience terms, for what is a property of the send.
 
 
-## Cluster 5 — Planning, checking and firing a send
+## Cluster 5 — Planning, checking and firing a send  ✅ CLOSED 2026-09-24, 8/8
 
 *What a manager confirms before real mail leaves, and what they watch afterwards.*
 Screens: **deliveries**, **delivery detail**.
@@ -1551,24 +1560,199 @@ Screens: **deliveries**, **delivery detail**.
    scheduler. What this resolution removes is the need for an *automation* to use
    it.
 
-4. **What question does the deliveries list answer?** What is scheduled, what went
-   out, what failed — or all three in one list with a filter?
-5. **What does a manager watch during and after a send?**
-   *Constraint: `SendInstanceDB` carries `sent_count`, `failed_count` and
-   `excluded_count`; the `SendInstance` response model exposes **none of them**.*
-   What is watched determines what the read routes must return.
-6. **A send that fails partway — what does the manager do?** Retry the failures,
-   start again, or is it the operator's problem rather than the manager's?
-7. **Where does a test send belong?** The inventory calls send-test a diagnostic
-   for the deployment docs. *If a manager sends a test to themselves before every
-   real send, that is wrong and it is part of the pre-flight.*
-8. **When is the approval gate on a send actually used?**
-   *Constraint: [[ADR-142 — Autonomous Workflows and the Automation Boundary]] §4;
-   `send.fire_send_instance` is the only approvable action, and a person firing a
-   send **is** the approval.* Is the gate for machines only, or do people route
-   sends to a colleague too?
+4. ✅ **What question does the deliveries list answer, and is it the monitoring
+   screen from question 3.1?**
+   **Resolution (2026-09-24): no — they are two screens. Monitoring is
+   campaign-level; deliveries is send-level.** Monitoring answers *where are my
+   campaigns*, including ones that have sent nothing yet. Deliveries answers *what
+   did this send do*.
+   **This answers question 3.1b**, which asked whether the monitoring screen the
+   user requested in the campaign list was this one. It is not.
+   **Established with it:** the *a screen answers one question* rule decides it.
+   A campaign in flight with nothing sent has no row in a send list, and a send
+   that failed is not a campaign state — so one screen would answer neither
+   question well. That rule has now decided four screen boundaries: no dashboard,
+   history out of the inbox, monitoring out of the campaign list, and this.
+   **The cut grows to nineteen.** Sixteen in the inventory, plus decision history
+   (question 1.6), plus the variant editor (question 3.3), plus monitoring. Worth
+   restating plainly: **this interview has added three screens and removed none**,
+   and each was added because a screen was being asked to answer two questions.
+   **Neither is servable today.** Deliveries has no flat list and no get-by-id —
+   only the snapshot-scoped route — which is the gap already logged with C8. And
+   **monitoring needs a campaign-level state view that does not exist at all**: no
+   route answers "which campaigns are in flight", because campaign status is a
+   column on the campaign and *in flight* is derived from its variants, their
+   snapshots and their sends.
+
+5. ✅ **What does a manager watch during and after a send?**
+   **Resolution (2026-09-24): the three counts — sent, failed, excluded — and what
+   explains the gap between the total reviewed and the total sent.** A manager who
+   approved 1,104 and sees 1,098 sent gets an answer rather than a discrepancy.
+   **Question 2 is what makes the gap routine rather than exceptional.** Because
+   the audience re-resolves at fire time, `excluded_count` is no longer an edge
+   case — it is the number that reconciles the review screen to reality, and it
+   carries the consent withdrawn and exclusions applied between approval and send.
+   **What needs defining rather than assuming:** whether `excluded_count` today
+   means *excluded at plan time by the consent gate* or *removed at re-resolution*.
+   Under this resolution the screen needs the second, and the two are not the same
+   number. Executions are created one per recipient at plan time and
+   `reconcile_executions_to_audience` adjusts them at fire time, so the delta is
+   derivable — but which column holds it is a question for the build.
+   **This is the third response model found dropping fields its table stores, and
+   three is a pattern rather than three accidents:**
+
+   | Model | Table has | Model exposes |
+   |---|---|---|
+   | `ModuleVariableOut` | `label`, `envelope` | neither |
+   | `PendingActionDetail` | `subject_type`, `subject_id` | neither |
+   | `SendInstance` | 15 columns incl. three counts | 8, none of the counts |
+
+   Each was found by asking what a screen needs, which is the method working — but
+   it suggests the response models were written to the routes that existed rather
+   than to what a client would ask for. **Worth a sweep rather than three
+   one-line fixes**, and worth remembering when the ADR work is done: the schema
+   honesty pass in Phase 0 caught bare dicts and did not catch under-exposure.
+   **Live progress is not required**, which spares the client polling: the counts
+   are the answer, before and after.
+
+6. ✅ **A send fails for some recipients. What does the manager do?**
+   **Resolution (2026-09-24): no retry button. Build a segment instead.** The
+   user: *"system/server fails that can be retried usually are taken care of the
+   provider. in general it depends. no 'retry button', but building a segment with
+   the option to select 'campaign X was / wasnt delivered' would work."*
+   **Established with it, and it is the most economical answer in the cluster:**
+   *resend to whoever missed it* is an **audience** question, not a delivery
+   feature. No retry subsystem, no backoff, no idempotency worry, no risk of
+   sending twice — the manager builds a segment of people a campaign did not reach
+   and sends to it, using machinery that already exists for a different reason.
+   **It also disposes of the transient-failure case correctly:** retryable
+   provider failures are the provider's job, not this platform's.
+   **What it needs is a new kind of criterion, and that is the real cost.**
+   Criteria today support exactly four keys — `language`, `status`, `category_id`
+   and `min_score` (`audience/service.py:402-415`) — and **all four are recipient
+   attributes**. *"Campaign X was or was not delivered"* queries
+   `DeliveryExecutionDB` instead, so audience criteria would span two domains for
+   the first time: who someone **is**, and what has **happened** to them.
+   **That is a bigger door than this question opens.** The same mechanism would
+   serve engagement criteria — opened, clicked, did not open — which is the
+   insight and signal layer, and it is the shape of the user's own Cluster 1
+   example, *"select recipients each day that should get a reactivation email"*.
+   They said that case comes from **external automation**, so there may be two
+   paths rather than one: criteria the platform evaluates, and segments an
+   orchestrator populates with a reason. Worth deciding which before building
+   either.
+
+7. ✅ **Where does a test send belong: a deployment diagnostic, or part of the
+   manager's pre-flight?**
+   **Resolution (2026-09-24): both — one endpoint, two surfaces, two meanings.**
+   The operator uses it at setup to answer *does mail leave this installation at
+   all*; the manager uses it before a send to answer *does this look right in a
+   real inbox*. `POST /delivery/send-test` serves both.
+   **This overturns the inventory**, which cut send-test from the first cut as *"an
+   operator tool that belongs beside the deployment docs"*. Half of that is right
+   and the half it missed is the manager's: no review screen can show what an email
+   client does to the HTML, which is precisely what
+   [[ADR-063 — Rendering Parity Over Rendering Implementation]] exists about.
+   **The permission tension is real and is recorded rather than resolved.**
+   `send-test` is priced `sends.execute` by its own entry in the policy table — the
+   same permission as firing for real — and the reasoning is sound for a manager:
+   *"It reaches a real inbox through a real provider — that it goes to one typed
+   address rather than to an audience makes it smaller, not different in kind."*
+   For the **operator** case it is awkward: somebody verifying an installation must
+   hold the permission to fire campaigns. Whether that is acceptable (an operator
+   at setup is trusted anyway) or wrong (setup should not require send rights) is
+   **open**, and it is the kind of question `MAILS_A_PERSON` in
+   `test_api_guard.py` will make loud if the answer changes — that set is asserted
+   in both directions.
+   **One feature with two audiences usually serves one badly**, which is the cost
+   accepted here. The mitigation is that the two surfaces differ: the manager's is
+   a button on the review screen with their own address prefilled; the operator's
+   is a documented call.
+
+8. ✅ **When is the approval gate on a send used: machines only, or do people
+   route sends to each other?**
+   **Resolution (2026-09-24): people too — a manager may require a second pair of
+   eyes on their own send.** Sending to fifty thousand people is worth a
+   colleague's check, and question 1.1's thesis makes deciding the manager's job
+   rather than an interruption to it.
+   **It contradicts a recorded build note and needs a record.**
+   [[ADR-168 — The Manager SPA Authenticates With Its Session Cookie]]'s notes
+   state that *"a person firing a send **is** the approval, which was implicit
+   while people could not reach this plane at all"*. That reasoning was correct
+   when only machines could request; it stops being sufficient once a person can.
+   It extends rather than reverses the 2026-09-19 addendum, which already decided
+   approving requires a session-authenticated person and is refused to a bearer
+   credential.
+   **It needs a concept the model does not have.** `may_send_unattended` is a
+   column on an **integration** and does not exist on a user, so "this send needs
+   approval" has nowhere to live on the person's side.
+   **And it opens a concrete hole, found by checking rather than assumed.**
+   `may_decide` (`approvals/service.py:345`) checks the action's own
+   `approve_permission` against the **request's** brand — which is the right design
+   and is well argued in its docstring — but **nothing compares the decider to the
+   requester**. `requested_by_type` and `requested_by_id` are stored and never read
+   for this. That has been safe purely by construction: machines requested, and a
+   machine cannot approve. **The moment a person can request, they can approve
+   their own request**, and the second pair of eyes becomes the first pair clicking
+   twice. A self-approval refusal is owed with this feature, not after it.
+   **The alternative that was not taken** — a brand-level setting requiring
+   approval on every send — stays available if per-send proves too easy to skip;
+   it would be governed like the recipient cap rather than chosen per action, and
+   it needs Settings, which is gap C2.
 
 ---
+
+### What Cluster 5 produced
+
+**The principle got its exception, and it is narrow.** *The system blocks what is
+broken, and reports what is merely questionable* (Q1). Blocking is reserved for
+*broken* — an empty required field, no recipients — and everything else is stated
+for the manager to judge. That reconciles the cluster principle with question
+2.3b's demand for a real check.
+
+**A mode is removed** (Q2). Always recalculate; `freeze` is the mode that should
+never be used, and both the function default and the column default currently say
+`freeze`. The cost lands on Q1: the reviewed number is *as of now* and the send
+recomputes it, so the review screen must say so rather than present a figure it
+cannot honour.
+
+**Three more backend gaps, and one pattern.**
+
+16. **Audience criteria cannot express delivery history** (Q6). Today's four keys
+    — `language`, `status`, `category_id`, `min_score` — are all recipient
+    attributes. *"Campaign X was or was not delivered"* queries
+    `DeliveryExecutionDB`, so criteria would span who someone **is** and what has
+    **happened** to them. The same door opens engagement criteria.
+17. **Nothing prevents self-approval** (Q8). `may_decide` checks the action's
+    permission against the request's brand and never compares decider to
+    requester. Safe only while machines requested and could not approve; a hole
+    the moment a person can request.
+18. **No campaign-level state view** (Q4). Nothing answers "which campaigns are in
+    flight" — *in flight* is derived from variants, snapshots and sends.
+
+**The pattern, named because three is not a coincidence** (Q5): response models
+routinely expose less than their tables store — `ModuleVariableOut` drops `label`
+and `envelope`, `PendingActionDetail` drops `subject_type` and `subject_id`,
+`SendInstance` exposes 8 of 15 columns and none of the three counts. Each was
+found by asking what a screen needs. **Worth a sweep rather than three one-line
+fixes**: Phase 0's schema-honesty pass caught bare dicts and did not catch
+under-exposure.
+
+**Two things solved by reusing what exists rather than building.** A failed send
+needs no retry feature — build a segment of who missed it (Q6). And an automation
+needing an immediate send can schedule `now + 5 minutes`, so there is no separate
+fire-now path for the machine plane (Q3).
+
+**The inventory is overturned once** (Q7): `send-test` is not only a deployment
+diagnostic. No review screen can show what an email client does to the HTML, which
+is what [[ADR-063 — Rendering Parity Over Rendering Implementation]] exists about.
+Its `sends.execute` pricing is left as an open question for the operator case.
+
+**Two records owed.** ADR-168's build note — *"a person firing a send is the
+approval"* — becomes insufficient once people can request (Q8). And the
+`freeze`/`rerun` choice disappearing is a decision worth recording wherever the
+mode is documented.
+
 
 ## Related
 
