@@ -9,7 +9,7 @@ modified: 2026-07-04
 
 # MOC - Interview Prep Baseline
 
-A living baseline of interview-style questions about the codebase as implemented — why this approach over the obvious alternative, edge cases, performance/concurrency, and schema tradeoffs — generated 2026-07-04 by reviewing every module against its governing ADRs. Re-run and extend as new modules land (see [[interview-prep-baseline]] slash command).
+A living baseline of interview-style questions about the codebase as implemented — why this approach over the obvious alternative, edge cases, performance/concurrency, and schema tradeoffs — generated 2026-07-04 by reviewing every module against its governing ADRs. Re-run and extend as new modules land (see `/interview-prep-baseline` slash command).
 
 **Status: the original 4 cluster files are fully reviewed and cleared** (Content/Campaigns/Audience, Decision/Overrides/Insight, Delivery/Providers/Recipients, Snapshots/Rendering/Email Modules) via `/interview-review`. Decisions logged to [[backlog]].
 

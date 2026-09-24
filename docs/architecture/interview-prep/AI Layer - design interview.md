@@ -9,10 +9,7 @@ status: closed
 ---
 
 > **Progress (2026-07-31):** Clusters 1, 2, 5 are settled **and written up as ADRs**
-> — **[[ADR-140 — AI Capability Layer]]** (Cluster 1), **[[ADR-141 — In-App
-> Assistive AI Actions]]** (Cluster 2), **[[ADR-144 — AI Data and Model
-> Governance]]** (Cluster 5), **[[ADR-142 — Autonomous Workflows and the Automation
-> Boundary]]** (Cluster 3) and **[[ADR-143 — AI-Assisted Development Boundary]]**
+> — **[[ADR-140 — AI Capability Layer]]** (Cluster 1), **[[ADR-141 — In-App Assistive AI Actions]]** (Cluster 2), **[[ADR-144 — AI Data and Model Governance]]** (Cluster 5), **[[ADR-142 — Autonomous Workflows and the Automation Boundary]]** (Cluster 3) and **[[ADR-143 — AI-Assisted Development Boundary]]**
 > (Cluster 4). **✅ All five clusters closed — the AI layer is fully specified.**
 >
 > Cluster 3 also spun off work outside the AI ADRs: a **suppression/opt-out
@@ -152,10 +149,7 @@ its model.
 12. **The platform/n8n line.** → **Confirmed + decided.** The platform exposes
     **triggerable-action APIs** (build group, create campaign, send, precompute
     content) + an **approval surface**; **n8n (or any orchestrator) owns the flow
-    logic**. (Confirmation only — already backed by [[ADR-091 — Automation Layer
-    Is Orchestration, Not a Workflow Engine]], [[ADR-092 — Automation Layer
-    Receives Triggers, It Does Not Own Trigger Sources]] and [[ADR-002 — API First
-    Architecture]].)
+    logic**. (Confirmation only — already backed by [[ADR-091 — Automation Layer Is Orchestration, Not a Workflow Engine]], [[ADR-092 — Automation Layer Receives Triggers, It Does Not Own Trigger Sources]] and [[ADR-002 — API First Architecture]].)
     **Ship scope = one worked example, not a workflow library.** A starter library
     of 4–5 flows would become a maintained integration surface *and* silently
     bless n8n as the one orchestrator. Instead:
@@ -180,8 +174,7 @@ its model.
       mechanism (ADR-141) exactly: same object, same inbox, same audit trail, and
       it survives orchestrator restarts.
     - **Email/push is notification only — a link *into* the inbox, never one-click
-      approve/reject.** Project-specific reason: [[ADR-132 — Signal Layer
-      Implementation Event-Sourced Contributions with Decay-on-Read]] already
+      approve/reject.** Project-specific reason: [[ADR-132 — Signal Layer Implementation Event-Sourced Contributions with Decay-on-Read]] already
       establishes that **security scanners and MPP prefetch links in email**. An
       approve-link is a bearer credential in an inbox — a scanner could auto-trigger
       it and approve a full-audience send with no human involved. (Also forwardable,
@@ -296,8 +289,7 @@ its model.
     the state the product exists to move companies *out of* — and every ESP already
     ships A/B testing, so it is effort spent competing on a commodity feature in the
     pre-personalization world.
-    **ADR-021 was *not* the blocker (correction).** [[ADR-021 — Variants Are Human
-    Created Versions]] constrains **granularity** (don't spawn one variant per
+    **ADR-021 was *not* the blocker (correction).** [[ADR-021 — Variants Are Human Created Versions]] constrains **granularity** (don't spawn one variant per
     resolution — dynamic selection stays *inside* one variant), **not origin**. An
     AI-drafted challenger variant reviewed by a human was always legitimate. But its
     *Decision* wording ("a variant is a human-created version") overshoots its own

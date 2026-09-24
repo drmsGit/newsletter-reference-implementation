@@ -232,8 +232,7 @@ implementation"), it should get a short ADR in the Claude Code side recording
 the React-over-Next.js reasoning above, rather than living only in this
 business doc.
 
-**Done 2026-09-19: [[ADR-170 — The Manager Client Is a Plain React SPA, Not
-Next.js]].** It records the reasoning above and adds three things this section
+**Done 2026-09-19: [[ADR-170 — The Manager Client Is a Plain React SPA, Not Next.js]].** It records the reasoning above and adds three things this section
 left open: the routing choice (React Router as a library, not its framework
 mode), the repository layout (`frontend/` beside `backend/`, because FastAPI
 serves the build output and the typed client is generated from the backend's
