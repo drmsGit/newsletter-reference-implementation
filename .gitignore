@@ -20,6 +20,9 @@ venv/
 # Logs
 *.log
 
+# business decisions branding
+docs/business/decisions/
+
 # Generated snapshot files
 storage/snapshots/*.html
 

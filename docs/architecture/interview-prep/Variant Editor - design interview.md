@@ -6,7 +6,7 @@ topic:
   - design
   - variant
 created: 2026-09-24
-modified: 2026-09-24
+modified: 2026-09-25
 status: open
 source:
   - "Manager Workflow - design interview, 2026-09-24 — closed 53/53 and did not cover the composer"
@@ -16,7 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 34 questions across five clusters, 0 answered.
+> 36 questions across five clusters, 1 answered.
+> **Cluster 1 in progress — 1/7.**
 
 # Variant Editor — design interview (forward-looking)
 
@@ -156,12 +157,42 @@ the product, and that is a real objection.
 
 *What a manager assembles, in what order, and what a half-built variant is.*
 
-1. **The variant list groups by channel — what does that actually look like?**
-   *Constraint: ADR-021's addendum commits to grouping in the UI and says nothing
-   about its shape; the omni-channel interview made the same that/how split for
-   channels generally. Lean: channel as a section heading, A/B versions nested
-   under it.* Does a manager ever want the flat list back — for instance to
-   compare "A" across channels?
+1. ✅ **The variant list groups by channel — what does that actually look like?**
+   **Resolution (2026-09-25): channel as a section heading, versions listed under
+   it, and no cross-channel view at all.** The user:
+
+   > *"it's a list of what exists per channel. There's no need to see the idea
+   > across its channels on that surface (a manager would just open the different
+   > variants/channels if needed), strategies differ by channel massively"*
+
+   **Established with it, and it closes the compare view permanently rather than
+   deferring it.** The reason given is not that a cross-channel comparison is
+   inconvenient to build — it is that **it is not meaningful**. An email A/B test
+   and a push A/B test are not two readings of one idea; they are separate
+   strategies that happen to share a campaign. So "A" in the email group and "A"
+   in the push group are not a pair, and a UI that placed them side by side would
+   be asserting a relationship the work does not have.
+
+   **This gives [[ADR-160 — Channel Model and Composition]] point 5 a workflow
+   reason to stand on.** That point fixes channel at creation and argues it
+   technically — switching channel invalidates a variant's modules, its
+   content-readiness and its renderer at once. The answer here says the same
+   thing from the manager's side: they were never one object being viewed two
+   ways, so there is nothing to switch. Two independent arguments reaching the
+   same constraint is the strongest position a decision can be in.
+
+   **It also settles a question the model could not answer.** Nothing links
+   "Email A" to "Push A" — there is no shared key, and pairing them would have
+   meant inferring a relationship from a free-text internal label. That absence
+   now reads as correct rather than as a gap.
+
+   **Known cost accepted:** *"is this campaign running on push yet?"* is easy and
+   *"how does the beach angle differ across channels?"* is not answered on this
+   surface. Accepted explicitly — a manager who wants that opens both variants.
+
+   **Consequence for the screen cut:** no compare view, no cross-channel variant
+   screen, and the variant list is a grouped list rather than a matrix. One less
+   screen than the sketch implied.
 2. **When a manager adds a module, do they pick the module type first, or pick
    what goes in it first?** *Constraint: `module_type` and `position` are the
    only NOT NULL columns, so the model's grain is type-first. Lean: type-first,
