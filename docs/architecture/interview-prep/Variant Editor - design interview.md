@@ -16,8 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 36 questions across five clusters, 1 answered.
-> **Cluster 1 in progress — 1/7.**
+> 36 questions across five clusters, 2 answered.
+> **Cluster 1 in progress — 2/7.**
 
 # Variant Editor — design interview (forward-looking)
 
@@ -193,10 +193,53 @@ the product, and that is a real objection.
    **Consequence for the screen cut:** no compare view, no cross-channel variant
    screen, and the variant list is a grouped list rather than a matrix. One less
    screen than the sketch implied.
-2. **When a manager adds a module, do they pick the module type first, or pick
-   what goes in it first?** *Constraint: `module_type` and `position` are the
-   only NOT NULL columns, so the model's grain is type-first. Lean: type-first,
-   but I suspect the real workflow is "I want this article in here".*
+2. ✅ **When a manager adds a module, do they pick the module type first, or pick
+   what goes in it first?**
+   **Resolution (2026-09-25): type first, and content-first is not offered as a
+   second entry point either.** The user:
+
+   > *"A, because of potential modules without content (divider, headlines that
+   > are not connected to the catalog) but also a manager might start setting the
+   > layout and not all necessary fields are prepared. In B this would mean a
+   > specific layout can't be selected if field values are missing. The hope is
+   > that there never are empty fields, but today this is rarely the case"*
+
+   **Two reasons, and the second is the one that generalises.** The first is the
+   obvious one: modules that hold no content at all — a divider, a headline not
+   drawn from the catalogue — have no content to pick first, so a content-first
+   flow cannot create them. The second is sharper: **content-first makes the
+   editor's available choices a function of how complete the data is.** A layout
+   a manager wants becomes unselectable because a field has not been written
+   yet, which inverts the actual working order — the layout is frequently
+   decided *before* the copy exists, and the user is explicit that incomplete
+   content is the normal state today rather than the exception.
+
+   **The principle underneath: composition must not be gated on content
+   readiness.** A tool whose options disappear when the data is thin is at its
+   least useful exactly when the work is at its earliest, and a manager who
+   cannot select the layout they want will pick one they can — so the constraint
+   would quietly change the output, not just the order of work.
+
+   **This is a workflow argument for what the schema already permits**, and it is
+   worth naming because the two agree for different reasons. `module_type` and
+   `position` are the only NOT NULL columns and every binding is nullable, so
+   the model already says a module exists before anything is in it.
+
+   **Carried forward:** it substantially pre-answers question 1.4 (a module with
+   nothing in it is a normal mid-state, not an error) and it constrains question
+   2.2 — if layout precedes copy, an empty required field is the ordinary
+   condition of a draft and cannot be treated as a defect in the composer.
+
+   **Known cost accepted:** the common case — *"I want the beach article in
+   here"* — takes two steps rather than one, and a manager must know which
+   module shape suits the content they have in mind before they can place it.
+
+   **Still unresolved and logged, not decided here:** fields are filled from the
+   manifest **by exact name** and a missing key silently becomes `""`, so binding
+   a content record to a module declaring variables that record does not have
+   renders blank with no error anywhere. Whether the composer warns about a poor
+   fit at bind time is a question for Cluster 2; that **nothing computes fit
+   today** is a fact either way.
 3. **Does a manager consciously choose between the three kinds of module — static,
    content-bound, decision slot — or is that a consequence of what they picked?**
    *Constraint: the CHECK enforces the two FKs are never both set, but nothing
