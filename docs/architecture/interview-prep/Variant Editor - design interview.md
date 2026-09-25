@@ -16,8 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 38 questions across five clusters, 7 answered.
-> **Cluster 1 in progress — 6/8.**
+> 38 questions across five clusters, 8 answered.
+> **Cluster 1 in progress — 7/8.**
 > **Two questions promoted out of order:** 2.7 was answered in passing during
 > question 3, and 2.8 was added by the same message.
 
@@ -369,10 +369,88 @@ the product, and that is a real objection.
    **Known cost accepted:** moving a module from the bottom of a long stack to
    the top is many keystrokes. Mitigated by the outline rather than by
    drag-and-drop on the stack itself.
-6. **May the same content record appear twice in one variant?** *Constraint:
-   nothing forbids it. Lean: allow it — a "featured" and a "more like this"
-   block legitimately overlap — but the editor should say so rather than let it
-   pass silently.*
+6. ✅ **May the same content record appear twice in one variant?**
+   **Resolution (2026-09-25): manual duplicates are allowed with a note in the
+   composer; a slot that would resolve to content already manually selected does
+   not render; and the multi-slot collision is fixed in the decision layer
+   rather than by cross-slot deduplication.** The user:
+
+   > *"manual duplicates allowed, note in composer. decision resolution rule —
+   > when rendering 'if contentid already in email manually selected, do not
+   > render module' (human beats system); if it comes to multiple slots, I guess
+   > it makes more sense to adjust the backend process that decision resolution
+   > not only contains 1 contentid per user but rather a queue of 'next
+   > content'. this way decision engine could pick more than one."*
+
+   **"Human beats system" is a new precedence rule and it is not a restatement
+   of [[ADR-176 — A Negative Decision Outranks a Positive One]].** ADR-176 ranks
+   a *negative* decision over a *positive* one — an exclusion segment beats a
+   manager's pin. This ranks a *human* positive over a *machine* positive when
+   both point at the same content. Different axis, no conflict, and both can
+   hold at once. It is worth stating explicitly because a future reader
+   encountering "the manager's pick wins" right after "the manager's pin loses"
+   would reasonably suspect one of them is wrong.
+
+   **The collision resolves by hiding the module, which reuses
+   [[ADR-086 — Decision Slots Fail Gracefully]]'s existing behaviour rather than
+   inventing one.** A slot whose pick is already in the email is, for that
+   recipient, a slot with nothing to show — the same outcome as a slot that
+   resolved to nothing, reached by a different route.
+
+   **The queue proposal is better than the ordered-exclusion approach I leaned
+   towards, and avoids a rule nobody wants.** My lean would have made each slot
+   aware of what earlier slots took, which gives **position** a meaning it does
+   not have today — the top slot gets first choice, and reordering modules
+   silently changes who receives what. The user's shape keeps slots independent
+   and moves the work into resolution: one recipient gets a ranked queue, and
+   consumers take from it. Reordering stays a presentation change.
+
+   **The business reality check is the part that should govern the build**, and
+   it argues against building much at all here. The user:
+
+   > *"The situation that there's different spots in the same asset with
+   > personalized content with manual selected content in between is low. It's
+   > more likely that it's one spot and gets a rule like 'show up to 3 content
+   > records'. Otherwise it's more likely that a manager would use different
+   > decision strategies (filter on categories or types) so getting the same
+   > content multiple times is low, too."*
+
+   So the collision this question chased is **rare in practice**, and the common
+   shape — one slot yielding several records — is a capability that is already
+   modelled and does not work. That is where the effort belongs.
+
+   **A scope boundary was drawn in passing and it is significant.** The user:
+
+   > *"the third case 'full email personalized' is not built with this frontend
+   > yet. That needs a different approach (including ai subject/preheader/header/
+   > editorial etc)"*
+
+   **This editor is for a human-composed email with personalised spots, not for
+   a generated one.** A fully personalised email is a different product surface
+   requiring AI-authored envelope and editorial copy, and it is explicitly out
+   of scope for this client. Recorded so the composer is not stretched towards
+   it by degrees — and it is consistent with
+   [[ADR-142 — Autonomous Workflows and the Automation Boundary]] and
+   [[ADR-082 — AI May Recommend but Not Publish]] rather than a new position.
+
+   **Three backend gaps found while answering, all verified in code:**
+   - **`max_results` is dead configuration.** `DecisionSlotDB.max_results`
+     exists, defaults to 1, is carried by `DecisionSlotCreate`, exposed by the
+     router and copied by `backend/app/campaigns/duplication.py:244` — and is
+     **read by neither the decision engine nor the render path**. Every
+     reference is CRUD. The *"show up to 3"* case the user calls most likely is
+     therefore configurable today and has no effect.
+   - **A resolution cannot hold a queue.**
+     `DecisionResolutionDB.content_record_id` is a single non-null foreign key,
+     one row per recipient per slot, and `resolve_content_for_module` takes
+     `.first()`. Supporting several picks means either a rank column with
+     several rows or a different shape, and it is the same change `max_results`
+     needs — they are one piece of work, not two.
+   - **Nothing checks manual selection against slot resolution.**
+     `resolve_content_for_module` (`backend/app/rendering/service.py:450`) reads
+     only its own module, so the "human beats system" rule has no place to live
+     yet. It needs the set of manually bound content records for the variant,
+     which the render loop has and does not pass down.
 7. **Can two people edit one variant at once, and what should happen?**
    *Constraint: there is no lock, no version column and no optimistic
    concurrency on `module_instances`. Last write wins, silently.* Is this a real
