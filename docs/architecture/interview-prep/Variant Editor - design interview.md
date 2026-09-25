@@ -16,8 +16,10 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 36 questions across five clusters, 2 answered.
-> **Cluster 1 in progress — 2/7.**
+> 38 questions across five clusters, 4 answered.
+> **Cluster 1 in progress — 3/8** (question 4 added during question 3).
+> **Two questions promoted out of order:** 2.7 was answered in passing during
+> question 3, and 2.8 was added by the same message.
 
 # Variant Editor — design interview (forward-looking)
 
@@ -240,11 +242,54 @@ the product, and that is a real objection.
    renders blank with no error anywhere. Whether the composer warns about a poor
    fit at bind time is a question for Cluster 2; that **nothing computes fit
    today** is a fact either way.
-3. **Does a manager consciously choose between the three kinds of module — static,
-   content-bound, decision slot — or is that a consequence of what they picked?**
-   *Constraint: the CHECK enforces the two FKs are never both set, but nothing
-   makes a manager name the kind.* Is "this slot is personalised" a decision a
-   manager makes about a module, or a different kind of thing they add?
+3. ✅ **Does a manager consciously choose between the three kinds of module —
+   static, content-bound, decision slot — or is that a consequence of what they
+   picked?**
+   **Resolution (2026-09-25): personalisation is configured on the module, in
+   place — shape A.** The user:
+
+   > *"Typically A → Manager decides the position and the strategy; potentially
+   > it shows a summary (what content would be selected now), final decision
+   > engine runs before send"*
+
+   **Established with it: a manager places a slot and picks a strategy; they do
+   not build a rule elsewhere and plug it in.** The decision slot stays a
+   separate row — it must, since `module_instances.decision_slot_id` is a
+   foreign key — but it is *authored* as a property of the module a manager is
+   looking at, not as an independent object with its own creation flow. This
+   makes the standalone Decisions screen a management and reuse surface rather
+   than the place slots come from.
+
+   **"Position and strategy" is the whole of what a manager supplies**, which
+   matches `DecisionSlotDB` exactly: `decision_strategy`, `candidate_filter`,
+   `strategy_config`, `max_results`. Nothing about *which content* — that is the
+   engine's job.
+
+   **The summary is a preview of resolution, and it is explicitly not a
+   commitment.** The user's own framing — *"what content would be selected
+   now"*, with the real engine running before send — states the honesty
+   requirement that question 4.3 asks about: a composer that showed a resolution
+   without saying it is provisional would be showing a manager something that
+   will not happen. Carried to Cluster 4 rather than settled here.
+
+   **Known cost accepted:** a slot shared by several modules is created inside
+   one of them, so the module a slot was born in is arbitrary. Editing it from
+   the Decisions screen must therefore be a first-class path, not a fallback.
+
+   **A correction, and a module type that does not exist.** My reading of
+   *"headlines that are not connected to the catalog"* (question 1.2) as the
+   existing `hero` module was wrong. The user:
+
+   > *"with headlines i didn't mean hero. Headlines can be necessary to separate
+   > different areas within an email. It's a module type that doesn't exist yet
+   > in code."*
+
+   A **section heading** — structural punctuation dividing an email into areas,
+   in the same family as a divider rather than of `hero`, which is editorial
+   content. Logged as a backend gap; it is a manifest and a template, which is
+   exactly the two-file shape [[ADR-160 — Channel Model and Composition]]
+   point 6 chose.
+
 4. **What is a module with nothing in it?** *Constraint: all three binding
    columns null is legal and renders nothing.* A deliberate placeholder the
    manager will fill later, an error, or something the editor should not let
@@ -264,6 +309,50 @@ the product, and that is a real objection.
    concurrency on `module_instances`. Last write wins, silently.* Is this a real
    scenario for a manager and an agency, or is single-editor an acceptable
    assumption to state out loud?
+
+8. 🔲 **Which modules should be catalogue-bound?**
+   question 3 and not yet decided.* The manifests currently split six ways:
+
+   | Module | `cms` | Variables |
+   |---|---|---|
+   | `email/header` | False | `subject`, `preheader` |
+   | `email/hero` | False | `headline`, `text` |
+   | `email/cta` | False | `label`, `url` |
+   | `email/img_left` · `img_right` · `single_stack` | True | `image_url`, `image_alt`, `headline_medium`, `body_medium`, `button_label`, `button_url` |
+   | `push/notification` | True | `push_title`, `push_body`, `push_image_url`, `push_link` |
+
+   The user's proposal:
+
+   > *"if it would be more consistent to make hero another module like the rest,
+   > connected to cms, options to override img/headlines etc; or even to make ALL
+   > modules cms=True. If a manager is forced to select content definitely
+   > everything is categorized. That leaves only decorative 'modules' as 'non cms
+   > modules' like divider."*
+
+   **The argument is strong and it is not about consistency.** Forcing content
+   through the catalogue is what guarantees **categorisation coverage**, and
+   categorisation exists for exactly one purpose the user has already stated —
+   building the recipient's affinity profile. Content typed straight into
+   `module_data` is invisible to that profile forever. So every hand-typed
+   module is a small permanent hole in the signal the decision layer runs on.
+
+   **The counter-argument is about what a catalogue is for.** A subject line and
+   a CTA label are usually campaign-specific rather than reusable assets, so
+   requiring a catalogue record for each would fill the catalogue with one-off
+   rows — which degrades exactly the thing the proposal is trying to protect,
+   since a catalogue of single-use records is not a catalogue. It also collides
+   with [[ADR-162 — Channel Rendering and Artifacts]] point 1: subject and
+   preheader live in a module *because they are fields of an email*, and making
+   them catalogue content says something different about what they are.
+
+   **The question is therefore where the line sits, and there are three
+   candidate lines**, not two: (a) everything except decorative modules, as
+   proposed; (b) everything that carries *editorial* content — so `hero` becomes
+   CMS, `header` and `cta` do not; (c) leave it as it is and accept the holes.
+   *Lean: (b), because it takes the proposal's real prize — `hero` is editorial
+   content and its invisibility to the affinity profile is a genuine defect —
+   without forcing envelope copy into a catalogue it does not belong in. But
+   this is the user's call and the coverage argument may simply outweigh it.*
 
 ## Cluster 2 — Filling a module's fields
 
@@ -300,13 +389,98 @@ the product, and that is a real objection.
    no fields to fill — the fields come from whatever the slot resolves to. Is
    this an empty form, a description of the rule, or a sample of what it would
    pick?
-7. **Should a module variable declare a length limit, and is it advisory or
-   enforced?** *Constraint: no limit exists anywhere today. The user's
-   predecessor system enforced three headline lengths and the user was explicit
-   that this was **deliberate editorial discipline, not a platform artefact**,
-   and that it maps to module variables rather than a new concept. Lean:
-   advisory — a counter, not a block, since the same discipline is a house style
-   and not a correctness property.*
+7. ✅ **Should a module variable declare a length limit, and is it advisory or
+   enforced?**
+   **Resolution (2026-09-25): the question was wrong. Lengths are not a
+   constraint on one field — they are separate fields.** The user:
+
+   > *"the 'there's only one text length' is not your base. There's only one text
+   > length because we haven't implemented more. To show the options we will need
+   > at least 2 options (long / medium texts + square / wide image)"*
+
+   **`headline_medium` and `body_medium` are not a medium-length rule applied to
+   `headline` — they are their own variables**, and `headline_long` is a
+   different variable rather than the same one with a different limit. The
+   `_medium` suffix already in every CMS manifest was a naming convention I read
+   as incidental; it is the model.
+
+   **This is a better answer than a character counter and it is worth saying
+   why.** A limit is a property of a *rendering context* — this module's layout
+   needs about this much text — and expressing it as a constraint on a shared
+   field forces one piece of content to have one length, which is exactly what
+   an editorial discipline of three lengths refuses. Separate fields let the
+   same content record carry a long headline and a short one and let each module
+   take the one that fits its layout. **No truncation, no ellipsis, no "the
+   designer will deal with it".**
+
+   **Consequence: a content record is authored at several lengths on purpose**,
+   and the composer never shortens anything — it picks the variable the module
+   declares. The counter I leaned towards would have been solving the wrong
+   problem politely.
+
+8. 🔲 **Should the content catalogue's field set be the union of every module
+   manifest's declared variables?** *Proposed by the user during question 3,
+   with a worked example, and not yet decided.* Three modules declaring
+   `{Text Medium, Headline Medium, Button Label Medium, Image Square, Url}`,
+   `{Image Wide, Headline Long, Button Label Long, Url}` and
+   `{Image Wide, Headline Long, Text Long, Url}` resolve by exact-name union
+   into one catalogue field set of seven. The user:
+
+   > *"before you start hardcoding those fields into the finale json blob. We
+   > need a dynamic solution in style of 'drop file'. For example → the .json
+   > files of each module define the existing content fields. So it pulls all
+   > content fields from the different .json files and this become the content
+   > fields in the catalog. […] If someone adds a new module at a later stage,
+   > the json will be extended."*
+
+   **The technical premise is correct and was verified, not assumed.**
+   `ContentRecordDB.content` is `Column(JSON, nullable=False, default=dict)` —
+   one column, no per-field columns, no validation. A module introducing new
+   variable names therefore needs **no migration, ever**. Manifest discovery
+   already walks every file at startup, so the union is computable where the
+   registry already reads.
+
+   **The codebase independently reached the same conclusion and recorded it as a
+   stopgap.** `CONTENT_FIELD_GROUPS` (`backend/app/content/service.py:101`)
+   hardcodes the per-channel field list and its own docstring says: *"Declared
+   here rather than derived from the channel manifests, **which is where it
+   belongs** and is not cheap today: the manifests describe modules and their
+   templates, not a flat list of the content keys a channel reads. When that
+   list exists, this table should read from it rather than repeat it."* The
+   proposal is that list. A duplicate of the email half also lives in
+   `backend/scripts/import_content_csv.py:33-41` and would collapse with it.
+
+   **Four consequences that need answers before this is an ADR**, none of them
+   objections:
+   - **`required` stops being a property of a field.** `body_medium` is required
+     by one module and absent from another, so the catalogue cannot show one
+     truth. `required` is a property of *(module, field)* and only means
+     anything once a module is chosen.
+   - **`label` has the same problem**, and two modules may legitimately label one
+     variable differently.
+   - **The authoring form grows with the module library.** Seven fields from
+     three modules; twenty-five from ten. A manager authoring one record would
+     face every field in the system, most irrelevant — which is the same
+     complaint the user made about content at scale, arriving from the other
+     direction. The union needs a grouping discipline, not just a list.
+   - **Exact-name union is also exact-name collision.** Two modules using one
+     name for different intents merge silently and there is no namespacing.
+     Today's render path already matches by exact name, so this property exists
+     already; the union makes it load-bearing.
+
+   **One tension to resolve explicitly rather than let pass.** On 2026-09-22 the
+   user ruled that *"the json files in the modules is just to connect the fields
+   to the final layout […] we shouldn't rely on reading the module json"* and
+   preferred channel information be held in the backend. That ruling was about
+   deriving **which channel a field belongs to**; this proposal derives **which
+   fields exist**. They are different claims and can both hold — existence from
+   the manifests, channel grouping from somewhere explicit — but the manifests
+   are filed per channel, so the union makes the channel derivation available
+   whether or not it is used. Worth stating which it is.
+
+   **This is a content-catalogue decision surfaced by the editor interview, not
+   an editor decision.** It likely owes its own ADR and it changes what
+   Cluster 2's form questions are asking about.
 
 ## Cluster 3 — Edit versus override
 
