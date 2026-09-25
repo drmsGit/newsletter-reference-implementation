@@ -16,8 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 38 questions across five clusters, 5 answered.
-> **Cluster 1 in progress — 4/8.**
+> 38 questions across five clusters, 7 answered.
+> **Cluster 1 in progress — 6/8.**
 > **Two questions promoted out of order:** 2.7 was answered in passing during
 > question 3, and 2.8 was added by the same message.
 
@@ -321,12 +321,54 @@ the product, and that is a real objection.
    **The model cannot distinguish the two ways a module ends up empty** —
    `module_data = null` on a `cms: false` module and both foreign keys null on a
    `cms: true` one — and does not need to, since both report identically.
-5. **How does a manager reorder the stack?** *Constraint:
-   `UniqueConstraint(variant_id, position)` — swapping two positions collides
-   unless the whole reorder is one transaction. That is an implementation
-   detail; the question is whether reordering is drag-and-drop, move up/down, or
-   explicit numbers, because a drag implies "send me the whole new order" and
-   the others imply "send me one change".*
+5. ✅ **How does a manager reorder the stack?**
+   **Resolution (2026-09-25): arrows and keyboard, optimised for speed.
+   Drag-and-drop is rejected for the module stack.** The user:
+
+   > *"ordering is something that frequently happens until the final send, but
+   > drag'n'drop is absolutely painfull. No SaaS platform managed a good
+   > drag'n'drop experience that allowed targeting the right spot. Especially if
+   > you have to scroll down while dragging. Experience shows that buttons or
+   > keyboard is much less annoying, as long as it's fast."*
+
+   **My question conflated two things and the answer separates them.** I assumed
+   frequent reordering is what *earns* drag-and-drop. It is not: frequency
+   argues for good ergonomics, and drag-and-drop is not good ergonomics here.
+   Reordering happens continually right up to the final send — so the "built in
+   final order, rarely rearranged" hypothesis is wrong — and that makes speed
+   the requirement rather than expressiveness.
+
+   **The rejection has a stated mechanism, not a preference.** A module stack is
+   tall, because every row is a content block, so dragging almost always means
+   dragging *while scrolling* — which is where drag-and-drop reliably fails to
+   hit the intended position. The failure is structural to the surface, which is
+   why "no SaaS platform managed a good experience" rather than "we would do it
+   better".
+
+   **The one place drag-and-drop survives, and it is a new screen element.** The
+   user:
+
+   > *"The only drag'n'drop scenario I can imagine is to have arrows + keys at
+   > the modules/preview but a sitemap somewhere that only shows a plain 'module
+   > and order' and there you can just drag up/down, as it looks more like a nav
+   > bar scrolling is probably not necessary."*
+
+   A compact **outline** listing module type and position only — no content, no
+   fields — is short enough to fit without scrolling, which removes the exact
+   condition that breaks dragging. So drag-and-drop is not rejected in
+   principle; it is rejected on a surface that scrolls and permitted on one that
+   does not. **The outline is an addition to the screen cut** and is not in
+   `docs/react-screen-inventory.md`.
+
+   **Nothing about this constrains the API.** `UniqueConstraint(variant_id,
+   position)` means moving a module from 5 to 2 shifts 2, 3 and 4 regardless, so
+   the backend is a bulk renumber whatever the interaction is. This was purely a
+   front-end question and the earlier framing — drag means "whole order", arrows
+   mean "one change" — was wrong.
+
+   **Known cost accepted:** moving a module from the bottom of a long stack to
+   the top is many keystrokes. Mitigated by the outline rather than by
+   drag-and-drop on the stack itself.
 6. **May the same content record appear twice in one variant?** *Constraint:
    nothing forbids it. Lean: allow it — a "featured" and a "more like this"
    block legitimately overlap — but the editor should say so rather than let it
@@ -419,6 +461,40 @@ the product, and that is a real objection.
    content and its invisibility to the affinity profile is a genuine defect —
    without forcing envelope copy into a catalogue it does not belong in. But
    this is the user's call and the coverage argument may simply outweigh it.*
+
+## Established during Cluster 1 — the client is keyboard-first
+
+**Recorded 2026-09-25, arising from question 1.5 and applying to every screen,
+not to the editor alone.** The user:
+
+> *"Focus is → fast sorting option with arrows. high focus on keys and
+> shortcuts (resend has a great shortcuts overlay)"*
+
+**This is a product-level requirement and it appears nowhere else in the
+repository.** [[Manager Workflow - design interview]] established that the
+manager's job is shifting from producing to deciding and that the landing screen
+answers *"does anything need me?"* — a person who works that way is moving
+through a queue, and queue work is keyboard work. Shortcuts are therefore not a
+power-user nicety bolted on later; they are how the primary user operates the
+primary screen.
+
+**It retroactively strengthens [[ADR-173 — The Manager Client's Runtime Dependencies]]
+for a reason that record does not give.** React Aria was chosen for permissive
+licensing and because it was the only candidate shipping an accessible table.
+Keyboard-first operation is the thing React Aria is actually built for — focus
+management, roving tabindex and keyboard interaction are its core rather than an
+add-on — so the choice is better than its stated justification. Worth carrying
+into the technical interview: the honest answer to *"why React Aria"* now has a
+third leg that is about the product rather than about compliance.
+
+**A shortcuts overlay is part of the deliverable**, on the user's reference
+(Resend's). An overlay is also the cheapest possible discoverability mechanism —
+without one, shortcuts exist for whoever reads the documentation, which is
+nobody.
+
+**Not yet decided:** which keys, whether shortcuts are global or per-screen, and
+whether they are user-configurable. Those are design questions for the build,
+not interview questions, and they are logged rather than answered here.
 
 ## Cluster 2 — Filling a module's fields
 
