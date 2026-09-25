@@ -290,10 +290,37 @@ the product, and that is a real objection.
    exactly the two-file shape [[ADR-160 — Channel Model and Composition]]
    point 6 chose.
 
-4. **What is a module with nothing in it?** *Constraint: all three binding
-   columns null is legal and renders nothing.* A deliberate placeholder the
-   manager will fill later, an error, or something the editor should not let
-   exist?
+4. ✅ **What is a module with nothing in it?**
+   **Resolution (2026-09-25): a normal mid-state in the composer, and a
+   *reported* condition at send — never blocked.** The user: *"report, not
+   block"*. The composer half was already settled by question 1.2 (layout
+   precedes copy, so an unfilled module is the everyday condition of a draft);
+   this closes the send half.
+
+   **It places an unbound module on the "questionable" side of
+   [[ADR-174 — Channel Readiness Is Asserted, Not Computed]] point 3's line** —
+   *the system blocks what is broken and reports what is merely questionable*.
+   The asymmetry that puts it there: an empty **required field on a bound
+   module** means a malformed payload reaches a device, which is broken; an
+   **unbound module** means a block is simply absent, so the email is shorter
+   than planned but still well-formed. Blocking it would also make an ordinary
+   drafting state fatal at the last moment.
+
+   **This is a different case from [[ADR-086 — Decision Slots Fail Gracefully]]
+   and the send review must not merge them.** ADR-086 covers a slot the system
+   *tried* to fill and could not, and hides it. This is a module nobody tried to
+   fill. Identical visual outcome, different fact, and only one of them is worth
+   telling a manager about — a hidden slot is the system working as designed,
+   an unbound module is probably an oversight.
+
+   **Known cost accepted:** a manager can fire a send with a section missing by
+   confirming past the report. Accepted as the same bargain ADR-174 point 2
+   makes — *"the warning is information, not a control"* — and for the same
+   reason: the alternative overrules a person about their own intent.
+
+   **The model cannot distinguish the two ways a module ends up empty** —
+   `module_data = null` on a `cms: false` module and both foreign keys null on a
+   `cms: true` one — and does not need to, since both report identically.
 5. **How does a manager reorder the stack?** *Constraint:
    `UniqueConstraint(variant_id, position)` — swapping two positions collides
    unless the whole reorder is one transaction. That is an implementation
