@@ -16,8 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 38 questions across five clusters, 8 answered.
-> **Cluster 1 in progress — 7/8.**
+> 38 questions across five clusters, 9 answered.
+> **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
 > **Two questions promoted out of order:** 2.7 was answered in passing during
 > question 3, and 2.8 was added by the same message.
 
@@ -451,11 +451,78 @@ the product, and that is a real objection.
      only its own module, so the "human beats system" rule has no place to live
      yet. It needs the set of manually bound content records for the variant,
      which the render loop has and does not pass down.
-7. **Can two people edit one variant at once, and what should happen?**
-   *Constraint: there is no lock, no version column and no optimistic
-   concurrency on `module_instances`. Last write wins, silently.* Is this a real
-   scenario for a manager and an agency, or is single-editor an acceptable
-   assumption to state out loud?
+7. ✅ **Can two people edit one variant at once, and what should happen?**
+   **Resolution (2026-09-25): optimistic concurrency is the floor, plus an
+   *advisory* lock that anyone can clear themselves. Presence and history are
+   wanted but explicitly not from the start.** The user:
+
+   > *"it can happen and data loss is always bad. So we need at least B. Locking
+   > would be nice in the form of that it's 'blocked by XX'. Each manager can
+   > click on 'unblock' themselves, but they will check before. So it doesn't
+   > have to be a real 'lock'. Technically maybe a 'last updated by X on XX at
+   > XX:XX - unlock'."*
+
+   **The lock is a social signal, not an enforcement mechanism, and that is the
+   design.** Anyone may clear it without asking anyone; the expectation is that
+   they check first. This is the cheapest thing that works among colleagues and
+   it deliberately avoids the failure mode of real locks — a lock held by
+   someone who went on holiday, needing an administrator to break.
+
+   **The strongest argument for it is not about people at all.** The user:
+
+   > *"it's realistic that there will be proper ai agents that 'work' parallel
+   > in the system. So they need some sort of fence to not start working on
+   > something that is edited in that same moment"*
+
+   **Concurrency control here is infrastructure for machine principals, not a
+   courtesy between two humans.** [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]]
+   already makes an agent a first-class caller and
+   [[ADR-142 — Autonomous Workflows and the Automation Boundary]] anticipates
+   orchestrators acting on their own schedule. An agent that begins rewriting a
+   variant a person is mid-edit on produces exactly the silent loss this
+   question is about, except faster and more often.
+
+   **This produces an asymmetry the implementation must carry: the same lock is
+   advisory for a person and binding for a machine.** A human clicking *unblock*
+   is exercising judgement — *"I know Jana is at lunch, this is fine"*. An agent
+   has no such judgement and must never clear a fence it did not set. So the
+   mechanism is one field and two policies, and that distinction has to be in
+   the rule rather than in a convention nobody enforces. **This is the part
+   likeliest to owe an ADR**, since it is a new rule about what machine
+   principals may do rather than a UI decision.
+
+   **Wanted, and deferred by the user rather than by me:**
+
+   > *"Small UI feature — showing users initials in a bubble on top, each that
+   > ever worked in that campaign for example, a very slim history function. Not
+   > necessary from the beginning."*
+
+   **Known cost accepted:** two people who both click through the advisory lock
+   still collide — at which point optimistic concurrency catches it and one of
+   them gets a 409 rather than losing work silently. The two mechanisms are
+   layered deliberately: the lock prevents the common case socially, the version
+   check makes the uncommon case visible.
+
+   **Backend gaps found while answering, all verified:**
+   - **The version token already exists.** `variants` and `module_instances`
+     both carry `updated_at` with `onupdate=func.now()`, so optimistic
+     concurrency needs no schema change — only a comparison on write and a 409.
+   - **Neither table records who changed it.** There is no `updated_by` on
+     `variants` or `module_instances`; the only actor column anywhere nearby is
+     `ContentVersionDB.created_by`. So *"last updated by X at HH:MM"* must be
+     read from `audit_events` (`actor_type` + `actor_id`, `subject_type` +
+     `subject_id`, indexed `created_at`) rather than from the row.
+   - **That makes this feature the first real consumer of `audit_events`**,
+     which `docs/backlog.md` flags as having three unproven properties
+     *precisely because nothing reads it back*: `action` is an unvalidated
+     VARCHAR, `detail` carries an unenforced policy, and brand filtering cannot
+     be a plain `WHERE brand_id = ?`. Building this would settle all three, and
+     it is a cheaper first consumer than the operator screen that item
+     anticipates — one subject, one lookup, no filtering.
+   - **`actor_id` is an id, not a name.** Rendering initials or *"blocked by
+     Jana"* needs a join the audit layer deliberately does not do, since
+     [[ADR-153 — Audit and Accountability]] keeps identifiers rather
+     than contact details in the log.
 
 8. ✅ **Which modules should be catalogue-bound?**
    **Resolution (2026-09-25): line (b) — editorial content only. `hero` becomes
@@ -539,6 +606,74 @@ the product, and that is a real objection.
    content and its invisibility to the affinity profile is a genuine defect —
    without forcing envelope copy into a catalogue it does not belong in. But
    this is the user's call and the coverage argument may simply outweigh it.*
+
+### What Cluster 1 produced
+
+**Three principles, and none of them is about the module stack.**
+
+**1. Composition must not be gated on content readiness (question 1.2).** A tool
+whose options disappear when the data is thin is at its least useful exactly when
+the work is earliest. A manager who cannot pick the layout they want picks one
+they can — so the constraint would change the output, not merely the order of
+work. This is the cluster's most portable finding and it generalises past the
+editor.
+
+**2. Human beats system, and it is a different axis from
+[[ADR-176 — A Negative Decision Outranks a Positive One]] (question 1.6).**
+ADR-176 ranks a negative decision over a positive one. This ranks a *human*
+positive over a *machine* positive when both point at the same content. Both
+hold; neither implies the other.
+
+**3. Concurrency control is infrastructure for machine principals (question
+1.7).** The advisory lock is *advisory for a person and binding for a machine* —
+one field, two policies — because a human clearing a fence is exercising
+judgement an agent does not have.
+
+**The catalogue boundary moved and the reason is reusable (question 1.8).**
+Editorial content is catalogue-bound; envelope and call-to-action copy is not.
+The deciding test — *does this field carry topical signal?* — is the right test
+because categorisation feeds exactly one thing, the recipient's affinity profile.
+A counter-argument was offered and rejected on its merits, which is recorded in
+full because the rejection is sharper than the decision.
+
+**Two screen-cut changes.** A compact **outline** view is added (module type and
+position only, no scrolling — the one surface where drag-and-drop works). No
+cross-channel compare view is built, ever, because an email A/B test and a push
+A/B test are separate strategies rather than two readings of one idea.
+
+**A scope boundary.** This editor composes a human-authored email with
+personalised spots. A **fully personalised email is a different product surface**
+requiring AI-authored envelope and editorial copy, and is out of scope for this
+client.
+
+**Eight backend gaps, all verified in code rather than assumed:**
+
+| # | Gap | Where |
+|---|---|---|
+| 1 | No section-heading module exists | `storage/modules/email/` |
+| 2 | `hero` → `cms: true` is a manifest change **and** a data migration | `storage/modules/email/hero.json` |
+| 3 | Catalogue field set should derive from manifests | `content/service.py:101` |
+| 4 | `max_results` is dead configuration — stored, exposed, duplicated, read by nothing | `campaigns/db_models.py:115` |
+| 5 | A resolution cannot hold a queue — one FK, `.first()` at the read site | `campaigns/db_models.py:135` |
+| 6 | Nothing checks manual bindings against slot resolutions | `rendering/service.py:450` |
+| 7 | No optimistic concurrency, though `updated_at` already exists | `variants`, `module_instances` |
+| 8 | No actor on either table; *"last updated by"* must come from `audit_events` | `campaigns/db_models.py` |
+
+**Gaps 4 and 5 are one piece of work, not two** — supporting *"show up to 3"*
+and supporting a ranked queue need the same schema change.
+
+**Gap 8 makes the advisory lock the first real consumer of `audit_events`**,
+which `docs/backlog.md` flags as having three unproven properties *because
+nothing reads it back*. It is a cheaper first consumer than the operator screen
+that item anticipates: one subject, one lookup, no filtering.
+
+**ADR work this cluster owes**, to be sequenced after the interview closes rather
+than written now: the machine-versus-human lock policy (question 1.7) is a new
+rule about what machine principals may do and is the clearest candidate; the
+catalogue-binding line (1.8) and the manifest-derived field set (2.8) probably
+belong together in a content-catalogue record; *human beats system* (1.6) may be
+an addendum to ADR-176 rather than its own record, since it sits on the axis
+ADR-176 already names.
 
 ## Established during Cluster 1 — the client is keyboard-first
 
