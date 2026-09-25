@@ -16,8 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 38 questions across five clusters, 4 answered.
-> **Cluster 1 in progress — 3/8** (question 4 added during question 3).
+> 38 questions across five clusters, 5 answered.
+> **Cluster 1 in progress — 4/8.**
 > **Two questions promoted out of order:** 2.7 was answered in passing during
 > question 3, and 2.8 was added by the same message.
 
@@ -310,7 +310,46 @@ the product, and that is a real objection.
    scenario for a manager and an agency, or is single-editor an acceptable
    assumption to state out loud?
 
-8. 🔲 **Which modules should be catalogue-bound?**
+8. ✅ **Which modules should be catalogue-bound?**
+   **Resolution (2026-09-25): line (b) — editorial content only. `hero` becomes
+   `cms: true`; `header` and `cta` stay static; decorative modules stay static.**
+   The user: *"b, and an override is an everyday tool"*.
+
+   **The deciding test is whether a field carries topical signal**, because that
+   is the only thing categorisation feeds, and categorisation exists for exactly
+   one purpose the user established earlier — the recipient's affinity profile.
+   `hero` is a headline and body copy about a subject, so its invisibility to
+   that profile today is a real defect and is the proposal's actual prize.
+   `cta` is *"Book now"* and carries no topic; `header` is a subject line
+   written for one campaign. Catalogue rows for either would add affinity
+   records worth nothing while filling the catalogue with one-offs — degrading
+   the thing the coverage argument is trying to protect.
+
+   **A counter-argument was offered and rejected on its merits, which is worth
+   recording because the rejection is the sharper reasoning.** I put it that
+   line (a) becomes workable if the override layer carries per-campaign
+   variation — bind `cta` to a canonical *"Read more"* and override the label
+   each time, preserving coverage without one-off rows. The user took (b)
+   anyway *and* confirmed overrides are an everyday tool, so the counter was not
+   refused for lack of cheap overrides. **It addressed the wrong objection.**
+   Cheap overrides solve the *friction* of routing every CTA through the
+   catalogue; they do nothing about the fact that a catalogue row carrying no
+   topical signal is worthless whatever it costs to create. My conditional
+   conflated the two.
+
+   **`header` staying static also keeps [[ADR-162 — Channel Rendering and Artifacts]]
+   point 1 intact.** Subject and preheader live in a module *because they are
+   fields of an email*; making them catalogue content would have asserted they
+   are something else.
+
+   **Known cost accepted:** `cta` and `header` copy remains invisible to the
+   affinity profile permanently. Accepted because neither carries a topic, so
+   nothing is lost that the profile could have used.
+
+   **Backend consequence, logged:** flipping `hero` to `cms: true` is a manifest
+   change *and* a data migration — whatever sits in existing `module_data` for
+   hero instances is orphaned by the flag, because rendering reads
+   `manifest.cms` to decide where variables come from.
    question 3 and not yet decided.* The manifests currently split six ways:
 
    | Module | `cms` | Variables |
@@ -485,6 +524,37 @@ the product, and that is a real objection.
 ## Cluster 3 — Edit versus override
 
 *Where the keystroke goes. The cluster this interview exists for.*
+
+> **Established 2026-09-25, before the cluster opened, while answering question
+> 1.8: an override is an everyday tool, not an exception.** The user:
+>
+> > *"an override is an everyday tool (unfortunately — the longer a company uses
+> > the platform the better they like working with ai and automation so override
+> > will be less and less needed)"*
+>
+> **Three things follow and they pull in different directions.**
+>
+> **(1) The override path must be fast.** It is the common case, so a
+> confirmation step, a mode switch or a dialog on every override would tax the
+> most frequent action in the composer. This is in real tension with
+> [[ADR-040 — Introduce Override Layer]]'s framing of an override as a
+> deliberate, logged deviation — deliberate and frequent are not contradictory,
+> but a UI tuned for one is usually wrong for the other, and questions 3.2 and
+> 3.3 have to resolve it rather than split the difference.
+>
+> **(2) "Unfortunately" is a design target, not an aside.** The user wants
+> overrides to become *less* necessary over time as automation earns trust.
+> A composer that makes overriding pleasant and leaves the underlying content
+> wrong is working against that, which is an argument for question 3.1's answer
+> mattering: an override that should have been a catalogue fix is debt.
+>
+> **(3) Override frequency is a maturity signal, and this is the first thing in
+> the repository that gives `outcome_delta` a reason to exist beyond curiosity.**
+> If a company's override rate falls as it uses the platform, the automation is
+> earning trust; if it rises, something is drifting. That makes override volume
+> a measure of the *product* rather than of a campaign — a claim the playbook
+> can make and few competitors can. Worth carrying to the business side and to
+> question 3.9.
 
 1. **A manager is composing a campaign, sees a typo in a headline, and fixes it.
    Where does that change land — in `content_records`, or in
