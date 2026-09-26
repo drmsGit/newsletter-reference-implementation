@@ -16,7 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 38 questions across five clusters, 9 answered.
+> 39 questions across five clusters, 11 answered.
+> **Cluster 2 in progress — 3/9** (2.7 and 2.8 answered out of order; 2.9 added).
 > **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
 > **Two questions promoted out of order:** 2.7 was answered in passing during
 > question 3, and 2.8 was added by the same message.
@@ -773,7 +774,7 @@ not interview questions, and they are logged rather than answered here.
    declares. The counter I leaned towards would have been solving the wrong
    problem politely.
 
-8. 🔲 **Should the content catalogue's field set be the union of every module
+8. ✅ **Should the content catalogue's field set be the union of every module
    manifest's declared variables?** *Proposed by the user during question 3,
    with a worked example, and not yet decided.* Three modules declaring
    `{Text Medium, Headline Medium, Button Label Medium, Image Square, Url}`,
@@ -836,6 +837,87 @@ not interview questions, and they are logged rather than answered here.
    **This is a content-catalogue decision surfaced by the editor interview, not
    an editor decision.** It likely owes its own ADR and it changes what
    Cluster 2's form questions are asking about.
+
+   **Resolution (2026-09-26): adopted. No field is required at the catalogue
+   level; the composer warns at bind time instead.** The user's answers also
+   dissolved the consequence I was most worried about.
+
+   **The field count is bounded, and my "thirty, maybe fifty" was wrong.** The
+   user:
+
+   > *"if we consider 3 module types (much, medium and small amount of content
+   > details) there's kind of a cap in fields: image url, alt text, headline,
+   > copy, button text (by 3) / url, tracking, hero headline, hero button text,
+   > legal conditions (by 1) — so roughly 20 fields for all email fields.
+   > push / social / whatsapp / sms may be another 4 per channel (url, tracking,
+   > headline, text). in the end it depends on business model but it's unlikely
+   > that it will become 50 - 60 - 70 fields."*
+
+   **Modules cluster into a few content densities rather than proliferating**,
+   so the union converges instead of growing with the library. The catalogue
+   form is long but finite — roughly twenty email fields plus four per
+   additional channel. Consequence 3 of this question ("the form grows with the
+   module library") is therefore a grouping problem, not a scale problem.
+
+   **Beta scope: two sizes, not three.** *"For our beta example we stick to two
+   length (modules that cover full width, modules that split in 50:50)."* The
+   size vocabulary is set by layout width, which is why it is two rather than
+   three — full-width and half-width are the layouts that exist.
+
+   **Nothing is required at the catalogue level**, confirming the lean, and
+   `required` and `label` are therefore properties of *(module, field)* rather
+   than of the field. The catalogue cannot show one truth for a field one module
+   demands and another never mentions, so it shows neither and the composer
+   shows both. This is the same shape as question 1.4 (report, do not block) and
+   [[ADR-174 — Channel Readiness Is Asserted, Not Computed]] point 2 (warn, do
+   not compute), and it puts the check where the information exists — only the
+   composer knows which module was chosen.
+
+9. ✅ **Is a content record safe for a machine to pick?**
+   *Raised by the user during question 2.8 and answered in the same message.*
+   **Resolution (2026-09-26): a manager-set "machine ready" toggle on the
+   content record.** The user:
+
+   > *"To help with all machine selection → toggl for 'machine ready' that way a
+   > manager can decide if it's save to use this content record (we need this
+   > anyway, maybe there's content that's only allowed for a specific target
+   > group or time or any other reason that must be excluded from machine
+   > pick)"*
+
+   **This is a third assertion axis and it must not be merged with the other
+   two.** ADR-174 point 1 was explicit that `status` and channel readiness are
+   different axes and that collapsing them produces an enum that grows by one
+   value per channel. The same reasoning applies again:
+
+   | Axis | Answers | Set by |
+   |---|---|---|
+   | `status` (`active`/`inactive`) | may this record be newly selected at all | a person |
+   | channel readiness | may it go out on this channel | a person (ADR-174) |
+   | **machine ready** | **may a machine pick it without a person deciding** | **a person** |
+
+   A record can be active, push-ready and *not* machine-selectable — a piece
+   that is legally sensitive, time-bound, or meant for one audience only, which
+   a person must place deliberately.
+
+   **It is a record-level fail-closed flag and that distinguishes it from
+   `candidate_filter`.** `DecisionSlotDB.candidate_filter` is *the slot saying
+   what it wants*; this is *the record saying whether it may be taken at all*,
+   and it applies to every slot at once. A slot's filter cannot express "never,
+   by anyone, automatically" without every slot author remembering to write it —
+   which is the fail-open shape the repo refuses elsewhere.
+
+   **It follows the same asserted-not-computed principle as ADR-174** and for
+   the same reason: the exclusions the user lists (a target-group restriction, a
+   time window, "any other reason") are intent, and no computation over the
+   `content` blob can see intent.
+
+   **It is consistent with [[ADR-082 — AI May Recommend but Not Publish]] and
+   with [[ADR-176 — A Negative Decision Outranks a Positive One]]** — a negative
+   assertion on the record outranks any slot's positive selection — but it is
+   narrower than either: it governs the *decision engine*, not AI authorship.
+
+   **Likely owes an ADR, probably the same one as question 1.8 and 2.8**, since
+   all three are catalogue-level decisions surfaced by this interview.
 
 ## Cluster 3 — Edit versus override
 
