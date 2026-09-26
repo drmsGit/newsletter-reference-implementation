@@ -16,10 +16,10 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 41 questions across five clusters, 32 answered.
+> 41 questions across five clusters, 33 answered.
 > **Cluster 3 ✅ CLOSED 2026-09-26, 9/9.**
 > **Cluster 2 ✅ CLOSED 2026-09-26, 10/10.**
-> **Cluster 4 in progress — 5/8** (4.3b added during 4.3).
+> **Cluster 4 in progress — 6/8** (4.3b added during 4.3).
 > **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
 > **Two questions promoted out of order:** 2.7 was answered in passing during
 > question 3, and 2.8 was added by the same message.
@@ -1923,11 +1923,39 @@ inherit it later.
     the engine chose at a moment, so it must be able to say which version it
     chose. A manual binding records a manager's intent to use a *record*, not a
     *version*.
-4. **A decision slot that resolves to nothing is hidden, not placeheld
-   ([[ADR-086 — Decision Slots Fail Gracefully]]). In the composer, should a
-   hidden slot be visible to the author?** *Constraint: rendering emits an HTML
-   comment, so the information exists.* The recipient must not see a gap; the
-   author probably must.
+4. ✅ **In the composer, should a hidden slot be visible to the author?**
+   **Resolution (2026-09-26): three distinct states, with "found nothing"
+   visibly different from the other two.** The user: *"three distinct states,
+   the found-nothing one visibly different"*.
+
+   | State | Means | Manager should |
+   |---|---|---|
+   | resolved to content | working | nothing |
+   | **resolved to nothing** | the rule found no candidate; [[ADR-086 — Decision Slots Fail Gracefully]] hides it in the real email | **fix the rule — it is too narrow** |
+   | no resolution exists | the decision run has not happened (question 4.2) | nothing — it has not run |
+
+   **This is question 1.4's shape arriving one screen earlier**, and the
+   repetition is the point. There the distinction was *"the system tried and
+   found nothing"* versus *"nobody tried"*, and the send review was told not to
+   merge them. Same two facts, identical appearance, different meaning, and only
+   one of them is actionable. **A design that collapses them trains a manager to
+   ignore both.**
+
+   **Only one of the three warrants visual weight**, which is why "three
+   distinct states" is not three alarms: a resolved slot shows content, an unrun
+   slot shows a plain placeholder, and a slot that resolved to nothing is marked
+   — because it is the only one that means *your rule is wrong*, and the only
+   one that otherwise ships as a **silently shorter email**.
+
+   **The information already exists and nothing needs computing.** Rendering
+   emits `<!-- module N: no content resolved, slot hidden -->`, so surfacing
+   this is reading a comment the renderer already writes. What is missing is a
+   structured form of it — an HTML comment is not something a client should
+   parse, so the render response needs to carry per-module state rather than the
+   client scraping the artifact.
+
+   **The recipient never sees any of this.** ADR-086 is untouched; this is
+   author-only, in the composer preview.
 5. **ADR-086 also says that if no meaningful content remains, the email must not
    be sent. Who evaluates "meaningful", and when?** *Constraint: this is
    currently unimplemented. It is a compose-time question and a send-time
