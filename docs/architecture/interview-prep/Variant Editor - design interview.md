@@ -16,8 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 40 questions across five clusters, 26 answered.
-> **Cluster 3 in progress — 7/9.**
+> 40 questions across five clusters, 27 answered.
+> **Cluster 3 in progress — 8/9.**
 > **Cluster 2 ✅ CLOSED 2026-09-26, 10/10.**
 > **Cluster 4 — 1/7** (4.7 answered during 2.2).
 > **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
@@ -1606,11 +1606,42 @@ second time the cluster found a boolean too coarse; question 1.8 was the first.
 
    **Known cost accepted:** a manager can change a colleague's unsent campaign
    knowing only that four campaigns are affected, not whose.
-8. **Does an override need a reason?** *Constraint: Manager Workflow Q1.5 settled
-   that comments are always optional. An override is a deliberate deviation from
-   what the system produced, and `outcome_delta` exists to ask later whether it
-   was a good one — which is hard to answer without knowing what was intended.*
-   Does "optional everywhere" hold here, or is this the exception?
+8. ✅ **Does an override need a reason?**
+   **Resolution (2026-09-26): optional presets, with free text behind "other".**
+   The user: *"presets with free text behind 'other'"*.
+
+   **"Optional everywhere" holds — this is not an exception to
+   [[Manager Workflow - design interview]] Q1.5.** Nothing is required; a
+   manager may override and say nothing. What changes is the *shape* of the
+   answer when they do give one.
+
+   **The reason for changing the shape is instrumentation, not accountability.**
+   Question 1.8 made override frequency a maturity measure — the rate should
+   fall as automation earns trust. But **a falling rate does not say what to
+   fix.** *Why* managers override is the actionable feedback, and a free-text
+   field that is empty most of the time produces none. A preset is **one click
+   rather than typing**, so it does not tax the everyday path a text box would,
+   and it is **machine-readable**, so the trend becomes analysable rather than
+   anecdotal.
+
+   **The stated goal is what justifies it.** The user wants overrides to become
+   less necessary; a goal with no instrumentation tends not to happen. This is
+   the cheapest instrumentation that does not slow the action being measured.
+
+   **Known cost accepted, and it is a real one:** a fixed vocabulary is always
+   slightly wrong, and presets invite people to pick the nearest option rather
+   than the true one — producing data that looks better than it is. The "other"
+   escape hatch limits but does not remove this.
+
+   **The vocabulary itself is not settled here.** The sketch offered was *too
+   long · wrong tone · factually wrong · campaign-specific · other*; it is a
+   starting point for the build, not a decision, and it should be revisited once
+   there is real volume rather than guessed at more precisely now.
+
+   **Storage:** `reason` is `String(1000), nullable=True` and already exists. A
+   preset is a value in that column, not a new one — though if the analysis in
+   1.8 is to be cheap, a short constrained code is a better fit than prose, and
+   that is a schema question for the ADR rather than for this interview.
 9. **Is `outcome_delta` a manager-facing thing?** Does the composer ever show
    "the last time you overrode this, it performed worse", or is that purely an
    insight-layer concern that never reaches this screen?
