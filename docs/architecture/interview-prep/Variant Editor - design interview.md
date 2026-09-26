@@ -16,8 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 40 questions across five clusters, 23 answered.
-> **Cluster 3 in progress — 4/9.**
+> 40 questions across five clusters, 24 answered.
+> **Cluster 3 in progress — 5/9.**
 > **Cluster 2 ✅ CLOSED 2026-09-26, 10/10.**
 > **Cluster 4 — 1/7** (4.7 answered during 2.2).
 > **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
@@ -1473,11 +1473,44 @@ second time the cluster found a boolean too coarse; question 1.8 was the first.
    expectation "I fixed it for this campaign" — meaning every module in the
    campaign that uses that record? *This is the one place the model may be
    finer-grained than the mental model.*
-7. **Editing the catalogue record changes every composed-but-unsent campaign
-   using it.** *Constraint: snapshots pin what was sent, so history is safe —
-   the exposure is campaigns already built and not yet fired, including ones
-   another person is responsible for.* What must the composer tell the manager
-   before that edit — nothing, a count, or a list?
+7. ✅ **Editing the catalogue record changes every composed-but-unsent campaign
+   using it. What must the composer tell the manager?**
+   **Resolution (2026-09-26): a passive count, always visible, clickable to a
+   list. No owner names.** The user: *"A is fine, passive count plus list, no
+   owner names"*. *Taken out of order because question 3.2's condition made it
+   binding rather than open.*
+
+   **"Nothing" was already excluded**, since 3.2 requires the catalogue state to
+   announce itself and its reach.
+
+   **Passive rather than on-edit or on-save, and the argument is that it cannot
+   surprise anyone.** The reach is on screen *before* a manager types, so
+   editing is never a revelation — which is the exact failure mode the 3.2
+   condition names. A notice on first keystroke or a dialog on save both arrive
+   after the manager has committed to the action, and a dialog would tax
+   question 3.3's default path with a confirmation on every typo fix.
+
+   **The count must be of *unsent* usages, not of usages.** Sent campaigns are
+   snapshotted and immune, so a raw "used in 12 campaigns" **overstates the
+   blast radius** — and a number a manager learns to distrust is worse than no
+   number. The query is one join (module instances → variants → campaigns,
+   filtered to unsent) and is cheap for a single record.
+
+   **Count first, list on demand.** A number answers *"should I be careful?"*,
+   which is asked every time; the list answers *"careful about what?"*, which is
+   not.
+
+   **Owner names are excluded, and the reasoning matters more than the
+   decision.** The hazard raised was that an affected campaign may belong to
+   someone else who is presenting it tomorrow. Naming owners here would mean
+   resolving `audit_events`' `actor_id` to a person on a composer screen, and
+   [[ADR-153 — Audit and Accountability]] deliberately stores identifiers rather
+   than contact details. **The composer reports scope, not people** — who is
+   affected is the approval inbox's and the audit log's question, on surfaces
+   built to answer it.
+
+   **Known cost accepted:** a manager can change a colleague's unsent campaign
+   knowing only that four campaigns are affected, not whose.
 8. **Does an override need a reason?** *Constraint: Manager Workflow Q1.5 settled
    that comments are always optional. An override is a deliberate deviation from
    what the system produced, and `outcome_delta` exists to ask later whether it
