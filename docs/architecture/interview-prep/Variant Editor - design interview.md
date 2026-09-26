@@ -16,8 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 40 questions across five clusters, 17 answered.
-> **Cluster 2 in progress — 8/10** (2.7–2.10 answered out of order).
+> 40 questions across five clusters, 18 answered.
+> **Cluster 2 in progress — 9/10** (2.7–2.10 answered out of order).
 > **Cluster 4 — 1/7** (4.7 answered during 2.2).
 > **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
 > **Two questions promoted out of order:** 2.7 was answered in passing during
@@ -926,10 +926,51 @@ not interview questions, and they are logged rather than answered here.
    **Known cost accepted:** two derived routes instead of none, and the field
    catalogue is a file the backend must reload or restart to pick up — the same
    property module discovery already has.
-5. **Which fields are rich text, and who decides?** *Constraint: rendering
-   special-cases a single field name today. A manifest-declared field type would
-   generalise it; a hardcoded name will not survive the second channel.* Does a
-   manager need formatting control at all, or is formatting the module's job?
+5. ✅ **Which fields are rich text, and who decides?**
+   **Resolution (2026-09-26): bold, link, italic and bullet lists. Raw markdown,
+   no toolbar — but the syntax must be explained somewhere.** The user: *"bold,
+   link, italic, bullets — raw markdown, no toolbar, but markdown commands need
+   to be explained somewhere"*.
+
+   **The security design was already right and is untouched.** `render_rich_text`
+   (`backend/app/rendering/service.py:49`) HTML-escapes the whole string *first*
+   and only then applies its patterns, so **raw HTML can never be injected
+   through content**. Italic and bullets are added inside that envelope, not
+   around it. The docstring calls this *"the controlled alternative to the
+   raw-HTML-in-content-fields risk autoescaping closed"*, and it stays the
+   controlled alternative.
+
+   **The defect was the hardcoded name, and questions 2.10 and 2.4 had already
+   fixed it.** `_RICH_TEXT_FIELD = "body_medium"` is a single constant, so
+   `body_long` — which 2.10's size vocabulary requires — would silently get no
+   formatting at all. It becomes `type: "richtext"` in `fields.json`, declared
+   once.
+
+   **One consequence that stops being luck and becomes a rule.** Rich text emits
+   `<strong>` and `<br>`, which are meaningless in a push notification. That is
+   safe today only by accident of layout: the email and push paths diverge
+   before this runs, and push happens to use `push_body` rather than
+   `body_medium`. Once `richtext` is a declared type any channel can use, **the
+   renderer must strip rather than emit** — which is consistent with
+   [[ADR-162 — Channel Rendering and Artifacts]] point 2 (*the renderer formats,
+   it never decides*) but has to be written down rather than inherited from a
+   coincidence.
+
+   **Headings were considered and excluded.** A heading inside a body field
+   fights the module's own layout, and every syntax added is one more pattern
+   the push path must strip and the email templates must style.
+
+   **No toolbar, and the reason is not only speed.** A toolbar implies WYSIWYG
+   affordances the escape-first design cannot honour, and raw typing suits the
+   keyboard-first client established in Cluster 1. The accepted cost is a
+   manager who does not know the syntax seeing `**bold**` come out literally.
+
+   **The user's "explained somewhere" is a requirement, not a nicety, and two
+   homes already exist for it.** The `note` field from question 2.10 carries
+   per-field guidance readable by a person or an AI, and the **shortcuts
+   overlay** established in Cluster 1 is the natural home for the syntax itself
+   — a keyboard-first client that already owes an overlay should not grow a
+   second help mechanism beside it.
 6. **What does a manager see for a module bound to a decision slot?** There are
    no fields to fill — the fields come from whatever the slot resolves to. Is
    this an empty form, a description of the rule, or a sample of what it would
