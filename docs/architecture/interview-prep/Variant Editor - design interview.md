@@ -16,10 +16,10 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 40 questions across five clusters, 28 answered.
+> 40 questions across five clusters, 29 answered.
 > **Cluster 3 ✅ CLOSED 2026-09-26, 9/9.**
 > **Cluster 2 ✅ CLOSED 2026-09-26, 10/10.**
-> **Cluster 4 — 1/7** (4.7 answered during 2.2).
+> **Cluster 4 in progress — 2/7.**
 > **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
 > **Two questions promoted out of order:** 2.7 was answered in passing during
 > question 3, and 2.8 was added by the same message.
@@ -1750,10 +1750,38 @@ inherit it later.
 
 *What a manager checks before handing the variant on, and what "ready" means.*
 
-1. **Who is the preview for — the author checking their own work, or the approver
-   checking someone else's?** *This decides whether preview belongs in the
-   composer, the approval screen, or both, and they are not the same artefact:
-   an author wants to iterate, an approver wants proof.*
+1. ✅ **Who is the preview for — the author checking their own work, or the
+   approver checking someone else's?**
+   **Resolution (2026-09-26): both, from two different sources. The same viewer,
+   fed live for an author and from the snapshot for an approver.** The user:
+   *"yes, split is right — surface the refusal earlier, at snapshot"*.
+
+   | | source | changes under you? |
+   |---|---|---|
+   | **Author's preview** | `GET /rendering/variants/{id}` — live render of current state | yes, that is the point |
+   | **Approver's proof** | the **snapshot** — `artifact_location`, frozen | no |
+
+   **The sequence already makes this work and nothing needs adding.** A snapshot
+   is a deliberate act (`POST /campaigns/{id}/variants/{id}/snapshots`), a send
+   takes a `snapshot_id`, and firing the send is the approvable step — so **a
+   frozen artefact exists by approval time**. An approver reviewing a live
+   render would be approving something that can change afterwards, which would
+   make the approval meaningless.
+
+   **A second blocking gate was surfaced and confirmed as correctly placed.**
+   `create_snapshot_for_variant` raises `UnpublishedContentError`, so freezing a
+   variant can be refused because of the publication state of content it
+   references. The user confirmed the gate belongs at snapshot — **which is
+   already earlier than the send pre-flight**, and catching it there rather than
+   deferring it to send is the point.
+
+   **The consequence, following question 3.7's pattern rather than being decided
+   separately:** the composer deliberately does not compute completeness (1.4,
+   2.2), so a manager can compose happily and be refused at the freeze. The fix
+   is not a new blocking check — it is the same shape 3.7 chose for catalogue
+   reach: **a passive indicator, visible before the action, so the refusal
+   cannot be a surprise.** Recorded as the natural consequence of two decisions
+   already taken, not as a separate one.
 2. **Preview takes an optional `recipient_id`. Does a manager pick a real
    recipient, pick a segment, or see a generic preview with slots unresolved?**
    *Lean: a real recipient, because a personalised newsletter previewed
