@@ -16,10 +16,10 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 41 questions across five clusters, 33 answered.
+> 41 questions across five clusters, 34 answered.
 > **Cluster 3 ✅ CLOSED 2026-09-26, 9/9.**
 > **Cluster 2 ✅ CLOSED 2026-09-26, 10/10.**
-> **Cluster 4 in progress — 6/8** (4.3b added during 4.3).
+> **Cluster 4 in progress — 7/8** (4.3b added during 4.3).
 > **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
 > **Two questions promoted out of order:** 2.7 was answered in passing during
 > question 3, and 2.8 was added by the same message.
@@ -1956,11 +1956,46 @@ inherit it later.
 
    **The recipient never sees any of this.** ADR-086 is untouched; this is
    author-only, in the composer preview.
-5. **ADR-086 also says that if no meaningful content remains, the email must not
-   be sent. Who evaluates "meaningful", and when?** *Constraint: this is
-   currently unimplemented. It is a compose-time question and a send-time
-   question and they may get different answers — at compose time the slots have
-   not resolved for anybody.*
+5. ✅ **ADR-086 says that if no meaningful content remains, the email must not
+   be sent. Who evaluates "meaningful", and when?**
+   **Resolution (2026-09-26): a per-recipient skip in the send path, after
+   rendering, with its reason recorded alongside the exclusion reasons.** The
+   user: *"yes, per-recipient skip, reason alongside the exclusion reasons"*.
+
+   **The "when" is settled by the fact that this is inherently per-recipient.**
+   For one recipient every slot resolves; for another none do, and they receive
+   a header, a divider and a footer. **Compose time cannot evaluate it** — the
+   slots have not resolved for anybody, and question 4.2 established that
+   preview does not resolve either. So it can only live in the send path, after
+   rendering, per person.
+
+   **That also reads [[ADR-086 — Decision Slots Fail Gracefully]] literally.**
+   *"The email must not be sent"* — **that** email, to **that** person. It is a
+   skip, not a failed send, and a send to a thousand people does not abort
+   because one of them resolved to nothing.
+
+   **"Meaningful" means at least one module produced output beyond the envelope
+   and the decorative modules.** The alternatives each break on a real case: *no
+   modules rendered* is never true because the header always renders; *no `cms`
+   module rendered* wrongly kills a legitimate all-static announcement email;
+   *fewer than N content modules* requires choosing N. The chosen test needs no
+   threshold — a static announcement passes because its `hero` and `cta` produce
+   output, and a recipient whose every slot came up empty fails because only
+   header and footer rendered.
+
+   **The reason lands with the exclusion reasons, and that is the load-bearing
+   half of the answer.** `app/delivery/exclusion.py` already records *why* each
+   recipient was excluded on the execution row, in an ordered stack
+   (addressability → consent → suppression → frequency). This check cannot
+   **join** that stack — the stack runs before the send loop and this one needs
+   the rendered result — so it is a distinct post-render skip. But its reason
+   belongs in the same place, because *"why didn't this person get it?"* must
+   have **one** answer surface. Two places to look is how a compliance question
+   becomes an afternoon.
+
+   **Consequence:** the exclusion-reason vocabulary gains a value that is not
+   produced by the exclusion stack, so whatever records it must accept a reason
+   from a later stage. Logged as a gap.
 6. **What are `variants.status`'s values, and who moves them?** *Constraint: the
    column defaults to `draft` and **no ADR defines the vocabulary**. The content
    record's `status` is deliberately constrained to exactly two values, with a
