@@ -16,8 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 39 questions across five clusters, 11 answered.
-> **Cluster 2 in progress — 3/9** (2.7 and 2.8 answered out of order; 2.9 added).
+> 40 questions across five clusters, 12 answered.
+> **Cluster 2 in progress — 4/10** (2.7–2.10 answered out of order).
 > **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
 > **Two questions promoted out of order:** 2.7 was answered in passing during
 > question 3, and 2.8 was added by the same message.
@@ -918,6 +918,65 @@ not interview questions, and they are logged rather than answered here.
 
    **Likely owes an ADR, probably the same one as question 1.8 and 2.8**, since
    all three are catalogue-level decisions surfaced by this interview.
+
+10. ✅ **What does a module variable declare?**
+    *Raised by the user during question 2.8 — "if we have concept and size, why
+    do we need a name?" — and settled 2026-09-26.*
+    **Resolution: an explicit, stable `name` is the storage key. `concept`,
+    `size` and `type` describe it; they never derive it.** The user: *"explicit
+    name, stable key"*.
+
+    **The redundancy is real and is accepted deliberately.** Deriving
+    `headline_long` from `concept: headline` + `size: long` removes the
+    duplication and puts one convention in one place — the registry — instead of
+    repeating it in every manifest. It was rejected because **a concept rename
+    would silently change every key**, and stored content would be orphaned in
+    place with no error: `ContentRecordDB.content` is unvalidated JSON, so
+    nothing anywhere would notice. A derived identifier is tidy until something
+    it derives from moves, which is the same failure the ADR renumbering repair
+    of 2026-09-24 was cleaning up years after the fact.
+
+    **With an explicit name, renaming a concept is a display change rather than
+    a data event.** That is the whole of the argument.
+
+    **The descriptor that results**, answering the three follow-up questions the
+    user raised in the same message:
+
+    | Attribute | Purpose |
+    |---|---|
+    | `name` | **the JSON key.** Explicit, stable, never computed |
+    | `concept` | semantic grouping for the authoring form — `headline`, `button_label`, `image` |
+    | `size` | optional. **Only meaningful for sized types**, and its vocabulary depends on the type: lengths for text, aspect ratios for images |
+    | `type` | `text` · `url` · `asset`. The attribute that was missing |
+    | `note` | guidance for a person **or an AI** on how to use the field. Replaces `label` |
+    | `required` | kept, but is a property of *(module, field)* — meaningful only once a module is chosen (question 2.8) |
+
+    **`type` is what resolves the user's "concept button, size url — doesn't make
+    sense" objection.** A button has a label that is sized and a URL that is not,
+    so they are **two concepts rather than one concept with two parts**, and the
+    rule that falls out is that **size applies only to text-typed fields**.
+
+    **Lengths belong to *(concept, size)*, not to size alone.** *"one spot to
+    define long =120, short =60"* is nearly right — a long headline and a long
+    body are not both 120. Defined centrally rather than per manifest, so two
+    modules cannot disagree about what "long headline" means, which is question
+    2.8's collision problem in another form. **Advisory, not enforced**, per
+    question 2.7 and the report-not-block line.
+
+    **`note` replacing `label` is a strict improvement.** The form label can be
+    built from concept and size, which frees the field to carry the thing that
+    has no home today — advice on how the field should be used, readable by a
+    person and by an AI author. `label` was dropped by `ModuleVariableOut`
+    anyway, so nothing regresses.
+
+    **Assets are a different kind of field and the subsystem does not exist.**
+    The user: *"image 'long' or 'wide' is a url in the end so 120 might be too
+    short (or it's just referring to a folder) it also will need an upload/select
+    function, so maybe it just fills an ID"*. Correct on all three counts, and
+    verified: **there is no asset table, no upload handling and no picker
+    anywhere in the backend** — `image_url` is a plain string typed into a form.
+    Storing an ID rather than a URL is the right call and it requires a media
+    subsystem that is entirely absent. Logged as a gap rather than designed here.
 
 ## Cluster 3 — Edit versus override
 
