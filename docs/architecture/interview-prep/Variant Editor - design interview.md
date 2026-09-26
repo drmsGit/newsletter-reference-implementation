@@ -16,8 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 40 questions across five clusters, 18 answered.
-> **Cluster 2 in progress — 9/10** (2.7–2.10 answered out of order).
+> 40 questions across five clusters, 19 answered.
+> **Cluster 2 ✅ CLOSED 2026-09-26, 10/10.**
 > **Cluster 4 — 1/7** (4.7 answered during 2.2).
 > **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
 > **Two questions promoted out of order:** 2.7 was answered in passing during
@@ -971,10 +971,72 @@ not interview questions, and they are logged rather than answered here.
    overlay** established in Cluster 1 is the natural home for the syntax itself
    — a keyboard-first client that already owes an overlay should not grow a
    second help mechanism beside it.
-6. **What does a manager see for a module bound to a decision slot?** There are
-   no fields to fill — the fields come from whatever the slot resolves to. Is
-   this an empty form, a description of the rule, or a sample of what it would
-   pick?
+6. ✅ **What does a manager see for a module bound to a decision slot?**
+   **Resolution (2026-09-26): the rule, plus an optional heading. A live summary
+   is a nice-to-have; a placeholder in the preview is the baseline. And a
+   decision slot may not be overridden at all.**
+
+   **The override answer reverses a documented intent, and that is the most
+   consequential thing in this question.** The user:
+
+   > *"decision slots shouldn't get override. It's personalized, so pinning a
+   > headline or body text would 'de-personalize' it and if you allow 3 results
+   > this would mean 3 times the same overridden content."*
+
+   `ContentOverrideDB`'s own docstring names the forbidden case as the intended
+   one — *"a consistent headline across the personalized picks"* — and
+   `resolve_module_variables` applies `field_overrides` **after** resolution, so
+   the capability exists and works today. **It is now to be removed rather than
+   merely left unused.** The reasoning is sound in a way the docstring's was
+   not: an override on a slot defeats the purpose of the slot, and the
+   `max_results` work from question 1.6 makes it absurd — three personalised
+   picks all wearing the same pinned headline.
+
+   **So an override attaches to a module bound to a content record, never to one
+   bound to a decision slot**, and that is enforceable rather than a convention:
+   a `ContentOverrideDB` row whose module has a non-null `decision_slot_id`
+   should be refused. **This pre-answers part of Cluster 3** and narrows what
+   "edit versus override" can mean — the fork only exists for catalogue-bound
+   modules.
+
+   **A new requirement, and it cannot be met with an existing module.** The
+   user:
+
+   > *"What is necessary as an option tho is to put a headline over the module
+   > optionally (like 'this might be of interest') you can't use a normal
+   > headline module here because it mustn't render in the case a person doesn't
+   > have a personlized content record."*
+
+   **The heading must hide when the slot hides.** A separate heading module has
+   no way to know that, so it would leave *"This might be of interest"* floating
+   above nothing for exactly the recipients the slot found nothing for — which
+   is the failure [[ADR-086 — Decision Slots Fail Gracefully]] exists to
+   prevent, reintroduced one row higher. The heading therefore belongs **to the
+   slot-bound module**, conditional on it resolving.
+
+   **That exposes a real limitation: `cms` is a boolean and the case needs a
+   mixture.** A manifest is either CMS-driven (every field from the content
+   record or slot) or not (every field from `module_data`) —
+   `backend/app/rendering/service.py:162` branches on exactly that. There is no
+   way to say *"these fields come from the resolved content, and this one is
+   typed by hand"*. The storage is already available — the `CHECK` constrains
+   only the two foreign keys, so `module_data` may coexist with a
+   `decision_slot_id` — but the renderer ignores it for a CMS module. **Logged
+   as a gap; it is the same shape as question 1.8's finding that the binary was
+   too coarse.**
+
+   **The summary is explicitly a nice-to-have.** The user: *"A nice to have
+   would be a summary of 'based on the selected strategy this content would be
+   picked today + count how many people see that content'. Otherwise a
+   placeholder in the preview is fine."* The **count** is the expensive half —
+   *how many people see this* means resolving the rule across the whole
+   audience, not asking it once — which is why it is correctly a nice-to-have
+   rather than a default. The baseline is a placeholder in the preview, which
+   costs nothing and answers *"something goes here"*.
+
+   **The recipient question the panel raised falls away with it.** Since the
+   baseline shows no summary, there is nothing to attribute to a recipient here;
+   naming a recipient stays where it already belongs, in preview (question 4.2).
 7. ✅ **Should a module variable declare a length limit, and is it advisory or
    enforced?**
    **Resolution (2026-09-25): the question was wrong. Lengths are not a
@@ -1207,6 +1269,79 @@ not interview questions, and they are logged rather than answered here.
     anywhere in the backend** — `image_url` is a plain string typed into a form.
     Storing an ID rather than a URL is the right call and it requires a media
     subsystem that is entirely absent. Logged as a gap rather than designed here.
+
+### What Cluster 2 produced
+
+**A reversal, and it is the cluster's most consequential outcome.**
+`ContentOverrideDB`'s docstring names *"a consistent headline across the
+personalized picks"* as the intended use of the override layer. Question 2.6
+forbids exactly that: **a decision slot may not be overridden.** An override on a
+slot defeats the slot, and once `max_results` works it produces three
+personalised picks wearing one pinned headline. So an override attaches to a
+**catalogue-bound** module only — enforceable, not conventional — and Cluster 3's
+fork narrows accordingly before it opens.
+
+**A principle the composer now rests on: do not special-case email.** Question
+2.1 rejected a WYSIWYG canvas because push, social and SMS have no layout, so a
+canvas serves one channel and every other channel needs the list anyway. This is
+[[ADR-160 — Channel Model and Composition]]'s argument arriving in the UI for the
+first time. Question 2.3 then showed the constructive form: the envelope is
+promoted to the top of the composer **by asking `envelope_module_type(channel)`**
+rather than by knowing a module called `header` is special — and push returns
+`None`, so the same screen is correct everywhere without a branch.
+
+**Three layers of field definition, settled together.** Questions 2.8, 2.10 and
+2.4 compose into one model:
+
+| Lives where | Carries |
+|---|---|
+| `storage/fields.json` (**new, central**) | `concept`, `size`, `type`, `note`, `envelope` — what a field *is* |
+| the module's own manifest (**unchanged, drop-in**) | which fields it uses, and `required` for each — a property of *(module, field)* |
+| `ContentRecordDB.content` | the values, in one unvalidated JSON column, needing **no migration ever** |
+
+The split was not designed; **2.8 discovered it** by noticing `required` could not
+be a property of a field, and 2.4 followed the same line to its conclusion. A
+bolder version — a central module→field mapping replacing the per-module pair —
+was narrowed away because [[ADR-160 — Channel Model and Composition]] point 6
+names modules as its own precedent for drop-in registration.
+
+**An explicit name stays the storage key (2.10).** Deriving it from concept and
+size was rejected because a concept rename would silently orphan stored content,
+in a JSON column nothing validates. Derived identifiers are tidy until something
+they derive from moves.
+
+**A third assertion axis (2.9): machine ready.** A record-level, manager-set,
+fail-closed flag — distinct from `status` and from channel readiness, and
+distinct from `candidate_filter`, which is the *slot* saying what it wants rather
+than the *record* saying whether it may be taken at all.
+
+**Readiness is asserted (4.7, answered during 2.2), and the principle is broader
+than [[ADR-174 — Channel Readiness Is Asserted, Not Computed]] states.** A
+variant's completeness is mechanical in a way a content record's intent is not,
+so a computation could have been honest here. It was still rejected: **the
+decision to proceed belongs to a person even when a machine could form an
+opinion.**
+
+**Six further backend gaps:**
+
+| # | Gap | Where |
+|---|---|---|
+| 9 | No asset or media subsystem at all — no table, no upload, no picker | `image_url` is a typed string |
+| 10 | `fields.json` does not exist; `CONTENT_FIELD_GROUPS` and its duplicate collapse into it | `content/service.py:101`, `scripts/import_content_csv.py:33` |
+| 11 | `ModuleVariableOut` exposes `name` and `required` only | `modules/router.py:10` |
+| 12 | No route for *"which module carries this channel's envelope"* | `envelope_module_type` is internal |
+| 13 | `_RICH_TEXT_FIELD` is one hardcoded name, so `body_long` gets no formatting | `rendering/service.py:37` |
+| 14 | `cms` is a boolean; no way to mix resolved fields with one static field | `rendering/service.py:162` |
+| 15 | An override on a slot-bound module is permitted and should be refused | `overrides/`, `rendering/service.py:286` |
+
+**Gap 14 is the one to look at twice.** The optional heading a slot needs — *"this
+might be of interest"* — must **hide when the slot hides**, so it cannot be a
+separate heading module; that would leave it floating above nothing for exactly
+the recipients [[ADR-086 — Decision Slots Fail Gracefully]] protects. It belongs
+to the slot-bound module, and the `cms` boolean cannot express it. The storage is
+already there — the `CHECK` constrains only the two foreign keys, so `module_data`
+may sit beside a `decision_slot_id` — but the renderer ignores it. This is the
+second time the cluster found a boolean too coarse; question 1.8 was the first.
 
 ## Cluster 3 — Edit versus override
 
