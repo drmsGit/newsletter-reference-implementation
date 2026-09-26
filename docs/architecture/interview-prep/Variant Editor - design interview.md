@@ -16,10 +16,10 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 40 questions across five clusters, 29 answered.
+> 40 questions across five clusters, 30 answered.
 > **Cluster 3 ✅ CLOSED 2026-09-26, 9/9.**
 > **Cluster 2 ✅ CLOSED 2026-09-26, 10/10.**
-> **Cluster 4 in progress — 2/7.**
+> **Cluster 4 in progress — 3/7.**
 > **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
 > **Two questions promoted out of order:** 2.7 was answered in passing during
 > question 3, and 2.8 was added by the same message.
@@ -1782,11 +1782,40 @@ inherit it later.
    reach: **a passive indicator, visible before the action, so the refusal
    cannot be a surprise.** Recorded as the natural consequence of two decisions
    already taken, not as a separate one.
-2. **Preview takes an optional `recipient_id`. Does a manager pick a real
-   recipient, pick a segment, or see a generic preview with slots unresolved?**
-   *Lean: a real recipient, because a personalised newsletter previewed
-   generically is not the thing being reviewed. The cost is that the manager
-   must choose one, and whoever they choose is not representative.*
+2. ✅ **Preview takes an optional `recipient_id`. Does a manager pick a real
+   recipient, a segment, or see a generic preview?**
+   **Resolution (2026-09-26): a manager may name a recipient, and preview stays
+   strictly read-only — when no resolution exists for that person it says so
+   rather than computing one.** The user: *"B, say so rather than compute"*.
+
+   **The finding that shaped this question: preview does not resolve, it
+   reads.** `resolve_content_for_module` looks up an existing
+   `DecisionResolutionDB` row and, when none matches the recipient, **falls back
+   to the generic `recipient_id IS NULL` row silently**. So previewing "for
+   Jana" before any decision run returns the generic pick while looking
+   personalised, and when neither row exists the slot is hidden (ADR-086) — the
+   manager sees a *shorter* email than Jana will receive.
+
+   **Computing on demand was available and was rejected because preview would
+   become a write with consequences.** `POST /decision/slots/{id}/execute`
+   exists, so the composer could resolve a slot for a named recipient. But the
+   send path reads the most recent resolution, so **a preview run at 10am could
+   become what that recipient actually receives at 2pm** — a read-shaped action
+   quietly determining a real outcome. That is too high a price for looking at
+   something.
+
+   **The silent fallback is fixable rather than inherent, and the fix costs one
+   line.** `resolve_content_for_module` already **returns** the resolution row
+   it used; the response only has to carry which one. *"Showing the generic pick
+   — no resolution exists for this recipient yet"* makes the preview honest
+   without making it authoritative.
+
+   **A consequence worth stating plainly: the composer's preview is a sketch and
+   should look like one.** The approver's proof (question 4.1) is a snapshot
+   that *was* rendered for someone; the author's preview may be generic. Those
+   are different things, only one of them is real, and the snapshot is the
+   truth. A composer preview that presented itself as authoritative would be the
+   same class of dishonesty question 2.1 rejected WYSIWYG for.
 3. **`mode="preview"` and the send path resolve decisions differently. Must the
    composer say so?** A preview that silently differs from what will ship is
    worse than no preview.
