@@ -16,8 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 40 questions across five clusters, 24 answered.
-> **Cluster 3 in progress — 5/9.**
+> 40 questions across five clusters, 25 answered.
+> **Cluster 3 in progress — 6/9.**
 > **Cluster 2 ✅ CLOSED 2026-09-26, 10/10.**
 > **Cluster 4 — 1/7** (4.7 answered during 2.2).
 > **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
@@ -1466,8 +1466,51 @@ second time the cluster found a boolean too coarse; question 1.8 was the first.
    manager opening the campaign next month sees a headline and has no way to
    know it is not the catalogue's. Showing both makes question 3.5's reset
    meaningful, since a manager can see what reverting would restore.
-5. **What is "reset", who can do it, and does it appear anywhere other than the
-   composer?** *Constraint: create → active → reset is the modelled lifecycle.*
+5. ✅ **What is "reset", who can do it, and does it appear anywhere other than
+   the composer?**
+   **Resolution (2026-09-26): both granularities, anyone may reset, and override
+   history gets its own screen.** The user: *"both, anyone can reset, history on
+   its own screen"*.
+
+   **The model is finer than the lifecycle summary suggested, and the
+   granularities do not line up one-to-one with question 3.2's per-field
+   state.** `ContentOverrideDB` holds **one active row per module instance**,
+   guarded by a partial unique index, carrying a `field_overrides` dict of many
+   fields. So:
+   - **Reset one field** removes that key from the dict; if the dict empties,
+     the row deactivates.
+   - **Reset the module** flips `active` to `False` wholesale — *"drop
+     everything I changed here"*.
+
+   Per-field is required by 3.2's mechanism. Per-module is the convenience, and
+   it is the one that is easy to fire by accident — a confirmation on the
+   wholesale reset is warranted where one on a single field would not be.
+
+   **Reset is a state change, not a delete, and that was already built.** The
+   column comment records the intent — *"reset flips this to False (ADR-041's
+   'used until it is deleted or reset') while keeping the row as history"* — and
+   `reverted_at` dates it. Nothing is destroyed, which is what makes the history
+   screen possible.
+
+   **Anyone who can edit the variant may reset.** `overridden_by` is **NOT
+   NULL**, so a reset is attributable without being restricted; restricting it
+   to the author would recreate exactly the holiday problem the advisory lock in
+   question 1.7 was shaped to avoid.
+
+   **Worth noting the asymmetry with Cluster 1's gap 8:** an override records
+   who made it, a variant edit does not. The override layer was built with
+   accountability in mind and the composition layer was not.
+
+   **History on its own screen, out of the composer.** *"This field was
+   overridden and reset twice in March"* is noise while composing, and
+   [[Manager Workflow - design interview]] Q1.6 moved decision history to a
+   separate screen for the same reason. It has to live somewhere because
+   `outcome_delta` (question 3.9) is meaningless without it — and because
+   question 1.8 made **override frequency a maturity signal**, which is a thing
+   you read on a history screen, not in an editor.
+
+   **Screen-cut consequence:** an override history screen is added, and it is
+   the natural home for the maturity signal rather than a second dashboard.
 6. **An override is scoped to one module instance. The same content record in
    another variant is unaffected.** Is that what a manager expects, or is the
    expectation "I fixed it for this campaign" — meaning every module in the
