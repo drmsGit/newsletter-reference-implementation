@@ -16,8 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 40 questions across five clusters, 27 answered.
-> **Cluster 3 in progress — 8/9.**
+> 40 questions across five clusters, 28 answered.
+> **Cluster 3 ✅ CLOSED 2026-09-26, 9/9.**
 > **Cluster 2 ✅ CLOSED 2026-09-26, 10/10.**
 > **Cluster 4 — 1/7** (4.7 answered during 2.2).
 > **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
@@ -1642,9 +1642,109 @@ second time the cluster found a boolean too coarse; question 1.8 was the first.
    preset is a value in that column, not a new one — though if the analysis in
    1.8 is to be cheap, a short constrained code is a better fit than prose, and
    that is a schema question for the ADR rather than for this interview.
-9. **Is `outcome_delta` a manager-facing thing?** Does the composer ever show
-   "the last time you overrode this, it performed worse", or is that purely an
-   insight-layer concern that never reaches this screen?
+9. ✅ **Is `outcome_delta` a manager-facing thing?**
+   **Resolution (2026-09-26): the history screen only. Nothing in the
+   composer.** The user:
+
+   > *"history screen only, as you said → it must stay a focused tool, and
+   > giving feedback would mean that there was a test somewhere that checked
+   > 'not overridden content against overridden content' which is not built yet.
+   > And if we build this in the future, there would be a monitoring screen for
+   > that"*
+
+   **"It must stay a focused tool" is the cluster's closing constraint.** The
+   composer already carries the field state (3.4), the catalogue reach count
+   (3.7), the reason presets (3.8), the duplicate note (1.6) and the slot
+   summary (2.6). A historical performance indicator is how a focused tool
+   becomes a dashboard, and [[Manager Workflow - design interview]] Q1.1
+   rejected dashboards explicitly and on evidence.
+
+   **The user's second reason is sharper than mine and worth recording as the
+   real finding.** I argued `outcome_delta` has no producer — true, and verified:
+   `record_outcome_delta` (`backend/app/overrides/service.py:221`) exists with a
+   route and careful merge semantics, but **only the router calls it**. Nothing
+   in the insight or engagement layer computes it. It is not dead configuration
+   like `max_results`; it is a **half-built loop** — the system can record the
+   answer and nothing works the answer out.
+
+   **But the deeper gap is that a "delta" presupposes a comparison that has no
+   design.** Measuring whether an override performed better needs a baseline —
+   the non-overridden version, which by definition was **not sent**. That
+   requires a holdout, a counterfactual or an A/B between overridden and
+   unoverridden content, and none of the three exists or is specified. **So the
+   column is further from meaningful than a missing producer suggests: it lacks
+   the experimental design that would make its value mean anything at all.**
+
+   **And when that is built, it gets its own monitoring screen** rather than
+   leaking into the composer — which keeps this decision stable rather than
+   provisional.
+
+### What Cluster 3 produced
+
+**The question the interview was written for has a two-part answer, and neither
+part is "it depends".** *Where does the keystroke go?* — **to the catalogue, by
+default**, because the manager's real question is **scope of the correction, not
+location of the manager**: *is this wrong everywhere, or different here?* And
+*how does a manager choose?* — **through the field's state, never the editor's
+mode**, because invisible state on a frequent action is how people lose work.
+
+**Three arguments were considered and rejected, and each rejection generalises.**
+
+**Blast radius as a tiebreaker (3.1).** It favours defaulting to the override,
+since a wrong override is local and a wrong catalogue edit reaches every unsent
+campaign. Rejected: **a catalogue edit being visible to other campaigns is the
+point of a catalogue, not a hazard.** The hazard is *silence* about reach — which
+is why 3.7 exists and why the count is passive.
+
+**Locally-safe defaults (3.1, 3.3).** Rejected because they manufacture the
+metric the user wants falling: an override that should have been a catalogue fix
+is debt, and a locally-safe default produces that debt whenever a manager is not
+thinking.
+
+**Feedback at the point of decision (3.9).** The strongest available lever for
+reducing overrides, and still rejected — *"it must stay a focused tool"*.
+
+**A contradiction with built behaviour (3.6).**
+`backend/app/campaigns/duplication.py:147` does not copy content overrides,
+grouping them with snapshots and send instances as *"a record of something that
+happened"*. **An override is dual-natured**: a record of what happened *and* live
+configuration the renderer reads. Dropping it means a duplicate renders
+differently from its original — wrong for exactly the duplicate-to-repeat
+workflow Cluster 5 is about. **The line belongs inside the row, not around it**:
+`field_overrides`, `system_content_record_id` and `reason` copy; `outcome_delta`,
+`send_instance_id` and `reverted_at` do not; only `active` rows copy; and
+`overridden_by` becomes the duplicator, because carrying the original name
+forward is the same fabrication the docstring guards against, arriving through
+the field it did not consider.
+
+**A concern I raised and the user dissolved (3.6).** The same record in two
+modules of one variant looked like a trap. It is not: a full-width hero takes
+`headline_long` and a 50:50 module takes `headline_medium`, so **they do not
+share a field**. The worry was an artefact of imagining one shared `headline`,
+which question 2.10's size vocabulary had already removed.
+
+**`outcome_delta` is further from working than "no producer" suggests (3.9).**
+`record_outcome_delta` exists and only the router calls it — so the loop is
+half-built. But a *delta* presupposes a baseline, and the baseline is the
+unoverridden version that **was not sent**. Measuring it needs a holdout, a
+counterfactual or an A/B between overridden and unoverridden content, and none
+of the three exists or is specified.
+
+**Two screens added.** An **override history screen** — the home for 1.8's
+maturity signal, kept out of the composer because *"this field was overridden and
+reset twice in March"* is noise while composing. And, when the comparison is
+built, a **monitoring screen** for it, decided now so the composer does not
+inherit it later.
+
+**Five backend gaps:**
+
+| # | Gap | Where |
+|---|---|---|
+| 16 | Duplication drops overrides entirely; it should copy the configuration half | `campaigns/duplication.py:147` |
+| 17 | No query for "how many unsent campaigns use this record" | new |
+| 18 | `outcome_delta` has no producer **and** no experimental design | `overrides/service.py:221` |
+| 19 | `reason` is prose; preset analysis wants a constrained code | `overrides/db_models.py` |
+| 20 | Nothing refuses an override on a slot-bound module (also gap 15) | `overrides/service.py` |
 
 ## Cluster 4 — Preview, proof and readiness
 
