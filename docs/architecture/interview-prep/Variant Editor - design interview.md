@@ -16,10 +16,10 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 40 questions across five clusters, 30 answered.
+> 41 questions across five clusters, 31 answered.
 > **Cluster 3 ✅ CLOSED 2026-09-26, 9/9.**
 > **Cluster 2 ✅ CLOSED 2026-09-26, 10/10.**
-> **Cluster 4 in progress — 3/7.**
+> **Cluster 4 in progress — 4/8** (4.3b added during 4.3).
 > **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
 > **Two questions promoted out of order:** 2.7 was answered in passing during
 > question 3, and 2.8 was added by the same message.
@@ -1816,9 +1816,72 @@ inherit it later.
    are different things, only one of them is real, and the snapshot is the
    truth. A composer preview that presented itself as authoritative would be the
    same class of dishonesty question 2.1 rejected WYSIWYG for.
-3. **`mode="preview"` and the send path resolve decisions differently. Must the
-   composer say so?** A preview that silently differs from what will ship is
-   worse than no preview.
+3. ✅ **`mode="preview"` and the send path differ. Must the composer say so?**
+   **Resolution (2026-09-26): yes, in three places — and my premise was wrong
+   about what differs.**
+
+   **`mode` does not control decision resolution. It controls which content
+   version is read**, which is a sharper difference than the question assumed:
+
+   > *"Preview mode: … falls back to the live, mutable `ContentRecord.content` —
+   > draft edits show up immediately. Send mode: … the latest frozen
+   > `ContentVersionDB`. If no version exists at all, raises
+   > `UnpublishedContentError` rather than silently sending draft content."*
+
+   **So a consequence of question 3.1 surfaced that neither of us had seen: an
+   edit to the content record does not reach a send until someone publishes.**
+   A manager fixes the typo, previews it, sees it corrected — and the send uses
+   the last published version, which still has the typo. **Silently**, because a
+   version exists; the refusal only fires when *no* version does.
+
+   **The user's answer, in three parts, and all three work.**
+
+   **(1) A preview is a preview; a test send is the truth.**
+
+   > *"a preview is a preview - if it comes to getting feedback, a link to that
+   > preview (current state like in the composer) is enough. If it comes to test
+   > sends they should show what actually will be sent in that moment (so if
+   > there's a drift, there's a drift) so a manager will notice this."*
+
+   **This is better than the draft/as-sent toggle I proposed**, because the two
+   views already correspond to two real actions rather than being a UI switch a
+   manager has to remember the meaning of. Preview stays honest by staying a
+   sketch (question 4.2); the test send is where drift becomes visible, which is
+   where a manager is already asking *"is this right?"*.
+
+   **It needs one change, and it is a bug rather than a feature.**
+   `send_test_email` (`backend/app/delivery/service.py:519`) renders with
+   `mode="preview"` — **a test send currently mails the draft, not what will
+   ship**, which defeats the purpose of a test send. Changing it to `"send"`
+   also needs care around the function's own rule that *"a render failure never
+   blocks the send"*, since unpublished content would now raise where it
+   previously rendered.
+
+   **A shareable preview link is a new capability**, not an existing one, and it
+   carries an authorisation question — a link shared for feedback may be opened
+   by someone outside the team. Logged rather than designed here.
+
+   **(2) A "this content has a newer version" control on the module.** The user
+   was unsure whether it works. **It does, and it needs one new column.** Today
+   `ModuleInstanceDB` carries `content_record_id` and **no version**, so a
+   manually bound module silently takes whatever is latest-published at send
+   time — there is no pinning, which means there is currently no choice to offer
+   a manager. `resolve_renderable_content` already *accepts* a
+   `content_version_id`, and `DecisionResolutionDB.content_version_id` already
+   pins one for resolutions, so **the pattern exists and is simply absent from
+   the manual path.** Adding `module_instances.content_version_id` (nullable =
+   follow latest, set = pinned) makes the control possible. *Which of the two is
+   the default is a real fork and is question 4.3b.*
+
+   **(3) A snapshot warns about unpublished drift, with an option to
+   autopublish.** Works, and it is the right shape. Today the drift is **not**
+   warned about at all: snapshot renders in send mode, so it silently freezes
+   the *published* version while the composer was showing the draft. A warning
+   fits the established line — a draft that differs is **questionable, not
+   broken**, so it reports rather than blocks — and autopublish is acceptable
+   precisely because it is an explicit click rather than an automatic behaviour,
+   which leaves the `UnpublishedContentError` gate and the draft/published
+   distinction intact.
 4. **A decision slot that resolves to nothing is hidden, not placeheld
    ([[ADR-086 — Decision Slots Fail Gracefully]]). In the composer, should a
    hidden slot be visible to the author?** *Constraint: rendering emits an HTML
