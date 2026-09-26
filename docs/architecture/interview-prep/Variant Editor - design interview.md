@@ -16,8 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 40 questions across five clusters, 12 answered.
-> **Cluster 2 in progress — 4/10** (2.7–2.10 answered out of order).
+> 40 questions across five clusters, 13 answered.
+> **Cluster 2 in progress — 5/10** (2.7–2.10 answered out of order).
 > **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
 > **Two questions promoted out of order:** 2.7 was answered in passing during
 > question 3, and 2.8 was added by the same message.
@@ -714,9 +714,73 @@ not interview questions, and they are logged rather than answered here.
 
 *The authoring form itself: where it lives, what it enforces, what it shows.*
 
-1. **Where does a manager fill fields — inline in the stack, a side panel, or a
-   separate screen?** This decides whether the composer is one screen or two,
-   and it constrains Cluster 3.
+1. ✅ **Where does a manager fill fields — inline in the stack, a side panel, or
+   a separate screen?**
+   **Resolution (2026-09-26): a list stack, a field editor beside it, and a
+   collapsed preview bar on the side that opens the full render as an overlay.**
+   The user: *"A → list plus field editor → collapsed preview of full html
+   render (if possible)"*, with the requirement that checking the preview is
+   fast, never switches screens, and ideally needs no explicit *render* button.
+
+   **The WYSIWYG alternative was considered seriously and rejected on three
+   arguments, of which the third is decisive and general.** The user:
+
+   > *"managers love direct editor (my current client with the customized
+   > salesforce frontend shows) and building preview with an html that actually
+   > renders with catalog content and THEN it's possible to override (if needed)
+   > directly in that preview would be glamorous, but then again → how often
+   > will a manager build a full newsletter in the future? Or just decide on
+   > layout, rest is machine? Or fully depends on machine? Also all other
+   > channels (push, social, etc) except letters don't work like email. So why
+   > build an extra (B) editor just for emails."*
+
+   **(1) It is honest about provisionality.** A rendered stack shows *one*
+   resolution, but a slot resolves per recipient and provisionally — question
+   1.3's *"what content would be selected now, final decision engine runs before
+   send"*. A WYSIWYG stack presents a single-recipient preview render as if it
+   were the email, and the more personalisation a variant uses, the more of the
+   screen is fiction.
+
+   **(2) It does not optimise for work that is going away.** Direct editing is
+   what managers like today, and [[Manager Workflow - design interview]] Q1.1
+   established this product is built for where the work is going rather than
+   where it is — *"the manager's job is shifting from producing to deciding"*.
+   A rich canvas is an investment in producing.
+
+   **(3) A WYSIWYG canvas is email exceptionalism in UI form, and this is the
+   argument that settles it.** Push, social and SMS have no layout at all —
+   [[ADR-162 — Channel Rendering and Artifacts]] point 2 already says *"a push
+   renderer fills fields and has no layout job"*. So a canvas editor serves
+   exactly one channel and every other channel needs the list anyway. Building
+   both means building the composer twice and maintaining an email-only surface
+   forever. **This is structurally the same argument [[ADR-160 — Channel Model and Composition]]
+   makes about the model — do not special-case email — arriving in the UI, and
+   it is the first time that principle has been applied to a screen.**
+
+   **A list also suits keyboard-first operation**, established in Cluster 1: a
+   list has rows to arrow through, a canvas does not.
+
+   **The preview machinery already exists and is already channel-neutral.**
+   `GET /rendering/variants/{variant_id}?recipient_id=`
+   (`backend/app/rendering/router.py:34`) goes through `render_channel_artifact`
+   and returns `artifact_body` for email or `fields` for push — so one overlay
+   serves every channel, which is the same property the composer was just chosen
+   for. **No new render route is needed.**
+
+   **One consequence that needs deciding with the build, not here: preview
+   renders persisted state.** The endpoint reads the database, so an overlay
+   opened mid-edit shows the last saved version. Meeting the user's "no render
+   button" requirement therefore means either autosaving on field blur and
+   re-rendering when the overlay opens, or a preview route that accepts unsaved
+   values. **Autosave is the simpler path and it interacts with the advisory
+   lock and optimistic concurrency from question 1.7** — an autosaving composer
+   makes conflicts more frequent, not less, which is an argument for building
+   those two together rather than deferring one.
+
+   **Known cost accepted:** a manager cannot judge how the email looks without
+   opening the overlay, and the composer demos less impressively than a canvas —
+   which for a reference implementation seeking credibility is a real cost,
+   accepted deliberately.
 2. **A required field is empty. What does the composer do?** *Constraint:
    ADR-174 point 3 already puts the **blocking** check in the send review
    pre-flight, so the composer is not the last line of defence. Lean: show it,
