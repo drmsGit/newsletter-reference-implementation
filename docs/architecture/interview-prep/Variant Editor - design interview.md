@@ -16,8 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 40 questions across five clusters, 20 answered.
-> **Cluster 3 in progress — 1/9.**
+> 40 questions across five clusters, 23 answered.
+> **Cluster 3 in progress — 4/9.**
 > **Cluster 2 ✅ CLOSED 2026-09-26, 10/10.**
 > **Cluster 4 — 1/7** (4.7 answered during 2.2).
 > **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
@@ -1410,16 +1410,62 @@ second time the cluster found a boolean too coarse; question 1.8 was the first.
    a campaign? A manager doesn't want to switch tabs"* — the content record, from
    inside the composer, is exactly what was asked for, and question 2.1's field
    editor beside the stack is where it happens.
-2. **Is it one behaviour or two?** If a manager can do both, what distinguishes
-   them at the moment of typing — two fields, a mode, a choice on save, or an
-   "also update the original" checkbox? *Lean: two visible actions, because an
-   invisible default here is discovered months later.*
-3. **If it is two, which is the default?** The default is what most managers will
-   do most of the time without noticing they chose.
-4. **How does the composer show that a field is currently overridden?**
-   *Constraint: ADR-041 — the override wins "until it is deleted or reset", so
-   this state is durable and invisible unless the UI says so.* Does the manager
-   need to see the catalogue value it is covering?
+2. ✅ **Is it one behaviour or two, and what distinguishes them at the moment of
+   typing?**
+   **Resolution (2026-09-26): the field's *state* carries the answer, not the
+   editor's mode — with a binding condition attached.** The user: *"C, field
+   state as long as a manager not accidentally overwrites the catalog while
+   thinking they just changed it in the campaign"*.
+
+   **The mechanism.** A normal field shows the catalogue value and typing edits
+   the catalogue (question 3.1's default). **"Override here"** is an explicit act
+   that converts *that field* into a visibly different input with the catalogue
+   value still shown beneath it; from then on, typing writes the override. No
+   mode, no dialog, and the state is legible at a glance rather than remembered.
+
+   **A mode was rejected as invisible state on a frequent action.** An editor a
+   manager is *in* override mode without noticing fails silently — they believe
+   they are fixing one campaign, they have changed the catalogue, and nothing
+   says so. **A dialog on save was rejected on question 1.8's constraint** that
+   the override path must be fast, since it taxes the most frequent action in
+   the composer.
+
+   **This collapses three questions into one mechanism** — 3.3 (which is the
+   default) and 3.4 (how an overridden field is shown) are answered by the same
+   design rather than by three separate decisions.
+
+   **The user's condition is a requirement, not a caveat, and it points at the
+   *other* direction.** C makes the override state visible; the danger the user
+   names is the reverse — a manager working inside a campaign naturally assuming
+   their edits are campaign-scoped, and silently changing the catalogue by
+   typing in a normal field. **So the catalogue state must announce itself too,
+   and announce its reach.** That is question 3.7 and it is now binding rather
+   than open.
+
+   **Known cost accepted:** creating an override is two actions — convert, then
+   type — rather than one. Mitigated by making the conversion a keystroke, and
+   it happens once per field rather than once per edit.
+
+3. ✅ **If it is two, which is the default?**
+   **Resolution (2026-09-26): the catalogue.** Follows from questions 3.1 and
+   3.2 together rather than being decided separately — a field is normal until
+   somebody converts it, and typing in a normal field edits the content record.
+
+   **The default is the one a manager gets without choosing**, which is why it
+   matters that it is also the one question 1.8's trajectory wants: an override
+   that should have been a catalogue fix is debt, and a catalogue default
+   produces no debt when a manager does not think about it.
+
+4. ✅ **How does the composer show that a field is currently overridden?**
+   **Resolution (2026-09-26): as a distinct field state, with the catalogue
+   value visible beneath it.** Part of question 3.2's mechanism.
+
+   **Showing the covered value is the part that earns its space.**
+   [[ADR-041 — Override Precedence]] makes an override win *"until it is deleted
+   or reset"*, so this is durable state that would otherwise be invisible — a
+   manager opening the campaign next month sees a headline and has no way to
+   know it is not the catalogue's. Showing both makes question 3.5's reset
+   meaningful, since a manager can see what reverting would restore.
 5. **What is "reset", who can do it, and does it appear anywhere other than the
    composer?** *Constraint: create → active → reset is the modelled lifecycle.*
 6. **An override is scoped to one module instance. The same content record in
