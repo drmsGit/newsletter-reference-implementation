@@ -16,8 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 40 questions across five clusters, 15 answered.
-> **Cluster 2 in progress — 6/10** (2.7–2.10 answered out of order).
+> 40 questions across five clusters, 16 answered.
+> **Cluster 2 in progress — 7/10** (2.7–2.10 answered out of order).
 > **Cluster 4 — 1/7** (4.7 answered during 2.2).
 > **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
 > **Two questions promoted out of order:** 2.7 was answered in passing during
@@ -818,13 +818,41 @@ not interview questions, and they are logged rather than answered here.
    a warning — it is a configured pipeline with its own verification, so the
    composer does not need to carry the burden of guarding it. This keeps the
    editor from acquiring checks whose real audience is a script.
-3. **Does the manager see subject and preheader as "the email's subject", or as
-   a module's fields like any other?** *Constraint: ADR-162 point 1 made them a
-   `header` module's declared variables at position 0, and which module carries
-   the envelope is discovered by reading manifests. The model says "module"; a
-   manager almost certainly thinks "the subject line".* If the composer promotes
-   them to a fixed position at the top of the screen, is that a display
-   convenience or a re-introduction of the concept the ADR removed?
+3. ✅ **Does the manager see subject and preheader as "the email's subject", or
+   as a module's fields like any other?**
+   **Resolution (2026-09-26): promoted to a fixed area at the top, and the
+   header module is removed from the stack.** The user: *"B, promoted, header
+   row removed from the stack"*.
+
+   **This does not re-introduce the concept [[ADR-162 — Channel Rendering and Artifacts]]
+   point 1 removed, and the mechanism is why.** The composer does not know that
+   a module called `header` is special. It asks `envelope_module_type(channel)`
+   (`backend/app/modules/registry.py:208`), which finds the envelope-carrying
+   module **by reading manifests for a variable declaring `envelope`** — the
+   function's own docstring refuses to special-case a module name, for the same
+   reason ADR-160 point 2 refuses it for push. **The promotion is therefore
+   channel-derived, and it is derived from the same declaration the renderer
+   uses.**
+
+   **It is also correct for every channel without a branch.** Push returns
+   `None` — a notification's title is body, not envelope — so nothing is
+   promoted and the composer looks the same everywhere. That is the property
+   question 2.1 chose this composer for, arriving a second time.
+
+   **Removing the row is the part that carries a real consequence, and it cuts
+   both ways.** The stack no longer shows everything, so position 0 becomes
+   invisible — which is also the safeguard, since nothing can be reordered above
+   it or into it by accident. The cost is that a manager who thinks in modules
+   loses the correspondence between the list and what exists; the stack starts
+   at the first body module rather than at the first module.
+
+   **The rejected option is worth naming:** promoting the fields *and* keeping
+   the row would put two editable views of one field on one screen, which is
+   where people discover they typed in the wrong box.
+
+   **Why promotion is justified at all:** the subject is the single most
+   consequential piece of copy in an email, and row 1 of a list treats it as
+   ordinary when it is not.
 4. **Should the API expose `ModuleVariable.label`?** *Constraint: it exists on
    the dataclass and `ModuleVariableOut` drops it. Its docstring says it exists
    "so a channel added later gets a readable authoring surface from its manifest
