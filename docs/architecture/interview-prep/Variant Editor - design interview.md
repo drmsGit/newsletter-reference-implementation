@@ -16,8 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 40 questions across five clusters, 16 answered.
-> **Cluster 2 in progress — 7/10** (2.7–2.10 answered out of order).
+> 40 questions across five clusters, 17 answered.
+> **Cluster 2 in progress — 8/10** (2.7–2.10 answered out of order).
 > **Cluster 4 — 1/7** (4.7 answered during 2.2).
 > **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
 > **Two questions promoted out of order:** 2.7 was answered in passing during
@@ -853,13 +853,79 @@ not interview questions, and they are logged rather than answered here.
    **Why promotion is justified at all:** the subject is the single most
    consequential piece of copy in an email, and row 1 of a list treats it as
    ordinary when it is not.
-4. **Should the API expose `ModuleVariable.label`?** *Constraint: it exists on
-   the dataclass and `ModuleVariableOut` drops it. Its docstring says it exists
-   "so a channel added later gets a readable authoring surface from its manifest
-   alone" — which is exactly what a generated client needs and cannot currently
-   get.* Same question for `envelope`. *Lean: expose both; this is a backend
-   gap, not a design decision — but it is worth confirming that the manifest is
-   meant to drive the form's labels at all.*
+4. ✅ **Does the API expose manifests, or answers?**
+   *The original question — whether to expose `ModuleVariable.label` — was
+   superseded by question 2.10, which replaced `label` with `note`.*
+   **Resolution (2026-09-26): field definitions are centralised in one file, and
+   the client is given derived answers rather than raw manifests to derive
+   from.** The user: *"yes, centralise the field definitions, and 2.4 is B"*.
+
+   **The user proposed a bolder restructure and it was narrowed, not rejected.**
+   The question asked was whether one manifest of all fields plus a separate
+   module→field mapping would replace the per-module `.json`/`.html` pair.
+   **The mapping half collides with an accepted ADR.**
+   [[ADR-160 — Channel Model and Composition]] point 6 names modules as its own
+   precedent — *"decision strategies already auto-register from a dropped `.py`
+   and email modules from `name.json` + `name.html`, and a third pattern that
+   needs registering in several places is the one that eventually gets
+   registered in two"* — under the criterion **time-to-first-output beats
+   completeness**. A central mapping turns "drop two files in a directory" into
+   "drop one file and edit a shared registry", which is the registration step
+   that ADR refused, and a merge-conflict hotspot the first time two people add
+   a module in the same week.
+
+   **The definitions half is right, and question 2.8 had already proved it
+   without either of us noticing.** 2.8 established that `type`, `size` and
+   `note` are properties of the **field**, while `required` is a property of
+   **(module, field)**. Today `headline_medium` is declared in three manifests
+   at once; if they disagree about its type, the union takes whichever
+   discovery reached last, **silently**. Centralising definitions removes that
+   collision structurally rather than by convention, and the split falls exactly
+   along the line 2.8 found.
+
+   **The shape adopted:**
+
+   ```jsonc
+   // storage/fields.json — one home per field definition
+   { "headline_medium": { "concept": "headline", "size": "medium",
+                          "type": "text", "note": "Works in a 50:50 split" },
+     "subject":         { "concept": "subject", "type": "text",
+                          "envelope": true } }
+
+   // storage/modules/email/img_left.json — still a dropped-in pair
+   { "label": "Image left", "cms": true,
+     "fields": [ { "name": "headline_medium", "required": true },
+                 { "name": "image_url",       "required": true } ] }
+   ```
+
+   A module still declares **which** fields it uses and **whether they are
+   required there**; it stops re-declaring what a field *is*. ADR-160 point 6
+   holds and the weekend path survives.
+
+   **One derivation collapses, one remains, and that is the answer to the
+   question as asked:**
+   - **The catalogue field union stops being a derivation at all.**
+     `GET /content/fields` becomes a read of `fields.json` rather than a union
+     computed across manifests, so the raw-versus-derived tension evaporates for
+     that route. `CONTENT_FIELD_GROUPS` and its duplicate in
+     `backend/scripts/import_content_csv.py:33-41` both collapse into it.
+   - **The envelope lookup is unchanged and stays derived.** Even with
+     `envelope: true` on the field definition, *which module carries a channel's
+     envelope* depends on which module **uses** that field, so it remains a scan
+     across module manifests — `envelope_module_type(channel)` keeps its job.
+
+   **The reason B rather than A** is written down in this repository already.
+   `CONTENT_FIELD_GROUPS`' docstring records a field list *"declared here rather
+   than derived from the channel manifests"*, duplicated a second time in the
+   import script — two copies of one derivation that can disagree. A client that
+   scans for `envelope: true` itself would be a third copy, in another language,
+   which is exactly what `docs/react-migration-inventory.md` warns about: *"the
+   React client must not be asked to reimplement backend business logic — if it
+   can, so can any other client, and the rule was never enforced."*
+
+   **Known cost accepted:** two derived routes instead of none, and the field
+   catalogue is a file the backend must reload or restart to pick up — the same
+   property module discovery already has.
 5. **Which fields are rich text, and who decides?** *Constraint: rendering
    special-cases a single field name today. A manifest-declared field type would
    generalise it; a hardcoded name will not survive the second channel.* Does a
