@@ -16,8 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 40 questions across five clusters, 25 answered.
-> **Cluster 3 in progress — 6/9.**
+> 40 questions across five clusters, 26 answered.
+> **Cluster 3 in progress — 7/9.**
 > **Cluster 2 ✅ CLOSED 2026-09-26, 10/10.**
 > **Cluster 4 — 1/7** (4.7 answered during 2.2).
 > **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
@@ -1511,11 +1511,63 @@ second time the cluster found a boolean too coarse; question 1.8 was the first.
 
    **Screen-cut consequence:** an override history screen is added, and it is
    the natural home for the maturity signal rather than a second dashboard.
-6. **An override is scoped to one module instance. The same content record in
-   another variant is unaffected.** Is that what a manager expects, or is the
-   expectation "I fixed it for this campaign" — meaning every module in the
-   campaign that uses that record? *This is the one place the model may be
-   finer-grained than the mental model.*
+6. ✅ **An override is scoped to one module instance. Is that the expectation?**
+   **Resolution (2026-09-26): yes, module-instance scope is right. A small
+   override icon is enough. And duplicating a variant must *keep* the
+   overrides.** The user: *"module-instance scope is right; if you duplicate the
+   variant, keep the override; maybe a small override icon is already enough."*
+
+   **The worry I raised was unfounded, and question 2.10 is why.** I suggested
+   the same record in two modules of one variant could bite — a manager fixes
+   the hero's headline and the listing below still shows the old one, inside one
+   email where a reader sees both. The user:
+
+   > *"Using the same content for example in the header and in the body → hero
+   > would use a different headline than in the body probably, so don't
+   > duplicate the override from hero to body"*
+
+   **They do not share a field.** A full-width hero takes `headline_long`; a
+   50:50 module takes `headline_medium` — that is what 2.10's size vocabulary
+   *is*. So there is nothing to propagate and no inconsistency to warn about:
+   the two are **meant** to differ, and an override on one has no bearing on the
+   other. The concern was an artefact of imagining one shared `headline`, which
+   the size model removed.
+
+   **A contradiction with built behaviour, and the built rationale is a category
+   error.** `backend/app/campaigns/duplication.py:147` states that content
+   overrides are **not** copied, grouping them with resolutions, snapshots, send
+   instances and content versions — *"each of those is a record of something
+   that happened, and a copy has no history — reproducing them would fabricate
+   decisions, publications and sends."*
+
+   **An override is dual-natured and that rationale only accounts for one
+   nature.** It is a record of something that happened — `overridden_by`,
+   `reverted_at`, `outcome_delta` — **and** it is live configuration that
+   `get_active_content_override` reads at render time. Dropping it on
+   duplication means the copy **renders differently from its original**, which
+   is precisely wrong for the duplicate-to-repeat workflow Cluster 5 is about.
+
+   **The line belongs *inside* the row, not around it**, which vindicates the
+   docstring's instinct while correcting where it drew the boundary:
+
+   | Copies (configuration) | Does not copy (measurement and attribution) |
+   |---|---|
+   | `field_overrides` | `outcome_delta` — it measures a send that happened |
+   | `system_content_record_id` | `send_instance_id` — likewise |
+   | `reason` | `reverted_at` — the copy has not been reset |
+   | `active = True` | `overridden_by` — see below |
+
+   **Only *active* overrides copy.** A reset row is purely history and
+   reproducing it would fabricate exactly what the docstring warns about.
+
+   **`overridden_by` should become the person duplicating, not the original
+   author.** Carrying the original name forward would attribute to them an act
+   they did not perform in a campaign they may not know exists — the same
+   fabrication the docstring is guarding against, arriving through the field it
+   did not consider.
+
+   **The override icon is the whole of the UI requirement**, and it already
+   exists as question 3.4's distinct field state. No extra warning is needed.
 7. ✅ **Editing the catalogue record changes every composed-but-unsent campaign
    using it. What must the composer tell the manager?**
    **Resolution (2026-09-26): a passive count, always visible, clickable to a
