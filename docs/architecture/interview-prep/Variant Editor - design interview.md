@@ -16,10 +16,10 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 41 questions across five clusters, 31 answered.
+> 41 questions across five clusters, 32 answered.
 > **Cluster 3 ✅ CLOSED 2026-09-26, 9/9.**
 > **Cluster 2 ✅ CLOSED 2026-09-26, 10/10.**
-> **Cluster 4 in progress — 4/8** (4.3b added during 4.3).
+> **Cluster 4 in progress — 5/8** (4.3b added during 4.3).
 > **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
 > **Two questions promoted out of order:** 2.7 was answered in passing during
 > question 3, and 2.8 was added by the same message.
@@ -1882,6 +1882,47 @@ inherit it later.
    precisely because it is an explicit click rather than an automatic behaviour,
    which leaves the `UnpublishedContentError` gate and the draft/published
    distinction intact.
+
+3b. ✅ **Does a bound module follow the latest published version, or pin one?**
+    **Resolution (2026-09-26): neither — the version column is an
+    *acknowledgement marker*, and rendering always follows the latest
+    published.** The user: *"B, marker only"*.
+
+    **The reframing came from noticing the snapshot already does the
+    freezing.** A snapshot renders once and stores the artefact; the approver
+    reviews that artefact and the send uses it. **Nothing can shift after
+    snapshot**, so the only drift window is compose → snapshot — and covering
+    that window needs a way to *detect* change, not a way to *pin* against it.
+
+    | | render pin | acknowledgement marker |
+    |---|---|---|
+    | `content_version_id` means | *use v3* | *the manager last saw v3* |
+    | rendering | uses v3 forever | **always the latest published** |
+    | the control | "switch me to v4" | "v4 exists — review it" |
+
+    **The deciding argument is the stale-legal-text case.** With a render pin, a
+    manager pins v3, the content team publishes v4 carrying a compliance
+    correction, and that campaign ships v3 — quietly, because pinning was a
+    deliberate act nobody goes back to revisit. **With a marker that is
+    structurally impossible**: rendering always takes the latest, so a
+    correction always propagates, and the marker only governs whether the
+    manager is *told*.
+
+    **It keeps question 3.7's principle intact** — the reach of a catalogue
+    change is the point of a catalogue, not a hazard — and it makes the
+    "newer version" control **informational rather than load-bearing**, which is
+    the safe place for a control a manager may ignore.
+
+    **What it gives up, accepted:** a manager cannot say *"I reviewed v3, give me
+    v3"*. They do not need to, because the snapshot is where *this exact thing*
+    gets fixed — and it is a better place for it, freezing the whole rendered
+    artefact rather than one module's content.
+
+    **Note the asymmetry with `DecisionResolutionDB.content_version_id`**, which
+    *is* a real pin. That is correct and different: a resolution records what
+    the engine chose at a moment, so it must be able to say which version it
+    chose. A manual binding records a manager's intent to use a *record*, not a
+    *version*.
 4. **A decision slot that resolves to nothing is hidden, not placeheld
    ([[ADR-086 — Decision Slots Fail Gracefully]]). In the composer, should a
    hidden slot be visible to the author?** *Constraint: rendering emits an HTML
