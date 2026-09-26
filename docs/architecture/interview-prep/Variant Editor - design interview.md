@@ -16,7 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 40 questions across five clusters, 19 answered.
+> 40 questions across five clusters, 20 answered.
+> **Cluster 3 in progress — 1/9.**
 > **Cluster 2 ✅ CLOSED 2026-09-26, 10/10.**
 > **Cluster 4 — 1/7** (4.7 answered during 2.2).
 > **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
@@ -1378,15 +1379,37 @@ second time the cluster found a boolean too coarse; question 1.8 was the first.
 > can make and few competitors can. Worth carrying to the business side and to
 > question 3.9.
 
-1. **A manager is composing a campaign, sees a typo in a headline, and fixes it.
-   Where does that change land — in `content_records`, or in
-   `field_overrides`?** *Constraint: [[ADR-040 — Introduce Override Layer]]
-   exists so the catalogue is not edited during composition, and
-   [[ADR-041 — Override Precedence]] makes an override win until reset. But the
-   user's stated requirement is literally "make a change to the content record
-   while orchestrating a campaign".* A typo is the easy case and both answers
-   are defensible: it is wrong *everywhere*, so the catalogue is right; but the
-   manager is in a campaign, so the override is what the model expects.
+1. ✅ **A manager is composing a campaign, sees a typo in a headline, and fixes
+   it. Where does that change land?**
+   **Resolution (2026-09-26): the content record.** The user: *"content record,
+   typo is wrong everywhere"*.
+
+   **The principle is scope of the correction, not location of the manager.**
+   The question a person answers instantly and no inspection can answer for
+   them is *"is this wrong everywhere, or different here?"* A typo is wrong
+   everywhere; *"shorter copy for this send"* is different here. **Where the
+   manager happens to be standing when they notice is not evidence of either.**
+
+   **The blast-radius argument was considered and rejected, and the rejection
+   generalises.** By blast radius the default should be the override: a wrong
+   override is local and resettable, a wrong catalogue edit reaches every
+   composed-but-unsent campaign using that record, including ones someone else
+   owns. That was rejected because **a catalogue edit being visible to other
+   campaigns is the point of a catalogue, not a hazard.** The hazard is not
+   reach; it is *silence* about reach, which is question 3.7's subject.
+
+   **It also agrees with the trajectory established in question 1.8.** An
+   override that should have been a catalogue fix is debt — the typo stays in
+   the catalogue, the next campaign meets it again, and the override rate rises.
+   Since the user wants that rate **falling** as automation earns trust,
+   defaulting to the locally-safe option would quietly manufacture the metric
+   they want going down.
+
+   **Note that this is the user's original requirement being honoured
+   literally.** *"Need to make a change to the content record while orchestrating
+   a campaign? A manager doesn't want to switch tabs"* — the content record, from
+   inside the composer, is exactly what was asked for, and question 2.1's field
+   editor beside the stack is where it happens.
 2. **Is it one behaviour or two?** If a manager can do both, what distinguishes
    them at the moment of typing — two fields, a mode, a choice on save, or an
    "also update the original" checkbox? *Lean: two visible actions, because an
