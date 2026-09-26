@@ -16,8 +16,9 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 40 questions across five clusters, 13 answered.
-> **Cluster 2 in progress — 5/10** (2.7–2.10 answered out of order).
+> 40 questions across five clusters, 15 answered.
+> **Cluster 2 in progress — 6/10** (2.7–2.10 answered out of order).
+> **Cluster 4 — 1/7** (4.7 answered during 2.2).
 > **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
 > **Two questions promoted out of order:** 2.7 was answered in passing during
 > question 3, and 2.8 was added by the same message.
@@ -781,12 +782,42 @@ not interview questions, and they are logged rather than answered here.
    opening the overlay, and the composer demos less impressively than a canvas —
    which for a reference implementation seeking credibility is a real cost,
    accepted deliberately.
-2. **A required field is empty. What does the composer do?** *Constraint:
-   ADR-174 point 3 already puts the **blocking** check in the send review
-   pre-flight, so the composer is not the last line of defence. Lean: show it,
-   never block it — an author mid-draft has empty fields by definition.* Does an
-   empty required field make the variant look incomplete in the variant list, or
-   only inside the editor?
+2. ✅ **A required field is empty. What does the composer do?**
+   **Resolution (2026-09-26): show it inside the editor only. Lists carry no
+   completeness indicator.** The user: *"A is fine, manager decides if ready and
+   would open anyway."*
+
+   **Most of this question was already answered elsewhere** — nothing is
+   required at the catalogue level (2.8), the composer warns at bind time (2.8),
+   an unbound module is reported rather than blocked (1.4), and a missing
+   required field on a *bound* module blocks the send
+   ([[ADR-174 — Channel Readiness Is Asserted, Not Computed]] point 3). What
+   remained was whether incompleteness travels outside the editor.
+
+   **It does not, and the reason is that the question dissolves once readiness
+   is asserted.** A list showing "has gaps" would need, per variant, its
+   modules, each module's manifest, each bound content record and a field-by-
+   field comparison — a fan-out the list view does not otherwise need, on a
+   project `docs/backlog.md` flags as having **no scale benchmark at all**.
+   Since a manager decides readiness and opens the variant to do it, the list
+   shows the decision rather than recomputing the evidence behind it.
+
+   **This is narrower than ADR-174 point 2's "warns wherever the record
+   appears", and deliberately so.** That rule governs a **content record**,
+   whose readiness mark is a durable claim that can be contradicted by a later
+   edit somewhere else entirely — so the warning has to chase it. A variant is
+   composed in one place by one person who is about to look at it anyway.
+
+   **A second scope argument, about the automated path.** The user:
+
+   > *"Prep / Firing recurring automatic machine variant would need extra steps
+   > and scripts anyway, so there will be tests before going live"*
+
+   **The composer protects a human's workflow; an automated pipeline protects
+   itself.** A recurring machine-fired variant is not a person clicking through
+   a warning — it is a configured pipeline with its own verification, so the
+   composer does not need to carry the burden of guarding it. This keeps the
+   editor from acquiring checks whose real audience is a script.
 3. **Does the manager see subject and preheader as "the email's subject", or as
    a module's fields like any other?** *Constraint: ADR-162 point 1 made them a
    `header` module's declared variables at position 0, and which module carries
@@ -1149,13 +1180,29 @@ not interview questions, and they are logged rather than answered here.
    comment refusing to invent a richer vocabulary locally — the same restraint
    presumably applies here.* Does the composer drive status, or does status
    change as a side effect of submitting for approval?
-7. **Is a variant's readiness asserted or computed?** *Constraint: ADR-174 point
-   1 chose **asserted** for a content record's channel readiness, with the
-   reasoning that a computation over fields cannot capture intent. Whether that
-   generalises to a variant is genuinely open: a variant's completeness is more
-   mechanical — every required field filled, every slot bound — so a computation
-   might be honest here where it was not there.* This is the question most
-   likely to owe an ADR.
+7. ✅ **Is a variant's readiness asserted or computed?**
+   **Resolution (2026-09-26): asserted. A manager decides.** Answered in passing
+   while closing question 2.2 — *"manager decides if ready and would open
+   anyway"*.
+
+   **The counter-argument was available and was not taken, which is worth
+   recording.** [[ADR-174 — Channel Readiness Is Asserted, Not Computed]] point
+   1 chose *asserted* for a content record because a computation over fields
+   cannot capture **intent**. A variant looked like the case where that reasoning
+   might not carry: its completeness is comparatively mechanical — every
+   required field filled, every module bound — so a computation could have been
+   honest here where it was not there. It was still rejected.
+
+   **So the principle is broader than ADR-174's stated reasoning.** It is not
+   only that a computation cannot see intent; it is that **the decision to
+   proceed belongs to a person even when a machine could form an opinion.**
+   That is the same line [[Manager Workflow - design interview]] Q1.1 drew —
+   the manager's job is deciding — and it is why the variant list shows a mark
+   rather than a recomputed verdict.
+
+   **Consequence:** `variants.status` carries the assertion (question 4.6), the
+   list reads one column instead of fanning out across modules and manifests,
+   and question 2.2 dissolves rather than needing its own mechanism.
 
 ## Cluster 5 — Reuse and repetition
 
