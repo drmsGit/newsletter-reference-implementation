@@ -16,10 +16,10 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 41 questions across five clusters, 34 answered.
+> 41 questions across five clusters, 35 answered.
 > **Cluster 3 ✅ CLOSED 2026-09-26, 9/9.**
 > **Cluster 2 ✅ CLOSED 2026-09-26, 10/10.**
-> **Cluster 4 in progress — 7/8** (4.3b added during 4.3).
+> **Cluster 4 ✅ CLOSED 2026-09-26, 8/8.**
 > **Cluster 1 ✅ CLOSED 2026-09-25, 8/8.**
 > **Two questions promoted out of order:** 2.7 was answered in passing during
 > question 3, and 2.8 was added by the same message.
@@ -1996,12 +1996,41 @@ inherit it later.
    **Consequence:** the exclusion-reason vocabulary gains a value that is not
    produced by the exclusion stack, so whatever records it must accept a reason
    from a later stage. Logged as a gap.
-6. **What are `variants.status`'s values, and who moves them?** *Constraint: the
-   column defaults to `draft` and **no ADR defines the vocabulary**. The content
-   record's `status` is deliberately constrained to exactly two values, with a
-   comment refusing to invent a richer vocabulary locally — the same restraint
-   presumably applies here.* Does the composer drive status, or does status
-   change as a side effect of submitting for approval?
+6. ✅ **What are `variants.status`'s values, and who moves them?**
+   **Resolution (2026-09-26): exactly two — `draft` and `ready` — constrained in
+   code, moved by a manager in both directions, never automatically.** The user:
+   *"yes, two values, constrained in code"*.
+
+   **Today the column accepts anything.** `status: str = "draft"` with no
+   validation anywhere, against the content record's explicit precedent:
+   `CONTENT_STATUSES = ("active", "inactive")`, whose comment refuses to invent
+   a richer vocabulary locally and sends *"archived"* to the general
+   data-lifecycle ADR.
+
+   **Three candidate values were considered and each belongs somewhere else:**
+   - **`approved`** — approval is on **firing a send**, not on the variant;
+     `APPROVABLE_ROUTES` has exactly one entry. A second approval concept on the
+     variant would mean two things called approval that are not the same thing.
+   - **`sent`** — a variant can be snapshotted and sent repeatedly, so this is a
+     property of send instances, not of the variant.
+   - **`archived`** — the content record's comment already routes this to the
+     data-lifecycle ADR. The same argument applies unchanged.
+
+   **`ready` is the assertion question 4.7 settled**, given a home. The list
+   reads this one column instead of fanning out across modules and manifests,
+   which is what made question 2.2 dissolve.
+
+   **Nothing moves it automatically.** A snapshot does not imply `ready` and an
+   edit does not silently revert it — both would be the system forming an
+   opinion about a person's intent, which 4.7 rejected. **Un-readying must be
+   possible**, or a manager who marks something ready and then spots a problem
+   has no way back.
+
+   **That produces a familiar state and it is accepted rather than fixed:** a
+   variant can be `ready` and then edited, so the mark and the content can
+   disagree. This is exactly [[ADR-174 — Channel Readiness Is Asserted, Not Computed]]
+   point 2's situation for content records, and it gets the same answer — warn,
+   keep the mark, do not overrule the person.
 7. ✅ **Is a variant's readiness asserted or computed?**
    **Resolution (2026-09-26): asserted. A manager decides.** Answered in passing
    while closing question 2.2 — *"manager decides if ready and would open
@@ -2025,6 +2054,56 @@ inherit it later.
    **Consequence:** `variants.status` carries the assertion (question 4.6), the
    list reads one column instead of fanning out across modules and manifests,
    and question 2.2 dissolves rather than needing its own mechanism.
+
+### What Cluster 4 produced
+
+**One correction that reframed the cluster.** `mode` does **not** control
+decision resolution, as question 4.3 assumed — it controls **which content
+version is read**: preview takes the live mutable draft, the send takes the
+latest frozen `ContentVersionDB`. That surfaced a consequence of question 3.1
+neither of us had seen: **an edit to the content record does not reach a send
+until someone publishes.** A manager fixes the typo, previews it corrected, and
+the send ships the old text — silently, because a version exists.
+
+**The cluster's organising idea: preview is a sketch, and the system already has
+two honest artefacts.** An author previews a live render; an approver reviews the
+**snapshot**, which is frozen before the approvable step. Nothing can shift after
+snapshot, and noticing that is what resolved question 4.3b — rendering needs no
+version pin, because the snapshot already freezes everything.
+
+**Three times the interview chose "say so" over "work it out".**
+Preview **names** the generic fallback rather than computing a resolution (4.2),
+because computing would make a read-shaped action write rows the send may later
+consume. A slot that **found nothing** is marked distinctly from one that has not
+run (4.4). And a snapshot **warns** about unpublished drift with an offer to
+publish, rather than resolving it silently (4.3). In each case the honest,
+cheaper option was chosen over the clever one.
+
+**A distinction this interview has now drawn three times, at three layers**:
+*the system tried and found nothing* is not *nobody tried*. Question 1.4 drew it
+for unbound modules at the send review, 4.4 for slots in the composer preview.
+Identical appearance, different meaning, only one actionable — **and collapsing
+them trains a manager to ignore both.**
+
+**`variants.status` is two values (4.6)** — `draft` and `ready`, constrained in
+code the way `CONTENT_STATUSES` is. `approved` belongs to the send, `sent` to
+send instances, `archived` to the data-lifecycle ADR. `ready` is question 4.7's
+assertion given a home, and it is the column the variant list reads instead of
+recomputing completeness.
+
+**Five backend gaps:**
+
+| # | Gap | Where |
+|---|---|---|
+| 21 | **A test send mails the draft, not what will ship** — `mode="preview"` | `delivery/service.py:519` |
+| 22 | `module_instances` has no version marker, so drift cannot be detected | `campaigns/db_models.py` |
+| 23 | The render response carries no per-module state; slot states exist only as HTML comments | `rendering/router.py` |
+| 24 | No post-render per-recipient "nothing meaningful" skip | `delivery/` |
+| 25 | `variants.status` accepts any string | `campaigns/service.py:191` |
+| 26 | A shareable preview link does not exist, and carries an authorisation question | new |
+
+**Gap 21 is a bug rather than a gap** — a test send exists precisely to show
+what will be sent, and it shows something else.
 
 ## Cluster 5 — Reuse and repetition
 
