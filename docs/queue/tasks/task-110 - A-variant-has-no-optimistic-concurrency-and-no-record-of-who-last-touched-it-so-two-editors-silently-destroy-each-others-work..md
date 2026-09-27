@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-09-27 14:20'
 labels:
   - backend
   - frontend
@@ -24,4 +25,6 @@ ordinal: 206300
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 370, section "Features", position 63 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-09-27: [[ADR-180 — A Lock Is Advisory for a Person and Binding for a Machine]] now records the lock policy this task implements.
 <!-- SECTION:NOTES:END -->

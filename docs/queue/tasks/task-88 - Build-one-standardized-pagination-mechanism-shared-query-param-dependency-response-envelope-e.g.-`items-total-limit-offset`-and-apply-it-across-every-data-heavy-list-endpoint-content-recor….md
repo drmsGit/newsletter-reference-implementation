@@ -7,6 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-09-27 14:20'
 labels:
   - backend
 dependencies: []
@@ -24,4 +25,6 @@ ordinal: 204100
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 252, section "Features", position 41 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-09-27: [[Manager Workflow - design interview]] Cluster 2 requirement 5 widens this — server-side filtering as well as paging, on content, campaigns, audiences, recipients and approvals (campaigns and approvals are not named above). Cluster 3 gap 10: GET /campaigns/decision-slots/{id}/resolutions is the worst instance (backend/app/campaigns/router.py:286-296, .all() at backend/app/campaigns/service.py:809). The approvals list's other filters are task-209.
 <!-- SECTION:NOTES:END -->

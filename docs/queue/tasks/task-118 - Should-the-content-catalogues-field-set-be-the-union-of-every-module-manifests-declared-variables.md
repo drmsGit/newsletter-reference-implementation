@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-09-27 14:20'
 labels:
   - needs-adr
   - backend
@@ -23,4 +24,6 @@ ordinal: 300200
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 412, section "Needs ADR", position 2 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-09-27: [[ADR-177 — A Field Is Defined Once, Required Per Module]] decides this question; the implementation is task-219. The interview session recommends marking this Done once task-219 exists — which it now does — so the thread from decision to implementation stays visible. Status change is the user's call.
 <!-- SECTION:NOTES:END -->

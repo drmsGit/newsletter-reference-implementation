@@ -4,6 +4,7 @@ title: 'Nothing can remove an audience group member, and a membership cannot exp
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-09-27 14:20'
 labels:
   - backend
 dependencies: []
@@ -21,4 +22,6 @@ ordinal: 206000
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 364, section "Features", position 60 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-09-27: related — task-217 (a membership records no reason; external automation must say why this recipient).
 <!-- SECTION:NOTES:END -->

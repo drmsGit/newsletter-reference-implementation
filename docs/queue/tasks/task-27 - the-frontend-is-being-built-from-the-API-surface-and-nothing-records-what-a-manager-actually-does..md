@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-09-27 14:20'
 labels:
   - needs-adr
   - backend
@@ -25,4 +26,6 @@ ordinal: 102700
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 90, section "Bugs", position 27 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-09-27: every Manager Workflow gap summarised here now has its own task — task-200 (self-approval), task-201 (required-field check), task-204 (stale resolve_audience docstring), task-205 to task-218 (MW requirements and gaps 2–20), task-219 (fields.json, with the Variant Editor gaps), task-231 (exclusion segment vs blocklist, Needs ADR). The interview session recommends closing this task now that the interview is closed; that is the user's call.
 <!-- SECTION:NOTES:END -->

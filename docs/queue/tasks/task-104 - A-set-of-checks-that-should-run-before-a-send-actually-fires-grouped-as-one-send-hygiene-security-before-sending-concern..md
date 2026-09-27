@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-09-27 14:20'
 labels:
   - backend
 dependencies: []
@@ -55,4 +56,6 @@ ordinal: 205700
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 326, section "Features", position 57 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-09-27: related — task-201 (required-field check before a send fires) and task-228 (post-render per-recipient 'nothing meaningful' skip, whose reason lands with the exclusion reasons).
 <!-- SECTION:NOTES:END -->
