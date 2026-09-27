@@ -7,6 +7,7 @@ topic:
   - content
   - approvals
 created: 2026-09-24
+modified: 2026-09-27
 source:
   - "Manager Workflow design interview (interview-prep), Cluster 2 / Q3, Q3b, Q6b — cluster closed 2026-09-21"
 depends_on:
@@ -83,6 +84,44 @@ Two concrete obligations fall out, and the second is the one that bites silently
 - **Precision on the approvals plumbing, because the two numbers differ and the difference matters.** `backend/app/approvals/actions/` registers two actions; `APPROVABLE_ROUTES` in `backend/app/auth/policy.py` maps exactly one route, the send. So the work point 4 owes is a registered action *and* a route entry, and shipping the first without the second produces a 403 on a route that looks configured. **The existing mismatch is not a defect, and saying so avoids a false reading:** `ai.apply_subject_preheader` is created by a service calling `approvals.request_approval` directly (`backend/app/ai/orchestration.py:102`), so it never passes the guard and needs no route entry. `APPROVABLE_ROUTES` exists for the other mechanism — a route tripping `ApprovalRequired`, where the guard must be told what to queue. Readiness needs a route entry only if a machine asserts it by calling a route, which is the shape point 4 assumes.
 - **Deliberately not decided here: what blocks the send beyond an empty required field.** Zero recipients clearly blocks and the recipient cap already raises; whether a thin decision slot or an excluded force-add joins them is open, and getting that list wrong in either direction is how the review screen becomes either a rubber stamp or an obstacle. This record contributes one entry to that list and does not settle it.
 - **Also not decided: whether a marked-but-incomplete record should be excluded from slot candidacy.** Point 1 says the engine trusts the mark and point 2 says the mark survives an emptied field, which together mean a slot can select a record that the send will then refuse. That is the honest consequence of the two decisions and it is survivable — the failure is caught at the send rather than at the selection — but it is a second place the same fact could be checked, and checking it in both is how the two answers drift apart.
+
+## Addendum 2026-09-27 — there is a third assertion axis, and point 1's argument is what adds it
+
+**Point 1 names two axes and a reader will take two to be the set.** It is
+three. [[ADR-179 — What Enters the Catalogue, and What a Machine May Take From It]]
+point 2 adds **machine ready** to the content record — a manager-set flag
+answering *may a machine pick this without a person deciding?* — on exactly the
+reasoning point 1 used to keep `status` and channel readiness apart.
+
+| Axis | Answers |
+|---|---|
+| `status` (`active` / `inactive`) | may this record be newly selected at all |
+| channel readiness | may it go out on this channel |
+| machine ready | may a machine pick it without a person deciding |
+
+**Nothing in point 1 is narrowed.** `status` stays `active` / `inactive`,
+readiness stays per channel and stored, and the reason the two must not be
+merged — a status enum that grows by one value per channel registered — is the
+reason the third one is also its own axis rather than a fourth status value or
+a channel-readiness variant. A record can be active, push-ready and not
+machine-selectable.
+
+**The asserted-not-computed principle carries across unchanged, and that is
+why this is an addendum rather than a separate argument.** The exclusions the
+new flag expresses — a target-group restriction, a time window, *"any other
+reason"* — are intent, and no computation over `content` can see intent. That
+is this record's Context, applied to a different question about the same
+object.
+
+**One thing point 4 leaves open under the new axis.** Point 4 lets an
+integration assert channel readiness through the approval inbox's held
+actions. Whether the same path exists for machine ready is deliberately not
+settled in ADR-179; today the flag is manager-set and no machine path exists.
+A machine marking its own output machine-selectable without the hold would be
+the self-certification [[ADR-082 — AI May Recommend but Not Publish]] refuses,
+which is the same reasoning point 4 already runs on.
+
+Nothing above changes this record's Decision section.
 
 ## Related ADRs
 
