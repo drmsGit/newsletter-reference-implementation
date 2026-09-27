@@ -49,6 +49,30 @@ Overrides are stored separately from catalog content and merged with referenced 
 ## Notes
 This generalizes the existing reference implementation's override approach.
 
+## Narrowed 2026-09-27 by the variant editor interview
+
+[[ADR-178 — Scope of the Correction, Not Location of the Manager]] narrows this
+record in two places without changing its Decision.
+
+**The override layer does not extend to decision slots.** An override attaches
+to a module bound to a content record and never to one bound to a decision
+slot — an override on a slot defeats the slot, and once `max_results` resolves
+several records it produces several personalised picks wearing one pinned
+headline. This is enforced rather than conventional. `ContentOverrideDB`'s
+docstring, which names *"a consistent headline across the personalized picks"*
+as an intended use, is wrong on that point and is corrected by ADR-178.
+
+**This record's Context reasons that editing the catalogue directly "would
+create unintended global changes", and the composer does not take that route.**
+An edit made while composing goes to the content record by default; the manager's
+question is the scope of the correction, not their own location. A catalogue
+edit being visible to other campaigns is the point of a catalogue, not a hazard
+— what this record's Negative calls for under *"makes preview and usage
+visibility more important"* is satisfied by a passive count of **unsent**
+campaigns affected, shown before the first keystroke. Nothing in the Decision
+above changes: both destinations exist, and the override layer stays separate
+from the catalogue.
+
 ## Related ADRs
 
 ### Depends On
