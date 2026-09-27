@@ -285,6 +285,62 @@ class TestGateA_AudienceResolutionScope:
         )
 
 
+class TestGateB_ChannelDecidesWhoIsInTheAudience:
+    """`resolve_audience` requires a channel, and the channel changes the answer.
+
+    Consent is keyed `(recipient, brand, channel, purpose)`, so resolving the
+    same group for email and for push returns different people. Until
+    2026-09-27 the parameter carried `= DEFAULT_CHANNEL`, so a caller that
+    forgot it silently consent-gated on email — the recorded cause of a push
+    send resolving to nobody. The default is gone for the same reason
+    `VariantDB.channel` never had one.
+
+    These tests pin the *property*, not the signature: a test that only
+    asserted `TypeError` on a missing argument would pass against a function
+    that took the channel and ignored it.
+    """
+
+    def test_a_recipient_consenting_only_to_email_is_absent_from_push(self, db):
+        group = db.group()
+        recipient = db.recipient("opted_in")  # email consent, by the fixture
+        db.pin(group, recipient)
+        db.session.commit()
+
+        for_email = resolve_audience(db.session, group.id, channel="email")
+        for_push = resolve_audience(db.session, group.id, channel="push")
+
+        assert recipient.id in {r.id for r in for_email}
+        assert recipient.id not in {r.id for r in for_push}, (
+            "a recipient who consented to email appeared in the push audience. "
+            "Consent is per channel, so the channel is not a delivery detail — "
+            "it decides membership, which is why the parameter has no default"
+        )
+
+    def test_consent_on_one_channel_does_not_leak_to_the_other(self, db):
+        group = db.group()
+        recipient = db.recipient("opted_in")
+        record_consent(
+            db.session,
+            recipient.id,
+            "opted_in",
+            ensure_default_brand(db.session).id,
+            source="test",
+            channel="push",
+            note="channel-scoping test",
+            commit=False,
+        )
+        db.pin(group, recipient)
+        db.session.commit()
+
+        for_push = resolve_audience(db.session, group.id, channel="push")
+
+        assert recipient.id in {r.id for r in for_push}, (
+            "an explicit push consent did not put the recipient in the push "
+            "audience — the consent lookup is not reading the channel it was "
+            "given"
+        )
+
+
 class TestGateB_ConsentFloorBeatsManualPins:
     """resolve_audience: the consent floor overrides a manual pin.
 
@@ -301,7 +357,7 @@ class TestGateB_ConsentFloorBeatsManualPins:
         db.pin(group, recipient)
         db.session.commit()
 
-        resolved = resolve_audience(db.session, group.id)
+        resolved = resolve_audience(db.session, group.id, channel="email")
 
         assert recipient.id in {r.id for r in resolved}
 
@@ -314,7 +370,7 @@ class TestGateB_ConsentFloorBeatsManualPins:
         db.pin(group, recipient)
         db.session.commit()
 
-        resolved = resolve_audience(db.session, group.id)
+        resolved = resolve_audience(db.session, group.id, channel="email")
 
         assert recipient.id not in {r.id for r in resolved}, (
             "a manually pinned recipient bypassed the consent floor. Pins beat "

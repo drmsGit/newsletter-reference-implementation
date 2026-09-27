@@ -3631,7 +3631,12 @@ def audience_groups_list(request: Request, error: str | None = None, db: Session
         # 0 pins but real recipients. "pinned" is kept as a secondary detail.
         pinned = db.query(AudienceGroupMemberDB).filter(AudienceGroupMemberDB.group_id == g.id).count()
         rows.append({"id": g.id, "name": g.name, "description": g.description,
-                     "recipient_count": len(audience_service.resolve_audience(db, g.id)),
+                     # Channel-explicit since resolve_audience stopped defaulting. This count
+                     # is email-consent-scoped and says so; a group meant for push shows an
+                     # email number, which is a real defect logged separately.
+                     "recipient_count": len(
+                         audience_service.resolve_audience(db, g.id, channel=DEFAULT_CHANNEL)
+                     ),
                      "pinned_count": pinned, "created_at": g.created_at})
     campaigns = (
         db.query(CampaignDB)
@@ -3726,7 +3731,9 @@ def audience_group_detail(group_id: int, request: Request, error: str | None = N
             "count": audience_service.count_for_criteria(db, crit, group.brand_id),
         })
 
-    resolved = audience_service.resolve_audience(db, group_id)
+    # Email is correct here rather than merely preserved: the next line renders
+    # email addresses, so the audience shown is the email-consenting one.
+    resolved = audience_service.resolve_audience(db, group_id, channel=DEFAULT_CHANNEL)
     resolved_addresses = resolve_emails(db, [r.id for r in resolved[:20]])
 
     # Source campaign (if this group was seeded by "Suggest audience") — enables

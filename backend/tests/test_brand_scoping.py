@@ -837,7 +837,7 @@ class TestConsentIsScopedToTheSendingBrand:
             brand_id=other.id,
         )
         try:
-            resolved = audience_service.resolve_audience(db, group.id)
+            resolved = audience_service.resolve_audience(db, group.id, channel="email")
 
             assert consenting_recipient.id not in {r.id for r in resolved}, (
                 "a group on brand B resolved a recipient who only ever "
@@ -902,7 +902,7 @@ class TestConsentIsScopedToTheSendingBrand:
         audience_service.add_member(
             db, group.id, consenting_recipient.id, brand_id=group.brand_id)
         try:
-            resolved = audience_service.resolve_audience(db, group.id)
+            resolved = audience_service.resolve_audience(db, group.id, channel="email")
 
             assert consenting_recipient.id not in {r.id for r in resolved}, (
                 "a recipient pinned into a brand-B group was resolved despite "

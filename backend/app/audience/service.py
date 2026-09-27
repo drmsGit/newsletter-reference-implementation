@@ -512,11 +512,21 @@ def delete_block(db: Session, block_id: int, *, brand_id: int) -> bool:
 
 
 def resolve_audience(
-    db: Session, group_id: int, channel: str = DEFAULT_CHANNEL
+    db: Session, group_id: int, channel: str
 ) -> list[RecipientDB]:
     """The group's live audience:
         ((∪ include blocks) − (∪ exclude blocks)) ∪ (manual member pins)
     then re-gated to consenting recipients.
+
+    **`channel` has no default, deliberately — the same reasoning
+    `VariantDB.channel` states for the same hazard.** Consent is keyed
+    `(recipient, brand, channel, purpose)`, so the channel decides who is in
+    the audience at all, not merely how they are reached. A default let a
+    caller that forgot to pass one silently consent-gate on email — harmless
+    only while email is the only channel, which is exactly the shape of
+    fail-open that stops being harmless the moment it matters. It was the
+    recorded cause of a push send resolving to nobody. Surfaced by the Manager
+    Workflow design interview and closed 2026-09-27.
 
     Precedence (decided 2026-07-26): a manual pin is a deliberate override and
     is **always included** — exclude blocks shape the rule-driven audience but
