@@ -75,7 +75,9 @@ implement anything, verify the entry against the tree as it is now:
   `(recipient, channel, purpose)` since ADR-163. An entry telling you to touch
   it is an entry to report, not to follow.
 - **Some entries are already fixed.** A task can still be To Do after the code
-  moved on. Check the code before you start typing.
+  moved on, and a related fix may be recorded in `docs/queue/completed/`
+  (grep it; `backlog search` does not look there). Check the code before you
+  start typing.
 - **An entry that offers "two honest options" is not specified.** That is a
   decision with the work attached, and it is not yours.
 

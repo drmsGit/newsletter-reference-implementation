@@ -72,8 +72,10 @@ uncertainty named, never in Confirmed.
 4. Cross-check the queue before reporting — **read-only, always**:
    `backlog search "<symbol or file>" --plain`, then
    `backlog task view task-N --plain` for a hit. Open tasks (status To Do)
-   already hold known items; a finding logged there is not news, and Done
-   tasks record fixes with reasoning. Verify an item is still open before
+   already hold known items; a finding logged there is not news. Done tasks
+   record fixes with reasoning, and they live in `docs/queue/completed/`,
+   which `backlog search` does **not** cover — grep that directory for the
+   symbol or file as well. Verify an item is still open before
    suppressing it; things do get fixed.
 
 ## What to look for

@@ -22,6 +22,8 @@ original line and section position. Read with:
   Without `--sort ordinal` the list sorts by priority, which is not the human's order.
 - `backlog task view task-N --plain` — one item in full.
 - `backlog search "<text>" --plain`; filter with `--labels needs-adr`, `--type bug`.
+Done tasks are in `docs/queue/completed/` — outside `task list`, the board and
+`backlog search`; grep that directory or `task view task-N`.
 Old sections are ordinal ranges: 1xxxxx Bugs, 2xxxxx Features, 3xxxxx Needs ADR,
 5xxxxx Done. `priority` is set only where the entry stated one; `Parked` = must be
 prioritised before anything else.

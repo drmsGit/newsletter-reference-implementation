@@ -37,6 +37,8 @@ The inputs:
   `task list` sorts by priority first, which is not the human's order.
   `priority` is set only where an entry states one; `Parked` means it must be
   prioritised before anything else. Entries are long; never load them all.
+  Done tasks live in `docs/queue/completed/`, outside `task list` and
+  `backlog search` — grep there when checking a Done claim.
 - `docs/playbook-strategy.md` §6 (roadmap status table) and §5 (decision log).
 - `docs/business/LAUNCH-GATES.md` — the exposure blockers.
 - `docs/business/BETA-SCOPE.md` — **if it exists.** This defines what "first

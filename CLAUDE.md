@@ -24,6 +24,10 @@ commercial product. Learnings feed the separate Condor use case.
     it must be prioritised before anything else happens to it.
   - Labels: `needs-adr` (📋 — blocked on a design decision), and area
     `backend` / `frontend` / `docs`. Type: bug / feature / chore / docs / decision.
+  - Done tasks are moved to `docs/queue/completed/` (`backlog task complete
+    task-N`). There they drop out of `task list`, the board and `backlog
+    search`; reach them with `backlog task view task-N` or by grepping
+    `docs/queue/completed/`. Check there before calling something unfixed.
   - Descriptions are essays, not tickets: keep the reasoning and `file:line`
     citations; never summarise an entry down.
   - Backlog.md's own `docs/queue/decisions/` and `docs/queue/docs/` stay
