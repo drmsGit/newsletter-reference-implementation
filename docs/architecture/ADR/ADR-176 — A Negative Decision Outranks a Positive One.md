@@ -91,6 +91,44 @@ Consent is keyed `(recipient, brand, channel, purpose)` ([[ADR-163 — Per-Chann
 - **Cluster 4 question 3 is what makes point 1 visible at the moment it matters**, and it is a return-shape change rather than new logic. `resolve_audience` already computes `include_ids`, `exclude_ids`, the pin set and the consent-dropped set, and returns only the final list. A manager who force-added four people and sees *− exclusion segments* learns that their add was overruled; a bare count cannot show that, which is why that gap and this decision belong to the same build. It also bears on [[ADR-093 — Audience Intelligence Is Derived, Not Authoritative]]: the arithmetic is derived and stays derived, and nothing here asks for resolution results to become durable.
 - **No decision-log entry in `docs/playbook-strategy.md` stands behind this record yet.** Its log ends at 2026-09-19 — *"The approval surface shipped, and a person may use the JSON API"* — and the Manager Workflow interview's five clusters closed on 2026-09-21 through 2026-09-24 with no entry written. The source for this decision is the interview document and `docs/backlog.md`'s entry, both cited above; the playbook entry is owed and is logged as such rather than invented here.
 
+## Addendum 2026-09-27 — point 5's default is removed; the trap it named was sprung
+
+**Point 5 said the default should stay and it no longer does.** That point kept
+`resolve_audience`'s `channel: str = DEFAULT_CHANNEL`, *"deliberately, for the
+service's own convenience where an email audience is being previewed"*, while
+naming it in the same breath as *"a trap for any caller displaying a number"*.
+The parameter is now required and has no default.
+
+**What changed is evidence, not opinion.** The trap this record described as a
+hazard for screens was subsequently recorded as a failure that had already
+happened: the [[Manager Workflow - design interview]] found the defaulted
+channel to be the cause of a push send resolving to nobody. A caller that
+forgot the argument did not display a misleading number — it silently
+consent-gated a push audience on email and sent to no one, which is a
+different and worse failure than the one point 5 anticipated.
+
+**The reasoning point 5 applied to screens applies to callers.** *"A defaulted
+channel on screen is always wrong"* is right, and the reason it is right —
+consent is keyed `(recipient, brand, channel, purpose)`, so the channel decides
+membership rather than delivery — does not stop at the screen. A convenience
+default on a membership question is the same fail-open
+[[ADR-160 — Channel Model and Composition]] point 5 refused for
+`VariantDB.channel`, in the same words: harmless only while email is the only
+channel.
+
+**Nothing else in point 5 changes, and its substance is strengthened.** There
+is still no channel-less count, no screen may show one, the channel still comes
+from the variant when a send is planned, and how a group is presented with no
+variant in hand is still left open. What is removed is the one mechanism by
+which a caller could get a channel without choosing it.
+
+**Points 1 and 4 of this record are accepted and not implemented**, verified
+2026-09-27: `resolve_audience` still computes `(include − exclude) ∪ pins`, so
+an exclude block still does not reach a hand-pinned recipient, and
+`audience_resolution_mode` still defaults to `"freeze"` in both
+`SendInstanceDB` and `prepare_send_from_audience`. That is recorded here rather
+than left to be rediscovered, and it is tracked in `docs/backlog.md`.
+
 ## Related ADRs
 
 ### Depends On
