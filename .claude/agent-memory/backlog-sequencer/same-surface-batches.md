@@ -50,3 +50,74 @@ engine-at-import defect (out-of-beta, the test-DB Needs-ADR) are lines 4 and 6 o
 same file. Batch regardless of scope; touching it twice is the only wrong answer.
 `requirements.txt` `httpx2` and the `Secure` cookie flag ride along as the same
 "publishable repo" pass.
+
+---
+
+# Run 2 batches — 2026-09-27
+
+Measured 2026-09-27: `app/frontend/router.py` **4,415** loc (was 2,927 on
+2026-09-12 — it grew ~1,500 lines while carrying a deletion date).
+
+**M1 — the content-catalogue field model migration.** ONE decision, ONE
+migration, ONE release. The human suspected this and it is correct — 1.8, 2.4,
+2.8, 2.9 and 2.10 are five decisions and one migration.
+Members: VE-3 (`content/service.py:101`), VE-10 (create `storage/fields.json`;
+collapse `CONTENT_FIELD_GROUPS` + `scripts/import_content_csv.py:33-41`),
+VE-11 (`modules/router.py:10` `ModuleVariableOut`), VE-13 (`rendering/service.py:37`
+`_RICH_TEXT_FIELD`), VE-14 (`rendering/service.py:162` `cms` boolean too coarse),
+VE-2 (`storage/modules/email/hero.json` + data migration, L362), VE-9's `type`
+descriptor, Feature **L176** (email's six fields hardcoded in `content.html`,
+`content_detail.html` and both routes), MW Cluster 2's maintenance item.
+Crosses: no existing ADR — it needs the new one. Files: `content/service.py`,
+`content/models.py`, `modules/router.py`, `rendering/service.py`, `storage/`,
+`scripts/import_content_csv.py`, two templates, `frontend/router.py`.
+
+**M2 — override integrity.** VE-15/20 (refuse override on slot-bound module,
+`overrides/service.py`, `rendering/service.py:286`), VE-16/28 (duplication copies
+the configuration half, `campaigns/duplication.py`), VE-19 (`reason` as code,
+`overrides/db_models.py`), VE-17 (reach-count query, new).
+Crosses the unwritten edit-vs-override ADR. **VE-15/20 must precede VE-4/5.**
+
+**M3 — response-model under-exposure sweep.** MW Cluster 5 names this as a
+pattern and explicitly says "worth a sweep rather than three one-line fixes":
+`ModuleVariableOut` drops `label`/`envelope`; `PendingActionDetail` drops
+`subject_type`/`subject_id` (MW-6); `SendInstance` exposes 8 of 15 columns and
+none of the three counts. Add VE-23 (render response carries no per-module state)
+and MW-13 (`resolve_audience` discards its arithmetic).
+**`ModuleVariableOut` is in both M1 and M3** — so M3 should follow M1.
+Phase 0's schema-honesty pass caught bare dicts and missed under-exposure.
+
+**M4 — the list-route contract.** MW-5 (filtering + pagination everywhere),
+MW-7 (approvals filters), MW-10 (resolutions, 96k rows), Feature L242,
+MW-18 (campaign state view needs it). One envelope, applied once, to content,
+campaigns, audiences, recipients, approvals, resolutions.
+
+**M5 — `campaigns/duplication.py`.** VE-27 (`duplicate_variant` — the *primary*
+creation action per 5.1, and it does not exist), VE-16/28 (overrides),
+VE-29 (context-sensitive `content_mode` default, `KEEP` within a campaign),
+MW-11 (`duplicate_campaign` must accept a facet-value mapping).
+Crosses the facet ADR (175) and the unwritten override ADR.
+
+**M6 — `audience/service.py` + one router.** MW-12 (no JSON route for
+suggestion, though `suggest_include_blocks_for_campaign`,
+`campaign_category_scores`, `create_suggested_group_for_campaign` and
+`recalculate_suggested_blocks` all exist), MW-13 (arithmetic),
+MW-15 (channel defaults to email — bug), MW-16 (delivery-history criteria),
+plus Cluster 5's "always recalculate, `freeze` is the mode that should never be
+used" (both the function default and the column default currently say `freeze`),
+plus the Q2 pin-vs-exclude reversal. Crosses ADR-093.
+
+**M7 — `campaigns/db_models.py` + `campaigns/service.py`.** VE-7/8 (optimistic
+concurrency + actor, L360), VE-22 (version marker — *a marker, not a render pin*),
+VE-25 (`variants.status` accepts any string, `campaigns/service.py:191`),
+VE-4/5 (`max_results` + ranked picks, `db_models.py:115` and :135).
+One schema pass. **VE-22 and VE-7 are adjacent, not the same.**
+
+**M8 — the asset subsystem + the snapshot storage medium.** L364 says to answer
+them together; `SnapshotDB` already has `artifact_storage_type` /
+`artifact_location` / `artifact_size`, and `snapshots/service.py:106` names the
+open question. Also folds in the long-standing snapshot atomicity P2. Crosses
+ADR-162 §3, ADR-101, and the new "nothing hard-deleted" Needs-ADR.
+
+**Still valid from run 1:** B2 (`app/auth/`), B4 (recipient/consent), B6
+(settings grid — now gated on C2), B7 (providers).

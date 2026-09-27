@@ -62,3 +62,72 @@ Line numbers come from backlog text and code-slimmer reports written between 202
 and 2026-08-21. Drift is likely; verify before editing. Numbers checked live on
 2026-09-12: `frontend/router.py` 2927 loc, `delivery/service.py` 433 loc,
 `decision_slot_detail.html:123`, `app/database.py:4,6`.
+
+---
+
+# Run 2 — 2026-09-27
+
+## Resolved since run 1
+1. Category picker — no longer listed 🔴.
+3. Beta DoD #4 — LAUNCH-GATES gate 2 now carries a *historical note* correcting
+   the `app/database.py` claim: "It does not — the suite collects and passes."
+   **My run-1 watchlist item 3 was wrong and the repo corrected it.** Keep this.
+7. 11 broken wikilinks — ✅ Done 2026-09-24.
+4/5/6. POSITIONING/BETA-SCOPE/LAUNCH-GATES omni-channel staleness — all updated.
+
+## Code-verified, run 2
+1. **`docs/playbook-strategy.md` §5 has no Variant Editor entry.** Verified:
+   `grep -c "Variant Editor" docs/playbook-strategy.md` = 0. The log ends at
+   2026-09-24 (Manager Workflow). An interview that closed 2026-09-27 and
+   produced 28 gaps and four owed ADRs is not in the live business record.
+2. **§6 "Status at a glance" is dated 2026-09-12** — predates both interviews,
+   19 screens, and the invalidation of four built client screens.
+3. **The pagination Feature (L242) does not record its own repricing.** MW
+   Cluster 2 Q10 moved it "from a latent scaling note to a blocker" and made it
+   invalidate four built screens. L242 still reads as a mid-priority nice-to-have
+   sourced from a July interview.
+4. **L150 is unblocked and its text says it is blocked.** ADR-169 (L427,
+   accepted 2026-09-19) names the unsubscribe surface as buildable on
+   acceptance; L150 still says to wait for the flow question.
+5. **`frontend/router.py` grew 1,488 lines while under a deletion date**
+   (2,927 on 2026-09-12 -> 4,415 on 2026-09-27). L138 says to "freeze the Jinja
+   UI for new features the same day" the sweep completes. The sweep completed
+   2026-09-19.
+6. **LAUNCH-GATES has no gate for the unsubscribe surface**, though L150 says
+   RFC 8058 one-click unsubscribe is a hard requirement for bulk senders at
+   Gmail and Yahoo and that it "blocks the beta's first send". L150 itself
+   says it "probably deserves to be a launch gate of its own... not added
+   there without the user's call." **Still not added. This is the strongest
+   candidate for a missing gate in the file.**
+7. **Interview question-count discrepancy.** The run-2 brief said Manager
+   Workflow closed 53/53. The interview's own Cluster 1 summary says question 5
+   is "◐ partial at the user's request", and backlog L90 says "52 of 53
+   answered; only Cluster 1 question 5 stays open, reopened at the user's
+   request." Two sources agree against the brief.
+8. **BETA-SCOPE §1-4 and the repo disagree about whether the React client
+   exists.** §1 chose Definition A and lists the React frontend under "Out of
+   scope for beta"; §5 is explicitly optional and "§1-4 above remain the
+   decision unless this gets adopted". ADR-168, 170, 171, 173 are accepted,
+   `frontend/` is built, two phases shipped and a third is paused. **§5 has
+   been adopted in practice and never in writing.** This is the single largest
+   scope contradiction in the docs and it is what makes "is X a launch concern"
+   unanswerable item by item.
+9. **`ContentOverrideDB`'s docstring is now contradicted by decision 2.6**
+   (it names "a consistent headline across the personalized picks" as the
+   intended use; 2.6 forbids exactly that), and
+   **`campaigns/duplication.py`'s docstring is contradicted by 3.6**
+   (it groups content overrides with "a record of something that happened").
+   Both are built code the interview reversed. Neither file has been touched.
+10. **ADR-161 point 7's rider is false** and has a dated addendum saying so
+    (2026-09-24). Good — recorded, not stale. Noted so it is not re-flagged.
+
+## Line-number drift measured 2026-09-27
+- `delivery/service.py` test-send: backlog says :519, actual **:520**.
+- `campaigns/duplication.py` override docstring: backlog says :147, actual **:143-152**.
+- `frontend/router.py`: backlog says 4,419 loc, actual **4,415**.
+- Verified exact: `content/service.py:101` (`CONTENT_FIELD_GROUPS`),
+  `content/service.py:85` (`CONTENT_STATUSES`), `campaigns/db_models.py:115`
+  (`max_results`), `campaigns/db_models.py:135` (`content_record_id` nullable=False),
+  `campaigns/db_models.py:64,83` (`updated_at` on both tables).
+- Verified absent: any `UploadFile` in `backend/app/`; `app/settings/router.py`;
+  `app/ai/router.py`; `storage/fields.json`.

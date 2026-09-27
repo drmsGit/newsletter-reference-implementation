@@ -59,3 +59,59 @@ Pagination envelope; image upload/media picker; AI progress indication; category
 (also stale, see watchlist); brand/theming web palette; per-task model selection;
 shared approval inbox. Under §1-4 all are out; under §5 the first three become
 frontend prerequisites.
+
+---
+
+# Run 2 additions — 2026-09-27
+
+## Rises (new)
+
+| Item | Why it rises | Who pays the tax |
+|---|---|---|
+| **Content-catalogue field model** (VE 1.8/2.4/2.8/2.9/2.10) | Every gap in batch M1 writes against a field vocabulary the ADR has not named yet. `ContentRecordDB.content` is unvalidated JSON, so a wrong key orphans content **silently**. The hero migration invents a title and brand per row and gets harder per row written | VE-2,3,10,11,13,14, VE-9's `type`, Feature L176, the client's field form, every future module manifest |
+| **VE-15/20 — refuse an override on a slot-bound module** | A constraint before the feature that makes its race routine. Once `max_results` works, an override on a slot puts one pinned headline on three personalised picks | `max_results` (L358), the whole override layer, the edit-vs-override ADR |
+| **Server-side filtering + pagination (MW-5)** | Reprices L242 from latent to blocking. Already invalidated four built screens; every further screen built on the un-enveloped contract is another rebuild, and the typed client is generated off the schema | The four Phase 2 screens, every Phase 3 screen, MW-7, MW-10, the typed client |
+| **MW-10 — `resolutions` route unpaginated** | On the table its own model comment calls the fastest-growing in the schema, measured at 96,040 rows and unbounded by design | Any client touching decision slots; grows with every send |
+| **VE-25 — `variants.status` accepts any string** | Same shape as `CONTENT_STATUSES`; constraining it after rows exist means cleaning them first | Variant list, readiness assertion (4.7), `ready` as a column the list reads |
+| **MW-17 — nothing prevents self-approval** | "Safe only while machines requested and could not approve; a hole the moment a person can request" — and ADR-168's 2026-09-24 addendum just made approval available to people | The whole approval surface; it is a live hole now, not a latent one |
+| **MW-8 — a held action cannot exist without a deadline** | `expires_at` is `nullable=False`; changing it later means every comparison must be re-read as *never expires* vs *expired*, across rows already written | ADR-142 §4 approval surface, content review |
+| **New Needs-ADR "nothing is ever hard-deleted" (L398)** | Each new table otherwise decides independently and one eventually decides wrong. The failure is silent and only visible long afterwards | Assets, content records, categories, every future catalogue table |
+
+## Flat (new)
+VE-1 section-heading module; VE-12 `envelope_module_type` route; VE-17 reach-count
+query; VE-19 `reason` as a constrained code; VE-23 per-module render state;
+VE-27 `duplicate_variant`; VE-29 context-sensitive `content_mode` default;
+MW-6/7 approvals response+filters; MW-9 slot distribution endpoint;
+MW-12 audience-suggestion JSON route; MW-13 `resolve_audience` arithmetic;
+MW-16 delivery-history audience criteria; MW-18 campaign state view.
+
+**VE-21 (test send mails the draft, `delivery/service.py:520`) is Flat but is a
+BUG, not a gap** — the one action whose purpose is showing what ships, showing
+something else. Cheap, and it does not get worse. It just should not wait on a
+design.
+
+**MW-15 (`resolve_audience` defaults `channel` to email) is Flat and is also a
+bug with a recorded incident** — "the recorded cause of a push send once
+resolving to nobody."
+
+## Decays (new)
+- **VE-18 `outcome_delta`** — moves *deeper* into Decays than the backlog implies.
+  It has no producer **and no experimental design**: a delta needs a baseline
+  that was not sent, requiring a holdout, counterfactual or A/B, none of which
+  exists or is specified. Building the producer without the design produces a
+  number nobody can interpret. Its natural upstream (the A/B component) is
+  already in Decays.
+- **VE-26 shareable preview link** — new surface, carries an authorisation
+  question, no consumer asking for it.
+- **VE-30 nothing prevents sending a template variant** — recorded by the
+  interview as *accepted, not fixed*. Leave it accepted.
+- **VE-24 post-render per-recipient "nothing meaningful" skip** — needs real
+  send volume to know whether it ever fires.
+
+## Reclassified from run 1
+- **Pagination envelope: Scope-dependent -> RISES.** MW-5 removed the scope
+  dependency; it is a blocker under the addendum the repo is actually executing.
+- **Image upload/media picker: Scope-dependent -> now the asset subsystem
+  (L364), design settled, and still out of beta scope under Definition A.**
+  It moved from "convenience Feature" to "subsystem with a settled design",
+  which changes its size but not its launch relevance.

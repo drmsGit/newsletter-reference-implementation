@@ -26,3 +26,41 @@ resolving them; record what sits behind each.
 | 13 | Transactional sends | System-mail channel; suppression (#14). **Partly pre-decided** by ADR-163 §3 and the ADR-122 addendum's `(channel, purpose)` grid |
 | 14 | Suppression + opt-out reason model | Stage 3 of ADR-163 §7's gate stack; CRM opt-out relay; pre-send safety net; reactivation audiences. Downstream OF the P0 fix, not upstream of it |
 | 15 | Data lifecycle / retention | DWH export + prune; auth session and login-code cleanup (code-slimmer S4); ADR-154 erasure; snapshot retention |
+
+---
+
+# Run 2 — 2026-09-27
+
+## Resolved since run 1
+- #11 **Isolated test DB** — ✅ Done 2026-09-19, and the entry records it is NOT
+  an ADR (`backend/tests/conftest.py`).
+- The **flow/journey** question — ✅ ADR-169 accepted 2026-09-19.
+  **Consequence nobody propagated:** L150 (subscribe/DOI/unsubscribe) still says
+  "do not build it as a one-off script — it is the first consumer of the
+  flow/journey question in Needs ADR". ADR-169's own entry (L427) says the
+  opposite: "the unsubscribe surface, double opt-in, ADR-163's opt-out scope —
+  become buildable as ordinary routes on acceptance." **L150 is actionable today.**
+- #4 **Mode-A subject/preheader** — partly absorbed; ADR-162 §1 moved the fields.
+
+## New Needs-ADR items
+| Item | Downstream |
+|---|---|
+| **Nothing in the catalogue is ever hard-deleted** (L398, user 2026-09-27) | Asset deletion (L364 point 4), content records, categories. Already implemented for content and named nowhere: `CONTENT_STATUSES = ("active","inactive")` at `content/service.py:85`. **Sequence with #15 data lifecycle** — its own text says they are the same question from opposite ends |
+| **Catalogue field set as the union of manifest variables** (L400) | This is the M1 batch. Four sub-decisions before it is an ADR: `required` becomes a property of *(module, field)*; `label` likewise; the union needs grouping discipline; exact-name union is exact-name collision with no namespacing. **One tension to settle:** the 2026-09-22 ruling "we shouldn't rely on reading the module json" was about deriving *which channel* a field belongs to; this derives *which fields exist* |
+| **What n8n and the CRM must actually do** | Sequenced after ADR-166. Upstream of L144 (machine-plane reads fall through to platform `view`) |
+| **Sales/transaction data from CRM or DWH** | Probably a playbook chapter |
+
+## The four ADRs the Variant Editor interview owes
+| Record | Blocks or trails | Reasoning |
+|---|---|---|
+| **Content-catalogue field model** (1.8, 2.4, 2.8, 2.9, 2.10) | **BLOCKS** | Defines the vocabulary ~10 gaps write against; the only one destructive if guessed (unvalidated JSON column + a migration that invents titles and brands) |
+| **Edit versus override** (3.1-3.9) | **SPLIT** | The 2.6 half — a slot may **not** be overridden, "enforceable, not conventional" — must precede `max_results`. The rest (field state, reach count, reason codes) trails |
+| **Machine-vs-human lock policy** (1.7) | **TRAILS, narrowly** | The optimistic-concurrency layer needs no ADR (`updated_at` exists). The **asymmetry** — advisory for a person, binding for a machine — is a new rule about machine principals and builds on ADR-166. Build layer 1; write the ADR before the binding half |
+| **Addendum to ADR-176** (1.6, *human beats system*) | **TRAILS, but lands with `max_results`** | No consumer today because a slot yields one pick. It becomes load-bearing the moment `max_results` works — that is when VE-6 ("nothing checks manual bindings against slot resolutions") can actually collide |
+
+## Manager Workflow ADR debt — fully discharged
+ADR-174, 175, 176 accepted; dated addenda written on ADR-142 (2026-09-24, ×2),
+ADR-150 (2026-09-20, 2026-09-24), ADR-161 (2026-09-24), ADR-168 (2026-09-20,
+2026-09-24). Verified in the files. **One record still owed**: the Cluster 4 Q2
+pin-vs-exclude reversal, which "is not in an ADR — it lives in a docstring and
+four documentation pages."
