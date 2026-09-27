@@ -6,9 +6,16 @@ description: The ADR format, status vocabulary, numbering rules, and
 
 # ADR Conventions
 
-Verified against all 82 records on 2026-09-15. Where this file and a habit
+Verified against all 94 records on 2026-09-27. Where this file and a habit
 disagree, this file wins — but check the reference records before assuming
 a record is wrong.
+
+**Counts and the highest number are deliberately not stated below.** Every
+figure this file has carried — 82 records, highest 166, "six proposed", then
+"two" — was wrong within days of being written, and a stale number in the
+document meant to be authoritative is worse than no number. Derive them:
+`ls docs/architecture/ADR/` for the count and the highest,
+`grep -l '^status: proposed'` for the proposed set.
 
 ## Location and filename
 `docs/architecture/ADR/ADR-NNN — Title Case Title.md`
@@ -16,8 +23,9 @@ a record is wrong.
 - NNN zero-padded to three digits; numbers are permanent, never renumbered or reused.
 - The separator is an **em dash surrounded by spaces**, not a hyphen, and the
   title keeps spaces and capitals. Not kebab-case.
-- 82 records exist; the highest number is **166**. Numbering is sparse —
-  count is not the next number. Always take highest + 1.
+- Numbering is sparse, so **the count is never the next number**. Always
+  `ls docs/architecture/ADR/`, take the highest, add one — never trust a
+  number written in this file or in `CLAUDE.md`.
 - `docs/` is an Obsidian vault. Cross-references are wikilinks:
   `[[ADR-101 — Provider Capabilities Are Explicit]]`. Code paths under
   `backend/` are outside the vault — write them as inline code.
@@ -46,14 +54,14 @@ enables:                  # optional — mirrors the Related ADRs section
 - `## Related ADRs` — with `### Depends On` / `### Enables` / `### Referenced By`
 
 Optional:
-- `## Notes` — used by 46 of 82 records. Not a defect when absent.
+- `## Notes` — used by most records. Not a defect when absent.
 
 **There is no "Alternatives Considered" section in this repository.** No record
 has one. Do not add one and do not flag its absence.
 
 ## Status vocabulary
-- `Proposed` — drafted, not agreed (2 records)
-- `Accepted` — in force (69 records)
+- `Proposed` — drafted, not agreed
+- `Accepted` — in force
 - `Superseded by ADR-NNN` — replaced; the successor must exist
 - `Deprecated` — no longer in force, no successor
 
@@ -75,14 +83,14 @@ Decision intact. See ADR-101 (addendum 2026-08-02) and ADR-003's
 "How this philosophy is realized (2026-07-31 AI-layer interview)".
 
 ## Known intentional deviations
-- `## Notes` absent in 36 records — optional, not a defect.
+- `## Notes` absent in a minority of records — optional, not a defect.
 - ADR-130 has no `## Related ADRs` section — the only record without one.
-- **Two** records sit at `proposed`: **ADR-152** (secret and credential
-  handling, awaiting a session of its own) and **ADR-166** (inbound machine
-  authentication, 2026-09-13). Proposed is a real state here, not a stalled
-  draft. ADR-004, ADR-150, ADR-151, ADR-153 and ADR-154 were **accepted
-  2026-09-15** — this file said seven as recently as the previous day, so check
-  the frontmatter rather than this line if the two disagree.
+- **No record currently sits at `proposed`** (verified 2026-09-27; ADR-152
+  and ADR-166, the last two, were accepted on 2026-09-18 and 2026-09-19).
+  Proposed is a real state here rather than a stalled draft, so the set will
+  be non-empty again. **Grep for it every time** — this line's count has been
+  six, then two, then zero inside three weeks, and each version was written
+  as though it would hold.
 - **One record has been superseded:** ADR-165 supersedes ADR-001 (2026-09-12).
   It was the first supersession in the repository, so it is still worth saying
   out loud when proposing another.

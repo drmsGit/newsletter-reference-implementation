@@ -4,7 +4,9 @@ Open-source newsletter architecture MVP. Teachable and tailorable, not a fixed
 commercial product. Learnings feed the separate Condor use case.
 
 ## Where things live
-- ADRs: `docs/architecture/ADR/` — 83 records, numbered to 167 (sparse)
+- ADRs: `docs/architecture/ADR/` — numbering is sparse and permanent. **No
+  count or highest number is recorded here on purpose**: every figure this
+  line has carried went stale within days. Run `ls` and read the directory.
 - ADR filenames: `ADR-NNN — Title Case Title.md` (em dash, spaces, NOT kebab-case)
 - Cross-references are Obsidian wikilinks: `[[ADR-101 — Provider Capabilities Are Explicit]]`
 - Strategy + decision log: `docs/playbook-strategy.md` — the live business record
@@ -21,7 +23,7 @@ commercial product. Learnings feed the separate Condor use case.
 ## ADR rules
 - Required sections: `## Status`, `## Context`, `## Decision`,
   `## Consequences` (with `### Positive` and `### Negative`), `## Related ADRs`
-- `## Notes` is optional — 45 of 81 records use it.
+- `## Notes` is optional and used by most records. Absence is never a defect.
 - There is no "Alternatives Considered" section. Do not add one.
 - Status lives twice and must agree: lowercase `status:` in YAML frontmatter,
   Title Case under `## Status`.
