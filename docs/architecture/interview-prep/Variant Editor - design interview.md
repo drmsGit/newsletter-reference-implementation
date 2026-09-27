@@ -16,7 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 41 questions across five clusters, 35 answered.
+> 41 questions across five clusters, 36 answered.
+> **Cluster 5 in progress — 1/6.**
 > **Cluster 3 ✅ CLOSED 2026-09-26, 9/9.**
 > **Cluster 2 ✅ CLOSED 2026-09-26, 10/10.**
 > **Cluster 4 ✅ CLOSED 2026-09-26, 8/8.**
@@ -2109,10 +2110,45 @@ what will be sent, and it shows something else.
 
 *The weekly newsletter, and everything that is not a first draft.*
 
-1. **How does a manager create a variant — blank, a copy of another variant, a
-   saved starting point, or an AI draft?** *Constraint: ADR-021 explicitly
-   permits an AI-drafted variant. Lean: copy is the common case and blank is the
-   rare one, which is the opposite of what a "New variant" button implies.*
+1. ✅ **How does a manager create a variant?**
+   **Resolution (2026-09-27): duplicate is the primary action, blank is the
+   secondary one, and there is no AI draft in this build.** The user:
+   *"duplicate is primary, no AI draft for now"*.
+
+   **Duplicate-first inverts what a "New variant" button implies, and the
+   reasoning is that near-copies are the normal case.** A/B variants exist to be
+   near-copies — that is what makes them comparable — and the weekly newsletter
+   (question 5.2) is duplication by definition. A manager starting genuinely
+   from nothing does it at most once per campaign.
+
+   **Variant-level duplication does not exist.** `backend/app/campaigns/duplication.py`
+   provides `duplicate_campaign` (the whole campaign, with a `content_mode`) and
+   `duplicate_content_record` (one record). There is **no `duplicate_variant`**,
+   and `POST /campaigns/{id}/variants` creates a blank one. So the action chosen
+   as *primary* is the one that is not built — logged as a gap.
+
+   **It inherits question 3.6's rule.** A duplicated variant must carry its
+   **active** content overrides, copying `field_overrides`,
+   `system_content_record_id` and `reason` but not `outcome_delta`,
+   `send_instance_id` or `reverted_at`, with `overridden_by` becoming the
+   duplicator. Without that the copy renders differently from its original,
+   which is exactly wrong for the workflow that makes duplication primary.
+
+   **No AI draft, and it is a scope decision rather than a prohibition.**
+   [[ADR-021 — Variants Are Human Created Versions]] explicitly permits one —
+   *"what makes it a variant is that it is deliberate and reviewed, not who
+   produced the first draft"* — and its 2026-07-31 clarification exists because
+   the title has twice been misread as forbidding it. **Permitted is not the
+   same as now**: an AI draft needs a prompt surface, a model choice and a
+   review step, and `docs/backlog.md` already carries a parked item on per-task
+   model selection that it would depend on. **Recorded so a future reader does
+   not mistake this for an architectural position** — it is a build boundary,
+   and ADR-021 continues to allow it.
+
+   **Distinct from the case Cluster 1 ruled out.** Question 1.6's boundary was
+   the *fully personalised email* — per-recipient generation of envelope and
+   editorial copy. An AI draft is one artefact a person reviews. Different
+   things, and only the first is architecturally out of scope.
 2. **A weekly newsletter goes out every Thursday. What carries over from last
    week?** The structure, the modules with their content cleared, the whole
    thing including last week's content, or nothing? *This is the single most
