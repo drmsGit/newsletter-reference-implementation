@@ -342,6 +342,26 @@ def expire_due_pending_actions(db: Session) -> list[int]:
 
 # --- reading ----------------------------------------------------------------
 
+def requester_is_decider(user, row: PendingActionDB) -> bool:
+    """Whether the person deciding this request is the one who made it.
+
+    **Type as well as id.** `requested_by_id` is a bare integer with no foreign
+    key — a machine principal's id and a person's id come from different tables,
+    so comparing ids alone would eventually match two unrelated principals by
+    coincidence. `requested_by_type` is what makes the comparison mean anything.
+
+    Lives here rather than inline because two callers need the same answer and
+    must not drift: `may_decide` gates the button, `resolve_for_decision` writes
+    the sentence explaining why it is missing. That is the same reason
+    `may_decide` itself was moved out of the Jinja router.
+    """
+    from app.audit.service import ACTOR_USER
+
+    if user is None:
+        return False
+    return row.requested_by_type == ACTOR_USER and row.requested_by_id == user.id
+
+
 def may_decide(db: Session, user, meta, row: PendingActionDB) -> bool:
     """Whether this person may approve or reject this particular request.
 
@@ -368,6 +388,12 @@ def may_decide(db: Session, user, meta, row: PendingActionDB) -> bool:
         from app.auth.dependencies import auth_enforced
 
         return not auth_enforced(db)
+
+    if not meta.requester_may_decide and requester_is_decider(user, row):
+        # Checked before the permission, because it is not a permission
+        # question: this person may well hold `approve_permission` and still
+        # not be the one to use it here. See `ApprovableAction`.
+        return False
 
     from app.auth.permissions import is_brand_scoped
     from app.auth.service import has_permission
@@ -401,6 +427,15 @@ def resolve_for_decision(db: Session, pending_id: int, *, brand_id: int, user):
         return row, None, (
             f"'{row.action_key}' is no longer a registered action, so it cannot "
             "be approved. Reject it, or restore the action module."
+        )
+    if not meta.requester_may_decide and requester_is_decider(user, row):
+        # Its own sentence, because the permission one would be false here —
+        # this person has the permission and is refused for a different reason,
+        # and "you need a permission you already hold" is the kind of message
+        # that sends somebody to an administrator for an hour.
+        return row, meta, (
+            f"You requested this, and '{meta.label}' has to be decided by "
+            "somebody else."
         )
     if not may_decide(db, user, meta, row):
         return row, meta, (

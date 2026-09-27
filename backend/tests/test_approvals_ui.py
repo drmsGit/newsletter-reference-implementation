@@ -54,6 +54,7 @@ def planted_action(tmp_path):
         f"META = ApprovableAction(key='{ACTION_KEY}', label='Write a marker',\n"
         "                        approve_permission='sends.execute',\n"
         "                        default_ttl_seconds=3600,\n"
+        "                        requester_may_decide=True,\n"
         "                        subject_type='marker')\n"
         "\n"
         "def describe(db, payload, *, brand_id=None):\n"
@@ -124,6 +125,162 @@ def _held(db, payload, brand_id=None):
     )
     _CREATED.append(row.id)
     return row
+
+
+SELF_KEY = f"{TAG}.needs_another_pair_of_eyes"
+
+
+@pytest.fixture
+def separation_of_duties_action(tmp_path):
+    """A second planted action, declaring `requester_may_decide=False`.
+
+    Separate from `planted_action` rather than parameterising it: the two
+    answers are not two settings of one thing, they are two kinds of approval —
+    a review, where the requester reading the output *is* the control, and a
+    second signature, where it is not.
+    """
+    package = Path(action_registry.__file__).parent
+    module = package / f"{TAG}_sod.py"
+    module.write_text(
+        "from app.approvals.actions.base import ApprovableAction, "
+        "ActionDescription, ActionResult\n"
+        "\n"
+        f"META = ApprovableAction(key='{SELF_KEY}', label='Fire something real',\n"
+        "                        approve_permission='sends.execute',\n"
+        "                        default_ttl_seconds=3600,\n"
+        "                        requester_may_decide=False,\n"
+        "                        subject_type='marker')\n"
+        "\n"
+        "def describe(db, payload, *, brand_id=None):\n"
+        "    return ActionDescription(summary='needs a second person')\n"
+        "\n"
+        "def execute(db, payload, *, choice=None, brand_id=None):\n"
+        "    return ActionResult(ok=True)\n"
+    )
+    action_registry._registry_mtime = None
+    try:
+        yield SELF_KEY
+    finally:
+        module.unlink(missing_ok=True)
+        action_registry._registry_mtime = None
+
+
+class TestARequesterCannotAlwaysDecide:
+    """`requester_may_decide`, declared per action.
+
+    The rule is not "nobody approves their own request" — that would break an AI
+    suggestion on the day it was written, since the manager who asked the model
+    for a subject line is the only human watching and ADR-082 wants *a* human to
+    publish, not a second one. It is that **each action says which kind of
+    approval it is**, and a module that forgets has to say so out loud, because
+    the field has no default.
+    """
+
+    def _held_by(self, db, user, action_key, brand_id=None):
+        row = approvals.request_approval(
+            db, action_key, payload={}, summary="requested by a person",
+            requested_by_type=ACTOR_USER, requested_by_id=user.id,
+            brand_id=brand_id or auth.ensure_default_brand(db).id,
+            subject_id=int(uuid.uuid4().int % 10**8),
+        )
+        _CREATED.append(row.id)
+        return row
+
+    def test_the_requester_is_refused_when_the_action_says_so(
+        self, db, separation_of_duties_action
+    ):
+        client, user = _signed_in(db, "admin")
+        row = self._held_by(db, user, separation_of_duties_action)
+
+        _, _, refusal = approvals.resolve_for_decision(
+            db, row.id, brand_id=row.brand_id, user=user,
+        )
+
+        assert refusal is not None
+        assert "somebody else" in refusal
+        assert "permission" not in refusal, (
+            "an admin holds sends.execute — telling them they need a permission "
+            "they already have sends them to an administrator for an hour, and "
+            "is the reason this refusal has its own sentence"
+        )
+
+    def test_a_different_person_may_decide_the_same_row(
+        self, db, separation_of_duties_action
+    ):
+        _, requester = _signed_in(db, "admin")
+        _, colleague = _signed_in(db, "admin")
+        row = self._held_by(db, requester, separation_of_duties_action)
+
+        _, _, refusal = approvals.resolve_for_decision(
+            db, row.id, brand_id=row.brand_id, user=colleague,
+        )
+
+        assert refusal is None, (
+            "the rule is about who asked, not about the action being untouchable"
+        )
+
+    def test_the_requester_may_decide_a_review_action(self, db, planted_action):
+        """The AI-suggestion shape, which the blunt rule would have broken."""
+        client, user = _signed_in(db, "admin")
+        row = self._held_by(db, user, ACTION_KEY)
+
+        _, _, refusal = approvals.resolve_for_decision(
+            db, row.id, brand_id=row.brand_id, user=user,
+        )
+
+        assert refusal is None
+
+    def test_may_decide_itself_refuses_so_the_button_never_appears(
+        self, db, separation_of_duties_action
+    ):
+        """`resolve_for_decision` is not the only gate, and testing it alone
+        misses half the rule.
+
+        `may_decide` is what both planes call per row to decide whether to
+        *offer* the decision at all. If only the resolver refused, the inbox
+        would show a button that fails when pressed — and any caller reaching
+        for `may_decide` as the enforcement would find no enforcement there.
+        Written after a mutation run showed four tests passing with the gate in
+        `may_decide` disabled.
+        """
+        from app.approvals.actions.registry import get_action
+
+        client, user = _signed_in(db, "admin")
+        row = self._held_by(db, user, separation_of_duties_action)
+        meta = get_action(separation_of_duties_action)
+
+        assert approvals.may_decide(db, user, meta, row) is False
+
+        _, colleague = _signed_in(db, "admin")
+        assert approvals.may_decide(db, colleague, meta, row) is True, (
+            "the same row, a different person — the rule is about who asked"
+        )
+
+    def test_a_machine_requester_never_matches_a_person(
+        self, db, separation_of_duties_action
+    ):
+        """`requested_by_id` is a bare integer with no foreign key.
+
+        A machine principal's id and a person's id come from different tables,
+        so comparing ids alone would eventually refuse an unrelated person by
+        coincidence. This pins the type half of the comparison.
+        """
+        client, user = _signed_in(db, "admin")
+        row = approvals.request_approval(
+            db, separation_of_duties_action, payload={}, summary="by a machine",
+            requested_by_type="integration", requested_by_id=user.id,
+            brand_id=auth.ensure_default_brand(db).id,
+            subject_id=int(uuid.uuid4().int % 10**8),
+        )
+        _CREATED.append(row.id)
+
+        _, _, refusal = approvals.resolve_for_decision(
+            db, row.id, brand_id=row.brand_id, user=user,
+        )
+
+        assert refusal is None, (
+            "an integration whose id happens to equal a user's id is not that user"
+        )
 
 
 class TestTheScreen:
@@ -478,6 +635,7 @@ class TestAnActionThatCannotRun:
             f"META = ApprovableAction(key='{TAG}.blocked', label='Blocked action',\n"
             "                        approve_permission='sends.execute',\n"
             "                        default_ttl_seconds=3600,\n"
+        "                        requester_may_decide=True,\n"
             "                        subject_type='marker')\n"
             "\n"
             "def describe(db, payload, *, brand_id=None):\n"

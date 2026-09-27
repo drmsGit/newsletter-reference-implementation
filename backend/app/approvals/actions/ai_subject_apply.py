@@ -41,6 +41,10 @@ META = ApprovableAction(
     # written now; one from last week is answering a question nobody is still
     # asking, and the options can be regenerated for a few cents.
     default_ttl_seconds=8 * 60 * 60,
+    # A review, not a second signature. The manager who asked the model for a
+    # subject line is the human ADR-082 requires, and is usually the only one
+    # watching; refusing them here would leave the suggestion undecidable.
+    requester_may_decide=True,
     subject_type="ai_run",
     description=(
         "An AI task proposed subject and preheader options for a variant. "

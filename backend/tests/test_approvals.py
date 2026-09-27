@@ -67,6 +67,7 @@ def planted_action(tmp_path):
         f"META = ApprovableAction(key='{ACTION_KEY}', label='Write a marker',\n"
         "                        approve_permission='sends.execute',\n"
         "                        default_ttl_seconds=3600,\n"
+        "                        requester_may_decide=True,\n"
         "                        subject_type='marker')\n"
         "\n"
         "def describe(db, payload, *, brand_id=None):\n"
@@ -170,7 +171,8 @@ class TestTheRegistry:
             "from app.approvals.actions.base import ApprovableAction\n"
             f"META = ApprovableAction(key='{BROKEN_KEY}', label='No execute',\n"
             "                        approve_permission='view',\n"
-            "                        default_ttl_seconds=60)\n"
+            "                        default_ttl_seconds=60,\n"
+            "                        requester_may_decide=True)\n"
         )
         try:
             action_registry._registry_mtime = None

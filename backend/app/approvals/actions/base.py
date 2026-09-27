@@ -57,6 +57,26 @@ class ApprovableAction:
     #: can be NOT NULL and a forgetful module cannot mint an immortal request.
     default_ttl_seconds: int
 
+    #: Whether the person who **requested** this may also decide it.
+    #:
+    #: **Required, with no default, for the same reason `default_ttl_seconds`
+    #: is**: a forgetful module must not get an answer by omission. Either
+    #: default is wrong. `False` would break an AI suggestion on the day it was
+    #: written — the manager who asked for a subject line is the only human
+    #: watching, and [[ADR-082]] wants *a* human to publish, not a second one.
+    #: `True` would silently reintroduce the hole this field exists to close,
+    #: which is the shape `APPROVABLE_ROUTES` already refuses by being
+    #: fail-closed on omission.
+    #:
+    #: **The two registered actions answer it differently, and that is why this
+    #: is a field rather than a rule.** An AI suggestion is a *review* — the
+    #: requester reading the model's output is the control, so `True`. Firing a
+    #: send is *separation of duties* — so `False`, even though a person
+    #: requesting one cannot arise today ([[ADR-174]] point 4: a person firing a
+    #: send **is** the approval, so no row is held). The value is what the action
+    #: would want if that changed, not a description of what happens now.
+    requester_may_decide: bool
+
     #: What the request is about — "send_instance", "variant", "ai_run" — or
     #: None for an action with no record behind it (ADR-142 §10).
     subject_type: str | None = None

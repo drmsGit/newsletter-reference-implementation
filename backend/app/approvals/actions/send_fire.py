@@ -36,6 +36,10 @@ META = ApprovableAction(
     # a morning review, and short enough that a forgotten one dies before it
     # becomes a surprise.
     default_ttl_seconds=24 * 60 * 60,
+    # Separation of duties. Cannot arise today — a person firing a send is
+    # the approval (ADR-174 point 4), so only a machine holds one — but if a
+    # person ever requests a send, they must not be the one to release it.
+    requester_may_decide=False,
     subject_type="send_instance",
     description=(
         "An orchestrator asked to fire a send it is not permitted to fire "
