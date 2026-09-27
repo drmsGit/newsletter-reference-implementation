@@ -99,3 +99,44 @@ Everything outside `test_consent_gates.py` is unaffected, so a change in
 - Run 5 worktree (f403d61): 175 collected → 154 pass / 21 fail (see above); 183
   collected / 162 pass with my 8 added tests.
 - "175 passing" is the figure for a worktree whose code matches the migrated DB.
+
+## 2026-09-27 — THE SHARED-DEV-DATABASE HAZARD IS GONE. Everything above about it is stale.
+
+`backend/tests/conftest.py` now redirects the suite to its own Postgres —
+`TEST_DATABASE_URL`, else `<dev url>_test` — and **refuses to run** if the name
+matches the dev database. It drops and rebuilds the schema with `create_all`,
+runs `auth.bootstrap`, then `scripts/seed_demo_data.seed()` once per session.
+So:
+
+- The "do not run while another agent is running" scheduling worry no longer
+  applies to the database. Tests can assert absolutes again.
+- The seed runs **every** session (100 content records, 40 recipients, 4
+  campaigns). Do not treat dev-DB row ids (`DeliveryExecutionDB` id 1,
+  recipient 39, content_id 1) as handles any more — they were dev-DB facts.
+- `create_all`, not the migrations, is the schema of record for tests. So the
+  "worktree older than the migrated DB" failure mode (21 `test_consent_gates`
+  failures on a missing `recipients.email` column) **cannot happen any more**
+  either — the test DB is built from the models in your tree.
+- Never point `DATABASE_URL`/`TEST_DATABASE_URL` at the dev database to "make
+  it work"; conftest refuses on the name for a reason.
+
+## Suite baseline, 2026-09-27
+
+`c45ce1b`, main checkout: **651 passed in ~10s**. The old 157 / 175 figures are
+dead. Run it and write down your own number before editing; do not accept a
+figure from the invoker.
+
+## There was no worktree on the 2026-09-27 run
+
+`git worktree list` showed only the main checkout, and the cwd handed to me was
+`<repo>/backend`. I worked in the main checkout on `main`, left it dirty, and
+said so. If that happens again: it is fine, but **say it in the report** —
+"leave the worktree dirty" becomes "left the main checkout dirty", which a
+human needs to know before they `git pull`.
+
+## Two memory directories exist now
+
+The agent definition names `<repo>/.claude/agent-memory/bug-fixer/` (this file).
+The harness preamble names `<repo>/backend/.claude/agent-memory/bug-fixer/` and
+auto-loads *that* MEMORY.md. Canonical content lives here; the backend one
+carries a pointer. Read both.

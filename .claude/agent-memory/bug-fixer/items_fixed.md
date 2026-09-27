@@ -152,3 +152,33 @@ path>`) with no `cd` and no heredoc. Do that from the start next run.
   output ceiling, the **partial result is still shown** (display ≠ commit), never
   silently discarded." ADR-140 §3 (the run row is the source of truth for what was
   offered) is why the notice is read back off the row rather than held in session.
+
+## Test send rendered the draft, not the frozen version (`docs/backlog.md` line 394, 🔴)
+
+- **Run:** 2026-09-27 on `c45ce1b`. Outcome: `fixed`. Main checkout, left dirty.
+- Entry verified live and accurate: `mode="preview"` really was at
+  `app/delivery/service.py:520`, and `UnpublishedContentError` really is at
+  `app/rendering/service.py:19`. Rare — most entries' line numbers have rotted.
+- Changed `mode="preview"` → `mode="send"` in `send_test_email`, plus a
+  dedicated `except UnpublishedContentError` **before** the broad
+  `except Exception`, with its own `render_note`. The "a render failure never
+  blocks the send" rule is untouched; do not let anyone talk you into making it
+  block, the interview did not ask for that.
+- **`app/delivery/` is on the protected-paths wall and this was an explicit
+  hand-off** — the invoker named the file and the function. That is the
+  documented exemption. Absent that naming it stays a wall.
+- Tests added to `tests/test_channels.py`, class
+  `TestATestSendShowsWhatWouldActuallyBeSent`. Both fail if `mode` is reverted
+  to `"preview"`, but the load-bearing one is the second: it asserts the
+  *published* headline reaches the provider and the *draft* headline does not.
+  Removing only the specific `except` fails the first test and not the second,
+  so the two halves of the fix are independently pinned.
+- `TestSendResult` carries no HTML, so the test monkeypatches
+  `app.delivery.service.get_provider` (imported at module top — patch it
+  *there*, not on `app.delivery.providers.factory`) with a capturing fake.
+  `render_variant_html`, by contrast, is re-imported inside the function, so
+  the neighbouring test patches `app.rendering.service.render_variant_html`.
+  Two different patch targets in the same function; do not mix them up.
+- **Deliberately not fixed:** the same call passes `recipient_id`, so it
+  resolves decision slots for a real person and falls back silently to the
+  generic resolution (interview question 4.2). Out of scope, still open.

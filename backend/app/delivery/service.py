@@ -473,7 +473,7 @@ def send_test_email(
 
     Composed in `app/frontend/router.py` until 2026-09-20 (inventory B9) with
     no service function at all — the only remaining item where a client would
-    have had to reimplement orchestration rather than call something. Three
+    have had to reimplement orchestration rather than call something. Four
     decisions live here:
 
     **It renders through the EMAIL path on purpose.** This sends an email, so a
@@ -482,6 +482,15 @@ def send_test_email(
     rendered as a 252-character empty shell, was mailed to a real address, and
     was reported as a success — because nothing raised, the handler below never
     fired.
+
+    **It renders in SEND mode, not preview mode.** A test send is the one
+    action whose entire purpose is "show me what recipients will get", and
+    preview mode reads the live, mutable `ContentRecordDB.content` — so an
+    unpublished headline edit appeared in the test and the real send shipped
+    the last frozen version instead, silently, because a version existed. The
+    variant-editor design interview (2026-09-26, question 4.3) settled this:
+    a test send shows what would actually be sent at that moment, drift
+    included, so a manager notices the drift.
 
     **A render failure never blocks the send.** The point of this screen is to
     prove the provider path works; a broken variant should not stop an operator
@@ -496,7 +505,7 @@ def send_test_email(
     brand gap as well — the same shape B15 had, and for the same reason.
     """
     from app.rendering.renderers.base import RenderedArtifact
-    from app.rendering.service import render_variant_html
+    from app.rendering.service import UnpublishedContentError, render_variant_html
 
     to = to.strip()
     fallback = (
@@ -517,8 +526,22 @@ def send_test_email(
         else:
             try:
                 html = render_variant_html(
-                    db, variant_id, recipient_id=recipient_id, mode="preview",
+                    db, variant_id, recipient_id=recipient_id, mode="send",
                 )
+            except UnpublishedContentError as error:
+                # **Caught ahead of the generic handler, for its message.**
+                # Send mode refuses content that has never been frozen, and
+                # that refusal is a fact about the variant rather than a
+                # renderer hiccup — folding it into "Could not render variant
+                # (...)" would hand the operator a vague failure in place of
+                # the one thing they can act on. Still sends, still falls back
+                # to the plain body: the rule above is unchanged.
+                render_note = (
+                    f"Content record {error.content_record_id} has never been "
+                    "published, so this variant cannot be sent yet — freeze a "
+                    "version first. Sent a plain test body instead."
+                )
+                html = fallback
             except Exception as error:  # never block the send on a render hiccup
                 render_note = (
                     f"Could not render variant ({error}); sent a plain test body "

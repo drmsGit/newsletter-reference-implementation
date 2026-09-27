@@ -2851,3 +2851,129 @@ class TestTheTestSendIsAServiceNotARoute:
             db.query(VariantDB).filter(VariantDB.campaign_id == campaign.id).delete()
             db.query(CampaignDB).filter(CampaignDB.id == campaign.id).delete()
             db.commit()
+
+
+class TestATestSendShowsWhatWouldActuallyBeSent:
+    """Variant-editor design interview, 2026-09-26, question 4.3.
+
+    `send_test_email` rendered with `mode="preview"`, which reads the live,
+    mutable content record — so a manager edited a headline, sent a test, saw
+    the new text, and the real send shipped the last frozen version instead.
+    **Silently**, because a version existed; send mode's refusal only fires
+    when *no* version does. The interview settled it: a test send shows what
+    would actually be sent at that moment, drift included.
+
+    The published-content test below is the one that catches a regression to
+    `mode="preview"`. The unpublished one only pins the note.
+    """
+
+    def _variant_on_content(self, db, record):
+        """A one-module email variant whose only module reads `record`."""
+        brand = auth.ensure_default_brand(db)
+        campaign = create_campaign(
+            db, name=_name("sendmode"), brand_id=brand.id, channel="email",
+        )
+        variant_id = campaign.variants[0].id
+        db.add(ModuleInstanceDB(
+            variant_id=variant_id,
+            module_type="single_stack",
+            position=0,
+            content_record_id=record.id,
+        ))
+        db.commit()
+        return variant_id
+
+    def _content_record(self, db, headline):
+        from app.content.db_models import ContentRecordDB
+
+        record = ContentRecordDB(
+            brand_id=auth.ensure_default_brand(db).id,
+            title=_name("content"),
+            content={"headline_medium": headline},
+        )
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+        return record
+
+    def _send(self, db, variant_id):
+        from app.delivery.service import send_test_email
+
+        return send_test_email(
+            db, to="nobody@example.invalid", subject="probe", provider="mock",
+            brand_id=auth.ensure_default_brand(db).id, variant_id=variant_id,
+        )
+
+    def test_unpublished_content_gets_its_own_note_not_the_generic_one(self, db):
+        """Send mode raises where preview mode rendered, and the generic
+        `except Exception` would turn that into "Could not render variant
+        (...)" — a vague failure in place of the one thing the operator can
+        act on. The send itself is unchanged: it still goes, with the plain
+        body, and still reports the provider's success."""
+        record = self._content_record(db, "never frozen")
+        variant_id = self._variant_on_content(db, record)
+
+        result = self._send(db, variant_id)
+
+        assert result.success, "the unpublished refusal blocked the send"
+        assert result.render_note, "the operator was not told anything"
+        assert "never been published" in result.render_note, result.render_note
+        assert "Could not render variant" not in result.render_note, (
+            "the refusal fell through to the generic render-failure handler"
+        )
+
+    def test_a_test_send_ships_the_published_version_not_the_draft_edit(
+        self, db, monkeypatch,
+    ):
+        """**The regression test for `mode="preview"`.**
+
+        A published version says one thing, the live record says another. A
+        test send must show the published text, because that is what the real
+        send would ship. Under preview mode this assertion fails on the draft
+        text appearing — which is exactly the bug.
+
+        The provider is replaced rather than mocked away: `TestSendResult`
+        does not carry the rendered HTML, and the HTML is the whole claim.
+        """
+        from app.content.db_models import ContentVersionDB
+        from app.delivery.providers.base import SendResult
+
+        record = self._content_record(db, "PUBLISHED-headline")
+        db.add(ContentVersionDB(
+            content_record_id=record.id,
+            version_number=1,
+            content={"headline_medium": "PUBLISHED-headline"},
+        ))
+        db.commit()
+
+        # The draft edit that has not been frozen. This is the manager typing.
+        record.content = {"headline_medium": "DRAFT-headline"}
+        db.commit()
+
+        variant_id = self._variant_on_content(db, record)
+
+        captured = {}
+
+        class _Capture:
+            def send(self, address, artifact):
+                captured["body"] = artifact.body
+                return SendResult(
+                    success=True, provider_message_id="captured",
+                    message="accepted",
+                )
+
+        monkeypatch.setattr(
+            "app.delivery.service.get_provider", lambda _name: _Capture(),
+            raising=True,
+        )
+
+        result = self._send(db, variant_id)
+
+        assert result.success
+        assert result.render_note is None, result.render_note
+        assert "PUBLISHED-headline" in captured["body"], (
+            "the frozen version did not reach the test send"
+        )
+        assert "DRAFT-headline" not in captured["body"], (
+            "the test send mailed the unpublished draft — this is mode='preview'"
+        )
