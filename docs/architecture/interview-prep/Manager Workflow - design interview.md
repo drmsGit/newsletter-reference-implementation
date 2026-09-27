@@ -431,9 +431,16 @@ list with filters rather than imposed grouping. The nav is **grouped: decide ·
 make · send**, accepted ahead of the volume that would force it, with per-screen
 placement to follow and manager-defined favourites deferred as a future feature.
 
-**Still open in this cluster:** question 5 is **◐ partial** at the user's request —
-not a ticket system and no thread are firm, a rejection reason is provisional, and
-the requester note plus the resubmission-overwrite behaviour are to be asked again.
+**Resolved since (2026-09-24), and this note is kept for the trail:** question 5
+was **◐ partial** at the user's request — not a ticket system and no thread were
+firm, a rejection reason was provisional, and the requester note plus the
+resubmission-overwrite behaviour were to be asked again. They were, on the
+reopen: **approval comments exist and are always optional, never required** —
+*"it doesn't make sense to require it so a manager quickly will start to type in
+'reason' or '---' just to be able to approve it"*. A required free-text field
+does not produce reasons, it produces `---`, and junk data is worse than none
+because it looks like data. **The cluster is closed 8/8 and the interview is
+53 of 53.**
 
 
 ## Cluster 2 — Authoring content across channels  ✅ CLOSED 2026-09-21

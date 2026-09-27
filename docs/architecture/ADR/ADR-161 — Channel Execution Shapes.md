@@ -141,6 +141,45 @@ point is falsified; the other points of this record are in force and nothing
 else in it depends on the rider. This repository has had exactly one
 supersession ever — [[ADR-165 — Core Scope Is Channel-Neutral Content Orchestration]] over ADR-001, on 2026-09-12 — and this is not a second.
 
+## Addendum 2026-09-27 — where the authoring contract lives, after ADR-177
+
+Prompted by [[ADR-177 — A Field Is Defined Once, Required Per Module]], which
+narrows point 7's *"module manifest = fields and limits"* without disturbing the
+rest of it. **This is a narrowing, not a contradiction** — unlike the 2026-09-24
+addendum above, which falsified the readiness rider outright.
+
+**What moves.** Field **definitions** — `type`, `size`, `note`, `envelope` — go
+to a central `storage/fields.json`, and the `(concept, size)` length table goes
+with them. A module manifest still declares **which** fields it uses and whether
+each is **required there**, and stays the drop-in `name.json` + `name.html` pair
+[[ADR-160 — Channel Model and Composition]] point 6 promises.
+
+**The reason is that a field's definition was never a property of any one module
+that uses it.** `headline_medium` is declared in three manifests at once, and
+`required` cannot have a single value across them — it is required by one module
+and absent from another. A union across manifests would merge the rest by exact
+name and let whichever discovery reached last win, silently. Centralising the
+definitions removes that collision structurally rather than by convention.
+
+**This qualifies one sentence of the addendum above.** That record closes by
+saying *"the authoring contract still lives in the module manifest"* and that the
+settled split is *"module manifest = fields and limits"*. Both remain true of
+**which fields a module uses and whether they are required there**; neither is
+any longer true of what a field *is*. The rest of that sentence — provider `.py`
+= capabilities, channel = an attribute on the variant plus which manifests it
+accepts, cardinality as the only channel-level fact — is untouched.
+
+**Point 7's substance is unchanged and is arguably strengthened.** The authoring
+contract still exists before a provider is chosen, still does not live in the
+adapter, and lengths are still an editor input constraint with a truncation
+preview rather than a validation gate. They are now written in one file instead
+of repeated across manifests, so *"push title, 40 characters"* has exactly one
+home rather than one per module that happens to use the field — which is what
+point 7 was protecting in the first place.
+
+**Not a supersession, for the same reason as the addendum above.** One clause of
+one point is narrowed; every other point is in force.
+
 ## Related ADRs
 
 ### Depends On
