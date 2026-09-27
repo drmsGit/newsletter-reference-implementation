@@ -6,7 +6,7 @@ topic:
   - overrides
   - rendering
 created: 2026-05-30
-modified: 2026-06-05
+modified: 2026-09-27
 source:
   - condor-reference-system
   - interview-2026-05-30
@@ -49,7 +49,7 @@ Overrides are stored separately from catalog content and merged with referenced 
 ## Notes
 This generalizes the existing reference implementation's override approach.
 
-## Narrowed 2026-09-27 by the variant editor interview
+## Addendum 2026-09-27 — the override layer does not reach decision slots
 
 [[ADR-178 — Scope of the Correction, Not Location of the Manager]] narrows this
 record in two places without changing its Decision.

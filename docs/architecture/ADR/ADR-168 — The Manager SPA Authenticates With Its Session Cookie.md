@@ -7,7 +7,7 @@ topic:
   - access
   - frontend
 created: 2026-09-19
-modified: 2026-09-19
+modified: 2026-09-24
 source:
   - "User decision, 2026-09-19 (raised while scoping the React manager frontend)"
 depends_on:
@@ -18,7 +18,6 @@ depends_on:
   - "[[ADR-152 — Secret and Credential Handling]]"
   - "[[ADR-153 — Audit and Accountability]]"
   - "[[ADR-166 — Inbound Machine Callers Are Authenticated Principals]]"
-enables:
 ---
 
 ## Status

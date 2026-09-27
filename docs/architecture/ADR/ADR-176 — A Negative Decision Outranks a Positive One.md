@@ -7,6 +7,7 @@ topic:
   - consent
   - delivery
 created: 2026-09-24
+modified: 2026-09-27
 source:
   - "Manager Workflow design interview (interview-prep, Cluster 4 Q2–Q4 and Cluster 5 Q2, closed 2026-09-24)"
 depends_on:

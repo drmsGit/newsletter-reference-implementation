@@ -7,7 +7,7 @@ topic:
   - access
   - governance
 created: 2026-08-02
-modified: 2026-09-15
+modified: 2026-09-24
 source:
   - "Security Chapter design interview, Part 1 (playbook-strategy.md Decision Log, 2026-08-02)"
 depends_on:

@@ -7,7 +7,7 @@ topic:
   - delivery
   - provider
 created: 2026-09-01
-modified: 2026-09-24
+modified: 2026-09-27
 source:
   - "Omni-Channel design interview (interview-prep, closed 2026-09-01), Cluster 2 / Q6–Q10"
 depends_on:
