@@ -7,17 +7,18 @@ topic:
   - variant
 created: 2026-09-24
 modified: 2026-09-25
-status: open
+status: closed
 source:
   - "Manager Workflow - design interview, 2026-09-24 — closed 53/53 and did not cover the composer"
 ---
 
-> **Status: interview OPEN.** Clustering approved 2026-09-24, with two
+> **Status: interview ✅ COMPLETE, 41/41, closed 2026-09-27.**
+> Clustering approved 2026-09-24, with two
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 41 questions across five clusters, 40 answered.
-> **Cluster 5 in progress — 5/6.**
+> 41 questions across five clusters, **41 answered — INTERVIEW COMPLETE**.
+> **Cluster 5 ✅ CLOSED 2026-09-27, 6/6.**
 > **Cluster 3 ✅ CLOSED 2026-09-26, 9/9.**
 > **Cluster 2 ✅ CLOSED 2026-09-26, 10/10.**
 > **Cluster 4 ✅ CLOSED 2026-09-26, 8/8.**
@@ -2293,11 +2294,179 @@ what will be sent, and it shows something else.
    re-find. That is an argument for **seeing** the email variant while composing
    the push, not for copying it — a read-only reference rather than a
    transformation. Logged as an idea, not adopted.
-6. **Can a variant be copied across campaigns, and across brands?**
-   *Constraint: a campaign is composed for one brand ([[ADR-150 — Tenancy and Access Model]]),
-   and content records are brand-scoped. A cross-brand copy either breaks the
-   boundary or silently drops every content reference.* Lean: within a brand
-   only, and say why rather than hiding the option.
+6. ✅ **Can a variant be copied across campaigns, and across brands?**
+   **Resolution (2026-09-27): variant duplication reuses the campaign machinery
+   and is same-brand only.** The user: *"reuse the machinery, same-brand only
+   for variant duplication"*.
+
+   **My lean was wrong about the policy and the built code is better than it.**
+   *"Within a brand only, and say why"* was the lean; cross-brand **campaign**
+   duplication already works and is carefully reasoned. `content_modes_for`
+   allows `COPY` or `LAYOUT` across brands and refuses `KEEP`, because
+   referencing would put one record in two brands. The hazards are handled
+   rather than avoided: `url_carriers` reports every brand-specific URL that
+   crossed verbatim, and `_copy_content_row` deliberately omits
+   `content_versions` — *"copying one would fabricate a publication that never
+   happened … the copy previews and cannot be sent until someone publishes
+   it"*. **That last line is question 4.3's draft/published divergence, already
+   known here and deliberately surfaced rather than hidden.**
+
+   **Variant duplication is narrower than campaign duplication, and being
+   narrower is the point.** Same-brand only means it never needs `COPY`, never
+   crosses a URL boundary and never forks the catalogue — the cross-brand story
+   stays a campaign-level operation, where a manager is already thinking about
+   brands. A variant copy is a small, frequent, local action (question 5.1 made
+   it primary), and small frequent actions should not carry the heaviest case.
+
+   **Reusing the machinery rather than reimplementing a subset is the load-
+   bearing half.** `duplicate_campaign` holds the brand logic, the URL
+   reporting, the version discipline and — per question 3.6 — the override
+   rules, all in one place. A parallel `duplicate_variant` would start as a
+   subset and drift. **This interview has now cited
+   [[ADR-160 — Channel Model and Composition]] point 6's *"registered in several
+   places … eventually gets registered in two"* three times** — for the module
+   mapping file (2.4), the template model (5.3) and here — which is a sign it is
+   the repo's most reusable argument rather than a coincidence.
+
+   **What variant duplication must not lose**, since it inherits rather than
+   redefines: `content_modes_for`'s constraint (trivially satisfied same-brand),
+   the absence of copied `content_versions`, and **3.6's rule that active
+   overrides carry with `overridden_by` becoming the duplicator**.
+
+### What Cluster 5 produced
+
+**The cluster mostly discovered that earlier answers had already settled it.**
+Questions 5.3 and 5.4 resolved to *no new concept* because 5.1 and 5.2 had built
+the mechanism: duplicate as the primary action, `LAYOUT` producing structure with
+content unbound, **is** what a template is. A template becomes a variant in a
+campaign named `000_template`, and "does a template change propagate" answers
+itself — a duplicate is a **copy, not a reference**, so there is no path for a
+change to travel along.
+
+**That exposed a distinction I had conflated.** Question 5.4 was written as
+*"question 3.1 one level up"*, and it is not. A content record is genuinely
+**shared** — one row, many references — so editing it reaches every unsent
+campaign and 3.7 exists to say how far. A template is **copied**, so it reaches
+nothing. Reference versus copy; the two only looked alike.
+
+**Two of my leans reversed against the evidence.** On cross-channel copy (5.5) I
+had leaned *"offer it, and be honest that it is a starting point"* — wrong,
+because almost nothing transfers and the only survivor is a single content pick,
+while the button would assert exactly the relationship question 1.1 denied. On
+cross-brand copy (5.6) I had leaned *"within a brand only"* — wrong, because
+cross-brand campaign duplication already works and handles its hazards better
+than my caution would have: `content_modes_for` refuses `KEEP` across brands,
+`url_carriers` reports every brand-specific URL that crossed verbatim, and
+`_copy_content_row` omits `content_versions` so *"the copy previews and cannot be
+sent until someone publishes it"* — question 4.3's divergence, already known and
+deliberately surfaced.
+
+**Duplication is primary and does not exist.** `duplicate_campaign` and
+`duplicate_content_record` are built; there is no `duplicate_variant`, and 5.1
+made it the primary creation action. 5.6 settles that it **reuses** the campaign
+machinery rather than reimplementing a subset — narrower (same-brand only), not
+parallel.
+
+**No AI draft, and the record says why that is a build boundary rather than an
+architectural position** — [[ADR-021 — Variants Are Human Created Versions]]
+permits one, and its 2026-07-31 clarification exists precisely because the title
+has twice been misread as forbidding it.
+
+**Four backend gaps:**
+
+| # | Gap | Where |
+|---|---|---|
+| 27 | No `duplicate_variant` — the primary creation action is unbuilt | `campaigns/duplication.py` |
+| 28 | Duplication must carry active overrides (also gap 16) | `campaigns/duplication.py:147` |
+| 29 | A context-sensitive `content_mode` default (`KEEP` within a campaign) | build-time |
+| 30 | Nothing prevents sending a template variant — accepted, not fixed | — |
+
+---
+
+## What the interview produced
+
+**41 questions, five clusters, closed 2026-09-25 to 2026-09-27.**
+
+### The four principles that outlast the screens
+
+**1. Composition must not be gated on content readiness** (1.2). A tool whose
+options disappear when the data is thin is least useful when the work is
+earliest — and a manager who cannot pick the layout they want picks one they
+can, so the constraint changes the *output*, not merely the order of work.
+
+**2. Do not special-case email** (2.1, 2.3, 5.5). A WYSIWYG canvas serves one
+channel; every other channel needs the list anyway. The constructive form is
+2.3's: promote the envelope by **asking** `envelope_module_type(channel)`, and
+push returns `None`, so one screen is correct everywhere with no branch. This is
+[[ADR-160 — Channel Model and Composition]]'s argument reaching the UI for the
+first time.
+
+**3. *The system tried and found nothing* is not *nobody tried*** (1.4, 4.4,
+4.5). Drawn three times at three layers — unbound modules at the send review,
+empty slots in the composer preview, and the per-recipient skip. Identical
+appearance, different meaning, only one actionable. **Collapsing them trains a
+manager to ignore both.**
+
+**4. The decision to proceed belongs to a person even when a machine could form
+an opinion** (4.7). Broader than [[ADR-174 — Channel Readiness Is Asserted, Not Computed]]'s
+stated reasoning: a variant's completeness is *mechanical* in a way a content
+record's intent is not, so a computation could have been honest here. It was
+rejected anyway.
+
+### The central question, answered in two parts
+
+**Where does the keystroke go?** To the **catalogue**, by default — because the
+manager's real question is **scope of the correction, not location of the
+manager**: *is this wrong everywhere, or different here?* **How do they choose?**
+Through the **field's state**, never the editor's mode.
+
+And **a decision slot may not be overridden at all** (2.6), which reverses
+`ContentOverrideDB`'s own docstring. An override on a slot defeats the slot, and
+once `max_results` works it produces three personalised picks wearing one pinned
+headline.
+
+### Six decisions taken against my recommendation, or against built code
+
+| | |
+|---|---|
+| 1.5 | Frequency argues for **ergonomics**, not drag-and-drop. I conflated them |
+| 2.6 | Slots may not be overridden — reverses the override docstring |
+| 3.6 | Duplication must **keep** overrides — reverses `duplication.py:147` |
+| 4.3b | The version column is a **marker**, not a render pin |
+| 5.5 | Don't build cross-channel copy at all |
+| 5.6 | Cross-brand copy already works and is better than my caution |
+
+### Five things the interview found in the code
+
+- **A test send mails the draft** (`mode="preview"`) — a bug in the one action whose purpose is showing what ships
+- **`max_results` is dead configuration** — stored, exposed, duplicated, read by nothing
+- **`outcome_delta` lacks a producer *and* an experimental design** — a delta needs a baseline that was never sent
+- **No asset subsystem at all** — no table, no upload, no picker; `image_url` is a typed string
+- **A catalogue edit does not reach a send until someone publishes** — a consequence of 3.1 that surfaced in 4.3
+
+### Screen-cut changes
+
+**Added:** a compact **outline** view (the one surface where drag-and-drop works,
+because it does not scroll); an **override history screen** (home for 1.8's
+maturity signal); a **monitoring screen** for the override comparison, when it is
+built.
+**Removed:** any cross-channel compare view, ever.
+
+### ADR work this interview owes
+
+Sequenced after the backlog pass rather than written now.
+
+| Likely record | Covers |
+|---|---|
+| **Machine-versus-human lock policy** | 1.7 — advisory for a person, binding for an agent. A new rule about what machine principals may do |
+| **The content catalogue's field model** | 1.8, 2.8, 2.9, 2.10, 2.4 — catalogue binding follows topical signal; `fields.json`; the machine-ready axis; explicit stable names |
+| **Edit versus override** | 3.1–3.9 — scope of the correction, field state, and that slots are never overridden |
+| **Addendum to [[ADR-176 — A Negative Decision Outranks a Positive One]]** | 1.6 — *human beats system* sits on the axis ADR-176 already names, so probably an addendum rather than a record |
+
+**Thirty backend gaps**, of which four are logged in `docs/backlog.md` in full
+(the duplication bug, the `outcome_delta` loop, the test-send bug, the asset
+subsystem) and the rest are carried in the cluster summaries above, awaiting the
+**backlog-sequencer** pass that was deferred until this interview closed.
 
 ## Related
 
