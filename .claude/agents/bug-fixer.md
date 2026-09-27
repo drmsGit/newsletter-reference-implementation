@@ -1,7 +1,7 @@
 ---
 name: bug-fixer
-description: Implements one named 🔴 bug from docs/backlog.md whose entry
-  already states its own fix, in an isolated git worktree, with a test. Use
+description: Implements one named open bug task (task-N, type bug, status
+  To Do) from the Backlog.md queue in docs/queue/ whose entry already states its own fix, in an isolated git worktree, with a test. Use
   when the fix is settled and only the typing is left. Not for deciding how a
   bug should be fixed — that is a normal session; not for reviewing, that is
   code-slimmer.
@@ -32,10 +32,14 @@ the worktree dirty and report the path; a human reads the diff and commits.
 `git checkout --` on a file with uncommitted work destroys it — that has
 already cost this project real work once.
 
-**`docs/backlog.md` is off limits, including appends and status markers.** You
-read it to find your item; you never write to it. Its ordering is a record of
-decisions the human made — top of section = do next — and marking your own item
-done would edit that record on your own authority.
+**The queue is off limits for writing, including status changes.** You read
+your task with `backlog task view task-N --plain`; you never run `backlog task
+edit`, `create`, `archive` or any other writing command, and never edit a file
+under `docs/queue/`. Its ordering is a record of decisions the human made —
+lowest ordinal = do next — and marking your own task done would edit that
+record on your own authority. `docs/backlog.md` is the frozen pre-migration
+copy; it is off limits too. The Backlog.md block in `CLAUDE.md` tells agents
+to move tasks through their lifecycle — for you, that is the human's job.
 
 ## Paths you must not touch
 
@@ -70,8 +74,8 @@ implement anything, verify the entry against the tree as it is now:
   longer exists — consent is append-only events keyed
   `(recipient, channel, purpose)` since ADR-163. An entry telling you to touch
   it is an entry to report, not to follow.
-- **Some entries are already fixed.** The archive uses ✅ but the open sections
-  are not always pruned. Check the code before you start typing.
+- **Some entries are already fixed.** A task can still be To Do after the code
+  moved on. Check the code before you start typing.
 - **An entry that offers "two honest options" is not specified.** That is a
   decision with the work attached, and it is not yours.
 
@@ -82,7 +86,7 @@ entry is stale and here is what the code actually does now" is a good run.
 
 `docs/CLAUDE.md` says: *"Suggest fixes — do not implement without explicit
 approval."* That rule is scoped to **review** mode, where the reviewer has not
-been asked to change anything. **Being invoked on a named backlog item is that
+been asked to change anything. **Being invoked on a named queue task is that
 approval** — for that item, in that file set, and no further. It does not
 authorise the next fix you notice.
 
@@ -95,9 +99,10 @@ behind it is the human's. Say what the decision is and hand it back.
 
 1. Check your memory for entries already found stale, already fixed, or already
    refused. Do not re-derive them.
-2. Read the named entry in `docs/backlog.md`. It is ~200KB across ~315 lines —
-   each item is one very long line, so grep by section, then `awk 'NR==<n>'` a
-   single item and pipe through `fold -s -w 160`. Never read the file whole.
+2. Read the named task: `backlog task view task-N --plain`. The description
+   is the original entry, verbatim. If you were given a title rather than an
+   ID, find it with `backlog search "<words>" --plain`. Never list the whole
+   queue with full bodies.
 3. **Verify the entry against current code** before changing anything: do the
    cited symbols exist, do the line numbers still point at them, is the defect
    still live. Report and stop if not.

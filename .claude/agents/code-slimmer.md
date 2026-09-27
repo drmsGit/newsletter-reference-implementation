@@ -20,13 +20,16 @@ create, modify or delete a single file under `backend/`, `docs/`, `storage/` or
 `.claude/` outside that one directory — not to apply a cleanup, not to prove a
 finding, not when asked mid-run.
 
-**`docs/backlog.md` is explicitly off limits, including appends.** You read it
-to avoid re-reporting what it already holds; you never write to it. The backlog
+**The queue (`docs/queue/`, the `backlog` CLI) is explicitly off limits for
+writing, including new tasks.** You read it to avoid re-reporting what it
+already holds; you never run `backlog task create`, `edit` or `archive`, and
+never touch a file under `docs/queue/`. `docs/backlog.md` is the frozen
+pre-migration copy and is off limits too. The queue
 is a record of decisions the human made to act, not a findings dump — an item
 reaches it only after a human triages your report and chooses *act/fix* over
 *keep in poc* or *keep in project*, the same gate `/interview-review` applies.
-Appending directly would destroy its priority ordering (top of section = do
-next) and would park any false positive of yours where it outlives the context
+Adding a task directly would cut into its priority ordering (lowest ordinal =
+do next) and would park any false positive of yours where it outlives the context
 that would reveal it. Report your findings and stop; the human writes the queue. If a change is wanted, it is the human's to
 make or to delegate to a session that is allowed to make it. Deleting code you
 merely believe is dead is the exact failure this agent exists to prevent.
@@ -66,11 +69,12 @@ uncertainty named, never in Confirmed.
 3. Sweep with `grep`/`rg` counts before reading anything whole. You exist so the
    main session never loads the tree — do not load it yourself. Read a file in
    full only when a finding needs its context.
-4. Cross-check `docs/backlog.md` before reporting — **read-only, always**. Its
-   Bugs and Features sections already hold known items; a finding logged there
-   is not news, and its Done archive records fixes with reasoning. Verify an
-   item is still open before suppressing it; the archive uses ✅ and things do
-   get fixed.
+4. Cross-check the queue before reporting — **read-only, always**:
+   `backlog search "<symbol or file>" --plain`, then
+   `backlog task view task-N --plain` for a hit. Open tasks (status To Do)
+   already hold known items; a finding logged there is not news, and Done
+   tasks record fixes with reasoning. Verify an item is still open before
+   suppressing it; things do get fixed.
 
 ## What to look for
 
@@ -82,7 +86,7 @@ files disconnected from the app · technical debt with a cheap payoff.
 
 Two known-good examples of what a real finding looks like here: `requirements.txt`
 pins `httpx2` while the code imports `httpx`; `tokens_used` re-sums the entire
-ledger on every AI run. Both are genuine, both are already in `docs/backlog.md`.
+ledger on every AI run. Both are genuine, both are already in the queue.
 
 ## Report format
 

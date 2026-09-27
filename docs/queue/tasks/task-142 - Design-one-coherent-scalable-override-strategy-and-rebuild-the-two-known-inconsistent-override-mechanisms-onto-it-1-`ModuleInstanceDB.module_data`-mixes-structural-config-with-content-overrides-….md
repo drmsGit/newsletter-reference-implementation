@@ -1,0 +1,28 @@
+---
+id: TASK-142
+title: >-
+  Design one coherent, scalable override strategy and rebuild the two
+  known-inconsistent override mechanisms onto it: (1)
+  `ModuleInstanceDB.module_data` mixes structural config with content overrides
+  (…
+status: Done
+assignee: []
+created_date: '2026-09-27 13:57'
+labels:
+  - backend
+dependencies: []
+type: feature
+ordinal: 500600
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+✅ **[Feature]** Design one coherent, scalable override strategy and rebuild the two known-inconsistent override mechanisms onto it: (1) `ModuleInstanceDB.module_data` mixes structural config with content overrides (`headline_override`, etc.) in one untyped JSON blob, no schema boundary, no way to query "which modules have an active override"; (2) the newer `OverrideEventDB` audit table is completely disconnected from rendering, which still reads the old `module_data.*_override` blob (flagged as the top cross-cutting finding). Design a single mechanism that's explicit, queryable, consistent; distinct names; explicit reset/reversal (ADR-041's "used until deleted or reset", previously inexpressible). Source: [[Interview Prep - Content, Campaigns, Audience]] → Campaigns Q3; [[Interview Prep - Decision, Overrides, Insight]] → Overrides Q1, Q5. **Done 2026-07-15 (content overrides; audience overrides split out to their own item, deferred behind Phase 3B — see Features).** Key finding on opening it up: *neither* old mechanism actually worked — `module_data.*_override` was read by rendering but **never written** anywhere (dead Condor leftover), and `OverrideEventDB` was written via `/overrides` CRUD but **never read by rendering** (audit-only, no teeth). So ADR-040/041 were effectively unimplemented. Rebuilt as a single first-class **`ContentOverrideDB`** (renamed/evolved from `OverrideEventDB`) — the functional layer rendering now honors *and* the self-auditing trust-loop record, one clearly-named thing rather than two confusable ones. Targets a module instance; carries a record-level pin (`override_content_record_id`) and/or field-level edits (`field_overrides`, keys validated against the module's manifest variables — same manifest discipline as the decision-slot config work), plus `system_content_record_id` (counterfactual), `active`, `reverted_at`, `outcome_delta`. Precedence (ADR-041): active override wins — pin decides *which* record, field edits win field-by-field on top; **reset** flips `active=false` (row kept as history, so the trust-loop/outcome survives). Constraints: must-change-something CHECK; **one active override per module** (partial unique index); overrides refused on non-CMS modules (they'd silently no-op). Rendering reads it in `render_cms_module`; the dead `module_data.*_override` path removed; `module_data` is structural config only again. Full REST + a campaign-detail UI (per-module override column with reset, add-override form). Seed switched the decision module from the manifest-less `content_card` (which rendered nothing) to `img_left`, so personalization + overrides are actually visible, and seeds one active field-override + one reverted record-pin (with outcome showing the system was better — the "70% didn't outperform" story). Verified live end-to-end: field override unified the headline across recipients while bodies stayed personalized; record pin forced one record for all; reset reverted to system-governed; list is queryable; one-active-per-module + non-CMS + must-change-something all rejected. Test suite rewritten (self-contained — no more `send_instances` id=1 fixture hack). **Shaped as a reusable spine** so audience overrides (deferred, needs Phase 3B) reuse the same lifecycle/audit/reset pattern. **Refined same day after review (managers' actual usage):** the first cut over-reached on record swaps. Corrected model — **field overrides are the only kind supported now** (Cases 1 & 3: unify/edit fields of the resolved content, for all recipients), available on **any content-resolving module** (has a content record or decision slot — not just cms:true; a hero/cta that references content qualifies, and field overrides now apply on the static render path too, not only `render_cms_module`). **Record-level swaps are not an override at all**: swapping a decision slot's whole record *for all* is meaningless (place static content instead), and swapping a manually-picked record is meaningless (just change the record). The segment-targeted case ("beach recipients get a special offer") — briefly modelled as a reserved "Case 2" — was **dropped entirely** (2026-07-15): strategically it's cleaner to handle via the **guaranteed-placement** concept plus an if/else (a recipient who qualifies for a guaranteed placement simply doesn't render the decision slot), rather than bolting a second case onto the override mechanism. So `ContentOverrideDB` is now **purely field edits** — the `override_content_record_id`/`condition_category_id` columns were removed. Frontend stays a raw dev affordance (JSON field input, list view) on purpose — the manager-facing labeled-field editor with live preview (Condor-style) is a separate future stage; the backend model/API is what was made correct + flexible here. Verified live: field override on both a decision module (headline unified, bodies personalized) and a static hero module; the non-content module rejected; 13 self-contained tests.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Migrated 2026-09-27 from `docs/backlog.md` line 513, section "Done", position 6 in that section (top = do next). The description is the original entry, verbatim.
+<!-- SECTION:NOTES:END -->

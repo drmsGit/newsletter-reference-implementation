@@ -3,7 +3,7 @@ Summarize what happened in this repository over the last 7 days — or since the
 Gather from:
 - `git log` — commits, files touched, and commit messages in the window
 - ADRs added or changed in `docs/architecture/ADR/`
-- `docs/backlog.md` — items added, resolved, or reprioritized
+- The queue (`docs/queue/tasks/`, Backlog.md) — tasks added, resolved, archived, or reprioritized: `git log --since=<start> --stat -- docs/queue/` for what moved, `backlog task view task-N --plain` for what a task is
 - `docs/architecture/interview-prep/` — new baselines generated, or questions resolved via `/interview-review`
 - `docs/business-interview.md` and `docs/business-interview-baseline.md` — findings resolved via `/business-review`
 - `docs/playbook-strategy.md` Decision Log — new entries in the window

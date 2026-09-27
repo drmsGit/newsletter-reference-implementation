@@ -15,8 +15,9 @@ For the statement given:
 2. Name the substitute a reader would reach for instead, including "do
    nothing" and "keep the current setup".
 3. Find every claim that cannot be demonstrated in the repo today. Verify
-   against the repo rather than reasoning from the claim — `docs/backlog.md`
-   (open bugs and Needs-ADR items) and the roadmap status table in
+   against the repo rather than reasoning from the claim — the queue in
+   `docs/queue/tasks/` (open bugs, and tasks labelled `needs-adr`; grep for
+   `status: To Do`) and the roadmap status table in
    `docs/playbook-strategy.md` §6 are where claims go to die. A capability
    that is designed but not built does not count as demonstrable, and this
    repo has several.

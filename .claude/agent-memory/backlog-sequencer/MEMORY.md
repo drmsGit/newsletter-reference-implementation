@@ -10,17 +10,25 @@ Variant Editor interviews closed). Refine these files; do not rebuild from scrat
 - [Staleness watchlist](staleness-watchlist.md)
 
 ## Standing constraints (do not re-derive)
-- Never edit `docs/backlog.md`. Top of section = do next is a human decision record.
+- Never write to the queue (no writing `backlog` command, no file under `docs/queue/`), and never edit the frozen `docs/backlog.md`. Lowest ordinal = do next is a human decision record.
 - Write access is this directory only.
 - No calendar time, velocity, hours, or story points, ever.
 
-## Backlog navigation (re-measured 2026-09-27)
-`docs/backlog.md` is 621 lines / 364KB. Each item is ONE very long line, with
-some continuation lines indented beneath. Grep by section, then
-`awk 'NR==<n>' docs/backlog.md | fold -s -w 150`.
+## Queue navigation (migrated to Backlog.md 2026-09-27)
+The queue is Backlog.md tasks in `docs/queue/tasks/`. Each task's description is
+the original `docs/backlog.md` entry verbatim; its Implementation Notes name the
+original line and section position. Read with:
+- `backlog task list --status "To Do" --sort ordinal --plain` — do-next order.
+  Without `--sort ordinal` the list sorts by priority, which is not the human's order.
+- `backlog task view task-N --plain` — one item in full.
+- `backlog search "<text>" --plain`; filter with `--labels needs-adr`, `--type bug`.
+Old sections are ordinal ranges: 1xxxxx Bugs, 2xxxxx Features, 3xxxxx Needs ADR,
+5xxxxx Done. `priority` is set only where the entry stated one; `Parked` = must be
+prioritised before anything else.
 
-Section line ranges 2026-09-27: Bugs 23-131, Features 132-395, Needs ADR 396-482,
-Won't Do 483-486, Done 487-618, Related 619+.
+`docs/backlog.md:NNN` citations in this directory predate the migration. The
+frozen file still resolves them; to find the task, grep `docs/queue/tasks/` for
+`line NNN,` in the migration note.
 
 Useful absolute line anchors (2026-09-27, will drift):
 - 136 React first-screen gaps (C1/C15 done, **C8 + C2 open**)

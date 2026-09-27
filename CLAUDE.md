@@ -10,7 +10,27 @@ commercial product. Learnings feed the separate Condor use case.
 - ADR filenames: `ADR-NNN — Title Case Title.md` (em dash, spaces, NOT kebab-case)
 - Cross-references are Obsidian wikilinks: `[[ADR-101 — Provider Capabilities Are Explicit]]`
 - Strategy + decision log: `docs/playbook-strategy.md` — the live business record
-- Queue: `docs/backlog.md` (Bugs / Features / Needs ADR)
+- Queue: Backlog.md tasks in `docs/queue/tasks/`, read and written only through
+  the `backlog` CLI (config: `backlog.config.yml`). Inside the vault so task
+  wikilinks resolve.
+  - **Order is priority: `ordinal` ascending = do next.** Plain `task list`
+    sorts by priority first, so always pass `--sort ordinal`:
+    `backlog task list --status "To Do" --sort ordinal --plain`.
+  - The old sections are ordinal ranges: 1xxxxx Bugs, 2xxxxx Features,
+    3xxxxx Needs ADR, 5xxxxx Done. Bugs outrank features of similar importance.
+    Ordinals step by 100, so a new item slots between neighbours without
+    renumbering them.
+  - `priority` (P0–P3) is set only where an entry states one; `Parked` means
+    it must be prioritised before anything else happens to it.
+  - Labels: `needs-adr` (📋 — blocked on a design decision), and area
+    `backend` / `frontend` / `docs`. Type: bug / feature / chore / docs / decision.
+  - Descriptions are essays, not tickets: keep the reasoning and `file:line`
+    citations; never summarise an entry down.
+  - Backlog.md's own `docs/queue/decisions/` and `docs/queue/docs/` stay
+    unused — decisions go in ADRs or `docs/business/decisions/`.
+- `docs/backlog.md` is the pre-migration queue (migrated 2026-09-27), frozen
+  and kept until the user confirms its deletion. Do not add to it. ADRs and
+  agent memory cite it by line; those citations are historical.
 - Business context: `docs/business/` — brief, positioning, gates, assumptions
 - Business decisions: `docs/business/decisions/` — same shape as ADRs
 - Technology explainers: `docs/implementation/` — one file per technology,
