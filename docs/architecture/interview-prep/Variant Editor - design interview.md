@@ -16,8 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 41 questions across five clusters, 39 answered.
-> **Cluster 5 in progress — 4/6.**
+> 41 questions across five clusters, 40 answered.
+> **Cluster 5 in progress — 5/6.**
 > **Cluster 3 ✅ CLOSED 2026-09-26, 9/9.**
 > **Cluster 2 ✅ CLOSED 2026-09-26, 10/10.**
 > **Cluster 4 ✅ CLOSED 2026-09-26, 8/8.**
@@ -2257,11 +2257,42 @@ what will be sent, and it shows something else.
    references — so editing it reaches every unsent campaign, and 3.7 exists to
    say how far. A template is copied, so it reaches nothing. **The distinction
    is reference versus copy, and the two questions only looked alike.**
-5. **Can a manager copy a variant to another channel — "make a push version of
-   this email"?** *Constraint: channel is fixed at creation and the two channels'
-   modules come from different manifests, so a copy is not a copy — at best it
-   is "carry the content references across and rebuild the stack". Lean: offer
-   it, and be honest that it is a starting point rather than a translation.*
+5. ✅ **Can a manager copy a variant to another channel?**
+   **Resolution (2026-09-27): no. It is not built.** The user: *"don't build
+   it"*.
+
+   **My lean reversed while working the question, on the user's own answer to
+   1.1.** The original lean was *"offer it, and be honest that it is a starting
+   point rather than a translation"*. That was wrong on both cost and concept.
+
+   **Almost nothing transfers.** Module types do not — email has `hero` and
+   `img_left`, push has `notification`, different manifests with different
+   names. `module_data` does not, since the field names differ entirely.
+   Positions are meaningless when the target has one module. Decision-slot
+   configuration *should* not, because question 1.1 established that
+   **strategies differ by channel massively**. **The only survivor is which
+   content records were chosen** — and for push that means binding one record
+   into one module. The work saved is a single content pick.
+
+   **The conceptual cost outweighs it.** Question 1.1 settled that an email
+   variant and a push variant are **separate strategies, not two views of one
+   idea** — which is why there is no cross-channel compare view and why nothing
+   in the model links them. A *"make a push version of this"* button asserts
+   exactly the relationship 1.1 denied. **This is the second time in this
+   interview a UI feature would have implied a link the model deliberately
+   refuses**, and both times the answer was no.
+
+   **It also agrees with [[ADR-160 — Channel Model and Composition]] points 4
+   and 5** for a reason beyond the technical one. That ADR fixes channel at
+   creation because switching would invalidate a variant's modules, readiness
+   and renderer at once. The same fact read from the manager's side: there was
+   never one object to convert.
+
+   **The counter, and why it points elsewhere:** with ten articles rather than
+   one, *"which of these did the email feature?"* stops being trivial to
+   re-find. That is an argument for **seeing** the email variant while composing
+   the push, not for copying it — a read-only reference rather than a
+   transformation. Logged as an idea, not adopted.
 6. **Can a variant be copied across campaigns, and across brands?**
    *Constraint: a campaign is composed for one brand ([[ADR-150 — Tenancy and Access Model]]),
    and content records are brand-scoped. A cross-brand copy either breaks the
