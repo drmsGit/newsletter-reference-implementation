@@ -1,12 +1,12 @@
 ---
 id: TASK-47
 title: >-
-  [[ADR-176 — A Negative Decision Outranks a Positive One]] was accepted
-  2026-09-24 and none of its implementable points exist.
+  ADR-176 — A Negative Decision Outranks a Positive One was accepted 2026-09-24
+  and none of its implementable points exist.
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:56'
-updated_date: '2026-09-27 14:22'
+updated_date: '2026-09-27 14:29'
 labels:
   - backend
 dependencies: []

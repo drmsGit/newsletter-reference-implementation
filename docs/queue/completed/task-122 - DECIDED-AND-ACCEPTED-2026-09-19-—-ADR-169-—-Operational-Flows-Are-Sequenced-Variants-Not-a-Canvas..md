@@ -1,8 +1,6 @@
 ---
 id: TASK-122
-title: >-
-  DECIDED AND ACCEPTED 2026-09-19 — [[ADR-169 — Operational Flows Are Sequenced
-  Variants, Not a Canvas]].
+title: "DECIDED AND ACCEPTED 2026-09-19 \u2014 ADR-169 \u2014 Operational Flows Are Sequenced Variants, Not a Canvas."
 status: Done
 assignee: []
 created_date: '2026-09-27 13:57'

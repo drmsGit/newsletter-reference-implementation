@@ -2,11 +2,12 @@
 id: TASK-85
 title: >-
   DWH export boundary + local retention/prune for signal contributions — per
-  [[ADR-132 — Signal Layer Implementation Event-Sourced Contributions with
-  Decay-on-Read]], the operational system stores only…
+  ADR-132 — Signal Layer Implementation Event-Sourced Contributions with
+  Decay-on-Read, the operational system stores only…
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-09-27 14:29'
 labels:
   - backend
 dependencies: []

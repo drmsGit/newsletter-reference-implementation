@@ -1,11 +1,12 @@
 ---
 id: TASK-121
 title: >-
-  Anonymous push identity — decided, and [[ADR-167 — Anonymous Push Recipients
-  Originate in the Source System]] is written (Proposed, 2026-09-17).
+  Anonymous push identity — decided, and ADR-167 — Anonymous Push Recipients
+  Originate in the Source System is written (Proposed, 2026-09-17).
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-09-27 14:29'
 labels:
   - needs-adr
   - backend

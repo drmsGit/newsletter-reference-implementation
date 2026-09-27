@@ -1,9 +1,6 @@
 ---
 id: TASK-140
-title: >-
-  Build the Signal layer (Phase 3C, [[ADR-110 — Insight Layer Transforms Events
-  Into Signals]]/[[ADR-112 — Signals Use Time-Based Decay]]/[[ADR-113 — Separate
-  Operational and Historical Signals]]) — re…
+title: "Build the Signal layer (Phase 3C, ADR-110 \u2014 Insight Layer Transforms Events Into Signals/ADR-112 \u2014 Signals Use Time-Based Decay/ADR-113 \u2014 Separate Operational and Historical Signals) \u2014 re\u2026"
 status: Done
 assignee: []
 created_date: '2026-09-27 13:57'

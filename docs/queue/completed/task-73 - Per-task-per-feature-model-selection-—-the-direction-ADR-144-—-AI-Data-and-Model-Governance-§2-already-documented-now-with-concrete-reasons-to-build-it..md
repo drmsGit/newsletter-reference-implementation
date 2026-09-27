@@ -1,9 +1,6 @@
 ---
 id: TASK-73
-title: >-
-  Per-task / per-feature model selection — the direction [[ADR-144 — AI Data and
-  Model Governance]] §2 already documented, now with concrete reasons to build
-  it.
+title: "Per-task / per-feature model selection \u2014 the direction ADR-144 \u2014 AI Data and Model Governance \u00a72 already documented, now with concrete reasons to build it."
 status: Done
 assignee: []
 created_date: '2026-09-27 13:57'

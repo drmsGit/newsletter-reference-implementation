@@ -1,12 +1,13 @@
 ---
 id: TASK-95
 title: >-
-  AI/system recommendation layer on top of the (human-governed, per [[ADR-080 —
-  Human-governed Taxonomy Before AI Selection]]) category taxonomy — e.g.
-  "system suggests promoting this to a main categor…
+  AI/system recommendation layer on top of the (human-governed, per ADR-080 —
+  Human-governed Taxonomy Before AI Selection) category taxonomy — e.g. "system
+  suggests promoting this to a main categor…
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-09-27 14:29'
 labels:
   - backend
 dependencies: []

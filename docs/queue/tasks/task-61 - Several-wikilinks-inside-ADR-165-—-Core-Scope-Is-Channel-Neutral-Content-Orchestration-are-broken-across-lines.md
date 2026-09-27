@@ -1,11 +1,12 @@
 ---
 id: TASK-61
 title: >-
-  Several wikilinks inside [[ADR-165 — Core Scope Is Channel-Neutral Content
-  Orchestration]] are broken across lines
+  Several wikilinks inside ADR-165 — Core Scope Is Channel-Neutral Content
+  Orchestration are broken across lines
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-09-27 14:29'
 labels:
   - docs
 dependencies: []
