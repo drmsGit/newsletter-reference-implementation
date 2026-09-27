@@ -6,10 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-09-27 14:29'
 labels:
   - needs-adr
   - backend
 dependencies: []
+type: decision
 ordinal: 300100
 ---
 
