@@ -35,7 +35,7 @@ When a decision is **act / fix**:
 - Bugs outrank features of similar importance when both are candidates for the same position.
 
 ## Step 4 — re-grooming existing backlog items
-If, while working through a file, an already-logged To Do task comes up again (e.g. a related question surfaces the same issue, or the user brings up an old item), ask: "still want to act on this, or should it become Won't Do?" If declined, record why with `backlog task edit task-N --append-notes "Won't Do <date>: <reason>"`, then `backlog task archive task-N`, rather than leaving it stale. `docs/backlog.md` is the frozen pre-migration copy — never write to it.
+If, while working through a file, an already-logged To Do task comes up again (e.g. a related question surfaces the same issue, or the user brings up an old item), ask: "still want to act on this, or should it become Won't Do?" If declined, record why with `backlog task edit task-N --append-notes "Won't Do <date>: <reason>"`, then `backlog task archive task-N`, rather than leaving it stale. `docs/backlog.md` is a signpost now — never write to it.
 
 ## Rules
 - Never skip ahead or batch multiple questions without the user weighing in on each one individually.

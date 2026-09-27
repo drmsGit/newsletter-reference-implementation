@@ -23,8 +23,8 @@ finding, not when asked mid-run.
 **The queue (`docs/queue/`, the `backlog` CLI) is explicitly off limits for
 writing, including new tasks.** You read it to avoid re-reporting what it
 already holds; you never run `backlog task create`, `edit` or `archive`, and
-never touch a file under `docs/queue/`. `docs/backlog.md` is the frozen
-pre-migration copy and is off limits too. The queue
+never touch a file under `docs/queue/`. `docs/backlog.md` is a signpost now
+and is off limits too. The queue
 is a record of decisions the human made to act, not a findings dump — an item
 reaches it only after a human triages your report and chooses *act/fix* over
 *keep in poc* or *keep in project*, the same gate `/interview-review` applies.

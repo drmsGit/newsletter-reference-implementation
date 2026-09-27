@@ -10,7 +10,7 @@ Variant Editor interviews closed). Refine these files; do not rebuild from scrat
 - [Staleness watchlist](staleness-watchlist.md)
 
 ## Standing constraints (do not re-derive)
-- Never write to the queue (no writing `backlog` command, no file under `docs/queue/`), and never edit the frozen `docs/backlog.md`. Lowest ordinal = do next is a human decision record.
+- Never write to the queue (no writing `backlog` command, no file under `docs/queue/`), and never edit `docs/backlog.md` (a signpost since 2026-09-27). Lowest ordinal = do next is a human decision record.
 - Write access is this directory only.
 - No calendar time, velocity, hours, or story points, ever.
 
@@ -28,9 +28,12 @@ Old sections are ordinal ranges: 1xxxxx Bugs, 2xxxxx Features, 3xxxxx Needs ADR,
 5xxxxx Done. `priority` is set only where the entry stated one; `Parked` = must be
 prioritised before anything else.
 
-`docs/backlog.md:NNN` citations in this directory predate the migration. The
-frozen file still resolves them; to find the task, grep `docs/queue/tasks/` for
-`line NNN,` in the migration note.
+`docs/backlog.md:NNN` citations in this directory predate the migration, and
+`docs/backlog.md` is now only a signpost. Each citation means the file as it
+stood on the date it was written: `git show $(git rev-list -1 --before=<date written> HEAD):docs/backlog.md`.
+A task's migration note ("line N") refers to the last full version,
+`b70f432^`, so grep `docs/queue/` for `line N,` only when the citation dates
+from 2026-09-27.
 
 Useful absolute line anchors (2026-09-27, will drift):
 - 136 React first-screen gaps (C1/C15 done, **C8 + C2 open**)

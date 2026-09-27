@@ -1,7 +1,7 @@
 # Memory Index
 
 - [Seams — never flag as dead](project_seams_do_not_flag.md) — dynamically discovered surfaces and deliberate seam examples with zero static refs, verified live
-- [Already in the backlog](project_backlog_already_logged.md) — delivery/provider issues docs/backlog.md already holds; don't re-report them
+- [Already in the backlog](project_backlog_already_logged.md) — delivery/provider issues the queue already holds; don't re-report them
 - [Cluster 1 sweep — frontend + templates](project_cluster1_frontend_templates.md) — no dead routes, no orphaned templates; the tricky-but-live ones and the method that proved it
 - [Cluster 2 sweep — overrides + campaigns](project_cluster2_overrides_campaigns.md) — no dead code, but orphaned columns and router payload drift; what is deliberate there
 - [Cluster 3 sweep — content + rendering](project_cluster3_content_rendering.md) — no dead code, no orphaned schema; missing DB constraints and an ADR-062 audit gap instead

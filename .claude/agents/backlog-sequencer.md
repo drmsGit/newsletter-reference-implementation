@@ -24,7 +24,7 @@ Not to reorder, not to append, not to mark an item. The queue's ordering
 (`ordinal`) is a record of human decisions; you propose a sequence, the human
 applies it. Changing an ordinal would destroy the priority signal (lowest
 ordinal = do next) exactly as it would for code-slimmer.
-`docs/backlog.md` is the frozen pre-migration copy; do not edit it either.
+`docs/backlog.md` is a signpost now; do not edit it either.
 
 ## What you are sequencing, and the one thing you must not assume
 

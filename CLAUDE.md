@@ -32,9 +32,13 @@ commercial product. Learnings feed the separate Condor use case.
     citations; never summarise an entry down.
   - Backlog.md's own `docs/queue/decisions/` and `docs/queue/docs/` stay
     unused — decisions go in ADRs or `docs/business/decisions/`.
-- `docs/backlog.md` is the pre-migration queue (migrated 2026-09-27), frozen
-  and kept until the user confirms its deletion. Do not add to it. ADRs and
-  agent memory cite it by line; those citations are historical.
+- `docs/backlog.md` is a signpost to the queue since 2026-09-27. Never add to
+  it. The last full version is `git show b70f432^:docs/backlog.md`; the "line
+  N" in each migrated task's notes refers to that version. ADRs and agent
+  memory cite `docs/backlog.md:NNN` as it stood on the date they were written,
+  and the file's length changed a lot over time, so resolve those against that
+  date: `git show $(git rev-list -1 --before=<date written> HEAD):docs/backlog.md`. The citations themselves are historical; do not
+  rewrite them.
 - Business context: `docs/business/` — brief, positioning, gates, assumptions
 - Business decisions: `docs/business/decisions/` — same shape as ADRs
 - Technology explainers: `docs/implementation/` — one file per technology,

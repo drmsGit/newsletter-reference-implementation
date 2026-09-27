@@ -7,7 +7,7 @@
 Memory now lives in the main checkout and persists; the worktree-strands-memory
 problem from runs 1-2 is fixed, do not re-report it.
 
-Items are not always from `docs/backlog.md` — run 4's came from
+Items are not always from the queue (`docs/queue/`; `docs/backlog.md` before 2026-09-27) — run 4's came from
 `docs/architecture/code-slimmer-report.md` (245KB; grep the finding, never read it
 whole, and read its `## Unverified — the specific checks a human should run`
 section for your finding's precondition before changing anything).

@@ -83,9 +83,10 @@ Method notes that paid off:
   does not have.
 - `grep "__table_args__\|UniqueConstraint\|CheckConstraint\|Index(" app/*/db_models.py`
   in one pass: the module that returns nothing is the finding.
-- For any missing-constraint finding, search `docs/backlog.md` for the *same
-  pattern in another module* — several were fixed there in 2026-07 and the Done
-  entries name the systemic gap explicitly.
+- For any missing-constraint finding, search the queue (`docs/queue/tasks/`
+  and `docs/queue/completed/`) for the *same pattern in another module* —
+  several were fixed in 2026-07 and those Done tasks name the systemic gap
+  explicitly.
 
 Related: [[seams-do-not-flag]], [[backlog-already-logged]],
 [[cluster2-overrides-campaigns]], [[review-only-never-edit]]

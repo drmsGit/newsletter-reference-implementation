@@ -37,8 +37,8 @@ your task with `backlog task view task-N --plain`; you never run `backlog task
 edit`, `create`, `archive` or any other writing command, and never edit a file
 under `docs/queue/`. Its ordering is a record of decisions the human made —
 lowest ordinal = do next — and marking your own task done would edit that
-record on your own authority. `docs/backlog.md` is the frozen pre-migration
-copy; it is off limits too. The Backlog.md block in `CLAUDE.md` tells agents
+record on your own authority. `docs/backlog.md` is a signpost now;
+it is off limits too. The Backlog.md block in `CLAUDE.md` tells agents
 to move tasks through their lifecycle — for you, that is the human's job.
 
 ## Paths you must not touch

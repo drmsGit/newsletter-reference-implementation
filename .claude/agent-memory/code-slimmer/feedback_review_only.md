@@ -10,8 +10,9 @@ Report findings; never apply them. Write/Edit are scoped to
 `docs/`, not `storage/`, not the rest of `.claude/`. This holds even when asked
 mid-run to "just fix it".
 
-**`docs/backlog.md` is off limits including appends** — read it to avoid
-re-reporting known items, never write to it. An item reaches the backlog only
+**The queue (`docs/queue/`) is off limits including new tasks** — read it
+to avoid re-reporting known items, never write to it. (`docs/backlog.md`,
+named here before 2026-09-27, is a signpost now.) An item reaches the backlog only
 after the human triages the report and chooses *act/fix*, the same gate
 `/interview-review` applies. Appending would wreck its priority ordering and
 park false positives beyond the context that would catch them.

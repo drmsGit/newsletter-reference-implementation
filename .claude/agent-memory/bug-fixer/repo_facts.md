@@ -34,11 +34,13 @@ Delete the rows and restore any `AppConfigDB` key you set, in `finally`.
 A `SIGNAL_WEIGHTS` config row **already exists** in the dev DB with values equal
 to the code defaults — read it and restore it rather than writing `{}`.
 
-## Backlog navigation
+## Queue navigation (replaced 2026-09-27)
 
-`docs/backlog.md`: 315 lines / ~200KB. Sections at: Bugs 23, Features 53,
-Needs ADR 146, Won't Do 200, Done 204, Related 313. Grep a section with
-`awk 'NR>=23 && NR<=52'`, then `awk 'NR==<n>' | fold -s -w 160` for one item.
+The queue is Backlog.md tasks in `docs/queue/`; read one with
+`backlog task view task-N --plain`. `docs/backlog.md` is a signpost now.
+Citations to `docs/backlog.md` line numbers elsewhere in this memory mean the
+file as it stood on the date they were written:
+`git show $(git rev-list -1 --before=<date written> HEAD):docs/backlog.md`.
 
 ## Memory persistence — RESOLVED as of run 3
 

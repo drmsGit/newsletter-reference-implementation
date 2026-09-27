@@ -1,20 +1,20 @@
 ---
 name: backlog-already-logged
-description: Delivery/provider issues already recorded in docs/backlog.md — do not re-report them as new findings in a code sweep
+description: Delivery/provider issues already recorded in the queue (docs/queue/) — do not re-report them as new findings in a code sweep
 metadata:
   type: project
 ---
 
-`docs/backlog.md` (~120KB, Bugs / Features / Needs ADR / Done archive) already
+The queue (`docs/queue/`; `docs/backlog.md` until 2026-09-27) already
 holds these. Re-raising them is noise.
 
 **Why:** the backlog is the queue of record and its Done archive carries the
 reasoning behind past fixes. A "finding" that is already logged reads as though
 the sweep did not check, which costs more trust than it buys.
 
-**How to apply:** grep `docs/backlog.md` for the file, symbol or symptom before
-writing any finding. Verify the item is still open — the archive uses ✅ and
-items do get fixed.
+**How to apply:** grep `docs/queue/tasks/` **and** `docs/queue/completed/` for
+the file, symbol or symptom before writing any finding (`backlog search` does
+not cover `completed/`). Verify the item is still open — items do get fixed.
 
 Confirmed present as of 2026-08-21:
 - **P0-02** — a recipient can be mailed after opting out in `freeze` mode;
