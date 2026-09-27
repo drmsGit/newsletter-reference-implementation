@@ -16,8 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 41 questions across five clusters, 37 answered.
-> **Cluster 5 in progress — 2/6.**
+> 41 questions across five clusters, 38 answered.
+> **Cluster 5 in progress — 3/6.**
 > **Cluster 3 ✅ CLOSED 2026-09-26, 9/9.**
 > **Cluster 2 ✅ CLOSED 2026-09-26, 10/10.**
 > **Cluster 4 ✅ CLOSED 2026-09-26, 8/8.**
@@ -2195,14 +2195,47 @@ what will be sent, and it shows something else.
    `KEEP` when duplicating within a campaign, `LAYOUT` when duplicating into a
    new one. Recorded as a consequence of what was said rather than as a decision
    taken.
-3. **Is a module stack ever saved as a reusable thing?** *Constraint: the
-   reference data model describes **Design** as colours, typography, spacing and
-   footer behaviour, and says explicitly **"Design is not a template"** — and
-   there is no `DesignDB` table, so it is documented rather than built.
-   [[ADR-030 — Separate Global and Repeatable Structures]] separates global from
-   repeatable structures but does not make either reusable across campaigns.* If
-   the answer is yes, this is a new model concept and needs an ADR before a
-   screen.
+3. ✅ **Is a module stack ever saved as a reusable thing?**
+   **Resolution (2026-09-27): no new concept. A template is a variant you
+   duplicate from, living in a pseudo-campaign.** The user: *"A, templates are
+   rarely used in my experience. Same result to create a pseudo campaign call it
+   000_template and include all different template as variants"*.
+
+   **Questions 5.1 and 5.2 had already built the mechanism.** Duplicate as the
+   primary action, with `LAYOUT` producing structure and `module_data` with the
+   content unbound — **that is what a template is**. Adding a template concept
+   would have meant a second way to express the same thing.
+
+   **The naming convention does the work a flag would have done.** A campaign
+   named `000_template` sorts to the top, is obvious to every colleague, and
+   needs no schema change, no `is_template` boolean and no exclusion logic in
+   the campaign list. The cost is a row in the campaign list that is not a
+   campaign — visible, small, and honest about what it is.
+
+   **A separate model was the alternative and was resisted for a reason with
+   precedent here.** A template table would recreate modules, positions,
+   bindings and channel — everything a variant already is — and duplication
+   would then read from two sources that must be kept in step.
+   [[ADR-160 — Channel Model and Composition]] point 6 refused a third
+   registration pattern on the same grounds: *"a third pattern that needs
+   registering in several places is the one that eventually gets registered in
+   two."*
+
+   **The structural snag that shaped the answer:** `variants.campaign_id` is
+   `NOT NULL`, so a variant cannot exist outside a campaign. Every option
+   therefore needed a home campaign; the only question was whether to also add a
+   concept. The answer is no.
+
+   **Known cost accepted, and the user's own experience is why it is small:**
+   nothing prevents someone snapshotting and sending a template, since there is
+   no flag and `draft`/`ready` (question 4.6) is the only status. Templates
+   being *rarely used* is what makes that acceptable — a guard-rail for a rare
+   path is a cost paid on every path.
+
+   **`Design` stays unbuilt and unrelated.** The reference data model describes
+   it as colours, typography, spacing and footer behaviour and says explicitly
+   *"Design is not a template"*; there is no `DesignDB` table. This question
+   does not change that, and the two should not be conflated later.
 4. **If a saved starting point exists and someone changes it, do existing
    variants follow or stay?** *This is question 3.1 one level up, and the answer
    should probably be the same shape.*
