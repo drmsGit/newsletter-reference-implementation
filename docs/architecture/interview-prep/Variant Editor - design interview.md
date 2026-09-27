@@ -16,8 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 41 questions across five clusters, 38 answered.
-> **Cluster 5 in progress — 3/6.**
+> 41 questions across five clusters, 39 answered.
+> **Cluster 5 in progress — 4/6.**
 > **Cluster 3 ✅ CLOSED 2026-09-26, 9/9.**
 > **Cluster 2 ✅ CLOSED 2026-09-26, 10/10.**
 > **Cluster 4 ✅ CLOSED 2026-09-26, 8/8.**
@@ -2236,9 +2236,27 @@ what will be sent, and it shows something else.
    it as colours, typography, spacing and footer behaviour and says explicitly
    *"Design is not a template"*; there is no `DesignDB` table. This question
    does not change that, and the two should not be conflated later.
-4. **If a saved starting point exists and someone changes it, do existing
-   variants follow or stay?** *This is question 3.1 one level up, and the answer
-   should probably be the same shape.*
+4. ✅ **If a starting point changes, do existing variants follow or stay?**
+   **Resolution (2026-09-27): they stay, and there is nothing to decide —
+   question 5.3 determined it.** Recorded as a consequence rather than asked.
+
+   **A duplicate is a copy, not a reference.** `duplicate_campaign` writes new
+   rows; nothing links them to the source, so there is no path for a change to
+   travel along. Provenance exists only in the audit entry's
+   `source_campaign_id`, which is a record of what happened rather than a live
+   relationship.
+
+   **The question was premised on a template being a live object**, which
+   question 5.3 declined to create. Once a template is a variant you duplicate
+   from, "does the template's change propagate" has the same answer as "does
+   last week's newsletter change when I edit this week's" — no, and obviously
+   not.
+
+   **Worth noting it does *not* have the same shape as question 3.1**, which I
+   expected it would. A content record is genuinely shared — one row, many
+   references — so editing it reaches every unsent campaign, and 3.7 exists to
+   say how far. A template is copied, so it reaches nothing. **The distinction
+   is reference versus copy, and the two questions only looked alike.**
 5. **Can a manager copy a variant to another channel — "make a push version of
    this email"?** *Constraint: channel is fixed at creation and the two channels'
    modules come from different manifests, so a copy is not a copy — at best it
