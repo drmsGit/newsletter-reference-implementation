@@ -3,10 +3,10 @@ id: TASK-27
 title: >-
   the frontend is being built from the API surface, and nothing records what a
   manager actually does.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
-updated_date: '2026-09-27 14:20'
+updated_date: '2026-09-27 14:23'
 labels:
   - needs-adr
   - backend
@@ -28,4 +28,10 @@ ordinal: 102700
 Migrated 2026-09-27 from `docs/backlog.md` line 90, section "Bugs", position 27 in that section (top = do next). The description is the original entry, verbatim.
 
 2026-09-27: every Manager Workflow gap summarised here now has its own task — task-200 (self-approval), task-201 (required-field check), task-204 (stale resolve_audience docstring), task-205 to task-218 (MW requirements and gaps 2–20), task-219 (fields.json, with the Variant Editor gaps), task-231 (exclusion segment vs blocklist, Needs ADR). The interview session recommends closing this task now that the interview is closed; that is the user's call.
+
+Closed 2026-09-27. This entry's premise was that nothing in the repository recorded what a manager actually does, operationally. [[Manager Workflow - design interview]] closed 53/53 on 2026-09-24 and answered it: three ADRs (174, 175, 176), four dated addenda, and eighteen backend gaps that now each have their own task. Keeping this open would double-count work that lives in roughly twenty tasks.
+
+What it produced is not lost by closing it — the interview file is the record, and the gap tasks carry the file:line evidence.
+
+One thing it surfaced that is still open and is NOT tracked by the gap tasks: the product thesis it stated for the first time anywhere — that the manager's job is shifting from producing to deciding — is a positioning claim as much as a design one, and Gate 1 (`docs/business/POSITIONING.md`) has not moved.
 <!-- SECTION:NOTES:END -->

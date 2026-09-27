@@ -3,10 +3,10 @@ id: TASK-118
 title: >-
   Should the content catalogue's field set be the union of every module
   manifest's declared variables?
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:57'
-updated_date: '2026-09-27 14:20'
+updated_date: '2026-09-27 14:23'
 labels:
   - needs-adr
   - backend
@@ -26,4 +26,10 @@ ordinal: 300200
 Migrated 2026-09-27 from `docs/backlog.md` line 412, section "Needs ADR", position 2 in that section (top = do next). The description is the original entry, verbatim.
 
 2026-09-27: [[ADR-177 — A Field Is Defined Once, Required Per Module]] decides this question; the implementation is task-219. The interview session recommends marking this Done once task-219 exists — which it now does — so the thread from decision to implementation stays visible. Status change is the user's call.
+
+Closed 2026-09-27. This sat in the Needs-ADR band, whose semantics are 'blocked on a design decision'. [[ADR-177 — A Field Is Defined Once, Required Per Module]] makes that decision, so it is unblocked — which is what Done means in this section.
+
+The implementation is **task-219**, which exists; this was closed on that condition rather than on the ADR alone. 'The ADR is written' must not be read as 'the work is done', and the thread from decision to implementation runs through task-219, not through this entry.
+
+What ADR-177 settled: field definitions centralise in `storage/fields.json`; a module manifest keeps which fields it uses and `required` for each and stays a drop-in pair; the storage key stays an explicit name rather than being derived from concept and size, because a rename would silently orphan content in an unvalidated JSON column. `CONTENT_FIELD_GROUPS` and the CSV importer's duplicate collapse into the new file.
 <!-- SECTION:NOTES:END -->

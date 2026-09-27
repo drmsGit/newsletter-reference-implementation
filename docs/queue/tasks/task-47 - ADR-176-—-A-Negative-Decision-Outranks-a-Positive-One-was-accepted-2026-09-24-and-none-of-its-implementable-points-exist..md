@@ -6,11 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-09-27 14:22'
 labels:
   - backend
 dependencies: []
 type: bug
-ordinal: 104700
+ordinal: 100050
 ---
 
 ## Description
@@ -31,4 +32,12 @@ ordinal: 104700
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 132, section "Bugs", position 47 in that section (top = do next). The description is the original entry, verbatim.
+
+Moved to the top of Bugs on 2026-09-27 at the user's direction. Ordering in this queue records human priority decisions, which is why neither this session nor the migration session ranked it when it was created — it sat at the end of Bugs awaiting exactly this call.
+
+The reason it outranks: ADR-176 point 1 is accepted and unimplemented, so `resolve_audience` still computes `(include − exclude) ∪ pins` and an exclude block still cannot remove a hand-pinned recipient. The system does the thing an accepted decision says it must not, and that record's own argument for the precedence is that wrongly including is "the failure that reaches a supervisory authority rather than a retrospective". Point 4 (the `freeze` default) rides along but is not what makes this urgent.
+
+Sequence before anything that writes exclusion segments automatically: the ADR-142 §7 addendum routes system-written temporary suppression through them and expects them to win.
+
+Note for whoever takes it: task-204 fixes only the channel sentence in `resolve_audience`'s docstring. The rest of that docstring still documents the pre-ADR-176 precedence and is **accurate to the code until this task lands** — correcting it earlier would make it describe behaviour that does not exist.
 <!-- SECTION:NOTES:END -->
