@@ -30,14 +30,24 @@ line and its position in its old section.
 
 ## If you followed a link here
 
-**32 citations across the ADR set point at this path.** They are historical and
+**Citations across the ADR set point at this path.** They are historical and
 were deliberately left alone: an ADR records what was true when it was written,
 and rewriting those citations would edit dated records to match a later fact.
 
-If one sent you here, the entry it meant is a task now. Search for it:
+If one sent you here, the entry it meant is a task now — open or, more often
+for an ADR citation, finished. Search both folders; `backlog task list` and
+`backlog search` do not look in `completed/`:
 
 ```bash
-backlog task list --plain | grep -i "<a few words from the entry>"
+grep -rli "<a few words from the entry>" docs/queue/tasks docs/queue/completed
+```
+
+If the citation gives a line number, read that line as the file stood when the
+citation was written — the file's length changed a lot, so today's numbering
+will not match — then search for its words:
+
+```bash
+git show $(git rev-list -1 --before=<date written> HEAD):docs/backlog.md | sed -n '<line>p'
 ```
 
 ## The file itself
