@@ -16,8 +16,8 @@ source:
 > corrections from the user: *edit vs override* was promoted to a cluster of its
 > own, and the proposed "what a variant is for" cluster was **struck** because
 > [[ADR-021 — Variants Are Human Created Versions]] already settles it.
-> 41 questions across five clusters, 36 answered.
-> **Cluster 5 in progress — 1/6.**
+> 41 questions across five clusters, 37 answered.
+> **Cluster 5 in progress — 2/6.**
 > **Cluster 3 ✅ CLOSED 2026-09-26, 9/9.**
 > **Cluster 2 ✅ CLOSED 2026-09-26, 10/10.**
 > **Cluster 4 ✅ CLOSED 2026-09-26, 8/8.**
@@ -2149,10 +2149,52 @@ what will be sent, and it shows something else.
    the *fully personalised email* — per-recipient generation of envelope and
    editorial copy. An AI draft is one artefact a person reviews. Different
    things, and only the first is architecturally out of scope.
-2. **A weekly newsletter goes out every Thursday. What carries over from last
-   week?** The structure, the modules with their content cleared, the whole
-   thing including last week's content, or nothing? *This is the single most
-   common real workflow in email marketing and the model says nothing about it.*
+2. ✅ **A weekly newsletter goes out every Thursday. What carries over?**
+   **Resolution (2026-09-27): `LAYOUT` is the default, the envelope carries, and
+   `KEEP` must remain available.** The user: *"LAYOUT is default, envelope
+   carries; option to keep content necessary typically when duplicating variant
+   within a campaign (to create a/b/c testing variants or when there's a content
+   record that should only be available for a certain audience group)"*.
+
+   **The modes already exist and the existing reasoning holds.**
+   `backend/app/campaigns/duplication.py` defines three, with
+   `content_modes_for` deciding which are expressible: `KEEP` (reference the
+   same records, same brand only), `COPY` (duplicate the records, cross-brand
+   only) and `LAYOUT` (*"either — modules arrive unbound"*). Its docstring is
+   the argument: *"Referencing across brands would put a record in two brands;
+   copying inside one brand would fork the catalogue for no reason the schema
+   requires."*
+
+   **`LAYOUT` is right for the weekly case because the split falls along
+   question 1.8's line.** `module_data` copies as-is regardless of mode, so
+   `cms: false` modules keep their hand-typed copy — the footer, the CTA — while
+   `cms: true` modules come back unbound. **The furniture survives and the news
+   does not**, which is exactly the shape of a recurring newsletter.
+
+   **The envelope carries, and it is the one field where "copied as-is" and
+   "recipient-facing" overlap most dangerously.** After question 1.8 the
+   `header` module is `cms: false`, so `subject` and `preheader` live in
+   `module_data` and come with the copy — last week's subject line arrives in
+   this week's draft. Accepted because question 2.3 promoted the envelope to a
+   fixed area at the top of the composer: it is the first thing a manager sees,
+   not something buried in row 1 of a list. **The 2.3 decision is what makes
+   this safe**, which is worth noting as two decisions supporting each other
+   rather than one being lucky.
+
+   **`KEEP` is not a legacy option — it is the normal case for a different
+   workflow.** Duplicating a variant *within* a campaign wants everything
+   identical except the one thing under test, so `LAYOUT` would force a manager
+   to rebind every module and defeat the purpose. The user names two such cases:
+   **A/B/C test arms**, and **a variant carrying a content record meant for one
+   audience group**. The second touches the guaranteed-placement concept
+   `ContentOverrideDB`'s docstring already sets aside as separate from
+   overrides.
+
+   **Worth considering at build time, not decided here:** the user's own
+   observation implies the sensible default may be **context-sensitive** —
+   `KEEP` when duplicating within a campaign, `LAYOUT` when duplicating into a
+   new one. Recorded as a consequence of what was said rather than as a decision
+   taken.
 3. **Is a module stack ever saved as a reusable thing?** *Constraint: the
    reference data model describes **Design** as colours, typography, spacing and
    footer behaviour, and says explicitly **"Design is not a template"** — and
