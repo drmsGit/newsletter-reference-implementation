@@ -30,6 +30,12 @@
       "channel": "email",
       "type": "text"
     },
+    "button_label_hero": {
+      "concept": "button_label",
+      "channel": "email",
+      "type": "text",
+      "size": "hero"
+    },
     "button_url": {
       "concept": "button_url",
       "channel": "email",
@@ -39,6 +45,13 @@
       "concept": "headline",
       "channel": "email",
       "type": "text"
+    },
+    "headline_hero": {
+      "concept": "headline",
+      "channel": "email",
+      "type": "text",
+      "size": "hero",
+      "note": "The h1. Largest type in the email and usually over a background image, so it must be SHORT — shorter than headline_medium."
     },
     "headline_medium": {
       "concept": "headline",

@@ -1,15 +1,19 @@
 {
   "label": "Hero Banner",
   "channel": "email",
-  "description": "Full-width opening section with a headline and supporting text. Use as the first block of any newsletter.",
-  "cms": false,
+  "description": "Full-width opening block: the h1 and an optional call to action. Carries no body copy \u2014 editorial belongs to the editorial module, which is hand-typed (ADR-179).",
+  "cms": true,
   "variables": [
     {
-      "name": "headline",
+      "name": "headline_hero",
       "required": true
     },
     {
-      "name": "text",
+      "name": "button_label_hero",
+      "required": false
+    },
+    {
+      "name": "button_url",
       "required": false
     }
   ]

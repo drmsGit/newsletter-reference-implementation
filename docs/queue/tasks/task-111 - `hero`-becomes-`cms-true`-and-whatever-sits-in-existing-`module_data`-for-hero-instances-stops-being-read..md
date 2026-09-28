@@ -3,9 +3,10 @@ id: TASK-111
 title: >-
   `hero` becomes `cms: true` and whatever sits in existing `module_data` for
   hero instances stops being read.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-09-28 20:44'
 labels:
   - backend
 dependencies: []
@@ -23,4 +24,6 @@ ordinal: 206400
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 372, section "Features", position 64 in that section (top = do next). The description is the original entry, verbatim.
+
+Done 2026-09-28 with M1 step 6 — see task-219 for the full record.
 <!-- SECTION:NOTES:END -->

@@ -3127,16 +3127,18 @@ class TestFieldDefinitionsAreTheOneHome:
         field between channels or flips a module's `cms`, this fails, and it
         should.
 
-        **One change is already expected**: when ADR-179's hero flip lands,
-        `headline_hero` and `button_label_hero` join `email`. Add them then,
-        deliberately.
+        **That expected change has landed.** ADR-179's hero flip made `hero`
+        a `cms: true` module on 2026-09-28, so `headline_hero` and
+        `button_label_hero` joined `email` — added here deliberately, which is
+        what this test exists to force.
         """
         from app.content.service import content_field_groups
 
         assert content_field_groups() == {
             "email": (
-                "body_medium", "button_label", "button_url",
-                "headline_medium", "image_alt", "image_url",
+                "body_medium", "button_label", "button_label_hero",
+                "button_url", "headline_hero", "headline_medium",
+                "image_alt", "image_url",
             ),
             "push": (
                 "push_body", "push_image_url", "push_link", "push_title",

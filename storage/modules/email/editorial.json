@@ -1,0 +1,12 @@
+{
+  "label": "Editorial",
+  "channel": "email",
+  "description": "Body copy written for this email. Deliberately NOT catalogue-bound: editorial is written once for one send, and a catalogue of single-use records is not a catalogue (ADR-179).",
+  "cms": false,
+  "variables": [
+    {
+      "name": "text",
+      "required": true
+    }
+  ]
+}

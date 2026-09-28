@@ -3,10 +3,10 @@ id: TASK-219
 title: >-
   storage/fields.json per ADR-177 — CONTENT_FIELD_GROUPS and the CSV importer's
   duplicate collapse into it
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 14:20'
-updated_date: '2026-09-28 20:27'
+updated_date: '2026-09-28 20:44'
 labels:
   - backend
 dependencies: []
@@ -129,4 +129,22 @@ Returns the fields a content record can carry, each with its definition — `con
 Mutation-verified: returning every definition rather than the catalogue subset fails, and so does declaring the route after `/{content_id}`.
 
 **Remaining in M1:** step 5 (`richtext` — task-222) and step 6 (the hero rename, data migration and `cms` flip, plus the new editorial module). Step 6 is the only one that touches data.
+
+**Step 6 done 2026-09-28. M1 complete. 681 tests passing.**
+
+`hero` is `cms: true` and takes `headline_hero`, `button_label_hero` and the unsized `button_url`. It **drops `text`**, and a new `editorial` module carries body copy as `cms: false` — so editorial written for one send never becomes a single-use catalogue record, which is ADR-179 point 1's argument applied one module along. `text` was not orphaned by the drop; editorial took it.
+
+**The migration is Python, not SQL, and that is a departure worth naming.** Every migration beside it is a `.sql` file. This one reads a JSON column, creates rows in another table and invents no values — expressing that as `module_data ->> 'headline'` inside a string would have been right once and unreviewable afterwards.
+
+**Three cases, and only one was a migration.** Four heroes with `module_data` became content records carrying `headline_hero`, title from the headline and brand from module → variant → campaign. One of those also had `text`, and an `editorial` module was planted beside it rather than dropping the copy — losing it would have been the migration deciding the copy did not matter. One hero had neither and needed nothing.
+
+**Three heroes were already bound, and were left alone deliberately.** Their records carry the catalogue's medium-size fields and no `headline_hero`. Copying `headline_medium` across was considered and rejected: a hero headline sits over a background image and must be short, a medium one need not be, so the guess ships a headline that does not fit and nobody is told. **Verified rather than asserted:** in preview the check reports `hero.headline_hero`; in send mode those records raise `UnpublishedContentError` first, so the send is refused by the publication gate before it is refused by name. Both refuse. Only the second names the field, and the migration's output says so.
+
+**Idempotent, and proven by re-running** — a hero already carrying `headline_hero` is skipped, so a re-run after a partial apply finishes rather than duplicates.
+
+**A bug the dry run could not have caught.** `--apply` died with `NoReferencedTableError`: `content_records.brand_id` points at `brands`, SQLAlchemy resolves that at **flush** time, and the dry run never flushes. The brand models are now imported for that side effect, with a comment saying why.
+
+**The literal pin from step 3 did its job.** It failed the moment hero flipped, because `headline_hero` and `button_label_hero` joined the email group — exactly the change the test's own docstring predicted. Updated deliberately, which is what that test exists to force.
+
+**Verified end to end:** a migrated hero renders its headline, the planted editorial renders its text, and the bound-but-headline-less variant reports the gap in preview.
 <!-- SECTION:NOTES:END -->
