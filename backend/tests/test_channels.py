@@ -2197,8 +2197,23 @@ class TestEnvelopeFieldsLiveInAModule:
         planted.write_text(json.dumps({
             "label": "Planted", "channel": "push", "cms": False,
             "has_template": False,
-            "variables": [{"name": "push_subject", "envelope": True}],
+            "variables": [{"name": "push_subject"}],
         }))
+        # **The definition too, because that is now what adding a field means**
+        # (ADR-177). `envelope` moved to the definition file with the rest of
+        # what a field *is*; a manifest naming a field nothing defines is
+        # refused at discovery, so without this the planted module would simply
+        # not be offered and this test would pass for the wrong reason — it
+        # would prove that an undefined field is ignored, not that a declared
+        # envelope changes the answer.
+        original = registry.FIELDS_PATH.read_text()
+        doc = json.loads(original)
+        doc["fields"]["push_subject"] = {
+            "concept": "push_subject", "channel": "push",
+            "type": "text", "envelope": True,
+        }
+        registry.FIELDS_PATH.write_text(json.dumps(doc, indent=2) + "\n")
+        registry.field_definitions.cache_clear()
         try:
             registry._registry_mtime = None
             assert registry.envelope_module_type("push") == f"{PREFIX}_envelope", (
@@ -2208,6 +2223,8 @@ class TestEnvelopeFieldsLiveInAModule:
             )
         finally:
             planted.unlink(missing_ok=True)
+            registry.FIELDS_PATH.write_text(original)
+            registry.field_definitions.cache_clear()
             registry._registry_mtime = None
         assert registry.envelope_module_type("push") is None
 
@@ -3088,3 +3105,99 @@ class TestARequiredFieldIsCheckedBeforeASendFires:
         )
         db.refresh(send)
         assert send.status == "draft", "refused before anything was sent"
+
+
+class TestFieldDefinitionsAreTheOneHome:
+    """`storage/fields.json` — ADR-177 and its 2026-09-28 addendum."""
+
+    def test_the_declared_channel_reproduces_the_hardcoded_table_exactly(self):
+        """**The proof that makes collapsing `CONTENT_FIELD_GROUPS` safe.**
+
+        That table is the PATCH merge authority — *a caller may only clear what
+        it was offering* — so getting it wrong means editing a record with push
+        switched off erases the push copy. It turns out to be, identically,
+        'the fields of `cms: true` modules grouped by channel'. Asserting the
+        equality here means any later difference is a mistake in the definition
+        file rather than a judgement call, and the collapse can be made without
+        touching `merge_content_fields` on faith.
+
+        Note it groups by the **declared** channel, not by the directory the
+        module sits in. Those agree today by construction; this is what catches
+        it when they stop.
+        """
+        from pathlib import Path
+
+        from app.content.service import CONTENT_FIELD_GROUPS
+        from app.modules import registry
+
+        derived: dict[str, set[str]] = {}
+        for channel_dir in Path(registry.MODULES_DIR).iterdir():
+            if not channel_dir.is_dir():
+                continue
+            for manifest in registry.list_manifests(channel_dir.name):
+                if not manifest.cms:
+                    continue
+                for var in manifest.variables:
+                    derived.setdefault(var.channel, set()).add(var.name)
+
+        assert derived == {
+            channel: set(fields) for channel, fields in CONTENT_FIELD_GROUPS.items()
+        }, (
+            "the definition file no longer reproduces CONTENT_FIELD_GROUPS. "
+            "Collapsing that table into it would change which fields a PATCH "
+            "may clear, which is how push copy gets erased silently"
+        )
+
+    def test_a_manifest_naming_an_undefined_field_is_not_offered(self, tmp_path):
+        """Fail closed, and cost only that module.
+
+        `MisfiledManifestError` stops everything, because a misfiled manifest
+        offers a module on a channel that cannot render it. An undefined field
+        is the other case `_discover` already distinguishes — a typo costs that
+        one module — so the registry keeps working and the module is absent.
+        """
+        import json
+
+        from app.modules import registry
+
+        planted = registry.MODULES_DIR / "email" / f"{PREFIX}_undefined.json"
+        planted.write_text(json.dumps({
+            "label": "Names a field nothing defines", "channel": "email",
+            "cms": False, "has_template": False,
+            "variables": [{"name": "a_field_that_is_not_defined_anywhere"}],
+        }))
+        try:
+            registry._registry_mtime = None
+            names = [m.name for m in registry.list_manifests("email")]
+            assert f"{PREFIX}_undefined" not in names, (
+                "a module whose field has no definition cannot be labelled, "
+                "grouped, typed or assigned a channel, so it must not be offered"
+            )
+            assert "hero" in names, "one bad manifest must not take the rest down"
+        finally:
+            planted.unlink(missing_ok=True)
+            registry._registry_mtime = None
+
+    def test_every_declared_variable_has_a_definition(self):
+        """The file must cover the static modules too, not only catalogue ones.
+
+        `fields.json` is a strictly larger set than the catalogue's fields: a
+        `cms: false` module still names variables, and a name with no
+        definition is refused. Building the file from 'what a content record
+        can carry' would silently un-offer `header` and `cta`.
+        """
+        from pathlib import Path
+
+        from app.modules import registry
+
+        defined = set(registry.field_definitions())
+        assert defined, "no definitions loaded"
+        for channel_dir in Path(registry.MODULES_DIR).iterdir():
+            if not channel_dir.is_dir():
+                continue
+            for manifest in registry.list_manifests(channel_dir.name):
+                for var in manifest.variables:
+                    assert var.name in defined, (
+                        f"{channel_dir.name}/{manifest.name} names {var.name!r}, "
+                        "which storage/fields.json does not define"
+                    )

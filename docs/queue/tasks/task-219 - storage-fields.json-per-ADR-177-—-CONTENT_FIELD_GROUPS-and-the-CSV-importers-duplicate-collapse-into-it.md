@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 14:20'
-updated_date: '2026-09-28 19:30'
+updated_date: '2026-09-28 19:40'
 labels:
   - backend
 dependencies: []
@@ -83,4 +83,20 @@ So the table is, identically, *the fields of `cms: true` modules grouped by chan
 **(2) The riskiest step becomes verifiable instead of brave.** `merge_content_fields` exists to prevent silent data loss on PATCH, and the plan was to pin its behaviour before touching it. Better: after building `fields.json` with declared channels, assert that the derived `{channel: cms-true fields}` equals today's `CONTENT_FIELD_GROUPS` **exactly**. It does now, so any difference is a mistake in the new file rather than a judgement call — the collapse is provably lossless before the merge rule is touched at all.
 
 **Expected change after ADR-179's hero flip:** `headline_hero` and `button_label_hero` join the email catalogue set, since hero becomes `cms: true`. That is the one intended difference, and the equality assertion above should be written to expect it rather than be surprised by it.
+
+**Step 2 built 2026-09-28: `storage/fields.json` exists and the registry reads it. 669 tests passing, up from 666.** `CONTENT_FIELD_GROUPS` is untouched — this step only establishes the proof that makes touching it safe.
+
+16 definitions, one per declared variable across both channels, each carrying `concept`, `channel`, `type` and — where they apply — `size`, `envelope`, `note`. `ModuleVariable` gains those five from the file; the manifest still supplies only `name` and `required`.
+
+**The equality proof is now a test.** `test_the_declared_channel_reproduces_the_hardcoded_table_exactly` groups the `cms: true` modules' fields by their **declared** channel and asserts the result equals `CONTENT_FIELD_GROUPS` exactly. It does. So the collapse in step 3 can be made without touching `merge_content_fields` on faith, and any later difference is a mistake in the definition file rather than a judgement call. Mutation-verified: making the code fall back to the module's directory fails it.
+
+**Fail-closed, and it costs one module rather than everything.** A manifest naming an undefined field raises `UndefinedFieldError` at discovery. `_discover` already draws this distinction — `MisfiledManifestError` is re-raised because a misfiled manifest offers a module on a channel that cannot render it, while everything else is swallowed with a warning because a typo costs that one module. An undefined field is the second kind. Mutation-verified.
+
+**`fields.json` is strictly larger than the catalogue's field set**, and a test pins it: a `cms: false` module still names variables, so building the file from *what a content record can carry* would silently stop offering `header` and `cta`.
+
+**A pre-existing test had to change, and the reason is the point.** `test_the_declaration_is_what_decides_not_a_hardcoded_name` plants a push manifest declaring an envelope field. It now has to plant the **definition** too, because that is what adding a field means under ADR-177 — otherwise the planted module is refused and the test passes for the wrong reason, proving that an undefined field is ignored rather than that a declared envelope changes the answer.
+
+**Two things deliberately not done here.** The manifests still carry their inline `label`, read as a fallback so an unstripped manifest keeps working; stripping them belongs with the `note` split. And the six `note` values are carried verbatim from those labels — *'Preheader (inbox preview)'* is a label plus guidance, and separating them is a judgement rather than a migration.
+
+**Still to do in M1:** steps 3 (collapse `CONTENT_FIELD_GROUPS` and the CSV importer's `CONTENT_KEYS`), 4 (`GET /content/fields`, which does not exist), 5 (`richtext` — task-222), 6 (the hero rename, migration and flag flip, plus the new editorial module).
 <!-- SECTION:NOTES:END -->

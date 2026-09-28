@@ -19,6 +19,7 @@ no longer matters whether they start to.
 """
 
 import json
+from functools import lru_cache
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -34,6 +35,23 @@ class MisfiledManifestError(Exception):
     Raised rather than logged, and at discovery rather than at render: the
     alternative is a manager being offered a module whose renderer will not
     take it. Same fail-closed idiom as an unmapped write route.
+    """
+
+
+class UndefinedFieldError(Exception):
+    """A manifest names a field that `storage/fields.json` does not define.
+
+    Raised rather than defaulted, and at discovery rather than at render: the
+    alternative is a manager being offered a module whose fields nothing can
+    describe. ADR-177 makes the definition file the one home for what a field
+    *is*, which only works if a reference to a name it does not carry is an
+    error rather than a shrug.
+
+    **Unlike `MisfiledManifestError` this is not fatal**, and the difference is
+    the one `_discover` already draws: a misfiled manifest offers a module on a
+    channel that cannot render it, so it must stop everything, while an
+    undefined field costs that one module. It is swallowed with a warning and
+    the module is simply not offered.
     """
 
 
@@ -57,6 +75,18 @@ class ModuleVariable:
     #: code reads the declaration.
     envelope: bool = False
 
+    #: From `storage/fields.json` (ADR-177). Not declared per module — a
+    #: field's definition was never a property of any one module that uses it,
+    #: which is the whole argument of that record.
+    concept: str | None = None
+    size: str | None = None
+    type: str = "text"
+    note: str | None = None
+    #: **Declared, never derived from the directory a module sits in** —
+    #: ADR-177's 2026-09-28 addendum. `CONTENT_FIELD_GROUPS` is the consumer
+    #: that makes this load-bearing rather than descriptive.
+    channel: str | None = None
+
 
 @dataclass
 class ModuleManifest:
@@ -72,6 +102,55 @@ class ModuleManifest:
     #: module manifest = fields and limits; channel = cardinality.
     has_template: bool = True
     variables: list[ModuleVariable] = field(default_factory=list)
+
+
+FIELDS_PATH = MODULES_DIR.parent / "fields.json"
+
+
+@lru_cache(maxsize=1)
+def field_definitions() -> dict[str, dict]:
+    """`storage/fields.json`, or `{}` when it is absent.
+
+    Absent is tolerated and an undefined *reference* is not: a repository
+    without the file yet still starts, while a manifest naming a field the file
+    does not carry is refused. That asymmetry is deliberate — the first is a
+    state this migration passes through, the second is a mistake.
+    """
+    if not FIELDS_PATH.exists():
+        logger.warning("field definitions not found: %s", FIELDS_PATH)
+        return {}
+    return json.loads(FIELDS_PATH.read_text()).get("fields", {})
+
+
+def _variable(declared: dict, json_path: Path) -> ModuleVariable:
+    """One manifest entry plus its definition.
+
+    The manifest supplies `name` and `required`; everything else comes from
+    `fields.json`. An inline `label` is still read so a manifest that has not
+    been stripped yet keeps working, but the definition wins — two sources that
+    disagree is the condition ADR-177 exists to end.
+    """
+    name = declared["name"]
+    defs = field_definitions()
+    if defs and name not in defs:
+        raise UndefinedFieldError(
+            f"{json_path} declares a field {name!r} that storage/fields.json "
+            "does not define. Add the definition, or correct the name — a "
+            "field with no definition cannot be labelled, grouped, typed or "
+            "assigned to a channel."
+        )
+    spec = defs.get(name, {})
+    return ModuleVariable(
+        name=name,
+        required=declared.get("required", True),
+        label=declared.get("label"),
+        envelope=bool(spec.get("envelope", declared.get("envelope", False))),
+        concept=spec.get("concept"),
+        size=spec.get("size"),
+        type=spec.get("type", "text"),
+        note=spec.get("note"),
+        channel=spec.get("channel"),
+    )
 
 
 def _load_manifest(json_path: Path, channel: str) -> ModuleManifest:
@@ -94,13 +173,7 @@ def _load_manifest(json_path: Path, channel: str) -> ModuleManifest:
         cms=data.get("cms", False),
         has_template=data.get("has_template", True),
         variables=[
-            ModuleVariable(
-                name=v["name"],
-                required=v.get("required", True),
-                label=v.get("label"),
-                envelope=v.get("envelope", False),
-            )
-            for v in data.get("variables", [])
+            _variable(v, json_path) for v in data.get("variables", [])
         ],
     )
 
