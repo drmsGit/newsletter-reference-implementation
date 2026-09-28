@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.auth.service import ensure_default_brand
 from app.database import SessionLocal  # noqa: E402
+from app.content.service import content_field_groups  # noqa: E402
 from app.content.db_models import (  # noqa: E402
     CategoryDB,
     ContentCategoryAssignmentDB,
@@ -30,14 +31,14 @@ from app.content.db_models import (  # noqa: E402
 
 # Keys copied verbatim from the CSV into ContentRecordDB.content (the JSON blob
 # the email modules read). Optional ones are omitted when the cell is empty.
-CONTENT_KEYS = (
-    "headline_medium",
-    "body_medium",
-    "button_label",
-    "button_url",
-    "image_url",
-    "image_alt",
-)
+#
+# **Derived since 2026-09-28.** This was a hand-kept copy of the email half of
+# `CONTENT_FIELD_GROUPS`, and the two could disagree — a field added to the
+# catalogue was silently unimportable until somebody remembered this file.
+# Both now read `storage/fields.json` (ADR-177), so a new email content field
+# becomes importable by existing, which is the only way a duplicate stays
+# correct: by not being one.
+CONTENT_KEYS = content_field_groups()["email"]
 REQUIRED_COLUMNS = {"title", "headline_medium", "body_medium", "categories"}
 
 

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 14:20'
-updated_date: '2026-09-28 19:40'
+updated_date: '2026-09-28 19:59'
 labels:
   - backend
 dependencies: []
@@ -99,4 +99,18 @@ So the table is, identically, *the fields of `cms: true` modules grouped by chan
 **Two things deliberately not done here.** The manifests still carry their inline `label`, read as a fallback so an unstripped manifest keeps working; stripping them belongs with the `note` split. And the six `note` values are carried verbatim from those labels — *'Preheader (inbox preview)'* is a label plus guidance, and separating them is a judgement rather than a migration.
 
 **Still to do in M1:** steps 3 (collapse `CONTENT_FIELD_GROUPS` and the CSV importer's `CONTENT_KEYS`), 4 (`GET /content/fields`, which does not exist), 5 (`richtext` — task-222), 6 (the hero rename, migration and flag flip, plus the new editorial module).
+
+**Step 3 done 2026-09-28: `CONTENT_FIELD_GROUPS` and the CSV importer's `CONTENT_KEYS` both collapsed. 670 tests passing, up from 669.**
+
+`content_field_groups()` derives the map from the registry: the fields of `cms: true` modules, grouped by their **declared** channel. The old table's own docstring had asked for this — *when that list exists, this table should read from it rather than repeat it* — and ADR-177 made the list.
+
+`CONTENT_KEYS` in `backend/scripts/import_content_csv.py` now reads the email group. It was a hand-kept copy of half the table, so a field added to the catalogue was **silently unimportable** until somebody remembered that file. `REQUIRED_COLUMNS` is deliberately left alone: it overlaps on two names but states which CSV *columns* are mandatory, which is a different claim from which keys get copied.
+
+**The proof became a literal pin.** The equality test compared the derived groups against `CONTENT_FIELD_GROUPS`; with the table gone, comparing the function to itself would assert nothing, so the six email and four push names are now written out in the test. A change to `storage/fields.json` that moves a field between channels or flips a module's `cms` fails it — and the one expected change is noted in the test: `headline_hero` and `button_label_hero` join `email` when ADR-179's hero flip lands.
+
+**A mutation run found that 'declared, never derived' was decoration.** Swapping the declared channel for the module's directory changed no result and failed no test, because the two agree by construction. That is the addendum's rule being unenforced — a later refactor could quietly go back to reading the directory. `test_the_declared_channel_wins_over_the_directory` now plants a field defined as `email` on a module sitting in `push/` and asserts the declared channel wins. Artificial on purpose: only a disagreement can show which source the code consults. The mutation now fails.
+
+**Also caught:** including `cms: false` modules in the groups, and ignoring which groups a caller offered — the second breaks five tests, which is the guard against a PATCH erasing push copy doing its job.
+
+**Process note:** I lost the step-2 registry work earlier by using `git checkout` to undo a mutation, against the standing rule never to `git checkout` a file with uncommitted work. Every mutation in this step restored from a `/tmp` copy.
 <!-- SECTION:NOTES:END -->

@@ -35,7 +35,7 @@ class ContentPatch(BaseModel):
     title: str | None = None
     description: str | None = None
     content: dict[str, Any] = {}
-    #: Names from `content.service.CONTENT_FIELD_GROUPS` — "email", "push".
+    #: Names from `content.service.content_field_groups()` — "email", "push".
     groups: list[str] = []
 
 

@@ -83,7 +83,7 @@ class ModuleVariable:
     type: str = "text"
     note: str | None = None
     #: **Declared, never derived from the directory a module sits in** —
-    #: ADR-177's 2026-09-28 addendum. `CONTENT_FIELD_GROUPS` is the consumer
+    #: ADR-177's 2026-09-28 addendum. `content_field_groups()` is the consumer
     #: that makes this load-bearing rather than descriptive.
     channel: str | None = None
 

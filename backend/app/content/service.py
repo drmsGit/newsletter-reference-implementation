@@ -85,27 +85,45 @@ def get_content_record(
 CONTENT_STATUSES = ("active", "inactive")
 
 
-#: The channel field groups a caller can claim authority over.
-#:
-#: **A caller may only clear what it was offering.** That is the whole rule,
-#: and it exists because an absent field and a cleared one are indistinguishable
-#: otherwise: a screen rendered with push switched off sends no push fields, and
-#: rebuilding `content` from what arrived would erase push copy on every edit
-#: made while push was off. The Jinja form carries the same signal as
-#: `channel_sections_present`; the JSON plane carries it as `groups`.
-#:
-#: Declared here rather than derived from the channel manifests, which is where
-#: it belongs and is not cheap today: the manifests describe modules and their
-#: templates, not a flat list of the content keys a channel reads. When that
-#: list exists, this table should read from it rather than repeat it.
-CONTENT_FIELD_GROUPS: dict[str, tuple[str, ...]] = {
-    "email": (
-        "headline_medium", "body_medium",
-        "button_label", "button_url",
-        "image_url", "image_alt",
-    ),
-    "push": ("push_title", "push_body", "push_image_url", "push_link"),
-}
+def content_field_groups() -> dict[str, tuple[str, ...]]:
+    """The channel field groups a caller can claim authority over.
+
+    **A caller may only clear what it was offering.** That is the whole rule,
+    and it exists because an absent field and a cleared one are
+    indistinguishable otherwise: a screen rendered with push switched off sends
+    no push fields, and rebuilding `content` from what arrived would erase push
+    copy on every edit made while push was off. The Jinja form carries the same
+    signal as `channel_sections_present`; the JSON plane carries it as `groups`.
+
+    **Derived, as of 2026-09-28 — this was a hardcoded table and the docstring
+    said where it belonged.** It read: *"Declared here rather than derived from
+    the channel manifests, which is where it belongs and is not cheap today …
+    when that list exists, this table should read from it rather than repeat
+    it."* [[ADR-177]] made that list, so it does.
+
+    A field is a catalogue field when at least one `cms: true` module reads it —
+    a definition nobody had written down until the collapse forced it. The
+    grouping is by the field's **declared** channel, never by the directory its
+    module sits in (ADR-177's 2026-09-28 addendum).
+
+    The old table and this function returned identical results at the moment of
+    the change, on both channels, and a test pins the values literally so a
+    later edit to `storage/fields.json` cannot move them unnoticed.
+    """
+    from pathlib import Path
+
+    from app.modules.registry import MODULES_DIR, list_manifests
+
+    groups: dict[str, set[str]] = {}
+    for channel_dir in sorted(p for p in Path(MODULES_DIR).iterdir() if p.is_dir()):
+        for manifest in list_manifests(channel_dir.name):
+            if not manifest.cms:
+                continue
+            for var in manifest.variables:
+                if var.channel:
+                    groups.setdefault(var.channel, set()).add(var.name)
+    return {channel: tuple(sorted(names)) for channel, names in groups.items()}
+
 
 #: Groups where an EMPTY value means "remove the key", not "store an empty one".
 #:
@@ -139,11 +157,12 @@ def merge_content_fields(
     """
     merged = dict(existing or {})
     for group in groups:
-        fields = CONTENT_FIELD_GROUPS.get(group)
+        known = content_field_groups()
+        fields = known.get(group)
         if fields is None:
             raise ValueError(
                 f"'{group}' is not a content field group. Known groups: "
-                f"{', '.join(sorted(CONTENT_FIELD_GROUPS))}."
+                f"{', '.join(sorted(known))}."
             )
         presence_significant = group in PRESENCE_SIGNIFICANT_GROUPS
         for name in fields:

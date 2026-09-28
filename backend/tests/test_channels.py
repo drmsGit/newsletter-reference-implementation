@@ -3110,43 +3110,89 @@ class TestARequiredFieldIsCheckedBeforeASendFires:
 class TestFieldDefinitionsAreTheOneHome:
     """`storage/fields.json` — ADR-177 and its 2026-09-28 addendum."""
 
-    def test_the_declared_channel_reproduces_the_hardcoded_table_exactly(self):
-        """**The proof that makes collapsing `CONTENT_FIELD_GROUPS` safe.**
+    def test_the_groups_are_exactly_what_the_hardcoded_table_held(self):
+        """**The pin that survived the table it was proving.**
 
-        That table is the PATCH merge authority — *a caller may only clear what
-        it was offering* — so getting it wrong means editing a record with push
-        switched off erases the push copy. It turns out to be, identically,
-        'the fields of `cms: true` modules grouped by channel'. Asserting the
-        equality here means any later difference is a mistake in the definition
-        file rather than a judgement call, and the collapse can be made without
-        touching `merge_content_fields` on faith.
+        Until 2026-09-28 this asserted the derived groups equalled
+        `CONTENT_FIELD_GROUPS`, which was the proof that collapsing that
+        hardcoded table into `storage/fields.json` changed nothing. The table
+        is gone, so the values are written out literally here instead — the
+        anchor has to live somewhere, and a test that compared the function to
+        itself would assert nothing.
 
-        Note it groups by the **declared** channel, not by the directory the
-        module sits in. Those agree today by construction; this is what catches
-        it when they stop.
+        These groups are the PATCH merge authority: *a caller may only clear
+        what it was offering*. Getting them wrong means editing a record with
+        push switched off erases the push copy, silently, on every edit. So a
+        change here is never incidental — if `storage/fields.json` moves a
+        field between channels or flips a module's `cms`, this fails, and it
+        should.
+
+        **One change is already expected**: when ADR-179's hero flip lands,
+        `headline_hero` and `button_label_hero` join `email`. Add them then,
+        deliberately.
         """
-        from pathlib import Path
+        from app.content.service import content_field_groups
 
-        from app.content.service import CONTENT_FIELD_GROUPS
+        assert content_field_groups() == {
+            "email": (
+                "body_medium", "button_label", "button_url",
+                "headline_medium", "image_alt", "image_url",
+            ),
+            "push": (
+                "push_body", "push_image_url", "push_link", "push_title",
+            ),
+        }
+
+    def test_the_declared_channel_wins_over_the_directory(self):
+        """**The test that makes "declared" mean something.**
+
+        Written after a mutation run: swapping the declared channel for the
+        module's directory changed no result and failed no test, because the
+        two agree by construction today. That makes ADR-177's addendum —
+        *declared, never derived from the directory a module sits in* —
+        decoration rather than a rule, and a later refactor could quietly go
+        back to reading the directory.
+
+        So: a field defined as `email`, used by a module sitting in `push/`.
+        The group it lands in has to be the declared one. The arrangement is
+        artificial on purpose — the point is which source the code consults,
+        and only a disagreement can show that.
+        """
+        import json
+
+        from app.content.service import content_field_groups
         from app.modules import registry
 
-        derived: dict[str, set[str]] = {}
-        for channel_dir in Path(registry.MODULES_DIR).iterdir():
-            if not channel_dir.is_dir():
-                continue
-            for manifest in registry.list_manifests(channel_dir.name):
-                if not manifest.cms:
-                    continue
-                for var in manifest.variables:
-                    derived.setdefault(var.channel, set()).add(var.name)
+        planted = registry.MODULES_DIR / "push" / f"{PREFIX}_crosschannel.json"
+        original = registry.FIELDS_PATH.read_text()
+        doc = json.loads(original)
+        doc["fields"][f"{PREFIX}_crossfield"] = {
+            "concept": "crossfield", "channel": "email", "type": "text",
+        }
+        registry.FIELDS_PATH.write_text(json.dumps(doc, indent=2) + "\n")
+        registry.field_definitions.cache_clear()
+        planted.write_text(json.dumps({
+            "label": "Sits in push, field declares email", "channel": "push",
+            "cms": True, "has_template": False,
+            "variables": [{"name": f"{PREFIX}_crossfield"}],
+        }))
+        try:
+            registry._registry_mtime = None
+            groups = content_field_groups()
 
-        assert derived == {
-            channel: set(fields) for channel, fields in CONTENT_FIELD_GROUPS.items()
-        }, (
-            "the definition file no longer reproduces CONTENT_FIELD_GROUPS. "
-            "Collapsing that table into it would change which fields a PATCH "
-            "may clear, which is how push copy gets erased silently"
-        )
+            assert f"{PREFIX}_crossfield" in groups.get("email", ()), (
+                "the field declares email and landed somewhere else — the "
+                "grouping is reading the directory, not the declaration"
+            )
+            assert f"{PREFIX}_crossfield" not in groups.get("push", ()), (
+                "it followed the module's directory, which is exactly what "
+                "ADR-177's addendum refuses"
+            )
+        finally:
+            planted.unlink(missing_ok=True)
+            registry.FIELDS_PATH.write_text(original)
+            registry.field_definitions.cache_clear()
+            registry._registry_mtime = None
 
     def test_a_manifest_naming_an_undefined_field_is_not_offered(self, tmp_path):
         """Fail closed, and cost only that module.
