@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 14:20'
-updated_date: '2026-09-28 19:25'
+updated_date: '2026-09-28 19:30'
 labels:
   - backend
 dependencies: []
@@ -62,4 +62,25 @@ Logged 2026-09-27 from the "What Cluster N produced" sections of the two design 
 **Order of operations.** (1) `ModuleVariableOut` exposes the full descriptor — independent, ships alone, unblocks composer work. (2) `fields.json` + the registry reading it. (3) `CONTENT_FIELD_GROUPS` and the CSV importer's `CONTENT_KEYS` read from it. (4) `GET /content/fields`, which **does not exist**. (5) the `richtext` type replacing `_RICH_TEXT_FIELD` — task-222. (6) the hero rename, migration and flag flip, plus the new editorial module.
 
 **Risks.** `merge_content_fields` is the dangerous one — its whole job is preventing silent data loss on PATCH, so pin *editing with push off does not erase push* **before** touching it. The CSV importer's `REQUIRED_COLUMNS` overlaps `CONTENT_KEYS`; collapsing one without the other leaves a half-duplicate. **Unverified:** whether any content record already carries a key no manifest declares — if so, a `fields.json` built from the manifests orphans it invisibly, which is the exact failure ADR-177 cites for derived keys. Check before writing the file, not after.
+
+**Orphaned-key check, run 2026-09-28 before writing anything. Clean, and it found a free proof.**
+
+**No orphans.** 161 content records carry 11 distinct keys, and **every one is declared by some manifest**. So a `fields.json` built from the manifests loses nothing — the failure ADR-177 cites for derived keys does not exist in this data. Check it again against a real adopter's database before assuming it generalises.
+
+**Five variables are declared and never stored:** `subject`, `preheader`, `label`, `url`, `text`. Those are exactly the fields of the modules ADR-179 keeps `cms: false` — `header`, `cta`, and hero's doomed `text`. **The data already drew the line that record drew**, independently: fields belonging only to hand-typed modules have never been in the catalogue, because nothing ever put them there.
+
+**The finding that changes the risk: `CONTENT_FIELD_GROUPS` is provably a duplicate, not approximately one.**
+
+```
+email  cms:true module fields  == CONTENT_FIELD_GROUPS['email']   exact match
+push   cms:true module fields  == CONTENT_FIELD_GROUPS['push']    exact match
+```
+
+So the table is, identically, *the fields of `cms: true` modules grouped by channel*. Two consequences:
+
+**(1) The catalogue's field set has a definition nobody had written down** — a field is a catalogue field when at least one `cms: true` module reads it. That is what `GET /content/fields` should expose, and it is a **narrower set than `fields.json`**, which must contain every declared variable including the static modules' — otherwise a manifest references a name with no definition, which is the fail-closed discovery error ADR-177's addendum describes. The ADR does not draw this distinction and the implementation must.
+
+**(2) The riskiest step becomes verifiable instead of brave.** `merge_content_fields` exists to prevent silent data loss on PATCH, and the plan was to pin its behaviour before touching it. Better: after building `fields.json` with declared channels, assert that the derived `{channel: cms-true fields}` equals today's `CONTENT_FIELD_GROUPS` **exactly**. It does now, so any difference is a mistake in the new file rather than a judgement call — the collapse is provably lossless before the merge rule is touched at all.
+
+**Expected change after ADR-179's hero flip:** `headline_hero` and `button_label_hero` join the email catalogue set, since hero becomes `cms: true`. That is the one intended difference, and the equality assertion above should be written to expect it rather than be surprised by it.
 <!-- SECTION:NOTES:END -->
