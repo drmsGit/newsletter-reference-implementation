@@ -120,6 +120,62 @@ A client that scanned manifests for `envelope: true` itself would be a third cop
 - **Scope, stated because the interview grouped these differently.** Questions 1.8 and 2.9 from the same cluster — catalogue binding by topical signal, and the record-level machine-ready assertion — are decisions about *content records*, not about the field model, and belong in a separate record. They are not folded in here.
 - **`docs/playbook-strategy.md` carries no decision-log entry for this interview.** The log ends 2026-09-24 and the interview closed 2026-09-27, so the reasoning behind this record lives in [[Variant Editor - design interview]] rather than in the playbook. The absence is a sequencing gap, not a sign the decision was unargued.
 
+## Addendum 2026-09-28 — a field declares its channel, and a size is not a length
+
+Two things the final-design pass for this record's implementation found
+missing. Neither changes the Decision; both complete it.
+
+**1. `fields.json` declares `channel` per field. Point 7 said
+`CONTENT_FIELD_GROUPS` collapses into the file and did not say how.** That
+table is `{channel: fields}` and this file is flat, so the mapping had nowhere
+to go — and it is load-bearing rather than cosmetic: it is the PATCH merge
+authority, *"a caller may only clear what it was offering"*, and losing it
+means editing a record with push switched off erases the push copy.
+
+Deriving the channel from which modules use a field was refused, because
+modules are filed per channel and that is reading the module manifests for
+channel — the thing the user ruled out on 2026-09-22. **Declaring is not
+deriving**: an explicit `channel` on the field definition is precisely the
+*"channel info in the backend"* that ruling asked for, in one file rather than
+inferred from a directory layout. `PRESENCE_SIGNIFICANT_GROUPS`
+(`backend/app/content/service.py:122`) is channel-keyed for the same reason and
+gets the same home.
+
+So the descriptor in point 3 gains a seventh attribute:
+
+| Attribute | Purpose |
+|---|---|
+| `channel` | which channel reads this field. Declared, never derived from where a module sits |
+
+**2. A size is not a point on a length scale, and the vocabulary must not imply
+one.** Point 5 says a size's vocabulary depends on the type — lengths for text,
+aspect ratios for images. That is right and it is not enough, because within
+text the names still read as an ordering, and the ordering is wrong.
+
+`hero` is the case that proves it. A hero headline is the largest type in an
+email and usually sits over a background image, so it must be **short** —
+shorter than `headline_medium`, which sits in a 50:50 block. A vocabulary of
+`short / medium / long` invites a reader to assume `hero` belongs somewhere on
+that line. It does not. **A size names a rendering context, and the amount of
+text it wants is a property of that context rather than of the name's position
+in a sequence.**
+
+This is why sizes are separate fields rather than limits on one field
+(question 2.7): the same content record carries a short hero headline and a
+longer medium one, and neither is a truncation of the other.
+
+**Consequences for the implementation, recorded so they are not rediscovered.**
+`hero` adopts `headline_hero` and `button_label_hero` and **drops its `text`
+field**; the editorial becomes a module of its own rather than a field on the
+hero, so that editorial copy stays hand-typed and does not fill the catalogue
+with single-use records — the same argument
+[[ADR-179 — What Enters the Catalogue, and What a Machine May Take From It]]
+point 1 makes about a call to action. **That keeps `hero` a plain `cms: true`
+module**, so ADR-179's flip does not depend on the unresolved "`cms` is a
+boolean and cannot express a mixture" gap. The button's URL stays the unsized
+`button_url`, following point 5: a button's label is sized text and its URL is
+not, so they are two concepts.
+
 ## Related ADRs
 
 ### Depends On

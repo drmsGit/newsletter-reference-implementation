@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 14:20'
+updated_date: '2026-09-28 19:25'
 labels:
   - backend
 dependencies: []
@@ -47,4 +48,18 @@ Related: task-118 (📋, the question this implements).
 
 <!-- SECTION:NOTES:BEGIN -->
 Logged 2026-09-27 from the "What Cluster N produced" sections of the two design interviews, each gap re-verified against the code that day. The plan was reviewed and approved by the session that ran the interviews. Parked: not yet ranked by anyone.
+
+**Final-design pass, 2026-09-28. Two decisions taken, one premise of mine corrected, one dependency ruled out.**
+
+**The blocker was a hole in ADR-177 point 7.** It said `CONTENT_FIELD_GROUPS` collapses into `fields.json` without saying how the channel grouping survives — that table is `{channel: fields}` and the file is flat. It is not cosmetic: it is the PATCH merge authority, *a caller may only clear what it was offering*, so losing it means editing a record with push switched off erases the push copy. **Settled: `fields.json` declares `channel` per field.** Deriving it from which modules use the field was refused, because modules are filed per channel and that is reading the manifests for channel — the 2026-09-22 ruling. Declaring is not deriving. `PRESENCE_SIGNIFICANT_GROUPS` gets the same home. Written up as a dated addendum to ADR-177.
+
+**A size is not a point on a length scale**, and the same addendum records it. `hero` proves it: the largest type in an email, usually over a background image, so it must be **shorter** than `headline_medium`, which sits in a 50:50 block. `short / medium / long` invites the wrong mental model — a size names a rendering context, and how much text that context wants is a property of the context, not of the name's position in a sequence.
+
+**My 'inventing a title and brand per row' warning was wrong.** Measured: 8 hero instances — one already bound to a content record, five with `module_data` like `{'headline': 'Edition 2'}`, one with headline **and** text, one with nothing at all. `title` comes from the existing headline and `brand_id` from module → variant → campaign. **Nothing is invented.** The empty one needs nothing; it becomes an unbound cms module, which ADR-086 hides and task-201's check correctly ignores. **The migration must carry the instance that has `text`** rather than assume every hero is headline-only.
+
+**The dependency that was almost created, and is not.** Hero's fields are `headline_hero` and `button_label_hero`; it **drops `text`**, and the editorial becomes a module of its own. Had hero kept a hand-typed body beside catalogue fields it would have been a **mixed module**, which needs VE-14 — `cms` is a boolean and the renderer branches on it — so M1 would have been blocked on the gap the interview called the one to look at twice. It is not. The button's URL stays the unsized `button_url`, per ADR-177 point 5.
+
+**Order of operations.** (1) `ModuleVariableOut` exposes the full descriptor — independent, ships alone, unblocks composer work. (2) `fields.json` + the registry reading it. (3) `CONTENT_FIELD_GROUPS` and the CSV importer's `CONTENT_KEYS` read from it. (4) `GET /content/fields`, which **does not exist**. (5) the `richtext` type replacing `_RICH_TEXT_FIELD` — task-222. (6) the hero rename, migration and flag flip, plus the new editorial module.
+
+**Risks.** `merge_content_fields` is the dangerous one — its whole job is preventing silent data loss on PATCH, so pin *editing with push off does not erase push* **before** touching it. The CSV importer's `REQUIRED_COLUMNS` overlaps `CONTENT_KEYS`; collapsing one without the other leaves a half-duplicate. **Unverified:** whether any content record already carries a key no manifest declares — if so, a `fields.json` built from the manifests orphans it invisibly, which is the exact failure ADR-177 cites for derived keys. Check before writing the file, not after.
 <!-- SECTION:NOTES:END -->
