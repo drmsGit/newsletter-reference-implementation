@@ -109,6 +109,27 @@ def describe(db: Session, payload: dict, *, brand_id: int) -> ActionDescription:
 
     warnings = []
     blocked_reason = None
+
+    # ADR-174 point 3. Advisory here — `send_send_instance` refuses on its own,
+    # because a disabled button is a courtesy and not a control — but the
+    # reviewer is the person who can fix it, so they are the person to tell.
+    from app.rendering.service import missing_required_fields
+    from app.snapshots.db_models import SnapshotDB
+
+    snapshot = db.query(SnapshotDB).filter(
+        SnapshotDB.id == send_instance.snapshot_id
+    ).first()
+    if snapshot is not None:
+        gaps = missing_required_fields(db, snapshot.variant_id)
+        if gaps:
+            named = ", ".join(f"{kind}.{field}" for _, kind, field in gaps[:4])
+            more = f" and {len(gaps) - 4} more" if len(gaps) > 4 else ""
+            blocked_reason = (
+                f"Required content is missing: {named}{more}. Sending would put "
+                "an empty field in front of a recipient, so this is refused "
+                "rather than warned about."
+            )
+
     if send_instance.status in ("sending", "sent"):
         # Not a warning: `send_send_instance` refuses this outright, so
         # approving can only produce a failed request. Saying so and disabling

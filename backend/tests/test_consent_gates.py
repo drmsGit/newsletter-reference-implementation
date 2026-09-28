@@ -181,15 +181,65 @@ def db():
             # happened the first time a push campaign was built by hand.
             from app.campaigns.db_models import VariantDB
 
-            snapshot = (
+            # **And a SENDABLE one.** Same lesson as the channel filter above,
+            # arriving a second time: ADR-174 point 3's required-field check
+            # refuses a send whose variant would render an empty required
+            # field, and four of the dev database's fourteen variants do — a
+            # `cta` with no label pointing nowhere. Taking "the newest email
+            # snapshot" would make these consent tests fail for a rendering
+            # reason, which is exactly the confusion the channel filter exists
+            # to prevent. Picking the newest *complete* one keeps the fixture
+            # about consent.
+            from app.rendering.service import missing_required_fields
+
+            snapshot = None
+            for candidate in (
                 self.session.query(SnapshotDB)
                 .join(VariantDB, VariantDB.id == SnapshotDB.variant_id)
                 .filter(VariantDB.channel == "email")
                 .order_by(SnapshotDB.id.desc())
-                .first()
-            )
+                .limit(50)
+                .all()
+            ):
+                if not missing_required_fields(self.session, candidate.variant_id):
+                    snapshot = candidate
+                    break
             if snapshot is None:
-                pytest.skip("no email snapshot in this database to send from")
+                # **Build one rather than skip.** An earlier version of this
+                # filter skipped, which silently stopped five real consent
+                # tests from running — a worse outcome than the failure it was
+                # avoiding. The required-field gate gets to refuse; it does not
+                # get to quietly delete coverage of something else.
+                #
+                # Zero modules is deliberate: a variant with none declares no
+                # required fields, so it passes the gate without dragging in
+                # the module and storage path this fixture's docstring is at
+                # pains to avoid. These tests assert who is excluded, never
+                # what the mail says.
+                from app.campaigns.db_models import CampaignDB
+                from app.snapshots.service import INLINE_LOCATION
+
+                brand = ensure_default_brand(self.session)
+                campaign = CampaignDB(
+                    brand_id=brand.id, name=f"consent-gate-{uuid.uuid4()}",
+                )
+                self.session.add(campaign)
+                self.session.flush()
+                variant = VariantDB(
+                    campaign_id=campaign.id, channel="email",
+                    name="consent-gate fixture", status="draft",
+                )
+                self.session.add(variant)
+                self.session.flush()
+                snapshot = SnapshotDB(
+                    variant_id=variant.id,
+                    artifact_storage_type="inline",
+                    artifact_location=INLINE_LOCATION,
+                    artifact_size=0,
+                    render_context={},
+                )
+                self.session.add(snapshot)
+                self.session.flush()
 
             send_instance = SendInstanceDB(
                 snapshot_id=snapshot.id,

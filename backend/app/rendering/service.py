@@ -346,17 +346,25 @@ def render_cms_module(
     return html, decision_resolution
 
 
-def render_static_module(
+def static_module_variables(
     db: Session,
     module: ModuleInstanceDB,
     manifest: ModuleManifest,
-    channel: str,
     mode: RenderMode = "preview",
-) -> str:
-    html_source = get_template_html(channel, module.module_type)
-    if html_source is None:
-        return render_unknown_module(module)
+) -> dict:
+    """A static module's declared variables, filled — the `cms: false` twin of
+    `resolve_module_variables`, and **no formatting of any kind**.
 
+    Extracted from `render_static_module` on 2026-09-28 so the pre-send
+    required-field check can ask what a module *would* render without
+    rendering it. The extraction is the point rather than a tidy-up: a check
+    that rebuilt this merge itself would drift from what actually ships, which
+    is the failure `CONTENT_FIELD_GROUPS` documents about its own duplicate.
+
+    The precedence is unchanged — `module_data`, then a fill from the linked
+    content record where `module_data` is sparse, then an active field override
+    on top ([[ADR-041]]).
+    """
     variables = dict(module.module_data or {})
 
     # If module_data is sparse, fill missing required variables from the
@@ -376,6 +384,22 @@ def render_static_module(
         for name, value in override.field_overrides.items():
             variables[name] = value
 
+    return variables
+
+
+def render_static_module(
+    db: Session,
+    module: ModuleInstanceDB,
+    manifest: ModuleManifest,
+    channel: str,
+    mode: RenderMode = "preview",
+) -> str:
+    html_source = get_template_html(channel, module.module_type)
+    if html_source is None:
+        return render_unknown_module(module)
+
+    variables = static_module_variables(db, module, manifest, mode=mode)
+
     rendered = _jinja.from_string(html_source).render(**variables)
 
     return (
@@ -383,6 +407,88 @@ def render_static_module(
         f"{rendered}\n"
         f"</div>"
     )
+
+
+# ---------------------------------------------------------------------------
+# Pre-send checks
+# ---------------------------------------------------------------------------
+
+def missing_required_fields(
+    db: Session, variant_id: int, mode: RenderMode = "send"
+) -> list[tuple[int, str, str]]:
+    """Required fields that would render empty, for the modules whose content
+    does not depend on who receives it.
+
+    Returns `(module_id, module_type, field_name)`, empty when nothing is
+    missing. [[ADR-174]] point 3: *a required-field check runs before a send
+    fires, this is not optional and it does not exist today* — an empty
+    `push_title` ships to a real device and the first party to learn is the
+    recipient.
+
+    **Deliberately only the deterministic half.** A slot-bound module resolves
+    per recipient inside the send loop, so whether one of its required fields
+    is empty is a different question with a different answer per person, and
+    refusing a thousand-recipient send because one person's pick lacks a field
+    would be absurd. That case is a per-recipient skip, not a block, and it
+    belongs to the "nothing meaningful" rule this deliberately does not touch.
+
+    **An unbound module is not a finding, and that falls out rather than being
+    special-cased.** It resolves to no content at all, so it declares no filled
+    variables to test — which is the same answer the Manager Workflow interview
+    reached for it independently: report it, never block on it.
+
+    **It asks the render path rather than reimplementing it.** `cms` modules go
+    through `resolve_module_variables` and static ones through
+    `static_module_variables`, which are the functions that actually produce
+    what ships. A second implementation of the merge would eventually disagree
+    with the first, and the disagreement would be invisible until a send went
+    out wrong.
+    """
+    from app.campaigns.db_models import ModuleInstanceDB, VariantDB
+
+    variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
+    if variant is None:
+        return []
+
+    modules = (
+        db.query(ModuleInstanceDB)
+        .filter(ModuleInstanceDB.variant_id == variant_id)
+        .order_by(ModuleInstanceDB.position)
+        .all()
+    )
+
+    missing: list[tuple[int, str, str]] = []
+    for module in modules:
+        if module.decision_slot_id is not None:
+            continue  # per-recipient; see the docstring
+
+        manifest = get_manifest(variant.channel, module.module_type)
+        if manifest is None:
+            continue  # an unknown module renders a comment and declares nothing
+
+        try:
+            if manifest.cms:
+                variables, _, _ = resolve_module_variables(
+                    db=db, module=module, manifest=manifest, recipient_id=None, mode=mode,
+                )
+                if variables is None:
+                    continue  # nothing bound — not a finding
+            else:
+                variables = static_module_variables(db, module, manifest, mode=mode)
+        except UnpublishedContentError:
+            # A different gate's job, and it is already closed:
+            # `create_snapshot_for_variant` refuses to freeze a variant whose
+            # content has never been published, so such a variant cannot reach
+            # a send at all. Reporting it here as a missing field would name
+            # the wrong cause — the fields may be perfectly well filled on a
+            # draft nobody has frozen yet.
+            continue
+
+        for var in manifest.variables:
+            if var.required and not str(variables.get(var.name, "") or "").strip():
+                missing.append((module.id, module.module_type, var.name))
+
+    return missing
 
 
 def render_unknown_module(module: ModuleInstanceDB) -> str:

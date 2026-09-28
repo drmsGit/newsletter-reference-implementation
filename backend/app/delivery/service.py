@@ -606,6 +606,40 @@ def send_send_instance(
             f"SendInstance {send_instance_id} is already {send_instance.status} — refusing to send again"
         )
 
+    # **ADR-174 point 3, and this is the enforcement rather than the courtesy.**
+    # `send_fire.describe()` shows the same finding so the reviewer can fix it,
+    # but a disabled button is not a control: an orchestrator calls this
+    # directly and `process_due_scheduled_sends` calls it on a timer.
+    #
+    # **Before the status transition, deliberately.** The first version of this
+    # sat after the snapshot lookup, which is after the line below — and a
+    # refused send was left stranded in "sending", unsendable and unretryable,
+    # which is the defect `docs/queue` already records about this transition
+    # being committed ahead of fallible preflight steps. A new check must not
+    # add to it.
+    #
+    # Before the loop, not inside it: these modules do not depend on who
+    # receives the mail, so the answer is the same for every recipient. The
+    # per-recipient half — a slot that resolved, for one person, to content
+    # missing a field — is a skip rather than a block and is deliberately not
+    # here.
+    from app.rendering.service import missing_required_fields
+    from app.snapshots.db_models import SnapshotDB as _Snapshot
+
+    _snapshot = db.query(_Snapshot).filter(
+        _Snapshot.id == send_instance.snapshot_id
+    ).first()
+    if _snapshot is not None:
+        gaps = missing_required_fields(db, _snapshot.variant_id)
+        if gaps:
+            named = ", ".join(f"{kind}.{field}" for _, kind, field in gaps)
+            raise ValueError(
+                f"Variant {_snapshot.variant_id} is missing required content "
+                f"({named}), so this send is refused. An empty required field "
+                "reaches the recipient with nothing in it, and the first party "
+                "to notice is them."
+            )
+
     send_instance.status = "sending"
     db.commit()
 

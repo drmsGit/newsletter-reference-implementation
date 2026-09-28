@@ -2977,3 +2977,114 @@ class TestATestSendShowsWhatWouldActuallyBeSent:
         assert "DRAFT-headline" not in captured["body"], (
             "the test send mailed the unpublished draft — this is mode='preview'"
         )
+
+
+class TestARequiredFieldIsCheckedBeforeASendFires:
+    """ADR-174 point 3: *not optional, and it does not exist today*.
+
+    `resolve_module_variables` defaults a missing field to `""`, so before this
+    an empty `push_title` reached a real device and the first party to notice
+    was the recipient. The check is the deterministic half only — a slot-bound
+    module resolves per recipient inside the send loop, and refusing a
+    thousand-recipient send because one person's pick lacks a field would be
+    absurd. That half is a skip, not a block, and lives elsewhere.
+    """
+
+    def _variant_with(self, db, module_type, module_data, channel="email"):
+        from app.campaigns.db_models import CampaignDB, ModuleInstanceDB, VariantDB
+        from app.auth.service import ensure_default_brand
+
+        campaign = CampaignDB(
+            brand_id=ensure_default_brand(db).id, name=f"{PREFIX}{_name("rf")}",
+        )
+        db.add(campaign); db.flush()
+        variant = VariantDB(
+            campaign_id=campaign.id, channel=channel,
+            name=f"{PREFIX}{_name("rf")}", status="draft",
+        )
+        db.add(variant); db.flush()
+        db.add(ModuleInstanceDB(
+            variant_id=variant.id, module_type=module_type, position=0,
+            module_data=module_data,
+        ))
+        db.flush()
+        return variant
+
+    def test_an_empty_required_field_is_reported(self, db):
+        from app.rendering.service import missing_required_fields
+
+        variant = self._variant_with(db, "cta", {"label": "", "url": ""})
+
+        gaps = missing_required_fields(db, variant.id)
+
+        assert {field for _, _, field in gaps} == {"label", "url"}, (
+            "cta declares label and url required; both are empty"
+        )
+
+    def test_a_filled_module_reports_nothing(self, db):
+        from app.rendering.service import missing_required_fields
+
+        variant = self._variant_with(db, "cta", {"label": "Book", "url": "/x"})
+
+        assert missing_required_fields(db, variant.id) == []
+
+    def test_whitespace_is_not_a_value(self, db):
+        from app.rendering.service import missing_required_fields
+
+        variant = self._variant_with(db, "cta", {"label": "   ", "url": "/x"})
+
+        assert [f for _, _, f in missing_required_fields(db, variant.id)] == ["label"], (
+            "a space is what somebody types to get past a check, not content"
+        )
+
+    def test_an_optional_field_is_never_reported(self, db):
+        from app.rendering.service import missing_required_fields
+
+        # `header` declares subject and preheader, both optional.
+        variant = self._variant_with(db, "header", {})
+
+        assert missing_required_fields(db, variant.id) == []
+
+    def test_an_unbound_module_is_not_a_finding(self, db):
+        """Interview Q1.4 reached this independently: report it, never block.
+
+        It falls out rather than being special-cased — an unbound cms module
+        resolves to no content, so it declares no filled variables to test.
+        """
+        from app.rendering.service import missing_required_fields
+
+        variant = self._variant_with(db, "img_left", None)
+
+        assert missing_required_fields(db, variant.id) == []
+
+    def test_the_send_refuses_rather_than_shipping_a_blank(self, db):
+        from app.delivery.db_models import SendInstanceDB
+        from app.delivery.service import send_send_instance
+        from app.snapshots.db_models import SnapshotDB
+        from app.snapshots.service import INLINE_LOCATION
+        from app.auth.service import ensure_default_brand
+        import pytest as _pytest
+
+        brand = ensure_default_brand(db)
+        variant = self._variant_with(db, "cta", {"label": "", "url": ""})
+        snapshot = SnapshotDB(
+            variant_id=variant.id, artifact_storage_type="inline",
+            artifact_location=INLINE_LOCATION, artifact_size=0, render_context={},
+        )
+        db.add(snapshot); db.flush()
+        send = SendInstanceDB(
+            snapshot_id=snapshot.id, brand_id=brand.id,
+            name=f"{PREFIX}{_name("rf")}", status="draft", provider="mock",
+        )
+        db.add(send); db.flush(); db.commit()
+
+        with _pytest.raises(ValueError) as caught:
+            send_send_instance(db, send.id, brand_id=brand.id)
+
+        assert "missing required content" in str(caught.value)
+        assert "cta.label" in str(caught.value), (
+            "the message names the field, because the reviewer is the person "
+            "who can fix it"
+        )
+        db.refresh(send)
+        assert send.status == "draft", "refused before anything was sent"

@@ -490,11 +490,51 @@ class TestTheSendAction:
         from app.approvals.actions import send_fire
         from app.delivery.db_models import SendInstanceDB
 
-        draft = db.query(SendInstanceDB).filter(
+        from app.rendering.service import missing_required_fields
+        from app.snapshots.db_models import SnapshotDB
+
+        # **A draft whose variant is complete.** `describe()` now also blocks on
+        # a missing required field (ADR-174 point 3), and most drafts in a dev
+        # database are unfinished — so "the first draft" would fail this test
+        # for the very reason the test is not about, and the assertion would
+        # read as "blocked_reason is always set" when it is not.
+        draft = None
+        for candidate in db.query(SendInstanceDB).filter(
             SendInstanceDB.status == "draft"
-        ).first()
+        ).limit(50).all():
+            snapshot = db.query(SnapshotDB).filter(
+                SnapshotDB.id == candidate.snapshot_id
+            ).first()
+            if snapshot and not missing_required_fields(db, snapshot.variant_id):
+                draft = candidate
+                break
         if draft is None:
-            pytest.skip("no draft send instance in this database")
+            # Build one rather than skip: skipping would delete the only guard
+            # that `blocked_reason` is not always set, which is the whole point
+            # of the test. A variant with no modules declares no required
+            # fields, so it passes the gate without a module or storage path.
+            from app.campaigns.db_models import CampaignDB, VariantDB
+            from app.snapshots.service import INLINE_LOCATION
+
+            brand = ensure_default_brand(db)
+            campaign = CampaignDB(brand_id=brand.id, name=f"draft-{uuid.uuid4()}")
+            db.add(campaign); db.flush()
+            variant = VariantDB(
+                campaign_id=campaign.id, channel="email",
+                name="not-blocked fixture", status="draft",
+            )
+            db.add(variant); db.flush()
+            snapshot = SnapshotDB(
+                variant_id=variant.id, artifact_storage_type="inline",
+                artifact_location=INLINE_LOCATION, artifact_size=0,
+                render_context={},
+            )
+            db.add(snapshot); db.flush()
+            draft = SendInstanceDB(
+                snapshot_id=snapshot.id, brand_id=brand.id,
+                name=f"not-blocked-{uuid.uuid4()}", status="draft", provider="mock",
+            )
+            db.add(draft); db.flush()
 
         assert send_fire.describe(db, {"send_instance_id": draft.id}, brand_id=ensure_default_brand(db).id).blocked_reason is None
 
