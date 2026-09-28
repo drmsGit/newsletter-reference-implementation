@@ -3,6 +3,23 @@ from datetime import datetime
 from typing import Any
 
 
+class ContentField(BaseModel):
+    """One field a content record can carry — ADR-177's descriptor.
+
+    `required` is absent on purpose: it belongs to *(module, field)*, so a
+    client asking "must I fill this?" has to name a module and ask `GET
+    /modules`. Reporting one answer here would be reporting the wrong one.
+    """
+
+    name: str
+    concept: str | None = None
+    size: str | None = None
+    type: str = "text"
+    note: str | None = None
+    channel: str | None = None
+    envelope: bool = False
+
+
 class ContentRecord(BaseModel):
     id: int
     title: str

@@ -1062,3 +1062,74 @@ class TestTheShellCanReadAndChangeItsBrand:
             assert response.status_code == 403, response.text
             assert "may not grant" in response.json()["detail"] or "person" in \
                 response.json()["detail"].lower()
+
+
+class TestTheContentFieldsRoute:
+    """`GET /content/fields` — ADR-177 point 8, the client is given answers."""
+
+    def test_it_is_not_swallowed_by_the_content_id_route(self, db):
+        """FastAPI matches in declaration order, and `/{content_id}` is a
+        sibling. Declared after it, this path is read as an id and answers 422.
+        A 200 here is the whole assertion; the shape is tested below."""
+        with signed_in(db) as (client, _, _):
+            response = client.get("/content/fields")
+
+        assert response.status_code == 200, response.text
+
+    def test_it_returns_only_what_a_content_record_can_carry(self, db):
+        """The catalogue's fields, not every definition.
+
+        `storage/fields.json` also defines the `cms: false` modules' variables
+        — `subject`, `preheader`, `label`, `url`. A content record carrying
+        those would hold copy nothing reads, because a static module takes its
+        values from `module_data`.
+        """
+        with signed_in(db) as (client, _, _):
+            names = {f["name"] for f in client.get("/content/fields").json()}
+
+        assert "headline_medium" in names and "push_title" in names
+        assert not (names & {"subject", "preheader", "label", "url", "text"}), (
+            "a field only hand-typed modules read is not a catalogue field"
+        )
+
+    def test_each_field_carries_its_definition(self, db):
+        with signed_in(db) as (client, _, _):
+            fields = {f["name"]: f for f in client.get("/content/fields").json()}
+
+        assert fields["headline_medium"]["concept"] == "headline"
+        assert fields["headline_medium"]["size"] == "medium"
+        assert fields["headline_medium"]["channel"] == "email"
+        assert fields["push_link"]["type"] == "url"
+        assert fields["push_title"]["note"] == "Notification title"
+
+    def test_required_is_absent_on_purpose(self, db):
+        """It belongs to *(module, field)*.
+
+        One module demands `body_medium` and another never mentions it, so the
+        catalogue has no single truth to report — and reporting one would be
+        reporting the wrong one. A client asking "must I fill this?" has to name
+        a module and ask `GET /modules`.
+        """
+        with signed_in(db) as (client, _, _):
+            fields = client.get("/content/fields").json()
+
+        assert fields and all("required" not in f for f in fields)
+
+    def test_the_names_agree_with_the_merge_groups(self, db):
+        """The route and the PATCH authority must describe one catalogue.
+
+        If they drift, a client offers a field it may then not clear — which is
+        how push copy gets erased, from the other direction.
+        """
+        from app.content.service import content_field_groups
+
+        with signed_in(db) as (client, _, _):
+            fields = client.get("/content/fields").json()
+
+        by_channel: dict[str, set[str]] = {}
+        for field in fields:
+            by_channel.setdefault(field["channel"], set()).add(field["name"])
+
+        assert by_channel == {
+            channel: set(names) for channel, names in content_field_groups().items()
+        }

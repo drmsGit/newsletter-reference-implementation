@@ -140,6 +140,40 @@ def content_field_groups() -> dict[str, tuple[str, ...]]:
 PRESENCE_SIGNIFICANT_GROUPS = frozenset({"push"})
 
 
+def catalogue_fields() -> list[dict]:
+    """Every field a content record can usefully carry, with its definition.
+
+    **A subset of `storage/fields.json`, not all of it**, and the distinction
+    matters: that file defines every variable any module names, including the
+    `cms: false` ones — `subject`, `preheader`, `label`, `url`. A content record
+    carrying those would be filling in copy nothing ever reads, because a static
+    module takes its values from `module_data`. So the catalogue's fields are
+    the ones at least one `cms: true` module reads, which is the same rule
+    `content_field_groups()` applies and the same one the hardcoded table
+    encoded before either existed.
+
+    `required` is deliberately absent. It is a property of *(module, field)*
+    ([[ADR-177]]) — one module demands `body_medium` and another never mentions
+    it — so the catalogue has no single truth to report and the composer asks
+    `GET /modules` instead.
+    """
+    from pathlib import Path
+
+    from app.modules.registry import MODULES_DIR, field_definitions, list_manifests
+
+    in_catalogue: set[str] = set()
+    for channel_dir in sorted(p for p in Path(MODULES_DIR).iterdir() if p.is_dir()):
+        for manifest in list_manifests(channel_dir.name):
+            if manifest.cms:
+                in_catalogue.update(v.name for v in manifest.variables)
+
+    defined = field_definitions()
+    return [
+        {"name": name, **defined.get(name, {})}
+        for name in sorted(in_catalogue)
+    ]
+
+
 def merge_content_fields(
     existing: dict | None, incoming: dict, *, groups: list[str],
 ) -> dict:

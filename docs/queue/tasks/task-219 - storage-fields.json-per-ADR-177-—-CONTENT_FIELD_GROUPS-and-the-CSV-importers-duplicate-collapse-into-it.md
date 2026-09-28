@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 14:20'
-updated_date: '2026-09-28 19:59'
+updated_date: '2026-09-28 20:27'
 labels:
   - backend
 dependencies: []
@@ -113,4 +113,20 @@ So the table is, identically, *the fields of `cms: true` modules grouped by chan
 **Also caught:** including `cms: false` modules in the groups, and ignoring which groups a caller offered — the second breaks five tests, which is the guard against a PATCH erasing push copy doing its job.
 
 **Process note:** I lost the step-2 registry work earlier by using `git checkout` to undo a mutation, against the standing rule never to `git checkout` a file with uncommitted work. Every mutation in this step restored from a `/tmp` copy.
+
+**Step 4 done 2026-09-28: `GET /content/fields` exists. 675 tests passing, up from 670.**
+
+Returns the fields a content record can carry, each with its definition — `concept`, `size`, `type`, `note`, `channel`, `envelope`.
+
+**It returns a subset of `storage/fields.json`, not all of it, and ADR-177 point 7 is loose about this.** That point says the route *reads fields.json*; the file also defines the `cms: false` modules' variables — `subject`, `preheader`, `label`, `url`, `text` — and a content record carrying those would hold copy nothing ever reads, because a static module takes its values from `module_data`. So the route exposes the ten fields at least one `cms: true` module reads. Same rule as `content_field_groups()`, and the same one the hardcoded table encoded before either existed.
+
+**`required` is absent on purpose** and a test pins its absence. It is a property of *(module, field)* — one module demands `body_medium` and another never mentions it — so the catalogue has no single truth to report, and reporting one would be reporting the wrong one. A client asking *must I fill this?* names a module and asks `GET /modules`.
+
+**Declared before `/{content_id}`, which is correctness rather than style.** FastAPI matches in declaration order, so after it the path is read as a content id and answers 422. Mutation-verified by moving the route below its sibling.
+
+**A test pins the route against the merge groups**, because they must describe one catalogue: if they drift, a client offers a field it may then not clear, which is how push copy gets erased from the other direction.
+
+Mutation-verified: returning every definition rather than the catalogue subset fails, and so does declaring the route after `/{content_id}`.
+
+**Remaining in M1:** step 5 (`richtext` — task-222) and step 6 (the hero rename, data migration and `cms` flip, plus the new editorial module). Step 6 is the only one that touches data.
 <!-- SECTION:NOTES:END -->

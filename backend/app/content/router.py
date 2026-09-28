@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import working_brand
 from app.database import get_db
 from app.content.models import (
+    ContentField,
     ContentRecord,
     ContentCreate,
     Category,
@@ -18,6 +19,7 @@ from app.content.models import (
     ContentPatch,
 )
 from app.content.service import (
+    catalogue_fields,
     merge_content_fields,
     list_content_records,
     get_content_record,
@@ -84,6 +86,23 @@ def delete_category_record(
     if not deleted:
         raise HTTPException(status_code=404, detail="Category not found")
     return {"status": "deleted"}
+
+
+@router.get("/fields", response_model=list[ContentField])
+def get_content_fields():
+    """The fields a content record can carry, with what each one is.
+
+    **Declared before `/{content_id}`, and that is not style.** FastAPI matches
+    in declaration order, so after it this path would be read as a content id
+    and answer 422.
+
+    Derived rather than stored, which is the point of [[ADR-177]]: the client is
+    given the answer instead of the manifests to work it out from. The client
+    must not rebuild this — a second implementation of "which fields exist" in
+    another language is how the two stop agreeing, which is the defect
+    `CONTENT_FIELD_GROUPS` documented about its own duplicate for months.
+    """
+    return [ContentField(**field) for field in catalogue_fields()]
 
 
 @router.get("/{content_id}", response_model=ContentRecord)
