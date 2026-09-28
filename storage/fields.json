@@ -22,7 +22,7 @@
     "body_medium": {
       "concept": "body",
       "channel": "email",
-      "type": "text",
+      "type": "richtext",
       "size": "medium"
     },
     "button_label": {

@@ -76,7 +76,15 @@ class PushRenderer(ChannelRenderer):
                     for var in manifest.variables
                 }
 
-            fields.update(variables)
+            # **Strip rather than emit** — task-222, interview Q2.5. A
+            # `richtext` field carries `**bold**` and `[label](url)`, which an
+            # operating system renders as the characters they are. Stripping is
+            # part of formatting for this channel, not a degradation of it, and
+            # it is done here rather than left to the accident that push
+            # happens not to use the field email formats.
+            from app.rendering.service import strip_rich_text
+
+            fields.update(strip_rich_text(variables, manifest))
             break
 
         return RenderedArtifact(

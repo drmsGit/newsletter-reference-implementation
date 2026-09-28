@@ -3247,3 +3247,127 @@ class TestFieldDefinitionsAreTheOneHome:
                         f"{channel_dir.name}/{manifest.name} names {var.name!r}, "
                         "which storage/fields.json does not define"
                     )
+
+
+class TestRichTextFollowsTheDeclaredType:
+    """Task-222 / interview Q2.5. The constant named one field; the type is
+    declared once and every field carrying it is formatted."""
+
+    def test_a_richtext_field_is_formatted(self):
+        from app.modules.registry import ModuleManifest, ModuleVariable
+        from app.rendering.service import apply_rich_text
+
+        manifest = ModuleManifest(
+            name="m", channel="email", label="", description="", cms=True,
+            variables=[ModuleVariable(name="body_medium", type="richtext")],
+        )
+
+        out = apply_rich_text({"body_medium": "a **bold** word"}, manifest)
+
+        assert "<strong>bold</strong>" in str(out["body_medium"])
+
+    def test_any_field_carrying_the_type_is_formatted_not_one_named_one(self):
+        """**The test the hardcoded constant would fail.**
+
+        `_RICH_TEXT_FIELD = "body_medium"` meant `body_long` — which ADR-177's
+        size vocabulary requires — would have rendered literal asterisks with
+        nobody told. Asserting only that `body_medium` works passes against the
+        constant too, so this uses a different name.
+        """
+        from app.modules.registry import ModuleManifest, ModuleVariable
+        from app.rendering.service import apply_rich_text
+
+        manifest = ModuleManifest(
+            name="m", channel="email", label="", description="", cms=True,
+            variables=[ModuleVariable(name="body_long", type="richtext")],
+        )
+
+        out = apply_rich_text({"body_long": "a **bold** word"}, manifest)
+
+        assert "<strong>bold</strong>" in str(out["body_long"])
+
+    def test_a_plain_text_field_is_left_alone(self):
+        from app.modules.registry import ModuleManifest, ModuleVariable
+        from app.rendering.service import apply_rich_text
+
+        manifest = ModuleManifest(
+            name="m", channel="email", label="", description="", cms=True,
+            variables=[ModuleVariable(name="headline_medium", type="text")],
+        )
+
+        out = apply_rich_text({"headline_medium": "a **bold** word"}, manifest)
+
+        assert out["headline_medium"] == "a **bold** word", (
+            "formatting a plain field would put markup in a headline"
+        )
+
+    def test_push_strips_rather_than_emits(self):
+        """The rule that was previously true only by accident of layout.
+
+        The paths diverged before the constant was read and push happened to
+        use `push_body`, so nothing enforced it. A declared type any channel can
+        use removes the accident.
+        """
+        from app.modules.registry import ModuleManifest, ModuleVariable
+        from app.rendering.service import strip_rich_text
+
+        manifest = ModuleManifest(
+            name="notification", channel="push", label="", description="",
+            cms=True,
+            variables=[ModuleVariable(name="push_body", type="richtext")],
+        )
+
+        out = strip_rich_text(
+            {"push_body": "read **this** and [that](https://x.test)"}, manifest,
+        )
+
+        assert out["push_body"] == "read this and that", (
+            "an operating system renders markup as the characters it is made "
+            "of, so a notification would show asterisks and brackets"
+        )
+
+    def test_the_push_renderer_actually_strips(self, db, campaign):
+        """**Through the renderer, not the helper.**
+
+        Written after a mutation run: deleting the strip from the push renderer
+        failed nothing, because the test above exercises `strip_rich_text`
+        directly. The wiring is otherwise unexercised — no push field is
+        declared `richtext` today, so the strip is a no-op in practice and a
+        missing call would sit there until one was.
+
+        So the declaration is planted for the length of the test, which is what
+        it would take for the rule to matter at all.
+        """
+        import json
+
+        from app.modules import registry
+        from app.rendering.service import render_variant
+
+        original = registry.FIELDS_PATH.read_text()
+        doc = json.loads(original)
+        doc["fields"]["push_body"]["type"] = "richtext"
+        registry.FIELDS_PATH.write_text(json.dumps(doc, indent=2) + "\n")
+        registry.field_definitions.cache_clear()
+        registry._registry_mtime = None
+        try:
+            variant, _ = TestEachChannelRendersItsOwnShape()._push_variant_with_content(
+                db, campaign,
+                push_body="read **this** and [that](https://x.test)",
+            )
+            artifact = render_variant(db, variant.id, mode="preview")
+
+            assert artifact.fields["push_body"] == "read this and that", (
+                "markup reached a notification payload. An operating system "
+                "renders it as the characters it is made of, so the recipient "
+                "sees asterisks and brackets"
+            )
+        finally:
+            registry.FIELDS_PATH.write_text(original)
+            registry.field_definitions.cache_clear()
+            registry._registry_mtime = None
+
+    def test_body_medium_is_declared_richtext(self):
+        """The declaration itself, so the behaviour above has a cause."""
+        from app.modules.registry import field_definitions
+
+        assert field_definitions()["body_medium"]["type"] == "richtext"

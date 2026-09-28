@@ -34,7 +34,6 @@ _BRAND_CSS_PATH = (
     Path(__file__).parent.parent.parent.parent / "storage" / "modules" / "email" / "brand.css"
 )
 
-_RICH_TEXT_FIELD = "body_medium"
 _RICH_TEXT_LINK = re.compile(r"\[([^\]]+)\]\((https?://[^\s)]+)\)")
 _RICH_TEXT_BOLD = re.compile(r"\*\*(.+?)\*\*")
 
@@ -58,6 +57,51 @@ def render_rich_text(text: str) -> Markup:
     body = _RICH_TEXT_BOLD.sub(r"<strong>\1</strong>", body)
     body = body.replace("\n", "<br>")
     return Markup(body)
+
+
+def apply_rich_text(variables: dict, manifest: ModuleManifest) -> dict:
+    """Format every `richtext` field, leave every other field alone.
+
+    **Driven by the declared type, not by a field name.** Until 2026-09-28 a
+    module-level constant named one field — `body_medium` — so `body_long`,
+    which ADR-177's size vocabulary requires, would have rendered as literal
+    asterisks and nobody would have been told. The type is declared once in
+    `storage/fields.json` and every field carrying it is formatted.
+
+    **Only the HTML-producing renderers call this.** Rich text emits `<strong>`
+    and `<br>`; a push notification has no document to put them in, so the push
+    renderer calls `strip_rich_text` instead. That was previously true only by
+    accident of layout — the paths diverged before the constant was read, and
+    push happened to use `push_body` rather than `body_medium`. A declared type
+    any channel can use removes the accident, so the rule is written down.
+
+    **Not called by `missing_required_fields`**, deliberately: that check reads
+    values to see whether they are empty, and formatting them first would mean
+    asking whether `Markup('')` is falsey rather than whether a manager filled
+    the field in.
+    """
+    formatted = dict(variables)
+    for var in manifest.variables:
+        if var.type == "richtext" and formatted.get(var.name):
+            formatted[var.name] = render_rich_text(formatted[var.name])
+    return formatted
+
+
+def strip_rich_text(variables: dict, manifest: ModuleManifest) -> dict:
+    """The counterpart, for a channel with no document to render into.
+
+    A notification body is read by an operating system, not a browser, so
+    markup arrives as the characters it is made of. Stripping is part of
+    formatting for that channel rather than a degradation of it.
+    """
+    plain = dict(variables)
+    for var in manifest.variables:
+        value = plain.get(var.name)
+        if var.type != "richtext" or not isinstance(value, str) or not value:
+            continue
+        text = _RICH_TEXT_LINK.sub(r"\1", value)
+        plain[var.name] = _RICH_TEXT_BOLD.sub(r"\1", text)
+    return plain
 
 
 def render_variant_html(
@@ -325,11 +369,7 @@ def render_cms_module(
             decision_resolution,
         )
 
-    if variables.get(_RICH_TEXT_FIELD):
-        variables = {
-            **variables,
-            _RICH_TEXT_FIELD: render_rich_text(variables[_RICH_TEXT_FIELD]),
-        }
+    variables = apply_rich_text(variables, manifest)
 
     html_source = get_template_html(channel, module.module_type)
     if html_source is None:
@@ -398,7 +438,9 @@ def render_static_module(
     if html_source is None:
         return render_unknown_module(module)
 
-    variables = static_module_variables(db, module, manifest, mode=mode)
+    variables = apply_rich_text(
+        static_module_variables(db, module, manifest, mode=mode), manifest
+    )
 
     rendered = _jinja.from_string(html_source).render(**variables)
 

@@ -3,9 +3,10 @@ id: TASK-222
 title: >-
   _RICH_TEXT_FIELD is one hardcoded name — and richtext must be stripped on
   channels that cannot take HTML
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 14:20'
+updated_date: '2026-09-28 20:36'
 labels:
   - backend
 dependencies:
@@ -35,4 +36,20 @@ Source: [[Variant Editor - design interview]] → What Cluster 2 produced, gap 1
 
 <!-- SECTION:NOTES:BEGIN -->
 Logged 2026-09-27 from the "What Cluster N produced" sections of the two design interviews, each gap re-verified against the code that day. The plan was reviewed and approved by the session that ran the interviews. Parked: not yet ranked by anyone.
+
+Done 2026-09-28 with M1 step 5. 681 tests passing, up from 675.
+
+**The declaration half:** `_RICH_TEXT_FIELD = "body_medium"` is gone; `body_medium` carries `"type": "richtext"` in `storage/fields.json` and `apply_rich_text` formats every field carrying the type. The constant meant `body_long` — which ADR-177's size vocabulary requires — would have rendered literal asterisks with nobody told.
+
+**The strip rule, which is what this task carried on its own:** the push renderer calls `strip_rich_text`, so `**bold**` and `[label](url)` arrive as plain words rather than as the characters an operating system would show. Previously true only by accident of layout — the paths diverged before the constant was read and push happened to use `push_body`.
+
+**Applied in the static render path too**, not only the CMS one, so it is not the next thing that is safe by accident. **Deliberately not applied in `missing_required_fields`**: that check asks whether a manager filled a field in, and formatting first would have it asking whether `Markup('')` is falsey instead.
+
+**Two things a mutation run caught.**
+
+A scripted edit asserted one call site of `static_module_variables` and found two — the second is inside `missing_required_fields`, which must keep raw values. The assertion aborted the write, so `push.py` briefly imported a function that did not exist. The count was right to be checked; the mismatch was the finding.
+
+**And my own test had the hole I have now hit three times this session.** Deleting the strip from the push renderer failed nothing, because the test exercised `strip_rich_text` directly rather than the renderer's use of it — and the wiring is otherwise unexercised, since no push field is declared `richtext` today, so a missing call would have sat there until one was. `test_the_push_renderer_actually_strips` plants the declaration for the length of the test and renders a real push variant. The mutation now fails.
+
+**Out of scope, from interview Q2.5 and still open:** italic and bullet lists. This task was the hardcoded name and the strip rule.
 <!-- SECTION:NOTES:END -->
