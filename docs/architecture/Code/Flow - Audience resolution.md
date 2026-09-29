@@ -54,7 +54,7 @@ graph TD
 ## Where this is used
 
 - [[delivery]] `prepare_send_from_audience` — materialize a send's executions (see [[Flow - Send a campaign]]).
-- [[delivery]] `reconcile_executions_to_audience` — a `"rerun"` send re-resolves *here* just before firing, so it can reach a different set than the plan showed.
+- [[delivery]] `reconcile_executions_to_audience` — **every** send re-resolves *here* just before firing ([[ADR-176 — A Negative Decision Outranks a Positive One]] point 4), so a send can reach a different set than the plan showed.
 - [[frontend]] — the group-detail "net audience" preview and the list-page recipient counts.
 
 ## Suggestions (use case 1)
@@ -69,5 +69,5 @@ A group can be **seeded from a campaign**: [[audience]] `create_suggested_group_
 
 - **Precedence order is load-bearing.** Pins union *after* excludes subtract. An earlier version put pins into includes before subtracting excludes, so excludes silently dropped pins (group showed 17 instead of 21) — don't reorder.
 - **Hard suppression ≠ an exclude block.** Bounces/opt-outs belong on the consent floor so they stay hard against pins. A regular exclude block would be overridden by a pin.
-- **Resolution is live, not frozen.** The same group resolves differently next week as signals/consent change. A `"freeze"` send captures a moment; a `"rerun"` send re-resolves — that choice lives in [[delivery]], not here.
+- **Resolution is live, not frozen, and there is no longer a choice about it.** The same group resolves differently next week as signals/consent change, and since [[ADR-176 — A Negative Decision Outranks a Positive One]] point 4 (2026-09-29) every send re-resolves immediately before firing. The `"freeze"` mode that captured a moment is refused; existing rows keep the value because it records how those sends were planned.
 - **A group can resolve to 0** — [[delivery]] refuses to plan an empty send.

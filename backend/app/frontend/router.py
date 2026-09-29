@@ -1832,7 +1832,6 @@ def send_instance_create(
     audience_group_id: str = Form(""),
     provider: str = Form("mock"),
     from_address: str = Form(""),
-    audience_resolution_mode: str = Form("freeze"),
     send_timing: str = Form("now"),
     scheduled_at: str = Form(""),
     db: Session = Depends(get_db),
@@ -1871,7 +1870,6 @@ def send_instance_create(
             audience_group_id=int(audience_group_id),
             provider=provider,
             from_address=from_address.strip() or None,
-            audience_resolution_mode=audience_resolution_mode,
             scheduled_at=scheduled,
             brand_id=working_brand_id(request, db),
         )

@@ -39,7 +39,7 @@ stores the results.
 **Service functions** (`delivery/service.py`):
 - `prepare_send_from_audience(...)` — resolve an audience group (consent-gated), check the send cap, create the send instance + one execution per recipient. Nothing is sent. **The main entry point for planning a send.**
 - `send_send_instance(db, send_instance_id)` — run the actual send loop for a planned instance (row-locked, one-shot). **The main entry point for firing a send.**
-- `reconcile_executions_to_audience(db, send_instance)` — for `"rerun"` sends: re-resolve the group just before firing and add/drop executions.
+- `reconcile_executions_to_audience(db, send_instance)` — for **every** send: re-resolve the group just before firing and add/drop executions. No-op when the send has no audience group, which is why the send-time exclusion stack is still the only gate for those.
 - `process_due_scheduled_sends(db)` — fire every scheduled send whose time has arrived (the seam a cron/worker/n8n drives).
 - `create_send_instance(...)` / `create_delivery_execution(...)` — low-level record creation (used by the JSON API and legacy paths).
 - `list_send_instances_for_snapshot(...)` / `list_delivery_executions_for_send_instance(...)` — read history.
@@ -65,7 +65,7 @@ stores the results.
   - `snapshot_id` → the frozen render it sends
   - `audience_group_id` → who it targets (nullable for ad-hoc sends)
   - `provider`, `from_address` → which adapter + verified sender
-  - `audience_resolution_mode` → `"freeze"` (executions fixed at plan time) or `"rerun"` (re-resolved at send time) — [[ADR-052 — Delivery Layer Supports Multiple Audience Resolution Modes]]
+  - `audience_resolution_mode` → **history, not behaviour** since [[ADR-176 — A Negative Decision Outranks a Positive One]] point 4 (2026-09-29): every send is re-resolved at send time whatever this says. New rows can only be `"rerun"`; older `"freeze"` rows record how those sends were planned. (Not the axis [[ADR-052 — Delivery Layer Supports Multiple Audience Resolution Modes]] is about — that record is on how an audience is *specified*, and shares only the word "mode".)
   - `scheduled_at`, `status` → `draft` → `scheduled` → `sending` → `sent` / `failed`
 - **`delivery_executions`** (`DeliveryExecutionDB`) — one row **per recipient per send**. Columns of note:
   - `recipient_id` → **direct FK** to `recipients.id` ([[ADR-054 — Use Internal Recipient Identifiers]], no external-id translation)

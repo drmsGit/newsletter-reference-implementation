@@ -63,12 +63,10 @@ sequenceDiagram
 
 Entry: [[frontend]] `POST /ui/campaigns/{campaign_id}/snapshots/{snapshot_id}/send-instances` → [[delivery]] `prepare_send_from_audience()`.
 
-1. **Resolve the audience.** [[delivery]] calls [[audience]] `resolve_audience(group_id)`, which computes `((∪ include blocks) − (∪ exclude blocks)) ∪ (manual pins)` and then drops any non-consenting recipient (the **consent floor** — see [[recipients]]). *→ full detail in [[Flow - Audience resolution]] (planned).*
+1. **Resolve the audience.** [[delivery]] calls [[audience]] `resolve_audience(group_id, channel)`, which computes `((∪ include blocks) ∪ (manual pins)) − (∪ exclude blocks)` — an exclude block removes a pin ([[ADR-176 — A Negative Decision Outranks a Positive One]] point 1) — and then drops any non-consenting recipient (the **consent floor** — see [[recipients]]). *→ full detail in [[Flow - Audience resolution]] (planned).*
 2. **Guard the size.** [[settings]] `get_max_send_recipients()` gives the cap; an empty audience or one over the cap raises and the plan is refused.
 3. **Materialize records.** One `SendInstanceDB` is created plus **one `DeliveryExecutionDB` per recipient** (status `created`). Status is `draft`, or `scheduled` if a time was given.
-4. **Choose the resolution mode** ([[ADR-052 — Delivery Layer Supports Multiple Audience Resolution Modes]]):
-   - `"freeze"` — these executions are final; later rule edits don't change who receives it.
-   - `"rerun"` — these executions are a preview; the group is re-resolved at fire time.
+4. **There is no resolution mode to choose.** These executions are a *preview*: every send re-resolves its group at fire time ([[ADR-176 — A Negative Decision Outranks a Positive One]] point 4, 2026-09-29). `"freeze"` is refused by name; rows that still carry it record how those sends were planned and re-resolve anyway.
 
 *Nothing has been sent. The plan is visible on the delivery page and can be triggered, scheduled, or abandoned.*
 
@@ -77,7 +75,7 @@ Entry: [[frontend]] `POST /ui/campaigns/{campaign_id}/snapshots/{snapshot_id}/se
 Entry: [[frontend]] `POST /ui/send-instances/{id}/send` (manual) **or** `process_due_scheduled_sends()` (a due scheduled send) → [[delivery]] `send_send_instance()`.
 
 5. **Lock and guard.** A `SELECT ... FOR UPDATE` row lock + status check makes the `draft → sending` transition one-shot — a second concurrent trigger blocks, re-reads `sending`, and is rejected. No double-sends.
-6. **Reconcile if `"rerun"`.** [[delivery]] `reconcile_executions_to_audience()` re-resolves the [[audience]] group *now* and adds newly-matching / drops no-longer-matching-and-unsent executions (re-checking the cap). `"freeze"` sends skip this.
+6. **Reconcile, always.** [[delivery]] `reconcile_executions_to_audience()` re-resolves the [[audience]] group *now* and adds newly-matching / drops no-longer-matching-and-unsent executions (re-checking the cap). A send with **no audience group** skips this — nothing to re-resolve — which is why step 9's exclusion stack is still the only gate for those.
 7. **Resolve the subject.** From the [[campaigns]] `VariantDB.subject` (recipient-facing), falling back to the send instance's internal name.
 8. **Per recipient, in a loop:**
    - **Personalize** — [[delivery]] calls [[decision]] `execute_decision_slot(slot, recipient)` for each decision slot on the variant, resolving *and persisting* that recipient's content pick. Without this a fresh recipient would render the personalized module hidden and have nothing to attribute engagement to. A strategy that resolves nothing fails gracefully ([[ADR-086 — Decision Slots Fail Gracefully]]) and the send continues. *→ [[Flow - Decision and rendering]] (planned).*
@@ -99,5 +97,5 @@ Entry: [[frontend]] `POST /ui/send-instances/{id}/send` (manual) **or** `process
 
 - **Two different "send" endpoints.** The rich planning form is the **UI** route (`POST /ui/campaigns/{campaign_id}/snapshots/{snapshot_id}/send-instances`); the JSON `/delivery/*` router only does low-level record creation + a bare trigger. Don't expect the JSON API to do audience resolution.
 - **Decisions are resolved at *send* time, not compose time.** If personalization looks empty in a preview, that's expected until a send (or an explicit resolve) runs.
-- **`"freeze"` vs `"rerun"` changes who gets it.** A scheduled `"rerun"` send can reach a *different* set than the plan showed. That's intended (Salesforce-style), but surprising if you assume the plan is final.
+- **A send can reach a different set than the plan showed**, and always could since 2026-09-29. That is intended: consent and exclusions are then current at the only moment that matters. It is surprising if you assume the plan is final, and the review screen says so out loud for that reason.
 - **Scheduling is a seam, not a scheduler.** `process_due_scheduled_sends()` only fires *when something calls it* — a manual button today, a cron/worker/n8n in production. There is no background loop.

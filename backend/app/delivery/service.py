@@ -199,7 +199,7 @@ def prepare_send_from_audience(
     audience_group_id: int,
     provider: str,
     from_address: str | None = None,
-    audience_resolution_mode: str = "freeze",
+    audience_resolution_mode: str = "rerun",
     scheduled_at=None,
     *,
     brand_id: int,
@@ -209,12 +209,22 @@ def prepare_send_from_audience(
     recipient, all in status "created". Nothing is sent here. Raises ValueError
     on an empty audience or one exceeding the recipient cap.
 
-    Two audience-resolution modes (`audience_resolution_mode`):
-      "freeze" — the executions created here are final; a later edit to the
-                 group's rules doesn't change who the send goes to.
-      "rerun"  — these executions are a preview; the group is re-resolved and
-                 reconciled immediately before the send fires (see
-                 reconcile_executions_to_audience).
+    **Every send re-resolves its audience (ADR-176 point 4, implemented
+    2026-09-29), and `"freeze"` is refused.** The executions created here are a
+    *preview*: the group is re-resolved and reconciled immediately before the
+    send fires (`reconcile_executions_to_audience`). A send therefore goes to
+    whoever qualifies at the moment it goes out, by construction rather than by
+    configuration — which is what makes an exclusion segment written after
+    planning actually remove somebody. Under `"freeze"` point 1's precedence
+    change would have been true of the resolver and false of the send: a rule
+    that reads as a safety and is not one.
+
+    **`audience_resolution_mode` survives as a parameter deliberately**, rather
+    than being deleted. Refusing the old value by name says what changed and
+    where it is written down; dropping the parameter would greet the same
+    caller with `unexpected keyword argument`, which is a fact about Python and
+    not about this system. The column it writes is kept for the same reason —
+    see `SendInstanceDB.audience_resolution_mode`.
 
     `scheduled_at` set → status "scheduled" (fires later via
     process_due_scheduled_sends); otherwise "draft" (fires on manual Trigger)."""
@@ -223,8 +233,16 @@ def prepare_send_from_audience(
     from app.audience.service import resolve_audience
     from app.settings.service import get_max_send_recipients
 
-    if audience_resolution_mode not in ("freeze", "rerun"):
-        raise ValueError("audience_resolution_mode must be 'freeze' or 'rerun'")
+    if audience_resolution_mode == "freeze":
+        raise ValueError(
+            "audience_resolution_mode 'freeze' was removed by ADR-176 point 4: "
+            "a send goes to whoever qualifies when it goes out, so consent and "
+            "exclusions are current at the only moment that matters. Existing "
+            "rows keep the value because they record how those sends were "
+            "planned; new ones cannot be created with it."
+        )
+    if audience_resolution_mode != "rerun":
+        raise ValueError("audience_resolution_mode must be 'rerun'")
 
     # A naive scheduled_at (e.g. from a datetime-local input, local wall-clock)
     # must be made timezone-aware before it hits the timestamptz column —
@@ -310,31 +328,37 @@ def prepare_send_from_audience(
 def reconcile_executions_to_audience(db: Session, send_instance: SendInstanceDB) -> None:
     """Re-resolve this send's audience and adjust THIS send's executions.
 
+    **Called for every send since ADR-176 point 4** (2026-09-29), rather than
+    only for the sends that asked. It is the mechanism that makes an exclusion
+    segment written after planning actually remove somebody.
+
     **Scoped to one send instance, which answers a question asked on
-    2026-09-18**: if two variants of a campaign share an audience group and one
-    is "freeze" while the other is "rerun", does the rerun undo the freeze? It
-    does not. Every query below filters on `send_instance_id`, and nothing here
-    writes to the group — so a sibling send's re-resolution cannot reach these
-    executions.
+    2026-09-18**: if two variants of a campaign share an audience group, can
+    one send's re-resolution reach the other's executions? It cannot. Every
+    query below filters on `send_instance_id`, and nothing here writes to the
+    group. The question was originally asked about a "freeze" send and a
+    "rerun" one; the modes are gone and the isolation is what mattered.
 
-    The sharper version of that worry is real and already answered elsewhere: a
-    push that goes out first can *change the world* — someone complains, the
-    provider reports it, they are opted out — and the later frozen email send
-    must honour that. It does, because the send-time gate in
-    `send_send_instance` runs for **every** resolution mode including freeze
-    (ADR-163 point 7, the P0). Freeze locks *who is targeted*; it never locks
-    *who may be contacted*.
+    The sharper version of that worry is real and answered elsewhere: a push
+    that goes out first can *change the world* — someone complains, the provider
+    reports it, they are opted out — and a later email send must honour that. It
+    does, and by two mechanisms now rather than one. This function drops them,
+    and the send-time gate in `send_send_instance` drops them again (ADR-163
+    point 7, the P0). **That the gate is now the second line rather than the
+    only one is a hazard for its tests, not a reason to remove it**: a send with
+    no audience group never reaches this function, so the gate is still the only
+    thing standing between an opted-out recipient and a mail.
 
-    Which is also why a separate "audience snapshot" entity is not needed:
-    freezing already materialises the audience as delivery executions at plan
-    time, and a second mechanism for the same thing would be one more place for
-    the two to disagree.
-    """
-    """For a "rerun" send: re-resolve the audience group right before firing and
+    Which is also why a separate "audience snapshot" entity is not needed: the
+    executions already materialise the audience, and a second mechanism for the
+    same thing would be one more place for the two to disagree.
+
+    **What it does:** re-resolve the audience group right before firing and
     reconcile executions — add one for each newly-matching recipient, and drop
     executions for recipients who no longer match *and* haven't sent yet (an
     already-sent execution is history and is left as-is). Enforces the recipient
-    cap on the freshly-resolved set. No-op if the send has no audience group."""
+    cap on the freshly-resolved set. No-op if the send has no audience group.
+    """
     if not send_instance.audience_group_id:
         return
 
@@ -643,16 +667,22 @@ def send_send_instance(
     send_instance.status = "sending"
     db.commit()
 
-    # "rerun" audiences are re-resolved against the group right now, just before
-    # sending, so a send reflects who matches at send time — not who matched when
-    # it was planned. "freeze" sends keep their planned executions untouched.
-    if send_instance.audience_resolution_mode == "rerun":
-        try:
-            reconcile_executions_to_audience(db, send_instance)
-        except ValueError:
-            send_instance.status = "failed"
-            db.commit()
-            raise
+    # The audience is re-resolved against the group right now, just before
+    # sending, so a send reflects who matches at send time — not who matched
+    # when it was planned. **Unconditional since ADR-176 point 4**: this was
+    # `if audience_resolution_mode == "rerun"`, which meant an exclusion
+    # segment written after planning reached the resolver and not the send.
+    # A send planned before that date still re-resolves, which is the point —
+    # the column records how it was planned, not what it may do.
+    #
+    # No-op for a send with no audience group: `reconcile_executions_to_audience`
+    # returns early, and those executions were never group-derived.
+    try:
+        reconcile_executions_to_audience(db, send_instance)
+    except ValueError:
+        send_instance.status = "failed"
+        db.commit()
+        raise
 
     snapshot = (
         db.query(SnapshotDB)
@@ -716,14 +746,19 @@ def send_send_instance(
     )
 
     # THE SEND-TIME GATE (ADR-163 point 7). Run here, immediately before the
-    # send loop, for every resolution mode — including "freeze".
+    # send loop, for every send without exception.
     #
-    # This is the P0 fix. A frozen send materialises its executions at plan
-    # time and, before this, never looked at permission again, so a recipient
-    # who opted out in between was still mailed. Re-resolving the audience is
-    # not the answer — that is what "rerun" does, and it changes *who is
-    # targeted*, which a frozen send deliberately does not want. Freezing
-    # targeting must never freeze permission to contact.
+    # This is the P0 fix. A send materialised its executions at plan time and,
+    # before this, never looked at permission again, so a recipient who opted
+    # out in between was still mailed.
+    #
+    # **Re-resolving the audience is not a substitute for this, and since
+    # ADR-176 point 4 made re-resolution unconditional it can look like one.**
+    # It is not, for two reasons. Re-resolution changes *who is targeted* and
+    # this changes *who may be contacted* — different questions that currently
+    # agree on consent and do not agree on suppression or addressability. And
+    # `reconcile_executions_to_audience` returns early for a send with no
+    # audience group, so for those sends this gate is the only thing there is.
     #
     # Set operations, one query per stage, so per-stage attribution costs no
     # N+1 (point 10).

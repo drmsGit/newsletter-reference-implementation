@@ -52,11 +52,11 @@ workstream.
 - [[insight]] — criteria min-score uses live per-category signals
 
 ## Depended on by →
-- [[delivery]] — `resolve_audience` materializes a send's recipients (and re-resolves for `"rerun"` sends)
+- [[delivery]] — `resolve_audience` materializes a send's recipients, and re-resolves them for every send just before it fires
 - [[frontend]] — the audience-groups UI (rule blocks, suggestions, net-audience preview)
 
 ## Invariants & decisions
-- **Live rule model, not a frozen list.** Groups re-resolve from blocks every time — a later rule edit changes future sends (unless a send froze its executions). [[delivery]] chooses freeze vs. rerun.
+- **Live rule model, not a frozen list.** Groups re-resolve from blocks every time, and a later rule edit changes future sends — **including sends already planned**, since [[ADR-176 — A Negative Decision Outranks a Positive One]] point 4 makes re-resolution unconditional. There is no freeze.
 - **Precedence ([[ADR-176 — A Negative Decision Outranks a Positive One]] point 1, 2026-09-29):** `((includes) ∪ (pins)) − (excludes)`, then consent floor. **An exclude block removes a hand-pinned recipient** — pins join the rule-driven set *before* the subtraction. The principle generalises past audiences: a negative decision outranks a positive one, because wrongly including costs more than wrongly omitting. This **reverses** the 2026-07-26 rule that a pin is always included, which lived here and in three other places and in no ADR; do not restore it from a document that still carries it.
 - **Consent floor is non-negotiable** — hard suppression (bounces/opt-outs) belongs here, not in a regular exclude block.
 - **Suggested blocks stay editable/deletable** (same trust model as [[overrides]]); Recalculate is delta-only and preserves manager-tuned thresholds.

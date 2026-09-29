@@ -12,7 +12,7 @@
     <h1 class="mb-0">{{ send_instance.name }}</h1>
     {% if send_instance.status in ["draft", "scheduled"] %}
     <form method="post" action="/ui/send-instances/{{ send_instance.id }}/send"
-          onsubmit="return confirm('Send{% if send_instance.audience_resolution_mode == 'rerun' %} (audience re-resolved now){% endif %} to {{ recipient_count }} recipient(s) via the {{ send_instance.provider or 'mock' }} provider?{% if send_instance.provider == 'resend' %}\n\nThis sends REAL email. Recipients whose address is not deliverable from your verified/sandbox sender will fail.{% endif %}\n\nThis cannot be undone.');">
+          onsubmit="return confirm('Send (audience re-resolved now) to {{ recipient_count }} recipient(s) via the {{ send_instance.provider or 'mock' }} provider?{% if send_instance.provider == 'resend' %}\n\nThis sends REAL email. Recipients whose address is not deliverable from your verified/sandbox sender will fail.{% endif %}\n\nThis cannot be undone.');">
         <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
         <button type="submit" class="btn btn-success">
             {% if send_instance.status == "scheduled" %}Send now (override schedule){% else %}Trigger send{% endif %} → {{ recipient_count }} recipient(s)
@@ -72,14 +72,20 @@
             {% if send_instance.provider == "resend" %}
             <tr><th>From</th><td>{{ send_instance.from_address or "RESEND_FROM default" }}</td></tr>
             {% endif %}
+            {# ADR-176 point 4: every send re-resolves, so this row says how the
+               send was PLANNED rather than what it will do. It is kept because a
+               send planned before 2026-09-29 reads "frozen" and that is a true
+               fact about its history — but the second line is unconditional,
+               because the behaviour is. #}
             <tr>
-                <th>Audience mode</th>
+                <th>Audience</th>
                 <td>
-                    {% if send_instance.audience_resolution_mode == "rerun" %}
-                    <span class="badge bg-info text-dark">re-run at send</span>
-                    <span class="text-muted small">audience re-resolved just before sending</span>
+                    {% if send_instance.audience_resolution_mode != "rerun" %}
+                    <span class="badge bg-secondary">planned as frozen</span>
+                    <span class="text-muted small">before 2026-09-29; it re-resolves anyway</span>
                     {% else %}
-                    <span class="badge bg-secondary">frozen at plan time</span>
+                    <span class="badge bg-info text-dark">re-resolved at send</span>
+                    <span class="text-muted small">audience re-resolved just before sending</span>
                     {% endif %}
                 </td>
             </tr>

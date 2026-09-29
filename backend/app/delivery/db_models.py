@@ -26,13 +26,20 @@ class SendInstanceDB(Base):
     # Verified sender for a real (Resend) send, e.g. "News <news@domain.com>".
     # Null = the provider adapter falls back to its RESEND_FROM env default.
     from_address = Column(String(255), nullable=True)
-    # How the audience is resolved into recipients:
-    #   "freeze" — executions are fixed at plan time (a snapshot of the group).
-    #   "rerun"  — the group is re-resolved immediately before the send fires and
-    #              executions are reconciled (add newly-matching, drop no-longer-
-    #              matching that haven't sent). Mirrors Salesforce's send-time
-    #              audience re-evaluation.
-    audience_resolution_mode = Column(String(20), nullable=False, default="freeze")
+    # **This column records how a send was planned. It no longer gates
+    # anything** (ADR-176 point 4, 2026-09-29): every send re-resolves its
+    # audience immediately before firing, whatever this says.
+    #
+    # It is kept rather than dropped because the five rows reading "freeze"
+    # were frozen — rewriting them to "rerun" would falsify history to match a
+    # decision taken afterwards. Only un-fired rows were backfilled. Dropping
+    # it would also be a hand-written migration in a repository with no
+    # Alembic, for no behavioural gain.
+    #
+    # `prepare_send_from_audience` refuses "freeze" by name, so nothing new can
+    # be written with it; a reader who sees one is looking at a send planned
+    # before that date.
+    audience_resolution_mode = Column(String(20), nullable=False, default="rerun")
     # Derived from the child executions once the send finishes, rather than set
     # unconditionally. Persisted rather than computed on read because
     # monitoring, retries and the audit trail all want the number without a

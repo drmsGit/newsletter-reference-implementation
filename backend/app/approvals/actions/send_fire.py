@@ -104,7 +104,11 @@ def describe(db: Session, payload: dict, *, brand_id: int) -> ActionDescription:
         ("Provider", send_instance.provider or "mock"),
         ("From", send_instance.from_address or "— not set —"),
         ("Audience", f"{planned} planned recipient(s)"),
-        ("Audience resolution", send_instance.audience_resolution_mode),
+        # The "Audience resolution" row was dropped on 2026-09-29 (ADR-176
+        # point 4). It would read "rerun" on every new send, and the fact it
+        # carried — that the number re-resolves — is now in the warnings,
+        # unconditionally. A constant row is decoration on a screen whose job
+        # is to be read.
     ]
 
     warnings = []
@@ -138,13 +142,20 @@ def describe(db: Session, payload: dict, *, brand_id: int) -> ActionDescription:
             f"This send is already {send_instance.status}, so it cannot be sent "
             "again. Rejecting it is the only outcome left."
         )
-    if send_instance.audience_resolution_mode == "rerun":
+    # Unconditional since ADR-176 point 4: every send re-resolves, so the count
+    # a reviewer approves is always an "as of now" figure. That record's own
+    # Negative says presenting a count the system cannot honour is how a review
+    # screen becomes a thing managers stop reading — so it is said every time
+    # rather than only when a mode said so.
+    warnings.append(
+        "The audience is re-resolved at send time, so the number above is "
+        "what matches now — not necessarily what will be mailed."
+    )
+    if planned == 0:
         warnings.append(
-            "The audience is re-resolved at send time, so the number above is "
-            "what matches now — not necessarily what will be mailed."
+            "No recipients are planned for this send. Re-resolution may still "
+            "find some, so this is a warning rather than a refusal."
         )
-    if planned == 0 and send_instance.audience_resolution_mode != "rerun":
-        warnings.append("No recipients are planned for this send.")
     if (send_instance.provider or "mock") != "mock":
         warnings.append(
             f"This will send for real through {send_instance.provider}."

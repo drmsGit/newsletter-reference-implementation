@@ -12,12 +12,17 @@ rendering behaviour rather than a compliance defect (point 8).
     4. frequency      — post-POC (ADR-161 point 8)
 
 **Why this exists at all.** Consent is checked when an audience is resolved,
-but a `freeze` send materialises its executions at plan time and then never
-looks again. Someone who opts out between planning and sending is still mailed.
-Re-resolving the audience is not the fix — that is what `rerun` mode does, and
-it changes *who is targeted*, which a frozen send deliberately does not want.
-The fix is to re-check *permission* without re-checking *targeting*: freezing
-targeting must never freeze permission to contact.
+but a send materialises its executions at plan time and then never looks again.
+Someone who opts out between planning and sending is still mailed. The fix is
+to re-check *permission* at the moment of sending, without re-checking
+*targeting*: a materialised audience must never freeze permission to contact.
+
+**Re-resolving the audience is not a substitute, although since
+[[ADR-176 — A Negative Decision Outranks a Positive One]] point 4 made
+re-resolution unconditional it can look like one.** Targeting and permission
+are different questions that happen to agree on consent and do not agree on
+suppression or addressability — and a send with no audience group is never
+re-resolved at all, so for those sends this stack is the only gate there is.
 
 **Order is a performance decision, not a correctness one (point 9).** All four
 stages are ANDed, so the order never changes who is excluded — only how many

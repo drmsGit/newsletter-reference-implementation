@@ -47,7 +47,7 @@ import uuid
 
 import pytest
 
-from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB
+from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB, AudienceRuleBlockDB
 from app.audience.service import find_by_criteria, resolve_audience
 from app.auth.service import ensure_default_brand
 from app.database import SessionLocal
@@ -148,7 +148,9 @@ def db():
             return group
 
         def pin(self, group, recipient):
-            """A manual member pin — 'always included', except consent."""
+            """A manual member pin. It is **not** "always included" — an
+            exclude block removes it since ADR-176 point 1 (2026-09-29), and
+            the consent floor always could."""
             member = AudienceGroupMemberDB(
                 group_id=group.id, recipient_id=recipient.id
             )
@@ -156,7 +158,7 @@ def db():
             self.session.flush()
             return member
 
-        def send_to(self, recipient):
+        def send_to(self, recipient, group=None):
             """A frozen, ready-to-fire send instance targeting one recipient.
 
             Reuses an existing snapshot rather than rendering one: this test is
@@ -165,10 +167,12 @@ def db():
             variant supplies the subject and the decision slots, exactly as a
             real send does.
 
-            `audience_resolution_mode="freeze"` is the point — it is the mode
-            where the defect lives. A "rerun" send re-resolves its audience and
-            would filter the opt-out out by accident, which is why the P0 hid
-            for as long as it did.
+            **No `audience_group_id` is the point**, and it is deliberate
+            rather than a shortcut: `reconcile_executions_to_audience` returns
+            early without one, so nothing re-resolves and the send-time gate is
+            the only thing under test. This fixture said
+            `audience_resolution_mode="freeze"` for that job until 2026-09-29,
+            when ADR-176 point 4 removed the mode; see the class docstring.
             """
             # **An EMAIL snapshot, specifically.** This picks up whatever is
             # already in the shared dev database, and `ORDER BY id DESC` was
@@ -249,7 +253,11 @@ def db():
                 name=f"test-consent-send-{uuid.uuid4()}",
                 status="draft",
                 provider="mock",
-                audience_resolution_mode="freeze",
+                # Group-backed only when a test asks. Without one,
+                # `reconcile_executions_to_audience` returns early and the
+                # send-time gate is the only thing that can drop a recipient —
+                # which is what every test in this file but one wants.
+                audience_group_id=group.id if group is not None else None,
             )
             self.session.add(send_instance)
             self.session.flush()
@@ -272,19 +280,24 @@ def db():
         yield tracker
     finally:
         session.rollback()
-        if created_groups:
-            session.query(AudienceGroupMemberDB).filter(
-                AudienceGroupMemberDB.group_id.in_(created_groups)
-            ).delete(synchronize_session=False)
-            session.query(AudienceGroupDB).filter(
-                AudienceGroupDB.id.in_(created_groups)
-            ).delete(synchronize_session=False)
         if created_sends:
             session.query(DeliveryExecutionDB).filter(
                 DeliveryExecutionDB.send_instance_id.in_(created_sends)
             ).delete(synchronize_session=False)
             session.query(SendInstanceDB).filter(
                 SendInstanceDB.id.in_(created_sends)
+            ).delete(synchronize_session=False)
+        # Groups after sends: `send_instances.audience_group_id` is a FK,
+        # and a group-backed send holds the group until it is gone.
+        if created_groups:
+            session.query(AudienceRuleBlockDB).filter(
+                AudienceRuleBlockDB.group_id.in_(created_groups)
+            ).delete(synchronize_session=False)
+            session.query(AudienceGroupMemberDB).filter(
+                AudienceGroupMemberDB.group_id.in_(created_groups)
+            ).delete(synchronize_session=False)
+            session.query(AudienceGroupDB).filter(
+                AudienceGroupDB.id.in_(created_groups)
             ).delete(synchronize_session=False)
         if created_recipients:
             # Consent events, sync logs and addresses are FK-bound to the
@@ -625,27 +638,40 @@ class TestConsentEventsAndDrift:
 
 
 class TestSendTimeConsentRevocation:
-    """The P0: opting out after the audience is frozen must stop the send.
+    """The P0: opting out after the executions are planned must stop the send.
 
     This is the regression test the 2026-08-07 review ranked first, and the one
     `test_consent_gates.py` originally declared out of scope because it needs a
     full send fixture. It lands with the fix, as planned.
 
-    The defect it pins: a `freeze` send materialises its `DeliveryExecutionDB`
-    rows at plan time, with consent checked *then*. Before the ADR-163 point 7
+    The defect it pins: a send materialises its `DeliveryExecutionDB` rows at
+    plan time, with consent checked *then*. Before the ADR-163 point 7
     exclusion stack, nothing looked again, so a recipient who opted out between
-    planning and sending was still handed to the provider. Re-resolving the
-    audience is not the fix — that is what `rerun` mode does, and it changes who
-    is targeted. Freezing targeting must never freeze permission to contact.
+    planning and sending was still handed to the provider.
+
+    **What actually protects this test changed on 2026-09-29, and the old
+    answer is no longer available.** It used to be `audience_resolution_mode`:
+    the fixture said `"freeze"`, and the comment here said that was the point,
+    because a `"rerun"` send re-resolves its audience and would drop the
+    opted-out recipient by accident — passing while testing nothing. ADR-176
+    point 4 makes every send re-resolve, so that protection is gone.
+
+    **What replaces it: the fixture's send has no `audience_group_id`.**
+    `reconcile_executions_to_audience` returns early for such a send, so
+    nothing re-resolves and the send-time gate is the only thing between an
+    opted-out recipient and the provider — which is also the real case, since
+    executions can be created without a group. Verified by mutation on
+    2026-09-29 in both directions: flipping the fixture's mode to `"rerun"`
+    changes nothing, and neutering the gate fails all four tests here.
 
     Runs against the mock provider, so nothing leaves the machine.
     """
 
-    def test_optout_after_freeze_stops_the_send(self, db):
+    def test_optout_after_planning_stops_the_send(self, db):
         recipient = db.recipient("opted_in")
         send_instance, execution = db.send_to(recipient)
 
-        # The audience is now frozen: the execution row exists and consent was
+        # The send is now planned: the execution row exists and consent was
         # good when it was created. The person then opts out.
         record_consent(
             db.session,
@@ -653,7 +679,7 @@ class TestSendTimeConsentRevocation:
             "opted_out",
             ensure_default_brand(db.session).id,
             source="test",
-            note="withdrew after the audience was frozen",
+            note="withdrew after the send was planned",
             commit=False,
         )
         db.session.commit()
@@ -798,3 +824,81 @@ def _any_decision_slot_id(session) -> int:
     if row is None:
         pytest.skip("no decision slot in this database")
     return row[0]
+
+
+class TestSendTimeAudienceReResolution:
+    """ADR-176 point 4: every send re-resolves its audience before firing.
+
+    **This is what makes point 1 mean anything.** Point 1 changed the resolver
+    so an exclude block removes a hand-pinned recipient; without point 4 that
+    would have been true of the resolver and false of the send, because a send
+    materialises its executions when it is planned. A rule that reads as a
+    safety and is not one is the worst available combination, which is why the
+    two points shipped together.
+
+    The send here carries `audience_resolution_mode="freeze"` **on purpose**.
+    That value can no longer be written — `prepare_send_from_audience` refuses
+    it by name — but five rows in the development database still hold it,
+    because they record how those sends were planned and rewriting them would
+    falsify history. So the question this class answers is the one an existing
+    row asks: does a send planned as frozen re-resolve anyway? It does, and
+    nothing but this test says so.
+    """
+
+    def test_an_exclusion_written_after_planning_removes_the_recipient(self, db):
+        """Fired through `send_send_instance`, not by calling the reconciler.
+        **The call site is what changed** — the reconciler already worked, and
+        was skipped unless the mode said "rerun". A test that calls it directly
+        would pass with that condition back in place."""
+        recipient = db.recipient("opted_in", language="rr-excl")
+        group = db.group("reresolve")
+        db.pin(group, recipient)
+        send_instance, execution = db.send_to(recipient, group=group)
+        execution_id = execution.id
+
+        # Planned as frozen, the way a row written before 2026-09-29 was, and
+        # the exclusion arrives *between* planning and firing — the only
+        # interesting moment. Excluding before planning would be caught by
+        # `resolve_audience` and would prove nothing about the send path.
+        send_instance.audience_resolution_mode = "freeze"
+        db.session.add(AudienceRuleBlockDB(
+            group_id=group.id, kind="exclude",
+            criteria={"language": "rr-excl"},
+            source="manual", position=0,
+        ))
+        db.session.commit()
+
+        send_send_instance(
+            db.session, send_instance.id, brand_id=send_instance.brand_id)
+
+        survivors = {e.id for e in db.session.query(DeliveryExecutionDB).filter(
+            DeliveryExecutionDB.send_instance_id == send_instance.id
+        ).all()}
+        assert execution_id not in survivors, (
+            "an exclusion segment written after the send was planned did not "
+            "remove the recipient — ADR-176 point 4. The send was planned as "
+            "'freeze', which is exactly the row that must re-resolve anyway."
+        )
+
+    def test_the_recipient_is_there_without_an_exclusion(self, db):
+        """Without this the test above passes against a reconciler that drops
+        everybody, or a pin that never resolved. Same shape as the pair in
+        `test_audience_api.TestExcludeBeatsPin`, for the same reason."""
+        recipient = db.recipient("opted_in", language="rr-keep")
+        group = db.group("reresolve-keep")
+        db.pin(group, recipient)
+        send_instance, execution = db.send_to(recipient, group=group)
+        execution_id = execution.id
+        send_instance.audience_resolution_mode = "freeze"
+        db.session.commit()
+
+        send_send_instance(
+            db.session, send_instance.id, brand_id=send_instance.brand_id)
+
+        survivors = {e.id for e in db.session.query(DeliveryExecutionDB).filter(
+            DeliveryExecutionDB.send_instance_id == send_instance.id
+        ).all()}
+        assert execution_id in survivors, (
+            "re-resolution dropped a consenting, pinned recipient that no "
+            "exclude block touched, so the exclusion test proves nothing"
+        )

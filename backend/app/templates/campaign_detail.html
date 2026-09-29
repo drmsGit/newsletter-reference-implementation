@@ -637,12 +637,16 @@
                                 {% endif %}
                             </div>
                             <div class="row g-2 mt-1">
+                                {# The "Audience resolution" select was removed on 2026-09-29
+                                   (ADR-176 point 4): every send re-resolves its audience, so
+                                   there is no longer a choice to offer. It defaulted to
+                                   "freeze", which was the mode that should never be used. #}
                                 <div class="col-md-5">
-                                    <label class="form-label small mb-1">Audience resolution</label>
-                                    <select name="audience_resolution_mode" class="form-select form-select-sm">
-                                        <option value="freeze" selected>Freeze now — lock recipients at plan time</option>
-                                        <option value="rerun">Re-run at send — re-resolve the audience just before sending</option>
-                                    </select>
+                                    <label class="form-label small mb-1">Audience</label>
+                                    <p class="form-text small mb-0">
+                                        Re-resolved just before sending, so consent and
+                                        exclusions are current at the moment it goes out.
+                                    </p>
                                 </div>
                                 <div class="col-md-3">
                                     <label class="form-label small mb-1">Send timing</label>
