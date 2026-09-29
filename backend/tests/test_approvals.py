@@ -733,3 +733,91 @@ class TestExpiryCannotOverwriteADecision:
         lapsed = [e for e in events_for_subject(db, approvals.SUBJECT, row.id)
                   if e.action == approvals.LAPSED]
         assert len(lapsed) == 1, f"{len(lapsed)} approval.expired events for one request"
+
+
+class TestEveryHeldRequestNamesItsSubject:
+    """task-15, ADR-142 addendum of 2026-09-29 (third).
+
+    The one-open-request index is keyed on (action_key, subject_type,
+    subject_id) and Postgres treats NULLs as distinct in a unique index — so a
+    request with no subject escapes it, and two identical ones can both sit
+    open. Two roads led there, and both are closed where rows are created.
+    """
+
+    @pytest.fixture
+    def subjectless_action(self):
+        """A planted action that declares no subject — the dataclass default,
+        so this is what forgetting looks like."""
+        package = Path(action_registry.__file__).parent
+        planted = package / f"{TAG}_nosubject.py"
+        planted.write_text(
+            "from app.approvals.actions.base import ApprovableAction, "
+            "ActionDescription, ActionResult\n"
+            "META = ApprovableAction(key='apprtest.no_subject', label='No subject',\n"
+            "                        approve_permission='sends.execute',\n"
+            "                        default_ttl_seconds=3600,\n"
+            "                        requester_may_decide=True)\n"
+            "def describe(db, payload, *, brand_id=None):\n"
+            "    return ActionDescription(summary='nothing', rows=[])\n"
+            "def execute(db, payload, *, choice=None, brand_id=None):\n"
+            "    return ActionResult(ok=True)\n"
+        )
+        action_registry._registry_mtime = None
+        try:
+            yield "apprtest.no_subject"
+        finally:
+            planted.unlink(missing_ok=True)
+            action_registry._registry_mtime = None
+
+    def test_an_action_declaring_no_subject_cannot_be_held(self, db, subjectless_action):
+        before = db.query(PendingActionDB).filter(
+            PendingActionDB.action_key == subjectless_action).count()
+
+        with pytest.raises(approvals.SubjectRequired, match="declares no subject"):
+            approvals.request_approval(
+                db, subjectless_action, payload={}, summary="x",
+                requested_by_type=ACTOR_USER, brand_id=1,
+            )
+        db.rollback()
+
+        assert db.query(PendingActionDB).filter(
+            PendingActionDB.action_key == subjectless_action).count() == before
+
+    def test_an_action_with_a_subject_type_but_no_id_cannot_be_held(self, db, planted_action):
+        """The road the index entry did not name: the guard lifts the id from
+        the path by the `<subject_type>_id` convention, so a route whose
+        parameter is named otherwise produced a NULL id for an action that does
+        declare a subject."""
+        with pytest.raises(approvals.SubjectRequired, match="names no marker"):
+            approvals.request_approval(
+                db, ACTION_KEY, payload=planted_action, summary="x",
+                requested_by_type=ACTOR_USER, brand_id=1, subject_id=None,
+            )
+        db.rollback()
+
+    def test_the_guard_answers_the_refusal_with_403_not_500(self, monkeypatch):
+        """Nothing caught `NotApprovable` before, so from the guard this would
+        have surfaced as a server error rather than a refusal."""
+        from tests.machine import machine
+        from tests.test_api_guard import client
+        from app.auth.permissions import SENDS_EXECUTE, VIEW
+
+        refused = []
+
+        def refuse(*args, **kwargs):
+            refused.append(True)
+            raise approvals.SubjectRequired("no subject")
+
+        # Past task-9's brand check, which would otherwise answer 409 for a send
+        # that does not exist and never reach the refusal under test. Patched on
+        # the module the REGISTRY returns: this file's autouse fixture makes the
+        # registry rediscover its actions, which loads fresh module objects, so
+        # patching `app.approvals.actions.send_fire` would miss the handler's.
+        live = action_registry.get_action_module("send.fire_send_instance")
+        monkeypatch.setattr(live, "subject_in_brand", lambda *a, **k: True)
+        monkeypatch.setattr(approvals, "request_approval", refuse)
+        with machine([VIEW, SENDS_EXECUTE]) as headers:
+            response = client.post("/delivery/send-instances/999999999/send", headers=headers)
+
+        assert refused, "the request never reached request_approval — this tests nothing"
+        assert response.status_code == 403, response.text

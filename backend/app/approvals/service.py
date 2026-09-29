@@ -57,6 +57,16 @@ class NotApprovable(Exception):
     """The action key names nothing the registry knows about."""
 
 
+class SubjectRequired(NotApprovable):
+    """The request names no subject, so nothing could keep it one of a kind.
+
+    task-15, ADR-142 addendum of 2026-09-29 (third). The one-open-request
+    index is keyed on (action_key, subject_type, subject_id), and Postgres
+    treats NULLs as distinct in a unique index — so a request without a
+    subject is invisible to it, and two identical ones can both be open.
+    """
+
+
 def now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -111,6 +121,32 @@ def request_approval(
     meta = get_action(action_key)
     if meta is None:
         raise NotApprovable(action_key)
+
+    # **Every held request names its subject** (task-15). The index that makes
+    # a request one of a kind cannot see a NULL, and there are two ways to
+    # produce one: an action that declares no subject — which is the dataclass
+    # default, so forgetting is enough — and an action that declares one but
+    # was handed no id, which the guard produces for a route whose path
+    # parameter does not follow the `<subject_type>_id` convention.
+    #
+    # The one real subject-less case is ADR-142 §10 (AI proposing settings
+    # changes), deliberately undesigned until after 1.0. Choosing what
+    # identifies a settings proposal here — one per action, or a caller key —
+    # would design §10 in advance. So this refuses, and §10 inherits the
+    # question rather than a silent default.
+    if not meta.subject_type:
+        raise SubjectRequired(
+            f"'{action_key}' declares no subject, so a held request for it could "
+            "not be kept one of a kind. A subject-less action is the ADR-142 §10 "
+            "case, which must decide what identifies such a request before one "
+            "can be held."
+        )
+    if subject_id is None:
+        raise SubjectRequired(
+            f"a request for '{action_key}' names no {meta.subject_type}, so it "
+            "could not be kept one of a kind. The subject is taken from the "
+            f"path parameter named '{meta.subject_type}_id'."
+        )
 
     ttl = ttl_seconds if ttl_seconds is not None else meta.default_ttl_seconds
     row = PendingActionDB(

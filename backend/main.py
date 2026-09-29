@@ -521,6 +521,13 @@ def _approval_required(request: Request, exc: ApprovalRequired):
                 brand_id=exc.brand_id,
                 subject_id=subject_id,
             )
+        except approvals.SubjectRequired as refusal:
+            # Fail closed, like the unmapped route above: a request that cannot
+            # be kept one of a kind is not held (task-15).
+            return JSONResponse(
+                {"detail": f"This request cannot be held for review: {refusal}"},
+                status_code=403,
+            )
         except approvals.DuplicateRequest:
             # An orchestrator that retries a held call should get the same
             # answer, not an error: the request IS pending, and saying so keeps

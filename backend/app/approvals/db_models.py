@@ -85,10 +85,13 @@ class PendingActionDB(Base):
     requested_by_id = Column(Integer, nullable=True)
 
     # Polymorphic, no foreign key, allowed to dangle — an entry must outlive
-    # what it references. Both nullable, and **that nullability is the ADR-142
-    # §10 answer**: a proposed settings change has no record to point at, so the
-    # contract accommodates it by requiring a subject of nothing rather than
-    # inventing a fake one.
+    # what it references. Both nullable in the schema, and that nullability was
+    # meant as the ADR-142 §10 answer: a proposed settings change has no record
+    # to point at. **That accommodation is withdrawn (2026-09-29, task-15).**
+    # A NULL subject is invisible to the one-open-request index below, so
+    # `request_approval` refuses any request without both. §10 must decide what
+    # identifies a settings proposal before one can be held; the columns stay
+    # nullable so that decision does not also need a migration.
     subject_type = Column(String(50), nullable=True)
     subject_id = Column(Integer, nullable=True)
 
@@ -131,7 +134,10 @@ class PendingActionDB(Base):
         ),
         # One open request per thing. A PARTIAL unique index, because a decided
         # request must not block the next one — the same idiom as
-        # `ux_content_overrides_one_active_per_module`.
+        # `ux_content_overrides_one_active_per_module`. **It holds only because
+        # every request names its subject:** Postgres treats NULLs as distinct
+        # here, so a request with a NULL subject would escape it entirely, and
+        # `request_approval` refuses one for that reason (task-15).
         #
         # **Declared here as well as in migration 0017, deliberately.** An
         # earlier version of this comment said the partial clause "cannot be
