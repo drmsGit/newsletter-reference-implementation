@@ -221,13 +221,14 @@ class TestExcludeBeatsPin:
         thing that could put them in the set, which is what makes the
         subtraction the single thing under test.
 
-        **The email address is load-bearing and was not obvious.** A block's
-        criteria resolve through `find_by_criteria`, which ends in
-        `_deduplicate_by_address` and drops anyone with no usable address —
-        so without one the block resolves to nobody and the test passes
-        against an empty exclude set rather than against the precedence.
-        That the pin path does *not* pass through the same filter is a real
-        asymmetry, logged separately.
+        **The email address was load-bearing until 2026-09-29 and no longer
+        is.** A block's criteria used to resolve through a helper that dropped
+        anyone unaddressable, so without an address the block resolved to
+        nobody and this test passed against an empty exclude set rather than
+        against the precedence. That asymmetry was task-233; the address is
+        kept here because a realistic recipient has one, not because the
+        assertion needs it — `TestExclusionReachesTheUnaddressable` below is
+        the test that would fail if it came back.
         """
         from app.recipients.consent import record_consent
         from app.recipients.db_models import AddressabilityDB, RecipientDB
@@ -303,4 +304,151 @@ class TestExcludeBeatsPin:
         assert recipient.id in {r.id for r in resolved}, (
             "a pinned, consenting recipient did not resolve at all, so the "
             "exclusion test above proves nothing"
+        )
+
+
+class TestExclusionReachesTheUnaddressable:
+    """task-233: a membership query must not ask whether somebody is reachable.
+
+    Until 2026-09-29 a rule block's criteria resolved through a helper that
+    dropped any recipient with no usable address. For an *exclude* block that
+    is backwards — dropping somebody from an exclusion puts them back in the
+    audience — so an unaddressable recipient could be pinned into a group and
+    no exclude block could remove them.
+
+    The two tests here are the two halves of the same root cause, and the
+    second is the one that leaked: the helper asked about **email**
+    addressability whatever channel was requested, so on a push send the
+    exclusion was ignored for exactly the people the push could still reach.
+    """
+
+    @pytest.fixture
+    def unaddressable(self, db, group):
+        """Consenting on email, pinned, and reachable at no address at all."""
+        from app.recipients.consent import record_consent
+        from app.recipients.db_models import RecipientDB
+
+        language = f"na-{uuid.uuid4().hex[:6]}"
+        recipient = RecipientDB(
+            external_id=f"{TAG}-{uuid.uuid4().hex[:8]}",
+            status="active", language=language,
+        )
+        db.add(recipient)
+        db.commit()
+        db.refresh(recipient)
+        record_consent(
+            db, recipient.id, "opted_in", group.brand_id,
+            channel="email", source="test",
+        )
+        service.add_member(db, group.id, recipient.id, brand_id=group.brand_id)
+        try:
+            yield recipient, language
+        finally:
+            db.rollback()
+            db.execute(text("DELETE FROM consent_events WHERE recipient_id = :r"),
+                       {"r": recipient.id})
+            db.execute(text("DELETE FROM audience_group_members WHERE recipient_id = :r"),
+                       {"r": recipient.id})
+            db.query(RecipientDB).filter(RecipientDB.id == recipient.id).delete()
+            db.commit()
+
+    def test_an_exclude_block_removes_a_recipient_with_no_address(
+        self, db, group, unaddressable
+    ):
+        recipient, language = unaddressable
+
+        service.add_block(
+            db, group.id, kind="exclude", criteria={"language": language},
+            brand_id=group.brand_id,
+        )
+
+        resolved = service.resolve_audience(db, group.id, "email")
+
+        assert recipient.id not in {r.id for r in resolved}, (
+            "an exclude block could not reach a pinned recipient who has no "
+            "address — the membership query filtered the exclusion by "
+            "reachability, which is task-233"
+        )
+
+
+class TestPushCriteriaAskAboutPush:
+    """The other half of task-233, and the larger one.
+
+    A rule block's criteria consent-gated on **email** whatever channel was
+    asked about, so a push-only recipient matched by an *include* block
+    resolved into nothing. Rule-based push audiences did not work at all —
+    only pins did — and nothing said so, because the resolver returned an empty
+    list rather than an error.
+    """
+
+    @pytest.fixture
+    def push_only(self, db, group):
+        """A push token, push consent, and no email anything."""
+        from app.recipients.consent import record_consent
+        from app.recipients.db_models import AddressabilityDB, RecipientDB
+
+        language = f"pu-{uuid.uuid4().hex[:6]}"
+        recipient = RecipientDB(
+            external_id=f"{TAG}-{uuid.uuid4().hex[:8]}",
+            status="active", language=language,
+        )
+        db.add(recipient)
+        db.commit()
+        db.refresh(recipient)
+        db.add(AddressabilityDB(
+            recipient_id=recipient.id, channel="push",
+            value={"token": f"apns-{uuid.uuid4().hex[:8]}", "platform": "apns"},
+            status="active", is_primary=True,
+        ))
+        db.commit()
+        record_consent(
+            db, recipient.id, "opted_in", group.brand_id,
+            channel="push", source="test",
+        )
+        try:
+            yield recipient, language
+        finally:
+            db.rollback()
+            db.execute(text("DELETE FROM recipient_addresses WHERE recipient_id = :r"),
+                       {"r": recipient.id})
+            db.execute(text("DELETE FROM consent_events WHERE recipient_id = :r"),
+                       {"r": recipient.id})
+            db.query(RecipientDB).filter(RecipientDB.id == recipient.id).delete()
+            db.commit()
+
+    def test_an_include_block_finds_a_push_only_recipient_on_push(
+        self, db, group, push_only
+    ):
+        recipient, language = push_only
+
+        service.add_block(
+            db, group.id, kind="include", criteria={"language": language},
+            brand_id=group.brand_id,
+        )
+
+        resolved = service.resolve_audience(db, group.id, "push")
+
+        assert recipient.id in {r.id for r in resolved}, (
+            "a push-consenting recipient was not found by a push audience's "
+            "include block, because the criteria asked about email consent"
+        )
+
+    def test_the_same_recipient_is_not_in_the_email_audience(
+        self, db, group, push_only
+    ):
+        """The channel is doing real work, not being ignored. Without this the
+        test above would pass against a resolver that stopped consent-gating
+        criteria at all — which would be a far worse bug than the one fixed."""
+        recipient, language = push_only
+
+        service.add_block(
+            db, group.id, kind="include", criteria={"language": language},
+            brand_id=group.brand_id,
+        )
+
+        resolved = service.resolve_audience(db, group.id, "email")
+
+        assert recipient.id not in {r.id for r in resolved}, (
+            "a recipient who consented to push and never to email was resolved "
+            "into an email audience"
         )

@@ -242,6 +242,7 @@ def find_by_criteria(
     db: Session,
     brand_id: int,
     *,
+    channel: str,
     language: str | None = None,
     status: str | None = None,
     preference_category_id: int | None = None,
@@ -264,7 +265,14 @@ def find_by_criteria(
     # to ask "consenting to WHOM". Before brand_id was threaded here, every
     # brand's audience resolved against every brand's consent — the authoring
     # side was scoped and the send side was not.
-    q = db.query(RecipientDB).filter(is_consenting_filter(brand_id))
+    # **On THIS channel.** `is_consenting_filter` defaults to email, and this
+    # call used the default until 2026-09-29 — so a push rule block asked
+    # whether these people had consented to *email*, and a push-only recipient
+    # matched by an include block resolved into nothing. Same class of failure
+    # as `resolve_audience`'s own channel default (ADR-176 addendum
+    # 2026-09-27), one layer further in, which is why `channel` is required
+    # here too rather than defaulted for convenience.
+    q = db.query(RecipientDB).filter(is_consenting_filter(brand_id, channel))
 
     if language:
         q = q.filter(RecipientDB.language == language)
@@ -288,75 +296,24 @@ def find_by_criteria(
         signals = operational_signals_for_category(db, preference_category_id)
         records = [r for r in records if signals.get(r.id, 0.0) >= min_score]
 
-    return _deduplicate_by_address(db, records)
-
-
-def _deduplicate_by_address(
-    db: Session, records: list[RecipientDB]
-) -> list[RecipientDB]:
-    """One address yields one recipient.
-
-    Two recipient rows can legitimately share an address — a shared team inbox,
-    `info@`, a household — so ADR-163's 2026-09-12 addendum (point 3) rejected a
-    uniqueness constraint and put deduplication in the **addressability** stage
-    of the point 7 exclusion stack instead. Without it the same inbox receives
-    the send twice, and a segment preview over-reports.
-
-    Deduplicating on the *resolved* address rather than `RecipientDB.email` is
-    what makes this survive phase B, when that column goes away: a recipient is
-    identified here by the address they would actually be sent to, chosen by the
-    point 11 rules (primary flag, else most-recently-verified).
-
-    A recipient with no usable address is dropped here too — they are not
-    addressable on this channel, which is precisely what stage 1 means.
-
-    Exclusions are logged rather than recorded to a table: the durable,
-    per-recipient exclusion record point 8 requires arrives with the full
-    ordered stack, in the P0 fix. Losing someone silently is the failure mode
-    that made the P0 read as a rendering bug, so until then this at least says
-    so out loud.
-    """
-    if not records:
-        return []
-
-    # One query for the whole candidate set, not one per recipient. ADR-163
-    # point 10 requires each stage to be a set operation precisely so that
-    # per-stage attribution does not cost the N+1 the send path is already
-    # flagged for — resolving addresses in the loop would reintroduce it on the
-    # audience path, where segments are largest.
-    addresses = resolve_emails(db, [r.id for r in records])
-
-    seen: set[str] = set()
-    kept: list[RecipientDB] = []
-    unaddressable: list[int] = []
-    duplicates: list[int] = []
-    for record in records:
-        address = addresses.get(record.id)
-        if not address:
-            unaddressable.append(record.id)
-            continue
-        if address in seen:
-            duplicates.append(record.id)
-            continue
-        seen.add(address)
-        kept.append(record)
-
-    # Logged in bulk for the same reason — one line per stage, not per person.
-    if unaddressable:
-        logger.info(
-            "audience: %d recipient(s) excluded — no usable address on the "
-            "email channel: %s",
-            len(unaddressable),
-            unaddressable,
-        )
-    if duplicates:
-        logger.info(
-            "audience: %d recipient(s) excluded — duplicate address, already "
-            "covered by an earlier recipient in this resolution: %s",
-            len(duplicates),
-            duplicates,
-        )
-    return kept
+    # **No addressability filter and no deduplication here** (task-233,
+    # 2026-09-29). Both moved to stage 1 of the ADR-163 point 7 exclusion
+    # stack, where that record's 2026-09-12 addendum point 3 put them and
+    # where the channel is already handled correctly.
+    #
+    # They were wrong in this function in two directions at once. An *exclude*
+    # block's criteria resolve through here, and dropping somebody from an
+    # exclusion puts them back in the audience — so an unaddressable recipient
+    # could be pinned in and no exclude block could remove them. And an
+    # *include* block asking about a non-email channel resolved against email
+    # addressability, so a push-only recipient could not be included at all.
+    #
+    # The trade, stated because it is real: a resolved audience now counts
+    # people the send will drop at stage 1. That is the honest split —
+    # membership answers "who did the manager mean", addressability answers
+    # "who can be reached", and the second is recorded per recipient with a
+    # reason (point 8) instead of vanishing into a log line here.
+    return records
 
 
 def bulk_add_members(
@@ -399,15 +356,22 @@ def bulk_add_members(
 # Rule blocks — live, editable criteria that make up a group's audience
 # ---------------------------------------------------------------------------
 
-def _recipients_for_criteria(db: Session, criteria: dict, brand_id: int) -> list[RecipientDB]:
+def _recipients_for_criteria(
+    db: Session, criteria: dict, brand_id: int, channel: str
+) -> list[RecipientDB]:
     """Resolve one block's criteria to consenting recipients. Thin adapter over
     find_by_criteria so blocks and the older bulk-add path share one definition
-    of what a criterion means."""
+    of what a criterion means.
+
+    `channel` is required for the reason `find_by_criteria` states: consent is
+    keyed `(recipient, brand, channel, purpose)`, so which people a criterion
+    matches depends on it."""
     criteria = criteria or {}
     cat = criteria.get("category_id")
     return find_by_criteria(
         db,
         brand_id,
+        channel=channel,
         language=criteria.get("language") or None,
         status=criteria.get("status") or None,
         preference_category_id=int(cat) if cat not in (None, "") else None,
@@ -415,8 +379,14 @@ def _recipients_for_criteria(db: Session, criteria: dict, brand_id: int) -> list
     )
 
 
-def count_for_criteria(db: Session, criteria: dict, brand_id: int) -> int:
-    return len(_recipients_for_criteria(db, criteria, brand_id))
+def count_for_criteria(
+    db: Session, criteria: dict, brand_id: int, channel: str
+) -> int:
+    """How many people a criterion matches on one channel.
+
+    There is no channel-less count (ADR-176 point 5), which is why this takes
+    one rather than defaulting."""
+    return len(_recipients_for_criteria(db, criteria, brand_id, channel))
 
 
 def list_blocks(
@@ -580,7 +550,7 @@ def resolve_audience(
     include_ids: set[int] = set()
     exclude_ids: set[int] = set()
     for block in blocks:
-        ids = {r.id for r in _recipients_for_criteria(db, block.criteria, brand_id)}
+        ids = {r.id for r in _recipients_for_criteria(db, block.criteria, brand_id, channel)}
         if block.kind == "exclude":
             exclude_ids |= ids
         else:
@@ -708,8 +678,21 @@ def campaign_category_scores(db: Session, campaign_id: int) -> list[dict]:
 
 def suggest_include_blocks_for_campaign(db: Session, campaign_id: int, max_categories: int = 5) -> list[dict]:
     """Proposed (not yet persisted) include blocks for a campaign: one per top
-    category its content covers, each with a default min-score and a live count
-    so the manager sees the impact before accepting."""
+    category its content covers, each with a default min-score.
+
+    **Channel-blind, and that is right rather than an omission.**
+    `campaign_category_scores` reads every variant whatever its channel,
+    because a push variant of a hiking campaign is still about hiking. A
+    suggestion is a topic proposal, and the topic does not change per channel.
+
+    **It carried a `count` per suggestion until 2026-09-29 and no caller ever
+    read it.** The docstring said it was there "so the manager sees the impact
+    before accepting", which is a real requirement and was never wired to a
+    screen — both callers here take `criteria` and `label` and discard the
+    rest. It was removed with the channel work rather than threaded through,
+    because a count is exactly the thing ADR-176 point 5 forbids being
+    channel-less: whoever builds the screen asks `count_for_criteria` with the
+    channel in hand, which is one call and cannot be wrong by default."""
     suggestions = []
     for row in campaign_category_scores(db, campaign_id)[:max_categories]:
         criteria = {"category_id": row["category_id"], "min_score": DEFAULT_SUGGESTION_MIN_SCORE}
@@ -717,7 +700,6 @@ def suggest_include_blocks_for_campaign(db: Session, campaign_id: int, max_categ
             "label": f"Interested in {row['category_name']}",
             "criteria": criteria,
             "content_score": row["content_score"],
-            "count": count_for_criteria(db, criteria, _brand_of_campaign(db, campaign_id)),
         })
     return suggestions
 

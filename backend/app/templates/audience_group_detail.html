@@ -113,6 +113,13 @@
         <div class="d-flex justify-content-between align-items-center mb-1">
             <h5 class="mb-0">Audience rules</h5>
             <span class="badge bg-dark fs-6">{{ resolved_count }} recipient(s) net</span>
+            {% if unreachable_count %}
+            {# ADR-163 addendum point 3: the drop is reported, not silent. #}
+            <span class="badge bg-warning text-dark fs-6"
+                  title="They match the rules and consent, but have no usable email address. Fix the address in the CRM.">
+                {{ unreachable_count }} unreachable
+            </span>
+            {% endif %}
         </div>
         <p class="text-muted small mb-3">
             <strong>Include</strong> blocks combine with OR; <strong>exclude</strong> blocks are subtracted from them

@@ -923,10 +923,10 @@ class TestConsentIsScopedToTheSendingBrand:
         other = temp_brand()
 
         mine = audience_service.find_by_criteria(
-            db, default_brand.id, language="test-brand-consent"
+            db, default_brand.id, channel="email", language="test-brand-consent"
         )
         theirs = audience_service.find_by_criteria(
-            db, other.id, language="test-brand-consent"
+            db, other.id, channel="email", language="test-brand-consent"
         )
 
         assert consenting_recipient.id in {r.id for r in mine}

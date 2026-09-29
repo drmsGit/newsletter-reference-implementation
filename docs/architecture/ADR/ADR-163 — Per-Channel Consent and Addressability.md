@@ -8,7 +8,7 @@ topic:
   - privacy
   - data-model
 created: 2026-09-01
-modified: 2026-09-15
+modified: 2026-09-29
 source:
   - "Omni-Channel design interview (interview-prep, closed 2026-09-01), Cluster 4 / Q16–Q20"
 depends_on:
@@ -159,6 +159,58 @@ The refusal stands because [[ADR-120 — CRM as Customer Source of Truth]] makes
 **Blocked on this work: the category graph's brand filter.** [[ADR-150 — Tenancy and Access Model]]'s second 2026-09-15 addendum defines a brand's audience as everyone who has consented to that brand, which is inexpressible until this change exists; that record notes the dependency from its side, and this is the other end of it.
 
 **The costs, stated plainly.** This requires the adopter's CRM to model brands the way this platform does — the kind of assumption about somebody else's system that [[ADR-126 — Maintain Local Recipient Projection]]'s local projection exists to avoid, and a widening of what Decision point 5 already demands of a single-flag CRM: not one grid now, but one per brand. It was chosen anyway, because the alternative silently manufactures consent, and there is no third option that is both quiet and honest. The rest follows from the wider key. Every read path gains a dimension it must be *passed* rather than default, since a defaulted brand inside a gate is exactly the fail-open this addendum refuses at the CRM boundary. Every write path has to name one — the `source="import"` event in `create_recipient`, the CRM sync, the provider suppression. And a person who hears from three brands now carries three cells per `(channel, purpose)` instead of one, which is the ordinary price of the grid and the same price the channel dimension already charges.
+
+## Addendum 2026-09-29 — the 2026-09-12 addendum's point 3 is implemented, seventeen days late and after it caused a leak
+
+**Point 3 of the 2026-09-12 addendum said address deduplication belongs in
+stage 1 of the point 7 exclusion stack. It stayed in
+`audience.service.find_by_criteria` until today**, and the helper that did it
+carried a docstring citing the very placement it was not honouring. That gap
+was not cosmetic: it is what the exclusion stack existed to make impossible.
+
+**What the wrong placement cost.** A rule block's criteria resolved through
+that helper, which dropped any recipient with no usable address. For an
+**exclude** block that is backwards — dropping somebody from an exclusion puts
+them back in the audience — so an unaddressable recipient could be pinned into
+a group and no exclude block could remove them. And because the helper resolved
+**email** addresses whatever channel was asked about, the failure had a second
+face: a push-only recipient could not be matched by an *include* block either,
+so rule-based push audiences resolved to nobody and said nothing. Both were
+verified against the development database before the fix, and the first is a
+direct hole in [[ADR-176 — A Negative Decision Outranks a Positive One]] point
+1, which had shipped the day before on the assumption that an exclusion reaches
+everybody its criteria match.
+
+**What changed.** `find_by_criteria` takes a **required** `channel`, gates
+consent on it, and no longer filters by addressability or deduplicates.
+Deduplication is now part of stage 1, beside the addressability check that was
+already there and already per channel — and the dropped duplicate carries a
+recorded exclusion reason naming the recipient that covered the address, which
+is the point 8 property the old site could not provide. Earliest id wins,
+deterministically.
+
+**The rider is honoured on the screen rather than in the resolver.** Point 3
+required that *"the audience preview must run the same addressability stage, or
+a displayed count over-reports what will actually send"*. That is now literally
+true: the group-detail page runs `run_exclusion_stack` over the resolved set
+and reports reachable and unreachable as two numbers. Running the real stack is
+the stricter reading of the rider than the resolver's own copy ever was — a
+second implementation of an addressability rule is a thing that drifts, and
+this one had drifted for seventeen days without a single failing test.
+
+**The cost, stated because it is real.** A resolved audience now counts people
+the send will drop, and `prepare_send_from_audience` materialises an execution
+for each of them before stage 1 excludes it. That is the honest split —
+membership answers who the manager meant, the stack answers who can be reached
+— and it buys the recorded reason. It also means the recipient cap is checked
+against the planned set rather than the reachable one, which is the
+conservative direction for a guardrail.
+
+**A note for whoever reads the tests.** `test_consent_gates.py`'s header had
+predicted this move in writing — *"the assertion must hold before and after;
+only its implementation site moves"* — and the assertion did survive
+unchanged. The prediction was right and nothing acted on it for seventeen days,
+which is the same failure mode as an accepted ADR nobody tracked.
 
 ## Related ADRs
 

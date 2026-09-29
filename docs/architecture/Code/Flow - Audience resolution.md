@@ -44,12 +44,14 @@ graph TD
 
 ## Step by step ([[audience]] `resolve_audience`)
 
-1. **Load the blocks.** Each `AudienceRuleBlockDB` carries a `criteria` payload (language × status × category × min-score). `_recipients_for_criteria` evaluates it to a recipient set — a category min-score uses the recipient's **live [[insight]] signal**, so "interested in Hiking ≥ 40" re-evaluates as behavior changes.
+1. **Load the blocks.** Each `AudienceRuleBlockDB` carries a `criteria` payload (language × status × category × min-score). `_recipients_for_criteria` evaluates it to a recipient set — a category min-score uses the recipient's **live [[insight]] signal**, so "interested in Hiking ≥ 40" re-evaluates as behavior changes. **It gates on consent for the channel being resolved**, which it did not before 2026-09-29: a push block asked about email consent, so a push-only recipient could not be included at all.
 2. **Union the includes.** All `kind="include"` blocks combine with **OR** — stack "interested in Hiking" OR "interested in Food", each editable/counted independently.
 3. **Union the pins.** `AudienceGroupMemberDB` manual pins join the include set. They are hand-picked people alongside the rules ("keep both"), and unlike the rules they are stored rows rather than a live query.
 4. **Subtract the excludes.** All `kind="exclude"` blocks are unioned and removed from the includes **and the pins together** — so **an exclude block removes a hand-pinned recipient** ([[ADR-176 — A Negative Decision Outranks a Positive One]] point 1, 2026-09-29). This reverses the 2026-07-26 rule, under which pins were added back *after* this step and survived it; the order of steps 3 and 4 is the whole decision.
 5. **Apply the consent floor.** The result is filtered to `consent_status == "opted_in"` ([[recipients]] `CONSENTING_STATUS`). A non-consenting recipient is excluded even if pinned (legal, non-negotiable) — and unlike an exclude block this floor is not a precedence question between two people's intentions at all.
-6. **Return** the recipient rows (ordered by email).
+6. **Return** the recipient rows (ordered by id).
+
+**What this deliberately does not do: ask whether anybody is reachable.** Until 2026-09-29 step 1 also dropped every recipient with no usable email address. That narrowed *exclude* blocks, which is backwards — dropping somebody from an exclusion puts them back in the audience — so an unaddressable recipient could be pinned in and no exclude block could remove them. Membership now answers *who did the manager mean*; addressability and address deduplication are stage 1 of the send-time exclusion stack, where [[ADR-163 — Per-Channel Consent and Addressability]]'s 2026-09-12 addendum point 3 put them, and where the drop carries a recorded reason instead of a log line. **A screen showing a count runs that stage too** — that addendum's rider — so the group page reports reachable and unreachable separately rather than one number that flatters.
 
 ## Where this is used
 

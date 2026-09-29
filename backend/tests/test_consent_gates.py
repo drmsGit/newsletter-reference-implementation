@@ -274,6 +274,25 @@ def db():
             self.session.commit()
             return send_instance, execution
 
+        def also_send_to(self, send_instance, recipient):
+            """A second execution on an existing send.
+
+            Only the duplicate-address test needs this: two recipient rows
+            sharing one inbox have to be on the *same* send for stage 1 to see
+            them together, since deduplication is per resolution and not
+            global.
+            """
+            execution = DeliveryExecutionDB(
+                send_instance_id=send_instance.id,
+                recipient_id=recipient.id,
+                status="created",
+                provider="mock",
+            )
+            self.session.add(execution)
+            self.session.flush()
+            self.session.commit()
+            return execution
+
     tracker = Tracker(session)
     session.commit()
     try:
@@ -330,7 +349,7 @@ class TestGateA_AudienceResolutionScope:
         recipient = db.recipient("opted_in", language="test-lang-in")
         db.session.commit()
 
-        found = find_by_criteria(db.session, _brand(db.session), language="test-lang-in")
+        found = find_by_criteria(db.session, _brand(db.session), channel="email", language="test-lang-in")
 
         assert recipient.id in {r.id for r in found}
 
@@ -339,7 +358,7 @@ class TestGateA_AudienceResolutionScope:
         recipient = db.recipient(consent_status, language="test-lang-out")
         db.session.commit()
 
-        found = find_by_criteria(db.session, _brand(db.session), language="test-lang-out")
+        found = find_by_criteria(db.session, _brand(db.session), channel="email", language="test-lang-out")
 
         assert recipient.id not in {r.id for r in found}, (
             f"a recipient with consent_status={consent_status!r} reached the "
@@ -476,27 +495,35 @@ class TestGateC_DecisioningRefusesNonConsenting:
         )
 
 
-class TestAddressDeduplication:
-    """One address yields one recipient.
+class TestAddressabilityIsAnsweredAtSendTime:
+    """One address yields one recipient — but the answer moved layers.
 
-    RecipientDB.email carries no unique constraint, so a bad import can produce
-    two rows for one inbox; find_by_criteria dedupes so a segment preview does
-    not double-count and a send does not arrive twice.
+    `RecipientDB` carries no uniqueness constraint on an address and ADR-163's
+    2026-09-12 addendum point 3 rejected adding one, because two recipient rows
+    legitimately sharing an inbox is a real case. That addendum put the
+    deduplication in **stage 1 of the exclusion stack**, and this file's header
+    said so while the code did it in `find_by_criteria` instead: *"the assertion
+    must hold before and after; only its implementation site moves."*
 
-    ADR-163's 2026-09-12 addendum moves this into stage 1 of the exclusion stack
-    (recorded rather than silent), and rejects a uniqueness constraint because
-    two recipients legitimately sharing an address is a real case. The assertion
-    here must therefore still hold after the migration — only where it happens
-    changes.
+    **It moved on 2026-09-29** (task-233), because the old site was wrong in two
+    directions at once — it narrowed *exclude* block criteria, so an
+    unaddressable recipient could not be excluded from an audience at all, and
+    it resolved *email* addresses whatever channel was asked about, so a
+    push-only recipient could not be included either.
+
+    So the pair below asserts both halves of the new split: membership does not
+    ask whether you are reachable, and the send does.
     """
 
-    def test_recipient_with_no_address_is_excluded(self, db):
-        """Consent is not enough — you also have to be reachable.
+    def test_a_recipient_with_no_address_still_resolves_into_the_audience(self, db):
+        """The behaviour change, pinned on the side that changed.
 
-        Stage 1 of the ADR-163 point 7 stack is addressability: a valid,
-        non-expired address for this channel. A fully opted-in recipient with no
-        address row is not addressable, and previously would have been handed to
-        the provider as an empty string.
+        Before 2026-09-29 this recipient was dropped by `find_by_criteria`, and
+        the test here asserted exactly that. Membership now answers "who did the
+        manager mean" and leaves "who can be reached" to stage 1 — see
+        `TestSendTimeConsentRevocation.test_unaddressable_recipient_is_excluded_at_stage_one`,
+        which is where that person is now dropped, with a recorded reason rather
+        than a log line.
         """
         recipient = db.recipient("opted_in", language="test-lang-noaddr")
         db.session.query(AddressabilityDB).filter(
@@ -504,26 +531,53 @@ class TestAddressDeduplication:
         ).delete(synchronize_session=False)
         db.session.commit()
 
-        found = find_by_criteria(db.session, _brand(db.session), language="test-lang-noaddr")
-
-        assert recipient.id not in {r.id for r in found}, (
-            "a recipient with consent but no address resolved into the "
-            "audience — they are not reachable on this channel"
+        found = find_by_criteria(
+            db.session, _brand(db.session), channel="email",
+            language="test-lang-noaddr",
         )
 
-    def test_two_recipients_sharing_an_address_yield_one(self, db):
+        assert recipient.id in {r.id for r in found}, (
+            "an unreachable recipient was filtered out of a membership query — "
+            "the filter that did this is what made an exclude block unable to "
+            "reach a pinned recipient (task-233)"
+        )
+
+    def test_two_recipients_sharing_an_address_yield_one_at_send(self, db):
+        """The assertion that had to survive the move, now made where it lives.
+
+        And it gains something the old site could not give: the loser is
+        *recorded* as excluded with a stated reason, which is what ADR-163
+        point 8 asks for. Under the old deduplication they simply were not in
+        the list, and nobody could answer why."""
         shared = f"shared-{uuid.uuid4()}@example.invalid"
         first = db.recipient("opted_in", email=shared, language="test-lang-dupe")
         second = db.recipient("opted_in", email=shared, language="test-lang-dupe")
+        send_instance, first_execution = db.send_to(first)
+        second_execution = db.also_send_to(send_instance, second)
         db.session.commit()
 
-        found = find_by_criteria(db.session, _brand(db.session), language="test-lang-dupe")
+        send_send_instance(
+            db.session, send_instance.id, brand_id=send_instance.brand_id)
+        db.session.refresh(first_execution)
+        db.session.refresh(second_execution)
 
-        matching = [r for r in found if r.id in {first.id, second.id}]
-        assert len(matching) == 1, (
-            "two recipient rows sharing one address both resolved — the same "
-            "inbox would receive the send twice"
+        statuses = {first_execution.status, second_execution.status}
+        assert "excluded" in statuses, (
+            "two recipient rows sharing one address both went out — the same "
+            "inbox received the send twice"
         )
+        assert statuses != {"excluded"}, (
+            "both were excluded, so the shared inbox received nothing at all"
+        )
+        loser = (
+            second_execution if second_execution.status == "excluded"
+            else first_execution
+        )
+        assert "addressability" in (loser.exclusion_reason or ""), (
+            "the duplicate was dropped without a recorded reason, which is the "
+            "silent loss ADR-163 point 8 exists to prevent"
+        )
+        assert "duplicate" in (loser.exclusion_reason or "")
 
 
 class TestConsentEventsAndDrift:

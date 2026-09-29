@@ -6,7 +6,8 @@ who fails any stage is excluded **with the reason recorded** — which is the
 whole point, and the property whose absence made the open P0 read as a
 rendering behaviour rather than a compliance defect (point 8).
 
-    1. addressability — is there a valid address for this channel?
+    1. addressability — is there a valid address for this channel, and is this
+                        the first recipient to claim it?
     2. consent        — is there a grant for this (channel, purpose)?
     3. suppression    — hard bounce, complaint, manual blocklist
     4. frequency      — post-POC (ADR-161 point 8)
@@ -133,6 +134,43 @@ def run_exclusion_stack(
             )
         )
     surviving -= unaddressable
+
+    # One address yields one recipient. `RecipientDB` carries no uniqueness
+    # constraint on an address and ADR-163's 2026-09-12 addendum point 3
+    # rejected adding one, because two recipient rows legitimately sharing an
+    # inbox is a real case — a shared team address, `info@`, a household. The
+    # same addendum placed the deduplication **here, in stage 1**.
+    #
+    # It lived in `audience.service._deduplicate_by_address` until 2026-09-29,
+    # which was the wrong layer in two directions: it narrowed *exclude* block
+    # criteria, so an unaddressable recipient could not be excluded at all, and
+    # it resolved email addresses whatever channel was asked about. Both are
+    # answered by being here — the addresses above are already this channel's.
+    #
+    # **Earliest id wins**, deterministically. The audience query orders by id
+    # and so does this, so which of two rows survives does not depend on what
+    # the database happened to return.
+    #
+    # The survivor is kept and the rest are *recorded* rather than dropped into
+    # a log line, which is the substantive gain over the old site: point 8 asks
+    # why a given person did not receive a mail, and "another recipient row has
+    # the same address" is an answer somebody will need.
+    seen: dict[str, int] = {}
+    duplicates: set[int] = set()
+    for recipient_id in sorted(surviving):
+        address = addresses[recipient_id]
+        first = seen.setdefault(address, recipient_id)
+        if first != recipient_id:
+            duplicates.add(recipient_id)
+            exclusions.append(
+                Exclusion(
+                    recipient_id,
+                    STAGE_ADDRESSABILITY,
+                    f"duplicate {channel} address, already covered by "
+                    f"recipient {first}",
+                )
+            )
+    surviving -= duplicates
 
     # --- Stage 2: consent --------------------------------------------------
     # The latest (recipient, brand, channel, purpose) event must be a grant.
