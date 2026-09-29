@@ -3,9 +3,10 @@ id: TASK-14
 title: >-
   The status transition is committed before several fallible preflight steps,
   and outside the handler that would undo it.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-09-29 19:07'
 labels:
   - backend
 dependencies: []
@@ -25,3 +26,9 @@ ordinal: 101400
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 64, section "Bugs", position 14 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fixed both ways the entry named. Read-only preflight (snapshot, provider, channel) now runs before the sending claim, so a refused send keeps its status and is retryable; everything after the claim is one helper wrapped in a handler that catches any exception, rolls back and marks the send failed (retryable) instead of stranding it in sending. Verified by three tests — including a real database error past the claim, so the rollback is actually exercised — that the original function fails; two narrower handler mutations also caught. 733 tests pass. Known and unchanged: a scheduled send refused before the claim stays scheduled and is retried each scheduler tick, as a required-field refusal already was.
+<!-- SECTION:FINAL_SUMMARY:END -->
