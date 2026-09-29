@@ -374,6 +374,83 @@ Nothing else in §4 changes: the held action still lives in the platform, the in
 audit trail are still the ones shared with ADR-141, email and push are still
 notification only, and expiry still applies to whatever action declares a deadline.
 
+## Addendum 2026-09-29 (second) — a held request's subject must belong to its brand
+
+Prompted by task-9, reproduced by a test the same day and decided by the user on
+2026-09-29. §4's *"the platform holds the pending action"* stands; what changes is
+which subjects the platform will hold an action for.
+
+**How a held request is raised.** A machine integration without unattended sending
+that calls `POST /delivery/send-instances/{send_instance_id}/send` meets
+`ApprovalRequired` in the generic API guard, `enforce_api_policy` in
+`backend/app/auth/dependencies.py`, which runs before any service has resolved the
+addressed row. The handler `_approval_required` in `backend/main.py` then creates the
+held request and answers 202, taking `brand_id` from the caller's declared brand and
+`subject_id` from the path parameter by convention (`<subject_type>_id`). Nothing on
+that path asks whether the subject belongs to that brand.
+
+**What that allowed.** A credential on brand A naming brand B's send id received a 202
+and a pending row branded A whose subject is B's send. The content was already
+protected since 2026-09-20: `summarise` and `describe` resolve within the row's brand
+and report the subject as no longer present, and `execute` is handed the row's brand,
+so approving refuses. The queue entry therefore called the residue *noise, not risk*.
+
+**That was wrong, and the reason is the open-request index.**
+`ux_pending_actions_one_open_per_subject` is keyed on (action_key, subject_type,
+subject_id) with no brand. A's row occupied B's send's slot. When B's own machine then
+asked to fire its own send, it hit `DuplicateRequest`, and the handler's retry branch —
+which looked the held row up without a brand filter — answered brand B with brand A's
+`pending_action_id`. B's orchestrator believed its send was held for review, in an
+inbox where nobody could see or approve it, for as long as A's row lived; and A could
+re-occupy the slot whenever it lapsed. That is one brand blocking another's sending,
+which is the boundary [[ADR-172 — The Working Brand Is Resolved Once and Carried Into Every Query]]
+draws.
+
+**1. A held request's subject must resolve within the brand the request is raised in,
+or nothing is held.** The handler asks the action before it creates any row. A subject
+outside the declared brand is answered 409 with the same `SendInstance {id} not found`
+detail the unattended path gives for a foreign or nonexistent send — there
+`send_send_instance` raises `ValueError` and the route in `backend/app/delivery/router.py`
+maps it to 409. The two paths answer identically, so the refusal is not itself an
+oracle for *exists in another brand*.
+
+**2. The check lives on the action, not on the route map.** Actions gain an optional
+hook, `subject_in_brand(db, subject_id, *, brand_id) -> bool`, which `send_fire`
+implements. Action modules already resolve their subject within a brand for
+`summarise` and `describe`, so that is where the knowledge is, and `APPROVABLE_ROUTES`
+stays a plain route-to-action map. The queue entry had suggested making
+`APPROVABLE_ROUTES` name a resolver; this is the same fix, placed where the knowledge
+already lives rather than duplicated beside the route table.
+
+**3. It fails closed.** An action that declares a subject but has no hook is refused
+from the guard rather than held — the same posture as a route with no approvable action
+mapped to it.
+
+**4. The retry lookup is brand-filtered**, so one brand is never answered with another
+brand's `pending_action_id`. If the slot is held by another brand's request — possible
+only for rows created before this fix — the answer is a neutral 409 that carries no id.
+
+**5. The unique index is unchanged.** Its key still carries no brand. Once a foreign
+row cannot be created, adding brand to the key would be a migration with no
+behavioural gain.
+
+**6. [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]] point 5 is
+narrowed, not contradicted.** Point 5 holds an integration without unattended sending
+at 202 rather than refusing it. That governs the sends the caller may address; a
+subject outside the caller's brand was never one of those.
+
+**What it costs.**
+
+- **An action added later that declares a subject but forgets the hook is refused from
+  the guard.** That is intended, and the message says why.
+- **Pre-existing foreign rows, if any, still occupy their slot until they expire.** They
+  are answered 409, not mis-attributed.
+- **One extra lookup per held request.**
+
+Nothing else in §4 changes: the inbox, the audit trail shared with ADR-141, the
+notification-only rule for email and push, and the state-based claim of the addendum
+above are untouched.
+
 ## Related ADRs
 
 ### Depends On
