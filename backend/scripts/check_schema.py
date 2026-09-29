@@ -15,6 +15,11 @@ not migrated — so every query touching snapshots failed, which included the on
 the dashboard runs on sign-in. Signing in returned a 500 and the cause was four
 layers from the symptom.
 
+**Since 2026-09-29 it has a caller** (ADR-181): `scripts/migrate.py
+--baseline` runs it first and refuses to record a baseline while it reports a
+difference. The ledger that answers "which migrations has this database had" is
+`app/schema_migrations.py`; this answers the narrower "do its columns match".
+
 **This is a detector, not a runner.** It reports what is missing and does not
 apply anything, because a script that silently ALTERs a database holding real
 work is a worse failure than the one it prevents. Run it, read it, apply the
@@ -26,8 +31,13 @@ import sys
 
 from sqlalchemy import inspect
 
-import main  # noqa: F401 — imports every router, and therefore every model
 from app.database import Base, engine
+from app.schema_migrations import import_all_models
+
+# Not `import main`, which this used to do: main now runs ADR-181's startup
+# check, and `migrate.py --baseline` calls this script precisely when that
+# check is refusing. Walking the db_models modules registers the same tables.
+import_all_models()
 
 
 def main_() -> int:

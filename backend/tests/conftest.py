@@ -108,6 +108,33 @@ _ensure_database_exists(TEST_DATABASE_URL)
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
 
+def _record_as_built_from_the_models() -> None:
+    """Tell ADR-181's startup check that this database is at head.
+
+    **True by construction, and it has to be said before `main` is imported.**
+    Test modules import `main` at collection time, which runs the startup
+    check, and that happens before `_known_state` below drops and rebuilds the
+    schema. Without this, the first migration added after a test database was
+    created would make the suite refuse to start — against a database that is
+    about to be rebuilt from the models anyway.
+
+    `built` rather than `baseline`: nobody checked anything; the schema is the
+    models' because the fixture makes it so. What this does NOT prove is that
+    the migrations build the same schema — that is task-12.
+    """
+    from app.database import engine, SessionLocal
+    from app import schema_migrations
+
+    schema_migrations.SchemaMigrationDB.__table__.create(bind=engine, checkfirst=True)
+    with SessionLocal() as session:
+        schema_migrations.record(
+            session, schema_migrations.migration_files(), schema_migrations.BUILT,
+        )
+
+
+_record_as_built_from_the_models()
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _known_state():
     """Build the schema and put a known dataset in it, once per run.
@@ -150,6 +177,9 @@ def _known_state():
     # and this is the only way to be sure the suite is running against them.
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+    # drop_all took the ledger with it; the rebuilt schema is the models', so
+    # say so again for anything in this run that reads the ledger.
+    _record_as_built_from_the_models()
 
     session = SessionLocal()
     try:

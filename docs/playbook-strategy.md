@@ -374,6 +374,18 @@ and the authentication question the React manager client was blocked on.
 
 **Status:** 685 tests passing. **What the composer still owes** is the client work the field model unblocked, and the three `hero` modules waiting on a headline a person has to write.
 
+### 2026-09-29 — A database records which migrations it has had (ADR-181)
+
+**Context:** task-1, the top of Bugs after the audience work, closed with an instruction rather than a fix: *"Take that decision consciously rather than by attrition."* The no-Alembic choice in `CODE-REVIEW-BRIEF.md` had a bill nobody had paid — nothing recorded which migrations a database had had, and on 2026-09-20 a missed column rename turned sign-in into a 500 four layers from its cause.
+
+1. **Three options, and the chosen one refines a deliberate omission rather than reversing it.** A startup schema check alone was rejected because **a column comparison cannot see a data migration** — a database missing 0020 passes it and still renders heroes wrong. Alembic was rejected because the brief's argument was against a *generated chain*, and that argument still holds. What was chosen is a ledger: the files stay hand-written and meant to be read, and a database now remembers which of them it has had. [[ADR-181 — A Database Records Which Migrations It Has Had]], drafted by the adr-author agent from the decided points — the first record written that way by instruction.
+
+2. **Refuse at boot, never apply at boot.** The application stops while a file is pending and names it; only a person running the runner changes a database. A ledger row says *how* it got there — `ran`, `baseline` or `built` — because only `ran` is evidence, and a baseline of a data migration is somebody's word.
+
+3. **The tests found two defects in the build before anything relied on it.** Registering models by walking `db_models` modules missed six tables, `content_records` among them, because two packages have no `__init__.py`. And the first runner **recorded every SQL migration as `ran` while rolling it back** — a pooled connection accepted an `autocommit` flag without passing it to the driver. That is the exact failure the ledger exists to prevent, arriving inside the ledger, and it was caught only because the test read the rows the migration wrote rather than trusting the return value. Seven mutants, all caught, including one that removes the startup call from `main.py` — the call site, tested in a fresh process, because the function passing its tests says nothing about whether anything calls it.
+
+**Status:** built and in force. The development database is baselined. task-12 — does replaying the migrations build the models' schema? — is now a command rather than a project.
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*

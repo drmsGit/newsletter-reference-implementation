@@ -221,10 +221,25 @@ app = FastAPI(
 
 templates = Jinja2Templates(directory="app/templates")
 
+# ADR-181. Asked BEFORE create_all, because afterwards every database has
+# tables: an empty one is being built from the models and is at head by
+# construction; one that already holds tables has a history only its ledger
+# knows. Importing the module registers the ledger table for create_all too.
+from app import schema_migrations
+
+_built_from_nothing = not schema_migrations.application_tables_exist(engine)
+
 Base.metadata.create_all(bind=engine)
 
 
 with SessionLocal() as db:
+    # First, before anything writes: refuse to run against a database that is
+    # behind its models. On 2026-09-20 a missed column rename started cleanly
+    # and returned a 500 on sign-in; this stops at boot and names the file.
+    schema_migrations.assert_no_pending_migrations(
+        db, built_from_nothing=_built_from_nothing,
+    )
+
     # Seed the default brand, the three preset roles and — while the user table
     # is empty — an initial Admin from INITIAL_ADMIN_EMAIL. Without that last
     # step nobody could ever sign in (ADR-151).
