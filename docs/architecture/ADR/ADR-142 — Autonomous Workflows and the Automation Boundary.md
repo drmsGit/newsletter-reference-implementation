@@ -7,7 +7,7 @@ topic:
   - automation
   - governance
 created: 2026-07-31
-modified: 2026-09-24
+modified: 2026-09-29
 source:
   - "AI Layer design interview (interview-prep, 2026-07-27 – 31), Cluster 3"
 depends_on:
@@ -294,6 +294,85 @@ from this addendum's subject.
 **Nothing in §7's other reasoning changes.** Suppression stays a platform concern rather
 than an orchestrator's, the exclusion stack still records why each recipient was
 excluded, and the automation boundary is untouched.
+
+## Addendum 2026-09-29 — a held action is claimed by state, not by lock
+
+Prompted by the 2026-09-19 code review's P1-01 (task-4) and by the expiry sweep's
+lost update (task-13), whose shared fix the user approved on 2026-09-29. §4's
+*"approving executes it"* stands; what changes is how the platform makes sure it
+executes **once**.
+
+**The lock §4's implementation relied on did not hold across the run.**
+`_claim` in `backend/app/approvals/service.py` takes `with_for_update()` on the
+`pending_actions` row, and `approve` meant to keep that lock while `module.execute`
+ran. But the action runs on the same session, and `send_send_instance` commits inside
+it — it moves the send to `sending` and commits. That commit ends the transaction
+holding the lock while the row still reads `pending`, because `approve` writes the
+status only after execute returns. Two approvers could therefore both claim and both
+execute; only `send_send_instance`'s own status guard stopped the second. That is
+exactly the masking `_claim`'s docstring names as the reason its lock exists: the
+first action whose execution is not idempotent would have run twice, silently.
+
+**The expiry sweep had the mirror-image fault.** `expire_due_pending_actions` and
+`_mark_expired` take no lock and re-check no status. A sweep can read a pending row,
+an approver can decide it, and the sweep then commits `status='expired'` over that
+decision from its stale ORM object — an approved, executed, mailed request recorded
+as lapsed. Two overlapping sweeps both emit `approval.expired`.
+
+**1. A request is claimed by state, not by lock.** Approving is a conditional
+`UPDATE … SET status='executing' … WHERE id=? AND status='pending'`, committed
+**before** the action runs. Zero rows updated means another decider won, and this
+caller stops. The action may then commit whatever it likes; the claim is already
+durable. Only the caller whose claim succeeded finalises the row:
+`executing → approved`, or `executing → failed`.
+
+**2. Reject and expiry use the same conditional transition from `pending`.** Neither
+can overwrite a decision or a running execution, because neither matches a row that
+has left `pending`. That closes task-13's lost update and the doubled
+`approval.expired` together.
+
+**3. `executing` is a new lifecycle state, and it means *a person approved; the
+outcome is not yet known*.** It joins pending, approved, rejected, expired and failed
+in `backend/app/approvals/db_models.py`. Writing `approved` at claim time instead
+would be simpler and wrong: the model's docstring makes `status` *"a cache of the
+latest audit entry"*, and the GRANTED audit event is written only after execute
+returns. A row reading `approved` while its action was still running — or after a
+crash — would assert an outcome that had not happened.
+
+**4. The decision is recorded at claim time.** `decided_at` and `decided_by_*` are set
+when the claim is taken, because that is when the person decided. The meaning of
+`ck_pending_actions_decided` — `(status = 'pending') = (decided_at IS NULL)` — is
+therefore unchanged: only `pending` is undecided.
+
+**5. An executing request is still open.** The one-open-request-per-subject partial
+index, `ux_pending_actions_one_open_per_subject` on (action_key, subject_type,
+subject_id), covers `pending` **and** `executing`, so no new held request can be
+created for a thing whose approved action is running.
+
+**6. A crash during execution leaves the row `executing`, deliberately, and nothing
+retries it.** Nobody can know whether the action ran, and re-approving would be
+exactly the double execution this addendum closes. It is the same shape as a send
+left in `sending`. The row is shown under its own status; resolving it is a person's
+investigation, not a button. The inbox counts `pending`, so it no longer shows it.
+
+**Implemented by `migrate_0022`**: `ck_pending_actions_status` gains `'executing'`
+and the partial index's predicate widens from `status = 'pending'` to both open
+states (the index was created in migration 0017 and is also declared on the model).
+It is the first migration applied through the runner of
+[[ADR-181 — A Database Records Which Migrations It Has Had]].
+
+**What it costs.**
+
+- **A stuck `executing` row has no automated way out.** It needs a person and, today,
+  SQL. That is the honest price of refusing to guess whether an action ran.
+- **Two commits per approval instead of one** — claim, then finalise. A crash between
+  them is precisely the stuck case above.
+- **Every consumer that enumerated the five statuses must learn a sixth** — filters,
+  templates and the React client alike.
+
+Nothing else in §4 changes: the held action still lives in the platform, the inbox and
+audit trail are still the ones shared with ADR-141, email and push are still
+notification only, and expiry still applies to whatever action declares a deadline.
 
 ## Related ADRs
 
