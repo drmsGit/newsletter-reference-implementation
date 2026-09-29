@@ -63,7 +63,14 @@ def main() -> int:
                 return 1
             ran = ledger.apply_pending(db, engine)
             print("\n".join(f"  ran {name}" for name in ran) or "  nothing pending.")
-            return 0
+            # Verify, now: this is the moment a migration either reached the
+            # models' schema or did not (ADR-181 addendum, task-12). The files
+            # ran and are recorded either way — a failed check does not undo
+            # them — but a gap is reported here rather than found later.
+            from scripts import check_schema
+
+            print()
+            return check_schema.main_()
 
         if "--baseline" in sys.argv:
             from scripts import check_schema

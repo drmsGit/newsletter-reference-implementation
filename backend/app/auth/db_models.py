@@ -15,7 +15,7 @@ Two shapes here are decisions rather than convenience:
 """
 
 from sqlalchemy import (
-    Boolean, Column, DateTime, ForeignKey, Integer, String, UniqueConstraint, func,
+    Boolean, Column, DateTime, ForeignKey, Integer, String, UniqueConstraint, func, text,
 )
 
 from app.database import Base
@@ -76,7 +76,12 @@ class RoleDB(Base):
     # preset would silently revert a company's changes on the next restart — the
     # sync exists so new permission keys reach shipped roles without a
     # migration, not to overwrite decisions somebody made deliberately.
-    is_customised = Column(Boolean, nullable=False, default=False)
+    # `server_default` as well as `default` (2026-09-29, task-12): the migration
+    # that added this NOT NULL column backfilled it with a database default,
+    # and the models did not declare one — so the two paths built different
+    # schemas. The rule: the database never supplies a default the models
+    # do not declare.
+    is_customised = Column(Boolean, nullable=False, default=False, server_default=text("false"))
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 

@@ -150,4 +150,13 @@ class PendingActionDB(Base):
             # request still occupies its subject.
             postgresql_where=text("status IN ('pending', 'executing')"),
         ),
+        # Created by migration 0017 and, until 2026-09-29, declared nowhere
+        # else — so every database built by `create_all`, the test database
+        # included, lacked them (task-12). Same names as the migration.
+        # The inbox query: one brand, one status, newest first.
+        Index("ix_pending_actions_inbox", "brand_id", "status", "created_at"),
+        # The expiry sweep.
+        Index("ix_pending_actions_due", "status", "expires_at"),
+        # "What has been asked about this send instance?"
+        Index("ix_pending_actions_subject", "subject_type", "subject_id"),
     )

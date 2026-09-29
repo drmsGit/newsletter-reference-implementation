@@ -15,10 +15,11 @@ not migrated — so every query touching snapshots failed, which included the on
 the dashboard runs on sign-in. Signing in returned a 500 and the cause was four
 layers from the symptom.
 
-**Since 2026-09-29 it has a caller** (ADR-181): `scripts/migrate.py
---baseline` runs it first and refuses to record a baseline while it reports a
-difference. The ledger that answers "which migrations has this database had" is
-`app/schema_migrations.py`; this answers the narrower "do its columns match".
+**Since 2026-09-29 it has two callers** (ADR-181 and its addendum):
+`scripts/migrate.py --baseline` refuses to record a baseline while this reports
+a difference, and `--apply` runs it after applying. The ledger answers "which
+migrations has this database had"; this answers "does it hold the schema the
+models declare" — compared in full against a scratch database built from them.
 
 **This is a detector, not a runner.** It reports what is missing and does not
 apply anything, because a script that silently ALTERs a database holding real
@@ -28,66 +29,35 @@ migration named in the output.
 Exits 1 when the schemas disagree, so CI can use it when there is CI.
 """
 import sys
+from pathlib import Path
 
-from sqlalchemy import inspect
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.database import Base, engine
-from app.schema_migrations import import_all_models
-
-# Not `import main`, which this used to do: main now runs ADR-181's startup
-# check, and `migrate.py --baseline` calls this script precisely when that
-# check is refusing. Walking the db_models modules registers the same tables.
-import_all_models()
+from app.database import engine  # noqa: E402
+from app.schema_compare import CannotCompare, check, report  # noqa: E402
 
 
 def main_() -> int:
-    database = str(engine.url).rsplit("/", 1)[-1]
-    inspector = inspect(engine)
-    live_tables = set(inspector.get_table_names())
+    """0 when the database holds the models' schema; 1 when it is behind or
+    disagrees, or when there is nothing to compare it with.
 
-    missing_tables: list[str] = []
-    differences: list[str] = []
+    **Full comparison since 2026-09-29** (task-12). This used to compare column
+    NAMES, and the development database passed it while carrying fourteen
+    differences — eight defaults the models did not declare, three missing
+    indexes — including an `audience_resolution_mode` defaulting to the
+    `'freeze'` that ADR-176 had removed that morning. `migrate.py --baseline`
+    gates on this, so a weak check here was a weak baseline.
 
-    for table, model in sorted(Base.metadata.tables.items()):
-        if table not in live_tables:
-            missing_tables.append(table)
-            continue
-        live = {column["name"] for column in inspector.get_columns(table)}
-        declared = {column.name for column in model.columns}
-        if declared - live:
-            differences.append(
-                f"  {table}: the models expect {sorted(declared - live)} and the "
-                "database does not have them"
-            )
-        if live - declared:
-            # Not always a problem — a column the models dropped may be
-            # deliberate debris awaiting a cleanup migration. Reported anyway,
-            # because "deliberate" should be a decision somebody remembers
-            # making.
-            differences.append(
-                f"  {table}: the database has {sorted(live - declared)} and the "
-                "models do not declare them"
-            )
-
-    print(f"schema check: {database}")
-    if not missing_tables and not differences:
-        print("  models and database agree.")
-        return 0
-
-    if missing_tables:
-        print("\ntables the models declare and the database lacks:")
-        for table in missing_tables:
-            print(f"  {table}")
-    if differences:
-        print("\ncolumn differences:")
-        for line in differences:
-            print(line)
-    print(
-        "\nThis usually means a migration in backend/scripts/ has not been "
-        "applied to this database. Find the one that names these columns and "
-        "run it — they are guarded and safe to re-run."
-    )
-    return 1
+    Debris (only in the database) is printed and does not fail.
+    """
+    database = engine.url.database
+    try:
+        result = check(engine)
+    except CannotCompare as refusal:
+        print(f"schema check: {database}\n  {refusal}")
+        return 1
+    print(report(result, database))
+    return 0 if result.agrees else 1
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func, text
 
 from app.database import Base
 
@@ -49,9 +49,14 @@ class SendInstanceDB(Base):
     # recipient is the exclusion stack working (ADR-163 point 7), not a
     # delivery problem, and folding the two together would recreate the lie
     # this field exists to stop.
-    sent_count = Column(Integer, nullable=False, default=0)
-    failed_count = Column(Integer, nullable=False, default=0)
-    excluded_count = Column(Integer, nullable=False, default=0)
+    # `server_default` as well as `default` (2026-09-29, task-12): the migration
+    # that added this NOT NULL column backfilled it with a database default,
+    # and the models did not declare one — so the two paths built different
+    # schemas. The rule: the database never supplies a default the models
+    # do not declare.
+    sent_count = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    failed_count = Column(Integer, nullable=False, default=0, server_default=text("0"))
+    excluded_count = Column(Integer, nullable=False, default=0, server_default=text("0"))
     # Set when a send is scheduled for later (normal calendar-time newsletter
     # scheduling, distinct from AI per-recipient send-time optimization). Status
     # is "scheduled" until it fires. Null = send on manual Trigger.

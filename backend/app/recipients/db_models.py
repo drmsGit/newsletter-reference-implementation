@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, Index, Integer, JSON, String, UniqueConstraint, func, Float, ForeignKey
+from sqlalchemy import Boolean, Column, DateTime, Index, Integer, JSON, String, UniqueConstraint, func, Float, ForeignKey, text
 
 from app.database import Base
 
@@ -153,8 +153,13 @@ class ConsentSyncLogDB(Base):
     # to a recipient can still be recorded.
     external_id = Column(String(255), nullable=True, index=True)
     # Did the run succeed, and how much did it change.
-    ok = Column(Boolean, nullable=False, default=True)
-    changes_applied = Column(Integer, nullable=False, default=0)
+    # `server_default` as well as `default` (2026-09-29, task-12): the migration
+    # that added this NOT NULL column backfilled it with a database default,
+    # and the models did not declare one — so the two paths built different
+    # schemas. The rule: the database never supplies a default the models
+    # do not declare.
+    ok = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    changes_applied = Column(Integer, nullable=False, default=0, server_default=text("0"))
     source = Column(String(100), nullable=False, default="crm")
     note = Column(String, nullable=True)
     synced_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
