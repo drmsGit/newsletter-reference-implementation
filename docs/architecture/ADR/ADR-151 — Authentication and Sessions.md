@@ -6,7 +6,7 @@ topic:
   - security
   - access
 created: 2026-08-02
-modified: 2026-09-14
+modified: 2026-09-29
 source:
   - "Security Chapter design interview, Part 2 (playbook-strategy.md Decision Log, 2026-08-02)"
 depends_on:
@@ -74,6 +74,82 @@ Sequence follows from this: ship the code flow, add passkeys as an additive laye
 - **Still open: step-up authentication** for destructive or high-value actions — triggering a real send, changing credentials, deactivating a user. Given that a mailbox compromise yields full Admin, this deserves a deliberate answer rather than an omission. Passkeys make an attractive step-up factor for users who have enrolled one, which is a further argument for point 6 but does not by itself decide the question.
 - Machine authentication for inbound API callers is a **separate concern** with its own scope, now designed in [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]], which also carries its status as a prerequisite for Mode B ([[ADR-142 — Autonomous Workflows and the Automation Boundary]]). This ADR covers human authentication only.
 - **Implementation status, 2026-09-14:** Points 1, 2, 3 and 5 are built — passwordless typed codes stored hashed, short-lived and attempt-limited; sessions carrying both an absolute and an idle expiry and revocable server-side; deactivation revoking sessions immediately; and the access list at `/ui/users` showing role assignments, last login and whether an account is external (`backend/app/auth/db_models.py`, `backend/app/auth/router.py`, `backend/app/auth/service.py`). Rate limiting of code *requests* per address and per IP — required by point 2 and previously missing — was built on 2026-09-13 (`LoginCodeRequestDB`). Points 4 and 6, SSO/SCIM and passkeys, are documented and not built **by decision**, not by omission. **Step-up authentication is unbuilt** and remains open, as the note above says.
+
+## Addendum 2026-09-29 — an identical response also arrives in the same time
+
+Prompted by task-5, and by Q5 of
+[[Interview Prep - Auth, Permissions, Machine Principals]], decided by the user on
+2026-09-29. Point 2 stands as written. This addendum records what *identical*
+turned out to require.
+
+**Point 2's response rule was built, and it moved the oracle rather than
+closing it.** Gate 4b in [[LAUNCH-GATES]] implemented the single-response rule and
+was closed for the response oracle on 2026-09-13. Both sign-in routes in
+`backend/app/auth/router.py` — the form `POST /ui/login` and the JSON
+`POST /auth/session/request` — returned the same 303 or the same 202 and body
+for a known, unknown or deactivated address and for a failed send. But
+`request_login_code` in `backend/app/auth/service.py` ran inline. For a known
+address it superseded outstanding codes, inserted a row, committed, and then
+called the mail provider synchronously over HTTPS through `deliver_code`. For an
+unknown address it returned after one SELECT. Against a real provider, the
+identical response arrived several hundred milliseconds later when the account
+existed. The response oracle had become a timing oracle, found on 2026-09-19.
+
+**1. Point 2's "identical response" includes arriving in the same time.** Timing
+is part of the response. A status and body that say nothing are not enough if
+the latency says something.
+
+**2. A code is delivered after the response, never inside the request path of a
+route that answers a sign-in request.** The service is split in two.
+`issue_login_code` does the lookup, supersedes old codes, inserts the new one
+and commits, then returns the address and code, or None. It sends nothing.
+`deliver_code` sends. Both routes call `issue_login_code` and pass
+`deliver_code` to FastAPI `BackgroundTasks`, which runs it after the response
+has been sent. `deliver_code` takes no database session, never raises, and logs
+a failed send itself. `request_login_code` survives as issue-then-deliver,
+synchronous, for local development, scripts and tests only. No HTTP route calls
+it. **Any future route that issues a code uses the same split:** issue in the
+request, deliver in the background.
+
+**3. The remaining gap is stated as a bound, not as constant time.** What
+remains is `issue_login_code`'s own database work for a known address. On a
+development machine with the mock provider it measured 0.6 ms median (known
+0.92 ms against unknown 0.32 ms, 300 samples each). The existing throttle limits
+how often anyone can sample it: 5 code requests per address per 15 minutes and
+20 per client per 60 minutes. The throttle is applied **before** the user lookup
+in both routes, so a throttled request costs the same work either way. So the
+claim is *sub-millisecond, sampled at most five times per address per quarter
+hour*, not *constant-time*.
+
+A response-time floor, where every sign-in is padded to a fixed minimum, was
+considered and not adopted. Every sign-in would pay the full floor. A worker
+would be occupied while sleeping. And the gap would reopen whenever a send took
+longer than the floor, so the floor would only move the threshold at which the
+oracle reappears.
+
+**4. Connection reuse was checked, not assumed.** Against a real uvicorn server
+with delivery artificially slowed to 500 ms, the median was 15.8 ms for a known
+address and 16.4 ms for an unknown one over fresh connections, a gap within
+noise. On a kept-alive connection, the next request after a known-address
+request took 11.9 ms. It does not wait for the background send, so the reused
+connection is not a side channel. Every background send completed.
+
+**What it costs.**
+
+- **A failed send is visible only in the server log, after the response.** This
+  was already the only signal, because the response never said anything, but it
+  is now further from the request that caused it.
+- **Background tasks die with the process.** A crash between the response and
+  the send loses that code, and the user requests another. This is acceptable
+  because codes are cheap and throttled, but nothing retries it.
+- **The bound depends on the throttle staying in front of the lookup.** Moving
+  the throttle behind the user lookup, or removing it, would turn the
+  sub-millisecond gap back into something that can be sampled freely, and no
+  response would change to show it.
+
+Gate 4b in [[LAUNCH-GATES]] is updated separately to reflect this fix. This
+addendum does not change it. Nothing else in point 2 changes: codes are still
+short-lived, single-use, hashed and rate limited per address and per IP.
 
 ## Related ADRs
 
