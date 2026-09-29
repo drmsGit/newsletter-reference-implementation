@@ -7,10 +7,15 @@ class EngagementEventDB(Base):
     __tablename__ = "engagement_events"
 
     id = Column(Integer, primary_key=True, index=True)
+    # Indexed 2026-09-29 (task-11, migration 0023). Every event of one
+    # delivery is looked up by this column, and without the index that is a
+    # scan over every engagement event ever recorded — one of the fastest-
+    # growing tables. At 100,000 events: 2.235 ms / 738 buffers → 0.005 ms / 4.
     delivery_execution_id = Column(
         Integer,
         ForeignKey("delivery_executions.id"),
         nullable=False,
+        index=True,
     )
     event_type = Column(String(100), nullable=False)
     provider = Column(String(100), nullable=True)

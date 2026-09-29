@@ -140,3 +140,73 @@ def test_migration_0019_renames_the_same_three():
     assert not missing, (
         f"migration 0019 does not rename {missing}, but the models expect it."
     )
+
+
+# --- migration 0023, the measured tail of 0018 --------------------------------
+
+MIGRATION_0023 = (
+    pathlib.Path(__file__).resolve().parent.parent
+    / "scripts" / "migrate_0023_measured_fk_indexes.sql"
+)
+
+#: task-11, measured 2026-09-29 — see the migration's header for the numbers.
+#: Exact column lists rather than leading columns: the composite leads on
+#: `decision_slot_id`, which 0018 already indexes, so a leading-column check
+#: would pass whether the composite existed or not.
+MEASURED_INDEXES = [
+    ("engagement_events", ("delivery_execution_id",)),
+    ("decision_resolutions", ("decision_slot_id", "recipient_id")),
+]
+
+#: Measured at the same time and deliberately NOT indexed. Pinned so that nobody
+#: adds them by rule — "it is a foreign key" is the reasoning this list exists
+#: to refuse. If you have a new measurement that says otherwise, change this
+#: list and write the numbers into the migration that adds it.
+MEASURED_AND_REFUSED = [
+    ("signal_contributions", "event_id"),
+    ("content_category_assignments", "category_id"),
+]
+
+
+def _index_columns() -> set[tuple[str, tuple[str, ...]]]:
+    with engine.connect() as conn:
+        rows = conn.execute(text("""
+            SELECT t.relname, array_agg(a.attname ORDER BY k.ord)
+            FROM pg_index i
+            JOIN pg_class t ON t.oid = i.indrelid
+            CROSS JOIN LATERAL unnest(i.indkey) WITH ORDINALITY AS k(attnum, ord)
+            JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
+            GROUP BY i.indexrelid, t.relname
+        """)).fetchall()
+    return {(t, tuple(cols)) for t, cols in rows}
+
+
+def test_the_measured_indexes_exist_with_exactly_these_columns():
+    present = _index_columns()
+    missing = [f"{t}{cols}" for t, cols in MEASURED_INDEXES if (t, cols) not in present]
+    assert not missing, f"the models declare {missing} and the database lacks them"
+
+
+def test_migration_0023_creates_the_same_ones():
+    sql = MIGRATION_0023.read_text()
+    missing = [
+        f"{t}{cols}" for t, cols in MEASURED_INDEXES
+        if f"ON {t} ({', '.join(cols)})" not in sql
+    ]
+    assert not missing, (
+        f"migration 0023 does not create {missing}, but the models declare it — "
+        "an existing deployment would never get it"
+    )
+
+
+def test_the_refused_candidates_stay_unindexed():
+    """The measurement that said no is as much a result as the one that said
+    yes. Both of these were indexable by the obvious rule, and both came out
+    at tens of microseconds with nothing that grows."""
+    leading = _leading_columns()
+    added = [f"{t}.{c}" for t, c in MEASURED_AND_REFUSED if (t, c) in leading]
+    assert not added, (
+        f"{added} gained an index that task-11 measured and refused. If that "
+        "was deliberate, it needs its own measurement — update "
+        "MEASURED_AND_REFUSED and record the numbers in the migration."
+    )

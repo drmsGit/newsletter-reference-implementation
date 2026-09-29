@@ -1,4 +1,4 @@
-from sqlalchemy import CheckConstraint, Column, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, func, JSON
+from sqlalchemy import Index, CheckConstraint, Column, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, func, JSON
 
 from app.database import Base
 
@@ -137,3 +137,20 @@ class DecisionResolutionDB(Base):
     reason = Column(String(255), nullable=True)
     score = Column(Float, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # **Slot, then recipient — measured 2026-09-29 (task-11, migration 0023).**
+    # The slot index above narrows a lookup to one slot, but three queries then
+    # want ONE recipient inside it — the renderer (rendering/service.py), the
+    # resolution dedup in decision/service.py, both once per recipient per
+    # send, and click attribution (providers/service.py). A slot holds a row
+    # per recipient, so each of those walked the whole slot: linear per
+    # recipient, quadratic across a send. At 100,000 rows (20 slots x 5,000):
+    # 0.184 ms / 38 buffers → 0.005 ms / 3 for the renderer, 0.536 ms / 112 →
+    # 0.006 ms / 9 for attribution.
+    #
+    # It also leads on `decision_slot_id`, so it makes the single-column index
+    # above redundant on the fastest-growing table. Dropping that one is a
+    # separate, measured decision — not taken here.
+    __table_args__ = (
+        Index("ix_decision_resolutions_slot_recipient", "decision_slot_id", "recipient_id"),
+    )
