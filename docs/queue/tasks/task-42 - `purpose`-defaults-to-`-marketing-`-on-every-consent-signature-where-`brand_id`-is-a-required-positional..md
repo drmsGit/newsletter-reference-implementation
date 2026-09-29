@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-09-29 18:53'
 labels:
   - backend
 dependencies: []
@@ -24,4 +25,6 @@ ordinal: 104200
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 122, section "Bugs", position 42 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-09-29, from task-12: the same class one layer down. The DATABASE default purpose 'marketing' (and channel 'email') on delivery_executions was dropped by migrate_0024 as fail-open. The Python-side default="email" / default="marketing" on DeliveryExecutionDB (backend/app/delivery/db_models.py) remain and were deliberately left to this task.
 <!-- SECTION:NOTES:END -->
