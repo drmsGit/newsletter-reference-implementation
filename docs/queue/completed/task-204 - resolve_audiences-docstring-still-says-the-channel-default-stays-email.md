@@ -1,9 +1,10 @@
 ---
 id: TASK-204
 title: resolve_audience's docstring still says the channel default stays email
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 14:20'
+updated_date: '2026-09-29 13:33'
 labels:
   - backend
 dependencies: []
@@ -25,3 +26,9 @@ ordinal: 105200
 <!-- SECTION:NOTES:BEGIN -->
 Logged 2026-09-27 from the "What Cluster N produced" sections of the two design interviews, each gap re-verified against the code that day. The plan was reviewed and approved by the session that ran the interviews. Parked: not yet ranked by anyone.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Subsumed by task-47 (commit fe92188). Both stale sentences lived in the resolve_audience docstring that task rewrote wholesale; leaving a known-false sentence in place to respect a task boundary would have been the wrong call. The pre-ADR-176 precedence half, which this task correctly declined to touch, was reversed by the same commit that made it true.
+<!-- SECTION:FINAL_SUMMARY:END -->
