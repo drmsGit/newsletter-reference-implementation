@@ -4,9 +4,10 @@ title: >-
   The approval gate fires in the guard, before any service resolves the
   addressed row — so a machine can mint a held request naming another brand's
   send.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-09-29 18:19'
 labels:
   - backend
 dependencies: []
@@ -26,3 +27,9 @@ ordinal: 100900
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 47, section "Bugs", position 9 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fixed 2026-09-29. The entry's 'noise, not risk' was wrong: a foreign held request occupied the other brand's send in the brand-less one-open index, and the unfiltered retry branch then answered that brand with the foreign pending_action_id — a cross-brand block on sending, reproduced by a test first. The handler now asks the action (new subject_in_brand hook on send_fire) before holding anything and answers a foreign subject with the unattended path's exact 409; no hook means refused, not held; retry lookups are brand-filtered. Recorded in a second ADR-142 addendum of 2026-09-29, drafted by the adr-author agent. Four mutations caught; 717 tests pass.
+<!-- SECTION:FINAL_SUMMARY:END -->
