@@ -3,9 +3,10 @@ id: TASK-15
 title: >-
   The partial unique index does not enforce "one open request per thing" when
   `subject_id` is NULL.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-09-29 19:31'
 labels:
   - backend
 dependencies: []
@@ -25,3 +26,9 @@ ordinal: 101500
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 66, section "Bugs", position 15 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed by refusal rather than by choosing an identity: request_approval refuses any held request without a declared subject type and a subject id, so the brand-less-NULL escape from the one-open index cannot occur; the guard answers with a fail-closed 403 (it would have been a 500). Also closes a second road the entry missed — a subject type with a NULL id from the guard's path convention. NULLS NOT DISTINCT and an idempotency key were both rejected as designing ADR-142 §10 before 1.0; §10 inherits the question. ADR-142 third addendum of 2026-09-29, drafted by the adr-author agent. Three tests, three mutations caught; 736 pass.
+<!-- SECTION:FINAL_SUMMARY:END -->
