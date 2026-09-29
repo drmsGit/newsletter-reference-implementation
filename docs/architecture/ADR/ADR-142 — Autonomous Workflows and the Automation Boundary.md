@@ -451,6 +451,68 @@ Nothing else in §4 changes: the inbox, the audit trail shared with ADR-141, the
 notification-only rule for email and push, and the state-based claim of the addendum
 above are untouched.
 
+## Addendum 2026-09-29 (third) — every held request names its subject
+
+Prompted by task-15, from the 2026-09-19 code review's P2-03, and decided by the user
+on 2026-09-29. §4's *"the platform holds the pending action"* stands; what changes is
+that the platform no longer holds one for nothing in particular.
+
+**The contract admitted a request with no subject, and the index could not see it.**
+`pending_actions.subject_type` and `subject_id` are both nullable, and the model in
+`backend/app/approvals/db_models.py` documented that as *"the ADR-142 §10 answer: a
+proposed settings change has no record to point at, so the contract accommodates it by
+requiring a subject of nothing rather than inventing a fake one."*
+`ApprovableAction.subject_type` in `backend/app/approvals/actions/base.py` defaults to
+`None`. But `ux_pending_actions_one_open_per_subject` is keyed on (action_key,
+subject_type, subject_id), and Postgres treats NULLs as distinct in a unique index. Two
+open subject-less requests for the same action never collide, so the `IntegrityError`
+that `request_approval` relies on for idempotence never fires, and a retrying caller
+raises a second held request instead of being answered with the first.
+
+**There is a second path into the same hole.** An action that *does* declare a subject
+type can still produce `subject_id = NULL`: the handler `_approval_required` in
+`backend/main.py` lifts the id from the path parameter by the `<subject_type>_id`
+convention, so a route whose parameter is named otherwise yields NULL, equally invisible
+to the index.
+
+**The hole is dormant, not closed.** The registered actions both declare subjects —
+`send_fire` on `send_instance`, `ai_subject_apply` on `ai_run` — and no caller passes a
+NULL subject. But because the dataclass defaults to `None`, an action whose author
+forgets to declare a subject becomes subject-less by omission, not by choice.
+
+**1. Every held request names its subject.** `request_approval` in
+`backend/app/approvals/service.py` — the one place every held row is created — refuses a
+request whose action declares no subject, and a request whose subject id is missing. The
+guard's handler answers that refusal with the same fail-closed 403 it gives a route with
+no approvable action mapped to it.
+
+**2. Refusing, rather than choosing an identity, is deliberate.** The two fixes the task
+named each decide what identifies a settings proposal. Uniqueness per action when there
+is no subject — `NULLS NOT DISTINCT`, available on the Postgres 16 in use — would make
+*at most one pending settings proposal of any kind* the rule, so two proposals about
+different settings would block each other. A caller-supplied idempotency key would hand
+the same question to the caller. Either one is exactly the mechanism §10 declines to
+design before 1.0, and neither closes the second path, a subject type with a NULL id.
+Refusing NULLs where rows are made makes *one open request per thing* true for every
+request that can exist.
+
+**3. The model's accommodation is withdrawn, not deleted.** The columns stay nullable;
+the contract no longer admits a subject-less request. When §10 is designed, it decides
+what identifies a settings proposal and lifts the refusal with that answer — so §10
+inherits an explicit question rather than a silent default.
+
+**What it costs.**
+
+- **§10 cannot ship without first answering the identity question.** That is intended.
+- **The dataclass default of `None` still exists**, so a forgotten declaration now fails
+  at the first request rather than at registration.
+- **One more refusal path for action authors to learn**, beside the brand hook of the
+  addendum above.
+
+Nothing else in §4 changes: the inbox, the audit trail shared with ADR-141, the
+notification-only rule for email and push, the state-based claim and the brand check of
+the two addenda above are untouched, and §10 remains direction only.
+
 ## Related ADRs
 
 ### Depends On
