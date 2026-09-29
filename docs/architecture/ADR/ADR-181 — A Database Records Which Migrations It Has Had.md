@@ -90,6 +90,95 @@ Refusing would be a refusal nobody could satisfy, since the missing file cannot 
 - **`docs/playbook-strategy.md` carries no decision-log entry for this decision** (checked 2026-09-29). It was argued and decided in task-1, which is the record of the reasoning.
 - **`check_schema.py` keeps its role and gains a caller.** It is still a detector, not a runner; point 6 makes it the gate a baseline must pass, which answers the "nothing runs it" gap for the one moment it matters most.
 
+## Addendum 2026-09-29 — the schema check compares everything, and runs after every apply
+
+Prompted by task-12, decided by the user on 2026-09-29. Points 1 to 7 stand as
+written. This addendum records what task-12 found and what the check became.
+
+**task-12's literal question cannot be asked.** It asked for a database built
+both ways and diffed. The migrations in `backend/scripts/` are deltas over a
+schema that `create_all` built around 2026-09-12 and that no file records.
+0001a backfills from columns it replaces. So the migrations cannot build a
+database from empty, and the migrations path exists only as real databases.
+This is the negative consequence above about old migrations, made concrete.
+`pg_dump` and `psql` are not installed, so the check introspects through
+SQLAlchemy.
+
+**The column-name check had passed a database that differed in 14 ways.** A
+full, name-independent comparison of the development database against a fresh
+`create_all` build found:
+
+- **Eight server-side defaults the models do not declare.** Migrations added
+  NOT NULL columns with `DEFAULT x` to backfill them, while the models use
+  Python-side `default=`. Five are harmless:
+  `send_instances.sent_count`, `failed_count` and `excluded_count` (0),
+  `consent_sync_logs.changes_applied` (0) and `.ok` (true), and
+  `roles.is_customised` (false).
+- **Three of those defaults fail open, which the ADRs refuse.**
+  `send_instances.audience_resolution_mode DEFAULT 'freeze'` contradicts the
+  model's `'rerun'` since [[ADR-176 — A Negative Decision Outranks a Positive One]]
+  point 4 was implemented that morning. A raw insert that omits the column gets
+  the mode ADR-176 removed. `delivery_executions.channel DEFAULT 'email'` is the
+  channel-default class that ADR-176's 2026-09-27 addendum removed from
+  `resolve_audience`. `delivery_executions.purpose DEFAULT 'marketing'` is the
+  same kind of guess.
+- **Three indexes on `pending_actions`** created by migration 0017 and never
+  declared in the models, so test databases lacked them.
+- **One piece of debris.** Both paths make
+  `delivery_executions.provider_message_id` unique: the migrated database by a
+  UNIQUE constraint, the models by a unique index. The migrated database also
+  carries a redundant plain index. That is debris, not disagreement.
+
+`backend/scripts/check_schema.py` compared column names only, so it saw none of
+the 14. Point 6's baseline gate had passed the development database on that
+weaker check.
+
+**1. The check is a full comparison against a database built from the models.**
+`check_schema` builds a scratch database with `create_all` and compares tables,
+columns (type, nullability, default), indexes and constraints. It compares them
+name-independently, so a UNIQUE constraint and a unique index are the same rule.
+Then it drops the scratch database. This is the stricter reading of the
+`check_schema.py` that point 6 already requires before a baseline, not a new
+gate.
+
+**2. A difference is either behind or debris, and only one fails.** Anything
+the models declare that the database lacks or holds differently, including a
+default, is *behind or disagreeing*, and fails. An index or column that exists
+only in the database is *debris*, and is reported, not failed. This follows
+`check_schema.py`'s existing rule that "deliberate should be a decision somebody
+remembers making".
+
+**3. The runner verifies after applying.** `migrate.py --apply` runs the
+comparison once the pending files have run. That is the moment a migration
+either reaches the models' schema or does not. It answers task-12 going forward
+without a stored snapshot.
+
+**4. The database never supplies a default the models do not declare.** This is
+a new rule. Migration `migrate_0024` drops the three fail-open defaults. The five
+harmless ones are declared as `server_default` in the models, so the two paths
+agree. The three `pending_actions` indexes are declared in the models too.
+
+A frozen baseline schema file, replayed with new migrations in CI, was
+considered and not adopted. It would be a large generated file, and only as
+trustworthy as the database it was generated from. Checking the real database
+after every `--apply` tests exactly the thing that drifts.
+
+**What it costs.**
+
+- **The check needs permission to create a database.** A role without it gets a
+  clear "cannot compare", never a pass.
+- **The Python-side defaults stay.** `DeliveryExecutionDB` still carries
+  `default="email"` and `default="marketing"`. They are the same fail-open
+  class, but they are scoped to task-42 and not changed here. Only the
+  database-side copies are removed.
+- **The development database reports its redundant `provider_message_id` index
+  as debris on every run** until someone decides to drop it.
+
+The negative consequence above that the test database "does not show that the
+migrations, applied in order, produce the models' schema" still holds for an
+empty database. What changes is that every real database is now checked against
+the models each time a migration is applied to it.
+
 ## Related ADRs
 
 ### Depends On
