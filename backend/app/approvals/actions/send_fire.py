@@ -48,6 +48,22 @@ META = ApprovableAction(
 )
 
 
+def subject_in_brand(db: Session, send_instance_id: int, *, brand_id: int) -> bool:
+    """Does the send named in the path belong to the brand asking? (task-9)
+
+    Asked by the guard's handler BEFORE a held request is created. A caller in
+    brand A naming brand B's send id used to get a held request anyway — its
+    content already resolved as "no longer present", but its subject id still
+    occupied brand B's slot in the one-open-request index, which has no brand
+    in its key, so brand B's own request to fire its own send was answered with
+    brand A's row. ADR-142 addendum of 2026-09-29 (second).
+    """
+    return db.query(SendInstanceDB.id).filter(
+        SendInstanceDB.id == send_instance_id,
+        SendInstanceDB.brand_id == brand_id,
+    ).first() is not None
+
+
 def summarise(db: Session, send_instance_id: int, *, brand_id: int) -> str:
     """The one line frozen onto the request at the moment it is made.
 

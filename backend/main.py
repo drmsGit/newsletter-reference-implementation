@@ -461,7 +461,7 @@ def _approval_required(request: Request, exc: ApprovalRequired):
 
     from app.approvals import service as approvals
     from app.approvals.actions.registry import get_action, get_action_module
-    from app.approvals.db_models import PENDING, PendingActionDB
+    from app.approvals.db_models import OPEN, PendingActionDB
     from app.audit.service import ACTOR_INTEGRATION
 
     meta = get_action(exc.action_key)
@@ -474,6 +474,34 @@ def _approval_required(request: Request, exc: ApprovalRequired):
 
     db = SessionLocal()
     try:
+        # **The subject must be in the caller's brand, or nothing is held**
+        # (task-9, ADR-142 addendum of 2026-09-29, second). The guard that
+        # raised this cannot know what the path parameter names, so a caller in
+        # brand A naming brand B's send used to get a held request anyway — and
+        # its subject id occupied B's slot in the one-open-request index, which
+        # has no brand in its key, so B's own request was answered with A's row.
+        if meta is not None and meta.subject_type and subject_id is not None:
+            if module is None or not callable(getattr(module, "subject_in_brand", None)):
+                # Fail closed, like the unmapped route above: an action that
+                # names a subject but cannot say whose it is must not be held.
+                return JSONResponse(
+                    {"detail": (
+                        f"'{exc.action_key}' names a {meta.subject_type} but "
+                        "cannot confirm it belongs to the declared brand, so "
+                        "the request cannot be held for review."
+                    )},
+                    status_code=403,
+                )
+            if not module.subject_in_brand(db, subject_id, brand_id=exc.brand_id):
+                # Word for word what the unattended path answers for a foreign
+                # or missing send (`send_send_instance` → 409), so the two
+                # paths cannot be compared to learn that the id exists in
+                # another brand.
+                noun = "".join(part.capitalize() for part in meta.subject_type.split("_"))
+                return JSONResponse(
+                    {"detail": f"{noun} {subject_id} not found"}, status_code=409,
+                )
+
         summary = ""
         if module is not None and hasattr(module, "summarise") and subject_id:
             try:
@@ -501,10 +529,23 @@ def _approval_required(request: Request, exc: ApprovalRequired):
                 PendingActionDB.action_key == exc.action_key,
                 PendingActionDB.subject_type == (meta.subject_type if meta else None),
                 PendingActionDB.subject_id == subject_id,
-                PendingActionDB.status == PENDING,
+                PendingActionDB.status.in_(OPEN),
+                # Never answer one brand with another brand's request. Without
+                # this, brand B retrying its own send was handed brand A's
+                # pending_action_id (task-9).
+                PendingActionDB.brand_id == exc.brand_id,
             ).first()
             if held is None:
-                raise
+                # The slot is taken by a request from another brand — possible
+                # only for rows created before the subject check above existed.
+                # Said without an id, because the id is not this caller's.
+                return JSONResponse(
+                    {"detail": (
+                        "A request for this is already held and cannot be "
+                        "reused from here. It lapses at its deadline."
+                    )},
+                    status_code=409,
+                )
         return JSONResponse(
             {
                 "status": "pending_approval",

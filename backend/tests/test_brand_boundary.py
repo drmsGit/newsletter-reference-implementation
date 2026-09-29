@@ -606,61 +606,195 @@ class TestASendCannotBeFiredFromAnotherBrand:
             self._remove(send_id)
 
     def test_a_held_request_naming_another_brands_send_discloses_nothing(self, foreign_api):
-        """The other half of P1-02, and it does NOT refuse — it queues.
+        """The other half of P1-02 — and since 2026-09-29 it refuses rather
+        than queues (task-9).
 
-        An unflagged machine hits `ApprovalRequired` **in the guard**, which
-        runs before any service resolves the addressed row. So a caller in
-        brand A can still mint a held request whose payload names brand B's
-        send, and a 202 here is the documented behaviour of ADR-166 point 5
-        rather than a hole.
+        An unflagged machine hits `ApprovalRequired` in the guard, which cannot
+        know what the path parameter names. Until task-9 the handler held the
+        request anyway: a 202, and a row branded A whose subject was B's send.
+        Its content was safe, and this test used to pin exactly that. What it
+        missed is that the row's subject occupied B's send in the one-open-
+        request index — see `test_a_foreign_request_cannot_occupy_this_brands_send`.
 
-        What must not happen is disclosure: the frozen summary and the live
-        review panel both resolve the send within the brand the request was
-        raised in, so an approver sees "no longer present" rather than another
-        brand's send name, provider and recipient count. And approving it
-        cannot send, because `execute` is handed the row's brand.
+        Now the handler asks the action whether the subject is in the declared
+        brand before creating anything, and answers **word for word what the
+        unattended path answers** for a foreign or missing send, so comparing
+        the two cannot reveal that the id exists elsewhere.
+
+        The summary/panel/execute checks stay, for any row created before the
+        fix: those still resolve within the row's brand.
         """
         from app.approvals.actions import send_fire
+        from app.approvals.db_models import PendingActionDB
         from app.database import SessionLocal
+        from app.delivery.db_models import SendInstanceDB
 
         send_id = self._draft_send_in_default_brand()
         db = SessionLocal()
         try:
             with foreign_api([VIEW, SENDS_EXECUTE]) as headers:
+                foreign_brand = int(headers["X-Brand"])
                 response = client.post(
                     f"/delivery/send-instances/{send_id}/send", headers=headers)
-                assert response.status_code == 202, response.text
-                pending_id = response.json()["pending_action_id"]
 
-            from app.approvals.db_models import PendingActionDB
+            assert response.status_code == 409, response.text
+            assert response.json()["detail"] == f"SendInstance {send_id} not found", (
+                "the held path answered differently from the unattended path, "
+                "which tells a caller the id exists in another brand"
+            )
+            assert db.query(PendingActionDB).filter(
+                PendingActionDB.subject_type == "send_instance",
+                PendingActionDB.subject_id == send_id,
+            ).count() == 0, "a held request was created for another brand's send"
 
-            row = db.query(PendingActionDB).filter(
-                PendingActionDB.id == pending_id).first()
-
-            summary = send_fire.summarise(db, send_id, brand_id=row.brand_id)
+            # Defence for rows that predate the check.
+            summary = send_fire.summarise(db, send_id, brand_id=foreign_brand)
             assert "no longer present" in summary, (
                 f"the frozen summary quoted another brand's send: {summary!r}"
             )
             described = send_fire.describe(
-                db, {"send_instance_id": send_id}, brand_id=row.brand_id)
+                db, {"send_instance_id": send_id}, brand_id=foreign_brand)
             assert described.blocked_reason, "the review panel offered the button"
             assert "mock" not in str(described.rows), "the panel leaked the provider"
-
             result = send_fire.execute(
-                db, {"send_instance_id": send_id}, brand_id=row.brand_id)
+                db, {"send_instance_id": send_id}, brand_id=foreign_brand)
             assert not result.ok, "approving fired another brand's send"
-
-            from app.delivery.db_models import SendInstanceDB
 
             db.expire_all()
             assert db.query(SendInstanceDB).filter(
                 SendInstanceDB.id == send_id).first().status == "draft"
-
-            db.query(PendingActionDB).filter(PendingActionDB.id == pending_id).delete()
-            db.commit()
         finally:
             db.close()
             self._remove(send_id)
+
+    def test_a_foreign_request_cannot_occupy_this_brands_send(self, foreign_api):
+        """task-9, and the reason its entry's "noise, not risk" was wrong.
+
+        The one-open-request-per-subject index is keyed on (action_key,
+        subject_type, subject_id) with no brand — and the subject is lifted from
+        the path. So brand A's machine naming brand B's send id stored B's id
+        under brand A, and B's OWN machine asking to fire its own send then hit
+        `DuplicateRequest`. The retry branch, looking for the held row without
+        a brand filter, found A's and answered B with A's pending_action_id:
+        B's orchestrator believed its send was held for review, in an inbox
+        where nobody can see it, for as long as the foreign row lived — and A
+        could take the slot again the moment it lapsed.
+
+        Not a leak of content — the summary and panel resolve within the row's
+        brand — but a brand blocking another brand's sending, which is the
+        boundary ADR-172 draws.
+        """
+        from tests.machine import machine
+        from app.approvals.db_models import PendingActionDB
+        from app.database import SessionLocal
+
+        send_id = self._draft_send_in_default_brand()
+        db = SessionLocal()
+        created: list[int] = []
+        try:
+            with foreign_api([VIEW, SENDS_EXECUTE]) as headers:
+                squat = client.post(
+                    f"/delivery/send-instances/{send_id}/send", headers=headers)
+            if squat.status_code == 202:
+                created.append(squat.json()["pending_action_id"])
+
+            with machine([VIEW, SENDS_EXECUTE]) as home:
+                response = client.post(
+                    f"/delivery/send-instances/{send_id}/send", headers=home)
+            assert response.status_code == 202, response.text
+            held_id = response.json()["pending_action_id"]
+            created.append(held_id)
+
+            held = db.query(PendingActionDB).filter(PendingActionDB.id == held_id).first()
+            home_brand = self._brand_of_send(db, send_id)
+            assert held.brand_id == home_brand, (
+                f"brand {home_brand}'s request to fire its own send was answered "
+                f"with a held request belonging to brand {held.brand_id} — a "
+                "foreign request is occupying this send"
+            )
+        finally:
+            db.rollback()
+            if created:
+                db.query(PendingActionDB).filter(
+                    PendingActionDB.id.in_(created)).delete(synchronize_session=False)
+                db.commit()
+            db.close()
+            self._remove(send_id)
+
+    def test_an_action_that_cannot_place_its_subject_is_refused_not_held(
+        self, monkeypatch
+    ):
+        """Fail closed. The check needs the action to say whose its subject is;
+        an action that names a subject and cannot answer is refused from the
+        guard rather than held — the same posture as a route with no approvable
+        action mapped at all."""
+        from tests.machine import machine
+        from app.approvals.actions import send_fire
+        from app.approvals.db_models import PendingActionDB
+        from app.database import SessionLocal
+
+        monkeypatch.delattr(send_fire, "subject_in_brand")
+        send_id = self._draft_send_in_default_brand()
+        db = SessionLocal()
+        try:
+            with machine([VIEW, SENDS_EXECUTE]) as home:
+                response = client.post(
+                    f"/delivery/send-instances/{send_id}/send", headers=home)
+            assert response.status_code == 403, response.text
+            assert db.query(PendingActionDB).filter(
+                PendingActionDB.subject_id == send_id).count() == 0
+        finally:
+            db.close()
+            self._remove(send_id)
+
+    def test_a_slot_held_by_another_brand_is_never_answered_with_its_id(
+        self, foreign_api
+    ):
+        """Rows created before the subject check existed can still occupy a
+        send's slot until they lapse. The retry lookup is brand-filtered, so
+        this brand is told the slot is taken — and is not handed the other
+        brand's pending_action_id as if it were its own."""
+        from tests.machine import machine
+        from app.approvals import service as approvals
+        from app.approvals.db_models import PendingActionDB
+        from app.audit.service import ACTOR_INTEGRATION
+        from app.database import SessionLocal
+
+        send_id = self._draft_send_in_default_brand()
+        db = SessionLocal()
+        legacy = None
+        try:
+            with foreign_api([VIEW]) as headers:
+                foreign_brand = int(headers["X-Brand"])
+            legacy = approvals.request_approval(   # as the pre-fix handler did
+                db, "send.fire_send_instance", payload={"send_instance_id": send_id},
+                summary="legacy", requested_by_type=ACTOR_INTEGRATION,
+                requested_by_id=None, brand_id=foreign_brand, subject_id=send_id,
+            )
+
+            with machine([VIEW, SENDS_EXECUTE]) as home:
+                response = client.post(
+                    f"/delivery/send-instances/{send_id}/send", headers=home)
+
+            assert response.status_code == 409, response.text
+            assert str(legacy.id) not in response.text, (
+                "this brand was answered with another brand's pending_action_id"
+            )
+        finally:
+            db.rollback()
+            if legacy is not None:
+                db.query(PendingActionDB).filter(
+                    PendingActionDB.id == legacy.id).delete(synchronize_session=False)
+                db.commit()
+            db.close()
+            self._remove(send_id)
+
+    @staticmethod
+    def _brand_of_send(db, send_id):
+        from app.delivery.db_models import SendInstanceDB
+
+        return db.query(SendInstanceDB.brand_id).filter(
+            SendInstanceDB.id == send_id).scalar()
 
     def test_its_executions_are_not_listable_from_another_brand(self, foreign_api):
         send_id = self._draft_send_in_default_brand()
