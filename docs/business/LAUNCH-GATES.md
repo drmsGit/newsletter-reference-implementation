@@ -9,7 +9,7 @@ What must be true before public beta. Reviewed against commits and
 | 2 | P0 consent defect fixed | any public exposure (compliance) | ✅ done 2026-09-13 — send-time exclusion stack |
 | 3 | P0 inbound machine authentication | any public exposure | ✅ done 2026-09-18 — ADR-166 accepted and built |
 | 4 | Auth enforcement flag switched on | any public exposure | ✅ CLOSED 2026-09-13 — default ON, CSRF on all 62 forms, code requests rate limited |
-| 4b | Sign-in code disclosure fixed (P0, security) | any public exposure | 🟡 response oracle closed 2026-09-13; **timing oracle found 2026-09-19** |
+| 4b | Sign-in code disclosure fixed (P0, security) | any public exposure | ✅ CLOSED 2026-09-29 — response oracle 2026-09-13; timing oracle 2026-09-29, to a measured sub-millisecond bound (ADR-151 addendum) |
 | 5 | Real provider integration proven | the "no lock-in" claim | ✅ done — Resend, live, verified domain |
 | 6 | Inbound engagement loop proven | the signal-layer claim | ✅ done — signed webhooks, end-to-end |
 | 7 | Security model designed + base built | Phase 4C | ✅ ADR-150–154; base built, proposed status |
@@ -166,6 +166,17 @@ apart. From the 2026-08-07 external review:
   the response body into the response latency, which is the exact substitution
   the comment at `auth/router.py:77-79` says was being avoided. Logged as a P1
   in `docs/backlog.md`; queue the delivery or floor the response time.
+
+  **Closed 2026-09-29** (task-5, [[ADR-151 — Authentication and Sessions]]
+  addendum of that date). Both sign-in routes now issue the code in the request
+  and send it **after the response**, so the provider round trip is off the
+  timed path. Measured against a real uvicorn server with delivery slowed to
+  500 ms: 15.8 ms median for a known address against 16.4 ms for an unknown
+  one, and a kept-alive connection does not wait for the send either. **Closed
+  to a bound, not to constant time** — the code insert itself still costs a
+  known address about 0.6 ms more, sampled at most five times per address per
+  fifteen minutes by the throttle. That bound is the honest claim, and it holds
+  only while the throttle stays in front of the user lookup.
 
   Recorded here rather than quietly in the backlog because **a gate recorded as
   closed and not closed is worse than one recorded as open** — the whole value

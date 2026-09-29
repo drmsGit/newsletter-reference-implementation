@@ -20,6 +20,7 @@ import hashlib
 import logging
 import os
 import secrets
+from typing import NamedTuple
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 
@@ -667,25 +668,32 @@ def _prune_login_requests(db: Session, current: datetime) -> None:
     ).delete(synchronize_session=False)
 
 
-def request_login_code(db: Session, email: str) -> str | None:
-    """Issue a code for an existing active user.
+class IssuedCode(NamedTuple):
+    """A code that exists and has not been sent yet — what `issue_login_code`
+    hands the caller so that SENDING can happen somewhere else."""
 
-    Returns the code **only** on the dev path, where nothing was sent and the
-    code is already in the server log. Returns None for every other outcome —
-    unknown address, deactivated user, successful send, and **a real send that
-    failed**.
+    address: str
+    code: str
 
-    That last case is the P0 this function used to have. It returned the code
-    whenever delivery did not succeed, without distinguishing "deliberately not
-    attempted" from "attempted and failed", so a deployment with a broken mail
-    provider handed a working sign-in code to anyone who typed an admin's
-    address.
 
-    **No HTTP path may render this value.** The router redirects identically in
-    every case (ADR-151 §2), which is what keeps the form from being an
-    account-enumeration oracle; this return exists for local development and
-    for tests, which run on the mock provider. If you find yourself passing it
-    into a template, you are reintroducing the defect.
+def issue_login_code(db: Session, email: str) -> IssuedCode | None:
+    """Create a code for an existing active user, and send nothing.
+
+    **Split from delivery on 2026-09-29 (task-5, ADR-151 §2).** The two routes
+    that answer a sign-in request used to call the provider inline, so a known
+    address cost a round trip over HTTPS and an unknown one cost a single
+    SELECT — the identical 303 arrived several hundred milliseconds later when
+    the account existed. The response had been made identical; its *timing*
+    had not. The routes now take this result and schedule `deliver_code` to
+    run after the response has gone.
+
+    What remains is this function's own work: for a known address one UPDATE,
+    one INSERT and a commit, against one SELECT for an unknown one. Measured at
+    a 0.6 ms median difference on the development machine, and sampled at most
+    five times per address per fifteen minutes by the throttle in front of it.
+    That is recorded as a bound, not as constant time.
+
+    Returns None for an unknown or inactive address, and nothing is scheduled.
     """
     address = normalise_email(email)
     user = db.query(UserDB).filter(UserDB.email == address).first()
@@ -706,13 +714,42 @@ def request_login_code(db: Session, email: str) -> str | None:
         expires_at=now() + timedelta(minutes=CODE_TTL_MINUTES),
     ))
     db.commit()
+    return IssuedCode(address, code)
 
-    outcome = deliver_code(address, code)
+
+def request_login_code(db: Session, email: str) -> str | None:
+    """Issue a code and send it, synchronously — **not for HTTP routes.**
+
+    The routes call `issue_login_code` and deliver in the background, because
+    sending inline is a timing oracle (task-5). This synchronous form stays for
+    local development, scripts and tests, which run on the mock provider where
+    there is no round trip to leak.
+
+    Returns the code **only** on the dev path, where nothing was sent and the
+    code is already in the server log. Returns None for every other outcome —
+    unknown address, deactivated user, successful send, and **a real send that
+    failed**.
+
+    That last case is the P0 this function used to have. It returned the code
+    whenever delivery did not succeed, without distinguishing "deliberately not
+    attempted" from "attempted and failed", so a deployment with a broken mail
+    provider handed a working sign-in code to anyone who typed an admin's
+    address.
+
+    **No HTTP path may render this value.** The router redirects identically in
+    every case (ADR-151 §2), which is what keeps the form from being an
+    account-enumeration oracle. If you find yourself passing it into a
+    template, you are reintroducing the defect.
+    """
+    issued = issue_login_code(db, email)
+    if issued is None:
+        return None
+    outcome = deliver_code(issued.address, issued.code)
     # The code escapes this function only when nothing was sent and it is
     # already in the log. `failed` deliberately returns None: the user is told
     # nothing, because telling them delivery failed would reveal that delivery
     # was ATTEMPTED, which only happens for addresses that exist.
-    return code if outcome is CodeDelivery.dev_not_attempted else None
+    return issued.code if outcome is CodeDelivery.dev_not_attempted else None
 
 
 def verify_login_code(db: Session, email: str, code: str) -> str | None:

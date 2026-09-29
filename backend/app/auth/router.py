@@ -12,7 +12,7 @@ bearing rather than cosmetic:
 
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -30,7 +30,7 @@ from app.auth.service import (
     csrf_token_for,
     delete_brand, delete_role, dev_code_visible, list_brands,
     rename_brand,
-    login_request_allowed, normalise_email, request_login_code,
+    deliver_code, issue_login_code, login_request_allowed, normalise_email,
     revoke_assignment, revoke_token, roles_with_permissions, safe_next, set_active,
     set_role_permissions, user_for_token, verify_login_code,
 )
@@ -57,9 +57,37 @@ def login_form(
     )
 
 
+def _issue_and_send_later(db: Session, email: str, background: BackgroundTasks) -> None:
+    """Create the code now; send it after the response has gone (task-5).
+
+    **Both sign-in routes go through here, and must.** Sending inline made a
+    known address cost a provider round trip over HTTPS and an unknown one a
+    single SELECT, so the response ADR-151 §2 made identical still arrived
+    hundreds of milliseconds later when the account existed — a timing oracle
+    where the response oracle used to be. Gate 4b had been recorded as closed.
+
+    What this does not remove is `issue_login_code`'s own database write for a
+    known address: a 0.6 ms median gap measured on the development machine,
+    sampled at most five times per address per fifteen minutes by the throttle
+    in front of it. A bound, not constant time.
+
+    `deliver_code` takes no database session, so the request's session having
+    closed by the time it runs is not a problem. It never raises and it logs a
+    failed send itself, which after the response is the only signal there is —
+    exactly as before, since the response never said anything anyway.
+
+    The code is never returned: it carries the dev code, and rendering it is
+    the defect gate 4b closed.
+    """
+    issued = issue_login_code(db, email)
+    if issued is not None:
+        background.add_task(deliver_code, issued.address, issued.code)
+
+
 @router.post("/ui/login")
 def login_request(
     request: Request,
+    background: BackgroundTasks,
     email: str = Form(...),
     next: str = Form(""),
     db: Session = Depends(get_db),
@@ -82,9 +110,9 @@ def login_request(
     # Throttled BEFORE the user lookup, so the path cannot diverge at all — a
     # limit applied after it would take a different amount of work for a known
     # address than an unknown one, which is a timing oracle in place of the
-    # response one. This is also the only call site of `request_login_code`
-    # reachable over HTTP; a second one would need its own throttle, because
-    # the limit lives here rather than in the service (the client address is a
+    # response one. Every HTTP path that issues a code — this one and
+    # `/auth/session/request` — applies the throttle itself, because the limit
+    # lives in the routes rather than in the service (the client address is a
     # request-scoped fact, and the service has no Request).
     if login_request_allowed(
         db, email,
@@ -93,9 +121,7 @@ def login_request(
             request.headers.get("x-forwarded-for"),
         ),
     ):
-        # Return value deliberately unused. It carries the dev code, and
-        # rendering it is exactly the defect this handler had.
-        request_login_code(db, email)
+        _issue_and_send_later(db, email, background)
 
     address = normalise_email(email)
     target = safe_next(next)
@@ -544,6 +570,7 @@ session_router = APIRouter(tags=["auth"])
 def session_request(
     request: Request,
     payload: SessionCodeRequest,
+    background: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     """Ask for a sign-in code. **One answer, always.**
@@ -557,9 +584,8 @@ def session_request(
     Throttled **before** the lookup, for the same reason the form route is: a
     limit applied afterwards costs different work for a known address than an
     unknown one, which is a timing oracle replacing a response one. That
-    substitution is already an open P1 against this pair — `request_login_code`
-    still calls the provider synchronously — and this route inherits it rather
-    than adding a second instance of it.
+    substitution was an open P1 against this pair until 2026-09-29, when the
+    provider call left the request — see `_issue_and_send_later`.
     """
     email = payload.email or ""
     if login_request_allowed(
@@ -569,9 +595,7 @@ def session_request(
             request.headers.get("x-forwarded-for"),
         ),
     ):
-        # Return value deliberately unused: it carries the dev code, and
-        # returning it is the defect gate 4b closed.
-        request_login_code(db, email)
+        _issue_and_send_later(db, email, background)
 
     return {
         "status": "code_requested",
