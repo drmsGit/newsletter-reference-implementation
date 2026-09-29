@@ -3,9 +3,10 @@ id: TASK-5
 title: >-
   The sign-in enumeration oracle was not closed, it moved from the response body
   into the response latency.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-09-29 17:56'
 labels:
   - backend
 dependencies: []
@@ -25,3 +26,9 @@ ordinal: 100500
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 39, section "Bugs", position 5 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Sign-in codes are issued in the request and delivered after the response on both routes (form and JSON), so a known address no longer answers later than an unknown one. Recorded in an ADR-151 addendum drafted by the adr-author agent, and gate 4b in LAUNCH-GATES.md marked closed to a bound. Verified against a real uvicorn server with delivery slowed to 500 ms: 15.8 vs 16.4 ms median, kept-alive connection unaffected; the remaining 0.6 ms insert cost is throttled to five samples per address per 15 minutes. 7 new tests on a real server (TestClient hides the property), three mutations caught; suite passes.
+<!-- SECTION:FINAL_SUMMARY:END -->
