@@ -46,9 +46,9 @@ graph TD
 
 1. **Load the blocks.** Each `AudienceRuleBlockDB` carries a `criteria` payload (language × status × category × min-score). `_recipients_for_criteria` evaluates it to a recipient set — a category min-score uses the recipient's **live [[insight]] signal**, so "interested in Hiking ≥ 40" re-evaluates as behavior changes.
 2. **Union the includes.** All `kind="include"` blocks combine with **OR** — stack "interested in Hiking" OR "interested in Food", each editable/counted independently.
-3. **Subtract the excludes.** All `kind="exclude"` blocks are unioned and removed from the include set.
-4. **Add back the pins.** `AudienceGroupMemberDB` manual pins are unioned in **after** excludes — so **a pin is always included** even if an exclude block would have removed it. Hand-picked people survive the rules ("keep both").
-5. **Apply the consent floor.** The result is filtered to `consent_status == "opted_in"` ([[recipients]] `CONSENTING_STATUS`). **This is the one thing that can drop a pin** — a non-consenting recipient is excluded even if pinned (legal, non-negotiable).
+3. **Union the pins.** `AudienceGroupMemberDB` manual pins join the include set. They are hand-picked people alongside the rules ("keep both"), and unlike the rules they are stored rows rather than a live query.
+4. **Subtract the excludes.** All `kind="exclude"` blocks are unioned and removed from the includes **and the pins together** — so **an exclude block removes a hand-pinned recipient** ([[ADR-176 — A Negative Decision Outranks a Positive One]] point 1, 2026-09-29). This reverses the 2026-07-26 rule, under which pins were added back *after* this step and survived it; the order of steps 3 and 4 is the whole decision.
+5. **Apply the consent floor.** The result is filtered to `consent_status == "opted_in"` ([[recipients]] `CONSENTING_STATUS`). A non-consenting recipient is excluded even if pinned (legal, non-negotiable) — and unlike an exclude block this floor is not a precedence question between two people's intentions at all.
 6. **Return** the recipient rows (ordered by email).
 
 ## Where this is used

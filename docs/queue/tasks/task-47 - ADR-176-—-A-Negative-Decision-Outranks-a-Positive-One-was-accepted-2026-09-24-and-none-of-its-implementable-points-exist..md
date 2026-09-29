@@ -3,10 +3,10 @@ id: TASK-47
 title: >-
   ADR-176 — A Negative Decision Outranks a Positive One was accepted 2026-09-24
   and none of its implementable points exist.
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-27 13:56'
-updated_date: '2026-09-27 14:29'
+updated_date: '2026-09-29 13:18'
 labels:
   - backend
 dependencies: []
@@ -27,6 +27,16 @@ ordinal: 100050
 
   **Sequence point 1 before anything that writes exclusion segments automatically**, since [[ADR-142 — Autonomous Workflows and the Automation Boundary]] §7 now routes system suppression through them and expects them to win. **Placed at the end of this section rather than at the top**: ordering here records human priority decisions and this item has not had one.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Point 1 — resolve_audience computes ((includes | pins) - excludes), consent floor unchanged. Rewrite the precedence docstring, the inline comment, Code/audience.md, Flow - Audience resolution.md and the 'Manually added — always included' template heading. New test: a pinned recipient an exclude block also catches is absent. Mutation-check by reverting the set operation.
+2. Point 4 — keep audience_resolution_mode, refuse 'freeze'. Default flips to 'rerun' in SendInstanceDB and prepare_send_from_audience; the validator rejects 'freeze' naming ADR-176; send_send_instance reconciles unconditionally. Backfill the one un-fired draft only — the five sent rows were frozen and rewriting them would falsify history. No migration (no Alembic, and it buys nothing).
+3. Re-point test_consent_gates' P0 test at a group-less send. Removing freeze makes re-resolution drop the opted-out recipient before the send-time gate sees them, so that test would pass for the wrong reason. Add a second test asserting the group-backed path drops them at re-resolution — both mechanisms, separately.
+4. Jinja surfaces: drop the resolution select from campaign_detail.html and the Form('freeze') default; rename the 'force add' / 'always included' wording wherever a manager reads it.
+Out of scope: point 3 (block kinds, explicitly not expressible), Cluster 4 Q3's return-shape change (separate task).
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 

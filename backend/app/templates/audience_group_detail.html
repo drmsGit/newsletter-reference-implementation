@@ -185,7 +185,12 @@
 <div class="card mb-4">
     <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="mb-0">Manually added — always included ({{ members | length }})</h5>
+            {# ADR-176 point 1: this heading read "always included" until
+               2026-09-29, and an exclude block now removes these people. A
+               control that says "force" and can be overruled is how a manager
+               discovers the precedence from a send that reached fewer people
+               than expected, so the heading says what the resolver does. #}
+            <h5 class="mb-0">Manually added ({{ members | length }})</h5>
             <div class="d-flex gap-2">
                 <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#form-bulk-add">+ Add by criteria</button>
                 {% if non_members %}
@@ -193,6 +198,11 @@
                 {% endif %}
             </div>
         </div>
+        <p class="text-muted small mb-3">
+            An exclusion rule still removes these people. Adding somebody here
+            puts them in the group; it does not override a rule that takes them
+            back out.
+        </p>
 
         {# ── Criteria-based bulk add ──────────────────────────────────── #}
         <div class="collapse mb-3" id="form-bulk-add">

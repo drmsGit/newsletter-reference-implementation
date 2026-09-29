@@ -515,7 +515,7 @@ def resolve_audience(
     db: Session, group_id: int, channel: str
 ) -> list[RecipientDB]:
     """The group's live audience:
-        ((∪ include blocks) − (∪ exclude blocks)) ∪ (manual member pins)
+        ((∪ include blocks) ∪ (manual member pins)) − (∪ exclude blocks)
     then re-gated to consenting recipients.
 
     **`channel` has no default, deliberately — the same reasoning
@@ -528,13 +528,31 @@ def resolve_audience(
     recorded cause of a push send resolving to nobody. Surfaced by the Manager
     Workflow design interview and closed 2026-09-27.
 
-    Precedence (decided 2026-07-26): a manual pin is a deliberate override and
-    is **always included** — exclude blocks shape the rule-driven audience but
-    never remove a hand-pinned recipient (pins are unioned *after* excludes are
-    subtracted). The **consent floor is the one exception**: a non-consenting
-    recipient is dropped even if pinned (legal, non-negotiable). Hard
-    suppression (bounces/opt-outs) belongs on the consent/suppression floor, not
-    in a regular exclude block, so it stays hard against pins too.
+    **Precedence (ADR-176 point 1, implemented 2026-09-29): an exclude block
+    removes a hand-pinned recipient.** Pins join the rule-driven set *before*
+    the subtraction rather than being unioned back in after it, so an exclusion
+    reaches them. The governing principle is the ADR's title — a negative
+    decision outranks a positive one — because wrongly including costs more
+    than wrongly omitting: a person who should not have received a mail and did
+    cannot be un-sent.
+
+    **This reverses the rule that stood here from 2026-07-26**, which read *"a
+    manual pin is always included — exclude blocks never remove a hand-pinned
+    recipient"*. That rule lived in this docstring, four documentation pages
+    and a template heading and in no ADR, which is why reversing it needed a
+    record rather than another docstring. Do not restore it from any document
+    that still carries it; ADR-176 is the authority.
+
+    **The consent and suppression floor is untouched and stays absolute.** It
+    was never a precedence question between two people's intentions — it is a
+    legal gate. A non-consenting recipient is dropped even if pinned, and hard
+    suppression (bounces/opt-outs) belongs on that floor rather than in a
+    regular exclude block, so it stays hard against pins too.
+
+    **The cost, accepted rather than overlooked:** there is now no way to say
+    *yes, really, this person*. A recipient an exclusion segment catches by
+    accident, who asked for exactly this mail, is answerable only by editing
+    the rule — which changes the audience for everybody.
 
     **The consent floor is per channel**, and the caller must say which.
     Consent is keyed `(recipient, brand, channel, purpose)` (ADR-163 point 1),
@@ -543,9 +561,8 @@ def resolve_audience(
     and refuse people who did the reverse. It defaulted to email while email
     was the only channel, which made a push send unplannable — the audience
     resolved to nobody and the planner reported "0 consenting recipients".
-
-    The default stays email for the screens that are previewing an email
-    audience; the send path passes the variant's channel."""
+    The send path passes the variant's channel; a screen previewing a group
+    with no variant in hand asks, because there is no channel-less count."""
     # The brand comes from the GROUP, never from the caller's working context.
     # A group belongs to exactly one brand (ADR-150 point 2), so resolving it
     # gates on that brand's consent — and a manager who switched brand between
@@ -569,12 +586,14 @@ def resolve_audience(
         else:
             include_ids |= ids
 
-    # Excludes subtract from the rule-driven set only; manual pins are then
-    # unioned back in so they survive excludes ("always included", except
-    # consent below). "keep both" — hand-picked recipients alongside the rules.
-    final_ids = (include_ids - exclude_ids) | get_member_recipient_ids(
-        db, group_id, brand_id=brand_id
-    )
+    # Pins join the rule-driven set and the excludes subtract from both
+    # (ADR-176 point 1). The parenthesisation IS the decision — moving the
+    # union outside the subtraction restores the 2026-07-26 rule that a pin
+    # always survives, which is the failure that sends mail to somebody a
+    # manager excluded on purpose.
+    final_ids = (
+        include_ids | get_member_recipient_ids(db, group_id, brand_id=brand_id)
+    ) - exclude_ids
     if not final_ids:
         return []
 

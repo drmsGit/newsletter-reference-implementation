@@ -198,3 +198,109 @@ class TestRecalculate:
 
         assert response.status_code == 400
         assert "no source campaign" in response.json()["detail"]
+
+
+class TestExcludeBeatsPin:
+    """ADR-176 point 1 — an exclusion segment removes a hand-pinned recipient.
+
+    **This reverses the rule that stood from 2026-07-26**, and no test asserted
+    the old one. The ADR measured that before deciding: every pin assertion in
+    this suite is against the *consent floor*, which is untouched here. So the
+    reversal shipped with nothing to fail, and this class is what was missing —
+    the precedence between two people's intentions, asserted on its own.
+
+    The recipient gets a language nobody else has, so the exclude block catches
+    exactly them. Resolving against the shared dev database otherwise makes the
+    assertion depend on rows this test did not create.
+    """
+
+    @pytest.fixture
+    def pinned_and_excluded(self, db, group):
+        """One consenting recipient, pinned to the group, and an exclude block
+        that catches them by language. No include block: the pin is the only
+        thing that could put them in the set, which is what makes the
+        subtraction the single thing under test.
+
+        **The email address is load-bearing and was not obvious.** A block's
+        criteria resolve through `find_by_criteria`, which ends in
+        `_deduplicate_by_address` and drops anyone with no usable address —
+        so without one the block resolves to nobody and the test passes
+        against an empty exclude set rather than against the precedence.
+        That the pin path does *not* pass through the same filter is a real
+        asymmetry, logged separately.
+        """
+        from app.recipients.consent import record_consent
+        from app.recipients.db_models import AddressabilityDB, RecipientDB
+
+        language = f"zz-{uuid.uuid4().hex[:8]}"
+        recipient = RecipientDB(
+            external_id=f"{TAG}-{uuid.uuid4().hex[:8]}",
+            status="active",
+            language=language,
+        )
+        db.add(recipient)
+        db.commit()
+        db.refresh(recipient)
+        db.add(AddressabilityDB(
+            recipient_id=recipient.id, channel="email",
+            value={"email": f"{TAG}-{uuid.uuid4().hex[:8]}@example.invalid"},
+        ))
+        db.commit()
+        record_consent(
+            db, recipient.id, "opted_in", group.brand_id,
+            channel="email", source="test",
+        )
+        service.add_member(db, group.id, recipient.id, brand_id=group.brand_id)
+        try:
+            yield recipient, language
+        finally:
+            db.rollback()
+            db.execute(
+                text("DELETE FROM recipient_addresses WHERE recipient_id = :r"),
+                {"r": recipient.id},
+            )
+            db.execute(
+                text("DELETE FROM consent_events WHERE recipient_id = :r"),
+                {"r": recipient.id},
+            )
+            db.execute(
+                text("DELETE FROM audience_group_members WHERE recipient_id = :r"),
+                {"r": recipient.id},
+            )
+            db.query(RecipientDB).filter(RecipientDB.id == recipient.id).delete()
+            db.commit()
+
+    def test_a_pinned_recipient_is_removed_by_an_exclude_block(
+        self, db, group, pinned_and_excluded
+    ):
+        """The reversal itself. Under the 2026-07-26 rule this recipient came
+        back, because pins were unioned in after the subtraction."""
+        recipient, language = pinned_and_excluded
+
+        service.add_block(
+            db, group.id, kind="exclude", criteria={"language": language},
+            brand_id=group.brand_id,
+        )
+
+        resolved = service.resolve_audience(db, group.id, "email")
+
+        assert recipient.id not in {r.id for r in resolved}, (
+            "a hand-pinned recipient survived an exclude block — the "
+            "2026-07-26 precedence, which ADR-176 point 1 reverses"
+        )
+
+    def test_a_pin_still_reaches_the_audience_without_an_exclude_block(
+        self, db, group, pinned_and_excluded
+    ):
+        """The other half, and the reason the first test proves anything. A pin
+        that never resolved would satisfy the assertion above for a reason that
+        has nothing to do with precedence — the group has no include block, so
+        without this the whole class would pass against a broken pin path."""
+        recipient, _language = pinned_and_excluded
+
+        resolved = service.resolve_audience(db, group.id, "email")
+
+        assert recipient.id in {r.id for r in resolved}, (
+            "a pinned, consenting recipient did not resolve at all, so the "
+            "exclusion test above proves nothing"
+        )
