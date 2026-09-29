@@ -1,9 +1,10 @@
 ---
 id: TASK-13
 title: The expiry sweep claims nothing.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-09-29 14:37'
 labels:
   - backend
 dependencies: []
@@ -23,3 +24,9 @@ ordinal: 101300
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 62, section "Bugs", position 13 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fixed 2026-09-29 together (commit after 1da074b). Held actions are claimed by a committed conditional pending→executing UPDATE before the action runs, so an action that commits internally can no longer release the guard; reject and expiry use the same conditional move, so a sweep cannot overwrite a decision from a stale read or double the expiry event. New 'executing' status via migrate_0022 (check constraint + widened one-open partial index), recorded in an ADR-142 addendum drafted by the adr-author agent. Verified by a two-thread test where a mid-run-committing action is approved twice and runs once — the original lock-based service fails it — plus stale-read expiry tests the pre-fix body fails; 707 tests pass; 0022 applied to dev through the ADR-181 runner and read back.
+<!-- SECTION:FINAL_SUMMARY:END -->
