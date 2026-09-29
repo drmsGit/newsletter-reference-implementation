@@ -111,6 +111,13 @@
             <span class="badge bg-secondary">Rejected</span>
             {% elif entry.status == 'expired' %}
             <span class="badge bg-secondary">Expired</span>
+            {% elif entry.status == 'executing' %}
+            {# ADR-142 addendum 2026-09-29. Approved and running — or it ran and
+               the process died before recording how. Before this branch the
+               `else` below labelled it Failed, which asserts an outcome nobody
+               knows. Deliberately no button: re-approving is the double run. #}
+            <span class="badge bg-info text-dark"
+                  title="Approved and running, or interrupted before its outcome was recorded. It is not retried automatically.">Running</span>
             {% else %}
             <span class="badge bg-danger">Failed</span>
             {% endif %}

@@ -109,6 +109,14 @@
             You need the <code>{{ meta.approve_permission if meta else '?' }}</code>
             permission to decide this.
         </div>
+        {% elif status == 'executing' %}
+        {# ADR-142 addendum 2026-09-29: no button on purpose. #}
+        <div class="alert alert-info">
+            <strong>Approved and running.</strong> If this stays here, the process
+            stopped before it could record how the action went — it may or may not
+            have run. It is not retried automatically, because running it again
+            could do it twice. Check the thing it acts on before doing anything.
+        </div>
         {% endif %}
     </div>
 

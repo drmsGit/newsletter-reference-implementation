@@ -18,14 +18,14 @@ the ADR-140 audit surface; it is not a second log" costs in practice.
 import logging
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.approvals.actions.base import ActionResult
 from app.approvals.actions.registry import get_action, get_action_module
 from app.approvals.db_models import (
-    APPROVED, DECIDED, EXPIRED, FAILED, PENDING, REJECTED, PendingActionDB,
+    APPROVED, DECIDED, EXECUTING, EXPIRED, FAILED, PENDING, REJECTED, PendingActionDB,
 )
 from app.audit import service as audit
 
@@ -159,20 +159,42 @@ def request_approval(
 
 # --- deciding ---------------------------------------------------------------
 
-def _claim(db: Session, pending_id: int) -> PendingActionDB | None:
-    """Lock the row so two operators clicking Approve cannot both win.
+def _transition(
+    db: Session, pending_id: int, *, from_status: str, to_status: str,
+    also: tuple = (), **values,
+) -> bool:
+    """Move one row from one status to another, **only if it is still in the
+    first**, and commit. True for exactly one caller.
 
-    Its own lock, and not a reliance on whatever the action's `execute` locks.
-    `send_send_instance` happens to take a row lock of its own, which would mask
-    the absence of this one — and the first action whose execution is not
-    idempotent would then double-execute silently.
+    This replaces a row lock (ADR-142 addendum 2026-09-29, task-4). The lock
+    was `SELECT … FOR UPDATE` held across `module.execute` — but the action runs
+    on the same session, and `send_send_instance` commits inside it. That commit
+    ended the transaction holding the lock while the row still read `pending`,
+    so a second approver could claim it and execute again, stopped only by the
+    send's own status guard — the masking the lock's docstring said it existed
+    to prevent. A conditional UPDATE, committed before the action runs, cannot
+    be released by anything the action does afterwards.
+
+    `also` adds conditions to the WHERE — the claim uses it to refuse a request
+    past its deadline by the database's clock.
     """
-    return (
+    moved = (
         db.query(PendingActionDB)
-        .filter(PendingActionDB.id == pending_id)
-        .with_for_update()
-        .first()
+        .filter(
+            PendingActionDB.id == pending_id,
+            PendingActionDB.status == from_status,
+            *also,
+        )
+        .update({"status": to_status, **values}, synchronize_session=False)
     )
+    db.commit()
+    return moved == 1
+
+
+def _current(db: Session, pending_id: int) -> PendingActionDB | None:
+    """The row as the database holds it now, not as this session last saw it."""
+    db.expire_all()
+    return db.get(PendingActionDB, pending_id)
 
 
 def approve(
@@ -186,29 +208,59 @@ def approve(
 ) -> ActionResult:
     """Run the held action, and record who let it run.
 
+    **Run-once is a claim, not a lock** (ADR-142 addendum 2026-09-29): the row
+    moves `pending → executing`, committed, before the action runs, and only the
+    caller whose move succeeded runs it and finalises it. Everybody else is told
+    who got there first.
+
     Expiry is checked against `expires_at` and **not** against `status`, so a
     request cannot execute past its deadline on a machine where no sweeper has
-    ever run.
+    ever run — and the claim itself repeats that check in the database, so the
+    deadline cannot pass between reading the row and claiming it.
     """
-    row = _claim(db, pending_id)
+    row = _current(db, pending_id)
     if row is None:
         return ActionResult(ok=False, message="no such request")
     if row.status != PENDING:
-        db.rollback()
         return ActionResult(ok=False, message=f"already {row.status}")
     if is_expired(row):
         # Retire it as part of refusing, so the inbox agrees with the answer the
         # caller just got.
-        _mark_expired(db, row)
+        _expire(db, row)
         return ActionResult(ok=False, message="this request has expired")
 
+    # Looked up BEFORE claiming: a request whose action is gone must stay
+    # pending, not be claimed and then stranded in `executing` by a lookup
+    # that was always going to fail.
     module = get_action_module(row.action_key)
     if module is None:
-        db.rollback()
         return ActionResult(
             ok=False,
             message=f"'{row.action_key}' is no longer a registered action",
         )
+
+    # The decision is recorded at the claim, because that is when the person
+    # decided. `ck_pending_actions_decided` still means what it did: only
+    # `pending` is undecided.
+    claimed = _transition(
+        db, pending_id, from_status=PENDING, to_status=EXECUTING,
+        also=(or_(PendingActionDB.expires_at.is_(None),
+                  PendingActionDB.expires_at > func.now()),),
+        decided_at=now(), decided_by_type=approver_type,
+        decided_by_id=approver_id, decision_reason=reason,
+    )
+    if not claimed:
+        row = _current(db, pending_id)
+        if row.status == PENDING:
+            # Still pending, so the claim lost to the deadline, not to a
+            # person — the one reason the WHERE refuses that leaves it here.
+            _expire(db, row)
+            return ActionResult(ok=False, message="this request has expired")
+        return ActionResult(ok=False, message=f"already {row.status}")
+
+    row = _current(db, pending_id)
+    action_key, brand_id = row.action_key, row.brand_id
+    subject_type, subject_id = row.subject_type, row.subject_id
 
     try:
         # **The brand the request was authorised in, not the approver's.**
@@ -218,46 +270,41 @@ def approve(
         # instead would let where somebody happened to be standing decide what
         # a queued send was allowed to touch.
         result = module.execute(
-            db, row.payload or {}, choice=choice, brand_id=row.brand_id,
+            db, row.payload or {}, choice=choice, brand_id=brand_id,
         )
     except Exception as error:  # the action blew up
         db.rollback()
-        row = _claim(db, pending_id)
-        row.status = FAILED
-        row.decided_at = now()
-        row.decided_by_type = approver_type
-        row.decided_by_id = approver_id
-        row.decision_reason = reason
-        row.execution_error = str(error)[:1000]
-        db.commit()
+        # From EXECUTING only, and this caller holds the claim — so this can
+        # only ever finalise our own run.
+        _transition(
+            db, pending_id, from_status=EXECUTING, to_status=FAILED,
+            execution_error=str(error)[:1000],
+        )
         audit.record(
             db, EXECUTION_FAILED,
             actor_type=approver_type, actor_id=approver_id,
-            subject_type=SUBJECT, subject_id=row.id, brand_id=row.brand_id,
-            detail={"action_key": row.action_key, "error": str(error)[:500]},
+            subject_type=SUBJECT, subject_id=pending_id, brand_id=brand_id,
+            detail={"action_key": action_key, "error": str(error)[:500]},
         )
         logger.warning("pending action %s failed to execute", pending_id, exc_info=True)
         return ActionResult(ok=False, message=f"the action failed: {error}")
 
-    if not result.ok:
+    if result.ok:
+        _transition(db, pending_id, from_status=EXECUTING, to_status=APPROVED)
+    else:
         # A clean refusal from the action itself — the send instance was already
         # sent, the content is unpublished. Recorded as FAILED rather than
         # REJECTED: nobody said no.
-        row.status = FAILED
-        row.execution_error = (result.message or "the action declined to run")[:1000]
-    else:
-        row.status = APPROVED
-    row.decided_at = now()
-    row.decided_by_type = approver_type
-    row.decided_by_id = approver_id
-    row.decision_reason = reason
-    db.commit()
+        _transition(
+            db, pending_id, from_status=EXECUTING, to_status=FAILED,
+            execution_error=(result.message or "the action declined to run")[:1000],
+        )
 
     audit.record(
         db, GRANTED if result.ok else EXECUTION_FAILED,
         actor_type=approver_type, actor_id=approver_id,
-        subject_type=SUBJECT, subject_id=row.id, brand_id=row.brand_id,
-        detail={"action_key": row.action_key, "reason": reason},
+        subject_type=SUBJECT, subject_id=pending_id, brand_id=brand_id,
+        detail={"action_key": action_key, "reason": reason},
     )
     if result.ok and result.audit_action:
         # The action's own event, attributed to the APPROVER. This is where
@@ -266,9 +313,9 @@ def approve(
         audit.record(
             db, result.audit_action,
             actor_type=approver_type, actor_id=approver_id,
-            subject_type=row.subject_type, subject_id=row.subject_id,
-            brand_id=row.brand_id,
-            detail={**(result.audit_detail or {}), "pending_action_id": row.id},
+            subject_type=subject_type, subject_id=subject_id,
+            brand_id=brand_id,
+            detail={**(result.audit_detail or {}), "pending_action_id": pending_id},
         )
     return result
 
@@ -281,20 +328,22 @@ def reject(
     approver_id: int | None,
     reason: str | None = None,
 ) -> bool:
-    row = _claim(db, pending_id)
-    if row is None or row.status != PENDING:
-        db.rollback()
+    """Say no. The same conditional move as approving, so a rejection can never
+    land on a request somebody else is already running."""
+    row = _current(db, pending_id)
+    if row is None:
         return False
-    row.status = REJECTED
-    row.decided_at = now()
-    row.decided_by_type = approver_type
-    row.decided_by_id = approver_id
-    row.decision_reason = reason
-    db.commit()
+    rejected = _transition(
+        db, pending_id, from_status=PENDING, to_status=REJECTED,
+        decided_at=now(), decided_by_type=approver_type,
+        decided_by_id=approver_id, decision_reason=reason,
+    )
+    if not rejected:
+        return False
     audit.record(
         db, DENIED,
         actor_type=approver_type, actor_id=approver_id,
-        subject_type=SUBJECT, subject_id=row.id, brand_id=row.brand_id,
+        subject_type=SUBJECT, subject_id=pending_id, brand_id=row.brand_id,
         detail={"action_key": row.action_key, "reason": reason},
     )
     return True
@@ -302,21 +351,34 @@ def reject(
 
 # --- expiry -----------------------------------------------------------------
 
-def _mark_expired(db: Session, row: PendingActionDB) -> None:
-    row.status = EXPIRED
-    # `decided_*` stay NULL: nobody decided this.
-    row.decided_at = now()
-    db.commit()
-    audit.record(
-        db, LAPSED,
-        actor_type=ACTOR_SYSTEM, actor_id=None,
-        subject_type=SUBJECT, subject_id=row.id, brand_id=row.brand_id,
-        detail={"action_key": row.action_key},
+def _expire(db: Session, row: PendingActionDB) -> bool:
+    """Retire a request that lapsed — **only if it is still pending** (task-13).
+
+    It used to set the status on whatever ORM object it was handed and commit.
+    A sweep could read a pending row, an approver could decide it, and the
+    sweep then wrote `expired` over the decision from its stale copy: a request
+    approved, executed and mailed, recorded as having lapsed. And two
+    overlapping sweeps each emitted `approval.expired` for the same row. The
+    conditional move gives exactly one caller the transition and the event.
+    """
+    expired = _transition(
+        db, row.id, from_status=PENDING, to_status=EXPIRED,
+        # `decided_by_*` stay NULL: nobody decided this.
+        decided_at=now(),
     )
+    if expired:
+        audit.record(
+            db, LAPSED,
+            actor_type=ACTOR_SYSTEM, actor_id=None,
+            subject_type=SUBJECT, subject_id=row.id, brand_id=row.brand_id,
+            detail={"action_key": row.action_key},
+        )
+    return expired
 
 
 def expire_due_pending_actions(db: Session) -> list[int]:
-    """Retire everything past its deadline. Idempotent, and safe to run twice.
+    """Retire everything past its deadline. Idempotent, and safe to run twice
+    **concurrently** since 2026-09-29 — before, it was safe only one at a time.
 
     Bookkeeping only — `approve()` already refuses an expired request whatever
     this has or has not done. Modelled on `process_due_scheduled_sends`: the
@@ -331,10 +393,10 @@ def expire_due_pending_actions(db: Session) -> list[int]:
         )
         .all()
     )
-    expired: list[int] = []
-    for row in due:
-        _mark_expired(db, row)
-        expired.append(row.id)
+    # Only the rows this sweep actually moved. Another sweep, or an approver,
+    # may have taken some of `due` between the SELECT and here, and reporting
+    # those as expired by this run would be the doubled event task-13 found.
+    expired: list[int] = [row.id for row in due if _expire(db, row)]
     if expired:
         logger.info("expired %s pending action(s): %s", len(expired), expired)
     return expired

@@ -29,7 +29,7 @@ from app.auth.service import ensure_default_brand
 from app.approvals import service as approvals
 from app.approvals.actions import registry as action_registry
 from app.approvals.db_models import (
-    APPROVED, EXPIRED, FAILED, PENDING, REJECTED, PendingActionDB,
+    APPROVED, EXECUTING, EXPIRED, FAILED, PENDING, REJECTED, PendingActionDB,
 )
 from app.audit.db_models import AuditEventDB
 from app.audit.service import ACTOR_USER, events_for_subject
@@ -79,6 +79,19 @@ def planted_action(tmp_path):
         "        raise RuntimeError('the action blew up')\n"
         "    if payload.get('decline'):\n"
         "        return ActionResult(ok=False, message='the action declined')\n"
+        "    if payload.get('gate'):\n"
+        "        # What send_send_instance does: commit mid-action, ending any\n"
+        "        # transaction the caller was holding a lock in. Then say we are\n"
+        "        # inside and wait, so a second approver can arrive in the window.\n"
+        "        import time\n"
+        "        db.commit()\n"
+        "        gate = Path(payload['gate'])\n"
+        "        with Path(str(gate) + '.entered').open('a') as handle:\n"
+        "            handle.write('1')\n"
+        "        for _ in range(200):\n"
+        "            if gate.exists():\n"
+        "                break\n"
+        "            time.sleep(0.05)\n"
         "    path = Path(payload['path'])\n"
         "    # APPENDS — deliberately not idempotent, so a double execution is\n"
         "    # visible rather than absorbed.\n"
@@ -576,3 +589,147 @@ class TestTheSendAction:
 
         assert "no longer present" in send_fire.summarise(
             db, 99999999, brand_id=ensure_default_brand(db).id)
+
+
+class TestRunOnce:
+    """ADR-142 addendum 2026-09-29 (task-4): a held action runs once.
+
+    The old guard was a row lock held across `module.execute` — and released
+    by the first commit the action made, because the action runs on the same
+    session. `send_send_instance` commits inside itself, so the lock let go
+    while the row still read `pending`, and a second approver could claim it and
+    run it again. Nothing in the suite noticed, because the send action's own
+    status guard stopped the second run — the masking the lock's docstring
+    named as the reason the lock existed.
+
+    The planted action here commits mid-run exactly as the send does, then
+    waits, so the second approver arrives in precisely that window. And it
+    APPENDS, so a second run is visible rather than absorbed.
+    """
+
+    def test_a_second_approver_cannot_run_an_action_that_committed_mid_run(
+        self, planted_action, tmp_path
+    ):
+        import threading
+        import time
+
+        gate = tmp_path / "release"
+        entered = Path(str(gate) + ".entered")
+        marker = Path(planted_action["path"])
+
+        with SessionLocal() as setup:
+            row = _request(setup, {**planted_action, "gate": str(gate)})
+        results = {}
+
+        def approve_as(name):
+            with SessionLocal() as session:
+                results[name] = approvals.approve(
+                    session, row.id, approver_type=ACTOR_USER, approver_id=None,
+                )
+
+        first = threading.Thread(target=approve_as, args=("first",))
+        first.start()
+        for _ in range(200):
+            if entered.exists():
+                break
+            time.sleep(0.05)
+        assert entered.exists(), "the first approval never reached the action"
+
+        # The first run has committed and is waiting inside the action. Under
+        # the lock this is where the guard had already let go.
+        second = threading.Thread(target=approve_as, args=("second",))
+        second.start()
+        second.join(timeout=3)
+        gate.write_text("go")
+        first.join(timeout=15)
+        second.join(timeout=15)
+
+        assert results["first"].ok, results["first"].message
+        assert not results["second"].ok
+        assert "executing" in results["second"].message, results["second"].message
+        assert entered.read_text() == "1", "the action was entered twice"
+        assert marker.read_text() == "x", (
+            f"the action ran {len(marker.read_text())} times — two approvers both "
+            "executed a request whose action commits mid-run"
+        )
+        with SessionLocal() as check:
+            assert check.get(PendingActionDB, row.id).status == APPROVED
+
+    def test_a_request_whose_action_is_gone_stays_pending(self, db, planted_action):
+        """Looked up before the claim, so it is not stranded in `executing` by a
+        lookup that was always going to fail — `executing` is sticky by design,
+        so getting there by accident would be permanent."""
+        row = _request(db, planted_action)
+        db.query(PendingActionDB).filter(PendingActionDB.id == row.id).update(
+            {"action_key": "apprtest.never_registered"}, synchronize_session=False)
+        db.commit()
+
+        result = approvals.approve(db, row.id, approver_type=ACTOR_USER, approver_id=None)
+
+        assert not result.ok
+        db.expire_all()
+        assert db.get(PendingActionDB, row.id).status == PENDING
+
+    def test_an_executing_request_still_occupies_its_subject(self, db, planted_action):
+        """The partial unique index covers both open states. Otherwise a second
+        held request could be created for a thing whose approved action is
+        running right now."""
+        row = _request(db, planted_action, subject_id=424242)
+        db.query(PendingActionDB).filter(PendingActionDB.id == row.id).update(
+            {"status": EXECUTING, "decided_at": approvals.now()},
+            synchronize_session=False)
+        db.commit()
+
+        with pytest.raises(approvals.DuplicateRequest):
+            _request(db, planted_action, subject_id=424242)
+
+
+class TestExpiryCannotOverwriteADecision:
+    """task-13. A sweep reads its due rows, and time passes before it writes.
+
+    `_mark_expired` used to set the status on the ORM object it was handed and
+    commit, so a request decided in between was recorded as lapsed — approved,
+    executed, mailed, and filed as expired. The stale object is the sweep's
+    own: `expire_due_pending_actions` reads every due row first and expires
+    them one by one, so these tests hand `_expire` a row read before the
+    decision, which is exactly what the sweep does.
+    """
+
+    def _due(self, db, planted_action):
+        row = _request(db, planted_action)
+        db.query(PendingActionDB).filter(PendingActionDB.id == row.id).update(
+            {"expires_at": approvals.now() - timedelta(minutes=1)},
+            synchronize_session=False)
+        db.commit()
+        return row
+
+    def test_a_sweep_holding_a_stale_row_does_not_expire_a_rejected_request(
+        self, db, planted_action
+    ):
+        row = self._due(db, planted_action)
+        with SessionLocal() as sweep:
+            stale = sweep.get(PendingActionDB, row.id)   # read: pending, due
+            with SessionLocal() as person:
+                assert approvals.reject(
+                    person, row.id, approver_type=ACTOR_USER, approver_id=None)
+
+            assert approvals._expire(sweep, stale) is False
+
+        db.expire_all()
+        assert db.get(PendingActionDB, row.id).status == REJECTED, (
+            "the sweep wrote 'expired' over a decision made after it read the row"
+        )
+        lapsed = [e for e in events_for_subject(db, approvals.SUBJECT, row.id)
+                  if e.action == approvals.LAPSED]
+        assert lapsed == []
+
+    def test_two_sweeps_emit_one_expiry(self, db, planted_action):
+        row = self._due(db, planted_action)
+        with SessionLocal() as one, SessionLocal() as two:
+            first, second = one.get(PendingActionDB, row.id), two.get(PendingActionDB, row.id)
+            outcomes = [approvals._expire(one, first), approvals._expire(two, second)]
+
+        assert sorted(outcomes) == [False, True]
+        lapsed = [e for e in events_for_subject(db, approvals.SUBJECT, row.id)
+                  if e.action == approvals.LAPSED]
+        assert len(lapsed) == 1, f"{len(lapsed)} approval.expired events for one request"

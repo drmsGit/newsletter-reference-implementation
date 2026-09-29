@@ -13,10 +13,23 @@ EXPIRED = "expired"
 #: no" and "the run blew up" are different facts, and one status covering both
 #: makes the history lie about which happened.
 FAILED = "failed"
+#: A person approved and the action is running — or ran, and the process died
+#: before recording how it went (ADR-142 addendum 2026-09-29). The claim that
+#: makes approval run-once: `approve` moves a row here, committed, BEFORE the
+#: action executes, so an action that commits internally can no longer release
+#: the guard. **A row left here by a crash stays here, deliberately.** Nobody
+#: can know whether the action ran, and re-approving it is the double execution
+#: this state exists to prevent.
+EXECUTING = "executing"
 
-STATUSES = (PENDING, APPROVED, REJECTED, EXPIRED, FAILED)
-#: Everything that is no longer waiting on anybody.
-DECIDED = (APPROVED, REJECTED, EXPIRED, FAILED)
+STATUSES = (PENDING, EXECUTING, APPROVED, REJECTED, EXPIRED, FAILED)
+#: Everything that is no longer waiting on a person. EXECUTING is here because
+#: the person has decided; it is shown with the decided rows rather than in the
+#: inbox, which must never offer an Approve button on something already running.
+DECIDED = (EXECUTING, APPROVED, REJECTED, EXPIRED, FAILED)
+#: A request that still occupies its subject: nobody may hold a second request
+#: for a thing whose first is waiting, or whose approved action is running.
+OPEN = (PENDING, EXECUTING)
 
 
 class PendingActionDB(Base):
@@ -107,7 +120,7 @@ class PendingActionDB(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "status IN ('pending','approved','rejected','expired','failed')",
+            "status IN ('pending','executing','approved','rejected','expired','failed')",
             name="ck_pending_actions_status",
         ),
         # Decided-ness is one fact held in two columns, so the database keeps
@@ -133,6 +146,8 @@ class PendingActionDB(Base):
             "ux_pending_actions_one_open_per_subject",
             "action_key", "subject_type", "subject_id",
             unique=True,
-            postgresql_where=text("status = 'pending'"),
+            # Both open states (ADR-142 addendum 2026-09-29): an executing
+            # request still occupies its subject.
+            postgresql_where=text("status IN ('pending', 'executing')"),
         ),
     )
