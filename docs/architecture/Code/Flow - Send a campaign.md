@@ -74,7 +74,7 @@ Entry: [[frontend]] `POST /ui/campaigns/{campaign_id}/snapshots/{snapshot_id}/se
 
 Entry: [[frontend]] `POST /ui/send-instances/{id}/send` (manual) **or** `process_due_scheduled_sends()` (a due scheduled send) → [[delivery]] `send_send_instance()`.
 
-5. **Lock and guard.** A `SELECT ... FOR UPDATE` row lock + status check makes the `draft → sending` transition one-shot — a second concurrent trigger blocks, re-reads `sending`, and is rejected. No double-sends.
+5. **Lock and guard.** A `SELECT ... FOR UPDATE` row lock + status check makes the `draft → sending` transition one-shot — a second concurrent trigger blocks, re-reads `sending`, and is rejected. No double-sends. **Everything that can refuse without writing runs before that transition** — the required-field check, the snapshot lookup, provider construction and channel validation — so a refused send keeps its status and can be retried once fixed. **Everything after it runs inside one handler**, so any exception moves the send to `failed` (retryable) rather than stranding it in `sending` with nothing sent (task-14, 2026-09-29).
 6. **Reconcile, always.** [[delivery]] `reconcile_executions_to_audience()` re-resolves the [[audience]] group *now* and adds newly-matching / drops no-longer-matching-and-unsent executions (re-checking the cap). A send with **no audience group** skips this — nothing to re-resolve — which is why step 9's exclusion stack is still the only gate for those.
 7. **Resolve the subject.** From the [[campaigns]] `VariantDB.subject` (recipient-facing), falling back to the send instance's internal name.
 8. **Per recipient, in a loop:**

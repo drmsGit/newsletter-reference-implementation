@@ -650,51 +650,21 @@ def send_send_instance(
     from app.rendering.service import missing_required_fields
     from app.snapshots.db_models import SnapshotDB as _Snapshot
 
-    _snapshot = db.query(_Snapshot).filter(
+    snapshot = db.query(_Snapshot).filter(
         _Snapshot.id == send_instance.snapshot_id
     ).first()
-    if _snapshot is not None:
-        gaps = missing_required_fields(db, _snapshot.variant_id)
-        if gaps:
-            named = ", ".join(f"{kind}.{field}" for _, kind, field in gaps)
-            raise ValueError(
-                f"Variant {_snapshot.variant_id} is missing required content "
-                f"({named}), so this send is refused. An empty required field "
-                "reaches the recipient with nothing in it, and the first party "
-                "to notice is them."
-            )
-
-    send_instance.status = "sending"
-    db.commit()
-
-    # The audience is re-resolved against the group right now, just before
-    # sending, so a send reflects who matches at send time — not who matched
-    # when it was planned. **Unconditional since ADR-176 point 4**: this was
-    # `if audience_resolution_mode == "rerun"`, which meant an exclusion
-    # segment written after planning reached the resolver and not the send.
-    # A send planned before that date still re-resolves, which is the point —
-    # the column records how it was planned, not what it may do.
-    #
-    # No-op for a send with no audience group: `reconcile_executions_to_audience`
-    # returns early, and those executions were never group-derived.
-    try:
-        reconcile_executions_to_audience(db, send_instance)
-    except ValueError:
-        send_instance.status = "failed"
-        db.commit()
-        raise
-
-    snapshot = (
-        db.query(SnapshotDB)
-        .filter(
-            SnapshotDB.id == send_instance.snapshot_id
-        )
-        .first()
-    )
-
     if snapshot is None:
         raise ValueError(
             f"Snapshot {send_instance.snapshot_id} not found"
+        )
+    gaps = missing_required_fields(db, snapshot.variant_id)
+    if gaps:
+        named = ", ".join(f"{kind}.{field}" for _, kind, field in gaps)
+        raise ValueError(
+            f"Variant {snapshot.variant_id} is missing required content "
+            f"({named}), so this send is refused. An empty required field "
+            "reaches the recipient with nothing in it, and the first party "
+            "to notice is them."
         )
 
     # Subject line comes from the variant (recipient-facing copy), not the
@@ -718,6 +688,58 @@ def send_send_instance(
         from_address=send_instance.from_address,
         channel=variant.channel if variant else DEFAULT_CHANNEL,
     )
+
+    # **Everything above this line only reads, and everything below it is
+    # inside the handler** (task-14). The status transition is the claim: once
+    # it is committed, every later attempt is refused by the guard above, so an
+    # exception that escaped between here and the send loop used to leave the
+    # instance in "sending" forever with nothing sent and no route back — and
+    # through approvals the request was recorded failed while the send stayed
+    # wedged. The snapshot lookup, provider construction and channel
+    # validation used to sit after this line; they only read, so they moved
+    # above it, and a send they refuse keeps its status and can be retried
+    # once the configuration is fixed.
+    send_instance.status = "sending"
+    db.commit()
+
+    try:
+        _deliver_claimed(db, send_instance, snapshot, variant, subject, provider)
+    except Exception:
+        # Any exception, not just ValueError: a database error in the slot
+        # query strands a send exactly as surely as a refused provider.
+        # "failed" is retryable — the guard refuses only sending and sent.
+        # Rolled back first, because a failed statement leaves the session
+        # unable to commit anything; executions already sent were committed
+        # one by one inside the loop and are not undone by this.
+        db.rollback()
+        db.query(SendInstanceDB).filter(
+            SendInstanceDB.id == send_instance.id
+        ).update({"status": "failed"}, synchronize_session=False)
+        db.commit()
+        raise
+
+
+def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, provider) -> None:
+    """Everything `send_send_instance` does after claiming the instance.
+
+    Separate so the caller can wrap ALL of it in one failure handler — the
+    property task-14 is about. Nothing here may assume it can leave the parent
+    in "sending": the caller moves it to "failed" on any exception.
+    """
+    send_instance_id = send_instance.id
+
+    # The audience is re-resolved against the group right now, just before
+    # sending, so a send reflects who matches at send time — not who matched
+    # when it was planned. **Unconditional since ADR-176 point 4**: this was
+    # `if audience_resolution_mode == "rerun"`, which meant an exclusion
+    # segment written after planning reached the resolver and not the send.
+    # A send planned before that date still re-resolves, which is the point —
+    # the column records how it was planned, not what it may do.
+    #
+    # No-op for a send with no audience group: `reconcile_executions_to_audience`
+    # returns early, and those executions were never group-derived.
+    reconcile_executions_to_audience(db, send_instance)
+
 
     # Decision slots on this variant. Rendering only *looks up* an existing
     # resolution per recipient (rendering/service.resolve_content_for_module),
@@ -792,103 +814,98 @@ def send_send_instance(
             ),
         )
 
-    try:
-        for execution in executions:
+    for execution in executions:
 
-            # Excluded by the stack above: record why and move on, before any
-            # work is done for this recipient. Ordering matters — a recipient
-            # who may not be contacted must not have decision slots resolved
-            # (that is AI spend on someone who will not be sent to, the cost
-            # reason ADR-163 gives alongside the legal one) and must not be
-            # rendered.
-            if execution.recipient_id not in gate.eligible:
-                execution.status = "excluded"
-                execution.exclusion_reason = gate.reason_for(execution.recipient_id)
-                logger.info(
-                    "execution %s excluded: recipient %s — %s",
-                    execution.id,
-                    execution.recipient_id,
-                    execution.exclusion_reason,
-                )
-                db.commit()
-                continue
-
-            # Resolve + persist each decision slot for this recipient before
-            # rendering, so their personalized content is chosen and recorded.
-            for slot in decision_slots:
-                try:
-                    execute_decision_slot(db, slot.id, recipient_id=execution.recipient_id)
-                except ConsentDenied:
-                    # Unreachable in practice — the stack above already excluded
-                    # every non-consenting recipient, so this is belt and braces
-                    # behind it. Deliberately NOT swallowed with the rest: a
-                    # consent refusal arriving here means the gate and the
-                    # decision layer disagree about who may be contacted, which
-                    # is a defect to surface rather than a slot to hide.
-                    raise
-                except ValueError:
-                    # Strategy resolved nothing — the slot renders hidden
-                    # (ADR-086) and the send continues. This is the ONLY case
-                    # this handler is for. Before ADR-163 point 8 it also
-                    # swallowed the consent guard, which is how a compliance
-                    # defect came to read as a rendering behaviour.
-                    pass
-
-            # Resolve HTML per recipient rather than reusing one shared
-            # variant-level snapshot — decision-slot personalization can
-            # resolve different content per recipient within the same
-            # variant (ADR-083), so every recipient must get their own
-            # rendered HTML, not identical copies of whatever the snapshot
-            # happened to freeze for a single (or no) recipient.
-            # Through the channel's renderer (ADR-162 point 4), not the email
-            # one. An email comes back as HTML with a subject in its envelope;
-            # a push comes back as fields. Per recipient rather than reusing
-            # the snapshot, because decision-slot personalisation can resolve
-            # different content per recipient within one variant (ADR-083).
-            artifact = render_variant(
-                db=db,
-                variant_id=snapshot.variant_id,
-                recipient_id=execution.recipient_id,
-                mode="send",
-            )
-            # Subject lives on the variant until ADR-162 point 1 moves it into
-            # a header module, so the renderer put it in the envelope. The send
-            # instance's name is the fallback it always was.
-            if artifact.body is not None and not artifact.envelope.get("subject"):
-                artifact.envelope["subject"] = subject
-
-            # Already resolved by stage 1 of the gate, which had to look it up
-            # to decide addressability at all. Resolving it again here would
-            # reintroduce the per-recipient query the stack exists to avoid,
-            # and would let the address that was *checked* differ from the
-            # address that is *used*.
-            recipient_email = gate.addresses[execution.recipient_id]
-
-            result = provider.send(recipient_email, artifact)
-
+        # Excluded by the stack above: record why and move on, before any
+        # work is done for this recipient. Ordering matters — a recipient
+        # who may not be contacted must not have decision slots resolved
+        # (that is AI spend on someone who will not be sent to, the cost
+        # reason ADR-163 gives alongside the legal one) and must not be
+        # rendered.
+        if execution.recipient_id not in gate.eligible:
+            execution.status = "excluded"
+            execution.exclusion_reason = gate.reason_for(execution.recipient_id)
             logger.info(
-                "send result: execution_id=%s recipient_id=%s success=%s "
-                "provider_message_id=%s message=%s",
+                "execution %s excluded: recipient %s — %s",
                 execution.id,
                 execution.recipient_id,
-                result.success,
-                result.provider_message_id,
-                result.message,
+                execution.exclusion_reason,
             )
-
-            execution.status = "sent" if result.success else "failed"
-            execution.provider_message_id = (
-                result.provider_message_id
-            )
-
-            # Commit after each execution — if provider.send() raises mid-batch,
-            # executions already sent must not lose their persisted status just
-            # because a later one in the loop failed.
             db.commit()
-    except Exception:
-        send_instance.status = "failed"
+            continue
+
+        # Resolve + persist each decision slot for this recipient before
+        # rendering, so their personalized content is chosen and recorded.
+        for slot in decision_slots:
+            try:
+                execute_decision_slot(db, slot.id, recipient_id=execution.recipient_id)
+            except ConsentDenied:
+                # Unreachable in practice — the stack above already excluded
+                # every non-consenting recipient, so this is belt and braces
+                # behind it. Deliberately NOT swallowed with the rest: a
+                # consent refusal arriving here means the gate and the
+                # decision layer disagree about who may be contacted, which
+                # is a defect to surface rather than a slot to hide.
+                raise
+            except ValueError:
+                # Strategy resolved nothing — the slot renders hidden
+                # (ADR-086) and the send continues. This is the ONLY case
+                # this handler is for. Before ADR-163 point 8 it also
+                # swallowed the consent guard, which is how a compliance
+                # defect came to read as a rendering behaviour.
+                pass
+
+        # Resolve HTML per recipient rather than reusing one shared
+        # variant-level snapshot — decision-slot personalization can
+        # resolve different content per recipient within the same
+        # variant (ADR-083), so every recipient must get their own
+        # rendered HTML, not identical copies of whatever the snapshot
+        # happened to freeze for a single (or no) recipient.
+        # Through the channel's renderer (ADR-162 point 4), not the email
+        # one. An email comes back as HTML with a subject in its envelope;
+        # a push comes back as fields. Per recipient rather than reusing
+        # the snapshot, because decision-slot personalisation can resolve
+        # different content per recipient within one variant (ADR-083).
+        artifact = render_variant(
+            db=db,
+            variant_id=snapshot.variant_id,
+            recipient_id=execution.recipient_id,
+            mode="send",
+        )
+        # Subject lives on the variant until ADR-162 point 1 moves it into
+        # a header module, so the renderer put it in the envelope. The send
+        # instance's name is the fallback it always was.
+        if artifact.body is not None and not artifact.envelope.get("subject"):
+            artifact.envelope["subject"] = subject
+
+        # Already resolved by stage 1 of the gate, which had to look it up
+        # to decide addressability at all. Resolving it again here would
+        # reintroduce the per-recipient query the stack exists to avoid,
+        # and would let the address that was *checked* differ from the
+        # address that is *used*.
+        recipient_email = gate.addresses[execution.recipient_id]
+
+        result = provider.send(recipient_email, artifact)
+
+        logger.info(
+            "send result: execution_id=%s recipient_id=%s success=%s "
+            "provider_message_id=%s message=%s",
+            execution.id,
+            execution.recipient_id,
+            result.success,
+            result.provider_message_id,
+            result.message,
+        )
+
+        execution.status = "sent" if result.success else "failed"
+        execution.provider_message_id = (
+            result.provider_message_id
+        )
+
+        # Commit after each execution — if provider.send() raises mid-batch,
+        # executions already sent must not lose their persisted status just
+        # because a later one in the loop failed.
         db.commit()
-        raise
 
     # Derive the parent status from its children rather than declaring success.
     # This line used to be an unconditional `status = "sent"`, so 100 failed

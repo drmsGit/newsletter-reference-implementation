@@ -956,3 +956,97 @@ class TestSendTimeAudienceReResolution:
             "re-resolution dropped a consenting, pinned recipient that no "
             "exclude block touched, so the exclusion test proves nothing"
         )
+
+
+class TestASendIsNeverStrandedInSending:
+    """task-14. The status transition to "sending" is the claim: once it is
+    committed, the guard refuses every later attempt. An exception that
+    escaped between the claim and the send loop used to leave the instance in
+    "sending" forever, with nothing sent and no way back.
+
+    Two halves, one test each. Read-only preflight — the snapshot, the
+    provider, the channel — runs BEFORE the claim, so a refusal leaves the
+    send as it was and retryable once fixed. Everything after the claim is
+    inside one handler, so any exception moves the send to "failed", which the
+    guard allows to be retried.
+
+    Lives here because this file owns the send fixture.
+    """
+
+    def test_an_unsupported_provider_is_refused_before_the_claim(self, db):
+        recipient = db.recipient("opted_in")
+        send_instance, _ = db.send_to(recipient)
+        send_instance.provider = "no-such-provider"
+        db.session.commit()
+
+        with pytest.raises(ValueError, match="Unsupported provider"):
+            send_send_instance(db.session, send_instance.id, brand_id=send_instance.brand_id)
+        db.session.rollback()
+        db.session.refresh(send_instance)
+
+        assert send_instance.status == "draft", (
+            f"a refused provider left the send {send_instance.status!r} — it was "
+            "claimed before a read-only check that could refuse it"
+        )
+
+        # And the way back exists: fix the configuration, send again.
+        send_instance.provider = "mock"
+        db.session.commit()
+        send_send_instance(db.session, send_instance.id, brand_id=send_instance.brand_id)
+        db.session.refresh(send_instance)
+        assert send_instance.status in ("sent", "no_recipients", "partial_failed")
+
+    def test_a_database_error_after_the_claim_leaves_the_send_failed_not_sending(
+        self, db, monkeypatch
+    ):
+        """A REAL database error, deliberately. A plain Python exception would
+        leave the session usable, and the handler's rollback would never be
+        needed; a failed statement poisons the session, so a handler that only
+        committed would itself raise and leave the send "sending" after all."""
+        from sqlalchemy import text as sql
+        from sqlalchemy.exc import ProgrammingError
+        import app.delivery.service as delivery
+
+        recipient = db.recipient("opted_in")
+        send_instance, _ = db.send_to(recipient)
+        db.session.commit()
+
+        def broken_gate(session, *args, **kwargs):
+            session.execute(sql("SELECT * FROM no_such_table_task14"))
+
+        monkeypatch.setattr(delivery, "run_exclusion_stack", broken_gate)
+        with pytest.raises(ProgrammingError):
+            send_send_instance(db.session, send_instance.id, brand_id=send_instance.brand_id)
+        monkeypatch.undo()
+
+        db.session.rollback()
+        db.session.refresh(send_instance)
+        assert send_instance.status == "failed", (
+            f"the send is {send_instance.status!r} after an error past the claim"
+        )
+
+        # Retryable: the guard refuses only sending and sent.
+        send_send_instance(db.session, send_instance.id, brand_id=send_instance.brand_id)
+        db.session.refresh(send_instance)
+        assert send_instance.status in ("sent", "no_recipients", "partial_failed")
+
+    def test_through_approvals_a_refusal_leaves_request_and_send_agreeing(self, db):
+        """The entry's worse half: `send_fire` treats a ValueError as a clean
+        refusal, so the request was recorded failed while the send stayed
+        wedged. Now the send is untouched, and can be requested again."""
+        from app.approvals.actions import send_fire
+
+        recipient = db.recipient("opted_in")
+        send_instance, _ = db.send_to(recipient)
+        send_instance.provider = "no-such-provider"
+        db.session.commit()
+
+        result = send_fire.execute(
+            db.session, {"send_instance_id": send_instance.id},
+            brand_id=send_instance.brand_id,
+        )
+        db.session.rollback()
+        db.session.refresh(send_instance)
+
+        assert not result.ok
+        assert send_instance.status == "draft"
