@@ -1,15 +1,14 @@
 ---
 id: TASK-232
-title: >-
-  The API docs cannot authenticate, so no protected route can be tried from
-  /docs
+title: The API docs cannot authenticate, so no protected route can be tried from /docs
 status: To Do
 assignee: []
-created_date: '2026-09-28 20:32'
-updated_date: '2026-09-28 20:32'
+created_date: 2026-09-28 20:32
+updated_date: 2026-09-28 20:32
 labels:
   - backend
   - docs
+  - needs-adr
 dependencies: []
 type: bug
 ordinal: 303200
