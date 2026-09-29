@@ -7,7 +7,7 @@ topic:
   - consent
   - delivery
 created: 2026-09-24
-modified: 2026-09-27
+modified: 2026-09-29
 source:
   - "Manager Workflow design interview (interview-prep, Cluster 4 Q2–Q4 and Cluster 5 Q2, closed 2026-09-24)"
 depends_on:
@@ -129,6 +129,65 @@ an exclude block still does not reach a hand-pinned recipient, and
 `audience_resolution_mode` still defaults to `"freeze"` in both
 `SendInstanceDB` and `prepare_send_from_audience`. That is recorded here rather
 than left to be rediscovered, and it is tracked in `docs/backlog.md`.
+
+## Addendum 2026-09-29 — points 1 and 4 are implemented, and point 1 has a hole this record did not anticipate
+
+**Both points now exist in code**, five days after acceptance. The previous
+addendum recorded them as accepted and unimplemented; that sentence is now
+false and is left standing, because it was true when written and this record
+says elsewhere that rewriting a dated statement to match a later fact is the
+error it exists to prevent.
+
+`resolve_audience` computes `((∪ include) ∪ pins) − (∪ exclude)`, and
+`send_send_instance` reconciles against the audience group for every send
+rather than only for the sends that asked. The docstring, the two Code pages
+and the template heading that carried the 2026-07-26 rule are corrected;
+`frontend/router.py:3629`'s comment became true without an edit, as the Notes
+predicted.
+
+**Point 4's build question is answered: the column is kept and the value is
+refused.** Five rows read `"freeze"` because those sends *were* frozen — their
+executions were fixed at plan time and that is what happened. Rewriting them
+would edit history to agree with a decision taken afterwards, which is the same
+move this record refuses for its own citations. Only the un-fired row was
+backfilled (`backend/scripts/migrate_0021_freeze_is_history.py`). The column
+therefore records **how a send was planned** and gates nothing, and
+`prepare_send_from_audience` refuses `"freeze"` by name rather than dropping the
+parameter, so a caller carrying the old value is told what changed instead of
+being told that Python does not recognise a keyword.
+
+**Point 1's guarantee is not yet complete, and the gap is not in the resolver.**
+A rule block's criteria resolve through `find_by_criteria`, which ends in
+`_deduplicate_by_address` and drops any recipient with no usable address.
+Manual pins do not pass through that filter. So a recipient who is not
+addressable can be pinned into a group and **no exclude block can remove them**
+— and because that helper asks about *email* addressability whatever channel
+was requested, a push-only recipient is returned by
+`resolve_audience(db, group_id, "push")` despite an exclude block matching them.
+Verified against the development database on 2026-09-29 and tracked as its own
+bug. This is worth recording here rather than only in the queue: this record's
+argument is that an exclusion is the safety, and an exclusion that silently
+does not apply to part of a group is the failure it exists to prevent. The
+precedence decided in point 1 is right and is implemented; what is incomplete
+is the set the subtraction is applied to.
+
+**A finding about the test suite, because it generalises.** The ADR-163 point 7
+P0 regression test was protected by `audience_resolution_mode="freeze"` — its
+docstring said so, and said a `"rerun"` send *"would filter the opt-out out by
+accident, which is why the P0 hid for as long as it did"*. Point 4 removes that
+protection, so the test was about to pass while testing nothing. It survives
+because its fixture's send carries no `audience_group_id` and
+`reconcile_executions_to_audience` returns early for such a send — which is
+also the real case, since executions can be created without a group. **A
+decision that makes a safety unconditional can disable the test that proved the
+safety was needed**, and nothing about the decision announces that.
+
+**Renaming is done.** The group-detail heading read *"Manually added — always
+included"*; it now reads *"Manually added"* with a line saying an exclusion
+rule still removes these people. The record's Negative called that not-optional
+cleanup and it was right — a control that says *force* and can be overruled is
+how a manager learns the precedence from a send that reached fewer people than
+expected.
 
 ## Related ADRs
 
