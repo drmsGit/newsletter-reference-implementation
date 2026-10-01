@@ -8,11 +8,23 @@ threaded that way and it was right there, because a brand is a property of the
 *data*; an actor is a property of the *request*, and passing it down would put
 a request concern in the domain layer for the sake of one log.
 
-The cost is stated rather than discovered: **a service called from somewhere
-other than a route is not audited.** Scripts, scheduled jobs and (when ADR-166
-lands) machine callers all bypass this. That is acceptable while the log covers
-human actions and nothing else, and it is the first thing to revisit when it
-does not.
+**When a service writes an entry instead** (ADR-153 addendum 2026-10-01,
+task-23). The rule above stopped holding when approvals landed, and was a
+documented exception there rather than a stated pattern. The pattern: an entry
+is written where the actor is KNOWN, and never where it would have to be
+guessed. A route writes it from the request. A service writes it, with the
+actor passed explicitly, only when no request carries the actor —
+
+  * an event with no request at all — a sweep, a scheduled job — written as
+    `ACTOR_SYSTEM` (`approval.expired`);
+  * an event whose actor was resolved before any route handler ran — a
+    machine's held request, refused inside a dependency, written as the
+    integration (`approval.requested`);
+  * a decision whose actor the service is handed — the approver.
+
+The cost that remains: **a service called from a script or job that passes no
+actor is not audited.** Nothing infers an actor; writing one requires saying
+who it was.
 """
 import logging
 
@@ -39,9 +51,17 @@ BRAND_CREATED = "brand.created"
 CAMPAIGN_DUPLICATED = "campaign.duplicated"
 CONTENT_DUPLICATED = "content.duplicated"
 
+# The three kinds of actor, together — the pattern in the module docstring
+# names all three, so they live beside each other (task-23).
 ACTOR_USER = "user"
-#: ADR-166's machine principals will use this. Nothing writes it yet.
+#: ADR-166's machine principals. Written as the requester of a held action
+#: (`approval.requested`), whose actor is resolved before any route runs.
 ACTOR_INTEGRATION = "integration"
+#: No person and no machine: a sweep or a scheduled job (`approval.expired`).
+#: Nobody decided it, so attributing it to a person would be the same
+#: dishonesty `record` refuses when it writes a null actor rather than
+#: guessing one. Moved here from approvals/service.py on 2026-10-01.
+ACTOR_SYSTEM = "system"
 
 
 #: Audit writes the database refused, since this process started (task-22).
@@ -125,7 +145,12 @@ def record_from_request(request, db: Session, action: str, **kwargs) -> AuditEve
     off nobody is signed in, and recording "no actor" honestly beats
     attributing the action to somebody who did not take it.
     """
-    user = getattr(request.state, "current_user", None)
+    # **Read strictly, without a default** (task-23). `attach_current_user`
+    # sets both of these on every request — None when nobody is signed in —
+    # so a default was never needed, and it made a renamed middleware attribute
+    # turn every actor into NULL silently: fail-open in the one field this
+    # table exists for. Now that raises at the first audited request.
+    user = request.state.current_user
     # **The resolved working brand first** (ADR-172 point 1). On the JSON
     # plane `current_brand` is the middleware's presentation summary and the
     # guard no longer overwrites it, so reading that alone would attribute a
@@ -133,7 +158,9 @@ def record_from_request(request, db: Session, action: str, **kwargs) -> AuditEve
     # Every caller of this is on the Jinja plane today, where the two agree —
     # and the SPA migration moves them, at which point an omission here would
     # be a very quiet wrong answer.
-    brand = getattr(request.state, "current_brand", None)
+    brand = request.state.current_brand
+    # This one keeps its default: only the JSON guard sets it, so on the
+    # Jinja plane its absence is the ordinary case, not a renamed attribute.
     resolved = getattr(request.state, "working_brand_id", None)
     kwargs.setdefault(
         "brand_id", resolved if resolved is not None else (brand["id"] if brand else None)

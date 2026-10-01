@@ -294,3 +294,45 @@ class TestTheLogIsEvidence:
             "the audit log gained a foreign key — an entry must be able to "
             "outlive what it references"
         )
+
+
+class TestTheActorIsReadStrictly:
+    """task-23. `record_from_request` read the middleware's attributes through
+    `getattr(..., None)`. The middleware sets them on every request, so the
+    default was never needed — and it meant renaming one would turn every
+    actor into NULL silently, in the one field this table exists for."""
+
+    def _request(self, **state):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(state=SimpleNamespace(**state))
+
+    def test_a_missing_middleware_attribute_raises_rather_than_writing_null(self, db):
+        request = self._request(current_brand=None)   # no current_user: as if renamed
+
+        with pytest.raises(AttributeError):
+            audit.record_from_request(request, db, audit.SIGNED_IN)
+
+    def test_an_anonymous_request_still_writes_an_honest_null_actor(self, db):
+        """None is a real answer — enforcement off, nobody signed in — and
+        recording "no actor" beats attributing the action to somebody."""
+        marker = f"audit.task23.{uuid.uuid4().hex[:8]}"
+        event = audit.record_from_request(
+            self._request(current_user=None, current_brand=None), db, marker)
+        try:
+            assert event is not None and event.actor_id is None
+        finally:
+            db.query(AuditEventDB).filter(AuditEventDB.action == marker).delete()
+            db.commit()
+
+    def test_without_a_resolved_working_brand_the_session_brand_is_used(self, db):
+        """`working_brand_id` keeps its default on purpose: only the JSON guard
+        sets it, so on the Jinja plane its absence is ordinary."""
+        marker = f"audit.task23.{uuid.uuid4().hex[:8]}"
+        event = audit.record_from_request(
+            self._request(current_user={"id": 7}, current_brand={"id": 3}), db, marker)
+        try:
+            assert (event.actor_id, event.brand_id) == (7, 3)
+        finally:
+            db.query(AuditEventDB).filter(AuditEventDB.action == marker).delete()
+            db.commit()

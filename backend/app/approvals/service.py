@@ -43,10 +43,10 @@ EXECUTION_FAILED = "approval.failed"
 #: The subject type every approval event points at.
 SUBJECT = "pending_action"
 
-#: Written as the actor of an expiry. Nobody decided it, so attributing it to a
-#: person would be the same dishonesty `audit.record` refuses when it writes a
-#: null actor rather than guessing one.
-ACTOR_SYSTEM = "system"
+#: Written as the actor of an expiry. Defined with the other actor kinds in
+#: the audit module since 2026-10-01; re-exported here because callers and
+#: tests already read it as `approvals.ACTOR_SYSTEM`.
+ACTOR_SYSTEM = audit.ACTOR_SYSTEM
 
 
 class DuplicateRequest(Exception):
