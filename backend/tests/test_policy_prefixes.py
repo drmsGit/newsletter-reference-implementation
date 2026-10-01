@@ -104,6 +104,70 @@ class TestNoPolicyPrefixCutsIntoASegment:
         )
 
 
+def _shadowed(prefixes):
+    """Every (earlier, later) pair where the later entry can never match.
+
+    First match wins, so an entry listed BELOW a prefix of itself is dead: the
+    earlier, broader prefix claims every route the narrower one was written
+    for, and those routes are priced with the broader entry's permission. This
+    is the case `_cuts_into` does not see, because the broader prefix ends at a
+    boundary — `/delivery/` above `/delivery/send-test` is clean by segment and
+    wrong by order.
+    """
+    return [
+        (earlier, later)
+        for i, earlier in enumerate(prefixes)
+        for later in prefixes[i + 1:]
+        if later.startswith(earlier)
+    ]
+
+
+class TestNoEntryIsShadowedByABroaderOneAboveIt:
+    """task-34. In this table order IS semantics: a narrow entry is right
+    only because it sits above the broad prefix it refines. The 2026-09-18
+    `sends.plan` / `sends.execute` split hit exactly this — moving
+    `/ui/send-instances/` above the dispatch route makes firing a real send
+    require only the permission to prepare one.
+
+    **Measured 2026-10-01, and it corrects the task:** there are 15 such pairs
+    with different permissions, not six, and reversing each one fails an
+    existing per-pair test — mostly `test_auth_policy.TestSpecificityOrdering`.
+    So the pairs that exist were defended one by one. What was not defended is
+    the NEXT one: a new narrow entry added below its broad prefix passed the
+    entire suite. This pins the rule instead of the list, so it is caught
+    whether or not anybody writes its per-pair test.
+    """
+
+    def test_every_narrow_entry_sits_above_the_broad_one_it_refines(self):
+        bad = _shadowed([entry[0] for entry in WRITE_POLICY])
+
+        assert not bad, (
+            f"these WRITE_POLICY entries can never match, because a broader "
+            f"prefix of them is listed ABOVE: {bad}. First match wins, so every "
+            "route the narrow entry was written for is priced with the broad "
+            "entry's permission. Move the narrower entry up."
+        )
+
+    def test_the_rule_catches_the_reorder_that_actually_happened(self):
+        """Mutation-proofing against the real case: firing a send priced as
+        preparing one."""
+        assert _shadowed(["/delivery/", "/delivery/send-test"]) == [
+            ("/delivery/", "/delivery/send-test")
+        ]
+        assert _shadowed(["/delivery/send-test", "/delivery/"]) == []
+
+    def test_reversing_the_real_table_is_caught(self):
+        """The table as shipped has narrow-above-broad pairs; reversed, every
+        one of them becomes a shadowed entry. If this found none, the rule
+        would be checking nothing."""
+        prefixes = [entry[0] for entry in WRITE_POLICY]
+
+        assert len(_shadowed(list(reversed(prefixes)))) >= 6, (
+            "the table has fewer refining pairs than the entry counted, or the "
+            "rule stopped seeing them"
+        )
+
+
 class TestTheCheckItselfCatchesTheCaseItWasWrittenFor:
     """**Mutation-proofing.** A test that cannot fail is worse than no test,
     because it reports a property nobody is checking. These assert the predicate
