@@ -60,7 +60,54 @@ def now() -> datetime:
 
 
 def hash_secret(value: str) -> str:
+    """SHA-256 for high-entropy secrets: session tokens, machine-credential
+    secrets and rate-limit identifiers. Right for those — there is no
+    dictionary of 32 random bytes, and a KDF would sit on the hot path of
+    every request. **Not for the six-digit login code**, which has 10^6
+    possible values and uses `hash_login_code` instead (task-35)."""
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+# --- the login code: the one low-entropy secret (task-35) --------------------
+#
+# A six-digit code is 10^6 values. Under bare SHA-256 a reader of
+# `login_codes` could precompute every code once, and identical codes collided
+# across users. A per-row salt alone would not have fixed it: a salted row
+# still falls to 10^6 SHA-256 guesses in milliseconds. scrypt makes each guess
+# cost ~25 ms on the development machine (measured 2026-10-01) — about seven
+# CPU-hours per code, against a ten-minute lifetime. Standard library, no new
+# dependency, no new secret to manage.
+_CODE_KDF = {"n": 2 ** 14, "r": 8, "p": 1, "dklen": 32}
+_CODE_PREFIX = "scrypt$"
+#: Salt for the KDF run a verify does when there is nothing real to check.
+_NO_SALT = bytes(16)
+
+
+def hash_login_code(code: str) -> str:
+    """`scrypt$<salt hex>$<hash hex>`. Salted per row, so equal codes differ."""
+    salt = os.urandom(16)
+    digest = hashlib.scrypt((code or "").strip().encode("utf-8"), salt=salt, **_CODE_KDF)
+    return f"{_CODE_PREFIX}{salt.hex()}${digest.hex()}"
+
+
+def login_code_matches(stored: str | None, code: str) -> bool:
+    """Whether `code` is the one `stored` was made from.
+
+    **Runs the KDF exactly once whatever `stored` is** — a real hash, a legacy
+    SHA-256 one, or None because there is no code to check. A slow hash on only
+    some verify paths would be a timing oracle: ~25 ms when the address exists
+    and holds a code, nothing otherwise, which is the account oracle ADR-151 §2
+    closes, reopened through the verify route. A row written before this
+    change (bare SHA-256, no prefix) never matches: it expires within the code
+    TTL, so failing it closed costs one re-request at most.
+    """
+    candidate = (code or "").strip().encode("utf-8")
+    if stored and stored.startswith(_CODE_PREFIX):
+        salt_hex, _, want = stored[len(_CODE_PREFIX):].partition("$")
+        got = hashlib.scrypt(candidate, salt=bytes.fromhex(salt_hex), **_CODE_KDF).hex()
+        return secrets.compare_digest(got, want)
+    hashlib.scrypt(candidate, salt=_NO_SALT, **_CODE_KDF)   # the same work, discarded
+    return False
 
 
 def csrf_token_for(session_token: str | None) -> str:
@@ -759,7 +806,7 @@ def issue_login_code(db: Session, email: str) -> IssuedCode | None:
     code = f"{secrets.randbelow(1_000_000):06d}"
     db.add(LoginCodeDB(
         user_id=user.id,
-        code_hash=hash_secret(code),
+        code_hash=hash_login_code(code),
         expires_at=now() + timedelta(minutes=CODE_TTL_MINUTES),
     ))
     db.commit()
@@ -802,34 +849,45 @@ def request_login_code(db: Session, email: str) -> str | None:
 
 
 def verify_login_code(db: Session, email: str, code: str) -> str | None:
-    """Check a code and open a session. Returns the session token, or None."""
+    """Check a code and open a session. Returns the session token, or None.
+
+    **The code is checked exactly once on every path** — unknown address,
+    inactive user, no code, expired, exhausted, wrong, right — because the
+    check is a deliberately slow KDF, and running it on only some paths would
+    tell a caller timing this route which addresses hold a code (task-35).
+    """
     address = normalise_email(email)
     user = db.query(UserDB).filter(UserDB.email == address).first()
-    if user is None or not user.is_active:
-        return None
-
-    row = (
-        db.query(LoginCodeDB)
-        .filter(LoginCodeDB.user_id == user.id, LoginCodeDB.consumed_at.is_(None))
-        .order_by(LoginCodeDB.id.desc())
-        .first()
+    row = None
+    if user is not None and user.is_active:
+        row = (
+            db.query(LoginCodeDB)
+            .filter(LoginCodeDB.user_id == user.id, LoginCodeDB.consumed_at.is_(None))
+            .order_by(LoginCodeDB.id.desc())
+            .first()
+        )
+    current = now()
+    checkable = (
+        row is not None and row.expires_at > current and row.attempts < CODE_MAX_ATTEMPTS
     )
-    if row is None or row.expires_at <= now():
+    matches = login_code_matches(row.code_hash if checkable else None, code)
+
+    if row is None or row.expires_at <= current:
         return None
 
     if row.attempts >= CODE_MAX_ATTEMPTS:
         # Burn it rather than leaving a guessable code alive.
-        row.consumed_at = now()
+        row.consumed_at = current
         db.commit()
         return None
 
     row.attempts += 1
-    if not secrets.compare_digest(row.code_hash, hash_secret((code or "").strip())):
+    if not matches:
         db.commit()
         return None
 
-    row.consumed_at = now()
-    user.last_login_at = now()
+    row.consumed_at = current
+    user.last_login_at = current
     db.commit()
     return create_session(db, user)
 

@@ -124,7 +124,8 @@ class LoginCodeDB(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    code_hash = Column(String(64), nullable=False)
+    # `scrypt$<salt>$<hash>` since task-35 (~104 chars); 64 held bare SHA-256.
+    code_hash = Column(String(128), nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False)
     consumed_at = Column(DateTime(timezone=True), nullable=True)
     attempts = Column(Integer, nullable=False, default=0)

@@ -141,7 +141,7 @@ class TestSigningInWorks:
         client.post("/auth/session/request", json={"email": user.email})
         row = _latest_code(db, user.id)
         code = "424242"
-        row.code_hash = hashlib.sha256(code.encode()).hexdigest()
+        row.code_hash = auth.hash_login_code(code)
         db.commit()
         return client.post(
             "/auth/session/verify", json={"email": user.email, "code": code},
@@ -215,7 +215,7 @@ class TestSigningOut:
 
         client.post("/auth/session/request", json={"email": user.email})
         row = _latest_code(db, user.id)
-        row.code_hash = hashlib.sha256(b"424242").hexdigest()
+        row.code_hash = auth.hash_login_code("424242")
         db.commit()
         signed = client.post(
             "/auth/session/verify", json={"email": user.email, "code": "424242"},
@@ -244,7 +244,7 @@ class TestSigningOut:
 
         client.post("/auth/session/request", json={"email": user.email})
         row = _latest_code(db, user.id)
-        row.code_hash = hashlib.sha256(b"424242").hexdigest()
+        row.code_hash = auth.hash_login_code("424242")
         db.commit()
         signed = client.post(
             "/auth/session/verify", json={"email": user.email, "code": "424242"},
@@ -286,7 +286,7 @@ class TestTheTokenSurvivesAReload:
 
         client.post("/auth/session/request", json={"email": user.email})
         row = _latest_code(db, user.id)
-        row.code_hash = hashlib.sha256(b"424242").hexdigest()
+        row.code_hash = auth.hash_login_code("424242")
         db.commit()
         signed = client.post(
             "/auth/session/verify", json={"email": user.email, "code": "424242"},

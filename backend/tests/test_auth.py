@@ -256,7 +256,9 @@ class TestSignIn:
         code = auth.request_login_code(db, user.email)
         row = db.query(LoginCodeDB).filter(LoginCodeDB.user_id == user.id).first()
         assert row.code_hash != code
-        assert row.code_hash == auth.hash_secret(code)
+        # Salted and stretched since task-35, so the stored value is checked
+        # through the same function the verify path uses, not recomputed.
+        assert auth.login_code_matches(row.code_hash, code)
 
 
 class TestSessions:
@@ -1290,3 +1292,87 @@ class TestTheSessionIsTouchedAtMostOnceAMinute:
 
         assert response.status_code == 200
         assert writes == [], f"{len(writes)} UPDATE(s) on auth_sessions for one page view"
+
+
+class TestTheLoginCodeIsStretched:
+    """task-35. The six-digit code was bare SHA-256: 10^6 values, precomputed
+    once by anyone who can read `login_codes`, and identical codes collided
+    across users. Now scrypt, salted per row."""
+
+    def test_the_same_code_stores_differently_and_is_not_sha256(self):
+        import hashlib
+
+        first, second = auth.hash_login_code("123456"), auth.hash_login_code("123456")
+
+        assert first != second, "equal codes still collide across users"
+        assert hashlib.sha256(b"123456").hexdigest() not in (first, second)
+        assert auth.login_code_matches(first, "123456")
+        assert not auth.login_code_matches(first, "654321")
+
+    def test_a_code_stored_before_the_change_fails_closed(self):
+        """Live codes cannot be converted — they are not stored — and expire
+        within the TTL, so an old SHA-256 row simply never matches."""
+        import hashlib
+
+        legacy = hashlib.sha256(b"123456").hexdigest()
+        assert not auth.login_code_matches(legacy, "123456")
+
+    def test_the_kdf_runs_exactly_once_on_every_verify_path(self, db, monkeypatch):
+        """A slow hash on some verify paths only would tell a caller timing the
+        route which addresses hold a code — the oracle ADR-151 §2 closes,
+        reopened through verify. Counted, not timed: timing is flaky in tests,
+        and a count is exactly the property."""
+        import hashlib
+        from datetime import timedelta
+        from app.auth.db_models import LoginCodeDB
+
+        calls = []
+        real = hashlib.scrypt
+
+        def counting(*args, **kwargs):
+            calls.append(1)
+            return real(*args, **kwargs)
+
+        email = f"kdf-{uuid.uuid4().hex[:8]}@example.invalid"
+        user = auth.create_user(db, email=email, role_key="viewer")
+        try:
+            def code_row(**changes):
+                db.query(LoginCodeDB).filter(LoginCodeDB.user_id == user.id).delete()
+                row = LoginCodeDB(user_id=user.id, code_hash=auth.hash_login_code("111111"),
+                                  expires_at=auth.now() + timedelta(minutes=10))
+                for key, value in changes.items():
+                    setattr(row, key, value)
+                db.add(row)
+                db.commit()
+
+            monkeypatch.setattr(hashlib, "scrypt", counting)
+            paths = {
+                "unknown address": lambda: auth.verify_login_code(db, "nobody@example.invalid", "111111"),
+                "known, no code": lambda: auth.verify_login_code(db, email, "111111"),
+            }
+            results = {}
+            for label, attempt in paths.items():
+                calls.clear(); results[label] = (attempt(), len(calls))
+
+            for label, changes, code in (
+                ("expired", {"expires_at": auth.now() - timedelta(minutes=1)}, "111111"),
+                ("exhausted", {"attempts": 99}, "111111"),
+                ("wrong code", {}, "999999"),
+                ("right code", {}, "111111"),
+            ):
+                monkeypatch.undo(); code_row(**changes)
+                monkeypatch.setattr(hashlib, "scrypt", counting)
+                calls.clear(); results[label] = (auth.verify_login_code(db, email, code), len(calls))
+
+            counts = {label: n for label, (_, n) in results.items()}
+            assert set(counts.values()) == {1}, f"KDF runs per path: {counts}"
+            assert results["right code"][0] is not None, "the right code did not sign in"
+            assert all(results[k][0] is None for k in results if k != "right code")
+        finally:
+            monkeypatch.undo()
+            db.rollback()
+            db.query(LoginCodeDB).filter(LoginCodeDB.user_id == user.id).delete()
+            for table in ("auth_sessions", "role_assignments"):
+                db.execute(text(f"DELETE FROM {table} WHERE user_id = :u"), {"u": user.id})
+            db.execute(text("DELETE FROM users WHERE id = :u"), {"u": user.id})
+            db.commit()
