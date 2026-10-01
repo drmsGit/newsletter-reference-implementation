@@ -129,19 +129,45 @@ class DecisionStrategy(ABC):
         pass
 
 
-def sending_brand_id(db, slot) -> int | None:
+class BrokenCampaignChain(RuntimeError):
+    """A decision slot whose variant → campaign → brand chain does not resolve.
+
+    **Deliberately not a ValueError** (task-18). The send loop catches
+    ValueError from a slot as "the strategy resolved nothing" and hides the
+    slot under ADR-086's graceful degradation — the right answer to an empty
+    candidate set and the wrong one to a structural fault. And not a
+    ConsentDenied either: that is what a broken chain used to surface as, via
+    `require_consent(..., None)`, naming "brand None" — a compliance-shaped
+    error for a data defect. This propagates, so a send fails loudly and the
+    error says what is actually wrong.
+    """
+
+
+def sending_brand_id(db, slot) -> int:
     """The brand of the campaign this decision slot belongs to (ADR-150 point 8).
 
     A slot hangs off a variant, which hangs off a campaign, which carries the
-    brand. Returns None only if that chain is broken, in which case the caller
-    must not silently widen the candidate set — an unknown brand is not the
-    same as every brand.
+    brand. **Raises `BrokenCampaignChain` if that chain does not resolve**
+    (task-18), rather than returning None. It used to return None, and every
+    caller stayed safe only by accident: `ContentRecordDB.brand_id == None`
+    renders as `IS NULL`, the column is NOT NULL, so nothing matched — and the
+    consent check then found no grant for brand None. Each link is NOT NULL
+    with a foreign key today, so the chain cannot actually break; the point is
+    that brand safety no longer rests on nullability nobody connects to it.
     """
     from app.campaigns.db_models import CampaignDB, VariantDB
 
-    return (
+    brand_id = (
         db.query(CampaignDB.brand_id)
         .join(VariantDB, VariantDB.campaign_id == CampaignDB.id)
         .filter(VariantDB.id == slot.variant_id)
         .scalar()
     )
+    if brand_id is None:
+        raise BrokenCampaignChain(
+            f"Decision slot {getattr(slot, 'id', '?')}: variant {slot.variant_id} "
+            "does not resolve to a campaign with a brand, so which brand's "
+            "content and consent apply is unknown. This is a data defect, not "
+            "an empty result — refusing rather than resolving nothing."
+        )
+    return brand_id

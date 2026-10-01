@@ -90,8 +90,8 @@ class RecipientTopScoreStrategy(DecisionStrategy):
             # ADR-150 point 8: a decision slot resolves ONLY the sending
             # brand's content. Safe by construction — widening it is the
             # configurable filter point 10 defers, not this default. A slot
-            # whose campaign chain is broken resolves nothing rather than
-            # every brand's content, because an unknown brand is not "any".
+            # whose campaign chain is broken never gets here: `sending_brand_id`
+            # raises rather than handing this filter None (task-18).
             .filter(ContentRecordDB.brand_id == brand_id)
         )
 

@@ -6,6 +6,7 @@ from app.campaigns.models import DecisionResolution
 from app.auth.dependencies import working_brand
 from app.database import get_db
 from app.decision.service import execute_decision_slot
+from app.decision.strategies.base import BrokenCampaignChain
 from app.decision.strategies.base import StrategyMeta
 from app.decision.strategies.registry import list_strategies
 
@@ -36,5 +37,9 @@ def execute_slot(
             recipient_id=payload.recipient_id if payload else None,
             brand_id=brand_id,
         )
+    except BrokenCampaignChain as error:
+        # A data defect, not a bad request: 409, and the message says what is
+        # broken. Without this branch it would surface as a 500 (task-18).
+        raise HTTPException(status_code=409, detail=str(error))
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
