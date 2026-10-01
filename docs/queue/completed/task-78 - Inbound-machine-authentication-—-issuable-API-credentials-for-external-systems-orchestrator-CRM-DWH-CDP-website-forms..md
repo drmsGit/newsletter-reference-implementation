@@ -3,9 +3,10 @@ id: TASK-78
 title: >-
   Inbound machine authentication — issuable API credentials for external systems
   (orchestrator, CRM, DWH, CDP, website forms).
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-10-01 20:43'
 labels:
   - backend
 dependencies: []
@@ -25,3 +26,9 @@ ordinal: 203100
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 232, section "Features", position 31 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as already done (verified 2026-10-01). Launch gate 3 records inbound machine authentication as built 2026-09-18 (ADR-166 accepted and built), and the JSON API is guarded by enforce_api_policy. The unauthenticated POST /provider/events sibling this entry named is now mapped in backend/app/auth/policy.py to insight.write, so it requires an authenticated principal holding that permission.
+<!-- SECTION:FINAL_SUMMARY:END -->

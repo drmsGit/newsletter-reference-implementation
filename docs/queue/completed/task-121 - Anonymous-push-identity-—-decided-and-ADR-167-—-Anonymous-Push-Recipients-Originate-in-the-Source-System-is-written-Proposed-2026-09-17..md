@@ -3,10 +3,10 @@ id: TASK-121
 title: >-
   Anonymous push identity — decided, and ADR-167 — Anonymous Push Recipients
   Originate in the Source System is written (Proposed, 2026-09-17).
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:57'
-updated_date: '2026-09-27 14:33'
+updated_date: '2026-10-01 20:43'
 labels:
   - needs-adr
   - backend
@@ -43,3 +43,9 @@ ordinal: 300500
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 418, section "Needs ADR", position 5 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as done (verified 2026-10-01). The entry was to stay until ADR-167 was Accepted and then become an implementation item for the sync-path gap in its Consequences. ADR-167 is accepted, and that gap is already closed: create_recipient (backend/app/recipients/service.py) takes address and channel instead of email, cites ADR-167, and records consent on the channel given rather than defaulting a synced contact to email consent. No follow-up task is needed.
+<!-- SECTION:FINAL_SUMMARY:END -->

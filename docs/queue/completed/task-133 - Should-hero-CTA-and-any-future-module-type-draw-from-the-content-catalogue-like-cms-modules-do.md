@@ -3,10 +3,10 @@ id: TASK-133
 title: >-
   Should hero / CTA (and any future module type) draw from the content catalogue
   like cms modules do?
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:57'
-updated_date: '2026-09-27 14:29'
+updated_date: '2026-10-01 20:43'
 labels:
   - needs-adr
   - backend
@@ -30,3 +30,9 @@ ordinal: 301700
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 467, section "Needs ADR", position 17 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as answered (verified 2026-10-01): ADR-179 decided that hero draws from the catalogue, and M1 implemented it — storage/modules/email/hero.json is cms: true, with headline_hero and button_label_hero as catalogue fields, and body copy split into its own editorial module (cms: false). Any future module type answers the same question through ADR-177/179's field model rather than a per-module decision.
+<!-- SECTION:FINAL_SUMMARY:END -->

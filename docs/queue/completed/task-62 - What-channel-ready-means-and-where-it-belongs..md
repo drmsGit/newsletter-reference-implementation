@@ -1,9 +1,10 @@
 ---
 id: TASK-62
 title: 'What "channel-ready" means, and where it belongs.'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-10-01 20:43'
 labels:
   - backend
 dependencies: []
@@ -26,3 +27,9 @@ ordinal: 201500
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 180, section "Features", position 15 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as superseded (2026-10-01). The entry was built on ADR-161 point 7's rider defining channel readiness as 'push fields not empty'. ADR-174 (Channel Readiness Is Asserted, Not Computed) overturned that: readiness is a person's deliberate per-channel act, stored, not derived from whether fields are filled — and ADR-161 carries a dated addendum saying the rider is false. The question this entry asked is the one ADR-174 answers.
+<!-- SECTION:FINAL_SUMMARY:END -->

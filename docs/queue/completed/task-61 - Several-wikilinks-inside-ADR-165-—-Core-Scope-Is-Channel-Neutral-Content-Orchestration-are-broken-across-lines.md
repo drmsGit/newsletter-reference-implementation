@@ -3,10 +3,10 @@ id: TASK-61
 title: >-
   Several wikilinks inside ADR-165 — Core Scope Is Channel-Neutral Content
   Orchestration are broken across lines
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
-updated_date: '2026-09-27 14:29'
+updated_date: '2026-10-01 20:43'
 labels:
   - docs
 dependencies: []
@@ -25,3 +25,9 @@ ordinal: 201400
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 178, section "Features", position 14 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as already done (verified 2026-10-01): ADR-165 contains no wikilink split across a line break — scanned for an unclosed [[ before a newline, zero found. Repaired in the earlier wikilink-repair pass.
+<!-- SECTION:FINAL_SUMMARY:END -->
