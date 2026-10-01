@@ -3,9 +3,10 @@ id: TASK-32
 title: >-
   Every page view runs four or five `SELECT`+`UPDATE`+`COMMIT` cycles against
   the same `auth_sessions` row.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-10-01 21:10'
 labels:
   - backend
 dependencies: []
@@ -25,3 +26,9 @@ ordinal: 103200
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 100, section "Bugs", position 32 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The write half, which was the problem: last_seen_at is written at most once a minute, so a request went from 4 UPDATE + 4 COMMIT on the session row to 0 (measured). The idle timeout still slides at minute precision; brand revalidation is untouched. The read half (resolve once per request) was deliberately not done: 5 indexed point-SELECTs remain, and removing them means 24 call sites for no lock gain. Three tests incl. a whole-request statement count; the original and a never-extend mutant each fail; 778 pass.
+<!-- SECTION:FINAL_SUMMARY:END -->
