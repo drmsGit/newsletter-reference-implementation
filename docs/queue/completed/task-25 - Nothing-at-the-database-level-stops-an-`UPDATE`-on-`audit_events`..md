@@ -1,9 +1,10 @@
 ---
 id: TASK-25
 title: Nothing at the database level stops an `UPDATE` on `audit_events`.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-10-01 20:32'
 labels:
   - backend
 dependencies: []
@@ -23,3 +24,9 @@ ordinal: 102500
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 86, section "Bugs", position 25 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The database now refuses UPDATE on audit_events via a BEFORE UPDATE trigger — not the proposed REVOKE, which was measured to do nothing because the app's role is a superuser. Created by create_all (after_create listener) and by migrate_0025; the schema comparison now checks triggers, so both paths must agree. DELETE left possible (test cleanup; erasure is ADR-153 point 5's question). Tests include an update refused even with every privilege granted; three mutations caught; applied to dev via the runner; 768 pass.
+<!-- SECTION:FINAL_SUMMARY:END -->
