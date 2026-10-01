@@ -4,9 +4,10 @@ title: >-
   The six-digit login code is hashed with a bare unsalted sha256 — 10^6 of
   entropy, fully precomputable by anyone who can read the table, and identical
   codes collide across users.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-10-01 21:37'
 labels:
   - backend
 dependencies: []
@@ -26,3 +27,9 @@ ordinal: 103500
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 106, section "Bugs", position 35 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Login codes are stored with salted scrypt (hash_login_code), ~25 ms per guess — about seven CPU-hours per code against a 10-minute TTL; the other three hash_secret roles are untouched. Also closed a timing oracle the fix would otherwise have opened: verify now runs the KDF exactly once on every path. migrate_0026 widens the column; pre-change codes fail closed and expire. Tests count KDF runs per path; two mutations caught; applied to dev; 787 pass.
+<!-- SECTION:FINAL_SUMMARY:END -->
