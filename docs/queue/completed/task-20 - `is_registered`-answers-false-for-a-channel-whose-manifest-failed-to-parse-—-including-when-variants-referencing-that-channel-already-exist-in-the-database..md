@@ -4,9 +4,10 @@ title: >-
   `is_registered` answers false for a channel whose manifest failed to parse —
   including when variants referencing that channel already exist in the
   database.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-10-01 19:49'
 labels:
   - backend
 dependencies: []
@@ -26,3 +27,9 @@ ordinal: 102000
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 76, section "Bugs", position 20 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Both halves the entry offered, narrowly: the channel registry remembers why a manifest failed, so the one refusal site says 'declared but unreadable' instead of 'not available'; and startup refuses only when an unreadable manifest names a channel existing variants use — an unused broken channel is still just skipped, keeping the blast-radius tolerance. Four tests (startup checked in a fresh process), four mutations caught; 752 pass.
+<!-- SECTION:FINAL_SUMMARY:END -->
