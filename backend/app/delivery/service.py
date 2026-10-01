@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
-from app.delivery.models import DeliveryExecution, SendInstance
+from app.delivery.models import DeliveryExecution, SendInstance, SendInstanceDetail
 
 from app.campaigns.db_models import VariantDB
 from app.delivery.exclusion import run_exclusion_stack
@@ -107,6 +107,63 @@ def to_send_instance(record: SendInstanceDB) -> SendInstance:
         scheduled_at=record.scheduled_at,
         created_at=record.created_at,
         updated_at=record.updated_at,
+        from_address=record.from_address,
+        audience_group_id=record.audience_group_id,
+        sent_count=record.sent_count or 0,
+        failed_count=record.failed_count or 0,
+        excluded_count=record.excluded_count or 0,
+    )
+
+
+def list_send_instances(
+    db: Session, *, brand_id: int, limit: int = 50, offset: int = 0,
+    status: str | None = None,
+) -> list[SendInstance]:
+    """Every send in one brand, newest first — the deliveries list (task-28).
+
+    The only way to list sends used to be per snapshot, so a screen had to walk
+    campaigns → variants → snapshots → sends itself, which the screen inventory
+    names as a thing the SPA must not reimplement. Paged from the start: the
+    Manager Workflow interview ruled that a list returning everything does not
+    survive real volume. The shared response envelope is task-88's to define;
+    this takes the same `limit`/`offset` it will wrap.
+    """
+    query = db.query(SendInstanceDB).filter(SendInstanceDB.brand_id == brand_id)
+    if status:
+        query = query.filter(SendInstanceDB.status == status)
+    records = (
+        query.order_by(SendInstanceDB.created_at.desc(), SendInstanceDB.id.desc())
+        .offset(offset).limit(limit).all()
+    )
+    return [to_send_instance(record) for record in records]
+
+
+def send_instance_detail(
+    db: Session, send_instance_id: int, *, brand_id: int
+) -> SendInstanceDetail | None:
+    """One send within a brand, with what explains its gap (task-28).
+
+    The stage is the part of `exclusion_reason` before the first colon — the
+    stack writes "<stage>: <reason>", so grouping on it counts by stage without
+    parsing the free-text reason.
+    """
+    record = get_send_instance(db, send_instance_id, brand_id=brand_id)
+    if record is None:
+        return None
+    reasons = [
+        reason for (reason,) in db.query(DeliveryExecutionDB.exclusion_reason)
+        .filter(DeliveryExecutionDB.send_instance_id == record.id)
+        .all()
+    ]
+    by_stage: dict[str, int] = {}
+    for reason in reasons:
+        if reason:
+            stage = reason.split(":", 1)[0].strip()
+            by_stage[stage] = by_stage.get(stage, 0) + 1
+    return SendInstanceDetail(
+        **to_send_instance(record).model_dump(),
+        execution_count=len(reasons),
+        exclusions_by_stage=by_stage,
     )
 
 

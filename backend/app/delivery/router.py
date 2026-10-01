@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -12,13 +12,16 @@ from app.delivery.models import (
     DeliveryExecutionCreate,
     SendInstance,
     SendInstanceCreate,
+    SendInstanceDetail,
 )
 from app.delivery.service import (
     send_test_email,
     create_delivery_execution,
     create_send_instance,
     list_delivery_executions_for_send_instance,
+    list_send_instances,
     list_send_instances_for_snapshot,
+    send_instance_detail,
     send_send_instance,
     process_due_scheduled_sends
 )
@@ -85,6 +88,44 @@ def create_send_instance_record(
         scheduled_at=payload.scheduled_at,
         brand_id=brand_id,
     )
+
+
+@router.get(
+    "/send-instances",
+    response_model=list[SendInstance],
+    summary="List sends in the working brand, newest first",
+)
+def get_send_instances(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    status: str | None = None,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    """The deliveries list (task-28): what has been sent, across campaigns.
+
+    Answers *what did this send do* — send-level. Where campaigns stand,
+    including ones that have sent nothing, is the separate monitoring screen
+    (task-216); one screen answering both would answer neither well.
+    """
+    return list_send_instances(db, brand_id=brand_id, limit=limit, offset=offset, status=status)
+
+
+@router.get(
+    "/send-instances/{send_instance_id}",
+    response_model=SendInstanceDetail,
+    summary="One send, with what explains its sent/failed/excluded gap",
+)
+def get_send_instance_detail(
+    send_instance_id: int,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    detail = send_instance_detail(db, send_instance_id, brand_id=brand_id)
+    if detail is None:
+        # Another brand's send and a missing one answer the same.
+        raise HTTPException(status_code=404, detail=f"SendInstance {send_instance_id} not found")
+    return detail
 
 
 @router.get(

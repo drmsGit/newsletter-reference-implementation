@@ -796,6 +796,91 @@ class TestASendCannotBeFiredFromAnotherBrand:
         return db.query(SendInstanceDB.brand_id).filter(
             SendInstanceDB.id == send_id).scalar()
 
+    # --- task-28: the deliveries read surface ---------------------------------
+
+    def test_the_deliveries_list_shows_this_brand_and_hides_others(self, foreign_api):
+        from tests.machine import machine
+
+        send_id = self._draft_send_in_default_brand()
+        try:
+            with machine([VIEW]) as home:
+                mine = client.get("/delivery/send-instances", headers=home)
+            with foreign_api([VIEW]) as headers:
+                theirs = client.get("/delivery/send-instances", headers=headers)
+
+            assert mine.status_code == 200, mine.text
+            assert send_id in {s["id"] for s in mine.json()}
+            assert send_id not in {s["id"] for s in theirs.json()}, (
+                "another brand's deliveries list included this brand's send"
+            )
+        finally:
+            self._remove(send_id)
+
+    def test_the_list_is_newest_first_and_paged(self):
+        from tests.machine import machine
+
+        first = self._draft_send_in_default_brand()
+        second = self._draft_send_in_default_brand()
+        try:
+            with machine([VIEW]) as home:
+                page = client.get("/delivery/send-instances", params={"limit": 1}, headers=home)
+                too_many = client.get("/delivery/send-instances", params={"limit": 500}, headers=home)
+
+            assert [s["id"] for s in page.json()] == [second], "not newest first, or not limited"
+            assert too_many.status_code == 422, "an unbounded page was accepted"
+        finally:
+            self._remove(first)
+            self._remove(second)
+
+    def test_a_send_can_be_read_by_id_and_not_from_another_brand(self, foreign_api):
+        from tests.machine import machine
+
+        send_id = self._draft_send_in_default_brand()
+        try:
+            with machine([VIEW]) as home:
+                mine = client.get(f"/delivery/send-instances/{send_id}", headers=home)
+            with foreign_api([VIEW]) as headers:
+                theirs = client.get(f"/delivery/send-instances/{send_id}", headers=headers)
+
+            assert mine.status_code == 200 and mine.json()["id"] == send_id, mine.text
+            assert theirs.status_code == 404, theirs.text
+        finally:
+            self._remove(send_id)
+
+    def test_the_detail_explains_the_gap_by_stage(self):
+        """The interview's question 5.5: what explains approved-versus-sent.
+        Exclusions are counted per stage of the ADR-163 point 7 stack."""
+        from tests.machine import machine
+        from app.database import SessionLocal
+        from app.delivery.db_models import DeliveryExecutionDB
+        from app.recipients.db_models import RecipientDB
+
+        send_id = self._draft_send_in_default_brand()
+        db = SessionLocal()
+        try:
+            ids = [r.id for r in db.query(RecipientDB.id).order_by(RecipientDB.id).limit(4)]
+            for recipient_id, reason in zip(ids, (
+                "addressability: no active address on the email channel",
+                "consent: no grant for (email, marketing)",
+                "consent: no grant for (email, marketing)",
+                None,
+            )):
+                db.add(DeliveryExecutionDB(
+                    send_instance_id=send_id, recipient_id=recipient_id, provider="mock",
+                    status="excluded" if reason else "sent", exclusion_reason=reason,
+                    channel="email", purpose="marketing",
+                ))
+            db.commit()
+
+            with machine([VIEW]) as home:
+                detail = client.get(f"/delivery/send-instances/{send_id}", headers=home).json()
+
+            assert detail["execution_count"] == 4
+            assert detail["exclusions_by_stage"] == {"addressability": 1, "consent": 2}
+        finally:
+            db.close()
+            self._remove(send_id)
+
     def test_its_executions_are_not_listable_from_another_brand(self, foreign_api):
         send_id = self._draft_send_in_default_brand()
         try:
