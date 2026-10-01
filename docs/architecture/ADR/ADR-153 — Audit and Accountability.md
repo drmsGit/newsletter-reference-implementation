@@ -7,7 +7,7 @@ topic:
   - governance
   - privacy
 created: 2026-08-02
-modified: 2026-09-19
+modified: 2026-10-01
 source:
   - "Security Chapter design interview, Part 2 (playbook-strategy.md Decision Log, 2026-08-02)"
 depends_on:
@@ -78,6 +78,69 @@ An unauthenticated attacker can generate failed logins at will, so a log that wr
 - **Implementation status, 2026-09-14 (superseded by the note above):** **Nothing in this record is built.** There is no audit table anywhere in `backend/` — no `__tablename__` across `backend/app/*/db_models.py` is an audit log — so points 1 through 6 have no implementation. The only actor field in the system is `ContentVersionDB.created_by`, free text typed into a form (`backend/app/content/db_models.py`, `backend/app/frontend/router.py`). Point 6's aggregated authentication-failure record does not exist either: `LoginCodeRequestDB` is a rate-limit counter over hashed address and client, and its own docstring calls it "a counter, not an audit trail".
 - Retention of the audit log itself is out of scope here. It plausibly outlives the data it describes — see [[ADR-154 — Erasure and Retention]] for why that is coherent rather than contradictory.
 - Aggregating failed logins (point 6) trades forensic detail for resilience: an investigator sees "41 failures against this address in this window," not each attempt. That is the right trade for a log whose value is accountability rather than intrusion detection; a company wanting per-attempt telemetry should ship it to a SIEM, which is the tool for it.
+
+## Addendum 2026-10-01 — an entry is written where the actor is known
+
+Prompted by task-23, from Interview Prep - Channels (Audit B-Q4), and decided by
+the user on 2026-10-01. Points 1–6 stand; what changes is where an entry is
+written, and how strictly the route-side writer reads its actor.
+
+**The written-from-routes convention had stopped holding, and nothing restated
+it.** The module docstring of `backend/app/audit/service.py` opened with
+*"Written from routes, not from services."* The route knows the actor —
+`request.state.current_user`, resolved once by middleware — and a service takes
+a session, not a request. Threading an actor through every write signature was
+rejected: a brand is a property of the data, and is threaded, rightly; an actor
+is a property of the request. The docstring named its own cost — *"a service
+called from somewhere other than a route is not audited"* — and called it the
+first thing to revisit when it did not hold.
+
+**Approvals is where it did not hold.** The 2026-09-19 implementation note above
+records that `backend/app/approvals/service.py` writes entries from a service
+with an explicit actor, and adds `ACTOR_SYSTEM`. Two of its events have no route
+behind them. `approval.requested` belongs to a machine refused inside a
+dependency: the guard raised `ApprovalRequired` before any route handler ran,
+and the handler in `backend/main.py` creates the held request
+([[ADR-142 — Autonomous Workflows and the Automation Boundary]] §4).
+`approval.expired` has no request at all — the expiry sweep writes it. Approval
+decisions are written by the service with the approver passed in. One module was
+therefore a documented exception rather than a stated pattern.
+
+**1. An entry is written where the actor is known, and never where it would have
+to be guessed.** A route writes it from the request, through
+`record_from_request`. A service writes it — with the actor passed explicitly —
+only when no request carries the actor:
+
+- an event with no request at all, such as a sweep or a scheduled job, written
+  as `ACTOR_SYSTEM`;
+- an event whose actor was resolved before any route handler ran, such as a
+  machine's held request, written as the integration
+  ([[ADR-166 — Inbound Machine Callers Are Authenticated Principals]]);
+- a decision whose actor the service is handed, such as the approver.
+
+This states as a pattern what approvals did as an exception. The route
+convention stays the default, and the reasoning against threading actors
+through domain signatures stands.
+
+**2. The cost that remains, stated.** A service called from a script or job that
+passes no actor is still not audited. Writing such an event requires an
+explicit actor; nothing infers one.
+
+**3. `record_from_request` reads the middleware's attributes strictly.** It read
+`current_user` and `current_brand` through `getattr(..., None)`. The middleware
+`attach_current_user` in `backend/main.py` sets both on every request —
+`current_user` is None when nobody is signed in — so the default was never
+needed. What it did do was let a renamed middleware attribute turn every actor
+into NULL silently: fail-open in the one field this table exists for. Both are
+now read without a default, so a renamed attribute raises at the first audited
+request instead of writing NULL actors forever. `working_brand_id` keeps its
+default, because it is legitimately absent on the Jinja plane: only the JSON
+guard sets it.
+
+**What this costs.** A request that somehow bypasses the middleware now raises
+on an audited write rather than writing an actorless row. That is intended —
+loud beats silently wrong. The scripts-and-jobs gap of point 2 is named here,
+not closed.
 
 ## Related ADRs
 
