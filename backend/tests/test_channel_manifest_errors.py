@@ -21,15 +21,28 @@ BACKEND = Path(__file__).resolve().parents[1]
 
 
 @pytest.fixture
-def channels(tmp_path, monkeypatch):
+def channels(tmp_path):
+    """A channels directory with one good manifest and one that does not parse.
+
+    **Restored by hand, not with monkeypatch** — and the reload is forced AFTER
+    the directory is put back. monkeypatch's undo restored `_registry_mtime` to
+    the real directory's timestamp while the registry still held these
+    manifests, so the next module's tests read a stale registry in which push
+    was broken: eight push tests in test_channels.py failed only when run after
+    this file. A fixture that leaks the state it is testing is the failure.
+    """
     directory = tmp_path / "channels"
     directory.mkdir()
     (directory / "email.json").write_text(json.dumps({"label": "Email"}))
     (directory / "push.json").write_text('{"label": "Push",')   # truncated: does not parse
-    monkeypatch.setattr(registry, "CHANNELS_DIR", directory)
-    monkeypatch.setattr(registry, "_registry_mtime", None)
-    yield directory
-    monkeypatch.setattr(registry, "_registry_mtime", None)
+    original = registry.CHANNELS_DIR
+    registry.CHANNELS_DIR = directory
+    registry._registry_mtime = None
+    try:
+        yield directory
+    finally:
+        registry.CHANNELS_DIR = original
+        registry._registry_mtime = None   # forces the real manifests to be re-read
 
 
 def test_a_broken_manifest_is_remembered_and_an_absent_one_is_not(channels):
