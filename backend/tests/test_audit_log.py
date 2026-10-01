@@ -336,3 +336,63 @@ class TestTheActorIsReadStrictly:
         finally:
             db.query(AuditEventDB).filter(AuditEventDB.action == marker).delete()
             db.commit()
+
+
+class TestTheDatabaseRefusesAnUpdate:
+    """task-25. Append-only was discipline — no field invites an update — and
+    stopped holding the day somebody added a mutable column. Now the database
+    refuses it, through a trigger, because the `REVOKE UPDATE` the task
+    proposed does nothing for the superuser role this application connects as.
+
+    The test database is built by `create_all`, so this also proves the
+    trigger survives that path, as the task required.
+    """
+
+    def test_an_update_is_refused(self, db):
+        from sqlalchemy import text as sql
+        from sqlalchemy.exc import DBAPIError
+
+        marker = f"audit.task25.{uuid.uuid4().hex[:8]}"
+        db.add(AuditEventDB(actor_type=audit.ACTOR_USER, action=marker))
+        db.commit()
+        try:
+            with pytest.raises(DBAPIError, match="append-only"):
+                db.execute(sql("UPDATE audit_events SET action = 'rewritten' WHERE action = :m"),
+                           {"m": marker})
+            db.rollback()
+            assert db.query(AuditEventDB).filter(AuditEventDB.action == marker).count() == 1
+        finally:
+            db.rollback()
+            db.query(AuditEventDB).filter(AuditEventDB.action == marker).delete()
+            db.commit()
+
+    def test_the_refusal_does_not_depend_on_privileges(self, db):
+        """Why a trigger rather than REVOKE: with EVERY privilege on the table
+        granted explicitly, the update is still refused. A refusal that came
+        from privileges would be lifted by the grant; this one is not — and the
+        role this application connects as is a superuser, for whom privileges
+        are not checked at all."""
+        from sqlalchemy import text as sql
+        from sqlalchemy.exc import DBAPIError
+
+        marker = f"audit.task25.{uuid.uuid4().hex[:8]}"
+        db.add(AuditEventDB(actor_type=audit.ACTOR_USER, action=marker))
+        db.commit()
+        try:
+            db.execute(sql('GRANT ALL ON audit_events TO CURRENT_USER'))
+            with pytest.raises(DBAPIError, match="append-only"):
+                db.execute(sql("UPDATE audit_events SET action = 'rewritten' WHERE action = :m"),
+                           {"m": marker})
+        finally:
+            db.rollback()   # also undoes the GRANT
+            db.query(AuditEventDB).filter(AuditEventDB.action == marker).delete()
+            db.commit()
+
+    def test_migration_0025_creates_the_same_trigger(self):
+        from pathlib import Path
+
+        sql = (Path(__file__).resolve().parents[1] / "scripts"
+               / "migrate_0025_audit_events_append_only.sql").read_text()
+        assert "CREATE TRIGGER audit_events_append_only" in sql
+        assert "BEFORE UPDATE ON audit_events" in sql
+        assert "EXECUTE FUNCTION audit_events_refuse_update()" in sql

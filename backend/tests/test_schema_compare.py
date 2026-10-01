@@ -189,3 +189,21 @@ class TestTwoPathsThatSayTheSameThing:
 
         assert result.failures == [], "\n".join(result.failures)
         assert result.debris == [], "\n".join(result.debris)
+
+
+class TestTriggersAreCompared:
+    """task-25 made a trigger load-bearing; a database built without it would
+    enforce a different rule, so the comparison treats triggers like
+    constraints — a failure in both directions."""
+
+    def test_a_trigger_the_models_declare_and_the_database_lacks_fails(self):
+        live = {"t": {**_table(), "triggers": set()}}
+        models = {"t": {**_table(), "triggers": {"CREATE TRIGGER BEFORE UPDATE ON t ..."}}}
+
+        assert not schema_compare.compare(live, models).agrees
+
+    def test_a_trigger_only_the_database_has_fails(self):
+        live = {"t": {**_table(), "triggers": {"CREATE TRIGGER BEFORE UPDATE ON t ..."}}}
+        models = {"t": {**_table(), "triggers": set()}}
+
+        assert not schema_compare.compare(live, models).agrees

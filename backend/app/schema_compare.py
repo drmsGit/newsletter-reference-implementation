@@ -48,7 +48,9 @@ def describe(engine: Engine) -> dict:
     tables: dict[str, dict] = {}
 
     def table(name):
-        return tables.setdefault(name, {"columns": {}, "indexes": set(), "constraints": set()})
+        return tables.setdefault(
+            name, {"columns": {}, "indexes": set(), "constraints": set(), "triggers": set()}
+        )
 
     with engine.connect() as c:
         for t, col, typ, length, nullable, default in c.execute(text("""
@@ -80,6 +82,20 @@ def describe(engine: Engine) -> dict:
             # the duplicate.
             if kind != "u":
                 table(t)["constraints"].add((kind, definition))
+        # Triggers, since task-25 made one load-bearing: `audit_events` refuses
+        # an UPDATE through a trigger, and a database built by one path without
+        # it would enforce a different rule. Internal triggers (the ones
+        # Postgres creates for foreign keys) are excluded — the constraints
+        # above already cover them.
+        for t, definition in c.execute(text("""
+            SELECT cl.relname, pg_get_triggerdef(tg.oid)
+            FROM pg_trigger tg
+            JOIN pg_class cl ON cl.oid = tg.tgrelid
+            JOIN pg_namespace n ON n.oid = cl.relnamespace
+            WHERE n.nspname = 'public' AND NOT tg.tgisinternal""")):
+            table(t)["triggers"].add(
+                re.sub(r"TRIGGER \S+ ", "TRIGGER ", definition).replace("public.", "")
+            )
     return tables
 
 
@@ -112,6 +128,14 @@ def compare(live: dict, models: dict) -> Comparison:
         for kind, definition in sorted(have["constraints"] - want["constraints"]):
             result.failures.append(
                 f"{t}: the database enforces {definition}, the models do not declare it"
+            )
+        # A trigger changes what the database refuses, so it is treated like a
+        # constraint in both directions, not as debris.
+        for trigger in sorted(want.get("triggers", set()) - have.get("triggers", set())):
+            result.failures.append(f"{t}: the models declare {trigger}, the database lacks it")
+        for trigger in sorted(have.get("triggers", set()) - want.get("triggers", set())):
+            result.failures.append(
+                f"{t}: the database has {trigger}, the models do not declare it"
             )
     return result
 

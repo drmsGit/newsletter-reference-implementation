@@ -77,3 +77,42 @@ class AuditEventDB(Base):
         # "was this already copied, and to what".
         Index("ix_audit_events_subject", "subject_type", "subject_id", "created_at"),
     )
+
+
+# --- append-only, enforced by the database (task-25) ------------------------
+#
+# Immutability used to be discipline: no field invites an update, and the
+# service exposes only `record()`. Right, and it stops holding the day somebody
+# adds a mutable column — neither the database nor the suite would notice.
+#
+# **A trigger, not the `REVOKE UPDATE` the task proposed**, because the REVOKE
+# was measured and does nothing here: the application connects as a superuser,
+# and a superuser bypasses privilege checks entirely — an UPDATE succeeded
+# straight after revoking it (2026-10-01). A trigger fires for every role.
+#
+# **Created by `create_all` too**, through the `after_create` listener below,
+# because that is how the test database is built; migration 0025 creates the
+# same function and trigger on existing databases, and the schema comparison
+# checks triggers so the two paths cannot quietly disagree.
+#
+# UPDATE only. DELETE is deliberately not refused here: the test suite cleans
+# up audit rows throughout, and whether an erasure request may remove an entry
+# is ADR-153 point 5's question, not this one's.
+from sqlalchemy import DDL, event  # noqa: E402
+
+APPEND_ONLY_FUNCTION = DDL("""
+CREATE OR REPLACE FUNCTION audit_events_refuse_update() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'audit_events is append-only: an entry cannot be updated (ADR-153)';
+END
+$$
+""")
+APPEND_ONLY_TRIGGER = DDL("""
+CREATE TRIGGER audit_events_append_only
+BEFORE UPDATE ON audit_events
+FOR EACH ROW EXECUTE FUNCTION audit_events_refuse_update()
+""")
+
+event.listen(AuditEventDB.__table__, "after_create", APPEND_ONLY_FUNCTION)
+event.listen(AuditEventDB.__table__, "after_create", APPEND_ONLY_TRIGGER)
