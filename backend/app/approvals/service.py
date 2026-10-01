@@ -494,11 +494,12 @@ def may_decide(db: Session, user, meta, row: PendingActionDB) -> bool:
         return False
 
     from app.auth.permissions import is_brand_scoped
-    from app.auth.service import has_permission
+    from app.auth.service import ALL_BRANDS, has_permission
 
     if is_brand_scoped(meta.approve_permission):
         return has_permission(db, user, meta.approve_permission, brand_id=row.brand_id)
-    return has_permission(db, user, meta.approve_permission)
+    # Platform-level: the union, named (task-16).
+    return has_permission(db, user, meta.approve_permission, brand_id=ALL_BRANDS)
 
 
 def resolve_for_decision(db: Session, pending_id: int, *, brand_id: int, user):

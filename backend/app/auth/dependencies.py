@@ -30,6 +30,7 @@ from app.auth.policy import (
 )
 from app.auth.integrations import authenticate, record_auth_failure
 from app.auth.service import (
+    ALL_BRANDS,
     SESSION_COOKIE,
     csrf_token_for,
     ensure_default_brand,
@@ -93,14 +94,17 @@ def _permitted(request: Request, db: Session, user: UserDB, permission: str) -> 
     no brand.
 
     **A brand-scoped permission with no working brand is REFUSED, never checked
-    without one.** `brand_id=None` means "any brand this user holds" — the
-    union — so passing it through would be the fail-open direction: it would
+    without one.** The union across brands is `ALL_BRANDS` — named since
+    task-16, it used to be what `brand_id=None` meant — so checking a
+    brand-scoped permission against it would be the fail-open direction: it would
     let an Admin on brand A act as one on brand B, which is the exact hole this
     addendum exists to close. No working brand means the user holds no grant at
     all, and holding no grant is not a reason to be allowed more.
     """
     if not is_brand_scoped(permission):
-        return has_permission(db, user, permission)
+        # Platform-level: held everywhere or nowhere, so the union is the
+        # right question and is asked by name.
+        return has_permission(db, user, permission, brand_id=ALL_BRANDS)
 
     brand = getattr(request.state, "current_brand", None)
     if not brand:
@@ -568,7 +572,8 @@ def enforce_api_policy(request: Request, db: Session = Depends(get_db)):
             raise BrandNotDeclared()
         if permission not in held_here:
             raise NotAuthorised(permission)
-    elif not has_permission(db, principal, permission):
+    elif not has_permission(db, principal, permission, brand_id=ALL_BRANDS):
+        # Platform-level, as above: the union, by name.
         raise NotAuthorised(permission)
 
     # ADR-166 point 5. Reached only by a caller that is authenticated,

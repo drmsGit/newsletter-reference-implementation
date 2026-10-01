@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import enforce_api_policy
@@ -32,6 +32,7 @@ router = APIRouter(prefix="/recipients", tags=["recipients"])
 
 @router.post("/", response_model=Recipient)
 def create_recipient_record(
+    request: Request,
     payload: RecipientCreate,
     db: Session = Depends(get_db),
     principal=Depends(enforce_api_policy),
@@ -64,13 +65,32 @@ def create_recipient_record(
     """
     declared = payload.consent_status.value
     if declared and principal is not None:
-        if not has_permission(db, principal, RECIPIENTS_CONSENT):
+        # **On the declared brand, and the body must agree** (task-16) — the
+        # rule `/recipients/{external_id}/consent` has kept since ADR-150's
+        # 2026-09-20 addendum, which this route never got. It used to check
+        # `recipients.consent` with no brand, which meant the union across
+        # every brand the caller holds, and then wrote the consent for the
+        # body's brand: a caller authorised on brand A could create a
+        # recipient carrying brand B's consent. Only here, because creating a
+        # plain contact is platform-level and must not start requiring a brand.
+        working = working_brand(request)
+        if not has_permission(db, principal, RECIPIENTS_CONSENT, brand_id=working):
             raise HTTPException(
                 status_code=403,
                 detail=(
                     "Creating a recipient needs 'recipients.manage'; asserting "
-                    "their consent needs 'recipients.consent' as well. Omit "
-                    "consent_status, or grant the second permission."
+                    "their consent needs 'recipients.consent' as well, on the "
+                    "brand this request declares. Omit consent_status, or grant "
+                    "the second permission there."
+                ),
+            )
+        if payload.brand_id != working:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"This request declares brand {working} and asserts consent "
+                    f"for brand {payload.brand_id}. Refusing rather than choosing "
+                    "one: a consent record is a compliance record."
                 ),
             )
     try:

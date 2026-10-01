@@ -919,6 +919,92 @@ class TestAConsentRecordLandsOnTheBrandItWasAuthorisedFor:
             "source": "boundary-test",
         }
 
+    # --- task-16: the same hole on the create route -------------------------
+
+    def _create(self, headers, brand_id):
+        import uuid as _uuid
+
+        external_id = f"bb16-{_uuid.uuid4().hex[:8]}"
+        response = client.post("/recipients/", headers=headers, json={
+            "brand_id": brand_id, "external_id": external_id,
+            "address": f"{external_id}@example.invalid",
+            "consent_status": "opted_in",
+        })
+        return external_id, response
+
+    def _consent_events_for(self, db, external_id):
+        from sqlalchemy import text as sql
+
+        return db.execute(sql(
+            "SELECT count(*) FROM consent_events WHERE recipient_id IN "
+            "(SELECT id FROM recipients WHERE external_id = :e)"), {"e": external_id}).scalar()
+
+    def _cleanup(self, db, external_id):
+        from sqlalchemy import text as sql
+
+        db.rollback()
+        for statement in (
+            "DELETE FROM consent_events WHERE recipient_id IN (SELECT id FROM recipients WHERE external_id = :e)",
+            "DELETE FROM recipient_addresses WHERE recipient_id IN (SELECT id FROM recipients WHERE external_id = :e)",
+            "DELETE FROM recipients WHERE external_id = :e",
+        ):
+            db.execute(sql(statement), {"e": external_id})
+        db.commit()
+
+    def test_creating_a_recipient_cannot_assert_consent_for_another_brand(self, foreign_brand):
+        """task-16. `POST /recipients/` is guarded as `recipients.manage`
+        (platform-level) and then checked `recipients.consent` with NO brand —
+        the union — while writing the consent for the body's brand. So the
+        consent route's rule, header authorises and body must agree, never
+        reached this one: a caller authorised on brand A could create a
+        recipient carrying brand B's consent."""
+        from app.database import SessionLocal
+
+        db = SessionLocal()
+        external_id = None
+        try:
+            with machine([VIEW, RECIPIENTS_MANAGE, RECIPIENTS_CONSENT],
+                         brand_id=foreign_brand.id) as headers:
+                external_id, response = self._create(headers, ensure_default_brand(db).id)
+
+            assert response.status_code == 409, response.text
+            assert self._consent_events_for(db, external_id) == 0, (
+                "a consent record was written for a brand the caller was not "
+                "authorised in"
+            )
+        finally:
+            if external_id:
+                self._cleanup(db, external_id)
+            db.close()
+
+    def test_the_consent_grant_must_be_held_on_the_declared_brand(self, foreign_brand):
+        """The union, directly: `recipients.consent` held on ANOTHER brand only.
+        Checked with no brand, the union says yes."""
+        from app.auth import integrations as ints
+        from app.auth.db_models import IntegrationCredentialDB, IntegrationDB
+        from app.database import SessionLocal
+
+        db = SessionLocal()
+        external_id = None
+        try:
+            home = ensure_default_brand(db).id
+            with machine([VIEW, RECIPIENTS_MANAGE], brand_id=home) as headers:
+                key_id = headers["Authorization"].split()[1].split(".")[0]
+                integration = db.query(IntegrationDB).join(
+                    IntegrationCredentialDB,
+                    IntegrationCredentialDB.integration_id == IntegrationDB.id,
+                ).filter(IntegrationCredentialDB.key_id == key_id).first()
+                assert ints.grant(db, integration.id, RECIPIENTS_CONSENT, foreign_brand.id)
+
+                external_id, response = self._create(headers, home)
+
+            assert response.status_code == 403, response.text
+            assert self._consent_events_for(db, external_id) == 0
+        finally:
+            if external_id:
+                self._cleanup(db, external_id)
+            db.close()
+
     def test_the_body_and_the_header_must_agree(self, foreign_brand):
         """The sharp one: both are present, and they disagree.
 

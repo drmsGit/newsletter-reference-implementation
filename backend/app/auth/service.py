@@ -887,10 +887,41 @@ def revoke_all_sessions(db: Session, user_id: int) -> int:
 Principal = UserDB | IntegrationDB
 
 
+class _AllBrands:
+    """The type of `ALL_BRANDS`. One instance; compare with `is`."""
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:
+        return "ALL_BRANDS"
+
+
+#: The union across every brand a principal holds a grant on (task-16).
+#:
+#: **Named, so that nobody gets it by forgetting.** `permissions_for` used to
+#: take `brand_id: int | None = None` and answer the union when it was left
+#: out, so "may this caller do this on brand B?" and "may this caller do this
+#: anywhere?" were the same call with one argument missing — and the second is
+#: the fail-open answer. The create-recipient route asked it about a
+#: brand-scoped permission and got exactly that: a caller holding
+#: `recipients.consent` on brand A could assert consent for brand B.
+#:
+#: The union itself is right for a platform-level permission, which is held
+#: everywhere or nowhere — and grants-only with no DENY means two roles can
+#: never contradict each other, so it needs no other change. What changes is
+#: that a caller has to say so.
+ALL_BRANDS = _AllBrands()
+
+
 def permissions_for(
-    db: Session, principal: Principal | None, brand_id: int | None = None,
+    db: Session, principal: Principal | None, brand_id: "int | _AllBrands",
 ) -> set[str]:
-    """Every permission this principal holds, optionally narrowed to one brand.
+    """Every permission this principal holds on one brand, or on `ALL_BRANDS`.
+
+    **`brand_id` is required, and `None` is refused** (task-16): the union is
+    something a caller names, never something it gets by leaving an argument
+    out. Pass a brand's id, or `ALL_BRANDS` — and only for a platform-level
+    permission or for showing a person their whole access.
 
     **Two storage shapes, one answer.** A person's permissions arrive through a
     role (`role_permissions → roles → role_assignments`, ADR-150 §6); an
@@ -903,6 +934,14 @@ def permissions_for(
 
     An inactive principal holds nothing, in either shape.
     """
+    if brand_id is None:
+        raise TypeError(
+            "permissions_for needs a scope: a brand id, or ALL_BRANDS. None used "
+            "to mean the union across every brand, which made the dangerous "
+            "answer the one a caller got by forgetting (task-16)."
+        )
+    narrowed = brand_id is not ALL_BRANDS
+
     if principal is None:
         return set()
 
@@ -912,7 +951,7 @@ def permissions_for(
         query = db.query(IntegrationGrantDB.permission).filter(
             IntegrationGrantDB.integration_id == principal.id
         )
-        if brand_id is not None:
+        if narrowed:
             query = query.filter(IntegrationGrantDB.brand_id == brand_id)
         # **`view` is NOT implied for an integration**, and that asymmetry is
         # deliberate. Every *role* implies it, because a person who may edit
@@ -932,15 +971,16 @@ def permissions_for(
         .join(RoleAssignmentDB, RoleAssignmentDB.role_id == RoleDB.id)
         .filter(RoleAssignmentDB.user_id == principal.id)
     )
-    if brand_id is not None:
+    if narrowed:
         query = query.filter(RoleAssignmentDB.brand_id == brand_id)
     return {row[0] for row in query.all()}
 
 
 def has_permission(
     db: Session, principal: Principal | None, permission: str,
-    brand_id: int | None = None,
+    brand_id: "int | _AllBrands",
 ) -> bool:
+    """Required scope, for `permissions_for`'s reason: the union is named."""
     return permission in permissions_for(db, principal, brand_id)
 
 

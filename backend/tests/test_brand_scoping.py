@@ -649,10 +649,10 @@ class TestThePermissionCheckIsBrandAware:
     ):
         """The defensive branch, pinned because it fails in the dangerous direction.
 
-        `brand_id=None` means "any brand this user holds" — the union — so
-        falling through to `has_permission(db, user, permission)` when there is
-        no working brand would quietly restore the exact hole the addendum
-        closes. A mutation proved nothing else covers this: every other test
+        The union across brands — `ALL_BRANDS`, named since task-16; it used
+        to be what an omitted `brand_id` meant — is what falling through to an
+        unscoped check would ask when there is no working brand, and that would
+        quietly restore the exact hole the addendum closes. A mutation proved nothing else covers this: every other test
         here goes through a request that HAS a working brand, so the fallback
         could be reverted and the suite stayed green.
 
@@ -666,7 +666,7 @@ class TestThePermissionCheckIsBrandAware:
 
         user = user_on(default_brand)  # Manager, so they DO hold campaigns.manage
 
-        assert auth.has_permission(db, user, "campaigns.manage") is True, (
+        assert auth.has_permission(db, user, "campaigns.manage", brand_id=auth.ALL_BRANDS) is True, (
             "fixture is wrong — the union must say yes, or this proves nothing"
         )
 

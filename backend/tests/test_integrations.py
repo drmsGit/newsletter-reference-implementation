@@ -213,7 +213,7 @@ class TestGrants:
         """A key names a code path. An invented one would guard nothing and sit
         in the table looking like access."""
         assert ints.grant(session, integration.id, "sends.obliterate", brand.id) is False
-        assert auth.permissions_for(session, integration) == set()
+        assert auth.permissions_for(session, integration, auth.ALL_BRANDS) == set()
 
     def test_view_is_not_implied_for_a_machine(self, session, integration, brand):
         """Every *role* implies `view`, because a person who may edit and not
@@ -223,7 +223,7 @@ class TestGrants:
         ADR-166's Context names as the reason the feature exists.
         """
         ints.grant(session, integration.id, INSIGHT_WRITE, brand.id)
-        held = auth.permissions_for(session, integration)
+        held = auth.permissions_for(session, integration, auth.ALL_BRANDS)
         assert held == {INSIGHT_WRITE}
         assert VIEW not in held
 
@@ -231,12 +231,12 @@ class TestGrants:
         self, session, integration, brand
     ):
         ints.grant(session, integration.id, "recipients.manage", brand.id)
-        assert not auth.has_permission(session, integration, RECIPIENTS_CONSENT)
+        assert not auth.has_permission(session, integration, RECIPIENTS_CONSENT, brand_id=auth.ALL_BRANDS)
 
     def test_revoking_a_grant_removes_it(self, session, integration, brand):
         ints.grant(session, integration.id, SENDS_EXECUTE, brand.id)
         assert ints.revoke_grant(session, integration.id, SENDS_EXECUTE, brand.id)
-        assert not auth.has_permission(session, integration, SENDS_EXECUTE)
+        assert not auth.has_permission(session, integration, SENDS_EXECUTE, brand_id=auth.ALL_BRANDS)
 
     def test_granting_twice_is_not_an_error(self, session, integration, brand):
         assert ints.grant(session, integration.id, SENDS_EXECUTE, brand.id)
@@ -291,10 +291,10 @@ class TestOnePrincipalModel:
         session.refresh(integration)
 
         for principal in (user_with_sends, integration):
-            assert auth.permissions_for(session, principal) == set(), principal
+            assert auth.permissions_for(session, principal, auth.ALL_BRANDS) == set(), principal
 
     def test_no_principal_holds_nothing(self, session):
-        assert auth.permissions_for(session, None) == set()
+        assert auth.permissions_for(session, None, auth.ALL_BRANDS) == set()
 
 
 class TestUnattendedSending:

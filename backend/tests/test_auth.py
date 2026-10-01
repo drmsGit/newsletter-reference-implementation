@@ -9,6 +9,7 @@ import uuid
 from datetime import timedelta
 
 import pytest
+from sqlalchemy import text
 
 from app.auth import service as auth
 from app.audit.db_models import AuditEventDB
@@ -129,24 +130,24 @@ class TestPermissions:
 
     def test_admin_can_manage_users_and_credentials(self, db, temp_user):
         user = temp_user(role_key=ADMIN)
-        assert auth.has_permission(db, user, USERS_MANAGE)
-        assert auth.has_permission(db, user, CREDENTIALS_MANAGE)
+        assert auth.has_permission(db, user, USERS_MANAGE, brand_id=auth.ALL_BRANDS)
+        assert auth.has_permission(db, user, CREDENTIALS_MANAGE, brand_id=auth.ALL_BRANDS)
 
     def test_manager_can_run_ai_but_not_touch_credentials(self, db, temp_user):
         # The line ADR-152's write-only credential rule leans on.
         user = temp_user(role_key=MANAGER)
-        assert auth.has_permission(db, user, AI_RUN)
-        assert not auth.has_permission(db, user, CREDENTIALS_MANAGE)
-        assert not auth.has_permission(db, user, USERS_MANAGE)
+        assert auth.has_permission(db, user, AI_RUN, brand_id=auth.ALL_BRANDS)
+        assert not auth.has_permission(db, user, CREDENTIALS_MANAGE, brand_id=auth.ALL_BRANDS)
+        assert not auth.has_permission(db, user, USERS_MANAGE, brand_id=auth.ALL_BRANDS)
 
     def test_viewer_can_only_view(self, db, temp_user):
         user = temp_user(role_key=VIEWER)
-        assert auth.permissions_for(db, user) == {VIEW}
+        assert auth.permissions_for(db, user, auth.ALL_BRANDS) == {VIEW}
 
     def test_deactivated_user_holds_nothing(self, db, temp_user):
         user = temp_user(role_key=ADMIN)
         auth.set_active(db, user.id, False)
-        assert auth.permissions_for(db, user) == set()
+        assert auth.permissions_for(db, user, auth.ALL_BRANDS) == set()
 
     def test_permissions_can_be_narrowed_to_one_brand(self, db, temp_user):
         user = temp_user(role_key=ADMIN)
@@ -361,7 +362,7 @@ class TestRoleAdministration:
         user = temp_user(role_key=VIEWER)
         admin_role = db.query(RoleDB).filter(RoleDB.key == ADMIN).first()
         assert auth.assign_role(db, user.id, admin_role.id) is True
-        assert USERS_MANAGE in auth.permissions_for(db, user)
+        assert USERS_MANAGE in auth.permissions_for(db, user, auth.ALL_BRANDS)
 
     def test_assigning_twice_is_idempotent(self, db, temp_user):
         user = temp_user(role_key=VIEWER)
@@ -375,7 +376,7 @@ class TestRoleAdministration:
         user = temp_user(role_key=VIEWER)
         manager = db.query(RoleDB).filter(RoleDB.key == MANAGER).first()
         auth.assign_role(db, user.id, manager.id)
-        held = auth.permissions_for(db, user)
+        held = auth.permissions_for(db, user, auth.ALL_BRANDS)
         assert VIEW in held and AI_RUN in held
 
     def test_revoking_one_grant_leaves_the_others(self, db, temp_user):
@@ -386,7 +387,7 @@ class TestRoleAdministration:
         manager_grant = next(g for g in row["grants"] if g["role"] == "Manager")
 
         assert auth.revoke_assignment(db, manager_grant["id"]) is True
-        assert auth.permissions_for(db, user) == {VIEW}
+        assert auth.permissions_for(db, user, auth.ALL_BRANDS) == {VIEW}
 
     def test_revoking_a_role_does_not_end_the_session(self, db, temp_user, monkeypatch):
         # Losing scope is not being thrown out mid-edit; the next request is
@@ -1168,3 +1169,43 @@ class TestSessionCookieIsSecure:
         assert auth.cookie_secure() is True
         monkeypatch.setenv("AUTH_COOKIE_INSECURE", "")
         assert auth.cookie_secure() is True
+
+
+class TestTheUnionIsNamed:
+    """task-16. `permissions_for` answered the union across every brand when
+    its brand was left out, so the safe question and the fail-open one were the
+    same call with one argument missing. The create-recipient route asked it
+    about brand-scoped `recipients.consent` and got the union — see
+    `test_brand_boundary.TestAConsentRecordLandsOnTheBrandItWasAuthorisedFor`.
+    """
+
+    def test_none_is_refused_rather_than_read_as_every_brand(self, db):
+        user = auth.create_user(db, email=f"scope-{uuid.uuid4().hex[:8]}@example.invalid",
+                                role_key="viewer")
+        try:
+            with pytest.raises(TypeError, match="ALL_BRANDS"):
+                auth.permissions_for(db, user, None)
+            with pytest.raises(TypeError):
+                auth.has_permission(db, user, VIEW)   # no scope at all
+        finally:
+            db.rollback()
+            for table in ("auth_sessions", "role_assignments"):
+                db.execute(text(f"DELETE FROM {table} WHERE user_id = :u"), {"u": user.id})
+            db.execute(text("DELETE FROM users WHERE id = :u"), {"u": user.id})
+            db.commit()
+
+    def test_all_brands_is_the_union_and_a_brand_narrows_it(self, db):
+        """The union still exists, unchanged — it is right for platform-level
+        permissions and for showing a person their whole access. It is just no
+        longer the default."""
+        user = auth.create_user(db, email=f"scope-{uuid.uuid4().hex[:8]}@example.invalid",
+                                role_key="viewer")
+        try:
+            assert auth.permissions_for(db, user, auth.ALL_BRANDS) == {VIEW}
+            assert auth.permissions_for(db, user, 10**9) == set()
+        finally:
+            db.rollback()
+            for table in ("auth_sessions", "role_assignments"):
+                db.execute(text(f"DELETE FROM {table} WHERE user_id = :u"), {"u": user.id})
+            db.execute(text("DELETE FROM users WHERE id = :u"), {"u": user.id})
+            db.commit()
