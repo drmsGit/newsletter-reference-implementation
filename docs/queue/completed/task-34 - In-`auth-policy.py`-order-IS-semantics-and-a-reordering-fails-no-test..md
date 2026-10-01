@@ -1,9 +1,10 @@
 ---
 id: TASK-34
 title: 'In `auth/policy.py` order IS semantics, and a reordering fails no test.'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-10-01 21:32'
 labels:
   - backend
 dependencies: []
@@ -23,3 +24,9 @@ ordinal: 103400
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 104, section "Bugs", position 34 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added the general rule the entry asked for: no WRITE_POLICY entry may sit below a prefix of itself (test_policy_prefixes.py). Measured first: there are 15 refining pairs, not six, and all of them were already guarded by per-pair tests — the stale part of the entry. What was unguarded is the next pair: a new narrow entry added below its broad prefix passed all 781 tests, and is now caught only by this rule. The /ui/brand vs /ui/brands collision was already fixed on 2026-09-20 and guarded by the mid-segment check. 784 pass.
+<!-- SECTION:FINAL_SUMMARY:END -->
