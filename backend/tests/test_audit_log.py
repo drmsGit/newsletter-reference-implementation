@@ -207,21 +207,67 @@ class TestTheHomelessEventsAreRecorded:
 
 class TestTheLogIsEvidence:
 
-    def test_an_audit_failure_never_breaks_the_action(self, db, monkeypatch):
+    def test_an_audit_failure_never_breaks_the_action(self, db):
         """A log entry that cannot write must not roll back what it records.
 
         This is the failure mode that gets audit logging switched off in
         production: a grant refused because its entry would not save. `record`
-        swallows and logs at error instead.
+        swallows the database's refusal and logs at error instead.
+
+        **A real refusal, not a stand-in.** This used to monkeypatch `db.add` to
+        raise RuntimeError; since task-22 only a database error is swallowed,
+        and a value too long for its column is a genuine one — it also runs
+        the savepoint for real.
         """
+        before = audit.failure_count()
+
+        assert audit.record(db, "x" * 200, actor_id=1) is None, (
+            "a refused audit write raised instead of returning None"
+        )
+        assert audit.failure_count() == before + 1, "the failure was not counted"
+
+    def test_a_failed_entry_leaves_the_callers_uncommitted_work_alone(self, db):
+        """task-22, the P1. `record` used to `db.rollback()` the CALLER's
+        session — with `commit=False`, exactly when the caller still holds
+        uncommitted work. Now only the savepoint around the entry is undone."""
+        marker = f"audit.task22.{uuid.uuid4().hex[:8]}"
+        db.add(AuditEventDB(actor_type=audit.ACTOR_USER, action=marker))   # the caller's work
+
+        audit.record(db, "x" * 200, commit=False)
+        db.commit()
+
+        try:
+            assert db.query(AuditEventDB).filter(AuditEventDB.action == marker).count() == 1, (
+                "the caller's uncommitted work was rolled back by a failed audit write"
+            )
+        finally:
+            db.query(AuditEventDB).filter(AuditEventDB.action == marker).delete()
+            db.commit()
+
+    def test_with_commit_the_callers_work_is_committed_anyway(self, db):
+        """The action still happens; only its log entry is missing."""
+        marker = f"audit.task22.{uuid.uuid4().hex[:8]}"
+        db.add(AuditEventDB(actor_type=audit.ACTOR_USER, action=marker))
+
+        audit.record(db, "x" * 200, commit=True)
+
+        db.expire_all()
+        try:
+            assert db.query(AuditEventDB).filter(AuditEventDB.action == marker).count() == 1
+        finally:
+            db.query(AuditEventDB).filter(AuditEventDB.action == marker).delete()
+            db.commit()
+
+    def test_a_bug_in_the_calling_code_is_not_swallowed(self, db, monkeypatch):
+        """Only "the database refused the write" is swallowed. Anything else is
+        a bug, and a bug that reads as a log line while the app keeps working
+        is how a broken audit trail goes unnoticed."""
         def explode(*args, **kwargs):
-            raise RuntimeError("audit table is gone")
+            raise RuntimeError("not a database error")
 
         monkeypatch.setattr(db, "add", explode)
-
-        assert audit.record(db, audit.SIGNED_IN, actor_id=1) is None, (
-            "a failing audit write raised instead of returning None"
-        )
+        with pytest.raises(RuntimeError):
+            audit.record(db, audit.SIGNED_IN, actor_id=1)
 
     def test_writes_are_append_only_in_shape(self):
         """No status, no updated_at, nothing a later write could change.

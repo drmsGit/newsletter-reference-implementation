@@ -16,6 +16,7 @@ does not.
 """
 import logging
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.audit.db_models import AuditEventDB
@@ -43,6 +44,17 @@ ACTOR_USER = "user"
 ACTOR_INTEGRATION = "integration"
 
 
+#: Audit writes the database refused, since this process started (task-22).
+#: Process-local and reset on restart — a durable count cannot live in the
+#: store that is failing. It turns "the log is incomplete" from a line nobody
+#: watches into a number every failure line carries.
+_failures = 0
+
+
+def failure_count() -> int:
+    return _failures
+
+
 def record(
     db: Session,
     action: str,
@@ -55,40 +67,55 @@ def record(
     detail: dict | None = None,
     commit: bool = True,
 ) -> AuditEventDB | None:
-    """Append one entry. **Never raises.**
+    """Append one entry. **Never raises for a database failure.**
 
     An audit write must not be able to break the action it records. A failure
     here means the log is incomplete, which is bad; a failure that rolls back a
     role grant because its log entry would not write is worse, and it is the
     failure mode that gets audit logging switched off in production.
 
-    So this swallows, and logs loudly at `error` — the one signal anyone gets,
-    exactly as `deliver_code` does for a failed sign-in send. It returns None
-    on failure so a caller that cares can tell.
+    **The entry is written inside a SAVEPOINT** (task-22). This used to call
+    `db.rollback()` on the caller's session when it failed — destroying the
+    transaction the swallow existed to protect, and with `commit=False`, which
+    is exactly the case where the caller still holds uncommitted work. Now only
+    the savepoint is rolled back: the caller's work survives, and with
+    `commit=True` it is still committed, without the entry.
+
+    **Only `SQLAlchemyError` is swallowed** — "the database refused the
+    write". A bug in the calling code (a bad argument, a TypeError) raises like
+    any other bug instead of reading as a log line while the app keeps working.
+    Schema drift, the other case the bare `except` used to hide, is refused at
+    startup now by ADR-181's ledger and full schema check.
+
+    Returns None on failure so a caller that cares can tell.
     """
+    global _failures
+
+    event = AuditEventDB(
+        actor_type=actor_type,
+        actor_id=actor_id,
+        action=action,
+        subject_type=subject_type,
+        subject_id=subject_id,
+        brand_id=brand_id,
+        detail=detail,
+    )
     try:
-        event = AuditEventDB(
-            actor_type=actor_type,
-            actor_id=actor_id,
-            action=action,
-            subject_type=subject_type,
-            subject_id=subject_id,
-            brand_id=brand_id,
-            detail=detail,
+        with db.begin_nested():
+            db.add(event)
+    except SQLAlchemyError as error:
+        _failures += 1
+        logger.error(
+            "audit: failed to record %s — %s (%d audit write(s) failed since start)",
+            action, error, _failures,
         )
-        db.add(event)
-        if commit:
-            db.commit()
-        else:
-            db.flush()
-        return event
-    except Exception as error:  # noqa: BLE001 — see the docstring
-        logger.error("audit: failed to record %s — %s", action, error)
-        try:
-            db.rollback()
-        except Exception:  # noqa: BLE001
-            pass
-        return None
+        event = None
+    if commit:
+        # The caller's work, and the entry if it was written. A failure HERE is
+        # the caller's own and is theirs to see — this function swallows only
+        # its own write.
+        db.commit()
+    return event
 
 
 def record_from_request(request, db: Session, action: str, **kwargs) -> AuditEventDB | None:

@@ -42,7 +42,7 @@ Each is argued in an ADR or a docstring. Disagree if you like, but as a
 |---|---|
 | No Alembic; hand-written SQL + `create_all` | Migrations are meant to be *read*; numbered files beat a generated chain. **Since 2026-09-29 a database records which files it has had** (`schema_migrations`, ADR-181) and the app refuses to start while one is pending — that refines this choice, it does not reverse it |
 | No foreign keys on `audit_events` | An accountability entry must outlive what it references |
-| `audit.record()` swallows every exception | A failed *log write* must not roll back the action it records |
+| `audit.record()` swallows a database failure | A failed *log write* must not roll back the action it records — so the entry is written in a savepoint and only that is undone, never the caller's transaction; a non-database error raises like any bug (task-22) |
 | Unsalted sha256 in `hash_secret` | 256-bit CSPRNG secrets; nothing to brute-force **(the six-digit login code is a known exception and is logged)** |
 | Mock provider / mock AI as defaults | Nothing commercial may be required to run this (ADR-171) |
 | `blocked_reason` is advisory, not enforced | The action refuses itself; the UI hint is a courtesy |
