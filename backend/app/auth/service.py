@@ -850,6 +850,12 @@ def create_session(db: Session, user: UserDB) -> str:
     return token
 
 
+#: How often a live session's `last_seen_at` is written. Short against the idle
+#: timeout, so the slide still works; long against a request, so a page view
+#: writes it at most once rather than on every one of its several lookups.
+TOUCH_INTERVAL = timedelta(seconds=60)
+
+
 def _session_user(db: Session, token: str | None, *, touch: bool) -> UserDB | None:
     """Resolve a session cookie to a user, enforcing both expiries.
 
@@ -879,7 +885,15 @@ def _session_user(db: Session, token: str | None, *, touch: bool) -> UserDB | No
     if user is None or not user.is_active:
         return None
 
-    if touch:
+    # **Written at most once a minute** (task-32). This used to write and
+    # commit on every call, and one request calls it four or five times —
+    # middleware, brand summary, switcher count, brand options, the policy
+    # guard — so every page view ran four UPDATE+COMMIT cycles on the same
+    # row, and two tabs serialised on its lock. A React screen is five to
+    # fifteen requests where a Jinja page was one. The idle timeout only needs
+    # minute precision: a session can now lapse up to TOUCH_INTERVAL earlier
+    # than it would have, and never later.
+    if touch and current - row.last_seen_at >= TOUCH_INTERVAL:
         row.last_seen_at = current
         db.commit()
     return user

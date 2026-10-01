@@ -1209,3 +1209,84 @@ class TestTheUnionIsNamed:
                 db.execute(text(f"DELETE FROM {table} WHERE user_id = :u"), {"u": user.id})
             db.execute(text("DELETE FROM users WHERE id = :u"), {"u": user.id})
             db.commit()
+
+
+class TestTheSessionIsTouchedAtMostOnceAMinute:
+    """task-32. `user_for_token` wrote `last_seen_at` and committed on every
+    call, and one request makes four or five of them, so every page view ran
+    four UPDATE+COMMIT cycles on the same row — measured 2026-10-01 — and two
+    tabs serialised on its lock. Now it writes when the last write is a minute
+    old, which keeps the idle timeout sliding at minute precision."""
+
+    def _signed_in(self, db):
+        user = auth.create_user(db, email=f"touch-{uuid.uuid4().hex[:8]}@example.invalid",
+                                role_key="manager")
+        return user, auth.create_session(db, user)
+
+    def _cleanup(self, db, user):
+        db.rollback()
+        for table in ("auth_sessions", "role_assignments"):
+            db.execute(text(f"DELETE FROM {table} WHERE user_id = :u"), {"u": user.id})
+        db.execute(text("DELETE FROM users WHERE id = :u"), {"u": user.id})
+        db.commit()
+
+    def _last_seen(self, db, token):
+        from app.auth.db_models import SessionDB
+
+        db.expire_all()
+        return db.query(SessionDB.last_seen_at).filter(
+            SessionDB.token_hash == auth.hash_secret(token)).scalar()
+
+    def test_a_recent_session_is_not_written_again(self, db):
+        user, token = self._signed_in(db)
+        try:
+            before = self._last_seen(db, token)
+            assert auth.user_for_token(db, token) is not None
+            assert self._last_seen(db, token) == before, "a fresh session was written again"
+        finally:
+            self._cleanup(db, user)
+
+    def test_an_older_one_is_still_extended(self, db):
+        """The slide has to survive: an idle timeout that never moves would
+        sign everybody out an hour after they signed in."""
+        from datetime import timedelta
+        from app.auth.db_models import SessionDB
+
+        user, token = self._signed_in(db)
+        try:
+            stale = auth.now() - timedelta(minutes=5)
+            db.query(SessionDB).filter(SessionDB.token_hash == auth.hash_secret(token)).update(
+                {"last_seen_at": stale})
+            db.commit()
+
+            assert auth.user_for_token(db, token) is not None
+            assert self._last_seen(db, token) > stale, "the idle timeout stopped sliding"
+        finally:
+            self._cleanup(db, user)
+
+    def test_a_page_view_writes_nothing_to_the_session_row(self, db):
+        """The call site: a whole request, counted at the engine. Measured
+        before the fix at four UPDATEs and four COMMITs per request."""
+        from fastapi.testclient import TestClient
+        from sqlalchemy import event
+        from app.database import engine
+        from main import app
+
+        user, token = self._signed_in(db)
+        writes = []
+
+        def count(conn, cursor, statement, params, context, executemany):
+            if statement.lstrip().upper().startswith("UPDATE AUTH_SESSIONS"):
+                writes.append(statement)
+
+        browser = TestClient(app, follow_redirects=False)
+        browser.cookies.set(auth.SESSION_COOKIE, token)
+        event.listen(engine, "before_cursor_execute", count)
+        try:
+            response = browser.get("/ui/campaigns")
+        finally:
+            event.remove(engine, "before_cursor_execute", count)
+            self._cleanup(db, user)
+
+        assert response.status_code == 200
+        assert writes == [], f"{len(writes)} UPDATE(s) on auth_sessions for one page view"
