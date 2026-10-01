@@ -4,11 +4,12 @@ title: 'A shareable preview link does not exist, and carries an authorisation qu
 status: To Do
 assignee: []
 created_date: '2026-09-27 14:20'
+updated_date: '2026-10-01 20:54'
 labels:
   - needs-adr
   - backend
 dependencies: []
-priority: parked
+priority: p3
 type: decision
 ordinal: 302100
 ---

@@ -1,9 +1,10 @@
 ---
 id: TASK-116
 title: The audience-groups list shows a recipient count that is silently email-only.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-10-01 20:54'
 labels:
   - backend
   - frontend
@@ -24,3 +25,9 @@ ordinal: 206900
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 406, section "Features", position 69 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Dropped 2026-10-01 in the Parked-task ranking, at the user's decision: it concerns the Jinja audience-groups list, a screen ADR-170 retires with the Jinja UI. The underlying rule — no channel-less count on screen (ADR-176 point 5) — carries into the React audience screen, where task-213 (the resolution arithmetic) is ranked.
+<!-- SECTION:FINAL_SUMMARY:END -->

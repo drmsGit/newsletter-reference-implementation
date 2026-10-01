@@ -4,10 +4,11 @@ title: this product has five names and none of them is canonical.
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-10-01 20:54'
 labels:
   - docs
 dependencies: []
-priority: parked
+priority: p3
 type: decision
 ordinal: 102900
 ---

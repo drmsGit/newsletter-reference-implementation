@@ -4,10 +4,11 @@ title: 'The facet model, including a facet-value mapping on duplicate_campaign'
 status: To Do
 assignee: []
 created_date: '2026-09-27 14:20'
+updated_date: '2026-10-01 20:54'
 labels:
   - backend
 dependencies: []
-priority: parked
+priority: p3
 type: feature
 ordinal: 207200
 ---

@@ -4,10 +4,11 @@ title: cms is a boolean — no way to mix resolved fields with one static field
 status: To Do
 assignee: []
 created_date: '2026-09-27 14:20'
+updated_date: '2026-10-01 20:54'
 labels:
   - backend
 dependencies: []
-priority: parked
+priority: p3
 type: feature
 ordinal: 208800
 ---

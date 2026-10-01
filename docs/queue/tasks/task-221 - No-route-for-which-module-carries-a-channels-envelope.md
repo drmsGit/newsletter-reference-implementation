@@ -4,12 +4,13 @@ title: No route for which module carries a channel's envelope
 status: To Do
 assignee: []
 created_date: '2026-09-27 14:20'
+updated_date: '2026-10-01 20:54'
 labels:
   - backend
 dependencies: []
-priority: parked
+priority: p2
 type: feature
-ordinal: 208600
+ordinal: 200360
 ---
 
 ## Description

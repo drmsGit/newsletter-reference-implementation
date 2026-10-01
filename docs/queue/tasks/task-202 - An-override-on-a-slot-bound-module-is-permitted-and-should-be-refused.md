@@ -4,12 +4,13 @@ title: An override on a slot-bound module is permitted and should be refused
 status: To Do
 assignee: []
 created_date: '2026-09-27 14:20'
+updated_date: '2026-10-01 20:54'
 labels:
   - backend
 dependencies: []
-priority: parked
+priority: p2
 type: bug
-ordinal: 105000
+ordinal: 104700
 ---
 
 ## Description

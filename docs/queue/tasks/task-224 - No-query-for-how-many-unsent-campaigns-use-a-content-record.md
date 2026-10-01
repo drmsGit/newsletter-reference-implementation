@@ -4,12 +4,13 @@ title: No query for how many unsent campaigns use a content record
 status: To Do
 assignee: []
 created_date: '2026-09-27 14:20'
+updated_date: '2026-10-01 20:54'
 labels:
   - backend
 dependencies: []
-priority: parked
+priority: p2
 type: feature
-ordinal: 208900
+ordinal: 200370
 ---
 
 ## Description

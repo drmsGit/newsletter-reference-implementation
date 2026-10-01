@@ -4,12 +4,13 @@ title: Response models expose less than their tables store — one sweep
 status: To Do
 assignee: []
 created_date: '2026-09-27 14:20'
+updated_date: '2026-10-01 20:54'
 labels:
   - backend
 dependencies: []
-priority: parked
+priority: p1
 type: feature
-ordinal: 207300
+ordinal: 200320
 ---
 
 ## Description

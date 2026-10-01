@@ -6,12 +6,13 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 14:20'
+updated_date: '2026-10-01 20:54'
 labels:
   - needs-adr
   - backend
 dependencies:
   - TASK-135
-priority: parked
+priority: p2
 type: decision
 ordinal: 302200
 ---

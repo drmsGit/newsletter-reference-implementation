@@ -4,12 +4,13 @@ title: variants.status accepts any string
 status: To Do
 assignee: []
 created_date: '2026-09-27 14:20'
+updated_date: '2026-10-01 20:54'
 labels:
   - backend
 dependencies: []
-priority: parked
+priority: p2
 type: bug
-ordinal: 105100
+ordinal: 104800
 ---
 
 ## Description

@@ -6,13 +6,13 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 14:20'
-updated_date: '2026-09-28 16:20'
+updated_date: '2026-10-01 20:54'
 labels:
   - backend
 dependencies: []
-priority: parked
+priority: p2
 type: feature
-ordinal: 209300
+ordinal: 200400
 ---
 
 ## Description
