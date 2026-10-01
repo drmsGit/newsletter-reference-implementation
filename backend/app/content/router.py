@@ -237,15 +237,18 @@ def create_content_record(
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
-    # PROVISIONAL. This router is unauthenticated (main.py leaves the twelve
-    # JSON routers unguarded — launch gate 3), so there is no session and no
-    # working brand. **Resolved 2026-09-19 (ADR-168).** `enforce_api_policy`
-    # now writes the brand it actually checked the permission against onto
-    # `request.state.current_brand` — the declared `X-Brand` for a machine, the
-    # session's working brand for a person — so this row is written to the same
-    # brand the caller was authorised for. Writing to the default brand while
-    # checking against a declared one was the gap: it authorised a caller for
-    # brand B and then put the row in brand A.
+    # The brand is the one the guard authorised (ADR-168, ADR-172 point 1):
+    # `enforce_api_policy` resolves it — the declared `X-Brand` for a machine,
+    # the session's working brand for a person — and `working_brand` hands it
+    # here, so the row lands where the permission was checked. This route used
+    # to check against the declared brand and write to the default one (task-39);
+    # `test_brand_boundary.TestAPermittedWriteLandsOnTheDeclaredBrand` pins it.
+    #
+    # The "PROVISIONAL — this router is unauthenticated" note that opened here
+    # is gone rather than amended, as in campaigns/router.py: it stopped being
+    # true when launch gate 3 closed, and it was the half of task-39 most
+    # likely to mislead — a reader told the routers are unguarded has a reason
+    # to leave a brand bug alone.
     return create_content(
         db=db,
         title=payload.title,

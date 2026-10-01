@@ -1228,3 +1228,59 @@ def test_listing_recipients_returns_rather_than_raising():
         response = client.get("/recipients/", headers=headers)
         assert response.status_code == 200, response.text
         assert isinstance(response.json(), list)
+
+
+class TestAPermittedWriteLandsOnTheDeclaredBrand:
+    """task-39. The JSON create routes checked the permission against the
+    declared brand and wrote the row to the DEFAULT brand: an integration
+    granted `content.manage` on brand B, correctly declaring `X-Brand: B`,
+    created its record in brand 1. Fixed on 2026-09-19 (ADR-168/172) by taking
+    the brand from `working_brand` — and nothing tested it: every guard test
+    checks a refusal, and the failure here is a write that is ALLOWED and goes
+    to the wrong place. One test per create route, on a non-default brand,
+    because the default brand is exactly where the bug put things.
+    """
+
+    def test_content(self, foreign_brand):
+        from app.content.db_models import ContentRecordDB
+        from app.database import SessionLocal
+        from app.auth.permissions import CONTENT_MANAGE
+
+        title = f"bb39-{uuid.uuid4().hex[:8]}"
+        with machine([VIEW, CONTENT_MANAGE], brand_id=foreign_brand.id) as headers:
+            response = client.post("/content/", headers=headers, json={
+                "brand_id": foreign_brand.id, "title": title,
+                "content": {"headline_medium": "x"},
+            })
+        assert response.status_code in (200, 201), response.text
+        with SessionLocal() as db:
+            row = db.query(ContentRecordDB).filter(ContentRecordDB.title == title).one()
+            assert row.brand_id == foreign_brand.id, (
+                f"authorised on brand {foreign_brand.id}, written to brand {row.brand_id}"
+            )
+
+    def test_campaign(self, foreign_brand):
+        from app.campaigns.db_models import CampaignDB
+        from app.database import SessionLocal
+        from app.auth.permissions import CAMPAIGNS_MANAGE
+
+        name = f"bb39-{uuid.uuid4().hex[:8]}"
+        with machine([VIEW, CAMPAIGNS_MANAGE], brand_id=foreign_brand.id) as headers:
+            response = client.post("/campaigns/", headers=headers, json={"name": name})
+        assert response.status_code in (200, 201), response.text
+        with SessionLocal() as db:
+            row = db.query(CampaignDB).filter(CampaignDB.name == name).one()
+            assert row.brand_id == foreign_brand.id
+
+    def test_audience_group(self, foreign_brand):
+        from app.audience.db_models import AudienceGroupDB
+        from app.database import SessionLocal
+        from app.auth.permissions import AUDIENCES_MANAGE
+
+        name = f"bb39-{uuid.uuid4().hex[:8]}"
+        with machine([VIEW, AUDIENCES_MANAGE], brand_id=foreign_brand.id) as headers:
+            response = client.post("/api/audience-groups", headers=headers, json={"name": name})
+        assert response.status_code in (200, 201), response.text
+        with SessionLocal() as db:
+            row = db.query(AudienceGroupDB).filter(AudienceGroupDB.name == name).one()
+            assert row.brand_id == foreign_brand.id
