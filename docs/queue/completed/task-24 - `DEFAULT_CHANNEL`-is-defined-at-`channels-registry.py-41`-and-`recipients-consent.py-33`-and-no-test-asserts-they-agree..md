@@ -3,9 +3,10 @@ id: TASK-24
 title: >-
   `DEFAULT_CHANNEL` is defined at `channels/registry.py:41` and
   `recipients/consent.py:33`, and no test asserts they agree.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-10-01 20:25'
 labels:
   - backend
 dependencies: []
@@ -25,3 +26,9 @@ ordinal: 102400
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 84, section "Bugs", position 24 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added the assertion the entry asked for, leaving the deliberate duplication in place: the two DEFAULT_CHANNEL constants must be equal, and the shared default must be a registered channel. Changing only one side fails the test. 763 pass.
+<!-- SECTION:FINAL_SUMMARY:END -->
