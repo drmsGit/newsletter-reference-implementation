@@ -3,9 +3,10 @@ id: TASK-16
 title: >-
   `brand_id=None` is an overloaded optional that means "every brand this
   principal holds".
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-10-01 19:25'
 labels:
   - backend
 dependencies: []
@@ -25,3 +26,9 @@ ordinal: 101600
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 68, section "Bugs", position 16 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Introduced ALL_BRANDS and made the scope of permissions_for/has_permission required, so the cross-brand union is named rather than reached by omission; None now raises. Found and fixed a live instance of the hole: POST /recipients/ checked brand-scoped recipients.consent against the union and wrote consent for the body's brand, so a caller authorised on brand A could assert brand B's consent (reproduced: 200 and an opted_in record). It now checks the declared brand (403) and requires body agreement (409), as the consent route has since 2026-09-20. Legitimate unions (platform-level branches) say ALL_BRANDS by name. Three mutations caught; 740 tests pass.
+<!-- SECTION:FINAL_SUMMARY:END -->
