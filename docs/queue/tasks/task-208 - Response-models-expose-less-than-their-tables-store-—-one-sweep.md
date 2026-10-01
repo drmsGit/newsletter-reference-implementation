@@ -4,7 +4,7 @@ title: Response models expose less than their tables store — one sweep
 status: To Do
 assignee: []
 created_date: '2026-09-27 14:20'
-updated_date: '2026-10-01 20:54'
+updated_date: '2026-10-01 20:58'
 labels:
   - backend
 dependencies: []
@@ -34,4 +34,6 @@ Source: [[Manager Workflow - design interview]] → What Cluster 5 produced (Q5.
 
 <!-- SECTION:NOTES:BEGIN -->
 Logged 2026-09-27 from the "What Cluster N produced" sections of the two design interviews, each gap re-verified against the code that day. The plan was reviewed and approved by the session that ran the interviews. Parked: not yet ranked by anyone.
+
+2026-10-01: SendInstance done as part of task-28 — it now carries from_address, audience_group_id, sent_count, failed_count and excluded_count. ModuleVariableOut and PendingActionDetail remain.
 <!-- SECTION:NOTES:END -->

@@ -3,9 +3,10 @@ id: TASK-28
 title: >-
   the deliveries screen has no read surface, and the screen inventory marks it
   ✅.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-10-01 20:58'
 labels:
   - backend
   - frontend
@@ -25,3 +26,9 @@ ordinal: 102800
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 92, section "Bugs", position 28 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Two routes: GET /delivery/send-instances (brand-scoped, newest first, paged with limit/offset/status) and GET /delivery/send-instances/{id} (404 across brands), whose detail carries sent/failed/excluded, the execution total and exclusions by ADR-163 stage — the gap the Manager Workflow interview asked to explain. SendInstance exposes the columns it was dropping. Built now rather than with C8 because the interview had decided the screen's shape. Four tests, four mutations caught; inventory corrected; 772 pass. The React screen itself and creating a send (C8) remain.
+<!-- SECTION:FINAL_SUMMARY:END -->
