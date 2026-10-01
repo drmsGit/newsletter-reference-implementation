@@ -3,9 +3,10 @@ id: TASK-33
 title: >-
   `record_auth_failure` buckets on an attacker-supplied `key_id`, so varying the
   key per request writes one row per attempt
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-10-01 21:24'
 labels:
   - backend
 dependencies: []
@@ -25,3 +26,9 @@ ordinal: 103300
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 102, section "Bugs", position 33 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fixed the fan-out: an invented claimed key now counts into one shared UNKNOWN_KEY bucket per client per hour, while a real key keeps its own, so an attacker varying the key no longer writes a row per attempt. Retention/pruning deferred to task-136 by the user's decision (ADR-153 leaves it there; growth is now linear in time and sources, not attempts). The missing reader — the integration list screen — belongs to the frontend track. Three new tests fail against the original; one existing test that pinned the old behaviour updated to the same intent; 781 pass.
+<!-- SECTION:FINAL_SUMMARY:END -->

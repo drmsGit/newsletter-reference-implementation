@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
-updated_date: '2026-09-27 14:29'
+updated_date: '2026-10-01 21:24'
 labels:
   - needs-adr
   - backend
@@ -29,4 +29,6 @@ ordinal: 302000
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 489, section "Needs ADR", position 20 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-01, from task-33: integration_auth_failures needs a retention period, and nothing prunes it. Deferred here by the user's decision because ADR-153 leaves the audit/evidence retention question to this item. Urgency is low: since task-33 the table grows linearly in time and in the number of sources (one row per real credential plus one shared UNKNOWN_KEY bucket, per client per hour), no longer per attempt. The login rate-limit counters, by contrast, are pruned on write to their longest window, because they are rate limits rather than evidence.
 <!-- SECTION:NOTES:END -->
