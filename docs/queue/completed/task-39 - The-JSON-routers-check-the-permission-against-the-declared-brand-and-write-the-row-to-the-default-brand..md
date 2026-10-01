@@ -3,9 +3,10 @@ id: TASK-39
 title: >-
   The JSON routers check the permission against the declared brand and write the
   row to the default brand.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-10-01 21:04'
 labels:
   - backend
 dependencies: []
@@ -25,3 +26,9 @@ ordinal: 103900
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 116, section "Bugs", position 39 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The defect was already fixed on 2026-09-19 (ADR-168/172): all three create routes take the brand from working_brand. Closed by pinning it — three tests assert a permitted write on a non-default brand lands there, and reverting any route to the default brand fails its test — and by removing content/router.py's stale 'PROVISIONAL — this router is unauthenticated' comment, the half the entry called more dangerous. 775 pass.
+<!-- SECTION:FINAL_SUMMARY:END -->
