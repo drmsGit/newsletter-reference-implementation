@@ -198,6 +198,12 @@ def credentials_for(db: Session, integration_id: int) -> list[IntegrationCredent
 
 # --- authentication ---------------------------------------------------------
 
+#: The bucket every claimed key that names no credential shares (task-33).
+#: Not a shape `issue_credential` can produce, so it cannot collide with a real
+#: key and read as one.
+UNKNOWN_KEY = "(no such key)"
+
+
 def record_auth_failure(db: Session, key_id: str, client: str | None) -> None:
     """Count a failed attempt into its hour bucket (ADR-153 §6).
 
@@ -213,6 +219,21 @@ def record_auth_failure(db: Session, key_id: str, client: str | None) -> None:
     try:
         window = now().replace(minute=0, second=0, microsecond=0)
         claimed = (key_id or "")[:64]
+        # **Bucket on something the caller cannot vary** (task-33). The claimed
+        # key comes straight off the Authorization header, so bucketing on it
+        # meant an attacker who changed the key per request wrote one row per
+        # attempt — the unbounded growth ADR-153 §6's aggregate rule exists to
+        # prevent. A key that names a real credential keeps its own bucket,
+        # because "someone is guessing the secret for this key" is the useful
+        # evidence; every key that names nothing shares one, so the rows an
+        # attacker can create are bounded by the credentials that exist, plus
+        # one. Hashing the claimed key would not have helped: a hash varies as
+        # freely as its input. The lookup runs on every failure and changes
+        # nothing about the response, so it is not an oracle either.
+        if not db.query(IntegrationCredentialDB.id).filter(
+            IntegrationCredentialDB.key_id == claimed
+        ).first():
+            claimed = UNKNOWN_KEY
         client_hash = hash_secret(client or "unknown")
         row = db.query(IntegrationAuthFailureDB).filter(
             IntegrationAuthFailureDB.key_id == claimed,

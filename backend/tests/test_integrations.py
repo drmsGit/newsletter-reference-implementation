@@ -308,3 +308,72 @@ class TestUnattendedSending:
         assert ints.set_unattended_sending(session, integration.id, True)
         session.refresh(integration)
         assert integration.may_send_unattended is True
+
+
+class TestFailedAttemptsCannotBeFannedOut:
+    """task-33. Failures were bucketed on the claimed key, which comes straight
+    off the Authorization header — so changing the key per request wrote one
+    row per attempt, the unbounded growth ADR-153 §6's aggregate rule exists to
+    prevent. Now a key that names nothing shares one bucket per client per
+    hour; a real key keeps its own, because that is the useful evidence."""
+
+    def _rows_for(self, session, client):
+        from app.auth.db_models import IntegrationAuthFailureDB
+
+        return session.query(IntegrationAuthFailureDB).filter(
+            IntegrationAuthFailureDB.client_hash == auth.hash_secret(client)).all()
+
+    def _clear(self, session, client):
+        from app.auth.db_models import IntegrationAuthFailureDB
+
+        session.rollback()
+        session.query(IntegrationAuthFailureDB).filter(
+            IntegrationAuthFailureDB.client_hash == auth.hash_secret(client)).delete()
+        session.commit()
+
+    def test_twenty_invented_keys_make_one_row(self):
+        client = f"t33-{uuid.uuid4().hex[:8]}"
+        with SessionLocal() as session:
+            try:
+                for _ in range(20):
+                    ints.record_auth_failure(session, f"nra_{uuid.uuid4().hex[:16]}", client)
+
+                rows = self._rows_for(session, client)
+                assert len(rows) == 1, f"{len(rows)} rows for 20 attempts from one client"
+                assert rows[0].key_id == ints.UNKNOWN_KEY and rows[0].attempts == 20
+            finally:
+                self._clear(session, client)
+
+    def test_a_real_key_keeps_its_own_bucket(self):
+        """Guessing the secret of a key that exists is the evidence worth
+        keeping apart from noise."""
+        client = f"t33-{uuid.uuid4().hex[:8]}"
+        with SessionLocal() as session:
+            integration = ints.create_integration(session, f"t33-{uuid.uuid4().hex[:8]}")
+            credential, _secret = ints.issue_credential(session, integration.id)
+            try:
+                ints.record_auth_failure(session, credential.key_id, client)
+                ints.record_auth_failure(session, "nra_invented", client)
+
+                keys = {r.key_id for r in self._rows_for(session, client)}
+                assert keys == {credential.key_id, ints.UNKNOWN_KEY}
+            finally:
+                self._clear(session, client)
+                session.query(IntegrationCredentialDB).filter(
+                    IntegrationCredentialDB.integration_id == integration.id).delete()
+                session.query(IntegrationDB).filter(IntegrationDB.id == integration.id).delete()
+                session.commit()
+
+    def test_over_http_a_varying_key_adds_at_most_one_row(self):
+        """The call site: the guard records what the header claimed."""
+        from app.auth.db_models import IntegrationAuthFailureDB
+        from tests.test_api_guard import client as http
+
+        with SessionLocal() as session:
+            before = session.query(IntegrationAuthFailureDB).count()
+            for _ in range(10):
+                http.get("/campaigns/", headers={
+                    "Authorization": f"Bearer nra_{uuid.uuid4().hex[:16]}.wrong"})
+            after = session.query(IntegrationAuthFailureDB).count()
+
+        assert after - before <= 1, f"{after - before} rows for 10 attempts"

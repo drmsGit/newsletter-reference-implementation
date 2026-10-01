@@ -527,21 +527,28 @@ class TestFailuresAreCountedNotListed:
     """
 
     def test_repeated_failures_share_one_row(self, db):
-        key_id = f"nri_{uuid.uuid4().hex[:16]}"
-        try:
-            for _ in range(3):
-                client.post("/content/", json=_content_payload(),
-                            headers={"Authorization": f"Bearer {key_id}.wrong"})
-            rows = db.query(IntegrationAuthFailureDB).filter(
-                IntegrationAuthFailureDB.key_id == key_id
+        """Since task-33 an invented key is not its own bucket — it would let a
+        caller who varies the key fan the table out row by row. It counts into
+        the shared UNKNOWN_KEY bucket for this client and hour, which other
+        tests in the same hour also add to, so this measures the delta."""
+        from app.auth import integrations as ints
+
+        def bucket():
+            return db.query(IntegrationAuthFailureDB).filter(
+                IntegrationAuthFailureDB.key_id == ints.UNKNOWN_KEY,
+                IntegrationAuthFailureDB.client_hash == auth.hash_secret("testclient"),
             ).all()
-            assert len(rows) == 1, "one row per key, client and hour"
-            assert rows[0].attempts == 3
-        finally:
-            db.query(IntegrationAuthFailureDB).filter(
-                IntegrationAuthFailureDB.key_id == key_id
-            ).delete()
-            db.commit()
+
+        db.expire_all()
+        before = sum(r.attempts for r in bucket())
+        for _ in range(3):
+            client.post("/content/", json=_content_payload(),
+                        headers={"Authorization": f"Bearer nri_{uuid.uuid4().hex[:16]}.wrong"})
+        db.expire_all()
+        rows = bucket()
+
+        assert len(rows) == 1, "one row per key, client and hour"
+        assert sum(r.attempts for r in rows) == before + 3
 
 
 class TestNoRouteIsUnguarded:
