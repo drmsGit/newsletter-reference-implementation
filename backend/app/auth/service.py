@@ -178,41 +178,90 @@ def rename_brand(db: Session, brand_id: int, name: str) -> BrandDB | None:
     return brand
 
 
+#: Brand references `delete_brand` clears rather than refuses on. A session's
+#: brand is only where its owner happens to be standing; setting it to NULL is
+#: what `resolve_session_brand` already treats as "fall back to a brand they
+#: hold". Everything else that references a brand blocks the delete.
+RELEASED_ON_BRAND_DELETE = {("auth_sessions", "brand_id")}
+
+
+def brand_holders() -> list[tuple]:
+    """Every (table, column) whose rows block deleting a brand.
+
+    **Read from the models, not kept by hand** (task-19). The list this
+    replaces named five tables, and two NOT NULL brand foreign keys were added
+    after it — `consent_events` (migrate_0008) and `integration_grants`
+    (ADR-166) — so a brand holding only a consent record, or only a machine
+    grant, got past the guard and failed at the foreign key with a 500 instead
+    of the sentence naming what blocks it. A maintenance rule written in a doc
+    is not a control; every foreign key to `brands.id` counts here unless it is
+    explicitly released above, so a new brand-carrying table refuses by
+    default instead of crashing.
+    """
+    from app.database import Base
+    from app.schema_migrations import import_all_models
+
+    import_all_models()
+    holders = []
+    for table in sorted(Base.metadata.tables.values(), key=lambda t: t.name):
+        for column in table.columns:
+            if (table.name, column.name) in RELEASED_ON_BRAND_DELETE:
+                continue
+            if any(fk.column.table.name == "brands" for fk in column.foreign_keys):
+                holders.append((table, column))
+    return holders
+
+
 def delete_brand(db: Session, brand_id: int) -> str | None:
     """Remove a brand. Returns an error message, or None on success.
 
     Refused while anything still belongs to it, and refused outright for the
-    default brand. Both refusals exist for the same reason: every row in four
-    tables carries a NOT NULL brand, so deleting one out from under its content
-    would either fail at the foreign key or, worse, need a rule for where the
-    orphans go — and inventing that rule silently is how content ends up in a
-    brand nobody chose.
+    default brand. Both refusals exist for the same reason: a row that carries
+    a brand cannot have it deleted out from under it — that either fails at
+    the foreign key or needs a rule for where the orphans go, and inventing
+    that rule silently is how content ends up in a brand nobody chose.
+
+    **Consent records block it too, and that one matters beyond the crash.**
+    Refusing while consent events exist is what stops a brand being deleted
+    and recreated as a way of dropping an opt-out record.
     """
+    from sqlalchemy import func as sql_func, select
+    from sqlalchemy.exc import IntegrityError
+
     brand = db.query(BrandDB).filter(BrandDB.id == brand_id).first()
     if brand is None:
         return "That brand no longer exists."
     if brand.key == DEFAULT_BRAND_KEY:
         return "The default brand cannot be deleted — one brand always exists (ADR-150 point 4)."
 
-    from app.audience.db_models import AudienceGroupDB
-    from app.campaigns.db_models import CampaignDB
-    from app.content.db_models import ContentRecordDB
-    from app.delivery.db_models import SendInstanceDB
-
-    holders = {
-        "content record": db.query(ContentRecordDB).filter(ContentRecordDB.brand_id == brand_id).count(),
-        "campaign": db.query(CampaignDB).filter(CampaignDB.brand_id == brand_id).count(),
-        "audience group": db.query(AudienceGroupDB).filter(AudienceGroupDB.brand_id == brand_id).count(),
-        "send": db.query(SendInstanceDB).filter(SendInstanceDB.brand_id == brand_id).count(),
-        "role assignment": db.query(RoleAssignmentDB).filter(RoleAssignmentDB.brand_id == brand_id).count(),
-    }
-    blocking = [f"{n} {label}{'s' if n != 1 else ''}" for label, n in holders.items() if n]
+    blocking = []
+    for table, column in brand_holders():
+        n = db.execute(
+            select(sql_func.count()).select_from(table).where(column == brand_id)
+        ).scalar()
+        if n:
+            label = table.name.replace("_", " ").removesuffix("s")
+            blocking.append(f"{n} {label}{'s' if n != 1 else ''}")
     if blocking:
         return f"{brand.name} still has {', '.join(blocking)}. Move or remove those first."
 
     db.query(SessionDB).filter(SessionDB.brand_id == brand_id).update({"brand_id": None})
-    db.query(BrandDB).filter(BrandDB.id == brand_id).delete()
-    db.commit()
+    try:
+        # Inside the try, not just the commit: a bulk `.delete()` executes at
+        # once, so the foreign-key refusal is raised here, before any commit.
+        db.query(BrandDB).filter(BrandDB.id == brand_id).delete()
+        db.commit()
+    except IntegrityError:
+        # Something references this brand that the models do not declare — a
+        # table only a migration created, say. The schema check (ADR-181's
+        # addendum) is what should catch that; this keeps it a refusal rather
+        # than a 500 if it has not.
+        db.rollback()
+        return (
+            f"{brand.name} is still referenced by something the guard could not "
+            "count, so it was not deleted. Run scripts/check_schema.py — the "
+            "database may hold a table the models do not declare."
+        )
     return None
 
 

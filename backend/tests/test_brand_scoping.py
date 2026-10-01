@@ -367,6 +367,68 @@ class TestBrandsCanActuallyBeAdministered:
         )
         assert "content record" in error, f"the refusal did not say why: {error!r}"
 
+    def test_a_brand_holding_only_a_consent_record_cannot_be_deleted(self, db, temp_brand):
+        """task-19/task-40. `consent_events.brand_id` became NOT NULL after the
+        guard's hand-kept list was written, so this brand got past it and failed
+        at the foreign key with a 500. The refusal matters beyond the crash:
+        deleting and recreating a brand must not be a way to drop an opt-out."""
+        from app.recipients.consent import record_consent
+        from app.recipients.db_models import ConsentEventDB, RecipientDB
+
+        brand = temp_brand()
+        recipient = db.query(RecipientDB).order_by(RecipientDB.id).first()
+        record_consent(db, recipient.id, "opted_out", brand.id, channel="email", source="test")
+        try:
+            error = auth.delete_brand(db, brand.id)
+
+            assert error is not None and "consent event" in error, error
+            db.expire_all()
+            assert db.get(BrandDB, brand.id) is not None, "the brand was deleted anyway"
+        finally:
+            db.rollback()
+            db.query(ConsentEventDB).filter(ConsentEventDB.brand_id == brand.id).delete()
+            db.commit()
+
+    def test_a_brand_holding_only_a_machine_grant_cannot_be_deleted(self, db, temp_brand):
+        """The other table added after the list: `integration_grants`."""
+        from tests.machine import machine
+        from app.auth.permissions import VIEW
+
+        brand = temp_brand()
+        with machine([VIEW], brand_id=brand.id):
+            error = auth.delete_brand(db, brand.id)
+
+        assert error is not None and "integration grant" in error, error
+
+    def test_every_brand_reference_the_models_declare_blocks_the_delete(self):
+        """Derived, so nobody has to remember. The two the hand-kept list
+        missed are named, because they are the evidence it was missing them."""
+        held = {f"{t.name}.{c.name}" for t, c in auth.brand_holders()}
+
+        assert {"consent_events.brand_id", "integration_grants.brand_id"} <= held
+        assert "auth_sessions.brand_id" not in held, "sessions are released, not counted"
+
+    def test_a_reference_the_models_do_not_declare_is_refused_not_crashed(self, db, temp_brand):
+        """A table only a migration created is invisible to the derived list.
+        The foreign key still refuses the delete; this keeps that a sentence
+        rather than a 500."""
+        from sqlalchemy import text as sql
+
+        brand = temp_brand()
+        db.execute(sql("CREATE TABLE t19_undeclared (brand_id int NOT NULL REFERENCES brands(id))"))
+        db.execute(sql("INSERT INTO t19_undeclared VALUES (:b)"), {"b": brand.id})
+        db.commit()
+        try:
+            error = auth.delete_brand(db, brand.id)
+
+            assert error is not None and "could not count" in error, error
+            db.expire_all()
+            assert db.get(BrandDB, brand.id) is not None
+        finally:
+            db.rollback()
+            db.execute(sql("DROP TABLE IF EXISTS t19_undeclared"))
+            db.commit()
+
     def test_an_empty_brand_can_be_deleted(self, db, temp_brand):
         brand = temp_brand()
         assert auth.delete_brand(db, brand.id) is None
