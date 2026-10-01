@@ -3,9 +3,10 @@ id: TASK-23
 title: >-
   Audit is written from routes and never services — and `approvals/service.py`
   now writes its own entries with an explicit actor.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-10-01 20:20'
 labels:
   - backend
 dependencies: []
@@ -25,3 +26,9 @@ ordinal: 102300
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 82, section "Bugs", position 23 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The audit module now states when a service writes an entry (only where no request carries the actor, with the actor passed explicitly — system, integration, or a handed approver), recorded in an ADR-153 addendum drafted by the adr-author agent. record_from_request reads current_user and current_brand strictly, so a renamed middleware attribute raises instead of writing NULL actors. ACTOR_SYSTEM moved into the audit vocabulary; a stale comment fixed. Three tests; the original fails the strict-read one; 761 pass.
+<!-- SECTION:FINAL_SUMMARY:END -->
