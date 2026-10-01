@@ -3413,3 +3413,34 @@ class TestTheModuleRoutesNeedAChannel:
         assert push.status_code == 200 and email.status_code == 200
         assert {m["channel"] for m in push.json()} == {"push"}
         assert {m["channel"] for m in email.json()} == {"email"}
+
+
+class TestTheTwoDefaultChannelsAgree:
+    """task-24. `DEFAULT_CHANNEL` is defined twice on purpose: the consent
+    constant is the default cell in (recipient, brand, channel, purpose), the
+    registry constant is the fallback a composition caller gets. Collapsing
+    them would make the consent layer import the composition registry, which
+    the channels module's zero-intra-app-imports position exists to prevent.
+
+    So the coupling is a test, not an import: two independent decisions that
+    must currently reach the same answer, and must change together if push
+    ever becomes a default anywhere.
+    """
+
+    def test_they_name_the_same_channel(self):
+        from app.channels.registry import DEFAULT_CHANNEL as composition_default
+        from app.recipients.consent import DEFAULT_CHANNEL as consent_default
+
+        assert composition_default == consent_default, (
+            f"the composition default is {composition_default!r} and the consent "
+            f"default is {consent_default!r} — a variant created with no channel "
+            "would be consent-gated on a different channel than it is built for"
+        )
+
+    def test_the_default_is_a_channel_that_exists(self):
+        """Agreeing on a channel nobody declared would be agreement on nothing."""
+        from app.channels.registry import DEFAULT_CHANNEL, is_registered
+
+        assert is_registered(DEFAULT_CHANNEL), (
+            f"the default channel {DEFAULT_CHANNEL!r} has no manifest in storage/channels/"
+        )
