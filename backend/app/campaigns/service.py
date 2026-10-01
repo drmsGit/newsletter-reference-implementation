@@ -33,9 +33,17 @@ def _refuse_unavailable_channel(db: Session, channel: str) -> None:
     than an HTTP error, so the service stays unaware of which plane called it;
     both routers already map `ValueError` from these functions.
     """
+    from app.channels.registry import load_error
     from app.settings.service import channel_available
 
     if not channel_available(db, channel):
+        # A broken manifest and an absent one used to read the same (task-20).
+        broken = load_error(channel)
+        if broken:
+            raise ChannelUnavailable(
+                f"'{channel}' is declared, but its manifest could not be read "
+                f"({broken}). Fix storage/channels/{channel}.json."
+            )
         raise ChannelUnavailable(
             f"'{channel}' is not an available channel in this deployment."
         )

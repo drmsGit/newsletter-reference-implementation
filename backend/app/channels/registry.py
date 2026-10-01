@@ -65,23 +65,32 @@ def _load(path: Path) -> ChannelManifest:
     )
 
 
-def _discover() -> dict[str, ChannelManifest]:
+def _discover() -> tuple[dict[str, ChannelManifest], dict[str, str]]:
     if not CHANNELS_DIR.exists():
         logger.warning("channels directory not found: %s", CHANNELS_DIR)
-        return {}
+        return {}, {}
 
     manifests: dict[str, ChannelManifest] = {}
+    failures: dict[str, str] = {}
     for path in sorted(CHANNELS_DIR.glob("*.json")):
         try:
             manifests[path.stem] = _load(path)
-        except Exception:
+        except Exception as error:
             # One malformed manifest must not take the registry down with it —
             # the same tolerance `modules.registry` already applies, and
             # for the same reason: a typo in a channel nobody is using should
             # not stop the ones that are.
+            #
+            # **But it is remembered, not just logged** (task-20). Skipped and
+            # forgotten, a channel that broke this morning looked exactly like
+            # one that was never declared — at the moment variants may already
+            # depend on it. The reason is kept so a refusal can say "broken"
+            # rather than "unknown", and so startup can refuse the one case
+            # where skipping quietly costs more than it saves.
+            failures[path.stem] = f"{error.__class__.__name__}: {error}"
             logger.warning("Failed to load channel manifest '%s' — skipping",
                            path.name, exc_info=True)
-    return manifests
+    return manifests, failures
 
 
 def _dir_mtime() -> float:
@@ -91,15 +100,51 @@ def _dir_mtime() -> float:
 
 
 _REGISTRY: dict[str, ChannelManifest] = {}
+_FAILURES: dict[str, str] = {}
 _registry_mtime: float | None = None
 
 
 def _ensure_fresh() -> None:
-    global _REGISTRY, _registry_mtime
+    global _REGISTRY, _FAILURES, _registry_mtime
     current = _dir_mtime()
     if _registry_mtime is None or current != _registry_mtime:
-        _REGISTRY = _discover()
+        _REGISTRY, _FAILURES = _discover()
         _registry_mtime = current
+
+
+def load_error(name: str) -> str | None:
+    """Why this channel's manifest could not be read — or None if it loaded,
+    or was never declared. The difference between those two is the point."""
+    _ensure_fresh()
+    return _FAILURES.get(name)
+
+
+class UnreadableChannelInUse(RuntimeError):
+    """A channel variants already use has a manifest that does not parse."""
+
+
+def assert_used_channels_load(channels_in_use: set[str]) -> None:
+    """Refuse to start when an unreadable manifest names a channel in use.
+
+    The narrow case task-20 names. Skipping a broken manifest is right while
+    nothing depends on it — a typo in an unused channel must not stop the ones
+    in use, which is why this does not refuse on every failure. It is wrong
+    when variants already reference the channel: their sends and their editor
+    would fail one request at a time, each saying the channel does not exist,
+    for a file that does exist and has a typo in it. Called at startup beside
+    the ADR-162 point 5 module-manifest assertion.
+    """
+    _ensure_fresh()
+    broken = {name: _FAILURES[name] for name in sorted(channels_in_use) if name in _FAILURES}
+    if broken:
+        raise UnreadableChannelInUse(
+            "These channels are used by existing variants and their manifests "
+            "could not be read:\n"
+            + "".join(f"    storage/channels/{n}.json — {why}\n" for n, why in broken.items())
+            + "Fix the file. A channel nobody uses would only have been skipped; "
+            "one with variants is refused at startup rather than failing on "
+            "every request that touches it."
+        )
 
 
 def get_channel(name: str) -> ChannelManifest | None:

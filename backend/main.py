@@ -260,6 +260,14 @@ with SessionLocal() as db:
     from app.modules.registry import assert_manifests_load, list_manifests
 
     assert_manifests_load()
+
+    # task-20: a channel whose manifest does not parse is skipped — unless
+    # variants already use it, where skipping turns one typo into a failure on
+    # every request that touches those variants.
+    from app.campaigns.db_models import VariantDB
+    from app.channels.registry import assert_used_channels_load
+
+    assert_used_channels_load({c for (c,) in db.query(VariantDB.channel).distinct()})
     logger.info(
         "channels: %s",
         ", ".join(
