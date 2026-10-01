@@ -36,15 +36,24 @@ def _to_out(manifest: ModuleManifest) -> ModuleManifestOut:
 
 
 @router.get("", response_model=list[ModuleManifestOut])
-def get_module_templates(channel: str = "email"):
-    """Modules one channel accepts. Defaults to email so this read-only route
-    keeps its existing contract for anything already calling it; every other
-    caller of the registry passes the channel explicitly."""
+def get_module_templates(channel: str):
+    """Modules one channel accepts. **`channel` is required** (task-21).
+
+    It defaulted to email "so this read-only route keeps its existing contract
+    for anything already calling it" — and nothing calls it: not the React
+    client, not the Jinja UI, not a test (checked 2026-10-01). What the default
+    did do is answer a push screen that forgot the parameter with email modules,
+    the module-picker miss in another place. `migrate_0010` added a server
+    default, backfilled with it and then dropped it precisely so a forgotten
+    channel fails; a route-level default put the email-by-omission back one
+    layer up. A missing channel is now a 422.
+    """
     return [_to_out(m) for m in list_manifests(channel)]
 
 
 @router.get("/{name}", response_model=ModuleManifestOut)
-def get_module_template(name: str, channel: str = "email"):
+def get_module_template(name: str, channel: str):
+    """One module on one channel. `channel` required, for the reason above."""
     manifest = get_manifest(channel, name)
     if manifest is None:
         raise HTTPException(

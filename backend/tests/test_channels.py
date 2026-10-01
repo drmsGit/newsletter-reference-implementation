@@ -3373,3 +3373,43 @@ class TestRichTextFollowsTheDeclaredType:
         from app.modules.registry import field_definitions
 
         assert field_definitions()["body_medium"]["type"] == "richtext"
+
+
+class TestTheModuleRoutesNeedAChannel:
+    """task-21. `GET /modules` and `GET /modules/{name}` defaulted `channel` to
+    email, so a caller that forgot it was handed email modules — fail-open the
+    moment a second channel exists, one layer above the server default
+    migrate_0010 dropped for exactly this reason."""
+
+    def test_listing_without_a_channel_is_refused(self):
+        from tests.machine import machine
+        from tests.test_api_guard import client
+        from app.auth.permissions import VIEW
+
+        with machine([VIEW]) as headers:
+            response = client.get("/modules", headers=headers)
+
+        assert response.status_code == 422, response.text
+
+    def test_one_module_without_a_channel_is_refused(self):
+        from tests.machine import machine
+        from tests.test_api_guard import client
+        from app.auth.permissions import VIEW
+
+        with machine([VIEW]) as headers:
+            response = client.get("/modules/hero", headers=headers)
+
+        assert response.status_code == 422, response.text
+
+    def test_a_named_channel_lists_only_its_own_modules(self):
+        from tests.machine import machine
+        from tests.test_api_guard import client
+        from app.auth.permissions import VIEW
+
+        with machine([VIEW]) as headers:
+            push = client.get("/modules", params={"channel": "push"}, headers=headers)
+            email = client.get("/modules", params={"channel": "email"}, headers=headers)
+
+        assert push.status_code == 200 and email.status_code == 200
+        assert {m["channel"] for m in push.json()} == {"push"}
+        assert {m["channel"] for m in email.json()} == {"email"}
