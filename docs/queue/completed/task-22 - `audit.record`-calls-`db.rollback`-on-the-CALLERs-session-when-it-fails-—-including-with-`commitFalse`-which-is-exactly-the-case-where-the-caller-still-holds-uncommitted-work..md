@@ -4,9 +4,10 @@ title: >-
   `audit.record()` calls `db.rollback()` on the CALLER's session when it fails —
   including with `commit=False`, which is exactly the case where the caller
   still holds uncommitted work.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-10-01 20:12'
 labels:
   - backend
 dependencies: []
@@ -26,3 +27,9 @@ ordinal: 102200
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 80, section "Bugs", position 22 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+audit.record writes its entry inside a savepoint, so a failed entry rolls back only itself — the caller's uncommitted work survives, and with commit=True is still committed. Only database errors are swallowed; a code bug raises. Failures are counted (process-local) and reported in each error line. Four new tests using a real database refusal; the original function fails all four; two narrower mutations caught. Brief row corrected; suite passes.
+<!-- SECTION:FINAL_SUMMARY:END -->
