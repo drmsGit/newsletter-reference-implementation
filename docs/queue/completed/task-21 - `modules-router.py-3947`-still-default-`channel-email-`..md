@@ -1,9 +1,10 @@
 ---
 id: TASK-21
 title: '`modules/router.py:39,47` still default `channel="email"`.'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-10-01 19:54'
 labels:
   - backend
 dependencies: []
@@ -23,3 +24,9 @@ ordinal: 102100
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 78, section "Bugs", position 21 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Both module routes now require channel (422 without it). The default's stated reason — an existing contract — protected no caller: nothing in the client, Jinja UI or tests calls these routes. Three tests; the original router fails both refusal tests; 755 pass.
+<!-- SECTION:FINAL_SUMMARY:END -->
