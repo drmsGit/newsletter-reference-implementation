@@ -3,9 +3,10 @@ id: TASK-19
 title: >-
   `delete_brand`'s `holders` dict counts five tables; there are seven NOT NULL
   brand foreign keys.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-10-01 19:43'
 labels:
   - backend
 dependencies: []
@@ -25,3 +26,9 @@ ordinal: 101900
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 74, section "Bugs", position 19 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fixed together with its duplicate (commit after 2b6425e): delete_brand's blocking list is derived from the models — every foreign key to brands.id blocks unless explicitly released (only sessions are) — so consent_events and integration_grants now refuse cleanly instead of crashing, and future brand-carrying tables do by default. An undeclared reference becomes a refusal rather than a 500. Five tests, three mutations caught; 748 pass.
+<!-- SECTION:FINAL_SUMMARY:END -->
