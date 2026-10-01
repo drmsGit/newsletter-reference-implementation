@@ -3,9 +3,10 @@ id: TASK-18
 title: >-
   `sending_brand_id` (`decision/strategies/base.py:132`) returns `int | None`
   into parameters annotated `brand_id: int`.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-10-01 19:37'
 labels:
   - backend
 dependencies: []
@@ -25,3 +26,9 @@ ordinal: 101800
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 72, section "Bugs", position 18 in that section (top = do next). The description is the original entry, verbatim.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+sending_brand_id now returns int or raises BrokenCampaignChain, a RuntimeError — deliberately not a ValueError (the send loop would hide it as an empty slot under ADR-086) nor a ConsentDenied (what it used to surface as, naming brand None). It propagates and fails the send through task-14's handler; the decision route answers 409. The chain cannot break under today's schema (every link NOT NULL + FK), so tests build the broken case directly; four tests, no skips, three mutations caught; 744 pass.
+<!-- SECTION:FINAL_SUMMARY:END -->
