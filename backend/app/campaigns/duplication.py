@@ -35,7 +35,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.db_models import BrandDB
 from app.auth.permissions import CAMPAIGNS_MANAGE, CONTENT_MANAGE
-from app.auth.service import has_permission
+from app.auth.service import has_permission, list_brands
 from app.campaigns.db_models import (
     CampaignDB,
     DecisionSlotDB,
@@ -113,10 +113,8 @@ def require_campaign_target(
         db, principal, target_brand_id=target_brand_id, noun="campaigns",
         permission=CAMPAIGNS_MANAGE, enforced=enforced,
     )
-    if (
-        content_mode == COPY
-        and enforced
-        and not has_permission(db, principal, CONTENT_MANAGE, brand_id=brand.id)
+    if content_mode == COPY and enforced and not has_permission(
+        db, principal, CONTENT_MANAGE, brand_id=brand.id
     ):
         raise DuplicationForbidden(
             "Copying content creates records in the target brand, and you cannot "
@@ -190,6 +188,36 @@ def content_modes_for(source_brand_id: int, target_brand_id: int) -> list[str]:
     if source_brand_id == target_brand_id:
         return [KEEP, LAYOUT]
     return [COPY, LAYOUT]
+
+
+def target_brands(
+    db: Session, principal, *, permission: str, enforced: bool = True,
+) -> list[BrandDB]:
+    """Brands this caller may duplicate *into*, ordered by id (task-50, B14).
+
+    The listing twin of `require_target_access`, and the same rule: it asks the
+    caller's own grants on each brand, so a person and an integration alike see
+    exactly the brands a duplication request would be accepted for. Not
+    `brands_for_user` — see `require_target_access` for why the working brand's
+    permission says nothing about a destination.
+    """
+    brands = list_brands(db)
+    if not enforced:
+        return brands
+    return [b for b in brands if has_permission(db, principal, permission, brand_id=b.id)]
+
+
+def allowed_modes(
+    db: Session, principal, *, source_brand_id: int, target_brand_id: int,
+    enforced: bool = True,
+) -> list[str]:
+    """The content modes this caller may use for this pair: what the boundary
+    allows (`content_modes_for`) minus `copy` unless they hold `content.manage`
+    on the target, since copying writes content rows there."""
+    modes = content_modes_for(source_brand_id, target_brand_id)
+    if enforced and not has_permission(db, principal, CONTENT_MANAGE, brand_id=target_brand_id):
+        modes = [m for m in modes if m != COPY]
+    return modes
 
 
 def _url_keys(data: dict | None) -> list[str]:

@@ -112,3 +112,11 @@ class CategoryRelationCreate(BaseModel):
 
 class ContentDuplicate(BaseModel):
     target_brand_id: int
+
+
+class ContentDuplicateTarget(BaseModel):
+    """A brand this caller may copy a record into (task-50, B14)."""
+
+    id: int
+    name: str
+    crossing: bool

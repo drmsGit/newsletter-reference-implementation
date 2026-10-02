@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.audit import service as audit
+from app.auth.permissions import CONTENT_MANAGE
 from app.auth.dependencies import auth_is_enforced, request_principal, working_brand
 from app.campaigns import duplication
 from app.database import get_db
@@ -10,6 +11,7 @@ from app.content.models import (
     ContentRecord,
     ContentCreate,
     ContentDuplicate,
+    ContentDuplicateTarget,
     Category,
     CategoryCreate,
     CategoryRelation,
@@ -383,6 +385,32 @@ def get_child_relations_for_category(
         db=db,
         parent_category_id=category_id,
     )
+
+@router.get(
+    "/{content_id}/duplicate-targets",
+    response_model=list[ContentDuplicateTarget],
+    summary="Brands this caller may copy this record into",
+    description=(
+        "The caller's own `content.manage` grants, brand by brand — the same rule "
+        "`POST /content/{id}/duplicate` enforces, so every brand listed here is "
+        "one that request would accept."
+    ),
+)
+def duplicate_targets(
+    content_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    if get_content_record(db, content_id, brand_id=brand_id) is None:
+        raise HTTPException(status_code=404, detail=f"ContentRecord {content_id} not found")
+    return [
+        ContentDuplicateTarget(id=b.id, name=b.name, crossing=b.id != brand_id)
+        for b in duplication.target_brands(
+            db, request_principal(request), permission=CONTENT_MANAGE,
+            enforced=auth_is_enforced(request))
+    ]
+
 
 @router.post(
     "/{content_id}/duplicate",

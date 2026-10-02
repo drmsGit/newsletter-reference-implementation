@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.audit import service as audit
+from app.auth.permissions import CAMPAIGNS_MANAGE
 from app.auth.dependencies import auth_is_enforced, request_principal, working_brand
 from app.database import get_db
 from app.campaigns import duplication
@@ -10,6 +11,8 @@ from app.campaigns.models import (
     Campaign,
     CampaignDuplicate,
     CampaignDuplicated,
+    DuplicationOptions,
+    DuplicationTarget,
     SubjectSuggestionResult,
     CampaignCreate,
     CampaignWithVariants,
@@ -510,6 +513,54 @@ def patch_decision_slot_record(
     if updated is None:
         raise HTTPException(status_code=404, detail="Decision slot not found")
     return to_decision_slot(updated)
+
+
+@router.get(
+    "/{campaign_id}/duplicate-options",
+    response_model=DuplicationOptions,
+    summary="What the duplicate wizard offers this caller",
+    description=(
+        "The brands this caller may duplicate into (their own `campaigns.manage` "
+        "grants, not the working brand's), the content modes allowed for each — "
+        "`keep` and `layout` inside one brand, `copy` and `layout` across, with "
+        "`copy` withheld unless the caller holds `content.manage` on the target — "
+        "and what the copy will consist of. `variant_ids` narrows "
+        "`selected_summary` to the variants being chosen. A client must not "
+        "rebuild this: it is the boundary rule."
+    ),
+)
+def duplicate_options(
+    campaign_id: int,
+    request: Request,
+    variant_ids: list[int] = Query(default=[]),
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    campaign = (
+        db.query(CampaignDB)
+        .filter(CampaignDB.id == campaign_id, CampaignDB.brand_id == brand_id)
+        .first()
+    )
+    if campaign is None:
+        raise HTTPException(status_code=404, detail=f"Campaign {campaign_id} not found")
+
+    principal, enforced = request_principal(request), auth_is_enforced(request)
+    targets = duplication.target_brands(
+        db, principal, permission=CAMPAIGNS_MANAGE, enforced=enforced)
+    return DuplicationOptions(
+        source_brand_id=brand_id,
+        summary=duplication.summarise_source(db, campaign.id),
+        selected_summary=duplication.summarise_source(db, campaign.id, variant_ids or None),
+        targets=[
+            DuplicationTarget(
+                id=b.id, name=b.name, crossing=b.id != brand_id,
+                modes=duplication.allowed_modes(
+                    db, principal, source_brand_id=brand_id, target_brand_id=b.id,
+                    enforced=enforced),
+            )
+            for b in targets
+        ],
+    )
 
 
 @router.post(

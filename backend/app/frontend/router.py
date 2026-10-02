@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 from app.database import get_db
 from app.auth.service import (
-    SESSION_COOKIE, brands_for_user, brands_with_permission, has_permission,
+    SESSION_COOKIE,
     list_brands, safe_next, set_session_brand, user_for_token,
 )
 from app.auth.dependencies import require_permission
@@ -1252,35 +1252,6 @@ def campaign_create(
     return RedirectResponse(url=f"/ui/campaigns/{campaign.id}", status_code=303)
 
 
-def _duplication_targets(db: Session, request: Request, permission: str):
-    """Brands this request may duplicate *into*.
-
-    Not `brands_for_user`: the target brand is chosen by the form, and the
-    policy table checks `campaigns.manage` against the **working** brand only.
-    Without this, a Manager on brand A could create a campaign in brand B by
-    picking it from a dropdown — the check would pass, because it never looked
-    at the destination.
-    """
-    if not getattr(request.state, "auth_enforced", True):
-        # Nobody is signed in, so there are no grants to read. Same reasoning
-        # as `working_brand_id` falling back to the default brand rather than
-        # refusing: with enforcement off, refusing would make the app unusable.
-        return list_brands(db)
-    user = user_for_token(db, request.cookies.get(SESSION_COOKIE))
-    if user is None:
-        return []
-    return brands_with_permission(db, user, permission)
-
-
-def _may_in_brand(db: Session, request: Request, permission: str, brand_id: int) -> bool:
-    if not getattr(request.state, "auth_enforced", True):
-        return True
-    user = user_for_token(db, request.cookies.get(SESSION_COOKIE))
-    if user is None:
-        return False
-    return has_permission(db, user, permission, brand_id=brand_id)
-
-
 @router.get("/ui/campaigns/{campaign_id}/duplicate")
 def campaign_duplicate_form(
     campaign_id: int,
@@ -1312,19 +1283,17 @@ def campaign_duplicate_form(
             status_code=303,
         )
 
-    targets = _duplication_targets(db, request, CAMPAIGNS_MANAGE)
+    principal = user_for_token(db, request.cookies.get(SESSION_COOKIE))
+    enforced = getattr(request.state, "auth_enforced", True)
+    targets = duplication.target_brands(
+        db, principal, permission=CAMPAIGNS_MANAGE, enforced=enforced)
     target = next((b for b in targets if b.id == target_brand_id), None)
-
-    modes = []
-    if target is not None:
-        for mode in duplication.content_modes_for(source_brand_id, target.id):
-            # Copying content writes content rows into the *target* brand, so
-            # it needs the target's content permission, not the working one.
-            if mode == duplication.COPY and not _may_in_brand(
-                db, request, CONTENT_MANAGE, target.id
-            ):
-                continue
-            modes.append(mode)
+    modes = (
+        duplication.allowed_modes(
+            db, principal, source_brand_id=source_brand_id,
+            target_brand_id=target.id, enforced=enforced)
+        if target is not None else []
+    )
 
     return templates.TemplateResponse(
         request,
@@ -2146,7 +2115,11 @@ def content_detail(
             # Which brands this record may be copied into — the target's own
             # content permission, not the working brand's, because the copy is
             # written there.
-            "duplicate_targets": _duplication_targets(db, request, CONTENT_MANAGE),
+            "duplicate_targets": duplication.target_brands(
+                db, user_for_token(db, request.cookies.get(SESSION_COOKIE)),
+                permission=CONTENT_MANAGE,
+                enforced=getattr(request.state, "auth_enforced", True),
+            ),
             "channel_sections": _channel_authoring_sections(db),
         },
     )

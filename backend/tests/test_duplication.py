@@ -1239,3 +1239,168 @@ class TestTheTargetBrandIsCheckedOverJson:
         finally:
             _purge_brand(db, target.id)
             self.helper._cleanup_user(db, user)
+
+
+class TestTheWizardOptionsOverJson:
+    """`GET /campaigns/{id}/duplicate-options` (task-50, B14): the server says
+    which brands and modes are on offer, so a client never rebuilds the rule.
+    Every target it lists must be one the POST would accept, and vice versa."""
+
+    helper = TestTheTargetBrandIsCheckedOverJson()
+
+    def _options(self, client, headers, campaign_id, **params):
+        return client.get(
+            f"/campaigns/{campaign_id}/duplicate-options", params=params, headers=headers)
+
+    def test_only_brands_the_caller_may_write_to_are_offered(
+        self, db, source, default_brand, temp_brand
+    ):
+        writable, readable = temp_brand("writable"), temp_brand("readable")
+        user, client, headers = self.helper._person(
+            db, {default_brand: MANAGER, writable: MANAGER, readable: VIEWER}, default_brand)
+        try:
+            response = self._options(client, headers, source["campaign"].id)
+            assert response.status_code == 200, response.text
+            offered = {t["id"]: t for t in response.json()["targets"]}
+            assert writable.id in offered and default_brand.id in offered
+            assert readable.id not in offered, "a brand the caller only reads was offered"
+            assert offered[default_brand.id]["crossing"] is False
+            assert offered[default_brand.id]["modes"] == [duplication.KEEP, duplication.LAYOUT]
+            assert offered[writable.id]["modes"] == [duplication.COPY, duplication.LAYOUT]
+        finally:
+            _purge_brand(db, writable.id)
+            _purge_brand(db, readable.id)
+            self.helper.helper._cleanup_user(db, user)
+
+    def test_copy_is_withheld_without_content_manage_on_the_target(
+        self, db, source, default_brand, temp_brand
+    ):
+        from app.auth.db_models import RolePermissionDB
+
+        target = temp_brand()
+        role = auth.create_role(db, key=_name("opt-campaigns-only"), name="Campaigns only")
+        auth.set_role_permissions(db, role.id, [CAMPAIGNS_MANAGE])
+        user, client, headers = self.helper._person(db, {default_brand: MANAGER}, default_brand)
+        db.add(RoleAssignmentDB(user_id=user.id, role_id=role.id, brand_id=target.id))
+        db.commit()
+        try:
+            offered = {t["id"]: t for t in self._options(
+                client, headers, source["campaign"].id).json()["targets"]}
+            assert offered[target.id]["modes"] == [duplication.LAYOUT]
+        finally:
+            _purge_brand(db, target.id)
+            self.helper.helper._cleanup_user(db, user)
+            db.query(RolePermissionDB).filter(RolePermissionDB.role_id == role.id).delete()
+            db.query(RoleDB).filter(RoleDB.id == role.id).delete()
+            db.commit()
+
+    def test_the_summary_narrows_to_the_chosen_variants(self, db, source, default_brand):
+        # A second variant, so "the chosen one" and "all of them" differ.
+        # Removed with the campaign by the `source` fixture.
+        second = VariantDB(campaign_id=source["campaign"].id, channel="email",
+                           name="Variant B", status="draft")
+        db.add(second)
+        db.commit()
+        user, client, headers = self.helper._person(db, {default_brand: MANAGER}, default_brand)
+        try:
+            body = self._options(client, headers, source["campaign"].id,
+                                 variant_ids=[source["variant"].id]).json()
+            assert [v["id"] for v in body["selected_summary"]["variants"]] == [source["variant"].id]
+            assert {v["id"] for v in body["summary"]["variants"]} == {source["variant"].id, second.id}
+        finally:
+            self.helper.helper._cleanup_user(db, user)
+
+    def test_a_source_in_another_brand_is_not_found(self, db, source, default_brand, temp_brand):
+        other = temp_brand()
+        user, client, headers = self.helper._person(
+            db, {default_brand: MANAGER, other: MANAGER}, other)
+        try:
+            assert self._options(client, headers, source["campaign"].id).status_code == 404
+        finally:
+            _purge_brand(db, other.id)
+            self.helper.helper._cleanup_user(db, user)
+
+    def test_a_machine_sees_the_brands_its_grants_name(self, db, source, default_brand, temp_brand):
+        from fastapi.testclient import TestClient
+
+        from app.auth.permissions import VIEW
+        from main import app
+        from tests.machine import machine
+
+        target = temp_brand()
+        client = TestClient(app, raise_server_exceptions=False)
+        with machine([VIEW, CAMPAIGNS_MANAGE]) as headers:
+            response = self._options(client, headers, source["campaign"].id)
+        assert response.status_code == 200, response.text
+        ids = [t["id"] for t in response.json()["targets"]]
+        assert ids == [default_brand.id], ids
+        _purge_brand(db, target.id)
+
+    def test_content_targets_follow_content_manage(self, db, source, default_brand, temp_brand):
+        writable, readable = temp_brand("cw"), temp_brand("cr")
+        user, client, headers = self.helper._person(
+            db, {default_brand: MANAGER, writable: MANAGER, readable: VIEWER}, default_brand)
+        try:
+            response = client.get(
+                f"/content/{source['record'].id}/duplicate-targets", headers=headers)
+            assert response.status_code == 200, response.text
+            ids = {t["id"] for t in response.json()}
+            assert writable.id in ids and default_brand.id in ids and readable.id not in ids
+        finally:
+            _purge_brand(db, writable.id)
+            _purge_brand(db, readable.id)
+            self.helper.helper._cleanup_user(db, user)
+
+
+class TestTheJinjaPagesStillOfferTheSameChoices:
+    """The wizard and the content page moved onto `target_brands` /
+    `allowed_modes` with B14, and neither page had a test before."""
+
+    helper = TestTheTargetBrandIsChecked()
+
+    @staticmethod
+    def _offered(page_text):
+        """Brand ids in the target picker only — the layout's brand switcher
+        lists every brand the user may WORK in, which is a different question."""
+        import re
+
+        picker = re.search(r'<select name="target_brand_id".*?</select>', page_text, re.S)
+        assert picker, "no target picker on the page"
+        return {int(v) for v in re.findall(r'value="(\d+)"', picker.group(0))}
+
+    def test_the_wizard_offers_writable_brands_and_their_modes(
+        self, db, source, default_brand, temp_brand
+    ):
+        writable, readable = temp_brand("wiz-w"), temp_brand("wiz-r")
+        user = self.helper._user_on(
+            db, {default_brand: MANAGER, writable: MANAGER, readable: VIEWER})
+        client, _token = self.helper._client(db, user, default_brand)
+        try:
+            page = client.get(f"/ui/campaigns/{source['campaign'].id}/duplicate"
+                              f"?target_brand_id={writable.id}")
+            assert page.status_code == 200, page.text[:300]
+            offered = self._offered(page.text)
+            assert writable.id in offered
+            assert readable.id not in offered, "a read-only brand was offered as a target"
+            assert f'value="{duplication.COPY}"' in page.text
+        finally:
+            _purge_brand(db, writable.id)
+            _purge_brand(db, readable.id)
+            self.helper._cleanup_user(db, user)
+
+    def test_the_content_page_offers_only_writable_brands(
+        self, db, source, default_brand, temp_brand
+    ):
+        writable, readable = temp_brand("cp-w"), temp_brand("cp-r")
+        user = self.helper._user_on(
+            db, {default_brand: MANAGER, writable: MANAGER, readable: VIEWER})
+        client, _token = self.helper._client(db, user, default_brand)
+        try:
+            page = client.get(f"/ui/content/{source['record'].id}")
+            assert page.status_code == 200, page.text[:300]
+            offered = self._offered(page.text)
+            assert writable.id in offered and readable.id not in offered
+        finally:
+            _purge_brand(db, writable.id)
+            _purge_brand(db, readable.id)
+            self.helper._cleanup_user(db, user)

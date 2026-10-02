@@ -217,3 +217,38 @@ class CampaignDuplicated(BaseModel):
     # source content record id -> the copy's id. Empty unless `copy`.
     content_records_copied: dict[int, int]
     url_carriers: list[str]
+
+
+class DuplicationVariantSummary(BaseModel):
+    id: int
+    name: str
+    channel: str
+    modules: int
+    decision_slots: int
+
+
+class DuplicationSummary(BaseModel):
+    variants: list[DuplicationVariantSummary]
+    module_count: int
+    decision_slot_count: int
+    content_titles: list[str]
+
+
+class DuplicationTarget(BaseModel):
+    id: int
+    name: str
+    crossing: bool
+    # The content modes this caller may use for this target, in UI order.
+    modes: list[str]
+
+
+class DuplicationOptions(BaseModel):
+    """What the duplicate wizard offers (task-50, B14) — computed by the
+    server so a client never rebuilds the boundary rule."""
+
+    source_brand_id: int
+    summary: DuplicationSummary
+    # Summarising only the chosen variants, so the content count a manager sees
+    # is the one the copy will produce. Equals `summary` when none are chosen.
+    selected_summary: DuplicationSummary
+    targets: list[DuplicationTarget]
