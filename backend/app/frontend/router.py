@@ -910,8 +910,10 @@ def campaign_detail(
             # Overrideable = the module resolves content (a content record or a
             # decision slot) and has a manifest so its fields are known. Not tied
             # to the cms flag — a hero/cta referencing a content record qualifies.
-            resolves_content = m.content_record_id is not None or m.decision_slot_id is not None
-            overrideable = bool(manifest and resolves_content)
+            # The service's rule, not a copy of it (ADR-178 point 5): never a slot.
+            from app.overrides.service import is_overrideable
+
+            overrideable = is_overrideable(manifest, m)
             active = get_active_content_override(db, m.id) if overrideable else None
             if active is not None:
                 active_override = {

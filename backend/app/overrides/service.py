@@ -22,6 +22,18 @@ def _validate_content_record_exists(db: Session, field_name: str, content_record
         )
 
 
+def is_overrideable(manifest, module: ModuleInstanceDB) -> bool:
+    """Whether a manager may override this module's fields — the rule
+    `_overrideable_manifest` enforces, asked without raising, for a screen.
+
+    A manifest (so its fields are known) and a content record (ADR-178 point 5:
+    never a decision slot). The Jinja campaign page used its own copy until
+    2026-10-02, which still counted slot-bound modules and so offered an
+    override the service refuses.
+    """
+    return bool(manifest) and module.content_record_id is not None and module.decision_slot_id is None
+
+
 def _overrideable_manifest(db: Session, module: ModuleInstanceDB):
     """A content override needs (a) a module bound to a **content record** and
     (b) a manifest, so its overridable fields are known.

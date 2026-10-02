@@ -938,3 +938,70 @@ def decision_slot_stats(db: Session, slot_id: int, *, brand_id: int) -> dict | N
         ],
         "reasons": [{"reason": reason, "count": count} for reason, count in reasons],
     }
+
+
+
+def campaign_composition(db: Session, campaign_id: int, *, brand_id: int) -> dict | None:
+    """A campaign as the variant editor shows it (task-50, B11). None when the
+    campaign is not in this brand.
+
+    Per variant: its modules in order — each with whether it may be overridden
+    (`overrides.service.is_overrideable`) and its active override — with the
+    envelope module (subject, preheader) reported apart, the channel's module
+    limit and whether another fits, the module types the channel accepts, and
+    each decision slot with its counts. Everything a client would otherwise
+    rebuild from manifests and channel rules; snapshots, audiences and
+    providers have their own reads.
+    """
+    from app.channels.registry import max_modules_for
+    from app.modules.registry import envelope_module_type, get_manifest, list_manifests
+    from app.overrides.service import get_active_content_override, is_overrideable
+
+    campaign = get_campaign(db, campaign_id, brand_id=brand_id)
+    if campaign is None:
+        return None
+    slot_stats = {row["id"]: row for row in list_decision_slots_with_stats(db, brand_id=brand_id)
+                  if row["campaign_id"] == campaign_id}
+    variants = []
+    for variant in (db.query(VariantDB).filter(VariantDB.campaign_id == campaign_id)
+                    .order_by(VariantDB.id.asc()).all()):
+        modules, envelope_modules = [], []
+        for m in (db.query(ModuleInstanceDB).filter(ModuleInstanceDB.variant_id == variant.id)
+                  .order_by(ModuleInstanceDB.position.asc()).all()):
+            manifest = get_manifest(variant.channel, m.module_type)
+            overrideable = is_overrideable(manifest, m)
+            active = get_active_content_override(db, m.id) if overrideable else None
+            row = {
+                "id": m.id, "position": m.position, "module_type": m.module_type,
+                "content_record_id": m.content_record_id, "decision_slot_id": m.decision_slot_id,
+                "module_data": m.module_data or {},
+                "known": manifest is not None,
+                "overrideable": overrideable,
+                "active_override": (
+                    {"id": active.id, "field_overrides": active.field_overrides or {},
+                     "overridden_by": active.overridden_by, "reason": active.reason}
+                    if active is not None else None
+                ),
+            }
+            is_envelope = bool(manifest and any(v.envelope for v in manifest.variables))
+            (envelope_modules if is_envelope else modules).append(row)
+        limit = max_modules_for(variant.channel)
+        variants.append({
+            "variant": to_variant(variant, db),
+            "module_limit": limit,
+            "can_add_module": limit is None or len(modules) < limit,
+            "has_envelope": envelope_module_type(variant.channel) is not None,
+            "accepted_module_types": [
+                m.name for m in list_manifests(variant.channel)
+                if not any(v.envelope for v in m.variables)
+            ],
+            "modules": modules,
+            "envelope_modules": envelope_modules,
+            "decision_slots": [
+                slot_stats[slot.id] for slot in
+                db.query(DecisionSlotDB).filter(DecisionSlotDB.variant_id == variant.id)
+                .order_by(DecisionSlotDB.id.asc()).all()
+                if slot.id in slot_stats
+            ],
+        })
+    return {"campaign": campaign, "variants": variants}

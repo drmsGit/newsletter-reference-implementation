@@ -343,3 +343,44 @@ class DecisionSlotStats(BaseModel):
     top_content: list[SlotTopContent]
     latest: list[SlotResolution]
     reasons: list[SlotReason]
+
+
+class ActiveOverride(BaseModel):
+    id: int
+    field_overrides: dict
+    overridden_by: str | None = None
+    reason: str | None = None
+
+
+class ComposedModule(BaseModel):
+    id: int
+    position: int
+    module_type: str
+    content_record_id: int | None = None
+    decision_slot_id: int | None = None
+    module_data: dict
+    # False when no manifest exists for this type on this channel.
+    known: bool
+    # A manager may override its fields (content-bound, never a slot).
+    overrideable: bool
+    active_override: ActiveOverride | None = None
+
+
+class ComposedVariant(BaseModel):
+    variant: Variant
+    # None: the channel sets no limit.
+    module_limit: int | None = None
+    can_add_module: bool
+    has_envelope: bool
+    accepted_module_types: list[str]
+    modules: list[ComposedModule]
+    # The subject/preheader module, kept apart from the body (ADR-162 point 1).
+    envelope_modules: list[ComposedModule]
+    decision_slots: list[DecisionSlotListed]
+
+
+class CampaignComposition(BaseModel):
+    """A campaign as the variant editor shows it (task-50, B11)."""
+
+    campaign: Campaign
+    variants: list[ComposedVariant]

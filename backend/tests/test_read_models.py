@@ -141,3 +141,91 @@ class TestB21B22DecisionSlotStats:
                 db.execute(text(f"DELETE FROM {table} WHERE user_id = :u"), {"u": user.id})
             db.execute(text("DELETE FROM users WHERE id = :u"), {"u": user.id})
             db.commit()
+
+
+class TestB11CampaignComposition:
+    @pytest.fixture
+    def composed(self, db, default_brand):
+        from app.campaigns.db_models import DecisionSlotDB, ModuleInstanceDB
+        from app.campaigns.service import create_campaign, create_module_for_variant
+        from app.content.service import create_content, create_content_version
+        from app.overrides.db_models import ContentOverrideDB
+
+        campaign = create_campaign(db, name=f"comp-{uuid.uuid4().hex[:6]}", brand_id=default_brand.id,
+                                   channel="email")
+        variant = db.query(VariantDB).filter(VariantDB.campaign_id == campaign.id).one()
+        record = create_content(db, title=f"comp-{uuid.uuid4().hex[:6]}", brand_id=default_brand.id,
+                                content={"headline_medium": "H", "body_medium": "B"})
+        create_content_version(db, content_record_id=record.id, created_by="t", brand_id=default_brand.id)
+        header = create_module_for_variant(db, variant_id=variant.id, module_type="header",
+                                           module_data={"subject": "S"}, brand_id=default_brand.id)
+        content = create_module_for_variant(db, variant_id=variant.id, module_type="img_right",
+                                            content_record_id=record.id, brand_id=default_brand.id)
+        slot = DecisionSlotDB(variant_id=variant.id, name="slot", decision_type="content_recommendation",
+                              decision_strategy="top_score")
+        db.add(slot); db.flush()
+        slotted = ModuleInstanceDB(variant_id=variant.id, module_type="single_stack", position=9,
+                                   decision_slot_id=slot.id, module_data={})
+        override = ContentOverrideDB(module_instance_id=content.id, field_overrides={"headline_medium": "X"},
+                                     overridden_by="t", active=True)
+        db.add_all([slotted, override]); db.commit()
+        yield {"campaign": campaign, "header": header.id, "content": content.id, "slotted": slotted.id,
+               "slot": slot.id, "override": override.id}
+        db.rollback()
+        db.query(ContentOverrideDB).filter(ContentOverrideDB.id == override.id).delete()
+        db.query(ModuleInstanceDB).filter(ModuleInstanceDB.variant_id == variant.id).delete()
+        db.query(DecisionSlotDB).filter(DecisionSlotDB.id == slot.id).delete()
+        db.query(VariantDB).filter(VariantDB.id == variant.id).delete()
+        db.query(CampaignDB).filter(CampaignDB.id == campaign.id).delete()
+        db.commit()
+
+    def _get(self, campaign_id):
+        with machine([VIEW]) as headers:
+            return client.get(f"/campaigns/{campaign_id}/composition", headers=headers)
+
+    def test_modules_say_what_may_be_overridden(self, composed):
+        body = self._get(composed["campaign"].id).json()
+        [variant] = body["variants"]
+        by_id = {m["id"]: m for m in variant["modules"]}
+        assert by_id[composed["content"]]["overrideable"] is True
+        assert by_id[composed["content"]]["active_override"]["field_overrides"] == {"headline_medium": "X"}
+        assert by_id[composed["slotted"]]["overrideable"] is False, "a slot is never overridden"
+
+    def test_the_envelope_is_reported_apart(self, composed):
+        [variant] = self._get(composed["campaign"].id).json()["variants"]
+        assert [m["id"] for m in variant["envelope_modules"]] == [composed["header"]]
+        assert composed["header"] not in {m["id"] for m in variant["modules"]}
+        assert variant["has_envelope"] is True and "header" not in variant["accepted_module_types"]
+        assert variant["module_limit"] is None and variant["can_add_module"] is True
+
+    def test_slots_carry_their_counts(self, composed):
+        [variant] = self._get(composed["campaign"].id).json()["variants"]
+        assert [s["id"] for s in variant["decision_slots"]] == [composed["slot"]]
+
+    def test_another_brands_campaign_is_not_found(self, db, foreign_brand):
+        campaign = CampaignDB(brand_id=foreign_brand.id, name=f"comp-f-{uuid.uuid4().hex[:6]}")
+        db.add(campaign); db.commit()
+        assert self._get(campaign.id).status_code == 404
+
+    def test_the_jinja_page_no_longer_offers_to_override_a_slot(self, db, composed):
+        from sqlalchemy import text
+
+        from app.auth import service as auth
+
+        user = auth.create_user(db, email=f"rm-{uuid.uuid4().hex[:8]}@example.invalid", role_key="admin")
+        token = auth.create_session(db, user)
+        page_client = TestClient(app, raise_server_exceptions=False)
+        page_client.cookies.set(auth.SESSION_COOKIE, token)
+        try:
+            page = page_client.get(f"/ui/campaigns/{composed['campaign'].id}")
+            assert page.status_code == 200, page.text[:300]
+            assert f"#{composed['content']} img_right" in page.text
+            assert f"#{composed['slotted']} single_stack" not in page.text, (
+                "the page offered an override the service refuses (ADR-178 point 5)"
+            )
+        finally:
+            db.rollback()
+            for table in ("auth_sessions", "role_assignments"):
+                db.execute(text(f"DELETE FROM {table} WHERE user_id = :u"), {"u": user.id})
+            db.execute(text("DELETE FROM users WHERE id = :u"), {"u": user.id})
+            db.commit()

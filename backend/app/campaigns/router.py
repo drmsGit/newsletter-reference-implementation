@@ -16,6 +16,7 @@ from app.campaigns.models import (
     SuggestionRun,
     DecisionSlotListed,
     DecisionSlotStats,
+    CampaignComposition,
     SubjectSuggestionResult,
     CampaignCreate,
     CampaignWithVariants,
@@ -690,3 +691,25 @@ def get_decision_slot_stats(
     if stats is None:
         raise HTTPException(status_code=404, detail=f"Decision slot {slot_id} not found")
     return {**stats, "slot": to_decision_slot(stats["slot"])}
+
+
+@router.get(
+    "/{campaign_id}/composition",
+    response_model=CampaignComposition,
+    summary="A campaign as the variant editor shows it",
+    description=(
+        "Each variant's modules in order, with whether each may be overridden and "
+        "its active override; the envelope module apart; the channel's module "
+        "limit and whether another module fits; the module types it accepts; and "
+        "each decision slot with its counts. 404 outside the working brand."
+    ),
+)
+def get_campaign_composition(
+    campaign_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.campaigns.service import campaign_composition
+
+    composition = campaign_composition(db, campaign_id, brand_id=brand_id)
+    if composition is None:
+        raise HTTPException(status_code=404, detail=f"Campaign {campaign_id} not found")
+    return composition
