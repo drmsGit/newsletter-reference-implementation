@@ -227,3 +227,38 @@ def event_trace(db: Session, execution_ids: list[int], *, brand_id: int) -> dict
             "created_at": e.created_at,
         })
     return trace
+
+
+def brand_overview(db: Session, *, brand_id: int) -> dict:
+    """The dashboard's counts for one brand (task-50, B4). Recipients are the
+    exception and are company-wide by design: a recipient carries no brand
+    (ADR-150 point 9)."""
+    from app.campaigns.db_models import CampaignDB, VariantDB
+    from app.content.db_models import ContentRecordDB
+    from app.delivery.db_models import SendInstanceDB
+    from app.recipients.db_models import RecipientDB
+    from app.snapshots.db_models import SnapshotDB
+
+    return {
+        "content_active": db.query(ContentRecordDB).filter(
+            ContentRecordDB.status == "active", ContentRecordDB.brand_id == brand_id).count(),
+        "campaigns": db.query(CampaignDB).filter(CampaignDB.brand_id == brand_id).count(),
+        "recipients": db.query(RecipientDB).count(),
+        "snapshots": (
+            db.query(SnapshotDB)
+            .join(VariantDB, VariantDB.id == SnapshotDB.variant_id)
+            .join(CampaignDB, CampaignDB.id == VariantDB.campaign_id)
+            .filter(CampaignDB.brand_id == brand_id).count()
+        ),
+        "deliveries": (
+            db.query(DeliveryExecutionDB)
+            .join(SendInstanceDB, SendInstanceDB.id == DeliveryExecutionDB.send_instance_id)
+            .filter(SendInstanceDB.brand_id == brand_id).count()
+        ),
+        "events": (
+            db.query(EngagementEventDB)
+            .join(DeliveryExecutionDB, DeliveryExecutionDB.id == EngagementEventDB.delivery_execution_id)
+            .join(SendInstanceDB, SendInstanceDB.id == DeliveryExecutionDB.send_instance_id)
+            .filter(SendInstanceDB.brand_id == brand_id).count()
+        ),
+    }

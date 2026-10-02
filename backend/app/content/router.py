@@ -514,3 +514,16 @@ def get_content_usage(
     if usage is None:
         raise HTTPException(status_code=404, detail="Content record not found")
     return usage
+
+
+@router.delete(
+    "/category-relations/{relation_id}",
+    status_code=204,
+    summary="Remove a link between two categories",
+    description="The taxonomy is shared by every brand (ADR-150), so this is not brand-scoped.",
+)
+def delete_category_relation_route(relation_id: int, db: Session = Depends(get_db)):
+    from app.content.service import delete_category_relation
+
+    if not delete_category_relation(db, relation_id):
+        raise HTTPException(status_code=404, detail="Category relation not found")

@@ -70,3 +70,52 @@ class CategoryGraph(BaseModel):
     brand_id: int
     nodes: list[CategoryGraphNode]
     edges: list[CategoryGraphEdge]
+
+
+class BrandOverview(BaseModel):
+    """The dashboard's counts (task-50, B4). `recipients` is company-wide."""
+
+    content_active: int
+    campaigns: int
+    recipients: int
+    snapshots: int
+    deliveries: int
+    events: int
+
+
+class CategoryRef(BaseModel):
+    id: int
+    name: str
+    type: str
+    # The relation linking it, for deleting that link (DELETE /content/category-relations/{id}).
+    relation_id: int | None = None
+
+
+class CategoryContent(BaseModel):
+    content_id: int
+    title: str
+    score: float | None = None
+
+
+class CategoryRecipient(BaseModel):
+    recipient_id: int
+    external_id: str | None = None
+    score: float
+
+
+class CategoryImpact(BaseModel):
+    update_count: int
+    total_delta: float
+    avg_delta: float
+
+
+class CategoryDetail(BaseModel):
+    """One category for the working brand (task-50, B20): this brand's content
+    and this brand's audience; the category and its relations are shared."""
+
+    category: CategoryRef
+    parents: list[CategoryRef]
+    children: list[CategoryRef]
+    assigned_content: list[CategoryContent]
+    top_recipients: list[CategoryRecipient]
+    impact: CategoryImpact

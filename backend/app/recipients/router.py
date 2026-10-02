@@ -7,6 +7,7 @@ from app.auth.service import has_permission
 from app.auth.dependencies import working_brand
 from app.database import get_db
 from app.recipients.models import (
+    RecipientActivity,
     ConsentDriftItem,
     ConsentSyncLog,
     ConsentSyncRequest,
@@ -237,3 +238,24 @@ def create_preference(
         score=payload.score,
         source=payload.source,
     )
+
+@router.get(
+    "/{recipient_id}/activity",
+    response_model=RecipientActivity,
+    summary="One recipient as the recipient page shows them, from the working brand",
+    description=(
+        "This brand's decisions and deliveries (with each delivery's engagement "
+        "trace), the one affinity profile, this brand's consent grid, and the "
+        "consent history across brands, labelled. 404 when the recipient does "
+        "not exist."
+    ),
+)
+def get_recipient_activity(
+    recipient_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.recipients.service import recipient_activity
+
+    activity = recipient_activity(db, recipient_id, brand_id=brand_id)
+    if activity is None:
+        raise HTTPException(status_code=404, detail=f"Recipient {recipient_id} not found")
+    return activity

@@ -574,3 +574,77 @@ def list_preferences_for_recipient(
         RecipientPreference(recipient_id=recipient_id, category_id=category_id, score=score)
         for category_id, score in sorted(signals.items(), key=lambda kv: kv[1], reverse=True)
     ]
+
+# --- the recipient detail read model (task-50, B10) ----------------------------
+
+def recipient_activity(db: Session, recipient_id: int, *, brand_id: int) -> dict | None:
+    """One person as the recipient page shows them, seen from one brand.
+
+    **What is scoped to the brand, and what is not.** Decisions and deliveries
+    are this brand's only — the Jinja page listed every brand's, which is
+    another brand's send names and content titles. The affinity profile is
+    one per person by design (ADR-150 point 8) and is shown whole. Consent
+    history spans brands on purpose, each event labelled with its brand, so a
+    person's record of what they agreed to is never partial (ADR-163).
+    None when the recipient does not exist.
+    """
+    from app.auth.service import list_brands
+    from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, DecisionSlotDB, VariantDB
+    from app.content.db_models import CategoryDB, ContentRecordDB, ContentVersionDB
+    from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
+    from app.insight.service import event_trace
+    from app.insight.signals import operational_signals_for_recipient
+    from app.recipients.consent import consent_grid, consent_history
+    from app.settings.service import available_channels
+
+    recipient = db.get(RecipientDB, recipient_id)
+    if recipient is None:
+        return None
+    signals = operational_signals_for_recipient(db, recipient_id)
+    names = dict(db.query(CategoryDB.id, CategoryDB.name)
+                 .filter(CategoryDB.id.in_(signals.keys())).all()) if signals else {}
+    decisions = (
+        db.query(DecisionResolutionDB, ContentRecordDB.title, ContentVersionDB.version_number)
+        .join(ContentRecordDB, DecisionResolutionDB.content_record_id == ContentRecordDB.id)
+        .outerjoin(ContentVersionDB, DecisionResolutionDB.content_version_id == ContentVersionDB.id)
+        .join(DecisionSlotDB, DecisionSlotDB.id == DecisionResolutionDB.decision_slot_id)
+        .join(VariantDB, VariantDB.id == DecisionSlotDB.variant_id)
+        .join(CampaignDB, CampaignDB.id == VariantDB.campaign_id)
+        .filter(DecisionResolutionDB.recipient_id == recipient_id, CampaignDB.brand_id == brand_id)
+        .order_by(DecisionResolutionDB.created_at.desc()).limit(20).all()
+    )
+    deliveries = (
+        db.query(DeliveryExecutionDB, SendInstanceDB.name)
+        .join(SendInstanceDB, DeliveryExecutionDB.send_instance_id == SendInstanceDB.id)
+        .filter(DeliveryExecutionDB.recipient_id == recipient_id, SendInstanceDB.brand_id == brand_id)
+        .order_by(DeliveryExecutionDB.created_at.desc()).limit(20).all()
+    )
+    trace = event_trace(db, [e.id for e, _ in deliveries], brand_id=brand_id)
+    brand_names = {b.id: b.name for b in list_brands(db)}
+    return {
+        "recipient_id": recipient.id,
+        "external_id": recipient.external_id,
+        "preferences": [
+            {"category_id": cid, "category_name": names.get(cid, f"#{cid}"), "score": round(score, 1)}
+            for cid, score in sorted(signals.items(), key=lambda kv: kv[1], reverse=True)
+        ],
+        "decisions": [
+            {"id": d.id, "decision_slot_id": d.decision_slot_id, "content_record_id": d.content_record_id,
+             "content_title": title, "content_version": version, "score": d.score,
+             "reason": d.reason, "created_at": d.created_at}
+            for d, title, version in decisions
+        ],
+        "deliveries": [
+            {"id": e.id, "send_instance_id": e.send_instance_id, "send_instance_name": name,
+             "status": e.status, "channel": e.channel, "provider": e.provider,
+             "provider_message_id": e.provider_message_id, "sent_at": e.sent_at,
+             "created_at": e.created_at, "events": trace.get(e.id, [])}
+            for e, name in deliveries
+        ],
+        "consent_grid": consent_grid(db, recipient.id, brand_id, [c.name for c in available_channels(db)]),
+        "consent_history": [
+            {"brand_id": ev.brand_id, "brand_name": brand_names.get(ev.brand_id), "channel": ev.channel,
+             "purpose": ev.purpose, "status": ev.status, "source": ev.source, "created_at": ev.created_at}
+            for ev in consent_history(db, recipient.id)
+        ],
+    }

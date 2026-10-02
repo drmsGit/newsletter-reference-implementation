@@ -152,57 +152,22 @@ def dashboard(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    dashboard_brand_id = working_brand_id(request, db)
+    from app.insight.service import brand_overview
 
+    # The counts are `insight.service.brand_overview`, shared with
+    # GET /insight/overview (task-50, B4).
+    counts = brand_overview(db, brand_id=working_brand_id(request, db))
     return templates.TemplateResponse(
         request,
         "dashboard.html",
         {
             "title": "Architecture Dashboard",
-            # Active only — a deactivated record still exists and still renders
-            # where it is already used, but it is not part of the catalogue a
-            # manager can compose with, so counting it here overstates the number.
-            # Scoped to the working brand, all of them together. A dashboard
-            # mixing scopes is the subtler version of the problem brand
-            # scoping exists to solve: "0 campaigns, 7 snapshots" invites the
-            # reader to average two different populations in their head.
-            "content_count": (
-                db.query(ContentRecordDB)
-                .filter(
-                    ContentRecordDB.status == "active",
-                    ContentRecordDB.brand_id == dashboard_brand_id,
-                )
-                .count()
-            ),
-            "campaign_count": (
-                db.query(CampaignDB)
-                .filter(CampaignDB.brand_id == dashboard_brand_id)
-                .count()
-            ),
-            # Recipients are company-wide by ADR-150 point 9 — brand is the
-            # SENDING context, not an attribute of the person — so this one is
-            # deliberately unscoped rather than overlooked.
-            "recipient_count": db.query(RecipientDB).count(),
-            "snapshot_count": (
-                db.query(SnapshotDB)
-                .join(VariantDB, VariantDB.id == SnapshotDB.variant_id)
-                .join(CampaignDB, CampaignDB.id == VariantDB.campaign_id)
-                .filter(CampaignDB.brand_id == dashboard_brand_id)
-                .count()
-            ),
-            "delivery_count": (
-                db.query(DeliveryExecutionDB)
-                .join(SendInstanceDB, SendInstanceDB.id == DeliveryExecutionDB.send_instance_id)
-                .filter(SendInstanceDB.brand_id == dashboard_brand_id)
-                .count()
-            ),
-            "event_count": (
-                db.query(EngagementEventDB)
-                .join(DeliveryExecutionDB, DeliveryExecutionDB.id == EngagementEventDB.delivery_execution_id)
-                .join(SendInstanceDB, SendInstanceDB.id == DeliveryExecutionDB.send_instance_id)
-                .filter(SendInstanceDB.brand_id == dashboard_brand_id)
-                .count()
-            ),
+            "content_count": counts["content_active"],
+            "campaign_count": counts["campaigns"],
+            "recipient_count": counts["recipients"],
+            "snapshot_count": counts["snapshots"],
+            "delivery_count": counts["deliveries"],
+            "event_count": counts["events"],
         },
     )
 
@@ -602,125 +567,32 @@ def recipient_detail(
         for category_id, score in sorted(signals.items(), key=lambda kv: kv[1], reverse=True)
     ]
 
-    decisions = (
-        db.query(
-            DecisionResolutionDB,
-            ContentRecordDB.title,
-            ContentVersionDB.version_number,
-        )
-        .join(
-            ContentRecordDB,
-            DecisionResolutionDB.content_record_id == ContentRecordDB.id,
-        )
-        .outerjoin(
-            ContentVersionDB,
-            DecisionResolutionDB.content_version_id == ContentVersionDB.id,
-        )
-        .filter(
-            DecisionResolutionDB.recipient_id == recipient_id
-        )
-        .order_by(
-            DecisionResolutionDB.created_at.desc()
-        )
-        .limit(20)
-        .all()
-    )
+    # This brand's decisions and deliveries only (task-50, B10): the page
+    # listed every brand's, which is another brand's send names and content
+    # titles. The same service answers GET /recipients/{id}/activity.
+    from app.recipients.service import recipient_activity
 
-    decision_rows = [
+    activity = recipient_activity(db, recipient_id, brand_id=working_brand_id(request, db))
+    decision_rows = activity["decisions"]
+    delivery_rows = [
         {
-            "id": decision.id,
-            "decision_slot_id": decision.decision_slot_id,
-            "content_title": content_title,
-            "content_version": version_number,
-            "score": decision.score,
-            "reason": decision.reason,
-            "created_at": decision.created_at,
-        }
-        for decision, content_title, version_number in decisions
-    ]
-
-    deliveries = (
-        db.query(
-            DeliveryExecutionDB,
-            SendInstanceDB.name,
-        )
-        .join(
-            SendInstanceDB,
-            DeliveryExecutionDB.send_instance_id == SendInstanceDB.id,
-        )
-        .filter(
-            DeliveryExecutionDB.recipient_id == recipient.id
-        )
-        .order_by(
-            DeliveryExecutionDB.created_at.desc()
-        )
-        .limit(20)
-        .all()
-    )
-
-    delivery_rows = []
-
-    for delivery, send_instance_name in deliveries:
-        delivery_events = (
-            db.query(EngagementEventDB)
-            .filter(
-                EngagementEventDB.delivery_execution_id == delivery.id
-            )
-            .order_by(
-                EngagementEventDB.created_at.desc()
-            )
-            .all()
-        )
-
-        event_rows = []
-
-        for event in delivery_events:
-            preference_updates = (
-                db.query(
-                    SignalContributionDB,
-                    CategoryDB.name,
-                )
-                .join(
-                    CategoryDB,
-                    SignalContributionDB.category_id == CategoryDB.id,
-                )
-                .filter(
-                    SignalContributionDB.event_id == event.id
-                )
-                .all()
-            )
-
-            event_rows.append(
+            **{k: d[k] for k in ("id", "send_instance_name", "status", "provider",
+                                  "provider_message_id", "created_at")},
+            "events": [
                 {
-                    "id": event.id,
-                    "event_type": event.event_type,
-                    "provider_event_id": event.provider_event_id,
-                    "created_at": event.created_at,
+                    "id": e["id"], "event_type": e["event_type"],
+                    "provider_event_id": e["provider_event_id"], "created_at": e["created_at"],
                     "preference_updates": [
-                        {
-                            "category_name": category_name,
-                            "previous_score": None,
-                            "delta": update.base_weight,
-                            "new_score": None,
-                            "reason": update.contribution_type,
-                        }
-                        for update, category_name in preference_updates
+                        {"category_name": c["category_name"], "previous_score": None,
+                         "delta": c["base_weight"], "new_score": None, "reason": c["contribution_type"]}
+                        for c in e["contributions"]
                     ],
                 }
-            )
-
-        delivery_rows.append(
-            {
-                "id": delivery.id,
-                "send_instance_name": send_instance_name,
-                "status": delivery.status,
-                "provider": delivery.provider,
-                "provider_message_id": delivery.provider_message_id,
-                "created_at": delivery.created_at,
-                "events": event_rows,
-            }
-        )
-
+                for e in d["events"]
+            ],
+        }
+        for d in activity["deliveries"]
+    ]
 
     return templates.TemplateResponse(
         request,
@@ -2474,76 +2346,19 @@ def category_detail(
         .all()
     )
 
-    assigned_content = (
-        db.query(
-            ContentRecordDB.id,
-            ContentRecordDB.title,
-            ContentCategoryAssignmentDB.score,
-        )
-        .join(
-            ContentCategoryAssignmentDB,
-            ContentCategoryAssignmentDB.content_id == ContentRecordDB.id,
-        )
-        .filter(
-            ContentCategoryAssignmentDB.category_id == category_id
-        )
-        .order_by(
-            ContentCategoryAssignmentDB.score.desc()
-        )
-        .all()
-    )
+    # This brand's content and this brand's audience (task-50, B20; the graph's
+    # rule, ADR-150): the page listed every brand's content and ranked every
+    # brand's people. Shared with GET /insight/categories/{id}.
+    from app.insight.graph import category_detail as category_figures
 
-    assigned_content_rows = [
-        {
-            "content_id": content_id,
-            "title": title,
-            "score": score,
-        }
-        for content_id, title, score in assigned_content
+    figures = category_figures(db, category_id, brand_id=working_brand_id(request, db))
+    assigned_content_rows = figures["assigned_content"]
+    recipient_preference_rows = [
+        {"recipient_id": r["recipient_id"], "recipient_external_id": r["external_id"],
+         "score": r["score"], "source": "signal"}
+        for r in figures["top_recipients"]
     ]
-
-    # Recipients ranked by their operational signal for this category
-    # (decay-on-read, ADR-132), not a stored preference score.
-    category_signals = operational_signals_for_category(db, category_id)
-    if category_signals:
-        recip_lookup = dict(
-            db.query(RecipientDB.id, RecipientDB.external_id)
-            .filter(RecipientDB.id.in_(category_signals.keys()))
-            .all()
-        )
-        recipient_preference_rows = sorted(
-            [
-                {
-                    "recipient_id": rid,
-                    "recipient_external_id": recip_lookup.get(rid),
-                    "score": round(score, 1),
-                    "source": "signal",
-                }
-                for rid, score in category_signals.items()
-            ],
-            key=lambda r: r["score"],
-            reverse=True,
-        )[:50]
-    else:
-        recipient_preference_rows = []
-
-    impact = (
-        db.query(
-            func.count(SignalContributionDB.id),
-            func.coalesce(func.sum(SignalContributionDB.base_weight), 0),
-            func.coalesce(func.avg(SignalContributionDB.base_weight), 0),
-        )
-        .filter(
-            SignalContributionDB.category_id == category_id
-        )
-        .first()
-    )
-
-    impact_summary = {
-        "update_count": impact[0],
-        "total_delta": round(float(impact[1]), 2),
-        "avg_delta": round(float(impact[2]), 2),
-    }
+    impact_summary = figures["impact"]
 
     all_categories = db.query(CategoryDB).order_by(CategoryDB.name.asc()).all()
 

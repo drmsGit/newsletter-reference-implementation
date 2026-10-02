@@ -166,3 +166,56 @@ class RecipientPreferenceCreate(BaseModel):
     category_id: int
     score: float
     source: str = "manual"
+
+class RecipientPreference(BaseModel):
+    category_id: int
+    category_name: str
+    score: float
+
+
+class RecipientDecision(BaseModel):
+    id: int
+    decision_slot_id: int
+    content_record_id: int
+    content_title: str
+    content_version: int | None = None
+    score: float | None = None
+    reason: str | None = None
+    created_at: datetime
+
+
+class RecipientDelivery(BaseModel):
+    id: int
+    send_instance_id: int
+    send_instance_name: str
+    status: str
+    channel: str
+    provider: str | None = None
+    provider_message_id: str | None = None
+    sent_at: datetime | None = None
+    created_at: datetime
+    # Engagement on this delivery and what it taught (see /delivery/executions/{id}/trace).
+    events: list[dict]
+
+
+class RecipientConsentEvent(BaseModel):
+    brand_id: int
+    brand_name: str | None = None
+    channel: str
+    purpose: str
+    status: str
+    source: str | None = None
+    created_at: datetime
+
+
+class RecipientActivity(BaseModel):
+    """One person seen from the working brand (task-50, B10): this brand's
+    decisions and deliveries; the one profile; consent across brands, labelled."""
+
+    recipient_id: int
+    external_id: str
+    preferences: list[RecipientPreference]
+    decisions: list[RecipientDecision]
+    deliveries: list[RecipientDelivery]
+    consent_grid: list[dict]
+    consent_history: list[RecipientConsentEvent]

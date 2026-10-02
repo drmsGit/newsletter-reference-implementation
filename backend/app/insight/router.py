@@ -6,6 +6,8 @@ from app.auth.dependencies import working_brand
 from app.database import get_db
 from app.insight.graph import category_graph
 from app.insight.models import (
+    BrandOverview,
+    CategoryDetail,
     CategoryGraph,
     CategoryGraphEdge,
     CategoryGraphNode,
@@ -106,3 +108,32 @@ def get_category_graph(
         ],
         edges=[CategoryGraphEdge(**edge) for edge in figures["edges"]],
     )
+
+
+@router.get("/overview", response_model=BrandOverview,
+            summary="The dashboard's counts for the working brand")
+def get_overview(db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
+    from app.insight.service import brand_overview
+
+    return brand_overview(db, brand_id=brand_id)
+
+
+@router.get(
+    "/categories/{category_id}",
+    response_model=CategoryDetail,
+    summary="One category for the working brand: its content, audience and impact",
+    description=(
+        "Parents and children (with relation ids), this brand's content in the "
+        "category, the top 50 of this brand's audience by decayed signal, and "
+        "the impact over that audience (ADR-150). 404 for an unknown category."
+    ),
+)
+def get_category_detail(
+    category_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.insight.graph import category_detail
+
+    detail = category_detail(db, category_id, brand_id=brand_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"Category {category_id} not found")
+    return detail

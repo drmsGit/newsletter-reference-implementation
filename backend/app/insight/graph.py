@@ -182,3 +182,63 @@ def category_graph(db: Session, *, brand_id: int) -> dict:
         },
         "edges": list(edges.values()),
     }
+
+
+def category_detail(db: Session, category_id: int, *, brand_id: int) -> dict | None:
+    """One category as the category page shows it, for one brand (task-50, B20).
+
+    The graph's rule, for one node (ADR-150's 2026-10-02 addendum): this
+    brand's content, and only this brand's audience summed — the Jinja page
+    listed every brand's content and ranked every brand's people. The category
+    and its relations are the shared vocabulary and are shown whole. None when
+    the category does not exist.
+    """
+    from app.insight.signals import operational_signals_for_category
+
+    category = db.get(CategoryDB, category_id)
+    if category is None:
+        return None
+    parents = (
+        db.query(CategoryDB, CategoryRelationDB.id)
+        .join(CategoryRelationDB, CategoryRelationDB.parent_category_id == CategoryDB.id)
+        .filter(CategoryRelationDB.child_category_id == category_id).all()
+    )
+    children = (
+        db.query(CategoryDB, CategoryRelationDB.id)
+        .join(CategoryRelationDB, CategoryRelationDB.child_category_id == CategoryDB.id)
+        .filter(CategoryRelationDB.parent_category_id == category_id).all()
+    )
+    content = (
+        db.query(ContentRecordDB.id, ContentRecordDB.title, ContentCategoryAssignmentDB.score)
+        .join(ContentCategoryAssignmentDB, ContentCategoryAssignmentDB.content_id == ContentRecordDB.id)
+        .filter(ContentCategoryAssignmentDB.category_id == category_id,
+                ContentRecordDB.brand_id == brand_id)
+        .order_by(ContentCategoryAssignmentDB.score.desc()).all()
+    )
+    audience = {rid for (rid,) in db.execute(brand_audience(brand_id)).all()}
+    ranked = sorted(
+        ((rid, score) for rid, score in operational_signals_for_category(db, category_id).items()
+         if rid in audience),
+        key=lambda kv: kv[1], reverse=True,
+    )[:50]
+    external = dict(db.query(RecipientDB.id, RecipientDB.external_id)
+                    .filter(RecipientDB.id.in_([rid for rid, _ in ranked])).all()) if ranked else {}
+    count, total, avg = (
+        db.query(func.count(SignalContributionDB.id),
+                 func.coalesce(func.sum(SignalContributionDB.base_weight), 0),
+                 func.coalesce(func.avg(SignalContributionDB.base_weight), 0))
+        .filter(SignalContributionDB.category_id == category_id,
+                SignalContributionDB.recipient_id.in_(brand_audience(brand_id)))
+        .first()
+    )
+    return {
+        "category": {"id": category.id, "name": category.name, "type": category.type},
+        "parents": [{"id": c.id, "name": c.name, "type": c.type, "relation_id": rid} for c, rid in parents],
+        "children": [{"id": c.id, "name": c.name, "type": c.type, "relation_id": rid} for c, rid in children],
+        "assigned_content": [{"content_id": cid, "title": title, "score": score}
+                             for cid, title, score in content],
+        "top_recipients": [{"recipient_id": rid, "external_id": external.get(rid), "score": round(score, 1)}
+                           for rid, score in ranked],
+        "impact": {"update_count": count, "total_delta": round(float(total), 2),
+                   "avg_delta": round(float(avg), 2)},
+    }

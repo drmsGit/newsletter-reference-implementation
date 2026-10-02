@@ -549,3 +549,189 @@ def test_bulk_add_is_priced_as_audiences_manage():
     from app.auth.policy import required_permission
 
     assert required_permission("POST", "/api/audience-groups/{group_id}/bulk-add") == AUDIENCES_MANAGE
+
+
+def _page_client(db, role_key="viewer"):
+    from app.auth import service as auth
+
+    user = auth.create_user(db, email=f"rm-{uuid.uuid4().hex[:8]}@example.invalid", role_key=role_key)
+    token = auth.create_session(db, user)
+    page = TestClient(app, raise_server_exceptions=False)
+    page.cookies.set(auth.SESSION_COOKIE, token)
+    return page, user
+
+
+def _drop_user(db, user):
+    from sqlalchemy import text
+
+    db.rollback()
+    for table in ("auth_sessions", "role_assignments"):
+        db.execute(text(f"DELETE FROM {table} WHERE user_id = :u"), {"u": user.id})
+    db.execute(text("DELETE FROM users WHERE id = :u"), {"u": user.id})
+    db.commit()
+
+
+def test_b4_the_overview_counts_this_brand(db, default_brand, foreign_brand):
+    from app.content.db_models import ContentRecordDB
+
+    with machine([VIEW]) as headers:
+        before = client.get("/insight/overview", headers=headers).json()
+    db.add(ContentRecordDB(title="f", content={}, status="active", brand_id=foreign_brand.id))
+    db.add(ContentRecordDB(title="o", content={}, status="active", brand_id=default_brand.id))
+    db.commit()
+    try:
+        with machine([VIEW]) as headers:
+            after = client.get("/insight/overview", headers=headers).json()
+        assert after["content_active"] == before["content_active"] + 1, "another brand's content was counted"
+    finally:
+        db.query(ContentRecordDB).filter(ContentRecordDB.title == "o",
+                                         ContentRecordDB.brand_id == default_brand.id).delete()
+        db.commit()
+
+
+class TestB10RecipientActivity:
+    @pytest.fixture
+    def person(self, db, default_brand, foreign_brand):
+        """One recipient with a delivery and a decision in each brand."""
+        from app.campaigns.db_models import DecisionResolutionDB, DecisionSlotDB
+        from app.content.db_models import ContentRecordDB
+        from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
+        from app.recipients.consent import record_consent
+        from app.recipients.db_models import ConsentEventDB, RecipientDB
+        from app.snapshots.db_models import SnapshotDB
+
+        r = RecipientDB(external_id=f"act-{uuid.uuid4()}", status="active")
+        db.add(r); db.flush()
+        made = {"sends": [], "slots": [], "content": []}
+        for brand, tag in ((default_brand, "OWN"), (foreign_brand, "FOREIGN")):
+            variant = _variant(db, brand)
+            snapshot = SnapshotDB(variant_id=variant.id, artifact_storage_type="inline",
+                                  artifact_location="inline:render_context", artifact_size=0,
+                                  render_context={})
+            content = ContentRecordDB(title=f"{tag}-content-{uuid.uuid4().hex[:4]}", content={},
+                                      status="active", brand_id=brand.id)
+            slot = DecisionSlotDB(variant_id=variant.id, name="s", decision_type="content_recommendation",
+                                  decision_strategy="top_score")
+            db.add_all([snapshot, content, slot]); db.flush()
+            send = SendInstanceDB(snapshot_id=snapshot.id, brand_id=brand.id, status="sent",
+                                  provider="mock", name=f"{tag}-send-{uuid.uuid4().hex[:4]}")
+            db.add(send); db.flush()
+            db.add(DeliveryExecutionDB(send_instance_id=send.id, recipient_id=r.id, status="sent",
+                                       provider="mock", channel="email", purpose="marketing"))
+            db.add(DecisionResolutionDB(decision_slot_id=slot.id, recipient_id=r.id,
+                                        content_record_id=content.id))
+            record_consent(db, r.id, "opted_in", brand.id, channel="email", purpose="marketing",
+                           source="test", commit=False)
+            made["sends"].append(send); made["slots"].append(slot); made["content"].append(content)
+            made.setdefault("snapshots", []).append(snapshot.id)
+        db.commit()
+        yield r, made
+        db.rollback()
+        ids = [s.id for s in made["sends"]]
+        db.query(DeliveryExecutionDB).filter(DeliveryExecutionDB.send_instance_id.in_(ids)).delete(
+            synchronize_session=False)
+        db.query(DecisionResolutionDB).filter(DecisionResolutionDB.recipient_id == r.id).delete()
+        db.query(SendInstanceDB).filter(SendInstanceDB.id.in_(ids)).delete(synchronize_session=False)
+        db.query(DecisionSlotDB).filter(DecisionSlotDB.id.in_([s.id for s in made["slots"]])).delete(
+            synchronize_session=False)
+        db.query(SnapshotDB).filter(SnapshotDB.id.in_(made["snapshots"])).delete(synchronize_session=False)
+        db.query(ContentRecordDB).filter(ContentRecordDB.id.in_([c.id for c in made["content"]])).delete(
+            synchronize_session=False)
+        db.query(ConsentEventDB).filter(ConsentEventDB.recipient_id == r.id).delete()
+        db.query(RecipientDB).filter(RecipientDB.id == r.id).delete()
+        db.commit()
+
+    def test_only_this_brands_decisions_and_deliveries(self, person):
+        r, made = person
+        with machine([VIEW]) as headers:
+            body = client.get(f"/recipients/{r.id}/activity", headers=headers).json()
+        assert [d["send_instance_name"] for d in body["deliveries"]] == [made["sends"][0].name]
+        assert [d["content_title"] for d in body["decisions"]] == [made["content"][0].title]
+
+    def test_consent_history_spans_brands_and_says_which(self, person, default_brand, foreign_brand):
+        r, _ = person
+        with machine([VIEW]) as headers:
+            body = client.get(f"/recipients/{r.id}/activity", headers=headers).json()
+        assert {e["brand_id"] for e in body["consent_history"]} == {default_brand.id, foreign_brand.id}
+        assert all(e["brand_name"] for e in body["consent_history"])
+
+    def test_the_jinja_page_no_longer_shows_another_brands_sends(self, db, person):
+        r, made = person
+        page, user = _page_client(db)
+        try:
+            html = page.get(f"/ui/recipients/{r.id}").text
+            assert made["sends"][0].name in html
+            assert made["sends"][1].name not in html, "another brand's send name on the recipient page"
+            assert made["content"][1].title not in html, "another brand's content title on the page"
+        finally:
+            _drop_user(db, user)
+
+
+class TestB20CategoryDetailAndC10:
+    @pytest.fixture
+    def category(self, db, default_brand, foreign_brand):
+        from app.content.db_models import CategoryDB, CategoryRelationDB, ContentCategoryAssignmentDB, ContentRecordDB
+        from app.recipients.consent import record_consent
+        from app.recipients.db_models import ConsentEventDB, RecipientDB, SignalContributionDB
+
+        cat = CategoryDB(name=f"cat-{uuid.uuid4().hex[:6]}", type="main")
+        other = CategoryDB(name=f"cat-p-{uuid.uuid4().hex[:6]}", type="main")
+        db.add_all([cat, other]); db.flush()
+        relation = CategoryRelationDB(parent_category_id=other.id, child_category_id=cat.id,
+                                      relation_type="parent_child")
+        own = ContentRecordDB(title=f"OWN-{uuid.uuid4().hex[:4]}", content={}, status="active", brand_id=default_brand.id)
+        theirs = ContentRecordDB(title=f"FOREIGN-{uuid.uuid4().hex[:4]}", content={}, status="active",
+                                 brand_id=foreign_brand.id)
+        db.add_all([relation, own, theirs]); db.flush()
+        for rec in (own, theirs):
+            db.add(ContentCategoryAssignmentDB(content_id=rec.id, category_id=cat.id, score=5))
+        people = []
+        for brand, weight in ((default_brand, 10.0), (foreign_brand, 99.0)):
+            p = RecipientDB(external_id=f"cat-{uuid.uuid4()}", status="active")
+            db.add(p); db.flush()
+            record_consent(db, p.id, "opted_in", brand.id, channel="email", purpose="marketing",
+                           source="test", commit=False)
+            db.add(SignalContributionDB(recipient_id=p.id, category_id=cat.id, contribution_type="manual",
+                                        base_weight=weight))
+            people.append(p)
+        db.commit()
+        yield cat, relation, own, theirs, people
+        db.rollback()
+        ids = [p.id for p in people]
+        db.query(SignalContributionDB).filter(SignalContributionDB.category_id == cat.id).delete()
+        db.query(ConsentEventDB).filter(ConsentEventDB.recipient_id.in_(ids)).delete(synchronize_session=False)
+        db.query(RecipientDB).filter(RecipientDB.id.in_(ids)).delete(synchronize_session=False)
+        db.query(ContentCategoryAssignmentDB).filter(ContentCategoryAssignmentDB.category_id == cat.id).delete()
+        db.query(ContentRecordDB).filter(ContentRecordDB.id.in_([own.id, theirs.id])).delete(
+            synchronize_session=False)
+        db.query(CategoryRelationDB).filter(CategoryRelationDB.child_category_id == cat.id).delete()
+        db.query(CategoryDB).filter(CategoryDB.id.in_([cat.id, other.id])).delete(synchronize_session=False)
+        db.commit()
+
+    def test_only_this_brands_content_and_audience(self, category):
+        cat, relation, own, _, people = category
+        with machine([VIEW]) as headers:
+            body = client.get(f"/insight/categories/{cat.id}", headers=headers).json()
+        assert [c["content_id"] for c in body["assigned_content"]] == [own.id]
+        assert [r["recipient_id"] for r in body["top_recipients"]] == [people[0].id]
+        assert body["impact"]["total_delta"] == 10.0, "another brand's audience was summed"
+        assert body["parents"][0]["relation_id"] == relation.id
+
+    def test_c10_a_relation_is_deleted_once(self, db, category):
+        from app.auth.permissions import CONTENT_MANAGE
+
+        _, relation, _, _, _ = category
+        rid = relation.id
+        with machine([VIEW, CONTENT_MANAGE]) as headers:
+            first = client.delete(f"/content/category-relations/{rid}", headers=headers)
+            second = client.delete(f"/content/category-relations/{rid}", headers=headers)
+        assert (first.status_code, second.status_code) == (204, 404)
+
+    def test_the_jinja_page_shows_only_this_brands_content(self, db, category):
+        cat, _, own, theirs, _ = category
+        page, user = _page_client(db)
+        try:
+            html = page.get(f"/ui/categories/{cat.id}").text
+            assert own.title in html and theirs.title not in html
+        finally:
+            _drop_user(db, user)
