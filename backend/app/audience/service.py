@@ -904,3 +904,43 @@ def recalculate_suggested_blocks(
             added += 1
 
     return group
+
+
+# --- criteria: who a rule would add, and adding them (task-50, C11/C12) --------
+
+def criteria_matches(
+    db: Session, group_id: int, *, brand_id: int, channel: str, criteria: dict,
+) -> list[RecipientDB] | None:
+    """Who these ad-hoc criteria would ADD to the group: consenting on
+    `channel` for the group's brand, and not already a member. None when the
+    group is not in this brand — the Jinja route called `.brand_id` on a
+    missing group and answered 500.
+
+    `channel` is required for the reason every count here takes one (ADR-176
+    point 5); the Jinja preview was hard-coded to email.
+    """
+    group = get_group(db, group_id, brand_id=brand_id)
+    if group is None:
+        return None
+    return find_by_criteria(
+        db, group.brand_id, channel=channel,
+        language=criteria.get("language") or None,
+        status=criteria.get("status") or None,
+        preference_category_id=criteria.get("category_id"),
+        min_preference_score=criteria.get("min_score"),
+        exclude_ids=get_member_recipient_ids(db, group_id, brand_id=brand_id),
+    )
+
+
+def bulk_add_by_criteria(
+    db: Session, group_id: int, *, brand_id: int, channel: str, criteria: dict,
+) -> dict | None:
+    """Pin everyone `criteria_matches` returns. `{matched, added}`, or None
+    when the group is not in this brand. Guarded by `audiences.manage`, not
+    `audiences.pin` (decided 2026-10-02): adding everyone a rule matches
+    reshapes the audience, which the narrow pin grant does not cover."""
+    matches = criteria_matches(db, group_id, brand_id=brand_id, channel=channel, criteria=criteria)
+    if matches is None:
+        return None
+    added = bulk_add_members(db, group_id, [r.id for r in matches], brand_id=brand_id)
+    return {"matched": len(matches), "added": added}

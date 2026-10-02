@@ -9,6 +9,10 @@ from app.audience.models import (
     AudiencePreview,
     PreviewBlock,
     PreviewRecipient,
+    BulkAddByCriteria,
+    BulkAddResult,
+    CriteriaPreview,
+    SuggestedAudienceRequest,
     AudienceGroupMember,
     AudienceRuleBlock,
     AudienceRuleBlockCreate,
@@ -273,3 +277,93 @@ def recalculate(group_id: int, db: Session = Depends(get_db), brand_id: int = De
             ),
         )
     return updated
+
+
+@router.get(
+    "/{group_id}/criteria-preview",
+    response_model=CriteriaPreview,
+    summary="Who ad-hoc criteria would add to this group, on one channel",
+    description=(
+        "Consenting on `channel` for the group's brand and not already members: "
+        "a count and a 20-person sample with their address on that channel. "
+        "`channel` is required (ADR-176 point 5)."
+    ),
+)
+def criteria_preview(
+    group_id: int,
+    channel: str = Query(...),
+    language: str | None = None,
+    status: str | None = None,
+    category_id: int | None = None,
+    min_score: float | None = None,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    from app.recipients.consent import resolve_send_addresses
+
+    if not is_registered(channel):
+        raise HTTPException(status_code=422, detail=f"{channel!r} is not a registered channel.")
+    matches = service.criteria_matches(db, group_id, brand_id=brand_id, channel=channel, criteria={
+        "language": language, "status": status, "category_id": category_id, "min_score": min_score,
+    })
+    if matches is None:
+        raise HTTPException(status_code=404, detail="Audience group not found")
+    sample = matches[:20]
+    addresses = resolve_send_addresses(db, [r.id for r in sample], channel=channel)
+    return CriteriaPreview(channel=channel, count=len(matches), sample=[
+        PreviewRecipient(recipient_id=r.id, external_id=r.external_id, language=r.language,
+                         status=r.status, address=addresses.get(r.id))
+        for r in sample
+    ])
+
+
+@router.post(
+    "/{group_id}/bulk-add",
+    response_model=BulkAddResult,
+    summary="Pin everyone the criteria match (needs audiences.manage)",
+    description=(
+        "Adds every consenting non-member the criteria match on `channel`. "
+        "`audiences.manage`, not `audiences.pin`: a rule that adds hundreds "
+        "reshapes the audience (decided 2026-10-02)."
+    ),
+)
+def bulk_add_by_criteria(
+    group_id: int, payload: BulkAddByCriteria,
+    db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    if not is_registered(payload.channel):
+        raise HTTPException(status_code=422, detail=f"{payload.channel!r} is not a registered channel.")
+    result = service.bulk_add_by_criteria(
+        db, group_id, brand_id=brand_id, channel=payload.channel,
+        criteria=payload.model_dump(exclude={"channel"}),
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Audience group not found")
+    return result
+
+
+@router.post(
+    "/suggested",
+    response_model=AudienceGroup,
+    status_code=201,
+    summary="A suggested audience from a campaign's content categories",
+    description=(
+        "One editable include block per top category of the campaign's content. "
+        "The campaign must be in the working brand (404 otherwise)."
+    ),
+)
+def create_suggested_audience(
+    payload: SuggestedAudienceRequest,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    from app.campaigns.service import get_campaign
+
+    campaign = get_campaign(db, payload.campaign_id, brand_id=brand_id)
+    if campaign is None:
+        raise HTTPException(status_code=404, detail=f"Campaign {payload.campaign_id} not found")
+    try:
+        return service.create_suggested_group_for_campaign(
+            db, campaign.id, campaign.name, brand_id=brand_id)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error))

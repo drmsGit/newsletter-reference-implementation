@@ -117,3 +117,34 @@ class AudiencePreview(BaseModel):
     unreachable_count: int
     dropped_by_stage: dict[str, int]
     sample: list[PreviewRecipient]
+
+
+class AudienceCriteria(BaseModel):
+    """Ad-hoc criteria over recipients (task-50, C11/C12). Every field narrows;
+    none set means everyone consenting on the channel."""
+
+    language: str | None = None
+    status: str | None = None
+    category_id: int | None = None
+    min_score: float | None = None
+
+
+class CriteriaPreview(BaseModel):
+    """Who the criteria would add, on one channel: a count and a sample."""
+
+    channel: str
+    count: int
+    sample: list[PreviewRecipient]
+
+
+class BulkAddByCriteria(AudienceCriteria):
+    channel: str
+
+
+class BulkAddResult(BaseModel):
+    matched: int
+    added: int
+
+
+class SuggestedAudienceRequest(BaseModel):
+    campaign_id: int

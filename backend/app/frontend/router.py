@@ -3304,22 +3304,20 @@ def audience_group_criteria_preview(
     db: Session = Depends(get_db),
 ):
     from fastapi.responses import JSONResponse
-    member_ids = audience_service.get_member_recipient_ids(db, group_id, brand_id=working_brand_id(request, db))
-    cat_id = int(preference_category_id) if preference_category_id else None
-    min_score = float(min_preference_score) if min_preference_score else None
-    matches = audience_service.find_by_criteria(
-        db,
-        # The group's brand, not the viewer's: a preview must count the same
-        # people the resolve will, or it advertises reach the send refuses.
-        audience_service.get_group(db, group_id, brand_id=working_brand_id(request, db)).brand_id,
-        # Email explicitly: this preview renders email addresses below.
-        channel=DEFAULT_CHANNEL,
-        language=language or None,
-        status=status or None,
-        preference_category_id=cat_id,
-        min_preference_score=min_score,
-        exclude_ids=member_ids,
+
+    # The service the JSON criteria-preview uses (task-50, C11). Email, because
+    # this page renders email addresses; another brand's group is now a 404
+    # rather than a 500 from `.brand_id` on a missing group.
+    matches = audience_service.criteria_matches(
+        db, group_id, brand_id=working_brand_id(request, db), channel=DEFAULT_CHANNEL,
+        criteria={
+            "language": language or None, "status": status or None,
+            "category_id": int(preference_category_id) if preference_category_id else None,
+            "min_score": float(min_preference_score) if min_preference_score else None,
+        },
     )
+    if matches is None:
+        return JSONResponse({"detail": "Audience group not found"}, status_code=404)
     preview = matches[:20]
     preview_addresses = resolve_emails(db, [r.id for r in preview])
     return JSONResponse({"count": len(matches), "recipients": [
@@ -3339,23 +3337,17 @@ def audience_group_bulk_add(
     min_preference_score: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    member_ids = audience_service.get_member_recipient_ids(db, group_id, brand_id=working_brand_id(request, db))
-    cat_id = int(preference_category_id) if preference_category_id else None
-    min_score = float(min_preference_score) if min_preference_score else None
-    matches = audience_service.find_by_criteria(
-        db,
-        # The group's brand, not the viewer's: a preview must count the same
-        # people the resolve will, or it advertises reach the send refuses.
-        audience_service.get_group(db, group_id, brand_id=working_brand_id(request, db)).brand_id,
-        # Email explicitly: this preview renders email addresses below.
-        channel=DEFAULT_CHANNEL,
-        language=language or None,
-        status=status or None,
-        preference_category_id=cat_id,
-        min_preference_score=min_score,
-        exclude_ids=member_ids,
+    # The service the JSON bulk-add uses (task-50, C12).
+    result = audience_service.bulk_add_by_criteria(
+        db, group_id, brand_id=working_brand_id(request, db), channel=DEFAULT_CHANNEL,
+        criteria={
+            "language": language or None, "status": status or None,
+            "category_id": int(preference_category_id) if preference_category_id else None,
+            "min_score": float(min_preference_score) if min_preference_score else None,
+        },
     )
-    audience_service.bulk_add_members(db, group_id, [r.id for r in matches], brand_id=working_brand_id(request, db))
+    if result is None:
+        return RedirectResponse("/ui/audience-groups", status_code=303)
     return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
 
 

@@ -444,3 +444,108 @@ def test_event_trace_answers_only_for_the_brand_asked(db, default_brand, foreign
         .filter(DeliveryExecutionDB.send_instance_id == send.id).first())
     assert event_trace(db, [clicked.id], brand_id=default_brand.id).get(clicked.id)
     assert event_trace(db, [clicked.id], brand_id=foreign_brand.id) == {}
+
+
+class TestC11C12C13AudienceCriteria:
+    @pytest.fixture
+    def group(self, db, default_brand):
+        from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB
+        from app.recipients.consent import record_consent
+        from app.recipients.db_models import AddressabilityDB, ConsentEventDB, RecipientDB
+
+        lang = f"lc-{uuid.uuid4().hex[:5]}"
+        people = {}
+        for name, channel in (("email", "email"), ("push", "push"), ("member", "email")):
+            r = RecipientDB(external_id=f"crit-{uuid.uuid4()}", status="active", language=lang)
+            db.add(r); db.flush()
+            record_consent(db, r.id, "opted_in", default_brand.id, channel=channel,
+                           purpose="marketing", source="test", commit=False)
+            db.add(AddressabilityDB(recipient_id=r.id, channel=channel, status="active", is_primary=True,
+                                    value={"email": f"{uuid.uuid4().hex[:6]}@example.invalid"}
+                                    if channel == "email" else {"token": "tok-1", "platform": "apns"}))
+            people[name] = r
+        g = AudienceGroupDB(brand_id=default_brand.id, name=f"crit-{uuid.uuid4().hex[:6]}")
+        db.add(g); db.flush()
+        db.add(AudienceGroupMemberDB(group_id=g.id, recipient_id=people["member"].id))
+        db.commit()
+        yield g, people, lang
+        db.rollback()
+        ids = [p.id for p in people.values()]
+        db.query(AudienceGroupMemberDB).filter(AudienceGroupMemberDB.group_id == g.id).delete()
+        db.query(AudienceGroupDB).filter(AudienceGroupDB.id == g.id).delete()
+        db.query(ConsentEventDB).filter(ConsentEventDB.recipient_id.in_(ids)).delete(synchronize_session=False)
+        db.query(AddressabilityDB).filter(AddressabilityDB.recipient_id.in_(ids)).delete(synchronize_session=False)
+        db.query(RecipientDB).filter(RecipientDB.id.in_(ids)).delete(synchronize_session=False)
+        db.commit()
+
+    def _preview(self, group_id, channel, lang, headers):
+        return client.get(f"/api/audience-groups/{group_id}/criteria-preview",
+                          params={"channel": channel, "language": lang}, headers=headers)
+
+    def test_c11_the_preview_is_per_channel_and_skips_members(self, group):
+        g, people, lang = group
+        with machine([VIEW]) as headers:
+            email = self._preview(g.id, "email", lang, headers).json()
+            push = self._preview(g.id, "push", lang, headers).json()
+        assert [s["recipient_id"] for s in email["sample"]] == [people["email"].id]
+        assert email["sample"][0]["address"].endswith("@example.invalid")
+        assert [s["recipient_id"] for s in push["sample"]] == [people["push"].id]
+        assert push["sample"][0]["address"] == "tok-1"
+
+    def test_c12_bulk_add_pins_the_matches_and_needs_manage(self, db, group):
+        from app.auth.permissions import AUDIENCES_MANAGE, AUDIENCES_PIN
+
+        g, people, lang = group
+        body = {"channel": "email", "language": lang}
+        with machine([VIEW, AUDIENCES_PIN]) as headers:
+            refused = client.post(f"/api/audience-groups/{g.id}/bulk-add", json=body, headers=headers)
+        with machine([VIEW, AUDIENCES_MANAGE]) as headers:
+            added = client.post(f"/api/audience-groups/{g.id}/bulk-add", json=body, headers=headers)
+            after = self._preview(g.id, "email", lang, headers).json()
+        assert refused.status_code == 403, "a pin-only grant could bulk-add by rule"
+        assert added.json() == {"matched": 1, "added": 1}
+        assert after["count"] == 0, "the added recipient is now a member"
+
+    def test_c11_c12_another_brands_group_is_not_found(self, db, foreign_brand):
+        from app.audience.db_models import AudienceGroupDB
+        from app.auth.permissions import AUDIENCES_MANAGE
+
+        g = AudienceGroupDB(brand_id=foreign_brand.id, name=f"crit-f-{uuid.uuid4().hex[:6]}")
+        db.add(g); db.commit()
+        with machine([VIEW, AUDIENCES_MANAGE]) as headers:
+            preview = self._preview(g.id, "email", None, headers)
+            add = client.post(f"/api/audience-groups/{g.id}/bulk-add", json={"channel": "email"},
+                              headers=headers)
+        assert preview.status_code == 404 and add.status_code == 404
+
+    def test_c13_a_suggested_audience_is_built_only_in_the_brand(self, db, default_brand, foreign_brand):
+        from app.audience.db_models import AudienceGroupDB, AudienceRuleBlockDB
+        from app.auth.permissions import AUDIENCES_MANAGE
+
+        own = CampaignDB(brand_id=default_brand.id, name=f"sugg-{uuid.uuid4().hex[:6]}")
+        foreign = CampaignDB(brand_id=foreign_brand.id, name=f"sugg-f-{uuid.uuid4().hex[:6]}")
+        db.add_all([own, foreign]); db.commit()
+        created = None
+        try:
+            with machine([VIEW, AUDIENCES_MANAGE]) as headers:
+                ok = client.post("/api/audience-groups/suggested", json={"campaign_id": own.id}, headers=headers)
+                refused = client.post("/api/audience-groups/suggested", json={"campaign_id": foreign.id},
+                                      headers=headers)
+            assert refused.status_code == 404
+            assert ok.status_code in (201, 409), ok.text  # 409: the campaign has no content to suggest from
+            if ok.status_code == 201:
+                created = ok.json()["id"]
+        finally:
+            if created:
+                db.query(AudienceRuleBlockDB).filter(AudienceRuleBlockDB.group_id == created).delete()
+                db.query(AudienceGroupDB).filter(AudienceGroupDB.id == created).delete()
+            db.query(CampaignDB).filter(CampaignDB.id == own.id).delete()
+            db.commit()
+
+
+def test_bulk_add_is_priced_as_audiences_manage():
+    """ADR-166 point 2: adding by rule reshapes the audience; pin is for one person."""
+    from app.auth.permissions import AUDIENCES_MANAGE
+    from app.auth.policy import required_permission
+
+    assert required_permission("POST", "/api/audience-groups/{group_id}/bulk-add") == AUDIENCES_MANAGE
