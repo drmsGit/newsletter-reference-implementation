@@ -179,6 +179,60 @@ migrations, applied in order, produce the models' schema" still holds for an
 empty database. What changes is that every real database is now checked against
 the models each time a migration is applied to it.
 
+## Addendum 2026-10-02 — under `--reload`, a pending migration stops the server silently
+
+Prompted by the development server going unresponsive on 2026-10-02, recorded
+by the user's decision of the same day as a cost of point 3. Points 1 to 7 and
+the 2026-09-29 addendum stand as written. No code changes.
+
+**What happened.** The development server runs as `uvicorn main:app --reload`
+(`.claude/launch.json`, and the user's own terminal). Under `--reload`, uvicorn
+runs a supervisor process that holds the port and a worker process that serves;
+every change to a watched `.py` file restarts the worker. On 2026-10-01 a new
+migration, `backend/scripts/migrate_0026_login_code_kdf.sql` (task-35), was
+written, and Python files were edited before it was applied. The reload
+restarted the worker, `assert_no_pending_migrations` in `backend/main.py`
+raised `PendingMigrations`, and the worker did not start. The supervisor kept
+holding port 8000 with no worker behind it. After the migration was applied,
+the remaining edits were Markdown, which uvicorn does not watch, so nothing
+restarted the worker.
+
+**The next day `/docs` and the Jinja UI did not load.** Connections were
+accepted and never answered: requests timed out after 5 seconds with no status.
+The supervisor had been up 2½ days, and its only child was Python's
+multiprocessing resource tracker. The refusal itself was visible only in the
+terminal that had started the server, as a traceback ending in
+`app.schema_migrations.PendingMigrations: Migrations are pending, and the
+application will not start against a database that is behind its models
+(ADR-181): migrate_0026_login_code_kdf.sql … Apply them with: venv/bin/python
+scripts/migrate.py --apply`. Two packages removed from the virtualenv by another
+session at about the same time, `httpx2` and `truststore`, were ruled out: nothing
+imports either.
+
+**1. Under `--reload`, a pending migration stops the development server
+silently.** The refusal is correct, and it stays: this is point 3 working. In
+reload mode, though, it does not look like a refusal. The port stays open,
+requests hang rather than fail, and the reason is printed once, in whichever
+terminal started the server. This is a cost of point 3 that the record did not
+name.
+
+**2. In a reload session, apply a new migration before editing any further
+Python.** Writing a migration file is safe on its own, because uvicorn does not
+watch `.sql`. It is the next `.py` edit that restarts the worker into the
+refusal.
+
+**3. Recovery is two steps: apply, then restart the worker.** Run
+`migrate.py --apply`, then make the supervisor start a new worker. Touching any
+watched `.py` file is enough (`touch backend/main.py`), and restarting the
+server also works. Done that way on 2026-10-02, `/ui/login`, `/docs` and
+`/openapi.json` returned 200 immediately.
+
+**4. Nothing else changes.** The refusal is the intended behaviour. Making
+startup warn instead of refuse would reopen the failure this record exists to
+prevent; point 3 already says why a warning would go unread. A louder signal,
+such as writing the refusal to a log file, was offered to the user and not
+chosen.
+
 ## Related ADRs
 
 ### Depends On
