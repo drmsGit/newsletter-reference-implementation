@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-27 13:56'
-updated_date: '2026-10-02 12:08'
+updated_date: '2026-10-02 12:12'
 labels:
   - backend
 dependencies: []
@@ -27,4 +27,6 @@ ordinal: 200300
 Migrated 2026-09-27 from `docs/backlog.md` line 148, section "Features", position 3 in that section (top = do next). The description is the original entry, verbatim.
 
 2026-10-02 audit (subagent sweep, code read for the security items only): the three rules the entry names are already fixed — brand reads (ADR-172, brand_id keyword-only), channel_available (campaigns/service.py), _may_decide (approvals.service.may_decide). Still router-only, ranked: B2/C6/C9/B14 cross-brand duplicate authorisation; B18 push fields written only when non-empty (ADR-161 readiness) vs JSON POST /content/; C14 integrations credentials (secret shown once); B5-B8/C3/C4 settings validation (with C2); task-57 graph brand filter + B26 recipient_count. No guard test exists against new logic landing in frontend/router.py. DONE in this pass: B2/C6/C9 — duplication.require_target_access etc. in campaigns/duplication.py, request.state.principal in the JSON guard, POST /campaigns/{id}/duplicate and POST /content/{id}/duplicate; machines allowed where they hold the grant (user decision). 8 new tests in tests/test_duplication.py, five mutants caught; suite 808 passed. NOT done: B14 (JSON read of which target brands/modes are offered; the SPA would reimplement it). Next: B18, then C14.
+
+2026-10-02: B18 done. content.service.without_empty_presence_fields (empty/whitespace push fields removed, kept values stripped; email fields and unknown keys untouched) is applied inside create_content and update_content_record, so POST /content/ AND PUT /content/{id} hold the ADR-161 readiness rule — PUT had the same defect, unnamed by the entry. tests/test_content_presence.py (8 tests, mutation-checked: create/update unguarded, no-strip, email swept). Jinja form's own loop left in place (redundant, harmless). Suite 816 passed. Remaining: C14 integrations credentials, B14, settings validation with C2, task-57/B26, the freeze guard.
 <!-- SECTION:NOTES:END -->

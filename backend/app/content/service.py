@@ -140,6 +140,36 @@ def content_field_groups() -> dict[str, tuple[str, ...]]:
 PRESENCE_SIGNIFICANT_GROUPS = frozenset({"push"})
 
 
+def without_empty_presence_fields(content: dict | None) -> dict:
+    """`content` with every empty presence-significant field removed (task-50, B18).
+
+    The write-side half of `PRESENCE_SIGNIFICANT_GROUPS`. `merge_content_fields`
+    holds the rule for a partial edit; this holds it for a record written
+    whole — `create_content` and `update_content_record`, which `POST /content/`
+    and `PUT /content/{id}` reach with the client's dict verbatim. Until
+    2026-10-02 the rule was enforced only by the Jinja form's own loop, so a
+    JSON client posting `"push_title": ""` made the record look push-ready
+    (ADR-161 point 7's rider) and the Jinja UI's deletion would have taken the
+    only enforcement with it.
+
+    Values are stripped when kept, as the merge does. Keys in no group are
+    untouched; the input is not mutated.
+    """
+    cleaned = dict(content or {})
+    known = content_field_groups()
+    for group in PRESENCE_SIGNIFICANT_GROUPS:
+        for name in known.get(group, ()):
+            if name not in cleaned:
+                continue
+            value = cleaned[name]
+            text = value.strip() if isinstance(value, str) else value
+            if not text:
+                cleaned.pop(name)
+            else:
+                cleaned[name] = text
+    return cleaned
+
+
 def catalogue_fields() -> list[dict]:
     """Every field a content record can usefully carry, with its definition.
 
@@ -234,7 +264,7 @@ def update_content_record(
         return None
     record.title = title
     record.description = description
-    record.content = content
+    record.content = without_empty_presence_fields(content)
     db.commit()
     db.refresh(record)
     return to_content_record(record)
@@ -433,7 +463,7 @@ def create_content(
     record = ContentRecordDB(
         title=title,
         description=description,
-        content=content,
+        content=without_empty_presence_fields(content),
         status="active",
         brand_id=brand_id,
     )
