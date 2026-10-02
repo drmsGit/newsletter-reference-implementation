@@ -35,7 +35,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.db_models import BrandDB
 from app.auth.permissions import CAMPAIGNS_MANAGE, CONTENT_MANAGE, OVERRIDES_MANAGE
-from app.auth.service import has_permission, list_brands
+from app.auth.service import actor_label, has_permission, list_brands
 from app.campaigns.db_models import (
     CampaignDB,
     DecisionSlotDB,
@@ -370,7 +370,7 @@ def duplicate_campaign(
         db, principal, brand_id=target_brand_id, content_mode=content_mode,
         variant_ids=[v.id for v in variants], enforced=enforced,
     )
-    actor = override_author(principal)
+    actor = actor_label(principal)
 
     campaign = CampaignDB(name=clean_name, status="draft", brand_id=target_brand_id)
     db.add(campaign)
@@ -475,7 +475,7 @@ def duplicate_variant(
         db, source, campaign_id=target.id,
         name=_clamp(name or "") or f"{source.name} (copy)"[:_NAME_LIMIT],
         content_mode=mode, target_brand_id=brand_id, report=report,
-        actor=override_author(principal),
+        actor=actor_label(principal),
     )
     db.commit()
     report.variant_id = variant.id
@@ -597,24 +597,6 @@ def _copy_variant_into(
                 f"{source_variant.name} → module {index} ({source_module.module_type}): {key}"
             )
     return variant
-
-
-def override_author(principal) -> str:
-    """Who a carried override is attributed to: **the person duplicating**.
-
-    Not the original author — carrying that name forward would attribute an
-    act they did not perform, in a campaign they may not know exists
-    (task-113). Taken from the authenticated principal and never from a
-    request body, so it cannot be asserted.
-    """
-    from app.auth.db_models import IntegrationDB, UserDB
-
-    if isinstance(principal, UserDB):
-        return principal.email
-    if isinstance(principal, IntegrationDB):
-        return f"integration:{principal.name}"[:255]
-    # Access control is off: nobody is signed in, so nobody can be named.
-    return "duplication (access control off)"
 
 
 def _carried_override_count(db: Session, variant_ids: list[int]) -> int:

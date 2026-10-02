@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 from app.database import get_db
 from app.auth.service import (
     SESSION_COOKIE,
-    list_brands, safe_next, set_session_brand, user_for_token,
+    actor_label, list_brands, safe_next, set_session_brand, user_for_token,
 )
 from app.auth.dependencies import require_permission
 from app.auth.permissions import (
@@ -1660,9 +1660,13 @@ def content_override_create(
             ContentOverrideCreate(
                 module_instance_id=module_instance_id,
                 field_overrides=field_overrides,
-                overridden_by="manager@example.com",
                 reason=reason.strip() or None,
             ),
+            # Both were missing (task-243): the author was a hardcoded
+            # placeholder, and brand_id has been required since 2026-09-20,
+            # so this form raised TypeError until then and now.
+            brand_id=working_brand_id(request, db),
+            author=actor_label(user_for_token(db, request.cookies.get(SESSION_COOKIE))),
         )
     except ValueError as error:
         return RedirectResponse(

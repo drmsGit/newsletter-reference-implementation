@@ -5622,7 +5622,13 @@ export interface components {
              */
             created_at: string;
         };
-        /** ContentOverrideCreate */
+        /**
+         * ContentOverrideCreate
+         * @description Create an override. **There is no author field** (task-243): who
+         *     overrode is the authenticated caller, set by the server. A body that still
+         *     sends `overridden_by` is not refused -- unknown fields are ignored -- and
+         *     the value is never stored.
+         */
         ContentOverrideCreate: {
             /** Module Instance Id */
             module_instance_id: number;
@@ -5634,8 +5640,6 @@ export interface components {
             system_content_record_id?: number | null;
             /** Send Instance Id */
             send_instance_id?: number | null;
-            /** Overridden By */
-            overridden_by: string;
             /** Reason */
             reason?: string | null;
         };

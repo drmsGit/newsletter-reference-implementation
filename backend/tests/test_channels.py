@@ -766,9 +766,8 @@ class TestEachChannelRendersItsOwnShape:
         create_content_override(db, ContentOverrideCreate(
             module_instance_id=module.id,
             field_overrides={"push_title": "Overridden title"},
-            overridden_by="test",
         ),
-            brand_id=brand_of_variant(db, variant.id))
+            brand_id=brand_of_variant(db, variant.id), author="test")
         artifact = render_variant(db, variant.id, mode="preview")
         assert artifact.fields["push_title"] == "Overridden title", (
             "the override layer did not reach a push field — push is resolving "

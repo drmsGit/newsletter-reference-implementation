@@ -377,3 +377,90 @@ class TestASlotNeverWearsAnOverride:
         finally:
             db.rollback()
             db.close()
+
+
+class TestTheAuthorIsTheCaller:
+    """task-243: who overrode is a fact the server knows, not one the caller states.
+
+    ADR-040/041 make an override the record of a person deviating from the
+    system's pick, and `outcome_delta` (task-114) is meant to judge that
+    deviation later. A record of *who* that the deviator types themselves
+    answers nothing. Same class as the consent-through-the-payload hole gate 3
+    closed on `POST /recipients/`.
+    """
+
+    def test_over_json_a_claimed_author_is_ignored(self, static_module):
+        from tests.machine import TAG
+
+        module_id, field = static_module
+        response = client.post("/overrides/", json={
+            "module_instance_id": module_id,
+            "field_overrides": {field: "Claimed"},
+            "overridden_by": "ceo@example.invalid",
+        })
+        assert response.status_code == 200, response.text
+        try:
+            author = response.json()["overridden_by"]
+            assert author != "ceo@example.invalid", "the body named the author"
+            assert author.startswith(f"integration:{TAG}-"), author
+        finally:
+            _delete_override(response.json()["id"])
+
+    def test_through_the_jinja_page_it_is_the_signed_in_user(self, static_module):
+        """Also the regression for the form itself: from 2026-09-20 (ADR-172
+        stage 6 made `brand_id` required) until this fix it raised TypeError
+        before writing anything, and nothing tested the route."""
+        import uuid
+
+        from app.auth import service as auth
+        from app.auth.db_models import RoleAssignmentDB, RoleDB, SessionDB, UserDB
+        from app.auth.permissions import MANAGER
+        from app.campaigns.service import brand_of_variant
+
+        module_id, field = static_module
+        db = SessionLocal()
+        user = UserDB(email=f"ovr-{uuid.uuid4().hex[:10]}@example.invalid", is_active=True)
+        db.add(user)
+        db.commit()
+        try:
+            module = db.get(ModuleInstanceDB, module_id)
+            variant = db.get(VariantDB, module.variant_id)
+            brand_id = brand_of_variant(db, variant.id)
+            role = db.query(RoleDB).filter(RoleDB.key == MANAGER).one()
+            db.add(RoleAssignmentDB(user_id=user.id, role_id=role.id, brand_id=brand_id))
+            db.commit()
+            token = auth.create_session(db, user)
+            auth.set_session_brand(db, token, brand_id)
+            browser = TestClient(app, follow_redirects=False)
+            browser.cookies.set(auth.SESSION_COOKIE, token)
+
+            page = browser.post(
+                f"/ui/campaigns/{variant.campaign_id}/variants/{variant.id}/overrides",
+                data={
+                    "module_instance_id": module_id,
+                    "field_overrides_json": f'{{"{field}": "From the page"}}',
+                    "reason": "",
+                    "csrf_token": auth.csrf_token_for(token),
+                },
+            )
+            assert page.status_code == 303, page.text[:300]
+            assert "error=" not in page.headers["location"], page.headers["location"]
+            row = (
+                db.query(ContentOverrideDB)
+                .filter(ContentOverrideDB.module_instance_id == module_id,
+                        ContentOverrideDB.active.is_(True))
+                .one()
+            )
+            assert row.overridden_by == user.email
+        finally:
+            db.rollback()
+            db.query(ContentOverrideDB).filter(
+                ContentOverrideDB.module_instance_id == module_id).delete()
+            db.query(SessionDB).filter(SessionDB.user_id == user.id).delete()
+            db.query(RoleAssignmentDB).filter(RoleAssignmentDB.user_id == user.id).delete()
+            from app.audit.db_models import AuditEventDB
+            db.query(AuditEventDB).filter(AuditEventDB.actor_id == user.id).delete(
+                synchronize_session=False)
+            db.query(UserDB).filter(UserDB.id == user.id).delete()
+            db.commit()
+            db.close()

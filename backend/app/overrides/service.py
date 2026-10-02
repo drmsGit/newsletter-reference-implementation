@@ -87,8 +87,10 @@ def _validate_field_overrides(manifest, module: ModuleInstanceDB, field_override
 
 
 def create_content_override(
-    db: Session, data: ContentOverrideCreate, *, brand_id: int
+    db: Session, data: ContentOverrideCreate, *, brand_id: int, author: str
 ) -> ContentOverrideDB:
+    """`author` is required and comes from the caller's principal
+    (`auth.service.actor_label`), never from `data` -- task-243."""
     from app.campaigns.service import get_module
 
     module = get_module(db, data.module_instance_id, brand_id=brand_id)
@@ -112,7 +114,7 @@ def create_content_override(
         field_overrides=data.field_overrides,
         system_content_record_id=data.system_content_record_id,
         send_instance_id=data.send_instance_id,
-        overridden_by=data.overridden_by,
+        overridden_by=author,
         reason=data.reason,
         active=True,
     )

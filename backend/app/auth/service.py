@@ -933,6 +933,23 @@ def _session_user(db: Session, token: str | None, *, touch: bool) -> UserDB | No
     return user
 
 
+def actor_label(principal) -> str:
+    """How a principal is named where a record stores its actor as text —
+    `content_overrides.overridden_by` (task-243, task-113).
+
+    **Always derived from the authenticated principal, never from a request
+    body**, so it cannot be asserted: a user's email, `integration:<name>` for
+    a machine caller, and a fixed label when access control is off and nobody
+    is signed in to name. Text rather than an actor reference, decided
+    2026-10-02: `audit_events` keeps the id-based record of the same act
+    (ADR-153), so this is the readable copy, not the authority.
+    """
+    if isinstance(principal, UserDB):
+        return principal.email
+    if isinstance(principal, IntegrationDB):
+        return f"integration:{principal.name}"[:255]
+    return "unauthenticated (access control off)"
+
 def user_for_token(db: Session, token: str | None) -> UserDB | None:
     """Resolve a session cookie to a user, enforcing both expiries.
 

@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import working_brand
+from app.auth.dependencies import request_principal, working_brand
+from app.auth.service import actor_label
 from app.database import get_db
 from app.overrides.models import ContentOverride, ContentOverrideCreate, OutcomeDeltaUpdate
 from app.overrides.service import (
@@ -16,9 +17,15 @@ router = APIRouter(prefix="/overrides", tags=["overrides"])
 
 
 @router.post("/", response_model=ContentOverride)
-def create(data: ContentOverrideCreate, db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
+def create(
+    data: ContentOverrideCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
     try:
-        return create_content_override(db, data, brand_id=brand_id)
+        return create_content_override(
+            db, data, brand_id=brand_id, author=actor_label(request_principal(request)))
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
 
