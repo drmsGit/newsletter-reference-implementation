@@ -42,6 +42,22 @@ class SendInstance(BaseModel):
     excluded_count: int = 0
 
 
+class SendPlanRequest(BaseModel):
+    """Plan a send from a snapshot and an audience group (task-49, C8).
+
+    The JSON twin of the Jinja plan form. No `audience_resolution_mode`: every
+    send re-resolves its audience before it fires (ADR-176 point 4), so there
+    is nothing to choose.
+    """
+
+    name: str
+    audience_group_id: int
+    provider: str = "mock"
+    from_address: str | None = None
+    # Omitted: a draft, fired later by hand. Given: status "scheduled".
+    scheduled_at: datetime | None = None
+
+
 class SendInstanceDetail(SendInstance):
     """One send, and what explains the gap between what it planned and what
     it sent — the Manager Workflow interview's question 5.5.

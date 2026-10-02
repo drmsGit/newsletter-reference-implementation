@@ -13,6 +13,7 @@ from app.delivery.models import (
     SendInstance,
     SendInstanceCreate,
     SendInstanceDetail,
+    SendPlanRequest,
 )
 from app.delivery.service import (
     send_test_email,
@@ -23,6 +24,7 @@ from app.delivery.service import (
     list_send_instances_for_snapshot,
     send_instance_detail,
     send_send_instance,
+    prepare_send_from_audience,
     process_due_scheduled_sends
 )
 
@@ -88,6 +90,45 @@ def create_send_instance_record(
         scheduled_at=payload.scheduled_at,
         brand_id=brand_id,
     )
+
+
+@router.post(
+    "/snapshots/{snapshot_id}/send-instances",
+    response_model=SendInstance,
+    status_code=201,
+    summary="Plan a send: resolve an audience into a send and its executions",
+    description=(
+        "The JSON twin of the UI plan form. Resolves the audience group to its "
+        "consenting recipients now and creates the send (`draft`, or `scheduled` "
+        "when `scheduled_at` is given) with one execution per recipient. "
+        "Nothing is sent; fire it with `POST /delivery/send-instances/{id}/send`. "
+        "Refused with 409 when the audience resolves to nobody or to more than "
+        "the send cap, 404 when the snapshot or audience is not in the working "
+        "brand. **Not idempotent:** a retried request plans a second send."
+    ),
+)
+def plan_send(
+    snapshot_id: int,
+    payload: SendPlanRequest,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    try:
+        return prepare_send_from_audience(
+            db,
+            snapshot_id=snapshot_id,
+            name=payload.name,
+            audience_group_id=payload.audience_group_id,
+            provider=payload.provider,
+            from_address=(payload.from_address or "").strip() or None,
+            scheduled_at=payload.scheduled_at,
+            brand_id=brand_id,
+        )
+    except ValueError as error:
+        # The service refuses with ValueError throughout; "not found" is the
+        # brand boundary (another brand's row and a missing one answer alike).
+        missing = str(error).endswith("not found")
+        raise HTTPException(status_code=404 if missing else 409, detail=str(error))
 
 
 @router.get(

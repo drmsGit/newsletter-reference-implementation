@@ -4,6 +4,7 @@ title: the gaps that block the first React screen.
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-10-02 07:15'
 labels:
   - backend
 dependencies: []
@@ -21,4 +22,6 @@ ordinal: 200200
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 146, section "Features", position 2 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-02: C8 done. POST /delivery/snapshots/{snapshot_id}/send-instances (backend/app/delivery/router.py plan_send, SendPlanRequest in models.py), tests/test_send_plan_api.py (10 tests, mutation-checked) plus a policy pair in tests/test_auth_policy.py. Rides the existing /delivery/ -> sends.plan entry. Refusals: 404 for a snapshot/audience not in the brand, 409 for an empty or over-cap audience. Not idempotent (ADR-142 §10). C2 (settings/AI routers) remains and is blocked on decisions: settings.manage vs ai.run for prompt publish/model choice, whether settings writes become approvable (ADR-142 §10), channel availability exposure. Found on the way: task-239 (NameError in the two Jinja send routes), fixed.
 <!-- SECTION:NOTES:END -->

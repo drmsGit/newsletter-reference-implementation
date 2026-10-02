@@ -71,6 +71,14 @@ class TestSpecificityOrdering:
         route = "/ui/campaigns/{campaign_id}/snapshots/{snapshot_id}/send-instances"
         assert required_permission("POST", route) == SENDS_PLAN
 
+    def test_planning_a_send_as_json_is_a_send_action(self):
+        # The JSON twin of the form above (task-49, C8). It rides the broad
+        # `/delivery/` entry; this pins that it neither needs a narrower entry
+        # nor has slid into `sends.execute` — planning mails nobody.
+        assert required_permission(
+            "POST", "/delivery/snapshots/{snapshot_id}/send-instances"
+        ) == SENDS_PLAN
+
     def test_firing_a_send_wins_over_the_prefix_that_prepares_one(self):
         """The ordering that matters most in the whole table.
 
