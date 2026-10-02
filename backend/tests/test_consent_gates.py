@@ -115,7 +115,7 @@ def _make_recipient(db, consent_status, email=None, language=None):
         ensure_default_brand(db).id,
         source="test",
         note="test_consent_gates fixture",
-        commit=False,
+        commit=False, purpose="marketing",
     )
     db.flush()
     return recipient
@@ -268,6 +268,9 @@ def db():
                 recipient_id=recipient.id,
                 status="created",
                 provider="mock",
+                # The email consent gate is what this file tests.
+                channel="email",
+                purpose="marketing",
             )
             self.session.add(execution)
             self.session.flush()
@@ -287,6 +290,9 @@ def db():
                 recipient_id=recipient.id,
                 status="created",
                 provider="mock",
+                # The email consent gate is what this file tests.
+                channel="email",
+                purpose="marketing",
             )
             self.session.add(execution)
             self.session.flush()
@@ -409,7 +415,7 @@ class TestGateB_ChannelDecidesWhoIsInTheAudience:
             source="test",
             channel="push",
             note="channel-scoping test",
-            commit=False,
+            commit=False, purpose="marketing",
         )
         db.pin(group, recipient)
         db.session.commit()
@@ -597,7 +603,7 @@ class TestConsentEventsAndDrift:
         before = _event_count(db.session, recipient.id)
 
         sync_consent_from_crm(
-            db.session, recipient.external_id, "opted_in", _brand(db.session), note="test"
+            db.session, recipient.external_id, "opted_in", _brand(db.session), note="test", purpose="marketing"
         )
 
         assert _event_count(db.session, recipient.id) == before + 1, (
@@ -611,7 +617,7 @@ class TestConsentEventsAndDrift:
         recipient = db.recipient("opted_in")
         db.session.commit()
         sync_consent_from_crm(
-            db.session, recipient.external_id, "opted_in", _brand(db.session), note="test"
+            db.session, recipient.external_id, "opted_in", _brand(db.session), note="test", purpose="marketing"
         )
 
         assert _drift_for(db.session, recipient.id) == []
@@ -620,10 +626,10 @@ class TestConsentEventsAndDrift:
         recipient = db.recipient("opted_in")
         db.session.commit()
         sync_consent_from_crm(
-            db.session, recipient.external_id, "opted_in", _brand(db.session), note="test"
+            db.session, recipient.external_id, "opted_in", _brand(db.session), note="test", purpose="marketing"
         )
 
-        assert suppress_recipient(db.session, recipient.id, _brand(db.session), reason="hard_bounce")
+        assert suppress_recipient(db.session, recipient.id, _brand(db.session), reason="hard_bounce", purpose="marketing")
 
         drift = _drift_for(db.session, recipient.id)
         assert len(drift) == 1, (
@@ -643,27 +649,27 @@ class TestConsentEventsAndDrift:
         recipient = db.recipient("opted_in")
         db.session.commit()
 
-        assert suppress_recipient(db.session, recipient.id, _brand(db.session), reason="hard_bounce")
+        assert suppress_recipient(db.session, recipient.id, _brand(db.session), reason="hard_bounce", purpose="marketing")
         assert not suppress_recipient(
-            db.session, recipient.id, _brand(db.session), reason="hard_bounce"
+            db.session, recipient.id, _brand(db.session), reason="hard_bounce", purpose="marketing"
         ), "a repeat bounce wrote a second opt-out event"
 
     def test_crm_reassertion_clears_drift_and_reopens_the_gate(self, db):
         recipient = db.recipient("opted_in")
         db.session.commit()
         sync_consent_from_crm(
-            db.session, recipient.external_id, "opted_in", _brand(db.session), note="test"
+            db.session, recipient.external_id, "opted_in", _brand(db.session), note="test", purpose="marketing"
         )
-        suppress_recipient(db.session, recipient.id, _brand(db.session), reason="hard_bounce")
+        suppress_recipient(db.session, recipient.id, _brand(db.session), reason="hard_bounce", purpose="marketing")
         assert _drift_for(db.session, recipient.id)
 
         # The CRM asserts again — the person re-subscribed, say.
         sync_consent_from_crm(
-            db.session, recipient.external_id, "opted_in", _brand(db.session), note="test"
+            db.session, recipient.external_id, "opted_in", _brand(db.session), note="test", purpose="marketing"
         )
 
         assert _drift_for(db.session, recipient.id) == []
-        assert is_consenting(db.session, recipient.id, _brand(db.session)), (
+        assert is_consenting(db.session, recipient.id, _brand(db.session), purpose="marketing"), (
             "the newest event is the CRM's opt-in, so it must be back in force "
             "— latest wins, per cell"
         )
@@ -678,14 +684,14 @@ class TestConsentEventsAndDrift:
             ensure_default_brand(db.session).id,
             source="test",
             channel="push",
-            commit=False,
+            commit=False, purpose="marketing",
         )
         db.session.commit()
 
-        suppress_recipient(db.session, recipient.id, _brand(db.session), reason="hard_bounce")
+        suppress_recipient(db.session, recipient.id, _brand(db.session), reason="hard_bounce", purpose="marketing")
 
-        assert not is_consenting(db.session, recipient.id, _brand(db.session), channel="email")
-        assert is_consenting(db.session, recipient.id, _brand(db.session), channel="push"), (
+        assert not is_consenting(db.session, recipient.id, _brand(db.session), channel="email", purpose="marketing")
+        assert is_consenting(db.session, recipient.id, _brand(db.session), channel="push", purpose="marketing"), (
             "an email bounce withdrew push consent — consent is per "
             "(channel, purpose) and a failure on one says nothing about another"
         )
@@ -734,7 +740,7 @@ class TestSendTimeConsentRevocation:
             ensure_default_brand(db.session).id,
             source="test",
             note="withdrew after the send was planned",
-            commit=False,
+            commit=False, purpose="marketing",
         )
         db.session.commit()
 
@@ -799,7 +805,7 @@ class TestSendTimeConsentRevocation:
         send_instance, execution = db.send_to(recipient)
         record_consent(
             db.session, recipient.id, "opted_out",
-            ensure_default_brand(db.session).id, source="test", commit=False,
+            ensure_default_brand(db.session).id, source="test", commit=False, purpose="marketing",
         )
         db.session.commit()
 

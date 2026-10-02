@@ -249,7 +249,7 @@ class TestExcludeBeatsPin:
         db.commit()
         record_consent(
             db, recipient.id, "opted_in", group.brand_id,
-            channel="email", source="test",
+            channel="email", source="test", purpose="marketing",
         )
         service.add_member(db, group.id, recipient.id, brand_id=group.brand_id)
         try:
@@ -338,7 +338,7 @@ class TestExclusionReachesTheUnaddressable:
         db.refresh(recipient)
         record_consent(
             db, recipient.id, "opted_in", group.brand_id,
-            channel="email", source="test",
+            channel="email", source="test", purpose="marketing",
         )
         service.add_member(db, group.id, recipient.id, brand_id=group.brand_id)
         try:
@@ -403,7 +403,7 @@ class TestPushCriteriaAskAboutPush:
         db.commit()
         record_consent(
             db, recipient.id, "opted_in", group.brand_id,
-            channel="push", source="test",
+            channel="push", source="test", purpose="marketing",
         )
         try:
             yield recipient, language

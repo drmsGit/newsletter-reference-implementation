@@ -49,7 +49,7 @@ def world(db, default_brand, temp_brand):
         db.flush()
         for brand, channel in consents:
             record_consent(db, recipient.id, "opted_in", brand.id, channel=channel,
-                           source="test", note="graph", commit=False)
+                           source="test", note="graph", commit=False, purpose="marketing")
         db.add(SignalContributionDB(recipient_id=recipient.id, category_id=category.id,
                                     contribution_type="manual", base_weight=weight))
         return recipient

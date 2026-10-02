@@ -46,7 +46,6 @@ from sqlalchemy.orm import Session
 
 from app.recipients.consent import (
     DEFAULT_CHANNEL,
-    DEFAULT_PURPOSE,
     is_consenting_filter,
     resolve_send_addresses,
 )
@@ -100,7 +99,7 @@ def run_exclusion_stack(
     brand_id: int,
     *,
     channel: str = DEFAULT_CHANNEL,
-    purpose: str = DEFAULT_PURPOSE,
+    purpose: str,
 ) -> ExclusionStackResult:
     """Run the four stages over a set of recipients.
 
@@ -187,7 +186,7 @@ def run_exclusion_stack(
             for row in db.query(RecipientDB.id)
             .filter(
                 RecipientDB.id.in_(sorted(surviving)),
-                is_consenting_filter(brand_id, channel, purpose),
+                is_consenting_filter(brand_id, channel, purpose=purpose),
             )
             .all()
         }

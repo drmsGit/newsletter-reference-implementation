@@ -206,7 +206,8 @@ def test_the_engagement_path_records_the_executions_channel(db):
                           provider="mock")
     db.add(send); db.flush()
     execution = DeliveryExecutionDB(send_instance_id=send.id, recipient_id=recipient.id,
-                                    status="sent", provider="mock", channel="push")
+                                    status="sent", provider="mock", channel="push",
+                                    purpose="marketing")
     db.add(execution); db.commit(); db.refresh(execution)
     # The content record travels in the event's data, not on the execution —
     # `apply_event_to_signals` reads it from there.

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB, AudienceRuleBlockDB
 from app.recipients.db_models import RecipientDB
-from app.recipients.consent import DEFAULT_CHANNEL, is_consenting_filter, resolve_emails
+from app.recipients.consent import DEFAULT_CHANNEL, MARKETING, is_consenting_filter, resolve_emails
 from app.insight.signals import operational_signals_for_category
 
 logger = logging.getLogger(__name__)
@@ -272,7 +272,7 @@ def find_by_criteria(
     # as `resolve_audience`'s own channel default (ADR-176 addendum
     # 2026-09-27), one layer further in, which is why `channel` is required
     # here too rather than defaulted for convenience.
-    q = db.query(RecipientDB).filter(is_consenting_filter(brand_id, channel))
+    q = db.query(RecipientDB).filter(is_consenting_filter(brand_id, channel, purpose=MARKETING))
 
     if language:
         q = q.filter(RecipientDB.language == language)
@@ -553,7 +553,7 @@ def preview_group(
         })
 
     resolved = resolve_audience(db, group.id, channel=channel)
-    gate = run_exclusion_stack(db, {r.id for r in resolved}, group.brand_id, channel=channel)
+    gate = run_exclusion_stack(db, {r.id for r in resolved}, group.brand_id, channel=channel, purpose=MARKETING)
     reachable = [r for r in resolved if r.id in gate.eligible]
     dropped_by_stage: dict[str, int] = {}
     for exclusion in gate.exclusions:
@@ -663,7 +663,7 @@ def resolve_audience(
         .filter(
             RecipientDB.id.in_(final_ids),
             # Consent floor, for THIS brand AND this channel.
-            is_consenting_filter(brand_id, channel),
+            is_consenting_filter(brand_id, channel, purpose=MARKETING),
         )
         .order_by(RecipientDB.id.asc())
         .all()

@@ -1352,8 +1352,8 @@ class TestAPushSendGoesOutAsAPush:
                 recipient_id=recipient.id, channel="email",
                 value={"email": f"{_name('a')}@example.invalid"}))
         db.commit()
-        record_consent(db, recipient.id, "opted_in", brand.id, channel="push", source="test")
-        record_consent(db, recipient.id, "opted_in", brand.id, channel="email", source="test")
+        record_consent(db, recipient.id, "opted_in", brand.id, channel="push", source="test", purpose="marketing")
+        record_consent(db, recipient.id, "opted_in", brand.id, channel="email", source="test", purpose="marketing")
         return recipient
 
     def _plan(self, db, brand, variant, recipients):
@@ -1387,6 +1387,34 @@ class TestAPushSendGoesOutAsAPush:
             f"executions were planned as {channels} — the column defaulted to "
             "email for every send ever made, and an inbound bounce weeks later "
             "has only this row to say which channel it was about"
+        )
+
+    def test_a_recipient_added_by_re_resolution_is_planned_as_a_push_too(self, db):
+        """Found 2026-10-02 while working task-42. Every send re-resolves its
+        audience just before it fires (ADR-176 point 4) and adds an execution
+        for each newly-matching recipient. That resolution asked the right
+        channel; the execution it added took the column defaults — channel
+        'email', purpose 'marketing' — so a push send's late joiner was planned
+        as an email."""
+        from app.audience.service import add_member
+        from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
+        from app.delivery.service import reconcile_executions_to_audience
+
+        brand = auth.ensure_default_brand(db)
+        _campaign, variant = self._push_campaign(db, brand)
+        first = self._recipients(db, brand, with_push_token=True)
+        send = self._plan(db, brand, variant, [first])
+        late = self._recipients(db, brand, with_push_token=True)
+        add_member(db, send.audience_group_id, late.id, brand_id=brand.id)
+
+        reconcile_executions_to_audience(db, db.get(SendInstanceDB, send.id))
+
+        added = db.query(DeliveryExecutionDB).filter(
+            DeliveryExecutionDB.send_instance_id == send.id,
+            DeliveryExecutionDB.recipient_id == late.id,
+        ).one()
+        assert (added.channel, added.purpose) == ("push", "marketing"), (
+            f"the late joiner was planned as {added.channel!r}/{added.purpose!r}"
         )
 
     def test_a_push_goes_to_the_device_token_with_its_fields(self, db):
@@ -1467,7 +1495,7 @@ class TestAPushSendGoesOutAsAPush:
             recipient_id=recipient.id, channel="push",
             value={"token": f"apns-{uuid.uuid4().hex[:8]}", "platform": "apns"}))
         db.commit()
-        record_consent(db, recipient.id, "opted_in", brand.id, channel="push", source="test")
+        record_consent(db, recipient.id, "opted_in", brand.id, channel="push", source="test", purpose="marketing")
 
         send = self._plan(db, brand, variant, [recipient])
         assert send.id is not None, (
@@ -1579,9 +1607,9 @@ class TestADeviceContactCanBeSyncedIn:
             RecipientDB.external_id == external_id).first()
 
         assert latest_consent_status(
-            db, recipient.id, brand.id, channel="push") == "opted_in"
+            db, recipient.id, brand.id, channel="push", purpose="marketing") == "opted_in"
         assert latest_consent_status(
-            db, recipient.id, brand.id, channel="email") is None, (
+            db, recipient.id, brand.id, channel="email", purpose="marketing") is None, (
             "a contact that agreed to notifications was recorded as having "
             "granted email consent — the consent event was written with no "
             "channel, so it landed on the default"
@@ -1610,7 +1638,7 @@ class TestADeviceContactCanBeSyncedIn:
             "the channel default stopped being email, which every existing "
             "caller relies on"
         )
-        assert latest_consent_status(db, recipient.id, brand.id) == "opted_in"
+        assert latest_consent_status(db, recipient.id, brand.id, purpose="marketing") == "opted_in"
 
     def test_a_person_with_an_inbox_and_a_device_is_two_calls_one_recipient(self, db):
         """The design call this records: one address per call, upserted on
@@ -1636,8 +1664,8 @@ class TestADeviceContactCanBeSyncedIn:
         channels = sorted(r.channel for r in db.query(AddressabilityDB).filter(
             AddressabilityDB.recipient_id == matches[0].id).all())
         assert channels == ["email", "push"]
-        assert latest_consent_status(db, matches[0].id, brand.id, channel="email") == "opted_in"
-        assert latest_consent_status(db, matches[0].id, brand.id, channel="push") == "opted_in"
+        assert latest_consent_status(db, matches[0].id, brand.id, channel="email", purpose="marketing") == "opted_in"
+        assert latest_consent_status(db, matches[0].id, brand.id, channel="push", purpose="marketing") == "opted_in"
 
 
 class TestTheRecipientPageShowsEveryChannelsConsent:
@@ -1698,8 +1726,8 @@ class TestTheRecipientPageShowsEveryChannelsConsent:
 
         brand = auth.ensure_default_brand(db)
         recipient = self._recipient(db)
-        record_consent(db, recipient.id, "opted_in", brand.id, channel="email", source="crm")
-        record_consent(db, recipient.id, "opted_out", brand.id, channel="push", source="form")
+        record_consent(db, recipient.id, "opted_in", brand.id, channel="email", source="crm", purpose="marketing")
+        record_consent(db, recipient.id, "opted_out", brand.id, channel="push", source="form", purpose="marketing")
         client, user = self._admin_client(db)
         try:
             page = client.get(f"/ui/recipients/{recipient.id}")
@@ -1725,7 +1753,7 @@ class TestTheRecipientPageShowsEveryChannelsConsent:
 
         brand = auth.ensure_default_brand(db)
         recipient = self._recipient(db)
-        record_consent(db, recipient.id, "opted_in", brand.id, channel="email", source="crm")
+        record_consent(db, recipient.id, "opted_in", brand.id, channel="email", source="crm", purpose="marketing")
         client, user = self._admin_client(db)
         try:
             page = client.get(f"/ui/recipients/{recipient.id}")
@@ -1746,9 +1774,9 @@ class TestTheRecipientPageShowsEveryChannelsConsent:
         brand = auth.ensure_default_brand(db)
         recipient = self._recipient(db)
         record_consent(db, recipient.id, "opted_in", brand.id,
-                       channel="email", source="form", note="signup form")
+                       channel="email", source="form", note="signup form", purpose="marketing")
         record_consent(db, recipient.id, "opted_out", brand.id,
-                       channel="email", source="provider", note="complaint reported")
+                       channel="email", source="provider", note="complaint reported", purpose="marketing")
         client, user = self._admin_client(db)
         try:
             page = client.get(f"/ui/recipients/{recipient.id}")
@@ -1771,7 +1799,7 @@ class TestTheRecipientPageShowsEveryChannelsConsent:
         other = BrandDB(key=_name("brand"), name="Other sender")
         db.add(other); db.commit(); db.refresh(other)
         recipient = self._recipient(db)
-        record_consent(db, recipient.id, "opted_in", other.id, channel="email", source="crm")
+        record_consent(db, recipient.id, "opted_in", other.id, channel="email", source="crm", purpose="marketing")
         try:
             grid = consent_grid(db, recipient.id, brand.id, ["email", "push"])
             assert all(cell["status"] is None for cell in grid), (
@@ -1811,7 +1839,7 @@ class TestTheApiProjectsEveryChannel:
                 value={key: value}, status="active"))
             db.commit()
             record_consent(db, recipient.id, status, brand.id,
-                           channel=channel, source="test")
+                           channel=channel, source="test", purpose="marketing")
         return recipient
 
     def _cleanup(self, db, recipient):
@@ -2027,12 +2055,12 @@ class TestTheSendFormOffersOnlyWhatTheChannelCanDo:
             db.add(AddressabilityDB(recipient_id=r.id, channel="email",
                                     value={"email": f"{_name('a')}@x.invalid"}))
             db.commit()
-            record_consent(db, r.id, "opted_in", brand.id, channel="email", source="t")
+            record_consent(db, r.id, "opted_in", brand.id, channel="email", source="t", purpose="marketing")
             if i == 0:
                 db.add(AddressabilityDB(recipient_id=r.id, channel="push",
                                         value={"token": f"apns-{uuid.uuid4().hex[:8]}"}))
                 db.commit()
-                record_consent(db, r.id, "opted_in", brand.id, channel="push", source="t")
+                record_consent(db, r.id, "opted_in", brand.id, channel="push", source="t", purpose="marketing")
             add_member(db, group.id, r.id, brand_id=group.brand_id)
             made.append(r)
 

@@ -10,7 +10,7 @@ from app.delivery.models import DeliveryExecution, SendInstance, SendInstanceDet
 from app.campaigns.db_models import VariantDB
 from app.delivery.exclusion import run_exclusion_stack
 from app.delivery.providers.factory import get_provider, providers_for_channel
-from app.recipients.consent import DEFAULT_CHANNEL, DEFAULT_PURPOSE, ConsentDenied
+from app.recipients.consent import DEFAULT_CHANNEL, MARKETING, ConsentDenied
 from app.rendering.service import render_variant, render_variant_html
 from app.snapshots.db_models import SnapshotDB
 
@@ -30,6 +30,20 @@ def to_delivery_execution(record: DeliveryExecutionDB) -> DeliveryExecution:
     )
 
 
+def channel_of_send(db: Session, send_instance: SendInstanceDB) -> str:
+    """The channel a send goes out on: its snapshot's variant's (ADR-160 point 4).
+
+    The one derivation for every place that creates an execution, so planning,
+    re-resolution and the low-level create cannot disagree about it.
+    """
+    return (
+        db.query(VariantDB.channel)
+        .join(SnapshotDB, SnapshotDB.variant_id == VariantDB.id)
+        .filter(SnapshotDB.id == send_instance.snapshot_id)
+        .scalar()
+    ) or DEFAULT_CHANNEL
+
+
 def create_delivery_execution(
     db: Session,
     send_instance_id: int,
@@ -40,7 +54,8 @@ def create_delivery_execution(
     *,
     brand_id: int,
 ) -> DeliveryExecution:
-    if get_send_instance(db, send_instance_id, brand_id=brand_id) is None:
+    send_instance = get_send_instance(db, send_instance_id, brand_id=brand_id)
+    if send_instance is None:
         raise ValueError(f"SendInstance {send_instance_id} not found")
 
     execution = DeliveryExecutionDB(
@@ -49,6 +64,8 @@ def create_delivery_execution(
         status=status,
         provider=provider,
         provider_message_id=provider_message_id,
+        channel=channel_of_send(db, send_instance),
+        purpose=MARKETING,
     )
 
     db.add(execution)
@@ -390,6 +407,9 @@ def prepare_send_from_audience(
             DeliveryExecutionDB(
                 send_instance_id=send_instance.id,
                 channel=plan_channel,
+                # Every planned send is a marketing send today; said rather
+                # than defaulted (task-42).
+                purpose=MARKETING,
                 recipient_id=recipient.id,
                 status="created",
                 provider=provider,
@@ -441,15 +461,20 @@ def reconcile_executions_to_audience(db: Session, send_instance: SendInstanceDB)
     from app.audience.service import resolve_audience
     from app.settings.service import get_max_send_recipients
 
-    # Same channel the executions carry — a "rerun" send re-resolves WHO is
-    # targeted, and must ask about the channel it was planned for, or it would
-    # reconcile an email audience onto a push send.
-    rerun_channel = (
-        db.query(DeliveryExecutionDB.channel)
+    # The channel the send goes out on is its variant's, exactly as
+    # `prepare_send_from_audience` derives it — not "whatever the first
+    # execution says", which fell back to email once every planned execution
+    # had been dropped. A "rerun" send re-resolves WHO is targeted, and must
+    # ask about the channel it was planned for.
+    rerun_channel = channel_of_send(db, send_instance)
+    # Purpose is not on the send instance; the planned executions carry it.
+    # Every planned send today is a marketing send (task-42).
+    rerun_purpose = (
+        db.query(DeliveryExecutionDB.purpose)
         .filter(DeliveryExecutionDB.send_instance_id == send_instance.id)
         .limit(1)
         .scalar()
-    ) or DEFAULT_CHANNEL
+    ) or MARKETING
     resolved_ids = {
         r.id for r in resolve_audience(
             db, send_instance.audience_group_id, channel=rerun_channel
@@ -483,6 +508,10 @@ def reconcile_executions_to_audience(db: Session, send_instance: SendInstanceDB)
                     recipient_id=recipient_id,
                     status="created",
                     provider=send_instance.provider,
+                    # Said, not defaulted: a late joiner on a push send was
+                    # planned as an email until 2026-10-02 (task-42).
+                    channel=rerun_channel,
+                    purpose=rerun_purpose,
                 )
             )
 
@@ -865,7 +894,7 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
     # them, so the first is representative; the defaults cover a send with no
     # executions at all.
     send_channel = executions[0].channel if executions else DEFAULT_CHANNEL
-    send_purpose = executions[0].purpose if executions else DEFAULT_PURPOSE
+    send_purpose = executions[0].purpose if executions else MARKETING
 
     gate = run_exclusion_stack(
         db,

@@ -96,8 +96,12 @@ class DeliveryExecutionDB(Base):
     # snapshot → variant on every inbound event, the same four-join shape
     # ADR-164 point 9 rejected for SignalContributionDB, and it degrades to
     # unknowable once executions are pruned.
-    channel = Column(String(50), nullable=False, default="email")
-    purpose = Column(String(50), nullable=False, default="marketing")
+    # **No Python-side default either** (task-42). migrate_0024 dropped the
+    # database defaults as fail-open; these two survived it, and that is how a
+    # push send's late joiner was planned as an email. A creator that forgets
+    # is now a NOT NULL error rather than a silent email.
+    channel = Column(String(50), nullable=False)
+    purpose = Column(String(50), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime(timezone=True),

@@ -52,7 +52,7 @@ def world(db, default_brand):
                                     status="active", is_primary=True))
         if consent:
             record_consent(db, recipient.id, "opted_in", default_brand.id, channel="email",
-                           source="test", note="preview", commit=False)
+                           source="test", note="preview", commit=False, purpose="marketing")
         people[name] = recipient
     group = AudienceGroupDB(brand_id=default_brand.id, name=f"prev-{uuid.uuid4().hex[:8]}")
     db.add(group)

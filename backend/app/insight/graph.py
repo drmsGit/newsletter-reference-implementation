@@ -31,7 +31,7 @@ from app.content.db_models import (
     CategoryDB, CategoryRelationDB, ContentCategoryAssignmentDB, ContentRecordDB,
 )
 from app.insight.db_models import EngagementEventDB
-from app.recipients.consent import is_consenting_filter
+from app.recipients.consent import MARKETING, is_consenting_filter
 from app.recipients.db_models import RecipientDB, SignalContributionDB
 
 _NO_IMPACT = {"update_count": 0, "total_delta": 0, "avg_delta": 0, "event_count": 0}
@@ -45,7 +45,7 @@ def brand_audience(brand_id: int):
     """
     channels = [manifest.name for manifest in list_channels()]
     return select(RecipientDB.id).where(
-        or_(*(is_consenting_filter(brand_id, channel=channel) for channel in channels))
+        or_(*(is_consenting_filter(brand_id, channel=channel, purpose=MARKETING) for channel in channels))
     )
 
 

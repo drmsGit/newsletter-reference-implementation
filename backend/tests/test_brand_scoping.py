@@ -377,7 +377,7 @@ class TestBrandsCanActuallyBeAdministered:
 
         brand = temp_brand()
         recipient = db.query(RecipientDB).order_by(RecipientDB.id).first()
-        record_consent(db, recipient.id, "opted_out", brand.id, channel="email", source="test")
+        record_consent(db, recipient.id, "opted_out", brand.id, channel="email", source="test", purpose="marketing")
         try:
             error = auth.delete_brand(db, brand.id)
 
@@ -791,7 +791,7 @@ class TestConsentIsScopedToTheSendingBrand:
             status="active",
             is_primary=True,
         ))
-        record_consent(db, recipient.id, "opted_in", default_brand.id, source="test")
+        record_consent(db, recipient.id, "opted_in", default_brand.id, source="test", purpose="marketing")
         db.commit()
 
         yield recipient
@@ -813,7 +813,7 @@ class TestConsentIsScopedToTheSendingBrand:
 
         found = db.query(RecipientDB).filter(
             RecipientDB.id == consenting_recipient.id,
-            is_consenting_filter(default_brand.id),
+            is_consenting_filter(default_brand.id, purpose="marketing"),
         ).count()
         assert found == 1, "an opted-in recipient was gated out of their own brand"
 
@@ -828,7 +828,7 @@ class TestConsentIsScopedToTheSendingBrand:
 
         found = db.query(RecipientDB).filter(
             RecipientDB.id == consenting_recipient.id,
-            is_consenting_filter(other.id),
+            is_consenting_filter(other.id, purpose="marketing"),
         ).count()
 
         assert found == 0, (
@@ -843,7 +843,7 @@ class TestConsentIsScopedToTheSendingBrand:
         from app.recipients.db_models import RecipientDB
 
         fresh = temp_brand()
-        reachable = db.query(RecipientDB).filter(is_consenting_filter(fresh.id)).count()
+        reachable = db.query(RecipientDB).filter(is_consenting_filter(fresh.id, purpose="marketing")).count()
 
         assert reachable == 0, (
             f"{reachable} recipients were reachable by a brand created seconds "
@@ -863,13 +863,13 @@ class TestConsentIsScopedToTheSendingBrand:
         from app.recipients.db_models import ConsentEventDB
 
         other = temp_brand()
-        record_consent(db, consenting_recipient.id, "opted_in", other.id, source="test")
-        assert is_consenting(db, consenting_recipient.id, other.id)
+        record_consent(db, consenting_recipient.id, "opted_in", other.id, source="test", purpose="marketing")
+        assert is_consenting(db, consenting_recipient.id, other.id, purpose="marketing")
 
-        record_consent(db, consenting_recipient.id, "opted_out", other.id, source="test")
+        record_consent(db, consenting_recipient.id, "opted_out", other.id, source="test", purpose="marketing")
 
-        assert not is_consenting(db, consenting_recipient.id, other.id)
-        assert is_consenting(db, consenting_recipient.id, default_brand.id), (
+        assert not is_consenting(db, consenting_recipient.id, other.id, purpose="marketing")
+        assert is_consenting(db, consenting_recipient.id, default_brand.id, purpose="marketing"), (
             "opting out of one brand withdrew consent for another"
         )
         db.query(ConsentEventDB).filter(
@@ -926,12 +926,12 @@ class TestConsentIsScopedToTheSendingBrand:
         other = temp_brand()
         ids = {consenting_recipient.id}
 
-        mine = run_exclusion_stack(db, ids, default_brand.id)
+        mine = run_exclusion_stack(db, ids, default_brand.id, purpose="marketing")
         assert consenting_recipient.id in mine.eligible, (
             "an opted-in recipient was excluded from their own brand's send"
         )
 
-        theirs = run_exclusion_stack(db, ids, other.id)
+        theirs = run_exclusion_stack(db, ids, other.id, purpose="marketing")
         assert consenting_recipient.id not in theirs.eligible, (
             "a send as brand B would have mailed someone who only consented "
             "to brand A — this is the send-time half of the boundary"

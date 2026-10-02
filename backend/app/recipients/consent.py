@@ -31,7 +31,13 @@ from app.recipients.db_models import AddressabilityDB, ConsentEventDB, Recipient
 # constants rather than literals so the call sites already read correctly when
 # push or transfer arrives — those are rows, not migrations (ADR-163 point 1).
 DEFAULT_CHANNEL = "email"
-DEFAULT_PURPOSE = "marketing"
+#: The one purpose that exists today. **Not a default** (task-42): every
+#: consent function takes `purpose` as a required argument, for the reason the
+#: 2026-09-15 addendum gave for `brand_id` — "a consent row whose brand was
+#: assumed is a consent record nobody gave". A row whose purpose was assumed is
+#: a marketing grant nobody gave. ADR-163 point 3's `transfer` is not in the
+#: vocabulary yet; task-134 owns the transactional-consent model.
+MARKETING = "marketing"
 
 # The only status that is a grant.
 CONSENTING_STATUS = "opted_in"
@@ -49,8 +55,8 @@ class ConsentDenied(ValueError):
         self,
         recipient_id: int,
         brand_id: int,
-        channel: str = DEFAULT_CHANNEL,
-        purpose: str = DEFAULT_PURPOSE,
+        channel: str,
+        purpose: str,
         status: str | None = None,
     ):
         self.recipient_id = recipient_id
@@ -75,7 +81,7 @@ def record_consent(
     *,
     source: str,
     channel: str = DEFAULT_CHANNEL,
-    purpose: str = DEFAULT_PURPOSE,
+    purpose: str,
     note: str | None = None,
     commit: bool = True,
 ) -> ConsentEventDB:
@@ -109,7 +115,7 @@ def latest_consent_event(
     brand_id: int,
     *,
     channel: str = DEFAULT_CHANNEL,
-    purpose: str = DEFAULT_PURPOSE,
+    purpose: str,
     source: str | None = None,
 ) -> ConsentEventDB | None:
     """The newest event for one cell, or None if the cell has never been set.
@@ -136,7 +142,7 @@ def latest_consent_status(
     brand_id: int,
     *,
     channel: str = DEFAULT_CHANNEL,
-    purpose: str = DEFAULT_PURPOSE,
+    purpose: str,
 ) -> str | None:
     event = latest_consent_event(
         db, recipient_id, brand_id, channel=channel, purpose=purpose
@@ -150,7 +156,7 @@ def latest_consent_statuses(
     brand_id: int,
     *,
     channel: str = DEFAULT_CHANNEL,
-    purpose: str = DEFAULT_PURPOSE,
+    purpose: str,
 ) -> dict[int, str]:
     """`latest_consent_status` for many recipients in one query.
 
@@ -248,7 +254,7 @@ def consent_grid(
     for event in events:
         latest.setdefault((event.channel, event.purpose), event)
 
-    purposes = sorted({p for _, p in latest} | {DEFAULT_PURPOSE})
+    purposes = sorted({p for _, p in latest} | {MARKETING})
     # Channels the caller asked about, plus any that carry events — a
     # deployment that switched a channel off still holds the consent it
     # gathered, and dropping it from the view would present a partial record.
@@ -303,7 +309,7 @@ def consent_grid_many(
         )
 
     purposes = sorted(
-        {p for cells in latest.values() for _, p in cells} | {DEFAULT_PURPOSE}
+        {p for cells in latest.values() for _, p in cells} | {MARKETING}
     )
     seen_channels = sorted({c for cells in latest.values() for c, _ in cells})
     known = list(dict.fromkeys(list(channels) + seen_channels))
@@ -355,7 +361,7 @@ def is_consenting(
     brand_id: int,
     *,
     channel: str = DEFAULT_CHANNEL,
-    purpose: str = DEFAULT_PURPOSE,
+    purpose: str,
 ) -> bool:
     return (
         latest_consent_status(
@@ -371,7 +377,7 @@ def require_consent(
     brand_id: int,
     *,
     channel: str = DEFAULT_CHANNEL,
-    purpose: str = DEFAULT_PURPOSE,
+    purpose: str,
 ) -> None:
     """Raise ConsentDenied unless this cell holds a grant for this brand."""
     status = latest_consent_status(
@@ -384,7 +390,8 @@ def require_consent(
 def consenting_status_expr(
     brand_id: int,
     channel: str = DEFAULT_CHANNEL,
-    purpose: str = DEFAULT_PURPOSE,
+    *,
+    purpose: str,
 ):
     """A correlated scalar subquery giving the latest consent status per
     `RecipientDB` row, for use as a SQL filter in the audience gates.
@@ -415,16 +422,18 @@ def consenting_status_expr(
 def is_consenting_filter(
     brand_id: int,
     channel: str = DEFAULT_CHANNEL,
-    purpose: str = DEFAULT_PURPOSE,
+    *,
+    purpose: str,
 ):
-    """The gate predicate: `.filter(is_consenting_filter(brand_id))`.
+    """The gate predicate: `.filter(is_consenting_filter(brand_id, channel, purpose=MARKETING))`.
 
-    **`brand_id` is required and has no default**, unlike channel and purpose.
+    **`brand_id` and `purpose` are required and have no default**, unlike channel
+    (task-42 removed purpose's).
     A default would mean any caller that forgot it silently gated on one
     brand's consent while sending as another — which is the whole defect this
     closes, reintroduced by a convenience. Forgetting it is a TypeError.
     """
-    return consenting_status_expr(brand_id, channel, purpose) == CONSENTING_STATUS
+    return consenting_status_expr(brand_id, channel, purpose=purpose) == CONSENTING_STATUS
 
 
 # ---------------------------------------------------------------------------

@@ -324,7 +324,8 @@ def seed():
 
         event_count = 0
         for r in random.sample(recipients, 32):
-            ex = DeliveryExecutionDB(send_instance_id=si.id, recipient_id=r.id, status="sent", provider="mock")
+            ex = DeliveryExecutionDB(send_instance_id=si.id, recipient_id=r.id, status="sent",
+                                     provider="mock", channel="email", purpose="marketing")
             db.add(ex); db.flush()
             for _ in range(random.randint(2, 6)):
                 content_id = random.choice(clickable)

@@ -46,7 +46,7 @@ def group(db):
         db.add(recipient)
         db.flush()
         record_consent(db, recipient.id, "opted_in", brand.id, channel=channel,
-                       source="test", note="counts", commit=False)
+                       source="test", note="counts", commit=False, purpose="marketing")
         db.add(AudienceGroupMemberDB(group_id=group.id, recipient_id=recipient.id))
         people.append(recipient.id)
     db.commit()

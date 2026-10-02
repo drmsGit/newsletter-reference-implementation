@@ -69,7 +69,7 @@ def world(db):
         status="active", is_primary=True,
     ))
     record_consent(db, recipient.id, "opted_in", brand.id, source="test",
-                   note="planapi", commit=False)
+                   note="planapi", commit=False, purpose="marketing")
     group = AudienceGroupDB(brand_id=brand.id, name=f"planapi-{uuid.uuid4().hex[:8]}")
     db.add(group)
     db.flush()

@@ -3,11 +3,11 @@ from sqlalchemy.orm import Session
 from app.recipients.consent import (
     CONSENTING_STATUS,
     DEFAULT_CHANNEL,
+    MARKETING,
     address_key_for,
     address_value,
     addresses_for_many,
     consent_grid_many,
-    DEFAULT_PURPOSE,
     latest_consent_event,
     latest_consent_status,
     latest_consent_statuses,
@@ -43,7 +43,7 @@ def suppress_recipient(
     reason: str,
     *,
     channel: str = DEFAULT_CHANNEL,
-    purpose: str = DEFAULT_PURPOSE,
+    purpose: str,
 ) -> bool:
     """Opt a recipient out because of a delivery-feedback signal (hard bounce /
     spam complaint) the provider reported. Idempotent — returns True only if the
@@ -163,7 +163,7 @@ def to_recipients(db: Session, records: list[RecipientDB], brand_id: int) -> lis
     # promise is the reason `consent_grid_many` and `addresses_for_many` exist
     # at all rather than looping the single-recipient readers.
     emails = resolve_emails(db, ids)
-    consents = latest_consent_statuses(db, ids, brand_id)
+    consents = latest_consent_statuses(db, ids, brand_id, purpose=MARKETING)
     grids = consent_grid_many(db, ids, brand_id, channels)
     address_rows = addresses_for_many(db, ids)
 
@@ -251,7 +251,7 @@ def create_recipient(
     # Compared AND written on the same channel. Comparing against email while
     # writing email was self-consistent and wrong; comparing against one
     # channel and writing another would be worse, so both take `channel`.
-    if latest_consent_status(db, recipient.id, brand_id, channel=channel) != consent_status:
+    if latest_consent_status(db, recipient.id, brand_id, channel=channel, purpose=MARKETING) != consent_status:
         record_consent(
             db,
             recipient.id,
@@ -260,7 +260,7 @@ def create_recipient(
             source="import",
             channel=channel,
             note=f"set via create_recipient for external_id={external_id}",
-            commit=False,
+            commit=False, purpose=MARKETING,
         )
 
     # The address is a row on its channel (ADR-163 point 2), and since phase B
@@ -326,7 +326,7 @@ def sync_consent_from_crm(
     note: str | None = None,
     *,
     channel: str = DEFAULT_CHANNEL,
-    purpose: str = DEFAULT_PURPOSE,
+    purpose: str,
 ) -> Recipient:
     """Apply a CRM consent assertion to the local projection and record it in
     the append-only consent-sync log. The CRM is the source of truth; this
