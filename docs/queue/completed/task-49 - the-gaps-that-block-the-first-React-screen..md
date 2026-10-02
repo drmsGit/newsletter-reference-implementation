@@ -1,10 +1,10 @@
 ---
 id: TASK-49
 title: the gaps that block the first React screen.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
-updated_date: '2026-10-02 13:31'
+updated_date: '2026-10-02 13:33'
 labels:
   - backend
 dependencies: []
@@ -27,3 +27,9 @@ Migrated 2026-09-27 from `docs/backlog.md` line 146, section "Features", positio
 
 2026-10-02: C2 done. User decisions: prompt publish and model choice need settings.manage AND ai.run (a future run-time free-text input needs ai.run only, if it enters as input to the prompt, never editing it); settings changes are not approvable (danger zone later for risky ones); settings writes are people only; channel availability readable, not writable. Built: GET /settings (view) and PUT /settings/signals, /send-cap, /ai/spend-cap, /ai/provider, /ai/tasks/{key}/approval, PUT /ai/tasks/{key}/model, POST /ai/tasks/{key}/prompt — app/settings/router.py + models.py; rules in settings.service, shared with the Jinja page, which now also refuses a half-life <= 0, a warning above the hard stop, an unknown provider, an unknown task, and checks ai.run for prompts/models. tests/test_settings_api.py: 19 tests, ten mutants caught. Suite 879 passed. Not done: settings changes are not audited.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+All four gaps that blocked the first React screen are closed: C1 and C15 (2026-09-20), C8 (POST /delivery/snapshots/{id}/send-instances, 2026-10-02, then provider/channel and name validation after review) and C2 (GET /settings plus seven people-only writes, prompts and models needing ai.run too, 2026-10-02). Verified by tests/test_send_plan_api.py and tests/test_settings_api.py, every rule mutation-checked; full suite 879 passed. Decisions recorded in ADR-150 and ADR-142 addenda of 2026-10-02.
+<!-- SECTION:FINAL_SUMMARY:END -->
