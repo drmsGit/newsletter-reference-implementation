@@ -929,3 +929,70 @@ def delete_category(db: Session, category_id: int, force: bool = False) -> bool:
     db.delete(category)
     db.commit()
     return True
+
+# --- content detail read models (task-50, B17) --------------------------------
+
+def content_assignments(db: Session, content_id: int, *, brand_id: int) -> list[dict] | None:
+    """The record's categories with their assignment id and score — what a
+    client needs to show them and to remove one (C5). None when the record is
+    not in this brand."""
+    if get_content_record(db, content_id, brand_id=brand_id) is None:
+        return None
+    rows = (
+        db.query(ContentCategoryAssignmentDB.id, CategoryDB.id, CategoryDB.name, CategoryDB.type,
+                 ContentCategoryAssignmentDB.score)
+        .join(CategoryDB, ContentCategoryAssignmentDB.category_id == CategoryDB.id)
+        .filter(ContentCategoryAssignmentDB.content_id == content_id)
+        .order_by(CategoryDB.name.asc())
+        .all()
+    )
+    return [
+        {"assignment_id": aid, "category_id": cid, "name": name, "type": ctype, "score": score}
+        for aid, cid, name, ctype, score in rows
+    ]
+
+
+def content_usage(db: Session, content_id: int, *, brand_id: int, limit: int = 20) -> dict | None:
+    """Where this record has been used and what it taught: its latest decision
+    picks, and the signal contributions from engagement events that named it.
+
+    **Filtered in SQL.** The Jinja page took the newest 100 contributions on the
+    whole platform and filtered them in Python, so a record whose signals were
+    older than the last 100 anywhere showed none. None when the record is not
+    in this brand.
+    """
+    from app.insight.db_models import EngagementEventDB
+    from app.recipients.db_models import SignalContributionDB
+
+    if get_content_record(db, content_id, brand_id=brand_id) is None:
+        return None
+    resolutions = (
+        db.query(DecisionResolutionDB)
+        .filter(DecisionResolutionDB.content_record_id == content_id)
+        .order_by(DecisionResolutionDB.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    signals = (
+        db.query(SignalContributionDB, CategoryDB.name)
+        .join(CategoryDB, SignalContributionDB.category_id == CategoryDB.id)
+        .join(EngagementEventDB, SignalContributionDB.event_id == EngagementEventDB.id)
+        .filter(EngagementEventDB.event_data["content_record_id"].as_integer() == content_id)
+        .order_by(SignalContributionDB.created_at.desc())
+        .limit(100)
+        .all()
+    )
+    return {
+        "resolutions": [
+            {"id": r.id, "decision_slot_id": r.decision_slot_id, "recipient_id": r.recipient_id,
+             "content_version_id": r.content_version_id, "score": r.score, "reason": r.reason,
+             "created_at": r.created_at}
+            for r in resolutions
+        ],
+        "signals": [
+            {"recipient_id": c.recipient_id, "category_id": c.category_id, "category_name": name,
+             "base_weight": c.base_weight, "contribution_type": c.contribution_type,
+             "created_at": c.created_at}
+            for c, name in signals
+        ],
+    }

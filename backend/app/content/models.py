@@ -120,3 +120,39 @@ class ContentDuplicateTarget(BaseModel):
     id: int
     name: str
     crossing: bool
+
+
+class ContentAssignment(BaseModel):
+    """One category on a record, with what removing it needs (task-50, B17/C5)."""
+
+    assignment_id: int
+    category_id: int
+    name: str
+    type: str
+    score: float | None = None
+
+
+class ContentResolutionUse(BaseModel):
+    id: int
+    decision_slot_id: int
+    recipient_id: int | None = None
+    content_version_id: int | None = None
+    score: float | None = None
+    reason: str | None = None
+    created_at: datetime
+
+
+class ContentSignal(BaseModel):
+    recipient_id: int
+    category_id: int
+    category_name: str
+    base_weight: float
+    contribution_type: str
+    created_at: datetime
+
+
+class ContentUsage(BaseModel):
+    """Where a record was picked and what its engagement taught (task-50, B17)."""
+
+    resolutions: list[ContentResolutionUse]
+    signals: list[ContentSignal]

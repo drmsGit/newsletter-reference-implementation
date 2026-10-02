@@ -2036,32 +2036,11 @@ def content_detail(
             status_code=303,
         )
 
-    categories = (
-        db.query(
-            ContentCategoryAssignmentDB.id,
-            CategoryDB.name,
-            CategoryDB.type,
-            ContentCategoryAssignmentDB.score,
-        )
-        .join(
-            ContentCategoryAssignmentDB,
-            ContentCategoryAssignmentDB.category_id == CategoryDB.id,
-        )
-        .filter(
-            ContentCategoryAssignmentDB.content_id == content_record_id
-        )
-        .all()
-    )
+    from app.content.service import content_assignments, content_usage
 
-    category_rows = [
-        {
-            "assignment_id": assignment_id,
-            "name": name,
-            "type": category_type,
-            "score": score,
-        }
-        for assignment_id, name, category_type, score in categories
-    ]
+    # From the service the JSON routes use (task-50, B17).
+    category_rows = content_assignments(db, content_record_id, brand_id=working_brand_id(request, db))
+    usage = content_usage(db, content_record_id, brand_id=working_brand_id(request, db))
 
     versions = (
         db.query(ContentVersionDB)
@@ -2091,58 +2070,15 @@ def content_detail(
         for version in versions
     ]
 
-    decision_usage = (
-        db.query(DecisionResolutionDB)
-        .filter(
-            DecisionResolutionDB.content_record_id == content_record_id
-        )
-        .order_by(
-            DecisionResolutionDB.created_at.desc()
-        )
-        .limit(20)
-        .all()
-    )
-
-    signals = (
-        db.query(
-            SignalContributionDB,
-            CategoryDB.name,
-            EngagementEventDB.event_data,
-        )
-        .join(
-            CategoryDB,
-            SignalContributionDB.category_id == CategoryDB.id,
-        )
-        .join(
-            EngagementEventDB,
-            SignalContributionDB.event_id == EngagementEventDB.id,
-        )
-        .order_by(
-            SignalContributionDB.created_at.desc()
-        )
-        .limit(100)
-        .all()
-    )
-
-    signal_rows = []
-
-    for update, category_name, event_data in signals:
-        event_content_record_id = (event_data or {}).get("content_record_id")
-
-        if event_content_record_id != content_record_id:
-            continue
-
-        signal_rows.append(
-            {
-                "recipient_id": update.recipient_id,
-                "category_name": category_name,
-                "previous_score": None,
-                "delta": update.base_weight,
-                "new_score": None,
-                "reason": update.contribution_type,
-                "created_at": update.created_at,
-            }
-        )
+    decision_usage = usage["resolutions"]
+    # Filtered in SQL by the service: this page used to take the platform's
+    # newest 100 contributions and filter them here, so older signals vanished.
+    signal_rows = [
+        {"recipient_id": sig["recipient_id"], "category_name": sig["category_name"],
+         "previous_score": None, "delta": sig["base_weight"], "new_score": None,
+         "reason": sig["contribution_type"], "created_at": sig["created_at"]}
+        for sig in usage["signals"]
+    ]
 
     all_categories = db.query(CategoryDB).order_by(CategoryDB.name.asc()).all()
 

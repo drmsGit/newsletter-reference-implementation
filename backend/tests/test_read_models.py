@@ -229,3 +229,120 @@ class TestB11CampaignComposition:
                 db.execute(text(f"DELETE FROM {table} WHERE user_id = :u"), {"u": user.id})
             db.execute(text("DELETE FROM users WHERE id = :u"), {"u": user.id})
             db.commit()
+
+
+class TestB17ContentDetailAndC5:
+    @pytest.fixture
+    def record(self, db, default_brand):
+        from app.content.db_models import CategoryDB, ContentCategoryAssignmentDB, ContentRecordDB
+
+        rec = ContentRecordDB(title=f"cd-{uuid.uuid4().hex[:6]}", content={}, status="active",
+                              brand_id=default_brand.id)
+        cat = CategoryDB(name=f"cd-{uuid.uuid4().hex[:6]}", type="main")
+        db.add_all([rec, cat]); db.flush()
+        a = ContentCategoryAssignmentDB(content_id=rec.id, category_id=cat.id, score=7)
+        db.add(a); db.commit()
+        yield rec, cat, a
+        db.rollback()
+        db.query(ContentCategoryAssignmentDB).filter(ContentCategoryAssignmentDB.category_id == cat.id).delete()
+        db.query(ContentRecordDB).filter(ContentRecordDB.id == rec.id).delete()
+        db.query(CategoryDB).filter(CategoryDB.id == cat.id).delete()
+        db.commit()
+
+    def test_assignments_carry_their_id_and_score(self, record):
+        rec, cat, a = record
+        with machine([VIEW]) as headers:
+            rows = client.get(f"/content/{rec.id}/assignments", headers=headers).json()
+        assert rows == [{"assignment_id": a.id, "category_id": cat.id, "name": cat.name,
+                         "type": "main", "score": 7}]
+
+    def test_c5_an_assignment_is_removed_through_its_record(self, db, record):
+        from app.auth.permissions import CONTENT_MANAGE
+        from app.content.db_models import ContentCategoryAssignmentDB
+
+        rec, _, a = record
+        rec_id, a_id = rec.id, a.id  # read before the row goes
+        with machine([VIEW, CONTENT_MANAGE]) as headers:
+            wrong = client.delete(f"/content/{rec_id + 99999}/assignments/{a_id}", headers=headers)
+            right = client.delete(f"/content/{rec_id}/assignments/{a_id}", headers=headers)
+        assert wrong.status_code == 404 and right.status_code == 204
+        db.expire_all()
+        assert db.get(ContentCategoryAssignmentDB, a_id) is None
+
+    def test_c5_another_brands_assignment_is_not_found(self, db, record, foreign_api):
+        from app.auth.permissions import CONTENT_MANAGE
+        from app.content.db_models import ContentCategoryAssignmentDB
+
+        rec, _, a = record
+        with foreign_api([VIEW, CONTENT_MANAGE]) as headers:
+            response = client.delete(f"/content/{rec.id}/assignments/{a.id}", headers=headers)
+        assert response.status_code == 404
+        db.expire_all()
+        assert db.get(ContentCategoryAssignmentDB, a.id) is not None
+
+    def test_usage_finds_old_signals_behind_newer_ones_elsewhere(self, db, record):
+        """The page used to take the newest 100 contributions platform-wide and
+        filter in Python, so these older ones vanished behind 101 newer."""
+        from datetime import datetime, timedelta, timezone
+
+        from app.delivery.db_models import DeliveryExecutionDB
+        from app.insight.db_models import EngagementEventDB
+        from app.recipients.db_models import RecipientDB, SignalContributionDB
+
+        rec, cat, _ = record
+        execution = db.query(DeliveryExecutionDB).order_by(DeliveryExecutionDB.id).first()
+        recipient = RecipientDB(external_id=f"cd-{uuid.uuid4()}", status="active")
+        db.add(recipient); db.flush()
+        mine = EngagementEventDB(delivery_execution_id=execution.id, event_type="click",
+                                 event_data={"content_record_id": rec.id})
+        other = EngagementEventDB(delivery_execution_id=execution.id, event_type="click",
+                                  event_data={"content_record_id": -1})
+        db.add_all([mine, other]); db.flush()
+        old = datetime.now(timezone.utc) - timedelta(days=30)
+        db.add(SignalContributionDB(recipient_id=recipient.id, category_id=cat.id, contribution_type="click",
+                                    base_weight=5.0, event_id=mine.id, created_at=old))
+        db.add_all([SignalContributionDB(recipient_id=recipient.id, category_id=cat.id,
+                                         contribution_type="click", base_weight=1.0, event_id=other.id)
+                    for _ in range(101)])
+        db.commit()
+        try:
+            with machine([VIEW]) as headers:
+                usage = client.get(f"/content/{rec.id}/usage", headers=headers).json()
+            assert [s["base_weight"] for s in usage["signals"]] == [5.0]
+        finally:
+            db.rollback()
+            db.query(SignalContributionDB).filter(SignalContributionDB.recipient_id == recipient.id).delete()
+            db.query(EngagementEventDB).filter(EngagementEventDB.id.in_([mine.id, other.id])).delete(
+                synchronize_session=False)
+            db.query(RecipientDB).filter(RecipientDB.id == recipient.id).delete()
+            db.commit()
+
+    def test_another_brands_record_is_not_found(self, db, foreign_brand):
+        from app.content.db_models import ContentRecordDB
+
+        rec = ContentRecordDB(title="f", content={}, status="active", brand_id=foreign_brand.id)
+        db.add(rec); db.commit()
+        with machine([VIEW]) as headers:
+            assert client.get(f"/content/{rec.id}/assignments", headers=headers).status_code == 404
+            assert client.get(f"/content/{rec.id}/usage", headers=headers).status_code == 404
+
+    def test_the_jinja_page_renders_from_the_services(self, db, record):
+        from sqlalchemy import text
+
+        from app.auth import service as auth
+
+        rec, cat, _ = record
+        user = auth.create_user(db, email=f"rm-{uuid.uuid4().hex[:8]}@example.invalid", role_key="viewer")
+        token = auth.create_session(db, user)
+        page_client = TestClient(app, raise_server_exceptions=False)
+        page_client.cookies.set(auth.SESSION_COOKIE, token)
+        try:
+            page = page_client.get(f"/ui/content/{rec.id}")
+            assert page.status_code == 200, page.text[:300]
+            assert cat.name in page.text
+        finally:
+            db.rollback()
+            for table in ("auth_sessions", "role_assignments"):
+                db.execute(text(f"DELETE FROM {table} WHERE user_id = :u"), {"u": user.id})
+            db.execute(text("DELETE FROM users WHERE id = :u"), {"u": user.id})
+            db.commit()

@@ -12,6 +12,8 @@ from app.content.models import (
     ContentCreate,
     ContentDuplicate,
     ContentDuplicateTarget,
+    ContentAssignment,
+    ContentUsage,
     Category,
     CategoryCreate,
     CategoryRelation,
@@ -464,3 +466,51 @@ def duplicate_content(
         },
     )
     return to_content_record(copy)
+
+
+@router.get(
+    "/{content_id}/assignments",
+    response_model=list[ContentAssignment],
+    summary="The record's categories, with assignment id and score",
+)
+def get_content_assignments(
+    content_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.content.service import content_assignments
+
+    rows = content_assignments(db, content_id, brand_id=brand_id)
+    if rows is None:
+        raise HTTPException(status_code=404, detail="Content record not found")
+    return rows
+
+
+@router.delete(
+    "/{content_id}/assignments/{assignment_id}",
+    status_code=204,
+    summary="Remove one category from the record",
+    description="Through the record, within the working brand (task-241): another record's or another brand's assignment is not found.",
+)
+def delete_content_assignment(
+    content_id: int, assignment_id: int,
+    db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.content.service import delete_category_assignment
+
+    if not delete_category_assignment(db, content_id, assignment_id, brand_id=brand_id):
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+
+@router.get(
+    "/{content_id}/usage",
+    response_model=ContentUsage,
+    summary="Where the record was picked, and the signals its engagement earned",
+)
+def get_content_usage(
+    content_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.content.service import content_usage
+
+    usage = content_usage(db, content_id, brand_id=brand_id)
+    if usage is None:
+        raise HTTPException(status_code=404, detail="Content record not found")
+    return usage
