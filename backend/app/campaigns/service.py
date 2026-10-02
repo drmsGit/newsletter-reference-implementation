@@ -1,4 +1,4 @@
-from sqlalchemy import func
+from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
 from app.campaigns.db_models import CampaignDB, VariantDB, ModuleInstanceDB, DecisionSlotDB, DecisionResolutionDB
@@ -834,3 +834,107 @@ def list_resolutions_for_decision_slot(
     return [to_decision_resolution(record) for record in records]
 
 
+
+
+# --- decision-slot read models (task-50, B21/B22) ------------------------------
+# Lifted from the Jinja decisions pages, which computed them in the router: the
+# SPA must not rebuild aggregates, and the composition read needs them too.
+
+def list_decision_slots_with_stats(db: Session, *, brand_id: int) -> list[dict]:
+    """Every decision slot in the brand, with its campaign and variant and three
+    aggregates: resolutions, distinct content picked, and the latest pick."""
+    rows = (
+        db.query(
+            DecisionSlotDB, VariantDB.id, VariantDB.name, CampaignDB.id, CampaignDB.name,
+            func.count(DecisionResolutionDB.id),
+            func.count(func.distinct(DecisionResolutionDB.content_record_id)),
+            func.max(DecisionResolutionDB.created_at),
+        )
+        .join(VariantDB, DecisionSlotDB.variant_id == VariantDB.id)
+        .join(CampaignDB, VariantDB.campaign_id == CampaignDB.id)
+        .filter(CampaignDB.brand_id == brand_id)
+        .outerjoin(DecisionResolutionDB, DecisionResolutionDB.decision_slot_id == DecisionSlotDB.id)
+        .group_by(DecisionSlotDB.id, VariantDB.id, VariantDB.name, CampaignDB.id, CampaignDB.name)
+        .order_by(CampaignDB.id.asc(), VariantDB.id.asc(), DecisionSlotDB.id.asc())
+        .all()
+    )
+    return [
+        {
+            "id": slot.id, "name": slot.name, "decision_type": slot.decision_type,
+            "decision_strategy": slot.decision_strategy,
+            "variant_id": variant_id, "variant_name": variant_name,
+            "campaign_id": campaign_id, "campaign_name": campaign_name,
+            "resolution_count": count, "unique_content_count": unique, "last_resolution_at": last,
+        }
+        for slot, variant_id, variant_name, campaign_id, campaign_name, count, unique, last in rows
+    ]
+
+
+def decision_slot_stats(db: Session, slot_id: int, *, brand_id: int) -> dict | None:
+    """One slot in the brand, with what it has picked: a summary, the top 20
+    content with their share, the latest 50 picks and a reason histogram.
+    None when the slot is not in this brand."""
+    context = (
+        db.query(DecisionSlotDB, VariantDB.id, VariantDB.name, CampaignDB.id, CampaignDB.name)
+        .join(VariantDB, DecisionSlotDB.variant_id == VariantDB.id)
+        .join(CampaignDB, VariantDB.campaign_id == CampaignDB.id)
+        .filter(DecisionSlotDB.id == slot_id, CampaignDB.brand_id == brand_id)
+        .first()
+    )
+    if context is None:
+        return None
+    slot, variant_id, variant_name, campaign_id, campaign_name = context
+    of_slot = DecisionResolutionDB.decision_slot_id == slot_id
+
+    s = db.query(
+        func.count(DecisionResolutionDB.id),
+        func.count(func.distinct(DecisionResolutionDB.recipient_id)),
+        func.count(func.distinct(DecisionResolutionDB.content_record_id)),
+        func.coalesce(func.avg(DecisionResolutionDB.score), 0),
+        func.coalesce(func.min(DecisionResolutionDB.score), 0),
+        func.coalesce(func.max(DecisionResolutionDB.score), 0),
+        func.max(DecisionResolutionDB.created_at),
+    ).filter(of_slot).first()
+    total = s[0] or 0
+    top = (
+        db.query(ContentRecordDB.id, ContentRecordDB.title, ContentVersionDB.version_number,
+                 func.count(DecisionResolutionDB.id).label("selection_count"))
+        .join(ContentRecordDB, DecisionResolutionDB.content_record_id == ContentRecordDB.id)
+        .outerjoin(ContentVersionDB, DecisionResolutionDB.content_version_id == ContentVersionDB.id)
+        .filter(of_slot)
+        .group_by(ContentRecordDB.id, ContentRecordDB.title, ContentVersionDB.version_number)
+        .order_by(desc("selection_count")).limit(20).all()
+    )
+    latest = (
+        db.query(DecisionResolutionDB, ContentRecordDB.title, ContentVersionDB.version_number)
+        .join(ContentRecordDB, DecisionResolutionDB.content_record_id == ContentRecordDB.id)
+        .outerjoin(ContentVersionDB, DecisionResolutionDB.content_version_id == ContentVersionDB.id)
+        .filter(of_slot).order_by(DecisionResolutionDB.created_at.desc()).limit(50).all()
+    )
+    reasons = (
+        db.query(DecisionResolutionDB.reason, func.count(DecisionResolutionDB.id).label("count"))
+        .filter(of_slot).group_by(DecisionResolutionDB.reason)
+        .order_by(desc("count")).limit(20).all()
+    )
+    return {
+        "slot": slot,
+        "variant_id": variant_id, "variant_name": variant_name,
+        "campaign_id": campaign_id, "campaign_name": campaign_name,
+        "summary": {
+            "resolution_count": total, "unique_recipient_count": s[1], "unique_content_count": s[2],
+            "avg_score": round(float(s[3]), 2), "min_score": round(float(s[4]), 2),
+            "max_score": round(float(s[5]), 2), "last_resolution_at": s[6],
+        },
+        "top_content": [
+            {"content_id": cid, "title": title, "version_number": version, "selection_count": n,
+             "share": round(n / total * 100, 2) if total else 0}
+            for cid, title, version, n in top
+        ],
+        "latest": [
+            {"id": r.id, "recipient_id": r.recipient_id, "content_record_id": r.content_record_id,
+             "content_title": title, "content_version": version, "score": r.score,
+             "reason": r.reason, "created_at": r.created_at}
+            for r, title, version in latest
+        ],
+        "reasons": [{"reason": reason, "count": count} for reason, count in reasons],
+    }

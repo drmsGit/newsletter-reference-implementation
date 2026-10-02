@@ -14,6 +14,8 @@ from app.campaigns.models import (
     DuplicationOptions,
     DuplicationTarget,
     SuggestionRun,
+    DecisionSlotListed,
+    DecisionSlotStats,
     SubjectSuggestionResult,
     CampaignCreate,
     CampaignWithVariants,
@@ -661,3 +663,30 @@ def get_variant_suggestions(
     if runs is None:
         raise HTTPException(status_code=404, detail=f"Variant {variant_id} not found")
     return runs
+
+
+@router.get(
+    "/decision-slots",
+    response_model=list[DecisionSlotListed],
+    summary="Every decision slot in the working brand, with its resolution counts",
+)
+def get_decision_slots(db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
+    from app.campaigns.service import list_decision_slots_with_stats
+
+    return list_decision_slots_with_stats(db, brand_id=brand_id)
+
+
+@router.get(
+    "/decision-slots/{slot_id}/stats",
+    response_model=DecisionSlotStats,
+    summary="What one decision slot has picked: summary, top content, latest, reasons",
+)
+def get_decision_slot_stats(
+    slot_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.campaigns.service import decision_slot_stats
+
+    stats = decision_slot_stats(db, slot_id, brand_id=brand_id)
+    if stats is None:
+        raise HTTPException(status_code=404, detail=f"Decision slot {slot_id} not found")
+    return {**stats, "slot": to_decision_slot(stats["slot"])}

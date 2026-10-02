@@ -278,3 +278,68 @@ class SuggestionRun(BaseModel):
     notices: list[str]
     reply: str
     message: str | None = None
+
+
+class DecisionSlotListed(BaseModel):
+    """A decision slot in the brand, with what it has done (task-50, B21)."""
+
+    id: int
+    name: str
+    decision_type: str
+    decision_strategy: str
+    variant_id: int
+    variant_name: str
+    campaign_id: int
+    campaign_name: str
+    resolution_count: int
+    unique_content_count: int
+    last_resolution_at: datetime | None = None
+
+
+class SlotSummary(BaseModel):
+    resolution_count: int
+    unique_recipient_count: int
+    unique_content_count: int
+    avg_score: float
+    min_score: float
+    max_score: float
+    last_resolution_at: datetime | None = None
+
+
+class SlotTopContent(BaseModel):
+    content_id: int
+    title: str
+    version_number: int | None = None
+    selection_count: int
+    # Percent of this slot's resolutions.
+    share: float
+
+
+class SlotResolution(BaseModel):
+    id: int
+    recipient_id: int | None = None
+    content_record_id: int
+    content_title: str
+    content_version: int | None = None
+    score: float | None = None
+    reason: str | None = None
+    created_at: datetime
+
+
+class SlotReason(BaseModel):
+    reason: str | None = None
+    count: int
+
+
+class DecisionSlotStats(BaseModel):
+    """One slot and what it has picked (task-50, B22)."""
+
+    slot: DecisionSlot
+    variant_id: int
+    variant_name: str
+    campaign_id: int
+    campaign_name: str
+    summary: SlotSummary
+    top_content: list[SlotTopContent]
+    latest: list[SlotResolution]
+    reasons: list[SlotReason]

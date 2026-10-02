@@ -2681,72 +2681,11 @@ def decisions_list(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    slots = (
-        db.query(
-            DecisionSlotDB,
-            VariantDB.id.label("variant_id"),
-            VariantDB.name.label("variant_name"),
-            CampaignDB.id.label("campaign_id"),
-            CampaignDB.name.label("campaign_name"),
-            func.count(DecisionResolutionDB.id).label("resolution_count"),
-            func.count(func.distinct(DecisionResolutionDB.content_record_id)).label("unique_content_count"),
-            func.max(DecisionResolutionDB.created_at).label("last_resolution_at"),
-        )
-        .join(
-            VariantDB,
-            DecisionSlotDB.variant_id == VariantDB.id,
-        )
-        .join(
-            CampaignDB,
-            VariantDB.campaign_id == CampaignDB.id,
-        )
-        # A decision slot has no brand of its own — it inherits one through the
-        # variant's campaign, which is the only place the brand is recorded.
-        .filter(CampaignDB.brand_id == working_brand_id(request, db))
-        .outerjoin(
-            DecisionResolutionDB,
-            DecisionResolutionDB.decision_slot_id == DecisionSlotDB.id,
-        )
-        .group_by(
-            DecisionSlotDB.id,
-            VariantDB.id,
-            VariantDB.name,
-            CampaignDB.id,
-            CampaignDB.name,
-        )
-        .order_by(
-            CampaignDB.id.asc(),
-            VariantDB.id.asc(),
-            DecisionSlotDB.id.asc(),
-        )
-        .all()
-    )
+    from app.campaigns.service import list_decision_slots_with_stats
 
-    slot_rows = [
-        {
-            "id": slot.id,
-            "name": slot.name,
-            "decision_type": slot.decision_type,
-            "decision_strategy": slot.decision_strategy,
-            "variant_id": variant_id,
-            "variant_name": variant_name,
-            "campaign_id": campaign_id,
-            "campaign_name": campaign_name,
-            "resolution_count": resolution_count,
-            "unique_content_count": unique_content_count,
-            "last_resolution_at": last_resolution_at,
-        }
-        for (
-            slot,
-            variant_id,
-            variant_name,
-            campaign_id,
-            campaign_name,
-            resolution_count,
-            unique_content_count,
-            last_resolution_at,
-        ) in slots
-    ]
+    # The aggregate lives in the service since 2026-10-02 (task-50, B21), so
+    # GET /campaigns/decision-slots and this page are one query.
+    slot_rows = list_decision_slots_with_stats(db, brand_id=working_brand_id(request, db))
 
     return templates.TemplateResponse(
         request,
@@ -2765,30 +2704,12 @@ def decision_slot_detail(
     error: str | None = None,
     db: Session = Depends(get_db),
 ):
-    slot_context = (
-        db.query(
-            DecisionSlotDB,
-            VariantDB.id.label("variant_id"),
-            VariantDB.name.label("variant_name"),
-            CampaignDB.id.label("campaign_id"),
-            CampaignDB.name.label("campaign_name"),
-        )
-        .join(
-            VariantDB,
-            DecisionSlotDB.variant_id == VariantDB.id,
-        )
-        .join(
-            CampaignDB,
-            VariantDB.campaign_id == CampaignDB.id,
-        )
-        .filter(
-            DecisionSlotDB.id == decision_slot_id,
-            CampaignDB.brand_id == working_brand_id(request, db),
-        )
-        .first()
-    )
+    from app.campaigns.service import decision_slot_stats
 
-    if not slot_context:
+    # The figures live in the service since 2026-10-02 (task-50, B22), shared
+    # with GET /campaigns/decision-slots/{id}/stats.
+    stats = decision_slot_stats(db, decision_slot_id, brand_id=working_brand_id(request, db))
+    if stats is None:
         return templates.TemplateResponse(
             request,
             "decision_slot_detail.html",
@@ -2798,142 +2719,13 @@ def decision_slot_detail(
             },
         )
 
-    slot, variant_id, variant_name, campaign_id, campaign_name = slot_context
-
-    summary = (
-        db.query(
-            func.count(DecisionResolutionDB.id),
-            func.count(func.distinct(DecisionResolutionDB.recipient_id)),
-            func.count(func.distinct(DecisionResolutionDB.content_record_id)),
-            func.coalesce(func.avg(DecisionResolutionDB.score), 0),
-            func.coalesce(func.min(DecisionResolutionDB.score), 0),
-            func.coalesce(func.max(DecisionResolutionDB.score), 0),
-            func.max(DecisionResolutionDB.created_at),
-        )
-        .filter(
-            DecisionResolutionDB.decision_slot_id == decision_slot_id
-        )
-        .first()
-    )
-
-    resolution_summary = {
-        "resolution_count": summary[0],
-        "unique_recipient_count": summary[1],
-        "unique_content_count": summary[2],
-        "avg_score": round(float(summary[3]), 2),
-        "min_score": round(float(summary[4]), 2),
-        "max_score": round(float(summary[5]), 2),
-        "last_resolution_at": summary[6],
-    }
-
-    top_content = (
-        db.query(
-            ContentRecordDB.id,
-            ContentRecordDB.title,
-            ContentVersionDB.version_number,
-            func.count(DecisionResolutionDB.id).label("selection_count"),
-        )
-        .join(
-            ContentRecordDB,
-            DecisionResolutionDB.content_record_id == ContentRecordDB.id,
-        )
-        .outerjoin(
-            ContentVersionDB,
-            DecisionResolutionDB.content_version_id == ContentVersionDB.id,
-        )
-        .filter(
-            DecisionResolutionDB.decision_slot_id == decision_slot_id
-        )
-        .group_by(
-            ContentRecordDB.id,
-            ContentRecordDB.title,
-            ContentVersionDB.version_number,
-        )
-        .order_by(
-            desc("selection_count")
-        )
-        .limit(20)
-        .all()
-    )
-
-    total_resolutions = resolution_summary["resolution_count"] or 0
-
-    top_content_rows = [
-        {
-            "content_id": content_id,
-            "title": title,
-            "version_number": version_number,
-            "selection_count": selection_count,
-            "share": round((selection_count / total_resolutions) * 100, 2)
-            if total_resolutions
-            else 0,
-        }
-        for content_id, title, version_number, selection_count in top_content
-    ]
-
-    latest_resolutions = (
-        db.query(
-            DecisionResolutionDB,
-            ContentRecordDB.title,
-            ContentVersionDB.version_number,
-        )
-        .join(
-            ContentRecordDB,
-            DecisionResolutionDB.content_record_id == ContentRecordDB.id,
-        )
-        .outerjoin(
-            ContentVersionDB,
-            DecisionResolutionDB.content_version_id == ContentVersionDB.id,
-        )
-        .filter(
-            DecisionResolutionDB.decision_slot_id == decision_slot_id
-        )
-        .order_by(
-            DecisionResolutionDB.created_at.desc()
-        )
-        .limit(50)
-        .all()
-    )
-
-    latest_resolution_rows = [
-        {
-            "id": resolution.id,
-            "recipient_id": resolution.recipient_id,
-            "content_record_id": resolution.content_record_id,
-            "content_title": content_title,
-            "content_version": version_number,
-            "score": resolution.score,
-            "reason": resolution.reason,
-            "created_at": resolution.created_at,
-        }
-        for resolution, content_title, version_number in latest_resolutions
-    ]
-
-    reason_summary = (
-        db.query(
-            DecisionResolutionDB.reason,
-            func.count(DecisionResolutionDB.id).label("count"),
-        )
-        .filter(
-            DecisionResolutionDB.decision_slot_id == decision_slot_id
-        )
-        .group_by(
-            DecisionResolutionDB.reason
-        )
-        .order_by(
-            desc("count")
-        )
-        .limit(20)
-        .all()
-    )
-
-    reason_summary_rows = [
-        {
-            "reason": reason,
-            "count": count,
-        }
-        for reason, count in reason_summary
-    ]
+    slot = stats["slot"]
+    variant_id, variant_name = stats["variant_id"], stats["variant_name"]
+    campaign_id, campaign_name = stats["campaign_id"], stats["campaign_name"]
+    resolution_summary = stats["summary"]
+    top_content_rows = stats["top_content"]
+    latest_resolution_rows = stats["latest"]
+    reason_summary_rows = stats["reasons"]
 
     strategy_metas = list_strategies()
     supported_strategies = sorted(s.name for s in strategy_metas)
