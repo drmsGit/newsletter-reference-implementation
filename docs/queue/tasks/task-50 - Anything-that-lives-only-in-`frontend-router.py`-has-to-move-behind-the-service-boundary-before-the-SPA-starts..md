@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-27 13:56'
-updated_date: '2026-10-02 13:41'
+updated_date: '2026-10-02 17:51'
 labels:
   - backend
 dependencies: []
@@ -41,4 +41,6 @@ Migrated 2026-09-27 from `docs/backlog.md` line 148, section "Features", positio
 2026-10-02: graph JSON route done — GET /insight/category-graph (insight/router.py) returns the working brand's nodes and edges from insight.graph.category_graph, no layout. Two HTTP tests in tests/test_category_graph.py read a non-default brand, so a default-brand fallback fails them (mutation-checked). BRAND_OWNED /insight text updated. Suite 860 passed.
 
 2026-10-02: B27 done (except the non-member list, deliberately). GET /api/audience-groups/{id}/preview?channel= (channel required, registered) returns per-block counts, resolved / reachable / unreachable-by-stage after run_exclusion_stack (ADR-163 rider), and a 20-row sample with channel addresses; audience.service.preview_group, shared with the Jinja detail page. tests/test_audience_preview.py: 6 tests, four mutants caught (one only after a second assertion was added). Suite 885 passed. Remaining in task-50: the other read-model rows (B4 dashboard, B10 recipient detail, B11 campaign detail, B17 content detail, B20-B22 categories/decisions, B23/B24 deliveries pages) and C5/C7/C10-C13 one-line capability gaps.
+
+2026-10-02, remaining rows, part 1. Security pass first: task-241 (four cross-brand Jinja paths; S1 turned out not to render, fixed anyway). Campaigns surface done: C7 GET /campaigns/variants/{id}/suggestions; B21 GET /campaigns/decision-slots; B22 GET /campaigns/decision-slots/{id}/stats; B11 GET /campaigns/{id}/composition — each from a campaigns/ai service function the Jinja page now shares; found on the way, the page's override rule still counted slot modules (now overrides.service.is_overrideable). tests/test_read_models.py, every scope and rule mutation-checked. Suite 969 passed. Still open: content (B17 + C5 JSON), deliveries (B23, B24), audience (C11, C12, C13 JSON), B4 dashboard, B10 recipient detail (with the S5 cross-brand leak), B20 category detail (S6) + C10.
 <!-- SECTION:NOTES:END -->
