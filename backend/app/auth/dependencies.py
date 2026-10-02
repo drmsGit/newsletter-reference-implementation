@@ -402,6 +402,31 @@ def require_person(request: Request, db: Session = Depends(get_db)) -> None:
         raise MachineRefused()
 
 
+def require_person_with(permission: str):
+    """A person, holding a platform-level `permission` — never a machine.
+
+    For the integration-management routes (ADR-166 addendum 2026-10-02): a
+    bearer credential holding `integrations.manage` could otherwise mint keys
+    with any grants for itself, which is effectively root. Refused as
+    `MachineRefused` before the permission is looked at, so the answer does not
+    depend on what the credential holds.
+
+    **Also the guard a GET needs.** `policy.required_permission` answers `view`
+    for every GET, so a table entry covers the writes and leaves the list
+    readable by anyone who can sign in — the trap `/ui/integrations` documents.
+    """
+
+    def guard(request: Request, db: Session = Depends(get_db)) -> None:
+        require_person(request, db)
+        if not auth_is_enforced(request):
+            return
+        principal = request_principal(request)
+        if not has_permission(db, principal, permission, brand_id=ALL_BRANDS):
+            raise NotAuthorised(permission)
+
+    return guard
+
+
 def _declared_brand(request: Request) -> int | None:
     raw = (request.headers.get(BRAND_HEADER) or "").strip()
     if not raw:

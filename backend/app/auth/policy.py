@@ -184,6 +184,7 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
     # `credentials.manage` — ADR-152 scopes that key to credentials the
     # platform HOLDS, and these are ones it ISSUES (ADR-166 point 4).
     ("/ui/integrations", INTEGRATIONS_MANAGE),
+    ("/integrations", INTEGRATIONS_MANAGE),
     ("/ui/settings", SETTINGS_MANAGE),
     ("/ui/users", USERS_MANAGE),
     ("/ui/roles", USERS_MANAGE),
@@ -341,6 +342,11 @@ BRAND_OWNED: dict[str, str] = {
         "no — provider configuration and signed callbacks. A webhook arrives "
         "from a vendor with no notion of brands, and is exempt from the guard "
         "entirely via `PROVIDER_SIGNED`."
+    ),
+    "/integrations": (
+        "no — an integration is platform-level, like `integrations.manage` itself. "
+        "Its GRANTS name a brand each; granting is checked against the grantor's "
+        "own holding on that brand (`grant_by_person`)."
     ),
     "/approvals": (
         "yes — `pending_actions.brand_id`, set to the brand the request was "

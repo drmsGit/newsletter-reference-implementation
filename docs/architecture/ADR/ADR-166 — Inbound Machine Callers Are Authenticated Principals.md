@@ -8,7 +8,7 @@ topic:
   - automation
   - governance
 created: 2026-09-13
-modified: 2026-09-19
+modified: 2026-10-02
 source:
   - "Machine authentication design interview (2026-09-13)"
 depends_on:
@@ -186,6 +186,63 @@ books the obligation rather than treating it as discharged.
 **Unchanged:** points 1 through 8, and build-notes 2, 3 and 4. A developer may
 still issue themselves an integration key, and that remains the right mechanism
 for a script; what changes is that a person at a browser is no longer required to.
+
+## Addendum 2026-10-02 — integration management becomes JSON routes, person-only, with no escalation
+
+Prompted by task-50 (C14). The operations that manage integrations — create an
+integration, issue and revoke a credential, add and remove a grant, set unattended
+sending, deactivate — had no JSON equivalent and lived only in
+`backend/frontend/router.py`, which [[ADR-170 — The Manager Client Is a Plain React SPA, Not Next.js]]
+gives a deletion date. The manager SPA cannot administer integrations until they
+exist as JSON. **This does not touch the Decision.** It decides three things the
+Decision left open, and it changes one behaviour that was in force until today.
+
+**1. The routes are person-only: a machine credential is refused, even one holding
+`integrations.manage`.** The routes sit under `/integrations` and use the same
+`require_person` guard that approve and reject use (point 5 above;
+[[ADR-168 — The Manager SPA Authenticates With Its Session Cookie]], addendum
+2026-09-19). The reason is plain: a machine holding `integrations.manage` could mint
+credentials with any grants, for itself or for others, which defeats every grant
+the platform holds — it would be effectively root. Point 4's "any holder may hold
+it" still holds for **roles**, which are people. It never meant that a machine may
+hold the permission *for use against these routes*. A machine can still be granted
+the permission string — `grant()` accepts it, and nothing here changes that — but
+the routes refuse it. Saying that plainly is the point: the grant is possible and
+inert, which is a quirk to document rather than to let someone discover.
+
+**2. No escalation: a person may grant an integration permission P on brand B only
+if they themselves hold P on B.** The check is `has_permission` against B, and it
+applies to platform-level permissions too: a grant row on a brand lets the machine
+declare that brand in `X-Brand`, so even `view` (not brand-scoped) would otherwise
+let someone with nothing on brand B open it to a machine. A brand that does not
+exist and a brand the grantor holds nothing on answer identically. It is enforced in the
+service layer, in `grant_by_person` in `backend/app/auth/integrations.py` (`grant`
+stays the unchecked primitive for the test harness and bootstrap), and not in the
+route, so the Jinja page gets the same rule as the JSON route. **This changes prior
+behaviour.** Until today any `integrations.manage` holder could grant any
+permission on any brand. The consequence to expect: an Admin on brand A only can
+no longer grant anything on brand B.
+
+**3. The secret is returned once, in the response body of the issue-credential
+route, with `Cache-Control: no-store`, and never in a URL.** Point 3's
+shown-once rule stands, as does [[ADR-152 — Secret and Credential Handling]] §4's
+ban on returning a stored credential. The list route returns each integration with
+its grants, key ids, labels, created, last-used and revoked times and the
+unattended flag, and **never a hash or a secret**.
+
+**The Notes' open question now has a read surface, and the gap is not closed by
+it.** The "integration list showing live credentials" that the Notes recorded as an
+open question exists as JSON and as the Jinja page. It is the review surface
+those Notes described. Exactly as they said, building it does not close point 4's
+gap: a credential still outlives the person who issued it, and the list only makes
+the stale key visible to someone who goes and looks.
+
+**Still open, and not decided here.** Step-up or second approval for granting
+`sends.execute` — a person who holds it may now grant it to an integration with one
+action. Credential expiry — a key lives until someone revokes it. Both are
+recorded as gaps rather than answered. The wider scope question for the person's
+own access remains with [[ADR-150 — Tenancy and Access Model]]; the human
+counterpart of step-up remains open in [[ADR-151 — Authentication and Sessions]].
 
 ## Related ADRs
 

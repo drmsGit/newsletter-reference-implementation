@@ -21,7 +21,7 @@ from app.auth.db_models import (
     IntegrationGrantDB,
 )
 from app.auth.permissions import ALL_PERMISSIONS
-from app.auth.service import hash_secret, now
+from app.auth.service import has_permission, hash_secret, list_brands, now
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +133,41 @@ def grant(db: Session, integration_id: int, permission: str, brand_id: int) -> b
     return True
 
 
+class GrantForbidden(ValueError):
+    """The person granting does not hold what they were asked to give."""
+
+
+def grant_by_person(
+    db: Session, actor, integration_id: int, permission: str, brand_id: int,
+    *, enforced: bool = True,
+) -> bool:
+    """`grant`, for a person: **they may give only what they hold** (task-50).
+
+    ADR-166's addendum of 2026-10-02. Until then any holder of
+    `integrations.manage` could grant any permission on any brand, so an Admin
+    of brand A could hand a machine `sends.execute` on brand B — a power they
+    did not themselves have. Now `permission` on `brand_id` must be one the
+    actor holds on THAT brand — for platform-level permissions too. A grant row
+    on a brand lets the machine declare that brand in `X-Brand` (the guard's
+    "holds no grant on it" check), so even `view`, which is not brand-scoped,
+    would otherwise let someone with nothing on brand B open it to a machine.
+
+    **A brand that does not exist and a brand the actor holds nothing on answer
+    identically**, for the reason `duplication.require_target_access` gives.
+    `grant` itself stays the unchecked primitive the test harness and the
+    bootstrap use; a route handling a person must come through here.
+
+    `enforced=False` is the auth-off posture, where nobody is signed in.
+    """
+    if enforced:
+        known = any(b.id == brand_id for b in list_brands(db))
+        if not known or not has_permission(db, actor, permission, brand_id=brand_id):
+            raise GrantForbidden(
+                f"You cannot grant {permission} on that brand: you do not hold it there."
+            )
+    return grant(db, integration_id, permission, brand_id)
+
+
 def revoke_grant(db: Session, integration_id: int, permission: str, brand_id: int) -> bool:
     removed = db.query(IntegrationGrantDB).filter(
         IntegrationGrantDB.integration_id == integration_id,
@@ -177,11 +212,19 @@ def issue_credential(
     return credential, secret
 
 
-def revoke_credential(db: Session, credential_id: int, at: datetime | None = None) -> bool:
-    credential = db.query(IntegrationCredentialDB).filter(
+def revoke_credential(
+    db: Session, credential_id: int, at: datetime | None = None,
+    *, integration_id: int | None = None,
+) -> bool:
+    """`integration_id`, when given, must own the credential — otherwise a
+    route naming one integration could revoke another's key."""
+    query = db.query(IntegrationCredentialDB).filter(
         IntegrationCredentialDB.id == credential_id,
         IntegrationCredentialDB.revoked_at.is_(None),
-    ).first()
+    )
+    if integration_id is not None:
+        query = query.filter(IntegrationCredentialDB.integration_id == integration_id)
+    credential = query.first()
     if credential is None:
         return False
     credential.revoked_at = at or now()

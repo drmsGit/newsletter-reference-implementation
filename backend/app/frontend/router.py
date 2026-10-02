@@ -4052,6 +4052,7 @@ def _integrations_context(request: Request, db: Session, **extra):
 @router.get("/ui/integrations")
 def integrations_page(
     request: Request,
+    error: str | None = None,
     db: Session = Depends(get_db),
     _user=Depends(require_permission(INTEGRATIONS_MANAGE)),
 ):
@@ -4065,7 +4066,7 @@ def integrations_page(
     last used, and whether it may send without approval.
     """
     return templates.TemplateResponse(
-        request, "integrations.html", _integrations_context(request, db),
+        request, "integrations.html", _integrations_context(request, db, error=error),
     )
 
 
@@ -4129,6 +4130,7 @@ def integration_revoke_key(
 
 @router.post("/ui/integrations/{integration_id}/grants")
 def integration_grant(
+    request: Request,
     integration_id: int,
     permission: str = Form(...),
     brand_id: int = Form(...),
@@ -4136,7 +4138,15 @@ def integration_grant(
 ):
     from app.auth import integrations as ints
 
-    ints.grant(db, integration_id, permission, brand_id)
+    try:
+        ints.grant_by_person(
+            db, user_for_token(db, request.cookies.get(SESSION_COOKIE)),
+            integration_id, permission, brand_id,
+            enforced=getattr(request.state, "auth_enforced", True),
+        )
+    except ints.GrantForbidden as error:
+        return RedirectResponse(
+            url="/ui/integrations?error=" + quote(str(error)), status_code=303)
     return RedirectResponse(url="/ui/integrations", status_code=303)
 
 

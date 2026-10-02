@@ -8,6 +8,10 @@
     without touching the others.
 </p>
 
+{% if error %}
+<div class="alert alert-danger" role="alert">{{ error }}</div>
+{% endif %}
+
 {% if issued %}
 <div class="alert alert-warning">
     <h5 class="alert-heading">Copy this key now — it is not shown again</h5>
