@@ -17,7 +17,7 @@ from datetime import datetime, timezone, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sqlalchemy import text
+from sqlalchemy import func, text
 
 from app.auth.service import ensure_default_brand
 from app.campaigns.service import set_envelope_fields
@@ -99,7 +99,10 @@ RELATIONS = [
 BRAND_ID: int | None = None
 
 
-def seed():
+def seed(extended: bool = False):
+    """The demo dataset. `extended=True` adds what the dev demo needs and the
+    test suite deliberately does not (see `_seed_extras`); the suite calls
+    `seed()`, so its baseline stays the single-brand fixture."""
     db = SessionLocal()
     try:
         _truncate(db)
@@ -262,6 +265,16 @@ def seed():
                 "subject": f"Edition {ci}: picked for you",
                 "preheader": "Your personalized selection",
             }, brand_id=BRAND_ID)
+            # The hero is a content module, so it needs a record: unbound it
+            # rendered hidden (ADR-086). Its own small published record, with
+            # the field the hero manifest reads.
+            hero_content = {"headline_hero": f"Edition {ci}", "button_label_hero": "Start reading",
+                            "button_url": "https://example.com/editions"}
+            hero_rec = ContentRecordDB(title=f"Edition {ci} hero", content=hero_content,
+                                       status="active", brand_id=BRAND_ID)
+            db.add(hero_rec); db.flush()
+            db.add(ContentVersionDB(content_record_id=hero_rec.id, version_number=1,
+                                    content=hero_content, created_by="demo"))
             slot = DecisionSlotDB(
                 variant_id=variant.id, name="Main Content Slot",
                 decision_type="content_recommendation", decision_strategy="recipient_top_score",
@@ -270,9 +283,13 @@ def seed():
             )
             db.add(slot); db.flush()
             db.add_all([
-                ModuleInstanceDB(variant_id=variant.id, module_type="hero", position=1, module_data={"headline": f"Edition {ci}"}),
+                ModuleInstanceDB(variant_id=variant.id, module_type="hero", position=1, content_record_id=hero_rec.id, module_data={}),
                 ModuleInstanceDB(variant_id=variant.id, module_type="img_left", position=2, decision_slot_id=slot.id),
-                ModuleInstanceDB(variant_id=variant.id, module_type="cta", position=3, module_data={"button_label": "Explore"}),
+                # `label` and `url` are the cta manifest's required fields. The
+                # seed wrote `button_label` until 2026-10-02, so every demo
+                # campaign was refused at send for missing required content.
+                ModuleInstanceDB(variant_id=variant.id, module_type="cta", position=3,
+                                 module_data={"label": "Explore", "url": "https://example.com/explore"}),
             ])
             slots.append((slot, variant))
         db.commit()
@@ -350,6 +367,9 @@ def seed():
                 event_count += 1
         db.commit()
 
+        if extended:
+            _seed_extras(db, recipients, cat, slots)
+
         # --- summary ----------------------------------------------------
         print("Demo data seeded:")
         print("  categories:", db.query(CategoryDB).count(), "| relations:", db.query(CategoryRelationDB).count())
@@ -358,9 +378,148 @@ def seed():
         print("  campaigns:", db.query(CampaignDB).count(), "| decision resolutions:", db.query(DecisionResolutionDB).count())
         print("  engagement events:", db.query(EngagementEventDB).count())
         print("  signal contributions:", db.query(SignalContributionDB).count())
+        if extended:
+            from app.audience.db_models import AudienceGroupDB
+            from app.auth.db_models import BrandDB
+
+            print("  brands:", db.query(BrandDB).count(),
+                  "| audience groups:", db.query(AudienceGroupDB).count())
+            print("  sends:", db.query(SendInstanceDB).count(), "| executions with a delivery record:",
+                  db.query(DeliveryExecutionDB).filter(DeliveryExecutionDB.delivery_record.isnot(None)).count())
+            print("  variants by channel:", dict(
+                db.query(VariantDB.channel, func.count(VariantDB.id)).group_by(VariantDB.channel).all()))
     finally:
         db.close()
 
 
+def _seed_extras(db, recipients, cat, slots) -> None:
+    """What the dev demo needs beyond the test baseline (2026-10-02).
+
+    Kept out of `seed()`'s default on purpose: the suite's baseline is a
+    single-brand, email-only fixture "so the suite keeps exercising the
+    degenerate case ADR-150 point 4 promises is free". Four additions:
+
+      1. an audience group, because planning a send needs one;
+      2. a real send of Demo Campaign 2 through `send_send_instance`, so its
+         executions carry delivery records and "as sent" answers (ADR-183);
+      3. a push variant on Demo Campaign 3, with push content, and push consent
+         and device tokens for 15 recipients;
+      4. a second brand with its own content, campaign and consent, and an
+         admin grant for every admin of the default brand, so duplication,
+         the per-brand graph and the grant rules have something to work on.
+    """
+    from app.audience.service import add_block, create_group
+    from app.auth.db_models import BrandDB, RoleAssignmentDB, RoleDB
+    from app.campaigns.service import create_module_for_variant, create_variant_for_campaign
+    from app.delivery.service import prepare_send_from_audience, send_send_instance
+    from app.snapshots.service import create_snapshot_for_variant
+
+    from app.audience.db_models import AudienceGroupDB
+    from app.audience.service import add_member
+
+    def group_named(name, description):
+        # `_truncate` empties groups through CASCADE today; get-or-create so a
+        # change to that list cannot turn a re-seed into a duplicate-name error.
+        existing = db.query(AudienceGroupDB).filter(
+            AudienceGroupDB.brand_id == BRAND_ID, AudienceGroupDB.name == name).first()
+        return existing or create_group(db, name, brand_id=BRAND_ID, description=description)
+
+    # 1. everyone who consents, on the channel a send asks about
+    everyone = group_named("All demo recipients", "Every demo recipient with consent (seeded)")
+    from app.audience.db_models import AudienceRuleBlockDB
+
+    if db.query(AudienceRuleBlockDB).filter(AudienceRuleBlockDB.group_id == everyone.id).count() == 0:
+        add_block(db, everyone.id, kind="include", criteria={}, label="everyone", brand_id=BRAND_ID)
+
+    # 2. a real send: snapshot (a frame), plan, fire — through the real path.
+    # To a small pinned sample rather than everyone, so it fits a deployment
+    # whose send cap was lowered (a dev database had it at 10): the seed must
+    # not change a setting somebody chose.
+    sample = group_named("Seed send sample", "Eight pinned demo recipients (seeded)")
+    for r in recipients[:8]:
+        add_member(db, sample.id, r.id, brand_id=BRAND_ID)
+    variant_2 = slots[1][1]
+    snapshot = create_snapshot_for_variant(db, variant_2.id, brand_id=BRAND_ID)
+    send = prepare_send_from_audience(
+        db, snapshot_id=snapshot.id, name="Edition 2 (sent by the seed)",
+        audience_group_id=sample.id, provider="mock", brand_id=BRAND_ID,
+    )
+    send_send_instance(db, send.id, brand_id=BRAND_ID)
+
+    # 3. a push variant, and people who can receive it
+    push_content = {"push_title": "Your weekend pick", "push_body": "Three trips we think you'll like.",
+                    "push_link": "https://example.com/weekend"}
+    push_rec = ContentRecordDB(title="Weekend pick (push)", content=push_content,
+                               status="active", brand_id=BRAND_ID)
+    db.add(push_rec); db.flush()
+    db.add(ContentVersionDB(content_record_id=push_rec.id, version_number=1,
+                            content=push_content, created_by="demo"))
+    db.commit()
+    campaign_3 = slots[2][1].campaign_id
+    push_variant = create_variant_for_campaign(db, campaign_3, name="Variant 3 (push)",
+                                               channel="push", brand_id=BRAND_ID)
+    create_module_for_variant(db, variant_id=push_variant.id, module_type="notification",
+                              content_record_id=push_rec.id, brand_id=BRAND_ID)
+    for i, r in enumerate(recipients[:15], start=1):
+        db.add(ConsentEventDB(recipient_id=r.id, brand_id=BRAND_ID, channel="push",
+                              purpose="marketing", status="opted_in", source="seed",
+                              note="seed_demo_data.py (extended)"))
+        db.add(AddressabilityDB(recipient_id=r.id, channel="push",
+                                value={"token": f"demo-token-{i:03d}", "platform": "apns"},
+                                status="active", is_primary=True))
+    db.commit()
+
+    # 4. a second brand, which `_truncate` leaves in place, so ensure it
+    brand_b = db.query(BrandDB).filter(BrandDB.key == "demo-b").first()
+    if brand_b is None:
+        brand_b = BrandDB(key="demo-b", name="Demo Brand B")
+        db.add(brand_b); db.commit()
+    admin = db.query(RoleDB).filter(RoleDB.key == "admin").first()
+    if admin is not None:
+        for assignment in db.query(RoleAssignmentDB).filter(
+            RoleAssignmentDB.role_id == admin.id, RoleAssignmentDB.brand_id == BRAND_ID,
+        ).all():
+            exists = db.query(RoleAssignmentDB).filter(
+                RoleAssignmentDB.user_id == assignment.user_id,
+                RoleAssignmentDB.role_id == admin.id,
+                RoleAssignmentDB.brand_id == brand_b.id,
+            ).first()
+            if exists is None:
+                db.add(RoleAssignmentDB(user_id=assignment.user_id, role_id=admin.id,
+                                        brand_id=brand_b.id))
+        db.commit()
+    b_records = []
+    for i, name in enumerate(["Beach", "City", "Food", "Wellness", "Family",
+                              "Culture", "Nature", "Luxury", "Hiking", "Adventure"], start=1):
+        body = {"headline_medium": f"Brand B: {name} #{i}",
+                "body_medium": f"Brand B's take on {name.lower()}.", "button_label": "Read more"}
+        rec = ContentRecordDB(title=f"Brand B {name} #{i}", content=body, status="active",
+                              brand_id=brand_b.id)
+        db.add(rec); db.flush()
+        db.add(ContentVersionDB(content_record_id=rec.id, version_number=1, content=body,
+                                created_by="demo"))
+        db.add(ContentCategoryAssignmentDB(content_id=rec.id, category_id=cat[name].id, score=8))
+        b_records.append(rec)
+    campaign_b = CampaignDB(name="Brand B newsletter", status="draft", brand_id=brand_b.id)
+    db.add(campaign_b); db.flush()
+    variant_b = VariantDB(campaign_id=campaign_b.id, channel="email", name="Variant B1", status="draft")
+    db.add(variant_b); db.flush()
+    db.commit()
+    set_envelope_fields(db, variant_b.id, {"subject": "Brand B: this month",
+                                           "preheader": "From Demo Brand B"}, brand_id=brand_b.id)
+    db.add_all([
+        ModuleInstanceDB(variant_id=variant_b.id, module_type="img_left", position=2,
+                         content_record_id=b_records[0].id, module_data={}),
+        ModuleInstanceDB(variant_id=variant_b.id, module_type="cta", position=3,
+                         module_data={"label": "Visit Brand B", "url": "https://example.com/brand-b"}),
+    ])
+    for r in recipients[:20]:
+        db.add(ConsentEventDB(recipient_id=r.id, brand_id=brand_b.id, channel="email",
+                              purpose="marketing", status="opted_in", source="seed",
+                              note="seed_demo_data.py (extended)"))
+    db.commit()
+
+
 if __name__ == "__main__":
-    seed()
+    # The dev demo: the extended set. The test suite calls `seed()` directly.
+    seed(extended=True)
