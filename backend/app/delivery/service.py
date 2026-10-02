@@ -6,7 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
-from app.delivery.models import DeliveryExecution, SendInstance, SendInstanceDetail
+from app.delivery.models import DeliveryExecution, SendInstance, SendInstanceDetail, SendInstanceListed
 
 from app.campaigns.db_models import VariantDB
 from app.delivery.exclusion import run_exclusion_stack
@@ -92,8 +92,20 @@ def list_delivery_executions_for_send_instance(
         .order_by(DeliveryExecutionDB.created_at.desc())
         .all()
     )
+    from app.recipients.db_models import RecipientDB
 
-    return [to_delivery_execution(record) for record in records]
+    external = dict(
+        db.query(RecipientDB.id, RecipientDB.external_id)
+        .filter(RecipientDB.id.in_({r.recipient_id for r in records})).all()
+    ) if records else {}
+    return [
+        to_delivery_execution(record).model_copy(update={
+            "recipient_external_id": external.get(record.recipient_id),
+            "exclusion_reason": record.exclusion_reason,
+            "sent_at": record.sent_at,
+        })
+        for record in records
+    ]
 
 
 def get_send_instance(
@@ -153,7 +165,46 @@ def list_send_instances(
         query.order_by(SendInstanceDB.created_at.desc(), SendInstanceDB.id.desc())
         .offset(offset).limit(limit).all()
     )
-    return [to_send_instance(record) for record in records]
+    if not records:
+        return []
+    # Three grouped queries for the page, not three per send (task-50, B23).
+    from sqlalchemy import func
+
+    from app.campaigns.db_models import CampaignDB
+    from app.insight.db_models import EngagementEventDB
+    from app.snapshots.db_models import SnapshotDB
+
+    ids = [r.id for r in records]
+    sources = {
+        snapshot_id: (cid, cname, vid, vname)
+        for snapshot_id, cid, cname, vid, vname in (
+            db.query(SnapshotDB.id, CampaignDB.id, CampaignDB.name, VariantDB.id, VariantDB.name)
+            .join(VariantDB, VariantDB.id == SnapshotDB.variant_id)
+            .join(CampaignDB, CampaignDB.id == VariantDB.campaign_id)
+            .filter(SnapshotDB.id.in_({r.snapshot_id for r in records}))
+            .all()
+        )
+    }
+    executions = dict(
+        db.query(DeliveryExecutionDB.send_instance_id, func.count(DeliveryExecutionDB.id))
+        .filter(DeliveryExecutionDB.send_instance_id.in_(ids))
+        .group_by(DeliveryExecutionDB.send_instance_id).all()
+    )
+    events = dict(
+        db.query(DeliveryExecutionDB.send_instance_id, func.count(EngagementEventDB.id))
+        .join(EngagementEventDB, EngagementEventDB.delivery_execution_id == DeliveryExecutionDB.id)
+        .filter(DeliveryExecutionDB.send_instance_id.in_(ids))
+        .group_by(DeliveryExecutionDB.send_instance_id).all()
+    )
+    listed = []
+    for record in records:
+        cid, cname, vid, vname = sources.get(record.snapshot_id, (None, None, None, None))
+        listed.append(SendInstanceListed(
+            **to_send_instance(record).model_dump(),
+            campaign_id=cid, campaign_name=cname, variant_id=vid, variant_name=vname,
+            execution_count=executions.get(record.id, 0), event_count=events.get(record.id, 0),
+        ))
+    return listed
 
 
 def send_instance_detail(
@@ -178,10 +229,17 @@ def send_instance_detail(
         if reason:
             stage = reason.split(":", 1)[0].strip()
             by_stage[stage] = by_stage.get(stage, 0) + 1
+    group_name = None
+    if record.audience_group_id is not None:
+        from app.audience.db_models import AudienceGroupDB
+
+        group = db.get(AudienceGroupDB, record.audience_group_id)
+        group_name = group.name if group is not None else None
     return SendInstanceDetail(
         **to_send_instance(record).model_dump(),
         execution_count=len(reasons),
         exclusions_by_stage=by_stage,
+        audience_group_name=group_name,
     )
 
 

@@ -2868,70 +2868,39 @@ def delivery_detail(
         .all()
     )
 
+    # The trace is `insight.service.event_trace`, shared with
+    # GET /delivery/executions/{id}/trace (task-50, B24): two queries for the
+    # whole send, where this loop made one per execution and one per event.
+    from app.insight.service import event_trace
+
+    trace = event_trace(db, [e.id for e in executions], brand_id=working_brand_id(request, db))
+    external_ids = dict(
+        db.query(RecipientDB.id, RecipientDB.external_id)
+        .filter(RecipientDB.id.in_({e.recipient_id for e in executions})).all()
+    ) if executions else {}
     execution_rows = []
-
     for execution in executions:
-        recipient = (
-            db.query(RecipientDB)
-            .filter(RecipientDB.id == execution.recipient_id)
-            .first()
-        )
-
-        events = (
-            db.query(EngagementEventDB)
-            .filter(EngagementEventDB.delivery_execution_id == execution.id)
-            .order_by(EngagementEventDB.created_at.desc())
-            .all()
-        )
-
-        event_rows = []
-
-        for event in events:
-            preference_updates = (
-                db.query(
-                    SignalContributionDB,
-                    CategoryDB.name,
-                )
-                .join(
-                    CategoryDB,
-                    SignalContributionDB.category_id == CategoryDB.id,
-                )
-                .filter(
-                    SignalContributionDB.event_id == event.id
-                )
-                .all()
-            )
-
-            event_rows.append(
-                {
-                    "id": event.id,
-                    "event_type": event.event_type,
-                    "provider": event.provider,
-                    "provider_event_id": event.provider_event_id,
-                    "event_data_pretty": json.dumps(
-                        event.event_data or {},
-                        indent=2,
-                        ensure_ascii=False,
-                    ),
-                    "occurred_at": event.occurred_at,
-                    "created_at": event.created_at,
-                    "preference_updates": [
-                        {
-                            "category_name": category_name,
-                            "previous_score": None,
-                            "delta": update.base_weight,
-                            "new_score": None,
-                            "reason": update.contribution_type,
-                        }
-                        for update, category_name in preference_updates
-                    ],
-                }
-            )
-
+        event_rows = [
+            {
+                "id": event["id"],
+                "event_type": event["event_type"],
+                "provider": event["provider"],
+                "provider_event_id": event["provider_event_id"],
+                "event_data_pretty": json.dumps(event["event_data"] or {}, indent=2, ensure_ascii=False),
+                "occurred_at": event["occurred_at"],
+                "created_at": event["created_at"],
+                "preference_updates": [
+                    {"category_name": c["category_name"], "previous_score": None,
+                     "delta": c["base_weight"], "new_score": None, "reason": c["contribution_type"]}
+                    for c in event["contributions"]
+                ],
+            }
+            for event in trace.get(execution.id, [])
+        ]
         execution_rows.append(
             {
                 "id": execution.id,
-                "recipient_external_id": recipient.external_id if recipient else None,
+                "recipient_external_id": external_ids.get(execution.recipient_id),
                 "recipient_id": execution.recipient_id,
                 "status": execution.status,
                 "provider": execution.provider,

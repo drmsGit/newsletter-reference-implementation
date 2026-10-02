@@ -15,6 +15,8 @@ from app.delivery.models import (
     SendInstanceDetail,
     SendPlanRequest,
     DeliveryAsSent,
+    ExecutionTrace,
+    SendInstanceListed,
 )
 from app.delivery.service import (
     send_test_email,
@@ -137,7 +139,7 @@ def plan_send(
 
 @router.get(
     "/send-instances",
-    response_model=list[SendInstance],
+    response_model=list[SendInstanceListed],
     summary="List sends in the working brand, newest first",
 )
 def get_send_instances(
@@ -341,3 +343,31 @@ def get_delivery_as_sent(
     if result is None:
         raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
     return result
+
+
+@router.get(
+    "/executions/{execution_id}/trace",
+    response_model=ExecutionTrace,
+    summary="One execution's engagement events and what each taught the profile",
+    description=(
+        "Each event newest first, with the signal contributions it produced "
+        "(category, weight, type). An event that named no content produced none "
+        "(ADR-182). 404 when the execution is not in the working brand."
+    ),
+)
+def get_execution_trace(
+    execution_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
+    from app.insight.service import event_trace
+
+    found = (
+        db.query(DeliveryExecutionDB.id)
+        .join(SendInstanceDB, SendInstanceDB.id == DeliveryExecutionDB.send_instance_id)
+        .filter(DeliveryExecutionDB.id == execution_id, SendInstanceDB.brand_id == brand_id)
+        .first()
+    )
+    if found is None:
+        raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
+    return {"execution_id": execution_id,
+            "events": event_trace(db, [execution_id], brand_id=brand_id).get(execution_id, [])}

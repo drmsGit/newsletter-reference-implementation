@@ -346,3 +346,101 @@ class TestB17ContentDetailAndC5:
                 db.execute(text(f"DELETE FROM {table} WHERE user_id = :u"), {"u": user.id})
             db.execute(text("DELETE FROM users WHERE id = :u"), {"u": user.id})
             db.commit()
+
+
+class TestB23B24Deliveries:
+    """Against the seed's "Demo send": 32 executions with clicks and the
+    contributions those clicks produced."""
+
+    @pytest.fixture
+    def demo(self, db):
+        from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
+        from app.insight.db_models import EngagementEventDB
+
+        send = db.query(SendInstanceDB).filter(SendInstanceDB.name == "Demo send").one()
+        clicked = (db.query(DeliveryExecutionDB).join(
+            EngagementEventDB, EngagementEventDB.delivery_execution_id == DeliveryExecutionDB.id)
+            .filter(DeliveryExecutionDB.send_instance_id == send.id).first())
+        return send, clicked
+
+    def test_the_list_says_what_each_send_sent_with_live_counts(self, demo):
+        send, _ = demo
+        with machine([VIEW]) as headers:
+            rows = client.get("/delivery/send-instances", params={"limit": 200}, headers=headers).json()
+        row = next(r for r in rows if r["id"] == send.id)
+        assert row["campaign_name"] == "Demo Campaign 1" and row["variant_name"]
+        assert row["execution_count"] == 32 and row["event_count"] > 0
+
+    def test_executions_say_who_and_why(self, demo):
+        send, _ = demo
+        with machine([VIEW]) as headers:
+            rows = client.get(f"/delivery/send-instances/{send.id}/executions", headers=headers).json()
+        assert all(r["recipient_external_id"].startswith("demo-") for r in rows)
+
+    def test_the_trace_carries_what_each_click_taught(self, demo):
+        _, clicked = demo
+        with machine([VIEW]) as headers:
+            body = client.get(f"/delivery/executions/{clicked.id}/trace", headers=headers).json()
+        assert body["events"], "the seeded click events are missing"
+        assert any(c["category_name"] for e in body["events"] for c in e["contributions"])
+
+    def test_another_brand_cannot_trace_this_execution(self, demo, foreign_api):
+        _, clicked = demo
+        with foreign_api([VIEW]) as headers:
+            response = client.get(f"/delivery/executions/{clicked.id}/trace", headers=headers)
+        assert response.status_code == 404
+
+    def test_the_detail_names_its_audience(self, db, default_brand):
+        from app.audience.db_models import AudienceGroupDB
+        from app.delivery.db_models import SendInstanceDB
+        from app.snapshots.db_models import SnapshotDB
+
+        group = AudienceGroupDB(brand_id=default_brand.id, name=f"rm-{uuid.uuid4().hex[:6]}")
+        db.add(group); db.flush()
+        snapshot_id = db.query(SnapshotDB.id).order_by(SnapshotDB.id).first()[0]
+        send = SendInstanceDB(snapshot_id=snapshot_id, brand_id=default_brand.id, name="rm",
+                              status="draft", provider="mock", audience_group_id=group.id)
+        db.add(send); db.commit()
+        try:
+            with machine([VIEW]) as headers:
+                body = client.get(f"/delivery/send-instances/{send.id}", headers=headers).json()
+            assert body["audience_group_name"] == group.name
+        finally:
+            db.query(SendInstanceDB).filter(SendInstanceDB.id == send.id).delete()
+            db.query(AudienceGroupDB).filter(AudienceGroupDB.id == group.id).delete()
+            db.commit()
+
+    def test_the_jinja_detail_still_shows_the_trace(self, db, demo):
+        from sqlalchemy import text
+
+        from app.auth import service as auth
+
+        send, clicked = demo
+        user = auth.create_user(db, email=f"rm-{uuid.uuid4().hex[:8]}@example.invalid", role_key="viewer")
+        token = auth.create_session(db, user)
+        page_client = TestClient(app, raise_server_exceptions=False)
+        page_client.cookies.set(auth.SESSION_COOKIE, token)
+        try:
+            page = page_client.get(f"/ui/deliveries/send-instances/{send.id}")
+            assert page.status_code == 200, page.text[:300]
+            assert "click" in page.text
+        finally:
+            db.rollback()
+            for table in ("auth_sessions", "role_assignments"):
+                db.execute(text(f"DELETE FROM {table} WHERE user_id = :u"), {"u": user.id})
+            db.execute(text("DELETE FROM users WHERE id = :u"), {"u": user.id})
+            db.commit()
+
+
+def test_event_trace_answers_only_for_the_brand_asked(db, default_brand, foreign_brand):
+    """B10 will call `event_trace` without the route's check in front of it."""
+    from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
+    from app.insight.db_models import EngagementEventDB
+    from app.insight.service import event_trace
+
+    send = db.query(SendInstanceDB).filter(SendInstanceDB.name == "Demo send").one()
+    clicked = (db.query(DeliveryExecutionDB).join(
+        EngagementEventDB, EngagementEventDB.delivery_execution_id == DeliveryExecutionDB.id)
+        .filter(DeliveryExecutionDB.send_instance_id == send.id).first())
+    assert event_trace(db, [clicked.id], brand_id=default_brand.id).get(clicked.id)
+    assert event_trace(db, [clicked.id], brand_id=foreign_brand.id) == {}

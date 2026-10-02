@@ -183,3 +183,47 @@ def apply_event_to_signals(
         updated_categories=updated_categories,
         applied_deltas=applied_deltas,
     )
+
+def event_trace(db: Session, execution_ids: list[int], *, brand_id: int) -> dict[int, list[dict]]:
+    """For each execution in this brand, its engagement events newest first,
+    each with the signal contributions it produced (task-50, B24; B10 reuses it).
+
+    Two queries for any number of executions — the Jinja delivery page did one
+    per execution and one per event. An execution of another brand's send is
+    simply absent from the result.
+    """
+    from app.content.db_models import CategoryDB
+    from app.delivery.db_models import SendInstanceDB
+
+    if not execution_ids:
+        return {}
+    events = (
+        db.query(EngagementEventDB)
+        .join(DeliveryExecutionDB, DeliveryExecutionDB.id == EngagementEventDB.delivery_execution_id)
+        .join(SendInstanceDB, SendInstanceDB.id == DeliveryExecutionDB.send_instance_id)
+        .filter(EngagementEventDB.delivery_execution_id.in_(execution_ids),
+                SendInstanceDB.brand_id == brand_id)
+        .order_by(EngagementEventDB.occurred_at.desc(), EngagementEventDB.id.desc())
+        .all()
+    )
+    contributions: dict[int, list[dict]] = {}
+    if events:
+        for c, name in (
+            db.query(SignalContributionDB, CategoryDB.name)
+            .join(CategoryDB, CategoryDB.id == SignalContributionDB.category_id)
+            .filter(SignalContributionDB.event_id.in_([e.id for e in events]))
+            .all()
+        ):
+            contributions.setdefault(c.event_id, []).append({
+                "category_id": c.category_id, "category_name": name,
+                "base_weight": c.base_weight, "contribution_type": c.contribution_type,
+            })
+    trace: dict[int, list[dict]] = {}
+    for e in events:
+        trace.setdefault(e.delivery_execution_id, []).append({
+            "id": e.id, "event_type": e.event_type, "occurred_at": e.occurred_at,
+            "event_data": e.event_data, "contributions": contributions.get(e.id, []),
+            "provider": e.provider, "provider_event_id": e.provider_event_id,
+            "created_at": e.created_at,
+        })
+    return trace

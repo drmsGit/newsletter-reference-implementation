@@ -12,6 +12,11 @@ class DeliveryExecution(BaseModel):
     provider_message_id: str | None = None
     created_at: datetime
     updated_at: datetime
+    # For the deliveries detail (task-50, B24): who it was, why it was not
+    # sent, and when it was (ADR-183).
+    recipient_external_id: str | None = None
+    exclusion_reason: str | None = None
+    sent_at: datetime | None = None
 
 
 class DeliveryExecutionCreate(BaseModel):
@@ -59,6 +64,18 @@ class SendPlanRequest(BaseModel):
     scheduled_at: datetime | None = None
 
 
+class SendInstanceListed(SendInstance):
+    """A send as the deliveries list shows it (task-50, B23): what it sent, and
+    live counts — the stored sent/failed/excluded read 0 until a send finishes."""
+
+    campaign_id: int | None = None
+    campaign_name: str | None = None
+    variant_id: int | None = None
+    variant_name: str | None = None
+    execution_count: int = 0
+    event_count: int = 0
+
+
 class SendInstanceDetail(SendInstance):
     """One send, and what explains the gap between what it planned and what
     it sent — the Manager Workflow interview's question 5.5.
@@ -72,6 +89,7 @@ class SendInstanceDetail(SendInstance):
 
     execution_count: int
     exclusions_by_stage: dict[str, int]
+    audience_group_name: str | None = None
 
 
 class SendInstanceCreate(BaseModel):
@@ -151,3 +169,27 @@ class DeliveryAsSent(BaseModel):
     modules: list[ReconstructedModule]
     templates_match: bool
     hash_matches: bool
+
+
+class TraceContribution(BaseModel):
+    category_id: int
+    category_name: str
+    base_weight: float
+    contribution_type: str
+
+
+class TraceEvent(BaseModel):
+    id: int
+    event_type: str
+    occurred_at: datetime
+    event_data: dict | None = None
+    # What this event taught the recipient's profile (ADR-132): nothing, when
+    # it named no content (ADR-182).
+    contributions: list[TraceContribution]
+
+
+class ExecutionTrace(BaseModel):
+    """One execution's engagement and what it learned (task-50, B24)."""
+
+    execution_id: int
+    events: list[TraceEvent]
