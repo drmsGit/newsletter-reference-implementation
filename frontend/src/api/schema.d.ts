@@ -318,9 +318,8 @@ export interface paths {
          *     Throttled **before** the lookup, for the same reason the form route is: a
          *     limit applied afterwards costs different work for a known address than an
          *     unknown one, which is a timing oracle replacing a response one. That
-         *     substitution is already an open P1 against this pair — `request_login_code`
-         *     still calls the provider synchronously — and this route inherits it rather
-         *     than adding a second instance of it.
+         *     substitution was an open P1 against this pair until 2026-09-29, when the
+         *     provider call left the request — see `_issue_and_send_later`.
          */
         post: operations["session_request_auth_session_request_post"];
         delete?: never;
@@ -1359,7 +1358,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Category Graph */
+        /**
+         * Category Graph
+         * @description The category graph for the working brand (task-57, ADR-150).
+         *
+         *     The figures come from `insight.graph.category_graph`, scoped to one brand
+         *     all together; this route only lays them out.
+         */
         get: operations["category_graph_ui_graph_get"];
         put?: never;
         post?: never;
@@ -1942,6 +1947,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/content/fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Content Fields
+         * @description The fields a content record can carry, with what each one is.
+         *
+         *     **Declared before `/{content_id}`, and that is not style.** FastAPI matches
+         *     in declaration order, so after it this path would be read as a content id
+         *     and answer 422.
+         *
+         *     Derived rather than stored, which is the point of [[ADR-177]]: the client is
+         *     given the answer instead of the manifests to work it out from. The client
+         *     must not rebuild this — a second implementation of "which fields exist" in
+         *     another language is how the two stop agreeing, which is the defect
+         *     `CONTENT_FIELD_GROUPS` documented about its own duplicate for months.
+         */
+        get: operations["get_content_fields_content_fields_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/content/{content_id}": {
         parameters: {
             query?: never;
@@ -2089,6 +2124,120 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/content/{content_id}/duplicate-targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Brands this caller may copy this record into
+         * @description The caller's own `content.manage` grants, brand by brand — the same rule `POST /content/{id}/duplicate` enforces, so every brand listed here is one that request would accept.
+         */
+        get: operations["duplicate_targets_content__content_id__duplicate_targets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/content/{content_id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Copy one content record, possibly into another brand
+         * @description One record, one step. The source must be in the working brand (404 otherwise). **`content.manage` is checked on the TARGET brand for the caller's own grants**; a brand that does not exist and one the caller holds no grant on both answer 403. The copy is a draft with no published version, so a campaign using it cannot send until someone publishes it.
+         */
+        post: operations["duplicate_content_content__content_id__duplicate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/content/{content_id}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The record's categories, with assignment id and score */
+        get: operations["get_content_assignments_content__content_id__assignments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/content/{content_id}/assignments/{assignment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove one category from the record
+         * @description Through the record, within the working brand (task-241): another record's or another brand's assignment is not found.
+         */
+        delete: operations["delete_content_assignment_content__content_id__assignments__assignment_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/content/{content_id}/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Where the record was picked, and the signals its engagement earned */
+        get: operations["get_content_usage_content__content_id__usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/content/category-relations/{relation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a link between two categories
+         * @description The taxonomy is shared by every brand (ADR-150), so this is not brand-scoped.
+         */
+        delete: operations["delete_category_relation_route_content_category_relations__relation_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2338,6 +2487,120 @@ export interface paths {
         patch: operations["patch_decision_slot_record_campaigns_decision_slots__slot_id__patch"];
         trace?: never;
     };
+    "/campaigns/{campaign_id}/duplicate-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the duplicate wizard offers this caller
+         * @description The brands this caller may duplicate into (their own `campaigns.manage` grants, not the working brand's), the content modes allowed for each — `keep` and `layout` inside one brand, `copy` and `layout` across, with `copy` withheld unless the caller holds `content.manage` on the target — and what the copy will consist of. `variant_ids` narrows `selected_summary` to the variants being chosen. A client must not rebuild this: it is the boundary rule.
+         */
+        get: operations["duplicate_options_campaigns__campaign_id__duplicate_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{campaign_id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Duplicate a campaign, possibly into another brand
+         * @description The JSON twin of the duplicate wizard. The source must be in the working brand (404 otherwise). **The target brand is checked against the caller's own grants, not the working brand's:** `campaigns.manage` there, and for `content_mode: copy` also `content.manage` there. A brand that does not exist and a brand the caller holds no grant on both answer 403, so the response never says which brands exist. A mode the boundary does not allow, or an empty `variant_ids`, is 409. Statuses are forced to draft; nothing that *happened* (snapshots, sends, history) comes across.
+         */
+        post: operations["duplicate_campaign_record_campaigns__campaign_id__duplicate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/variants/{variant_id}/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every AI subject/preheader suggestion for this variant, newest first
+         * @description Reads back what `POST /campaigns/variants/{id}/suggest-subject` started: the options, the notices to show before using one, the raw reply when nothing parsed, the prompt version and the tokens. 404 when the variant is not in the working brand.
+         */
+        get: operations["get_variant_suggestions_campaigns_variants__variant_id__suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/decision-slots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every decision slot in the working brand, with its resolution counts */
+        get: operations["get_decision_slots_campaigns_decision_slots_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/decision-slots/{slot_id}/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What one decision slot has picked: summary, top content, latest, reasons */
+        get: operations["get_decision_slot_stats_campaigns_decision_slots__slot_id__stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{campaign_id}/composition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A campaign as the variant editor shows it
+         * @description Each variant's modules in order, with whether each may be overridden and its active override; the envelope module apart; the channel's module limit and whether another module fits; the module types it accepts; and each decision slot with its counts. 404 outside the working brand.
+         */
+        get: operations["get_campaign_composition_campaigns__campaign_id__composition_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/rendering/variants/{variant_id}": {
         parameters: {
             query?: never;
@@ -2417,7 +2680,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List sends in the working brand, newest first
+         * @description The deliveries list (task-28): what has been sent, across campaigns.
+         *
+         *     Answers *what did this send do* — send-level. Where campaigns stand,
+         *     including ones that have sent nothing, is the separate monitoring screen
+         *     (task-216); one screen answering both would answer neither well.
+         */
+        get: operations["get_send_instances_delivery_send_instances_get"];
         put?: never;
         /**
          * Create a send instance
@@ -2439,6 +2710,27 @@ export interface paths {
         };
         /** List sends for a snapshot */
         get: operations["get_send_instances_for_snapshot_delivery_snapshots__snapshot_id__send_instances_get"];
+        put?: never;
+        /**
+         * Plan a send: resolve an audience into a send and its executions
+         * @description The JSON twin of the UI plan form. Resolves the audience group to its consenting recipients now and creates the send (`draft`, or `scheduled` when `scheduled_at` is given) with one execution per recipient. Nothing is sent; fire it with `POST /delivery/send-instances/{id}/send`. Refused with 409 when the audience resolves to nobody or to more than the send cap, or the provider cannot carry the variant's channel; 404 when the snapshot or audience is not in the working brand. **Not idempotent:** a retried request plans a second send.
+         */
+        post: operations["plan_send_delivery_snapshots__snapshot_id__send_instances_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/delivery/send-instances/{send_instance_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One send, with what explains its sent/failed/excluded gap */
+        get: operations["get_send_instance_detail_delivery_send_instances__send_instance_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2539,6 +2831,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/delivery/executions/{execution_id}/as-sent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What this recipient got, as of the send date
+         * @description Rebuilt from the snapshot's frame and the execution's delivery record (ADR-183): every value is the one that was sent — content versions, static fields, overrides, this recipient's slot picks, the subject. The layout is today's templates: `templates_match` says whether they are the ones used, `hash_matches` whether the output is byte-identical. 404 when the execution is not in the working brand; 409 when it was not sent, or was sent before delivery records existed.
+         */
+        get: operations["get_delivery_as_sent_delivery_executions__execution_id__as_sent_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/delivery/executions/{execution_id}/trace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One execution's engagement events and what each taught the profile
+         * @description Each event newest first, with the signal contributions it produced (category, weight, type). An event that named no content produced none (ADR-182). 404 when the execution is not in the working brand.
+         */
+        get: operations["get_execution_trace_delivery_executions__execution_id__trace_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/insight/events": {
         parameters: {
             query?: never;
@@ -2584,6 +2916,63 @@ export interface paths {
         put?: never;
         /** Apply Signals From Event */
         post: operations["apply_signals_from_event_insight_events__event_id__apply_signals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/insight/category-graph": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The category graph's figures for the working brand
+         * @description Every category (the taxonomy is shared, so all appear) with this brand's figures, and the graph's edges. **Every figure is scoped to the working brand together** (ADR-150): counts are this brand's content and resolutions; signal impact sums this brand's audience — people whose latest marketing consent for it is opted in on any channel. Layout is the client's.
+         */
+        get: operations["get_category_graph_insight_category_graph_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/insight/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The dashboard's counts for the working brand */
+        get: operations["get_overview_insight_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/insight/categories/{category_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One category for the working brand: its content, audience and impact
+         * @description Parents and children (with relation ids), this brand's content in the category, the top 50 of this brand's audience by decayed signal, and the impact over that audience (ADR-150). 404 for an unknown category.
+         */
+        get: operations["get_category_detail_insight_categories__category_id__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2793,6 +3182,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/recipients/{recipient_id}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One recipient as the recipient page shows them, from the working brand
+         * @description This brand's decisions and deliveries (with each delivery's engagement trace), the one affinity profile, this brand's consent grid, and the consent history across brands, labelled. 404 when the recipient does not exist.
+         */
+        get: operations["get_recipient_activity_recipients__recipient_id__activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/provider/events": {
         parameters: {
             query?: never;
@@ -2860,9 +3269,16 @@ export interface paths {
         };
         /**
          * Get Module Templates
-         * @description Modules one channel accepts. Defaults to email so this read-only route
-         *     keeps its existing contract for anything already calling it; every other
-         *     caller of the registry passes the channel explicitly.
+         * @description Modules one channel accepts. **`channel` is required** (task-21).
+         *
+         *     It defaulted to email "so this read-only route keeps its existing contract
+         *     for anything already calling it" — and nothing calls it: not the React
+         *     client, not the Jinja UI, not a test (checked 2026-10-01). What the default
+         *     did do is answer a push screen that forgot the parameter with email modules,
+         *     the module-picker miss in another place. `migrate_0010` added a server
+         *     default, backfilled with it and then dropped it precisely so a forgotten
+         *     channel fails; a route-level default put the email-by-omission back one
+         *     layer up. A missing channel is now a 422.
          */
         get: operations["get_module_templates_modules_get"];
         put?: never;
@@ -2880,7 +3296,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Module Template */
+        /**
+         * Get Module Template
+         * @description One module on one channel. `channel` required, for the reason above.
+         */
         get: operations["get_module_template_modules__name__get"];
         put?: never;
         post?: never;
@@ -2970,7 +3389,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Groups */
+        /**
+         * The brand's audience groups, with counts
+         * @description Each group with its pinned-member count. Pass `channel` to add the live, consent-gated recipient count for that channel — the number a send on that channel would reach. **Without `channel` there is no recipient count** (ADR-176 point 5: a group resolves to different people per channel, so a channel-less number would be a guess). Asking for counts resolves every group, so it costs one resolution per group.
+         */
         get: operations["list_groups_api_audience_groups__get"];
         put?: never;
         /** Create Group */
@@ -2998,6 +3420,26 @@ export interface paths {
         head?: never;
         /** Update Group */
         patch: operations["update_group_api_audience_groups__group_id__patch"];
+        trace?: never;
+    };
+    "/api/audience-groups/{group_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What a send to this group on one channel would reach
+         * @description Each rule block with its own count, the resolved audience, how many of them the send's own exclusion stack would actually reach (and why the rest drop, by stage), and the first 20 reachable recipients with their address on that channel. `channel` is required: a group resolves to different people per channel, so there is no channel-less preview (ADR-176 point 5).
+         */
+        get: operations["preview_group_api_audience_groups__group_id__preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/audience-groups/{group_id}/members": {
@@ -3109,6 +3551,66 @@ export interface paths {
          *     nothing to recalculate and says so rather than silently doing nothing.
          */
         post: operations["recalculate_api_audience_groups__group_id__recalculate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/audience-groups/{group_id}/criteria-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who ad-hoc criteria would add to this group, on one channel
+         * @description Consenting on `channel` for the group's brand and not already members: a count and a 20-person sample with their address on that channel. `channel` is required (ADR-176 point 5).
+         */
+        get: operations["criteria_preview_api_audience_groups__group_id__criteria_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/audience-groups/{group_id}/bulk-add": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pin everyone the criteria match (needs audiences.manage)
+         * @description Adds every consenting non-member the criteria match on `channel`. `audiences.manage`, not `audiences.pin`: a rule that adds hundreds reshapes the audience (decided 2026-10-02).
+         */
+        post: operations["bulk_add_by_criteria_api_audience_groups__group_id__bulk_add_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/audience-groups/suggested": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A suggested audience from a campaign's content categories
+         * @description One editable include block per top category of the campaign's content. The campaign must be in the working brand (404 otherwise).
+         */
+        post: operations["create_suggested_audience_api_audience_groups_suggested_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3253,10 +3755,340 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/integrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every integration, with its grants and keys
+         * @description The review surface ADR-166's Notes named: what each integration may do, how many keys are live, when each was last used, and whether it may send without approval. **Never carries a secret or a hash.** A person with `integrations.manage` only; a bearer credential is refused.
+         */
+        get: operations["list_integrations_integrations_get"];
+        put?: never;
+        /** Create an integration */
+        post: operations["create_integration_integrations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/integrations/{integration_id}/keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue a key. The secret is in this response and nowhere else
+         * @description Refused (403) unless the caller holds every grant the integration has, on its brand: a key is the integration's whole power.
+         */
+        post: operations["issue_key_integrations__integration_id__keys_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/integrations/{integration_id}/keys/{credential_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke one key, immediately */
+        post: operations["revoke_key_integrations__integration_id__keys__credential_id__revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/integrations/{integration_id}/grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Grant one permission on one brand
+         * @description **You may grant only what you hold on that brand** — platform-level permissions included, because a grant on a brand lets the machine declare it. A brand that does not exist and one you hold nothing on both answer 403. An unknown permission is 422.
+         */
+        post: operations["add_grant_integrations__integration_id__grants_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/integrations/{integration_id}/grants/{permission}/{brand_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove one grant */
+        delete: operations["remove_grant_integrations__integration_id__grants__permission___brand_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/integrations/{integration_id}/unattended": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Allow or stop this integration sending without approval
+         * @description ADR-166 point 5. Switching it on removes the human from the loop for this integration's sends, which is why the change is logged.
+         */
+        put: operations["set_unattended_integrations__integration_id__unattended_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/integrations/{integration_id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deactivate an integration and every key beneath it */
+        post: operations["deactivate_integrations__integration_id__deactivate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Everything the settings screen shows */
+        get: operations["read_settings_settings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/signals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace the signal weights and half-lives
+         * @description Replaces the overrides: a contribution type not named returns to its code default. Unknown types and a half-life of 0 or less are refused (422).
+         */
+        put: operations["put_signals_settings_signals_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/send-cap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** The most recipients one send may reach */
+        put: operations["put_send_cap_settings_send_cap_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/ai/spend-cap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * The AI token cap and the stated budget
+         * @description Omitted fields keep their value. A warning above the hard stop is refused.
+         */
+        put: operations["put_spend_cap_settings_ai_spend_cap_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/ai/provider": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Which AI provider runs the tasks (a governed list) */
+        put: operations["put_provider_settings_ai_provider_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/ai/tasks/{task_key}/approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Apply this task's output directly, or hold it */
+        put: operations["put_approval_mode_settings_ai_tasks__task_key__approval_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/ai/tasks/{task_key}/prompt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish a new prompt version (needs settings.manage and ai.run)
+         * @description A new immutable version becomes the live one; no version is ever edited (ADR-140 §3).
+         */
+        post: operations["post_prompt_settings_ai_tasks__task_key__prompt_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/ai/tasks/{task_key}/model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Point a task at a governed model, or null for the default (needs ai.run too) */
+        put: operations["put_model_settings_ai_tasks__task_key__model_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AIBudget */
+        AIBudget: {
+            cap: components["schemas"]["SpendCap"];
+            /** Tokens Used */
+            tokens_used: number;
+            spend: components["schemas"]["Spend"];
+            /** Tokens Remaining */
+            tokens_remaining: number;
+            /** Used Pct */
+            used_pct: number;
+            /** Over Warn */
+            over_warn: boolean;
+        };
+        /** AITaskSettings */
+        AITaskSettings: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Description */
+            description: string;
+            /** Prompt Body */
+            prompt_body: string;
+            /** Prompt Version */
+            prompt_version?: number | null;
+            /** Versions */
+            versions: components["schemas"]["PromptVersion"][];
+            /** Model */
+            model?: string | null;
+            /** Approval Mode */
+            approval_mode: string;
+        };
+        /** ActiveOverride */
+        ActiveOverride: {
+            /** Id */
+            id: number;
+            /** Field Overrides */
+            field_overrides: {
+                [key: string]: unknown;
+            };
+            /** Overridden By */
+            overridden_by?: string | null;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** ApprovalModeChoice */
+        ApprovalModeChoice: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "auto_apply" | "require_approval";
+        };
         /** AudienceGroup */
         AudienceGroup: {
             /** Id */
@@ -3283,6 +4115,39 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /**
+         * AudienceGroupListed
+         * @description A group as the list shows it (task-50, B26).
+         *
+         *     `recipient_count` is the live, consent-gated audience **for
+         *     `count_channel`**, and both are null unless the caller asked for a channel
+         *     (ADR-176 point 5: there is no channel-less count). `pinned_count` is the
+         *     manual pins, which a rule-only group has none of.
+         */
+        AudienceGroupListed: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Pinned Count */
+            pinned_count: number;
+            /** Recipient Count */
+            recipient_count?: number | null;
+            /** Count Channel */
+            count_channel?: string | null;
+        };
         /** AudienceGroupMember */
         AudienceGroupMember: {
             /** Id */
@@ -3296,6 +4161,34 @@ export interface components {
              * Format: date-time
              */
             added_at: string;
+        };
+        /**
+         * AudiencePreview
+         * @description What sending to a group on one channel would reach (task-50, B27).
+         *
+         *     `reachable_count` is after the send's own exclusion stack (ADR-163's
+         *     rider); `resolved_count - reachable_count` are the people who match and
+         *     cannot be reached, counted by stage in `dropped_by_stage`.
+         */
+        AudiencePreview: {
+            /** Group Id */
+            group_id: number;
+            /** Channel */
+            channel: string;
+            /** Blocks */
+            blocks: components["schemas"]["PreviewBlock"][];
+            /** Resolved Count */
+            resolved_count: number;
+            /** Reachable Count */
+            reachable_count: number;
+            /** Unreachable Count */
+            unreachable_count: number;
+            /** Dropped By Stage */
+            dropped_by_stage: {
+                [key: string]: number;
+            };
+            /** Sample */
+            sample: components["schemas"]["PreviewRecipient"][];
         };
         /**
          * AudienceRuleBlock
@@ -3856,11 +4749,6 @@ export interface components {
              */
             from_address: string;
             /**
-             * Audience Resolution Mode
-             * @default freeze
-             */
-            audience_resolution_mode: string;
-            /**
              * Send Timing
              * @default now
              */
@@ -4016,6 +4904,24 @@ export interface components {
             name: string;
         };
         /**
+         * BrandOverview
+         * @description The dashboard's counts (task-50, B4). `recipients` is company-wide.
+         */
+        BrandOverview: {
+            /** Content Active */
+            content_active: number;
+            /** Campaigns */
+            campaigns: number;
+            /** Recipients */
+            recipients: number;
+            /** Snapshots */
+            snapshots: number;
+            /** Deliveries */
+            deliveries: number;
+            /** Events */
+            events: number;
+        };
+        /**
          * BrandSwitch
          * @description Which brand to work in next.
          *
@@ -4026,6 +4932,19 @@ export interface components {
         BrandSwitch: {
             /** Brand Id */
             brand_id: number;
+        };
+        /** BulkAddByCriteria */
+        BulkAddByCriteria: {
+            /** Language */
+            language?: string | null;
+            /** Status */
+            status?: string | null;
+            /** Category Id */
+            category_id?: number | null;
+            /** Min Score */
+            min_score?: number | null;
+            /** Channel */
+            channel: string;
         };
         /**
          * BulkAddRequest
@@ -4038,6 +4957,13 @@ export interface components {
         BulkAddRequest: {
             /** Recipient Ids */
             recipient_ids: number[];
+        };
+        /** BulkAddResult */
+        BulkAddResult: {
+            /** Matched */
+            matched: number;
+            /** Added */
+            added: number;
         };
         /** Campaign */
         Campaign: {
@@ -4061,6 +4987,15 @@ export interface components {
              */
             updated_at: string;
         };
+        /**
+         * CampaignComposition
+         * @description A campaign as the variant editor shows it (task-50, B11).
+         */
+        CampaignComposition: {
+            campaign: components["schemas"]["Campaign"];
+            /** Variants */
+            variants: components["schemas"]["ComposedVariant"][];
+        };
         /** CampaignCreate */
         CampaignCreate: {
             /** Name */
@@ -4080,6 +5015,52 @@ export interface components {
              * @default Variant A
              */
             initial_variant_name: string;
+        };
+        /**
+         * CampaignDuplicate
+         * @description Duplicate a campaign, possibly into another brand (task-50).
+         *
+         *     `content_mode` is one of `keep` (same brand: modules cite the same
+         *     records), `copy` (other brand: records are duplicated across) or `layout`
+         *     (either: modules arrive unbound). The boundary decides which are legal —
+         *     `GET`-ing the wizard's options is not needed, a wrong one is refused 409.
+         */
+        CampaignDuplicate: {
+            /** Name */
+            name: string;
+            /** Target Brand Id */
+            target_brand_id: number;
+            /** Content Mode */
+            content_mode: string;
+            /** Variant Ids */
+            variant_ids?: number[] | null;
+        };
+        /** CampaignDuplicated */
+        CampaignDuplicated: {
+            /** Campaign Id */
+            campaign_id: number;
+            /** Source Campaign Id */
+            source_campaign_id: number;
+            /** Source Brand Id */
+            source_brand_id: number;
+            /** Target Brand Id */
+            target_brand_id: number;
+            /** Content Mode */
+            content_mode: string;
+            /** Crossed Brands */
+            crossed_brands: boolean;
+            /** Variants */
+            variants: number;
+            /** Modules */
+            modules: number;
+            /** Decision Slots */
+            decision_slots: number;
+            /** Content Records Copied */
+            content_records_copied: {
+                [key: string]: number;
+            };
+            /** Url Carriers */
+            url_carriers: string[];
         };
         /** CampaignWithVariants */
         CampaignWithVariants: {
@@ -4117,6 +5098,15 @@ export interface components {
              */
             type: string;
         };
+        /** CategoryContent */
+        CategoryContent: {
+            /** Content Id */
+            content_id: number;
+            /** Title */
+            title: string;
+            /** Score */
+            score?: number | null;
+        };
         /** CategoryCreate */
         CategoryCreate: {
             /** Name */
@@ -4126,6 +5116,113 @@ export interface components {
              * @default main
              */
             type: string;
+        };
+        /**
+         * CategoryDetail
+         * @description One category for the working brand (task-50, B20): this brand's content
+         *     and this brand's audience; the category and its relations are shared.
+         */
+        CategoryDetail: {
+            category: components["schemas"]["CategoryRef"];
+            /** Parents */
+            parents: components["schemas"]["CategoryRef"][];
+            /** Children */
+            children: components["schemas"]["CategoryRef"][];
+            /** Assigned Content */
+            assigned_content: components["schemas"]["CategoryContent"][];
+            /** Top Recipients */
+            top_recipients: components["schemas"]["CategoryRecipient"][];
+            impact: components["schemas"]["CategoryImpact"];
+        };
+        /**
+         * CategoryGraph
+         * @description The category graph's figures for one brand — no layout. Positions,
+         *     radius, colour and thickness are presentation and stay with the client.
+         */
+        CategoryGraph: {
+            /** Brand Id */
+            brand_id: number;
+            /** Nodes */
+            nodes: components["schemas"]["CategoryGraphNode"][];
+            /** Edges */
+            edges: components["schemas"]["CategoryGraphEdge"][];
+        };
+        /** CategoryGraphEdge */
+        CategoryGraphEdge: {
+            /** Source */
+            source: number;
+            /** Target */
+            target: number;
+            /** Type */
+            type: string;
+            /** Cooccurrence Count */
+            cooccurrence_count: number;
+            /** Event Count */
+            event_count: number;
+            /** Total Delta */
+            total_delta: number;
+            /** Strength */
+            strength: number;
+        };
+        /**
+         * CategoryGraphNode
+         * @description One category and what this brand's figures say about it (ADR-150).
+         *
+         *     Counts are this brand's content and resolutions; the impact figures sum
+         *     this brand's audience (latest marketing consent opted in on any channel).
+         */
+        CategoryGraphNode: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Type */
+            type: string;
+            /** Selected Count */
+            selected_count: number;
+            /** Content Count */
+            content_count: number;
+            /** Update Count */
+            update_count: number;
+            /** Event Count */
+            event_count: number;
+            /** Total Delta */
+            total_delta: number;
+            /** Avg Delta */
+            avg_delta: number;
+            /** Parent Count */
+            parent_count: number;
+            /** Child Count */
+            child_count: number;
+        };
+        /** CategoryImpact */
+        CategoryImpact: {
+            /** Update Count */
+            update_count: number;
+            /** Total Delta */
+            total_delta: number;
+            /** Avg Delta */
+            avg_delta: number;
+        };
+        /** CategoryRecipient */
+        CategoryRecipient: {
+            /** Recipient Id */
+            recipient_id: number;
+            /** External Id */
+            external_id?: string | null;
+            /** Score */
+            score: number;
+        };
+        /** CategoryRef */
+        CategoryRef: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Type */
+            type: string;
+            /** Relation Id */
+            relation_id?: number | null;
         };
         /** CategoryRelation */
         CategoryRelation: {
@@ -4157,6 +5254,53 @@ export interface components {
              * @default parent_child
              */
             relation_type: string;
+        };
+        /** ChannelSetting */
+        ChannelSetting: {
+            /** Name */
+            name: string;
+            /** Available */
+            available: boolean;
+        };
+        /** ComposedModule */
+        ComposedModule: {
+            /** Id */
+            id: number;
+            /** Position */
+            position: number;
+            /** Module Type */
+            module_type: string;
+            /** Content Record Id */
+            content_record_id?: number | null;
+            /** Decision Slot Id */
+            decision_slot_id?: number | null;
+            /** Module Data */
+            module_data: {
+                [key: string]: unknown;
+            };
+            /** Known */
+            known: boolean;
+            /** Overrideable */
+            overrideable: boolean;
+            active_override?: components["schemas"]["ActiveOverride"] | null;
+        };
+        /** ComposedVariant */
+        ComposedVariant: {
+            variant: components["schemas"]["Variant"];
+            /** Module Limit */
+            module_limit?: number | null;
+            /** Can Add Module */
+            can_add_module: boolean;
+            /** Has Envelope */
+            has_envelope: boolean;
+            /** Accepted Module Types */
+            accepted_module_types: string[];
+            /** Modules */
+            modules: components["schemas"]["ComposedModule"][];
+            /** Envelope Modules */
+            envelope_modules: components["schemas"]["ComposedModule"][];
+            /** Decision Slots */
+            decision_slots: components["schemas"]["DecisionSlotListed"][];
         };
         /**
          * ConfigField
@@ -4318,6 +5462,22 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /**
+         * ContentAssignment
+         * @description One category on a record, with what removing it needs (task-50, B17/C5).
+         */
+        ContentAssignment: {
+            /** Assignment Id */
+            assignment_id: number;
+            /** Category Id */
+            category_id: number;
+            /** Name */
+            name: string;
+            /** Type */
+            type: string;
+            /** Score */
+            score?: number | null;
+        };
         /** ContentCategoryAssignment */
         ContentCategoryAssignment: {
             /** Id */
@@ -4352,6 +5512,53 @@ export interface components {
             content: {
                 [key: string]: unknown;
             };
+        };
+        /** ContentDuplicate */
+        ContentDuplicate: {
+            /** Target Brand Id */
+            target_brand_id: number;
+        };
+        /**
+         * ContentDuplicateTarget
+         * @description A brand this caller may copy a record into (task-50, B14).
+         */
+        ContentDuplicateTarget: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Crossing */
+            crossing: boolean;
+        };
+        /**
+         * ContentField
+         * @description One field a content record can carry — ADR-177's descriptor.
+         *
+         *     `required` is absent on purpose: it belongs to *(module, field)*, so a
+         *     client asking "must I fill this?" has to name a module and ask `GET
+         *     /modules`. Reporting one answer here would be reporting the wrong one.
+         */
+        ContentField: {
+            /** Name */
+            name: string;
+            /** Concept */
+            concept?: string | null;
+            /** Size */
+            size?: string | null;
+            /**
+             * Type
+             * @default text
+             */
+            type: string;
+            /** Note */
+            note?: string | null;
+            /** Channel */
+            channel?: string | null;
+            /**
+             * Envelope
+             * @default false
+             */
+            envelope: boolean;
         };
         /** ContentOverride */
         ContentOverride: {
@@ -4453,10 +5660,58 @@ export interface components {
              */
             status: string;
         };
+        /** ContentResolutionUse */
+        ContentResolutionUse: {
+            /** Id */
+            id: number;
+            /** Decision Slot Id */
+            decision_slot_id: number;
+            /** Recipient Id */
+            recipient_id?: number | null;
+            /** Content Version Id */
+            content_version_id?: number | null;
+            /** Score */
+            score?: number | null;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** ContentSignal */
+        ContentSignal: {
+            /** Recipient Id */
+            recipient_id: number;
+            /** Category Id */
+            category_id: number;
+            /** Category Name */
+            category_name: string;
+            /** Base Weight */
+            base_weight: number;
+            /** Contribution Type */
+            contribution_type: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** ContentStatusUpdate */
         ContentStatusUpdate: {
             /** Status */
             status: string;
+        };
+        /**
+         * ContentUsage
+         * @description Where a record was picked and what its engagement taught (task-50, B17).
+         */
+        ContentUsage: {
+            /** Resolutions */
+            resolutions: components["schemas"]["ContentResolutionUse"][];
+            /** Signals */
+            signals: components["schemas"]["ContentSignal"][];
         };
         /** ContentVersion */
         ContentVersion: {
@@ -4484,6 +5739,36 @@ export interface components {
             content_record_id: number;
             /** Created By */
             created_by?: string | null;
+        };
+        /** CredentialOut */
+        CredentialOut: {
+            /** Id */
+            id: number;
+            /** Key Id */
+            key_id: string;
+            /** Label */
+            label?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Last Used At */
+            last_used_at?: string | null;
+            /** Revoked At */
+            revoked_at?: string | null;
+        };
+        /**
+         * CriteriaPreview
+         * @description Who the criteria would add, on one channel: a count and a sample.
+         */
+        CriteriaPreview: {
+            /** Channel */
+            channel: string;
+            /** Count */
+            count: number;
+            /** Sample */
+            sample: components["schemas"]["PreviewRecipient"][];
         };
         /** DecisionExecutionRequest */
         DecisionExecutionRequest: {
@@ -4606,6 +5891,34 @@ export interface components {
             max_results: number;
         };
         /**
+         * DecisionSlotListed
+         * @description A decision slot in the brand, with what it has done (task-50, B21).
+         */
+        DecisionSlotListed: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Decision Type */
+            decision_type: string;
+            /** Decision Strategy */
+            decision_strategy: string;
+            /** Variant Id */
+            variant_id: number;
+            /** Variant Name */
+            variant_name: string;
+            /** Campaign Id */
+            campaign_id: number;
+            /** Campaign Name */
+            campaign_name: string;
+            /** Resolution Count */
+            resolution_count: number;
+            /** Unique Content Count */
+            unique_content_count: number;
+            /** Last Resolution At */
+            last_resolution_at?: string | null;
+        };
+        /**
          * DecisionSlotPatch
          * @description A partial edit: what is not sent is left as it is.
          *
@@ -4633,6 +5946,28 @@ export interface components {
             } | null;
         };
         /**
+         * DecisionSlotStats
+         * @description One slot and what it has picked (task-50, B22).
+         */
+        DecisionSlotStats: {
+            slot: components["schemas"]["DecisionSlot"];
+            /** Variant Id */
+            variant_id: number;
+            /** Variant Name */
+            variant_name: string;
+            /** Campaign Id */
+            campaign_id: number;
+            /** Campaign Name */
+            campaign_name: string;
+            summary: components["schemas"]["SlotSummary"];
+            /** Top Content */
+            top_content: components["schemas"]["SlotTopContent"][];
+            /** Latest */
+            latest: components["schemas"]["SlotResolution"][];
+            /** Reasons */
+            reasons: components["schemas"]["SlotReason"][];
+        };
+        /**
          * DecisionSlotUpdate
          * @description Edit a slot's strategy and configuration.
          *
@@ -4651,6 +5986,39 @@ export interface components {
             strategy_config?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /**
+         * DeliveryAsSent
+         * @description What one recipient got, as of the send date (ADR-183). Content is exact;
+         *     `templates_match` and `hash_matches` say whether the layout is too.
+         */
+        DeliveryAsSent: {
+            /** Execution Id */
+            execution_id: number;
+            /** Send Instance Id */
+            send_instance_id: number;
+            /** Recipient Id */
+            recipient_id: number;
+            /** Channel */
+            channel: string;
+            /** Sent At */
+            sent_at?: string | null;
+            /** Envelope */
+            envelope: {
+                [key: string]: unknown;
+            };
+            /** Body */
+            body?: string | null;
+            /** Fields */
+            fields?: {
+                [key: string]: unknown;
+            } | null;
+            /** Modules */
+            modules: components["schemas"]["ReconstructedModule"][];
+            /** Templates Match */
+            templates_match: boolean;
+            /** Hash Matches */
+            hash_matches: boolean;
         };
         /** DeliveryExecution */
         DeliveryExecution: {
@@ -4676,6 +6044,12 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Recipient External Id */
+            recipient_external_id?: string | null;
+            /** Exclusion Reason */
+            exclusion_reason?: string | null;
+            /** Sent At */
+            sent_at?: string | null;
         };
         /** DeliveryExecutionCreate */
         DeliveryExecutionCreate: {
@@ -4693,12 +6067,71 @@ export interface components {
             /** Provider Message Id */
             provider_message_id?: string | null;
         };
+        /** DeliveryProviderSetting */
+        DeliveryProviderSetting: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Channels */
+            channels: string[];
+            /** Click Content Attribution */
+            click_content_attribution: boolean;
+        };
         /** DescriptionRow */
         DescriptionRow: {
             /** Label */
             label: string;
             /** Value */
             value: string;
+        };
+        /**
+         * DuplicationOptions
+         * @description What the duplicate wizard offers (task-50, B14) — computed by the
+         *     server so a client never rebuilds the boundary rule.
+         */
+        DuplicationOptions: {
+            /** Source Brand Id */
+            source_brand_id: number;
+            summary: components["schemas"]["DuplicationSummary"];
+            selected_summary: components["schemas"]["DuplicationSummary"];
+            /** Targets */
+            targets: components["schemas"]["DuplicationTarget"][];
+        };
+        /** DuplicationSummary */
+        DuplicationSummary: {
+            /** Variants */
+            variants: components["schemas"]["DuplicationVariantSummary"][];
+            /** Module Count */
+            module_count: number;
+            /** Decision Slot Count */
+            decision_slot_count: number;
+            /** Content Titles */
+            content_titles: string[];
+        };
+        /** DuplicationTarget */
+        DuplicationTarget: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Crossing */
+            crossing: boolean;
+            /** Modes */
+            modes: string[];
+        };
+        /** DuplicationVariantSummary */
+        DuplicationVariantSummary: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Channel */
+            channel: string;
+            /** Modules */
+            modules: number;
+            /** Decision Slots */
+            decision_slots: number;
         };
         /** EngagementEvent */
         EngagementEvent: {
@@ -4744,10 +6177,83 @@ export interface components {
             /** Occurred At */
             occurred_at?: string | null;
         };
+        /**
+         * ExecutionTrace
+         * @description One execution's engagement and what it learned (task-50, B24).
+         */
+        ExecutionTrace: {
+            /** Execution Id */
+            execution_id: number;
+            /** Events */
+            events: components["schemas"]["TraceEvent"][];
+        };
+        /** GrantOut */
+        GrantOut: {
+            /** Permission */
+            permission: string;
+            /** Brand Id */
+            brand_id: number;
+        };
+        /** GrantRequest */
+        GrantRequest: {
+            /** Permission */
+            permission: string;
+            /** Brand Id */
+            brand_id: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** IntegrationCreate */
+        IntegrationCreate: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+        };
+        /** IntegrationOut */
+        IntegrationOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Is Active */
+            is_active: boolean;
+            /** May Send Unattended */
+            may_send_unattended: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By User Id */
+            created_by_user_id?: number | null;
+            /** Live Keys */
+            live_keys: number;
+            /** Grants */
+            grants: components["schemas"]["GrantOut"][];
+            /** Credentials */
+            credentials: components["schemas"]["CredentialOut"][];
+        };
+        /** KeyCreate */
+        KeyCreate: {
+            /** Label */
+            label?: string | null;
+        };
+        /** KeyIssued */
+        KeyIssued: {
+            credential: components["schemas"]["CredentialOut"];
+            /** Secret Key */
+            secret_key: string;
+        };
+        /** ModelChoice */
+        ModelChoice: {
+            /** Model */
+            model?: string | null;
         };
         /** ModuleInstance */
         ModuleInstance: {
@@ -4942,6 +6448,38 @@ export interface components {
                 [key: string]: number;
             };
         };
+        /** PreviewBlock */
+        PreviewBlock: {
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Label */
+            label?: string | null;
+            /** Source */
+            source?: string | null;
+            /** Criteria */
+            criteria: {
+                [key: string]: unknown;
+            };
+            /** Category Name */
+            category_name?: string | null;
+            /** Count */
+            count: number;
+        };
+        /** PreviewRecipient */
+        PreviewRecipient: {
+            /** Recipient Id */
+            recipient_id: number;
+            /** External Id */
+            external_id: string;
+            /** Language */
+            language?: string | null;
+            /** Status */
+            status?: string | null;
+            /** Address */
+            address?: string | null;
+        };
         /**
          * ProcessDueResult
          * @description What firing the due scheduled sends did.
@@ -4968,6 +6506,25 @@ export interface components {
              * @default []
              */
             pending_action_ids: number[];
+        };
+        /** PromptPublish */
+        PromptPublish: {
+            /** Body */
+            body: string;
+        };
+        /** PromptVersion */
+        PromptVersion: {
+            /** Version */
+            version: number;
+            /** Body */
+            body: string;
+            /** Is Published */
+            is_published: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** ProviderEventCreate */
         ProviderEventCreate: {
@@ -5018,6 +6575,11 @@ export interface components {
              */
             created_at: string;
         };
+        /** ProviderUpdate */
+        ProviderUpdate: {
+            /** Provider */
+            provider: string;
+        };
         /** Recipient */
         Recipient: {
             /** Id */
@@ -5058,6 +6620,29 @@ export interface components {
             updated_at: string;
         };
         /**
+         * RecipientActivity
+         * @description One person seen from the working brand (task-50, B10): this brand's
+         *     decisions and deliveries; the one profile; consent across brands, labelled.
+         */
+        RecipientActivity: {
+            /** Recipient Id */
+            recipient_id: number;
+            /** External Id */
+            external_id: string;
+            /** Preferences */
+            preferences: components["schemas"]["RecipientPreference"][];
+            /** Decisions */
+            decisions: components["schemas"]["RecipientDecision"][];
+            /** Deliveries */
+            deliveries: components["schemas"]["RecipientDelivery"][];
+            /** Consent Grid */
+            consent_grid: {
+                [key: string]: unknown;
+            }[];
+            /** Consent History */
+            consent_history: components["schemas"]["RecipientConsentEvent"][];
+        };
+        /**
          * RecipientAddress
          * @description One contact point. `value` is the deliverable scalar for its channel —
          *     an address for email, a token for push — pulled out of the row's JSON by
@@ -5070,6 +6655,26 @@ export interface components {
             value: string;
             /** Status */
             status: string;
+        };
+        /** RecipientConsentEvent */
+        RecipientConsentEvent: {
+            /** Brand Id */
+            brand_id: number;
+            /** Brand Name */
+            brand_name?: string | null;
+            /** Channel */
+            channel: string;
+            /** Purpose */
+            purpose: string;
+            /** Status */
+            status: string;
+            /** Source */
+            source?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** RecipientCreate */
         RecipientCreate: {
@@ -5101,12 +6706,62 @@ export interface components {
             /** @default pending */
             consent_status: components["schemas"]["ConsentStatus"];
         };
+        /** RecipientDecision */
+        RecipientDecision: {
+            /** Id */
+            id: number;
+            /** Decision Slot Id */
+            decision_slot_id: number;
+            /** Content Record Id */
+            content_record_id: number;
+            /** Content Title */
+            content_title: string;
+            /** Content Version */
+            content_version?: number | null;
+            /** Score */
+            score?: number | null;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** RecipientDelivery */
+        RecipientDelivery: {
+            /** Id */
+            id: number;
+            /** Send Instance Id */
+            send_instance_id: number;
+            /** Send Instance Name */
+            send_instance_name: string;
+            /** Status */
+            status: string;
+            /** Channel */
+            channel: string;
+            /** Provider */
+            provider?: string | null;
+            /** Provider Message Id */
+            provider_message_id?: string | null;
+            /** Sent At */
+            sent_at?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Events */
+            events: {
+                [key: string]: unknown;
+            }[];
+        };
         /** RecipientPreference */
         RecipientPreference: {
-            /** Recipient Id */
-            recipient_id: number;
             /** Category Id */
             category_id: number;
+            /** Category Name */
+            category_name: string;
             /** Score */
             score: number;
         };
@@ -5123,6 +6778,23 @@ export interface components {
              * @default manual
              */
             source: string;
+        };
+        /** ReconstructedModule */
+        ReconstructedModule: {
+            /** Module Id */
+            module_id: number;
+            /** Module Type */
+            module_type: string;
+            /** Kind */
+            kind: string;
+            /** Content Record Id */
+            content_record_id?: number | null;
+            /** Content Version Id */
+            content_version_id?: number | null;
+            /** Override Id */
+            override_id?: number | null;
+            /** Decision Resolution Id */
+            decision_resolution_id?: number | null;
         };
         /** RenderedVariant */
         RenderedVariant: {
@@ -5141,6 +6813,11 @@ export interface components {
             fields?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** SendCapUpdate */
+        SendCapUpdate: {
+            /** Max Send Recipients */
+            max_send_recipients: number;
         };
         /** SendInstance */
         SendInstance: {
@@ -5166,6 +6843,25 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** From Address */
+            from_address?: string | null;
+            /** Audience Group Id */
+            audience_group_id?: number | null;
+            /**
+             * Sent Count
+             * @default 0
+             */
+            sent_count: number;
+            /**
+             * Failed Count
+             * @default 0
+             */
+            failed_count: number;
+            /**
+             * Excluded Count
+             * @default 0
+             */
+            excluded_count: number;
         };
         /** SendInstanceCreate */
         SendInstanceCreate: {
@@ -5180,6 +6876,157 @@ export interface components {
             status: string;
             /** Provider */
             provider?: string | null;
+            /** Scheduled At */
+            scheduled_at?: string | null;
+        };
+        /**
+         * SendInstanceDetail
+         * @description One send, and what explains the gap between what it planned and what
+         *     it sent — the Manager Workflow interview's question 5.5.
+         *
+         *     Because every send re-resolves its audience before it fires (ADR-176 point
+         *     4), exclusions are routine, not an edge case: a manager who approved 1,104
+         *     and sees 1,098 sent needs the answer, not a discrepancy. So the detail
+         *     carries the execution total and the exclusions counted by stage of the
+         *     ADR-163 point 7 stack — addressability, consent, suppression.
+         */
+        SendInstanceDetail: {
+            /** Id */
+            id: number;
+            /** Snapshot Id */
+            snapshot_id: number;
+            /** Name */
+            name: string;
+            /** Status */
+            status: string;
+            /** Provider */
+            provider?: string | null;
+            /** Scheduled At */
+            scheduled_at?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** From Address */
+            from_address?: string | null;
+            /** Audience Group Id */
+            audience_group_id?: number | null;
+            /**
+             * Sent Count
+             * @default 0
+             */
+            sent_count: number;
+            /**
+             * Failed Count
+             * @default 0
+             */
+            failed_count: number;
+            /**
+             * Excluded Count
+             * @default 0
+             */
+            excluded_count: number;
+            /** Execution Count */
+            execution_count: number;
+            /** Exclusions By Stage */
+            exclusions_by_stage: {
+                [key: string]: number;
+            };
+            /** Audience Group Name */
+            audience_group_name?: string | null;
+        };
+        /**
+         * SendInstanceListed
+         * @description A send as the deliveries list shows it (task-50, B23): what it sent, and
+         *     live counts — the stored sent/failed/excluded read 0 until a send finishes.
+         */
+        SendInstanceListed: {
+            /** Id */
+            id: number;
+            /** Snapshot Id */
+            snapshot_id: number;
+            /** Name */
+            name: string;
+            /** Status */
+            status: string;
+            /** Provider */
+            provider?: string | null;
+            /** Scheduled At */
+            scheduled_at?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** From Address */
+            from_address?: string | null;
+            /** Audience Group Id */
+            audience_group_id?: number | null;
+            /**
+             * Sent Count
+             * @default 0
+             */
+            sent_count: number;
+            /**
+             * Failed Count
+             * @default 0
+             */
+            failed_count: number;
+            /**
+             * Excluded Count
+             * @default 0
+             */
+            excluded_count: number;
+            /** Campaign Id */
+            campaign_id?: number | null;
+            /** Campaign Name */
+            campaign_name?: string | null;
+            /** Variant Id */
+            variant_id?: number | null;
+            /** Variant Name */
+            variant_name?: string | null;
+            /**
+             * Execution Count
+             * @default 0
+             */
+            execution_count: number;
+            /**
+             * Event Count
+             * @default 0
+             */
+            event_count: number;
+        };
+        /**
+         * SendPlanRequest
+         * @description Plan a send from a snapshot and an audience group (task-49, C8).
+         *
+         *     The JSON twin of the Jinja plan form. No `audience_resolution_mode`: every
+         *     send re-resolves its audience before it fires (ADR-176 point 4), so there
+         *     is nothing to choose.
+         */
+        SendPlanRequest: {
+            /** Name */
+            name: string;
+            /** Audience Group Id */
+            audience_group_id: number;
+            /**
+             * Provider
+             * @default mock
+             */
+            provider: string;
+            /** From Address */
+            from_address?: string | null;
             /** Scheduled At */
             scheduled_at?: string | null;
         };
@@ -5248,6 +7095,109 @@ export interface components {
             /** Code */
             code: string;
         };
+        /**
+         * Settings
+         * @description Everything the settings screen shows. Readable with `view`.
+         */
+        Settings: {
+            signals: components["schemas"]["SignalTuning"];
+            /** Known Contribution Types */
+            known_contribution_types: string[];
+            /** Max Send Recipients */
+            max_send_recipients: number;
+            /** Channels */
+            channels: components["schemas"]["ChannelSetting"][];
+            /** Delivery Providers */
+            delivery_providers: components["schemas"]["DeliveryProviderSetting"][];
+            /** Ai Provider */
+            ai_provider: string;
+            /** Ai Providers */
+            ai_providers: string[];
+            /** Ai Key Present */
+            ai_key_present: boolean;
+            /** Ai Model */
+            ai_model: string;
+            /** Ai Model From Env */
+            ai_model_from_env: boolean;
+            ai_budget: components["schemas"]["AIBudget"];
+            /** Ai Tasks */
+            ai_tasks: components["schemas"]["AITaskSettings"][];
+            /** Governed Models */
+            governed_models: string[];
+        };
+        /**
+         * SignalTuning
+         * @description Contribution base weights and decay half-lives, by contribution type.
+         */
+        SignalTuning: {
+            /** Weights */
+            weights: {
+                [key: string]: number;
+            };
+            /** Half Lives */
+            half_lives: {
+                [key: string]: number;
+            };
+        };
+        /** SlotReason */
+        SlotReason: {
+            /** Reason */
+            reason?: string | null;
+            /** Count */
+            count: number;
+        };
+        /** SlotResolution */
+        SlotResolution: {
+            /** Id */
+            id: number;
+            /** Recipient Id */
+            recipient_id?: number | null;
+            /** Content Record Id */
+            content_record_id: number;
+            /** Content Title */
+            content_title: string;
+            /** Content Version */
+            content_version?: number | null;
+            /** Score */
+            score?: number | null;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** SlotSummary */
+        SlotSummary: {
+            /** Resolution Count */
+            resolution_count: number;
+            /** Unique Recipient Count */
+            unique_recipient_count: number;
+            /** Unique Content Count */
+            unique_content_count: number;
+            /** Avg Score */
+            avg_score: number;
+            /** Min Score */
+            min_score: number;
+            /** Max Score */
+            max_score: number;
+            /** Last Resolution At */
+            last_resolution_at?: string | null;
+        };
+        /** SlotTopContent */
+        SlotTopContent: {
+            /** Content Id */
+            content_id: number;
+            /** Title */
+            title: string;
+            /** Version Number */
+            version_number?: number | null;
+            /** Selection Count */
+            selection_count: number;
+            /** Share */
+            share: number;
+        };
         /** Snapshot */
         Snapshot: {
             /** Id */
@@ -5271,6 +7221,34 @@ export interface components {
             render_context?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** Spend */
+        Spend: {
+            /** Usd */
+            usd: number;
+            /** Unpriced Runs */
+            unpriced_runs: number;
+        };
+        /** SpendCap */
+        SpendCap: {
+            /** Warn Tokens */
+            warn_tokens: number;
+            /** Hard Stop Tokens */
+            hard_stop_tokens: number;
+            /** Budget Usd */
+            budget_usd: number;
+        };
+        /**
+         * SpendCapUpdate
+         * @description Any of the three; an omitted field keeps its current value.
+         */
+        SpendCapUpdate: {
+            /** Warn Tokens */
+            warn_tokens?: number | null;
+            /** Hard Stop Tokens */
+            hard_stop_tokens?: number | null;
+            /** Budget Usd */
+            budget_usd?: number | null;
         };
         /** StrategyMeta */
         StrategyMeta: {
@@ -5312,6 +7290,51 @@ export interface components {
             ai_run_id?: number | null;
             /** Pending Action Id */
             pending_action_id?: number | null;
+        };
+        /** SuggestedAudienceRequest */
+        SuggestedAudienceRequest: {
+            /** Campaign Id */
+            campaign_id: number;
+        };
+        /** SuggestionOption */
+        SuggestionOption: {
+            /** Subject */
+            subject: string;
+            /** Preheader */
+            preheader: string;
+        };
+        /**
+         * SuggestionRun
+         * @description One AI suggestion run for a variant, read back (task-50, C7).
+         */
+        SuggestionRun: {
+            /** Run Id */
+            run_id: number;
+            /** Status */
+            status: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Provider */
+            provider: string;
+            /** Model */
+            model?: string | null;
+            /** Prompt Version */
+            prompt_version?: number | null;
+            /** Input Tokens */
+            input_tokens: number;
+            /** Output Tokens */
+            output_tokens: number;
+            /** Options */
+            options: components["schemas"]["SuggestionOption"][];
+            /** Notices */
+            notices: string[];
+            /** Reply */
+            reply: string;
+            /** Message */
+            message?: string | null;
         };
         /**
          * TestSendRequest
@@ -5363,6 +7386,40 @@ export interface components {
             message?: string | null;
             /** Render Note */
             render_note?: string | null;
+        };
+        /** TraceContribution */
+        TraceContribution: {
+            /** Category Id */
+            category_id: number;
+            /** Category Name */
+            category_name: string;
+            /** Base Weight */
+            base_weight: number;
+            /** Contribution Type */
+            contribution_type: string;
+        };
+        /** TraceEvent */
+        TraceEvent: {
+            /** Id */
+            id: number;
+            /** Event Type */
+            event_type: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Event Data */
+            event_data?: {
+                [key: string]: unknown;
+            } | null;
+            /** Contributions */
+            contributions: components["schemas"]["TraceContribution"][];
+        };
+        /** UnattendedRequest */
+        UnattendedRequest: {
+            /** Allowed */
+            allowed: boolean;
         };
         /** ValidationError */
         ValidationError: {
@@ -5426,8 +7483,9 @@ export interface components {
             /**
              * Status
              * @default draft
+             * @enum {string}
              */
-            status: string;
+            status: "draft" | "ready";
         };
         /** VariantUpdate */
         VariantUpdate: {
@@ -6185,6 +8243,7 @@ export interface operations {
         parameters: {
             query?: {
                 saved?: boolean;
+                error?: string | null;
             };
             header?: never;
             path?: never;
@@ -8334,7 +10393,9 @@ export interface operations {
     };
     integrations_page_ui_integrations_get: {
         parameters: {
-            query?: never;
+            query?: {
+                error?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -8348,6 +10409,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -8935,6 +11005,26 @@ export interface operations {
             };
         };
     };
+    get_content_fields_content_fields_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentField"][];
+                };
+            };
+        };
+    };
     get_content_record_by_id_content__content_id__get: {
         parameters: {
             query?: never;
@@ -9284,6 +11374,193 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CategoryRelation"][];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    duplicate_targets_content__content_id__duplicate_targets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                content_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentDuplicateTarget"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    duplicate_content_content__content_id__duplicate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                content_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContentDuplicate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_content_assignments_content__content_id__assignments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                content_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentAssignment"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_content_assignment_content__content_id__assignments__assignment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                content_id: number;
+                assignment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_content_usage_content__content_id__usage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                content_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentUsage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_category_relation_route_content_category_relations__relation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                relation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -9848,6 +12125,187 @@ export interface operations {
             };
         };
     };
+    duplicate_options_campaigns__campaign_id__duplicate_options_get: {
+        parameters: {
+            query?: {
+                variant_ids?: number[];
+            };
+            header?: never;
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DuplicationOptions"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    duplicate_campaign_record_campaigns__campaign_id__duplicate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CampaignDuplicate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignDuplicated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_variant_suggestions_campaigns_variants__variant_id__suggestions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                variant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestionRun"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_decision_slots_campaigns_decision_slots_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionSlotListed"][];
+                };
+            };
+        };
+    };
+    get_decision_slot_stats_campaigns_decision_slots__slot_id__stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slot_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionSlotStats"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_campaign_composition_campaigns__campaign_id__composition_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignComposition"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     render_variant_rendering_variants__variant_id__get: {
         parameters: {
             query?: {
@@ -10009,6 +12467,39 @@ export interface operations {
             };
         };
     };
+    get_send_instances_delivery_send_instances_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                status?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SendInstanceListed"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_send_instance_record_delivery_send_instances_post: {
         parameters: {
             query?: never;
@@ -10060,6 +12551,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SendInstance"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plan_send_delivery_snapshots__snapshot_id__send_instances_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                snapshot_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendPlanRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SendInstance"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_send_instance_detail_delivery_send_instances__send_instance_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                send_instance_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SendInstanceDetail"];
                 };
             };
             /** @description Validation Error */
@@ -10207,6 +12764,68 @@ export interface operations {
             };
         };
     };
+    get_delivery_as_sent_delivery_executions__execution_id__as_sent_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                execution_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliveryAsSent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_execution_trace_delivery_executions__execution_id__trace_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                execution_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExecutionTrace"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_event_insight_events_post: {
         parameters: {
             query?: never;
@@ -10289,6 +12908,77 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PreferenceUpdateResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_category_graph_insight_category_graph_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryGraph"];
+                };
+            };
+        };
+    };
+    get_overview_insight_overview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrandOverview"];
+                };
+            };
+        };
+    };
+    get_category_detail_insight_categories__category_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryDetail"];
                 };
             };
             /** @description Validation Error */
@@ -10591,6 +13281,37 @@ export interface operations {
             };
         };
     };
+    get_recipient_activity_recipients__recipient_id__activity_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                recipient_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecipientActivity"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_provider_event_provider_events_post: {
         parameters: {
             query?: never;
@@ -10666,8 +13387,8 @@ export interface operations {
     };
     get_module_templates_modules_get: {
         parameters: {
-            query?: {
-                channel?: string;
+            query: {
+                channel: string;
             };
             header?: never;
             path?: never;
@@ -10697,8 +13418,8 @@ export interface operations {
     };
     get_module_template_modules__name__get: {
         parameters: {
-            query?: {
-                channel?: string;
+            query: {
+                channel: string;
             };
             header?: never;
             path: {
@@ -10893,7 +13614,9 @@ export interface operations {
     };
     list_groups_api_audience_groups__get: {
         parameters: {
-            query?: never;
+            query?: {
+                channel?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -10906,7 +13629,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AudienceGroup"][];
+                    "application/json": components["schemas"]["AudienceGroupListed"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -11026,6 +13758,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AudienceGroup"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_group_api_audience_groups__group_id__preview_get: {
+        parameters: {
+            query: {
+                channel: string;
+            };
+            header?: never;
+            path: {
+                group_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AudiencePreview"];
                 };
             };
             /** @description Validation Error */
@@ -11330,6 +14095,111 @@ export interface operations {
             };
         };
     };
+    criteria_preview_api_audience_groups__group_id__criteria_preview_get: {
+        parameters: {
+            query: {
+                channel: string;
+                language?: string | null;
+                status?: string | null;
+                category_id?: number | null;
+                min_score?: number | null;
+            };
+            header?: never;
+            path: {
+                group_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CriteriaPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_add_by_criteria_api_audience_groups__group_id__bulk_add_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkAddByCriteria"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkAddResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_suggested_audience_api_audience_groups_suggested_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuggestedAudienceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AudienceGroup"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_pending_approvals__get: {
         parameters: {
             query?: {
@@ -11532,6 +14402,517 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_integrations_integrations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationOut"][];
+                };
+            };
+        };
+    };
+    create_integration_integrations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntegrationCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issue_key_integrations__integration_id__keys_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeyCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyIssued"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_key_integrations__integration_id__keys__credential_id__revoke_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: number;
+                credential_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_grant_integrations__integration_id__grants_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrantRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_grant_integrations__integration_id__grants__permission___brand_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: number;
+                permission: string;
+                brand_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_unattended_integrations__integration_id__unattended_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnattendedRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_integrations__integration_id__deactivate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_settings_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Settings"];
+                };
+            };
+        };
+    };
+    put_signals_settings_signals_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignalTuning"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignalTuning"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_send_cap_settings_send_cap_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendCapUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SendCapUpdate"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_spend_cap_settings_ai_spend_cap_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpendCapUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AIBudget"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_provider_settings_ai_provider_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderUpdate"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_approval_mode_settings_ai_tasks__task_key__approval_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalModeChoice"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalModeChoice"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_prompt_settings_ai_tasks__task_key__prompt_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromptPublish"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptVersion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_model_settings_ai_tasks__task_key__model_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelChoice"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelChoice"];
+                };
             };
             /** @description Validation Error */
             422: {
