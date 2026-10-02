@@ -3,9 +3,11 @@ id: TASK-50
 title: >-
   Anything that lives only in `frontend/router.py` has to move behind the
   service boundary before the SPA starts.
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-27 13:56'
+updated_date: '2026-10-02 12:08'
 labels:
   - backend
 dependencies: []
@@ -23,4 +25,6 @@ ordinal: 200300
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 148, section "Features", position 3 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-02 audit (subagent sweep, code read for the security items only): the three rules the entry names are already fixed — brand reads (ADR-172, brand_id keyword-only), channel_available (campaigns/service.py), _may_decide (approvals.service.may_decide). Still router-only, ranked: B2/C6/C9/B14 cross-brand duplicate authorisation; B18 push fields written only when non-empty (ADR-161 readiness) vs JSON POST /content/; C14 integrations credentials (secret shown once); B5-B8/C3/C4 settings validation (with C2); task-57 graph brand filter + B26 recipient_count. No guard test exists against new logic landing in frontend/router.py. DONE in this pass: B2/C6/C9 — duplication.require_target_access etc. in campaigns/duplication.py, request.state.principal in the JSON guard, POST /campaigns/{id}/duplicate and POST /content/{id}/duplicate; machines allowed where they hold the grant (user decision). 8 new tests in tests/test_duplication.py, five mutants caught; suite 808 passed. NOT done: B14 (JSON read of which target brands/modes are offered; the SPA would reimplement it). Next: B18, then C14.
 <!-- SECTION:NOTES:END -->

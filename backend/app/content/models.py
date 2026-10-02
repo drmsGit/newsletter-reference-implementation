@@ -109,3 +109,6 @@ class CategoryRelationCreate(BaseModel):
     parent_category_id: int
     child_category_id: int
     relation_type: str = "parent_child"
+
+class ContentDuplicate(BaseModel):
+    target_brand_id: int

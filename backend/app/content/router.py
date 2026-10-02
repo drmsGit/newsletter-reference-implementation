@@ -1,12 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import working_brand
+from app.audit import service as audit
+from app.auth.dependencies import auth_is_enforced, request_principal, working_brand
+from app.campaigns import duplication
 from app.database import get_db
 from app.content.models import (
     ContentField,
     ContentRecord,
     ContentCreate,
+    ContentDuplicate,
     Category,
     CategoryCreate,
     CategoryRelation,
@@ -380,3 +383,56 @@ def get_child_relations_for_category(
         db=db,
         parent_category_id=category_id,
     )
+
+@router.post(
+    "/{content_id}/duplicate",
+    response_model=ContentRecord,
+    status_code=201,
+    summary="Copy one content record, possibly into another brand",
+    description=(
+        "One record, one step. The source must be in the working brand (404 "
+        "otherwise). **`content.manage` is checked on the TARGET brand for the "
+        "caller's own grants**; a brand that does not exist and one the caller "
+        "holds no grant on both answer 403. The copy is a draft with no "
+        "published version, so a campaign using it cannot send until someone "
+        "publishes it."
+    ),
+)
+def duplicate_content(
+    content_id: int,
+    payload: ContentDuplicate,
+    request: Request,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    record = get_content_record(db, content_id, brand_id=brand_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"ContentRecord {content_id} not found")
+
+    try:
+        target = duplication.require_content_target(
+            db,
+            request_principal(request),
+            target_brand_id=payload.target_brand_id,
+            enforced=auth_is_enforced(request),
+        )
+    except duplication.DuplicationForbidden as error:
+        raise HTTPException(status_code=403, detail=str(error))
+
+    try:
+        copy = duplication.duplicate_content_record(
+            db, content_id=record.id, target_brand_id=target.id
+        )
+    except duplication.DuplicationRefused as error:
+        raise HTTPException(status_code=409, detail=str(error))
+
+    audit.record_from_request(
+        request, db, audit.CONTENT_DUPLICATED,
+        subject_type="content_record", subject_id=copy.id, brand_id=target.id,
+        detail={
+            "source_content_id": record.id,
+            "source_brand_id": record.brand_id,
+            "target_brand_id": target.id,
+        },
+    )
+    return to_content_record(copy)

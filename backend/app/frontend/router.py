@@ -1375,27 +1375,18 @@ def campaign_duplicate(
 
     back = f"/ui/campaigns/{campaign_id}/duplicate?target_brand_id={target_brand_id}&name={quote(name)}"
 
-    targets = _duplication_targets(db, request, CAMPAIGNS_MANAGE)
-    target = next((b for b in targets if b.id == target_brand_id), None)
-    if target is None:
-        # Answers the same whether the brand does not exist or the user simply
-        # holds no grant on it — the difference would tell a signed-in user
-        # which brands exist beyond their own, exactly as `set_session_brand`
-        # refuses to.
-        return RedirectResponse(
-            url=back + "&error=" + quote("You cannot create campaigns in that brand."),
-            status_code=303,
+    try:
+        target = duplication.require_campaign_target(
+            db,
+            user_for_token(db, request.cookies.get(SESSION_COOKIE)),
+            target_brand_id=target_brand_id,
+            content_mode=content_mode,
+            enforced=getattr(request.state, "auth_enforced", True),
         )
-    if content_mode == duplication.COPY and not _may_in_brand(
-        db, request, CONTENT_MANAGE, target.id
-    ):
-        return RedirectResponse(
-            url=back + "&error=" + quote(
-                "Copying content creates records in the target brand, and you cannot "
-                "edit content there. Take the layout only."
-            ),
-            status_code=303,
-        )
+    except duplication.DuplicationForbidden as error:
+        # The same words whether the brand does not exist or the user holds no
+        # grant on it (see `require_target_access`).
+        return RedirectResponse(url=back + "&error=" + quote(str(error)), status_code=303)
 
     try:
         report = duplication.duplicate_campaign(
@@ -2281,12 +2272,16 @@ def content_duplicate(
             status_code=303,
         )
 
-    targets = _duplication_targets(db, request, CONTENT_MANAGE)
-    target = next((b for b in targets if b.id == target_brand_id), None)
-    if target is None:
+    try:
+        target = duplication.require_content_target(
+            db,
+            user_for_token(db, request.cookies.get(SESSION_COOKIE)),
+            target_brand_id=target_brand_id,
+            enforced=getattr(request.state, "auth_enforced", True),
+        )
+    except duplication.DuplicationForbidden as error:
         return RedirectResponse(
-            url="/ui/content?error=" + quote("You cannot create content in that brand."),
-            status_code=303,
+            url="/ui/content?error=" + quote(str(error)), status_code=303
         )
 
     try:

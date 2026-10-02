@@ -33,6 +33,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
 
+from app.auth.db_models import BrandDB
 from app.campaigns.db_models import (
     CampaignDB,
     DecisionSlotDB,
@@ -54,6 +55,88 @@ class DuplicationRefused(ValueError):
     """The request cannot be honoured — wrong content mode for the boundary,
     or a source that does not exist. A ValueError subclass so the UI routes
     that already catch ValueError keep working."""
+
+
+class DuplicationForbidden(DuplicationRefused):
+    """The caller holds no grant that lets them write into the target brand.
+
+    A subclass of `DuplicationRefused` so a caller that does not care which
+    refusal it is keeps working; the JSON plane tells them apart because "you
+    may not" is a 403 and "that cannot be done" is a 409.
+    """
+
+
+def require_target_access(
+    db: Session,
+    principal,
+    *,
+    target_brand_id: int,
+    noun: str,
+    permission: str,
+    enforced: bool = True,
+) -> "BrandDB":
+    """The target half of the duplication rule (task-50), enforced once.
+
+    **Why this exists.** The policy table checks a permission against the
+    *working* brand only, and duplication names a second one. Without this, a
+    Manager on brand A creates a campaign in brand B by choosing B as the
+    target — the check passes because it never looked at the destination. The
+    rule lived in `frontend/router.py`, a file with a deletion date
+    (ADR-170), so deleting it would have deleted the only enforcement.
+
+    **One answer for a brand that does not exist and a brand the caller holds
+    no grant on** — the difference would tell a signed-in caller which brands
+    exist beyond their own, as `set_session_brand` refuses to.
+
+    `enforced=False` is the auth-off posture (nobody signed in, so there are no
+    grants to read): any existing brand is a legal target, matching what
+    `working_brand_id` does on the Jinja plane.
+    """
+    from app.auth.service import has_permission, list_brands
+
+    brand = next((b for b in list_brands(db) if b.id == target_brand_id), None)
+    if brand is None or (
+        enforced and not has_permission(db, principal, permission, brand_id=brand.id)
+    ):
+        raise DuplicationForbidden(f"You cannot create {noun} in that brand.")
+    return brand
+
+
+def require_campaign_target(
+    db: Session, principal, *, target_brand_id: int, content_mode: str,
+    enforced: bool = True,
+):
+    """`campaigns.manage` on the target, and for COPY also `content.manage`
+    there: copying creates content rows in the target brand, so the working
+    brand's content permission says nothing about it."""
+    from app.auth.permissions import CAMPAIGNS_MANAGE, CONTENT_MANAGE
+    from app.auth.service import has_permission
+
+    brand = require_target_access(
+        db, principal, target_brand_id=target_brand_id, noun="campaigns",
+        permission=CAMPAIGNS_MANAGE, enforced=enforced,
+    )
+    if (
+        content_mode == COPY
+        and enforced
+        and not has_permission(db, principal, CONTENT_MANAGE, brand_id=brand.id)
+    ):
+        raise DuplicationForbidden(
+            "Copying content creates records in the target brand, and you cannot "
+            "edit content there. Take the layout only."
+        )
+    return brand
+
+
+def require_content_target(
+    db: Session, principal, *, target_brand_id: int, enforced: bool = True,
+):
+    from app.auth.permissions import CONTENT_MANAGE
+
+    return require_target_access(
+        db, principal, target_brand_id=target_brand_id, noun="content",
+        permission=CONTENT_MANAGE, enforced=enforced,
+    )
 
 
 @dataclass

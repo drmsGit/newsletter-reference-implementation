@@ -328,6 +328,18 @@ def _session_brand(request: Request) -> int | None:
     return brand["id"] if brand else None
 
 
+def request_principal(request: Request):
+    """The authenticated caller — a `UserDB` or an `IntegrationDB` — as
+    `enforce_api_policy` resolved it. `None` only with enforcement off, when
+    nobody is authenticated and the guard returns before resolving one."""
+    return getattr(request.state, "principal", None)
+
+
+def auth_is_enforced(request: Request) -> bool:
+    """Whether access control is on, as the middleware read it for this request."""
+    return getattr(request.state, "auth_enforced", True)
+
+
 def working_brand(request: Request) -> int:
     """The brand this request is working in (ADR-172 point 1).
 
@@ -561,6 +573,10 @@ def enforce_api_policy(request: Request, db: Session = Depends(get_db)):
     # universal one. The ADR's own split between context and authorisation,
     # applied to the state object rather than only to this function.
     request.state.working_brand_id = brand_id
+    # Handed on for the few routes whose rule names a SECOND brand (duplication,
+    # task-50): the policy table above checks the working brand only, so such a
+    # route must ask the same question again about its target, as this caller.
+    request.state.principal = principal
 
     if is_brand_scoped(permission):
         if brand_id is None:

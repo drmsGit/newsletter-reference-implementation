@@ -1,10 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import working_brand
+from app.audit import service as audit
+from app.auth.dependencies import auth_is_enforced, request_principal, working_brand
 from app.database import get_db
+from app.campaigns import duplication
+from app.campaigns.db_models import CampaignDB
 from app.campaigns.models import (
     Campaign,
+    CampaignDuplicate,
+    CampaignDuplicated,
     SubjectSuggestionResult,
     CampaignCreate,
     CampaignWithVariants,
@@ -505,3 +510,78 @@ def patch_decision_slot_record(
     if updated is None:
         raise HTTPException(status_code=404, detail="Decision slot not found")
     return to_decision_slot(updated)
+
+
+@router.post(
+    "/{campaign_id}/duplicate",
+    response_model=CampaignDuplicated,
+    status_code=201,
+    summary="Duplicate a campaign, possibly into another brand",
+    description=(
+        "The JSON twin of the duplicate wizard. The source must be in the working "
+        "brand (404 otherwise). **The target brand is checked against the caller's "
+        "own grants, not the working brand's:** `campaigns.manage` there, and for "
+        "`content_mode: copy` also `content.manage` there. A brand that does not "
+        "exist and a brand the caller holds no grant on both answer 403, so the "
+        "response never says which brands exist. A mode the boundary does not "
+        "allow, or an empty `variant_ids`, is 409. Statuses are forced to draft; "
+        "nothing that *happened* (snapshots, sends, history) comes across."
+    ),
+)
+def duplicate_campaign_record(
+    campaign_id: int,
+    payload: CampaignDuplicate,
+    request: Request,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    campaign = (
+        db.query(CampaignDB)
+        .filter(CampaignDB.id == campaign_id, CampaignDB.brand_id == brand_id)
+        .first()
+    )
+    if campaign is None:
+        raise HTTPException(status_code=404, detail=f"Campaign {campaign_id} not found")
+
+    try:
+        target = duplication.require_campaign_target(
+            db,
+            request_principal(request),
+            target_brand_id=payload.target_brand_id,
+            content_mode=payload.content_mode,
+            enforced=auth_is_enforced(request),
+        )
+    except duplication.DuplicationForbidden as error:
+        raise HTTPException(status_code=403, detail=str(error))
+
+    try:
+        report = duplication.duplicate_campaign(
+            db,
+            campaign_id=campaign.id,
+            target_brand_id=target.id,
+            name=payload.name,
+            content_mode=payload.content_mode,
+            variant_ids=payload.variant_ids,
+        )
+    except duplication.DuplicationRefused as error:
+        raise HTTPException(status_code=409, detail=str(error))
+
+    audit.record_from_request(
+        request, db, audit.CAMPAIGN_DUPLICATED,
+        subject_type="campaign", subject_id=report.campaign_id,
+        # The brand the copy now lives in; the source is in the detail.
+        brand_id=report.target_brand_id, detail=report.as_detail(),
+    )
+    return CampaignDuplicated(
+        campaign_id=report.campaign_id,
+        source_campaign_id=report.source_campaign_id,
+        source_brand_id=report.source_brand_id,
+        target_brand_id=report.target_brand_id,
+        content_mode=report.content_mode,
+        crossed_brands=report.crossed_brands,
+        variants=report.variants,
+        modules=report.modules,
+        decision_slots=report.decision_slots,
+        content_records_copied=report.content_records_copied,
+        url_carriers=report.url_carriers,
+    )

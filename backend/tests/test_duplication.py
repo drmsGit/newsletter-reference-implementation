@@ -1009,3 +1009,222 @@ class TestChoosingWhichVariantsComeAcross:
                 )
         finally:
             _purge_campaigns(db, [other.campaign_id])
+
+
+class TestTheTargetBrandIsCheckedOverJson:
+    """The same rule on the SPA's plane (task-50).
+
+    It lived only in `frontend/router.py`, which has a deletion date, so a JSON
+    route written without it would have let a Manager on brand A create a
+    campaign in brand B. These pin the rule at the HTTP surface for both kinds
+    of principal. Cleanup mirrors `TestTheTargetBrandIsChecked`.
+    """
+
+    helper = TestTheTargetBrandIsChecked()
+
+    def _person(self, db, grants, brand):
+        from fastapi.testclient import TestClient
+
+        from main import app
+
+        user = self.helper._user_on(db, grants)
+        token = auth.create_session(db, user)
+        auth.set_session_brand(db, token, brand.id)
+        client = TestClient(app, raise_server_exceptions=False)
+        client.cookies.set(auth.SESSION_COOKIE, token)
+        return user, client, {"X-CSRF-Token": auth.csrf_token_for(token)}
+
+    def _post(self, client, headers, campaign_id, target_id, mode, name):
+        return client.post(
+            f"/campaigns/{campaign_id}/duplicate",
+            json={"name": name, "target_brand_id": target_id, "content_mode": mode},
+            headers=headers,
+        )
+
+    def test_a_brand_the_person_cannot_write_to_is_refused(
+        self, db, source, default_brand, temp_brand
+    ):
+        target = temp_brand()
+        user, client, headers = self._person(
+            db, {default_brand: MANAGER, target: VIEWER}, default_brand)
+        name = _name("json-sneaky")
+        try:
+            response = self._post(
+                client, headers, source["campaign"].id, target.id, duplication.LAYOUT, name)
+            assert response.status_code == 403, response.text
+            assert db.query(CampaignDB).filter(CampaignDB.brand_id == target.id).count() == 0
+        finally:
+            _purge_named(db, name)
+            _purge_brand(db, target.id)
+            self.helper._cleanup_user(db, user)
+
+    def test_an_unknown_brand_and_an_ungranted_one_answer_identically(
+        self, db, source, default_brand, temp_brand
+    ):
+        """The enumeration defence: the response must not say which exist."""
+        target = temp_brand()
+        user, client, headers = self._person(db, {default_brand: MANAGER}, default_brand)
+        name = _name("json-enum")
+        try:
+            ungranted = self._post(
+                client, headers, source["campaign"].id, target.id, duplication.LAYOUT, name)
+            missing = self._post(
+                client, headers, source["campaign"].id, 99999999, duplication.LAYOUT, name)
+            assert ungranted.status_code == missing.status_code == 403
+            assert ungranted.json() == missing.json()
+        finally:
+            _purge_named(db, name)
+            _purge_brand(db, target.id)
+            self.helper._cleanup_user(db, user)
+
+    def test_copying_content_needs_content_manage_on_the_target(
+        self, db, source, default_brand, temp_brand
+    ):
+        from app.auth.db_models import RolePermissionDB
+
+        target = temp_brand()
+        role = auth.create_role(db, key=_name("json-campaigns-only"), name="Campaigns only")
+        auth.set_role_permissions(db, role.id, [CAMPAIGNS_MANAGE])
+        user, client, headers = self._person(db, {default_brand: MANAGER}, default_brand)
+        db.add(RoleAssignmentDB(user_id=user.id, role_id=role.id, brand_id=target.id))
+        db.commit()
+        name = _name("json-content-grab")
+        try:
+            response = self._post(
+                client, headers, source["campaign"].id, target.id, duplication.COPY, name)
+            assert response.status_code == 403, response.text
+            assert "content" in response.json()["detail"]
+            assert db.query(ContentRecordDB).filter(
+                ContentRecordDB.brand_id == target.id).count() == 0
+            # Same grant, layout only: the one guard standing is the campaign
+            # one, which this user passes — so the refusal above was the second.
+            ok = self._post(
+                client, headers, source["campaign"].id, target.id, duplication.LAYOUT, name)
+            assert ok.status_code == 201, ok.text
+        finally:
+            _purge_named(db, name)
+            _purge_brand(db, target.id)
+            self.helper._cleanup_user(db, user)
+            db.query(RolePermissionDB).filter(RolePermissionDB.role_id == role.id).delete()
+            db.query(RoleDB).filter(RoleDB.id == role.id).delete()
+            db.commit()
+
+    def test_a_manager_on_both_brands_duplicates_and_it_is_logged(
+        self, db, source, default_brand, temp_brand
+    ):
+        target = temp_brand()
+        user, client, headers = self._person(
+            db, {default_brand: MANAGER, target: MANAGER}, default_brand)
+        name = _name("json-legit")
+        try:
+            response = self._post(
+                client, headers, source["campaign"].id, target.id, duplication.COPY, name)
+            assert response.status_code == 201, response.text
+            body = response.json()
+            assert body["target_brand_id"] == target.id and body["crossed_brands"] is True
+            copy = db.get(CampaignDB, body["campaign_id"])
+            assert copy.brand_id == target.id and copy.name == name
+            entry = db.query(AuditEventDB).filter(
+                AuditEventDB.action == "campaign.duplicated",
+                AuditEventDB.subject_id == copy.id,
+            ).first()
+            assert entry is not None and entry.actor_id == user.id
+            assert entry.brand_id == target.id
+        finally:
+            _purge_named(db, name)
+            _purge_brand(db, target.id)
+            self.helper._cleanup_user(db, user)
+
+    def test_a_source_in_another_brand_is_not_found(
+        self, db, source, default_brand, temp_brand
+    ):
+        other = temp_brand()
+        user, client, headers = self._person(
+            db, {default_brand: MANAGER, other: MANAGER}, other)
+        name = _name("json-foreign-source")
+        try:
+            # Working in `other`, naming a campaign that lives in the default brand.
+            response = self._post(
+                client, headers, source["campaign"].id, other.id, duplication.LAYOUT, name)
+            assert response.status_code == 404, response.text
+        finally:
+            _purge_named(db, name)
+            _purge_brand(db, other.id)
+            self.helper._cleanup_user(db, user)
+
+    def test_a_wrong_mode_for_the_boundary_is_409(self, db, source, default_brand):
+        user, client, headers = self._person(db, {default_brand: MANAGER}, default_brand)
+        name = _name("json-mode")
+        try:
+            response = self._post(
+                client, headers, source["campaign"].id, default_brand.id, duplication.COPY, name)
+            assert response.status_code == 409, response.text
+        finally:
+            _purge_named(db, name)
+            self.helper._cleanup_user(db, user)
+
+    def test_a_machine_is_held_to_the_same_target_rule(
+        self, db, source, default_brand, temp_brand
+    ):
+        """The integration may duplicate where it holds the grant, and only there."""
+        from fastapi.testclient import TestClient
+
+        from app.auth import integrations as ints
+        from app.auth.db_models import IntegrationCredentialDB, IntegrationDB
+        from app.auth.permissions import CONTENT_MANAGE, VIEW
+        from main import app
+        from tests.machine import machine
+
+        client = TestClient(app, raise_server_exceptions=False)
+        target = temp_brand()
+        name = _name("json-machine")
+        try:
+            with machine([VIEW, CAMPAIGNS_MANAGE, CONTENT_MANAGE]) as headers:
+                refused = self._post(
+                    client, headers, source["campaign"].id, target.id, duplication.LAYOUT, name)
+                assert refused.status_code == 403, refused.text
+                assert db.query(CampaignDB).filter(CampaignDB.brand_id == target.id).count() == 0
+
+                key_id = headers["Authorization"].split()[1].split(".")[0]
+                integration = db.query(IntegrationDB).join(
+                    IntegrationCredentialDB,
+                    IntegrationCredentialDB.integration_id == IntegrationDB.id,
+                ).filter(IntegrationCredentialDB.key_id == key_id).first()
+                assert ints.grant(db, integration.id, CAMPAIGNS_MANAGE, target.id)
+
+                allowed = self._post(
+                    client, headers, source["campaign"].id, target.id, duplication.LAYOUT, name)
+                assert allowed.status_code == 201, allowed.text
+                assert db.get(CampaignDB, allowed.json()["campaign_id"]).brand_id == target.id
+        finally:
+            _purge_named(db, name)
+            _purge_brand(db, target.id)
+
+    def test_content_follows_the_same_rule(self, db, source, default_brand, temp_brand):
+        target = temp_brand()
+        user, client, headers = self._person(
+            db, {default_brand: MANAGER, target: VIEWER}, default_brand)
+        record_id = source["record"].id
+        try:
+            refused = client.post(
+                f"/content/{record_id}/duplicate",
+                json={"target_brand_id": target.id}, headers=headers)
+            assert refused.status_code == 403, refused.text
+            assert db.query(ContentRecordDB).filter(
+                ContentRecordDB.brand_id == target.id).count() == 0
+            # And a grant makes the identical request succeed.
+            db.add(RoleAssignmentDB(
+                user_id=user.id,
+                role_id=db.query(RoleDB).filter(RoleDB.key == MANAGER).first().id,
+                brand_id=target.id,
+            ))
+            db.commit()
+            ok = client.post(
+                f"/content/{record_id}/duplicate",
+                json={"target_brand_id": target.id}, headers=headers)
+            assert ok.status_code == 201, ok.text
+            copy = db.get(ContentRecordDB, ok.json()["id"])
+            assert copy.brand_id == target.id
+        finally:
+            _purge_brand(db, target.id)
+            self.helper._cleanup_user(db, user)

@@ -186,3 +186,34 @@ class SubjectSuggestionResult(BaseModel):
     ai_run_id: int | None = None
     #: The held request, for the approval case.
     pending_action_id: int | None = None
+
+
+class CampaignDuplicate(BaseModel):
+    """Duplicate a campaign, possibly into another brand (task-50).
+
+    `content_mode` is one of `keep` (same brand: modules cite the same
+    records), `copy` (other brand: records are duplicated across) or `layout`
+    (either: modules arrive unbound). The boundary decides which are legal —
+    `GET`-ing the wizard's options is not needed, a wrong one is refused 409.
+    """
+
+    name: str
+    target_brand_id: int
+    content_mode: str
+    # Omitted means every variant; an explicitly empty list is refused.
+    variant_ids: list[int] | None = None
+
+
+class CampaignDuplicated(BaseModel):
+    campaign_id: int
+    source_campaign_id: int
+    source_brand_id: int
+    target_brand_id: int
+    content_mode: str
+    crossed_brands: bool
+    variants: int
+    modules: int
+    decision_slots: int
+    # source content record id -> the copy's id. Empty unless `copy`.
+    content_records_copied: dict[int, int]
+    url_carriers: list[str]

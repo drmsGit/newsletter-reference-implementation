@@ -63,6 +63,13 @@ Two more of the same shape:
   brand chosen in the form, not the working brand, and answer identically for
   "brand does not exist" and "you hold no grant there" — an enumeration defence.
   Nothing in `app/auth/` does this.
+  **✅ DONE 2026-10-02 (task-50):** the rule is `duplication.require_target_access` /
+  `require_campaign_target` / `require_content_target` (`app/campaigns/duplication.py`),
+  used by both the Jinja routes and the new JSON routes. It checks the caller's own
+  grants on the target brand for a person or an integration alike (`has_permission`),
+  answers the same for an unknown and an ungranted brand, and for `copy` also needs
+  `content.manage` there. The JSON guard now leaves the authenticated principal on
+  `request.state.principal` (`request_principal`) so a route can ask about a second brand.
 - **B3 — per-row approval authorisation.** `_may_decide` (`:4167`) resolves the
   permission from the *action's own* `approve_permission`, brand-scoped against the
   row's brand. `auth/policy.py:129` explicitly documents that the policy table
@@ -131,12 +138,12 @@ The ones that block a screen, in order of weight:
 | C2 | `GET /ui/settings` | twelve settings/AI service functions. **There is no `app/settings/router.py` and no `app/ai/router.py`** — the entire settings surface is UI-only | substantial |
 | C14 | `/ui/integrations` ×8 | the whole of `auth/integrations.py`: create, issue, revoke, grant, revoke grant, set unattended, deactivate. `:4044` must **not** redirect — the secret exists in one response body only (ADR-166 pt 3), and the React equivalent needs the same property | substantial |
 | C15 | `/ui/approvals` ×5 | list, detail, approve, reject, `process-expired`. Approve/reject over JSON is **decided** (session-authenticated person, bearer refused) and not built. `process-expired` is the cron seam `/delivery/process-due` got and this did not. Carries live `describe()` vs frozen `summary`, and `choice_index` → pick-one | substantial |
-| C6 | `POST /ui/campaigns/{id}/duplicate` | `duplication.duplicate_campaign` + audit + variant subset. Nothing in `campaigns/router.py` touches `duplication`. B2's authorisation moves with it | substantial |
+| C6 | `POST /ui/campaigns/{id}/duplicate` | `duplication.duplicate_campaign` + audit + variant subset. Nothing in `campaigns/router.py` touches `duplication`. B2's authorisation moves with it | ✅ **DONE 2026-10-02:** `POST /campaigns/{id}/duplicate` (403 target not permitted, 404 source not in brand, 409 refused mode) | substantial |
 | C1 | `POST /ui/brand` | **`set_session_brand`** — verified, one call site. `session_router` has request/verify/end only. Without it a cookie-authenticated SPA cannot change brand | one line, moderate semantics |
 | C11 | `GET .../criteria-preview` | `find_by_criteria` — already returns JSON, from the Jinja router | moderate |
 | C12 | `POST .../bulk-add` | bulk add **by criteria**. The JSON route takes an explicit id list only | moderate |
 | C7 | `GET .../suggestions` | `runs_for_target` + `parse_options` — AI run history | moderate |
-| C9 | `POST /ui/content/{id}/duplicate` | `duplicate_content_record` + audit + target-brand check | moderate |
+| C9 | `POST /ui/content/{id}/duplicate` | `duplicate_content_record` + audit + target-brand check | ✅ **DONE 2026-10-02:** `POST /content/{id}/duplicate` | moderate |
 | C13 | `POST .../suggest-audience` | `create_suggested_group_for_campaign` | one line |
 | C3, C4 | AI prompt publish, per-task model | `publish_prompt`, `set_task_model` | one line each |
 | C5, C10 | unassign a category, delete a category relation | JSON can create both and delete neither | one line each |
