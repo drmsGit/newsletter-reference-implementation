@@ -1,3 +1,5 @@
+import { useNavigate } from 'react-router'
+
 import { useCampaigns, type Campaign } from '../api/resources'
 import DataTable, { type DataColumn } from '../components/DataTable'
 import ScreenState from '../components/ScreenState'
@@ -9,15 +11,11 @@ const columns: DataColumn<Campaign>[] = [
 ]
 
 /**
- * The campaign list.
- *
- * **Rows are not clickable, deliberately.** Campaign detail is inventory B11 --
- * the largest block of derived state in the application, scheduled with the
- * write surface -- so there is nothing to navigate to yet. A row that invites a
- * click and goes nowhere is worse than a row that does not invite one.
+ * The campaign list. A row opens the campaign, variant by variant.
  */
 export default function Campaigns() {
   const campaigns = useCampaigns()
+  const navigate = useNavigate()
 
   return (
     <>
@@ -28,6 +26,7 @@ export default function Campaigns() {
           columns={columns}
           items={campaigns.data ?? []}
           emptyMessage="No campaigns in this brand yet."
+          onRowAction={(c) => navigate(`/campaigns/${c.id}`)}
         />
       </ScreenState>
     </>

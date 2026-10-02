@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from './client'
 import { HttpError } from './session'
@@ -12,6 +12,10 @@ export type PendingActionDetail = components['schemas']['PendingActionDetail']
 export type SendInstanceListed = components['schemas']['SendInstanceListed']
 export type DeliveryExecution = components['schemas']['DeliveryExecution']
 export type DeliveryAsSent = components['schemas']['DeliveryAsSent']
+export type CampaignComposition = components['schemas']['CampaignComposition']
+export type ComposedVariant = components['schemas']['ComposedVariant']
+export type ComposedModule = components['schemas']['ComposedModule']
+export type VariantDuplicated = components['schemas']['VariantDuplicated']
 
 /**
  * **Every key here names its resource, and none mentions the brand.**
@@ -27,6 +31,7 @@ export type DeliveryAsSent = components['schemas']['DeliveryAsSent']
  */
 export const keys = {
   campaigns: ['campaigns'] as const,
+  composition: (id: number) => ['campaigns', id, 'composition'] as const,
   content: ['content'] as const,
   contentRecord: (id: number) => ['content', id] as const,
   audienceGroups: ['audience-groups'] as const,
@@ -156,5 +161,43 @@ export function useAsSent(executionId: number) {
           params: { path: { execution_id: executionId } },
         }),
       ),
+  })
+}
+
+/** A campaign as the variant editor shows it (B11): one read for the screen. */
+export function useComposition(campaignId: number) {
+  return useQuery({
+    queryKey: keys.composition(campaignId),
+    queryFn: () =>
+      read(
+        api.GET('/campaigns/{campaign_id}/composition', {
+          params: { path: { campaign_id: campaignId } },
+        }),
+      ),
+  })
+}
+
+/**
+ * Duplicate a variant beside its original (task-229).
+ *
+ * **The body is empty on purpose.** Which content mode a copy takes is the
+ * server's rule -- `keep` inside the variant's own campaign, `layout` into
+ * another -- and sending one from here would be a second copy of it, free to
+ * disagree. The response says which mode was used.
+ *
+ * Not idempotent: each call makes another copy. The screen disables the button
+ * while a call is in flight, which is the whole of the double-click defence.
+ */
+export function useDuplicateVariant(campaignId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (variantId: number) =>
+      read(
+        api.POST('/campaigns/variants/{variant_id}/duplicate', {
+          params: { path: { variant_id: variantId } },
+          body: {},
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.composition(campaignId) }),
   })
 }

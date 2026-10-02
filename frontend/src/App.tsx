@@ -4,6 +4,7 @@ import ApprovalDetail from './screens/ApprovalDetail'
 import Approvals from './screens/Approvals'
 import AudienceDetail from './screens/AudienceDetail'
 import Audiences from './screens/Audiences'
+import CampaignDetail from './screens/CampaignDetail'
 import Campaigns from './screens/Campaigns'
 import Content from './screens/Content'
 import ContentDetail from './screens/ContentDetail'
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="/approvals" element={<Approvals />} />
         <Route path="/approvals/:id" element={<ApprovalDetail />} />
         <Route path="/campaigns" element={<Campaigns />} />
+        <Route path="/campaigns/:id" element={<CampaignDetail />} />
         <Route path="/content" element={<Content />} />
         <Route path="/content/:id" element={<ContentDetail />} />
         <Route path="/audiences" element={<Audiences />} />

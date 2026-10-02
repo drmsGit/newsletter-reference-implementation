@@ -1,0 +1,182 @@
+import { Button } from 'react-aria-components'
+import { Link, useParams } from 'react-router'
+
+import {
+  useComposition,
+  useDuplicateVariant,
+  type ComposedModule,
+  type ComposedVariant,
+} from '../api/resources'
+import { HttpError } from '../api/session'
+import DataTable, { type DataColumn } from '../components/DataTable'
+import ScreenState from '../components/ScreenState'
+import { formatDate } from './Campaigns'
+
+/**
+ * One campaign, variant by variant (inventory B11).
+ *
+ * Everything comes from one read, `GET /campaigns/{id}/composition`, which
+ * already carries what the Jinja page used to compute for itself: whether a
+ * module may be overridden, the channel's module limit, which module is the
+ * envelope. **This screen derives none of it.** It shows the server's answers,
+ * so there is one place those rules live.
+ *
+ * The one write is Duplicate, the primary way a variant comes into being
+ * (Variant Editor interview Q5.1). Editing modules, overrides and slots comes
+ * with the rest of the write surface.
+ */
+export default function CampaignDetail() {
+  const id = Number(useParams().id)
+  const composition = useComposition(id)
+
+  return (
+    <>
+      <p>
+        <Link to="/campaigns">← Campaigns</Link>
+      </p>
+      <ScreenState query={composition}>
+        {composition.data && (
+          <>
+            <h1>{composition.data.campaign.name}</h1>
+            <dl className="facts">
+              <dt>Status</dt>
+              <dd>{composition.data.campaign.status}</dd>
+              <dt>Variants</dt>
+              <dd>{composition.data.variants.length}</dd>
+              <dt>Updated</dt>
+              <dd>{formatDate(composition.data.campaign.updated_at)}</dd>
+            </dl>
+            {composition.data.variants.map((composed) => (
+              <VariantSection key={composed.variant.id} campaignId={id} composed={composed} />
+            ))}
+          </>
+        )}
+      </ScreenState>
+    </>
+  )
+}
+
+function VariantSection({
+  campaignId,
+  composed,
+}: {
+  campaignId: number
+  composed: ComposedVariant
+}) {
+  const duplicate = useDuplicateVariant(campaignId)
+  const { variant } = composed
+  const slotNames = new Map(composed.decision_slots.map((s) => [s.id, s.name]))
+  const envelope = composed.envelope_modules[0]?.module_data ?? {}
+
+  const columns: DataColumn<ComposedModule>[] = [
+    { key: 'position', header: 'Position', render: (m) => m.position },
+    {
+      key: 'type',
+      header: 'Module',
+      isRowHeader: true,
+      render: (m) => (m.known ? m.module_type : `${m.module_type} (not on this channel)`),
+    },
+    {
+      key: 'source',
+      header: 'Content',
+      /**
+       * Where the module's content comes from, in the three ways a module can
+       * have it: bound to a record, filled by a decision slot per recipient, or
+       * typed into the module itself.
+       */
+      render: (m) =>
+        m.content_record_id != null ? (
+          <Link to={`/content/${m.content_record_id}`}>Record #{m.content_record_id}</Link>
+        ) : m.decision_slot_id != null ? (
+          `Slot: ${slotNames.get(m.decision_slot_id) ?? `#${m.decision_slot_id}`}`
+        ) : (
+          'Typed in the module'
+        ),
+    },
+    {
+      key: 'override',
+      header: 'Override',
+      render: (m) =>
+        m.active_override
+          ? `Overridden${m.active_override.overridden_by ? ` by ${m.active_override.overridden_by}` : ''}`
+          : '—',
+    },
+  ]
+
+  return (
+    <section aria-labelledby={`variant-${variant.id}`}>
+      <h2 id={`variant-${variant.id}`}>{variant.name}</h2>
+      <dl className="facts">
+        <dt>Channel</dt>
+        <dd>{variant.channel}</dd>
+        <dt>Status</dt>
+        <dd>{variant.status}</dd>
+        {/*
+          The envelope is the header module's own fields (ADR-162 point 1),
+          kept apart from the body by the server. Rendered generically: email
+          has subject and preheader, and a channel without an envelope has none.
+        */}
+        {Object.entries(envelope).map(([key, value]) => (
+          <div key={key} style={{ display: 'contents' }}>
+            <dt>{key}</dt>
+            <dd>{String(value ?? '—')}</dd>
+          </div>
+        ))}
+        <dt>Modules</dt>
+        <dd>
+          {composed.modules.length}
+          {composed.module_limit != null ? ` of ${composed.module_limit}` : ''}
+        </dd>
+      </dl>
+
+      <p>
+        <Button
+          isDisabled={duplicate.isPending}
+          onPress={() => duplicate.mutate(variant.id)}
+        >
+          {duplicate.isPending ? 'Duplicating…' : 'Duplicate this variant'}
+        </Button>
+      </p>
+      {duplicate.isSuccess && (
+        <p role="status">
+          {/* The mode is the server's answer, not assumed: it decides the default. */}
+          Copied into this campaign as a draft,{' '}
+          {duplicate.data.content_mode === 'keep'
+            ? 'pointing at the same content.'
+            : 'with the layout only — content is unbound.'}
+        </p>
+      )}
+      {duplicate.isError && (
+        <p role="alert">
+          {duplicate.error instanceof HttpError && duplicate.error.status === 403
+            ? 'You do not have permission to create variants in this brand.'
+            : 'The variant could not be duplicated.'}
+        </p>
+      )}
+
+      <DataTable
+        label={`Modules of ${variant.name}`}
+        columns={columns}
+        items={composed.modules}
+        emptyMessage="This variant has no modules yet."
+      />
+
+      {composed.decision_slots.length > 0 && (
+        <>
+          <h3>Decision slots</h3>
+          <DataTable
+            label={`Decision slots of ${variant.name}`}
+            columns={[
+              { key: 'name', header: 'Slot', isRowHeader: true, render: (s) => s.name },
+              { key: 'strategy', header: 'Strategy', render: (s) => s.decision_strategy },
+              { key: 'picks', header: 'Picks made', render: (s) => s.resolution_count },
+              { key: 'unique', header: 'Distinct content', render: (s) => s.unique_content_count },
+            ]}
+            items={composed.decision_slots}
+            emptyMessage=""
+          />
+        </>
+      )}
+    </section>
+  )
+}

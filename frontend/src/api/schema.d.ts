@@ -2527,6 +2527,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/campaigns/variants/{variant_id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Duplicate a variant, by default beside the original
+         * @description The primary way a variant is created (task-229). Same brand only: the variant and `target_campaign_id` (default: its own campaign) must be in the working brand, 404 otherwise. `content_mode` defaults to `keep` inside the own campaign and `layout` into another; `copy` is 409. Status is draft, slots arrive unconfigured, nothing that happened comes across.
+         */
+        post: operations["duplicate_variant_record_campaigns_variants__variant_id__duplicate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/campaigns/variants/{variant_id}/suggestions": {
         parameters: {
             query?: never;
@@ -7487,6 +7507,42 @@ export interface components {
              */
             status: "draft" | "ready";
         };
+        /**
+         * VariantDuplicate
+         * @description Duplicate one variant inside its brand (task-229). Every field optional.
+         *
+         *     `target_campaign_id` omitted means the variant's own campaign. `content_mode`
+         *     omitted means the default for that target: `keep` inside the own campaign
+         *     (an A/B arm), `layout` into another one (the weekly newsletter).
+         *     `copy` is refused, because a variant copy never leaves its brand.
+         */
+        VariantDuplicate: {
+            /** Target Campaign Id */
+            target_campaign_id?: number | null;
+            /** Name */
+            name?: string | null;
+            /** Content Mode */
+            content_mode?: string | null;
+        };
+        /** VariantDuplicated */
+        VariantDuplicated: {
+            /** Variant Id */
+            variant_id: number;
+            /** Source Variant Id */
+            source_variant_id: number;
+            /** Campaign Id */
+            campaign_id: number;
+            /** Source Campaign Id */
+            source_campaign_id: number;
+            /** Content Mode */
+            content_mode: string;
+            /** Modules */
+            modules: number;
+            /** Decision Slots */
+            decision_slots: number;
+            /** Url Carriers */
+            url_carriers: string[];
+        };
         /** VariantUpdate */
         VariantUpdate: {
             /** Name */
@@ -12180,6 +12236,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CampaignDuplicated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    duplicate_variant_record_campaigns_variants__variant_id__duplicate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                variant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VariantDuplicate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariantDuplicated"];
                 };
             };
             /** @description Validation Error */
