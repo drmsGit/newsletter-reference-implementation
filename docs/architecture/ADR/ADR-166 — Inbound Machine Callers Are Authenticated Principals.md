@@ -244,6 +244,24 @@ recorded as gaps rather than answered. The wider scope question for the person's
 own access remains with [[ADR-150 — Tenancy and Access Model]]; the human
 counterpart of step-up remains open in [[ADR-151 — Authentication and Sessions]].
 
+**Corrected the same day, after review: no escalation covers using an integration,
+not only granting to it.** Point 2 as first written gated only granting. Review
+found the gap: `integrations.manage` is platform-level, so an Admin of brand A only
+could issue a key for an integration that brand B's people had given
+`sends.execute` on B, and send there with a power they do not hold. Switching
+unattended sending on widens that power the same way. And removing a grant let them
+strip brand B's integrations. Now, issuing a key and switching unattended sending
+**on** require the person to hold every grant the integration has, each on its own
+brand (`require_holds_integration` in `backend/app/auth/integrations.py`). Removing
+a grant requires holding that grant's permission on its brand. Reductions stay
+ungated: revoking a key, switching unattended sending off, deactivating. Like point
+2, this is enforced in the service, so the Jinja page and the JSON routes agree.
+**A consequence to name, not solved:** a grant goes to whoever already holds the
+integration's keys. Someone who grants an integration a permission is trusting
+every existing key holder, including one issued earlier by a person who could not
+have been granted that permission themselves. Granting to an integration is
+therefore a decision about its key holders too.
+
 ## Related ADRs
 
 ### Depends On
