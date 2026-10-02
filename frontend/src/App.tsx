@@ -7,6 +7,9 @@ import Audiences from './screens/Audiences'
 import Campaigns from './screens/Campaigns'
 import Content from './screens/Content'
 import ContentDetail from './screens/ContentDetail'
+import Deliveries from './screens/Deliveries'
+import DeliveryAsSent from './screens/DeliveryAsSent'
+import DeliveryDetail from './screens/DeliveryDetail'
 import RequireSession from './routes/RequireSession'
 import SignIn from './screens/SignIn'
 import Shell from './shell/Shell'
@@ -43,6 +46,12 @@ export default function App() {
         <Route path="/content/:id" element={<ContentDetail />} />
         <Route path="/audiences" element={<Audiences />} />
         <Route path="/audiences/:id" element={<AudienceDetail />} />
+        <Route path="/deliveries" element={<Deliveries />} />
+        <Route path="/deliveries/:id" element={<DeliveryDetail />} />
+        <Route
+          path="/deliveries/:id/executions/:executionId"
+          element={<DeliveryAsSent />}
+        />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

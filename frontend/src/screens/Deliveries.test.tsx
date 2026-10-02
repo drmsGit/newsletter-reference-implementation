@@ -1,0 +1,203 @@
+import { screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Route, Routes } from 'react-router'
+
+import Deliveries from './Deliveries'
+import DeliveryAsSent from './DeliveryAsSent'
+import DeliveryDetail from './DeliveryDetail'
+import { jsonResponse, renderWithProviders, stubFetch } from '../test-utils'
+
+afterEach(() => vi.unstubAllGlobals())
+
+const A_SEND = {
+  id: 4,
+  snapshot_id: 9,
+  name: 'Spring launch — send 1',
+  status: 'sent',
+  provider: 'mock',
+  scheduled_at: null,
+  created_at: '2026-10-02T09:00:00Z',
+  updated_at: '2026-10-02T09:05:00Z',
+  from_address: 'news@example.invalid',
+  audience_group_id: 3,
+  sent_count: 2,
+  failed_count: 0,
+  excluded_count: 1,
+}
+
+function execution(id: number, status: string, extra: object = {}) {
+  return {
+    id,
+    send_instance_id: 4,
+    recipient_id: 100 + id,
+    status,
+    provider: 'mock',
+    provider_message_id: null,
+    created_at: '2026-10-02T09:00:00Z',
+    updated_at: '2026-10-02T09:05:00Z',
+    recipient_external_id: `ext-${id}`,
+    exclusion_reason: null,
+    sent_at: status === 'sent' ? '2026-10-02T09:05:00Z' : null,
+    ...extra,
+  }
+}
+
+const AS_SENT = {
+  execution_id: 11,
+  send_instance_id: 4,
+  recipient_id: 111,
+  channel: 'email',
+  sent_at: '2026-10-02T09:05:00Z',
+  envelope: { subject: 'Spring is here', preheader: 'Three new trips' },
+  body: '<html><body><h1>Spring is here</h1><script>parent.x=1</script></body></html>',
+  fields: null,
+  modules: [
+    {
+      module_id: 1,
+      module_type: 'hero',
+      kind: 'content',
+      content_record_id: 42,
+      content_version_id: 7,
+      override_id: null,
+      decision_resolution_id: null,
+    },
+  ],
+  templates_match: true,
+  hash_matches: true,
+}
+
+function renderAsSent() {
+  return renderWithProviders(
+    <Routes>
+      <Route path="/deliveries/:id/executions/:executionId" element={<DeliveryAsSent />} />
+    </Routes>,
+    { route: '/deliveries/4/executions/11' },
+  )
+}
+
+describe('the deliveries list', () => {
+  it("shows the server's counts and where each send came from", async () => {
+    stubFetch({
+      'GET /delivery/send-instances': () =>
+        jsonResponse([
+          {
+            ...A_SEND,
+            campaign_id: 1,
+            campaign_name: 'Spring',
+            variant_id: 2,
+            variant_name: 'Main',
+            execution_count: 3,
+            event_count: 0,
+          },
+        ]),
+    })
+    renderWithProviders(<Deliveries />)
+
+    expect(await screen.findByText('Spring launch — send 1')).toBeInTheDocument()
+    expect(screen.getByText('Spring / Main')).toBeInTheDocument()
+    expect(screen.getByText('2 / 0 / 1')).toBeInTheDocument()
+  })
+})
+
+describe('a send in detail', () => {
+  function stubDetail() {
+    stubFetch({
+      'GET /delivery/send-instances/4': () =>
+        jsonResponse({
+          ...A_SEND,
+          execution_count: 3,
+          exclusions_by_stage: { consent: 1 },
+          audience_group_name: 'Spring travellers',
+        }),
+      'GET /delivery/send-instances/4/executions': () =>
+        jsonResponse([
+          execution(11, 'sent'),
+          execution(12, 'excluded', { exclusion_reason: 'consent' }),
+        ]),
+    })
+    renderWithProviders(
+      <Routes>
+        <Route path="/deliveries/:id" element={<DeliveryDetail />} />
+      </Routes>,
+      { route: '/deliveries/4' },
+    )
+  }
+
+  it('explains the gap between planned and sent, by stage', async () => {
+    /**
+     * ADR-176 point 4 makes exclusions routine: a manager who approved three and
+     * sees two sent needs the reason, and the stage counts are that reason.
+     */
+    stubDetail()
+    expect(await screen.findByText('Excluded: consent')).toBeInTheDocument()
+    expect(screen.getByText('Spring travellers')).toBeInTheDocument()
+  })
+
+  it('links to "as sent" only for a recipient who was sent something', async () => {
+    /**
+     * Only a sent execution has a delivery record (ADR-183). A link on the
+     * excluded row could only end in "nothing to show".
+     */
+    stubDetail()
+    const links = await screen.findAllByRole('link', { name: 'As sent' })
+    expect(links).toHaveLength(1)
+    expect(links[0]).toHaveAttribute('href', '/deliveries/4/executions/11')
+  })
+
+  it("answers another brand's send as absent", async () => {
+    stubFetch({
+      'GET /delivery/send-instances/4': () => jsonResponse({ detail: 'not found' }, 404),
+      'GET /delivery/send-instances/4/executions': () => jsonResponse([]),
+    })
+    renderWithProviders(
+      <Routes>
+        <Route path="/deliveries/:id" element={<DeliveryDetail />} />
+      </Routes>,
+      { route: '/deliveries/4' },
+    )
+    expect(await screen.findByRole('alert')).toHaveTextContent('That record does not exist.')
+  })
+})
+
+describe('a message as sent', () => {
+  it('renders the message in a frame with every permission withheld', async () => {
+    /**
+     * **The assertion that keeps email HTML out of this origin.** An empty
+     * `sandbox` refuses scripts, forms and popups and gives the frame an origin
+     * of its own; any token added to it -- `allow-scripts`, `allow-same-origin`
+     * -- would let a stored message act as the person viewing it.
+     */
+    stubFetch({ 'GET /delivery/executions/11/as-sent': () => jsonResponse(AS_SENT) })
+    renderAsSent()
+
+    const frame = await screen.findByTitle('The message as sent')
+    expect(frame).toHaveAttribute('sandbox', '')
+    expect(frame.getAttribute('srcdoc')).toContain('Spring is here')
+    expect(screen.getByText('Three new trips')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('says so when the layout is not the one that was sent', async () => {
+    // ADR-183 point 4: a layout difference is reported, never hidden.
+    stubFetch({
+      'GET /delivery/executions/11/as-sent': () =>
+        jsonResponse({ ...AS_SENT, templates_match: false, hash_matches: false }),
+    })
+    renderAsSent()
+
+    const alerts = await screen.findAllByRole('alert')
+    expect(alerts.map((a) => a.textContent).join(' ')).toMatch(/templates have changed/i)
+    expect(alerts.map((a) => a.textContent).join(' ')).toMatch(/not byte-identical/i)
+  })
+
+  it('tells "nothing was sent" apart from a failure', async () => {
+    // 409 is the server's answer for an execution with no delivery record.
+    stubFetch({
+      'GET /delivery/executions/11/as-sent': () => jsonResponse({ detail: 'no record' }, 409),
+    })
+    renderAsSent()
+
+    expect(await screen.findByRole('status')).toHaveTextContent(/nothing to show/i)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})

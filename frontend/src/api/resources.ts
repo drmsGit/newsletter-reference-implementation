@@ -9,6 +9,9 @@ export type ContentRecord = components['schemas']['ContentRecord']
 export type AudienceGroup = components['schemas']['AudienceGroup']
 export type PendingActionRow = components['schemas']['PendingActionRow']
 export type PendingActionDetail = components['schemas']['PendingActionDetail']
+export type SendInstanceListed = components['schemas']['SendInstanceListed']
+export type DeliveryExecution = components['schemas']['DeliveryExecution']
+export type DeliveryAsSent = components['schemas']['DeliveryAsSent']
 
 /**
  * **Every key here names its resource, and none mentions the brand.**
@@ -30,6 +33,10 @@ export const keys = {
   audienceGroup: (id: number) => ['audience-groups', id] as const,
   approvals: ['approvals'] as const,
   approval: (id: number) => ['approvals', id] as const,
+  deliveries: ['deliveries'] as const,
+  delivery: (id: number) => ['deliveries', id] as const,
+  deliveryExecutions: (id: number) => ['deliveries', id, 'executions'] as const,
+  asSent: (executionId: number) => ['executions', executionId, 'as-sent'] as const,
 }
 
 /**
@@ -95,5 +102,59 @@ export function useApproval(id: number) {
     queryKey: keys.approval(id),
     queryFn: () =>
       read(api.GET('/approvals/{pending_id}', { params: { path: { pending_id: id } } })),
+  })
+}
+
+/**
+ * The first page of sends, newest first -- the server's default of 50.
+ *
+ * No pager yet: one standard pagination mechanism is task-88's to build, and a
+ * screen-local one would be the second answer it exists to prevent.
+ */
+export function useDeliveries() {
+  return useQuery({
+    queryKey: keys.deliveries,
+    queryFn: () => read(api.GET('/delivery/send-instances')),
+  })
+}
+
+export function useDelivery(id: number) {
+  return useQuery({
+    queryKey: keys.delivery(id),
+    queryFn: () =>
+      read(
+        api.GET('/delivery/send-instances/{send_instance_id}', {
+          params: { path: { send_instance_id: id } },
+        }),
+      ),
+  })
+}
+
+export function useDeliveryExecutions(id: number) {
+  return useQuery({
+    queryKey: keys.deliveryExecutions(id),
+    queryFn: () =>
+      read(
+        api.GET('/delivery/send-instances/{send_instance_id}/executions', {
+          params: { path: { send_instance_id: id } },
+        }),
+      ),
+  })
+}
+
+/**
+ * What one recipient got (ADR-183). Answers 409 for an execution that was not
+ * sent, or was sent before delivery records existed -- the screen tells that
+ * apart from a failure, since it is an answer and not an error.
+ */
+export function useAsSent(executionId: number) {
+  return useQuery({
+    queryKey: keys.asSent(executionId),
+    queryFn: () =>
+      read(
+        api.GET('/delivery/executions/{execution_id}/as-sent', {
+          params: { path: { execution_id: executionId } },
+        }),
+      ),
   })
 }
