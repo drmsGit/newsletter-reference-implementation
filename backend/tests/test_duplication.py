@@ -1195,7 +1195,18 @@ class TestTheTargetBrandIsCheckedOverJson:
                 allowed = self._post(
                     client, headers, source["campaign"].id, target.id, duplication.LAYOUT, name)
                 assert allowed.status_code == 201, allowed.text
-                assert db.get(CampaignDB, allowed.json()["campaign_id"]).brand_id == target.id
+                copy_id = allowed.json()["campaign_id"]
+                assert db.get(CampaignDB, copy_id).brand_id == target.id
+
+                # The machine is the actor, not "nobody" (ADR-166 point 3).
+                entry = db.query(AuditEventDB).filter(
+                    AuditEventDB.action == "campaign.duplicated",
+                    AuditEventDB.subject_id == copy_id,
+                ).one()
+                assert (entry.actor_type, entry.actor_id) == ("integration", integration.id)
+                assert entry.brand_id == target.id
+                db.delete(entry)
+                db.commit()
         finally:
             _purge_named(db, name)
             _purge_brand(db, target.id)

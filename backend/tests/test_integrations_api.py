@@ -46,6 +46,11 @@ def _purge(db):
     db.rollback()
     ids = [i.id for i in db.query(IntegrationDB).filter(IntegrationDB.name.like(f"{TAG}-%")).all()]
     if ids:
+        from app.audit.db_models import AuditEventDB
+
+        db.query(AuditEventDB).filter(
+            AuditEventDB.subject_type == "integration",
+            AuditEventDB.subject_id.in_(ids)).delete(synchronize_session=False)
         db.query(IntegrationCredentialDB).filter(
             IntegrationCredentialDB.integration_id.in_(ids)).delete(synchronize_session=False)
         db.query(IntegrationGrantDB).filter(
@@ -356,3 +361,55 @@ class TestNoEscalationThroughUse:
             db.expire_all()
             assert db.query(IntegrationGrantDB).filter(
                 IntegrationGrantDB.integration_id == integration.id).count() == 1
+
+
+class TestEveryChangeIsAudited:
+    """Until 2026-10-02 integration changes left only a log line. ADR-166
+    point 5 calls logging the unattended switch "the whole control"; a log
+    line nobody keeps is not one. The secret is never in the entry."""
+
+    def _entries(self, db, integration_id):
+        from app.audit.db_models import AuditEventDB
+
+        db.expire_all()
+        return db.query(AuditEventDB).filter(
+            AuditEventDB.subject_type == "integration",
+            AuditEventDB.subject_id == integration_id,
+        ).order_by(AuditEventDB.id).all()
+
+    def test_the_json_lifecycle_is_recorded_with_the_person_as_actor(
+        self, db, made, default_brand
+    ):
+        with signed_in_admin(db) as (admin, token, csrf):
+            h = {"X-CSRF-Token": csrf}
+            user = auth.user_for_token(db, token)
+            integration = _create(admin, csrf)
+            iid = integration["id"]
+            admin.post(f"/integrations/{iid}/grants",
+                       json={"permission": VIEW, "brand_id": default_brand.id}, headers=h)
+            issued = admin.post(f"/integrations/{iid}/keys", json={"label": "k"}, headers=h).json()
+            admin.post(f"/integrations/{iid}/keys/{issued['credential']['id']}/revoke", headers=h)
+            admin.put(f"/integrations/{iid}/unattended", json={"allowed": True}, headers=h)
+            admin.delete(f"/integrations/{iid}/grants/{VIEW}/{default_brand.id}", headers=h)
+            admin.post(f"/integrations/{iid}/deactivate", headers=h)
+
+            entries = self._entries(db, iid)
+            assert [e.action for e in entries] == [
+                "integration.created", "integration.grant_added", "integration.key_issued",
+                "integration.key_revoked", "integration.unattended_set",
+                "integration.grant_removed", "integration.deactivated",
+            ]
+            assert {(e.actor_type, e.actor_id) for e in entries} == {("user", user.id)}
+            secret = issued["secret_key"].split(".", 1)[1]
+            assert all(secret not in str(e.detail) for e in entries)
+            assert entries[1].brand_id == default_brand.id
+
+    def test_the_jinja_grant_is_recorded_too(self, db, made, default_brand):
+        with signed_in_admin(db) as (admin, token, csrf):
+            integration = _create(admin, csrf)
+            admin.follow_redirects = False
+            admin.post(f"/ui/integrations/{integration['id']}/grants",
+                       data={"permission": VIEW, "brand_id": str(default_brand.id),
+                             "csrf_token": auth.csrf_token_for(token)})
+            actions = [e.action for e in self._entries(db, integration["id"])]
+            assert "integration.grant_added" in actions, actions

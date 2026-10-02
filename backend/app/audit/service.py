@@ -50,6 +50,15 @@ BRAND_CREATED = "brand.created"
 # ADR-163 computing consent from events rather than storing a status.
 CAMPAIGN_DUPLICATED = "campaign.duplicated"
 CONTENT_DUPLICATED = "content.duplicated"
+# ADR-166's administration surface (task-50). Logged lines were the only trace
+# of these until 2026-10-02; the subject is always the integration.
+INTEGRATION_CREATED = "integration.created"
+INTEGRATION_KEY_ISSUED = "integration.key_issued"
+INTEGRATION_KEY_REVOKED = "integration.key_revoked"
+INTEGRATION_GRANT_ADDED = "integration.grant_added"
+INTEGRATION_GRANT_REMOVED = "integration.grant_removed"
+INTEGRATION_UNATTENDED_SET = "integration.unattended_set"
+INTEGRATION_DEACTIVATED = "integration.deactivated"
 
 # The three kinds of actor, together — the pattern in the module docstring
 # names all three, so they live beside each other (task-23).
@@ -145,6 +154,21 @@ def record_from_request(request, db: Session, action: str, **kwargs) -> AuditEve
     off nobody is signed in, and recording "no actor" honestly beats
     attributing the action to somebody who did not take it.
     """
+    # **A machine on the JSON plane is its own actor** (ADR-166 point 3: the
+    # integration is the durable audit actor). `current_user` is the session's
+    # person and is None for a bearer credential, so without this every
+    # machine-made change was recorded as made by nobody. Only the JSON guard
+    # sets `principal`; its absence is the Jinja plane's ordinary case.
+    from app.auth.db_models import IntegrationDB
+
+    principal = getattr(request.state, "principal", None)
+    if isinstance(principal, IntegrationDB):
+        resolved = getattr(request.state, "working_brand_id", None)
+        kwargs.setdefault("brand_id", resolved)
+        return record(
+            db, action, actor_type=ACTOR_INTEGRATION, actor_id=principal.id, **kwargs
+        )
+
     # **Read strictly, without a default** (task-23). `attach_current_user`
     # sets both of these on every request — None when nobody is signed in —
     # so a default was never needed, and it made a renamed middleware attribute

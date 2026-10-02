@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.audit import service as audit
 from app.auth import integrations as ints
 from app.auth.db_models import (
     IntegrationCredentialDB, IntegrationDB, IntegrationGrantDB,
@@ -146,6 +147,7 @@ def create_integration(
     )
     if integration is None:
         raise HTTPException(status_code=422, detail="An integration needs a name.")
+    ints.record_change(request, db, audit.INTEGRATION_CREATED, integration.id)
     return _out(db, integration)
 
 
@@ -176,6 +178,8 @@ def issue_key(
     if issued is None:
         raise HTTPException(status_code=409, detail="That integration is deactivated.")
     credential, secret = issued
+    ints.record_change(request, db, audit.INTEGRATION_KEY_ISSUED, integration_id,
+           key_id=credential.key_id, label=credential.label)
     # A secret in a cacheable response is a secret in somebody's cache.
     response.headers["Cache-Control"] = "no-store"
     return KeyIssued(
@@ -192,12 +196,16 @@ def issue_key(
     response_model=IntegrationOut,
     summary="Revoke one key, immediately",
 )
-def revoke_key(integration_id: int, credential_id: int, db: Session = Depends(get_db)):
+def revoke_key(
+    integration_id: int, credential_id: int, request: Request,
+    db: Session = Depends(get_db),
+):
     integration = _get(db, integration_id)
     # Ownership is part of the query, so naming one integration cannot revoke
     # another's key. Already-revoked and not-found answer alike.
     if not ints.revoke_credential(db, credential_id, integration_id=integration_id):
         raise HTTPException(status_code=404, detail=f"Key {credential_id} not found")
+    ints.record_change(request, db, audit.INTEGRATION_KEY_REVOKED, integration_id, credential_id=credential_id)
     return _out(db, integration)
 
 
@@ -229,6 +237,8 @@ def add_grant(
         )
     except ints.GrantForbidden as error:
         raise HTTPException(status_code=403, detail=str(error))
+    ints.record_change(request, db, audit.INTEGRATION_GRANT_ADDED, integration_id,
+           permission=payload.permission, brand_id=payload.brand_id)
     return _out(db, integration)
 
 
@@ -251,6 +261,8 @@ def remove_grant(
         raise HTTPException(status_code=403, detail=str(error))
     if not removed:
         raise HTTPException(status_code=404, detail="That grant does not exist.")
+    ints.record_change(request, db, audit.INTEGRATION_GRANT_REMOVED, integration_id,
+           permission=permission, brand_id=brand_id)
     return _out(db, integration)
 
 
@@ -275,6 +287,7 @@ def set_unattended(
         )
     except ints.GrantForbidden as error:
         raise HTTPException(status_code=403, detail=str(error))
+    ints.record_change(request, db, audit.INTEGRATION_UNATTENDED_SET, integration_id, allowed=payload.allowed)
     db.refresh(integration)
     return _out(db, integration)
 
@@ -284,8 +297,9 @@ def set_unattended(
     response_model=IntegrationOut,
     summary="Deactivate an integration and every key beneath it",
 )
-def deactivate(integration_id: int, db: Session = Depends(get_db)):
+def deactivate(integration_id: int, request: Request, db: Session = Depends(get_db)):
     integration = _get(db, integration_id)
     ints.deactivate_integration(db, integration_id)
+    ints.record_change(request, db, audit.INTEGRATION_DEACTIVATED, integration_id)
     db.refresh(integration)
     return _out(db, integration)

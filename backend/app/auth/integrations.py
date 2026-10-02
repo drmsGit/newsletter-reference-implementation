@@ -107,6 +107,21 @@ def set_unattended_sending(db: Session, integration_id: int, allowed: bool) -> b
     return True
 
 
+def record_change(request, db: Session, action: str, integration_id: int, **detail) -> None:
+    """Audit one change to an integration, for both planes (task-50).
+
+    The integration is the subject. The brand is the grant's when the change
+    names one; otherwise none, since an integration is platform-level. Never a
+    secret — `key_id` is the public half.
+    """
+    from app.audit import service as audit
+
+    audit.record_from_request(
+        request, db, action, subject_type="integration", subject_id=integration_id,
+        brand_id=detail.get("brand_id"), detail=detail or None,
+    )
+
+
 # --- grants -----------------------------------------------------------------
 
 def grant(db: Session, integration_id: int, permission: str, brand_id: int) -> bool:

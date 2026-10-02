@@ -4080,10 +4080,12 @@ def integration_create(
     from app.auth import integrations as ints
 
     user = user_for_token(db, request.cookies.get(SESSION_COOKIE))
-    ints.create_integration(
+    integration = ints.create_integration(
         db, name=name, description=description,
         created_by_user_id=user.id if user else None,
     )
+    if integration is not None:
+        ints.record_change(request, db, audit.INTEGRATION_CREATED, integration.id)
     return RedirectResponse(url="/ui/integrations", status_code=303)
 
 
@@ -4115,6 +4117,8 @@ def integration_issue_key(
     extra = {}
     if issued is not None:
         credential, secret = issued
+        ints.record_change(request, db, audit.INTEGRATION_KEY_ISSUED, integration_id,
+                           key_id=credential.key_id, label=credential.label)
         extra = {
             "issued": f"{credential.key_id}.{secret}",
             "issued_for": integration_id,
@@ -4126,13 +4130,16 @@ def integration_issue_key(
 
 @router.post("/ui/integrations/{integration_id}/keys/{credential_id}/revoke")
 def integration_revoke_key(
-    integration_id: int, credential_id: int, db: Session = Depends(get_db),
+    request: Request, integration_id: int, credential_id: int,
+    db: Session = Depends(get_db),
 ):
     from app.auth import integrations as ints
 
     # Ownership in the query: the URL names an integration, so a key of
     # another one is not revoked through it.
-    ints.revoke_credential(db, credential_id, integration_id=integration_id)
+    if ints.revoke_credential(db, credential_id, integration_id=integration_id):
+        ints.record_change(request, db, audit.INTEGRATION_KEY_REVOKED, integration_id,
+                           credential_id=credential_id)
     return RedirectResponse(url="/ui/integrations", status_code=303)
 
 
@@ -4147,7 +4154,7 @@ def integration_grant(
     from app.auth import integrations as ints
 
     try:
-        ints.grant_by_person(
+        granted = ints.grant_by_person(
             db, user_for_token(db, request.cookies.get(SESSION_COOKIE)),
             integration_id, permission, brand_id,
             enforced=getattr(request.state, "auth_enforced", True),
@@ -4155,6 +4162,9 @@ def integration_grant(
     except ints.GrantForbidden as error:
         return RedirectResponse(
             url="/ui/integrations?error=" + quote(str(error)), status_code=303)
+    if granted:
+        ints.record_change(request, db, audit.INTEGRATION_GRANT_ADDED, integration_id,
+                           permission=permission, brand_id=brand_id)
     return RedirectResponse(url="/ui/integrations", status_code=303)
 
 
@@ -4169,12 +4179,15 @@ def integration_revoke_grant(
     from app.auth import integrations as ints
 
     try:
-        ints.revoke_grant_by_person(
+        removed = ints.revoke_grant_by_person(
             db, user_for_token(db, request.cookies.get(SESSION_COOKIE)), integration_id, permission, brand_id, enforced=getattr(request.state, "auth_enforced", True),
         )
     except ints.GrantForbidden as error:
         return RedirectResponse(
             url="/ui/integrations?error=" + quote(str(error)), status_code=303)
+    if removed:
+        ints.record_change(request, db, audit.INTEGRATION_GRANT_REMOVED, integration_id,
+                           permission=permission, brand_id=brand_id)
     return RedirectResponse(url="/ui/integrations", status_code=303)
 
 
@@ -4191,20 +4204,26 @@ def integration_set_unattended(
     from app.auth import integrations as ints
 
     try:
-        ints.set_unattended_by_person(
+        changed = ints.set_unattended_by_person(
             db, user_for_token(db, request.cookies.get(SESSION_COOKIE)), integration_id, allowed == "1", enforced=getattr(request.state, "auth_enforced", True),
         )
     except ints.GrantForbidden as error:
         return RedirectResponse(
             url="/ui/integrations?error=" + quote(str(error)), status_code=303)
+    if changed:
+        ints.record_change(request, db, audit.INTEGRATION_UNATTENDED_SET, integration_id,
+                           allowed=allowed == "1")
     return RedirectResponse(url="/ui/integrations", status_code=303)
 
 
 @router.post("/ui/integrations/{integration_id}/deactivate")
-def integration_deactivate(integration_id: int, db: Session = Depends(get_db)):
+def integration_deactivate(
+    request: Request, integration_id: int, db: Session = Depends(get_db),
+):
     from app.auth import integrations as ints
 
-    ints.deactivate_integration(db, integration_id)
+    if ints.deactivate_integration(db, integration_id):
+        ints.record_change(request, db, audit.INTEGRATION_DEACTIVATED, integration_id)
     return RedirectResponse(url="/ui/integrations", status_code=303)
 
 
