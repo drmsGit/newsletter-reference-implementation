@@ -218,6 +218,11 @@ def _purge_campaigns(db, campaign_ids: list[int]) -> None:
         AuditEventDB.subject_type == "campaign",
         AuditEventDB.subject_id.in_(campaign_ids),
     ).delete(synchronize_session=False)
+    if variant_ids:
+        db.query(AuditEventDB).filter(
+            AuditEventDB.subject_type == "variant",
+            AuditEventDB.subject_id.in_(variant_ids),
+        ).delete(synchronize_session=False)
     db.commit()
 
 
@@ -1404,3 +1409,190 @@ class TestTheJinjaPagesStillOfferTheSameChoices:
             _purge_brand(db, writable.id)
             _purge_brand(db, readable.id)
             self.helper._cleanup_user(db, user)
+
+
+class TestDuplicatingAVariant:
+    """Variant duplication — the primary way a variant comes into being (task-229).
+
+    Variant Editor interview Q5.1 made duplicate the primary creation action and
+    Q5.6 settled its shape: **same brand only, and the campaign machinery reused
+    rather than a subset reimplemented.** So these assert the same disciplines
+    the campaign tests above do — slots as prepared spots, positions renumbered,
+    the envelope at 0, status draft — through the variant entry point.
+
+    The default content mode depends on where the copy goes (decided
+    2026-10-02): KEEP inside the source's own campaign, because an A/B arm wants
+    the same content with one thing changed; LAYOUT into another campaign,
+    because the weekly newsletter wants the furniture and not last week's news
+    (Q5.2).
+    """
+
+    def _other_campaign(self, db, brand_id):
+        campaign = CampaignDB(name=_name("other"), status="draft", brand_id=brand_id)
+        db.add(campaign)
+        db.commit()
+        db.refresh(campaign)
+        return campaign
+
+    def _copy_modules(self, db, variant_id):
+        return (
+            db.query(ModuleInstanceDB)
+            .filter(ModuleInstanceDB.variant_id == variant_id)
+            .order_by(ModuleInstanceDB.position.asc())
+            .all()
+        )
+
+    def test_inside_its_own_campaign_the_default_keeps_the_content(
+        self, db, source, default_brand
+    ):
+        before = db.query(ContentRecordDB).count()
+        report = duplication.duplicate_variant(
+            db, variant_id=source["variant"].id, brand_id=default_brand.id)
+
+        copy = db.get(VariantDB, report.variant_id)
+        assert copy.campaign_id == source["campaign"].id
+        assert report.content_mode == duplication.KEEP
+        bound = [m.content_record_id for m in self._copy_modules(db, copy.id) if m.content_record_id]
+        assert bound == [source["record"].id]
+        assert db.query(ContentRecordDB).count() == before, "a same-brand copy forked content"
+
+    def test_into_another_campaign_the_default_takes_the_layout(
+        self, db, source, default_brand
+    ):
+        other = self._other_campaign(db, default_brand.id)
+        try:
+            report = duplication.duplicate_variant(
+                db, variant_id=source["variant"].id, brand_id=default_brand.id,
+                target_campaign_id=other.id)
+
+            copy = db.get(VariantDB, report.variant_id)
+            assert copy.campaign_id == other.id
+            assert report.content_mode == duplication.LAYOUT
+            modules = self._copy_modules(db, copy.id)
+            assert all(m.content_record_id is None for m in modules)
+            # The furniture survives and the news does not (Q5.2): hand-typed
+            # module_data and the envelope come across in every mode.
+            cta = next(m for m in modules if m.module_type == "cta")
+            assert cta.module_data["button_url"] == "https://brand-a.example/book"
+            header = modules[0]
+            assert header.position == 0
+            assert header.module_data["subject"] == "Hello"
+        finally:
+            _purge_campaigns(db, [other.id])
+
+    def test_an_explicit_mode_wins_over_the_default(self, db, source, default_brand):
+        report = duplication.duplicate_variant(
+            db, variant_id=source["variant"].id, brand_id=default_brand.id,
+            content_mode=duplication.LAYOUT)
+        assert report.content_mode == duplication.LAYOUT
+        assert all(m.content_record_id is None
+                   for m in self._copy_modules(db, report.variant_id))
+
+    def test_it_reuses_the_campaign_disciplines(self, db, source, default_brand):
+        report = duplication.duplicate_variant(
+            db, variant_id=source["variant"].id, brand_id=default_brand.id)
+        copy = db.get(VariantDB, report.variant_id)
+
+        assert copy.status == "draft", "a copy of a sent variant has not been sent"
+        assert copy.channel == source["variant"].channel
+        assert copy.name == "Variant A (copy)"
+        modules = self._copy_modules(db, copy.id)
+        assert [m.position for m in modules] == [0, 1, 2, 3]
+        slots = db.query(DecisionSlotDB).filter(DecisionSlotDB.variant_id == copy.id).all()
+        assert len(slots) == 1 and slots[0].id != source["slot"].id
+        assert slots[0].candidate_filter is None, "the slot came across configured"
+        assert slots[0].max_results == 2
+        slotted = [m for m in modules if m.decision_slot_id]
+        assert [m.decision_slot_id for m in slotted] == [slots[0].id]
+        assert report.modules == 4 and report.decision_slots == 1
+        assert any("button_url" in c for c in report.url_carriers)
+
+    def test_copying_content_is_refused_because_it_never_crosses_a_brand(
+        self, db, source, default_brand
+    ):
+        with pytest.raises(duplication.DuplicationRefused, match="not copied inside a brand"):
+            duplication.duplicate_variant(
+                db, variant_id=source["variant"].id, brand_id=default_brand.id,
+                content_mode=duplication.COPY)
+
+    def test_another_brands_variant_or_campaign_answers_as_absent(
+        self, db, source, default_brand, temp_brand
+    ):
+        elsewhere = temp_brand("var")
+        foreign = self._other_campaign(db, elsewhere.id)
+        try:
+            # The source seen from a brand it is not in.
+            with pytest.raises(duplication.DuplicationNotFound):
+                duplication.duplicate_variant(
+                    db, variant_id=source["variant"].id, brand_id=elsewhere.id)
+            # The source pulled INTO the caller's own campaign. The target check
+            # passes here, so only the source check stands between brand B and
+            # a copy of brand A's variant — under KEEP, bound to A's content.
+            with pytest.raises(duplication.DuplicationNotFound):
+                duplication.duplicate_variant(
+                    db, variant_id=source["variant"].id, brand_id=elsewhere.id,
+                    target_campaign_id=foreign.id)
+            # A target campaign in another brand: same-brand only (Q5.6).
+            with pytest.raises(duplication.DuplicationNotFound):
+                duplication.duplicate_variant(
+                    db, variant_id=source["variant"].id, brand_id=default_brand.id,
+                    target_campaign_id=foreign.id)
+            assert db.query(VariantDB).filter(VariantDB.campaign_id == foreign.id).count() == 0
+        finally:
+            _purge_brand(db, elsewhere.id)
+
+
+class TestDuplicatingAVariantOverJson:
+    """`POST /campaigns/variants/{id}/duplicate` — the SPA's entry point."""
+
+    helper = TestTheTargetBrandIsCheckedOverJson()
+
+    def _person(self, db, brand):
+        return self.helper._person(db, {brand: MANAGER}, brand)
+
+    def test_an_empty_body_duplicates_beside_the_original_and_is_audited(
+        self, db, source, default_brand
+    ):
+        user, client, headers = self._person(db, default_brand)
+        try:
+            response = client.post(
+                f"/campaigns/variants/{source['variant'].id}/duplicate",
+                json={}, headers=headers)
+            assert response.status_code == 201, response.text
+            body = response.json()
+            assert body["campaign_id"] == source["campaign"].id
+            assert body["content_mode"] == duplication.KEEP
+            audit_row = (
+                db.query(AuditEventDB)
+                .filter(AuditEventDB.subject_type == "variant",
+                        AuditEventDB.subject_id == body["variant_id"])
+                .one()
+            )
+            assert audit_row.action == "variant.duplicated"
+            assert audit_row.detail["source_variant_id"] == source["variant"].id
+        finally:
+            self.helper.helper._cleanup_user(db, user)
+
+    def test_another_brands_variant_is_404_and_copy_is_409(
+        self, db, source, default_brand, temp_brand
+    ):
+        elsewhere = temp_brand("var-json")
+        user, client, headers = self.helper._person(
+            db, {default_brand: MANAGER, elsewhere: MANAGER}, elsewhere)
+        try:
+            refused = client.post(
+                f"/campaigns/variants/{source['variant'].id}/duplicate",
+                json={}, headers=headers)
+            assert refused.status_code == 404, refused.text
+        finally:
+            self.helper.helper._cleanup_user(db, user)
+            _purge_brand(db, elsewhere.id)
+
+        user, client, headers = self._person(db, default_brand)
+        try:
+            conflict = client.post(
+                f"/campaigns/variants/{source['variant'].id}/duplicate",
+                json={"content_mode": duplication.COPY}, headers=headers)
+            assert conflict.status_code == 409, conflict.text
+        finally:
+            self.helper.helper._cleanup_user(db, user)

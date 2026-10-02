@@ -50,6 +50,7 @@ BRAND_CREATED = "brand.created"
 # ADR-163 computing consent from events rather than storing a status.
 CAMPAIGN_DUPLICATED = "campaign.duplicated"
 CONTENT_DUPLICATED = "content.duplicated"
+VARIANT_DUPLICATED = "variant.duplicated"
 # ADR-166's administration surface (task-50). Logged lines were the only trace
 # of these until 2026-10-02; the subject is always the integration.
 INTEGRATION_CREATED = "integration.created"

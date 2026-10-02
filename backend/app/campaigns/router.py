@@ -11,6 +11,8 @@ from app.campaigns.models import (
     Campaign,
     CampaignDuplicate,
     CampaignDuplicated,
+    VariantDuplicate,
+    VariantDuplicated,
     DuplicationOptions,
     DuplicationTarget,
     SuggestionRun,
@@ -638,6 +640,58 @@ def duplicate_campaign_record(
         modules=report.modules,
         decision_slots=report.decision_slots,
         content_records_copied=report.content_records_copied,
+        url_carriers=report.url_carriers,
+    )
+
+
+@router.post(
+    "/variants/{variant_id}/duplicate",
+    response_model=VariantDuplicated,
+    status_code=201,
+    summary="Duplicate a variant, by default beside the original",
+    description=(
+        "The primary way a variant is created (task-229). Same brand only: the "
+        "variant and `target_campaign_id` (default: its own campaign) must be in "
+        "the working brand, 404 otherwise. `content_mode` defaults to `keep` "
+        "inside the own campaign and `layout` into another; `copy` is 409. "
+        "Status is draft, slots arrive unconfigured, nothing that happened comes "
+        "across."
+    ),
+)
+def duplicate_variant_record(
+    variant_id: int,
+    payload: VariantDuplicate,
+    request: Request,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    try:
+        report = duplication.duplicate_variant(
+            db,
+            variant_id=variant_id,
+            brand_id=brand_id,
+            target_campaign_id=payload.target_campaign_id,
+            name=payload.name,
+            content_mode=payload.content_mode,
+        )
+    except duplication.DuplicationNotFound as error:
+        raise HTTPException(status_code=404, detail=str(error))
+    except duplication.DuplicationRefused as error:
+        raise HTTPException(status_code=409, detail=str(error))
+
+    audit.record_from_request(
+        request, db, audit.VARIANT_DUPLICATED,
+        subject_type="variant", subject_id=report.variant_id,
+        brand_id=brand_id, detail=report.as_detail(),
+    )
+    return VariantDuplicated(
+        variant_id=report.variant_id,
+        source_variant_id=report.source_variant_id,
+        campaign_id=report.campaign_id,
+        source_campaign_id=report.source_campaign_id,
+        content_mode=report.content_mode,
+        modules=report.modules,
+        decision_slots=report.decision_slots,
         url_carriers=report.url_carriers,
     )
 

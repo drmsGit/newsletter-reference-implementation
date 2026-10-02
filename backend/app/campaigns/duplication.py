@@ -59,6 +59,14 @@ class DuplicationRefused(ValueError):
     that already catch ValueError keep working."""
 
 
+class DuplicationNotFound(DuplicationRefused):
+    """The source, or the target campaign, is not in the working brand.
+
+    One answer for "does not exist" and "exists in another brand", as
+    ADR-172 point 6 requires, so the JSON plane can make both a 404.
+    """
+
+
 class DuplicationForbidden(DuplicationRefused):
     """The caller holds no grant that lets them write into the target brand.
 
@@ -175,6 +183,35 @@ class DuplicationReport:
             "modules": self.modules,
             "decision_slots": self.decision_slots,
             "content_records_copied": self.content_records_copied,
+        }
+
+
+@dataclass
+class VariantDuplicationReport:
+    """What a variant copy did (task-229) — the audit entry's payload, like
+    `DuplicationReport`, and for the same ADR-153 reason: provenance is an
+    event, not a `copied_from_id` column that could go stale."""
+    variant_id: int
+    source_variant_id: int
+    campaign_id: int
+    source_campaign_id: int
+    content_mode: str
+    variants: int = 0
+    modules: int = 0
+    decision_slots: int = 0
+    #: Always empty — a variant copy never leaves its brand — but the shared
+    #: copy helper tallies into it.
+    content_records_copied: dict[int, int] = field(default_factory=dict)
+    url_carriers: list[str] = field(default_factory=list)
+
+    def as_detail(self) -> dict:
+        return {
+            "source_variant_id": self.source_variant_id,
+            "source_campaign_id": self.source_campaign_id,
+            "campaign_id": self.campaign_id,
+            "content_mode": self.content_mode,
+            "modules": self.modules,
+            "decision_slots": self.decision_slots,
         }
 
 
@@ -314,99 +351,213 @@ def duplicate_campaign(
         )
 
     for source_variant in variants:
-        variant = VariantDB(
-            campaign_id=campaign.id,
-            # Carried, never re-chosen. ADR-160 point 5 fixes a variant's
-            # channel at creation because switching it would invalidate the
-            # modules, the content-readiness and the renderer at once — and a
-            # copy whose modules came from a push variant is a push variant.
-            channel=source_variant.channel,
-            name=source_variant.name,
-            # Envelope copy is NOT carried here any more: it lives in the
-            # header module (ADR-162 point 1), which the module loop below
-            # copies like any other. Copying the columns too would restore the
-            # second source of truth that point exists to remove.
-            status="draft",
+        _copy_variant_into(
+            db, source_variant, campaign_id=campaign.id, name=source_variant.name,
+            content_mode=content_mode, target_brand_id=target_brand_id, report=report,
         )
-        db.add(variant)
-        db.flush()
-        report.variants += 1
-
-        slot_map: dict[int, int] = {}
-        source_slots = (
-            db.query(DecisionSlotDB)
-            .filter(DecisionSlotDB.variant_id == source_variant.id)
-            .order_by(DecisionSlotDB.id.asc())
-            .all()
-        )
-        for source_slot in source_slots:
-            slot = DecisionSlotDB(
-                variant_id=variant.id,
-                name=source_slot.name,
-                decision_type=source_slot.decision_type,
-                decision_strategy=source_slot.decision_strategy,
-                candidate_filter=None,
-                strategy_config=None,
-                max_results=source_slot.max_results,
-            )
-            db.add(slot)
-            db.flush()
-            slot_map[source_slot.id] = slot.id
-            report.decision_slots += 1
-
-        source_modules = (
-            db.query(ModuleInstanceDB)
-            .filter(ModuleInstanceDB.variant_id == source_variant.id)
-            .order_by(ModuleInstanceDB.position.asc())
-            .all()
-        )
-        # Positions are re-numbered from 1 rather than carried over: deleting a
-        # module leaves a hole, and a copy is a fresh composition with no reason
-        # to inherit one. Iterating in source order keeps the layout identical.
-        #
-        # **The envelope module keeps position 0**, which is where
-        # `set_envelope_fields` puts it on a fresh variant (ADR-162 point 1).
-        # Letting it renumber to 1 would work — the renderer only cares that it
-        # is first — but it would leave originals and copies structured
-        # differently for no reason, and "first" is easier to rely on when it is
-        # always the same number.
-        envelope_type = envelope_module_type(variant.channel)
-        next_position = 0
-        for source_module in source_modules:
-            if source_module.module_type == envelope_type:
-                index = 0
-            else:
-                next_position += 1
-                index = next_position
-            content_record_id = _target_content_id(
-                db,
-                source_module.content_record_id,
-                content_mode=content_mode,
-                target_brand_id=target_brand_id,
-                report=report,
-            )
-            module = ModuleInstanceDB(
-                variant_id=variant.id,
-                module_type=source_module.module_type,
-                position=index,
-                content_record_id=content_record_id,
-                # A decision slot is layout, not content: it arrives in every
-                # mode, including layout-only, because what "layout only" drops
-                # is the binding to a specific record.
-                decision_slot_id=slot_map.get(source_module.decision_slot_id),
-                module_data=source_module.module_data,
-            )
-            db.add(module)
-            report.modules += 1
-            for key in _url_keys(source_module.module_data):
-                report.url_carriers.append(
-                    f"{source_variant.name} → module {index} ({source_module.module_type}): {key}"
-                )
 
     db.commit()
     db.refresh(campaign)
     report.campaign_id = campaign.id
     return report
+
+
+def default_variant_mode(source_campaign_id: int, target_campaign_id: int) -> str:
+    """The content mode a variant copy takes when none is named (task-229).
+
+    **It depends on where the copy goes**, decided 2026-10-02 from the Variant
+    Editor interview's own observation (Q5.2):
+
+      - **Into its own campaign: KEEP.** That is an A/B/C arm, or a variant
+        carrying a record meant for one audience group. It wants everything
+        identical except the thing under test, and LAYOUT would make the manager
+        rebind every module, which defeats the point.
+      - **Into another campaign: LAYOUT.** That is the weekly newsletter.
+        `module_data` and the envelope come across in every mode, so the
+        furniture survives and last week's news does not.
+
+    A mode the caller names always wins. This only fills the gap.
+    """
+    return KEEP if target_campaign_id == source_campaign_id else LAYOUT
+
+
+def duplicate_variant(
+    db: Session,
+    *,
+    variant_id: int,
+    brand_id: int,
+    target_campaign_id: int | None = None,
+    name: str | None = None,
+    content_mode: str | None = None,
+) -> VariantDuplicationReport:
+    """Copy one variant into a campaign of the same brand — by default its own.
+
+    **The primary way a variant comes into being** (Variant Editor interview
+    Q5.1), and deliberately narrower than `duplicate_campaign` (Q5.6): **same
+    brand only**, so it never needs COPY, never carries a URL across a brand
+    and never forks the catalogue. The cross-brand story stays a campaign-level
+    act, where a manager is already thinking about brands.
+
+    It inherits everything else by sharing `_copy_variant_into`: slots arrive as
+    prepared spots, positions are renumbered with the envelope at 0, the channel
+    is carried (ADR-160 point 5), status is draft, and nothing that *happened*
+    comes across. One commit, for the reason the module docstring gives.
+
+    Active content overrides do not come across yet; that is task-113, which
+    fixes this shared helper for both entry points at once.
+    """
+    from app.campaigns.service import brand_of_variant
+
+    source = db.get(VariantDB, variant_id)
+    if source is None or brand_of_variant(db, variant_id) != brand_id:
+        raise DuplicationNotFound("That variant does not exist.")
+
+    campaign_id = target_campaign_id if target_campaign_id is not None else source.campaign_id
+    target = (
+        db.query(CampaignDB)
+        .filter(CampaignDB.id == campaign_id, CampaignDB.brand_id == brand_id)
+        .first()
+    )
+    if target is None:
+        raise DuplicationNotFound("That campaign does not exist.")
+
+    mode = content_mode or default_variant_mode(source.campaign_id, target.id)
+    if mode not in content_modes_for(brand_id, brand_id):
+        if mode == COPY:
+            raise DuplicationRefused(
+                "Content is not copied inside a brand — the copy references the "
+                "same records, so catalogue edits still reach it (ADR-013)."
+            )
+        raise DuplicationRefused(f"Unknown content option: {mode!r}")
+
+    report = VariantDuplicationReport(
+        variant_id=0,
+        source_variant_id=source.id,
+        campaign_id=target.id,
+        source_campaign_id=source.campaign_id,
+        content_mode=mode,
+    )
+    variant = _copy_variant_into(
+        db, source, campaign_id=target.id,
+        name=_clamp(name or "") or f"{source.name} (copy)"[:_NAME_LIMIT],
+        content_mode=mode, target_brand_id=brand_id, report=report,
+    )
+    db.commit()
+    report.variant_id = variant.id
+    return report
+
+
+def _copy_variant_into(
+    db: Session,
+    source_variant: VariantDB,
+    *,
+    campaign_id: int,
+    name: str,
+    content_mode: str,
+    target_brand_id: int,
+    report,
+) -> VariantDB:
+    """One variant, its decision slots and its modules, into `campaign_id`,
+    inside the caller's transaction (flushed, never committed).
+
+    **The one place a variant is copied**, for a whole campaign and for a single
+    variant alike. Variant Editor interview Q5.6 settled that variant
+    duplication reuses this machinery rather than reimplementing a subset,
+    because a parallel copy starts as a subset and drifts — the argument
+    ADR-160 point 6 makes about registration patterns.
+
+    `report` is tallied in place (`variants`, `modules`, `decision_slots`,
+    `url_carriers`, `content_records_copied`), whichever report it is.
+    """
+    variant = VariantDB(
+        campaign_id=campaign_id,
+        # Carried, never re-chosen. ADR-160 point 5 fixes a variant's
+        # channel at creation because switching it would invalidate the
+        # modules, the content-readiness and the renderer at once — and a
+        # copy whose modules came from a push variant is a push variant.
+        channel=source_variant.channel,
+        name=name,
+        # Envelope copy is NOT carried here any more: it lives in the
+        # header module (ADR-162 point 1), which the module loop below
+        # copies like any other. Copying the columns too would restore the
+        # second source of truth that point exists to remove.
+        status="draft",
+    )
+    db.add(variant)
+    db.flush()
+    report.variants += 1
+
+    slot_map: dict[int, int] = {}
+    source_slots = (
+        db.query(DecisionSlotDB)
+        .filter(DecisionSlotDB.variant_id == source_variant.id)
+        .order_by(DecisionSlotDB.id.asc())
+        .all()
+    )
+    for source_slot in source_slots:
+        slot = DecisionSlotDB(
+            variant_id=variant.id,
+            name=source_slot.name,
+            decision_type=source_slot.decision_type,
+            decision_strategy=source_slot.decision_strategy,
+            candidate_filter=None,
+            strategy_config=None,
+            max_results=source_slot.max_results,
+        )
+        db.add(slot)
+        db.flush()
+        slot_map[source_slot.id] = slot.id
+        report.decision_slots += 1
+
+    source_modules = (
+        db.query(ModuleInstanceDB)
+        .filter(ModuleInstanceDB.variant_id == source_variant.id)
+        .order_by(ModuleInstanceDB.position.asc())
+        .all()
+    )
+    # Positions are re-numbered from 1 rather than carried over: deleting a
+    # module leaves a hole, and a copy is a fresh composition with no reason
+    # to inherit one. Iterating in source order keeps the layout identical.
+    #
+    # **The envelope module keeps position 0**, which is where
+    # `set_envelope_fields` puts it on a fresh variant (ADR-162 point 1).
+    # Letting it renumber to 1 would work — the renderer only cares that it
+    # is first — but it would leave originals and copies structured
+    # differently for no reason, and "first" is easier to rely on when it is
+    # always the same number.
+    envelope_type = envelope_module_type(variant.channel)
+    next_position = 0
+    for source_module in source_modules:
+        if source_module.module_type == envelope_type:
+            index = 0
+        else:
+            next_position += 1
+            index = next_position
+        content_record_id = _target_content_id(
+            db,
+            source_module.content_record_id,
+            content_mode=content_mode,
+            target_brand_id=target_brand_id,
+            report=report,
+        )
+        module = ModuleInstanceDB(
+            variant_id=variant.id,
+            module_type=source_module.module_type,
+            position=index,
+            content_record_id=content_record_id,
+            # A decision slot is layout, not content: it arrives in every
+            # mode, including layout-only, because what "layout only" drops
+            # is the binding to a specific record.
+            decision_slot_id=slot_map.get(source_module.decision_slot_id),
+            module_data=source_module.module_data,
+        )
+        db.add(module)
+        report.modules += 1
+        for key in _url_keys(source_module.module_data):
+            report.url_carriers.append(
+                f"{source_variant.name} → module {index} ({source_module.module_type}): {key}"
+            )
+    return variant
 
 
 def _target_content_id(

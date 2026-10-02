@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Literal, Any
 
 # Module-scope is safe: `app.ai.orchestration` imports nothing from `app`
@@ -218,6 +218,31 @@ class CampaignDuplicated(BaseModel):
     decision_slots: int
     # source content record id -> the copy's id. Empty unless `copy`.
     content_records_copied: dict[int, int]
+    url_carriers: list[str]
+
+
+class VariantDuplicate(BaseModel):
+    """Duplicate one variant inside its brand (task-229). Every field optional.
+
+    `target_campaign_id` omitted means the variant's own campaign. `content_mode`
+    omitted means the default for that target: `keep` inside the own campaign
+    (an A/B arm), `layout` into another one (the weekly newsletter).
+    `copy` is refused, because a variant copy never leaves its brand.
+    """
+
+    target_campaign_id: int | None = None
+    name: str | None = Field(default=None, max_length=255)
+    content_mode: str | None = None
+
+
+class VariantDuplicated(BaseModel):
+    variant_id: int
+    source_variant_id: int
+    campaign_id: int
+    source_campaign_id: int
+    content_mode: str
+    modules: int
+    decision_slots: int
     url_carriers: list[str]
 
 
