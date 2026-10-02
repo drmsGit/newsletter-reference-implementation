@@ -160,27 +160,10 @@ def render_variant_html(
         if resolution is not None:
             resolutions_by_module_id[module.id] = resolution
 
-    brand_css = _load_brand_css()
-
     # The preheader — the hidden span clients read as the inbox preview — is
     # rendered by the `header` module's own template (ADR-162 point 1), so its
     # markup lives with the field that produces it. Nothing is injected here.
-    preheader_html = ""
-
-    raw_html = f"""<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <title>Newsletter Preview</title>
-    <style>{brand_css}</style>
-  </head>
-  <body>
-    {preheader_html}
-    {"".join(rendered_modules)}
-  </body>
-</html>"""
-
-    final_html = _inliner.inline(raw_html)
+    final_html = email_document(rendered_modules)
 
     if collect_resolutions:
         return final_html, resolutions_by_module_id
@@ -350,6 +333,54 @@ def resolve_module_variables(
     return variables, content, decision_resolution
 
 
+def module_html(
+    channel: str,
+    module_type: str,
+    module_id: int,
+    variables: dict,
+    content_id: int | None = None,
+) -> str:
+    """One module's HTML from values already decided — the formatting half.
+
+    Shared by the live render (`render_cms_module`, `render_static_module`) and
+    the frame render (`app.rendering.frame`), so a module looks the same
+    whichever path produced it. Rich text is applied here; nothing is resolved.
+    """
+    manifest = get_manifest(channel, module_type)
+    html_source = get_template_html(channel, module_type)
+    if manifest is None or html_source is None:
+        return (
+            f'<div data-module-id="{module_id}" data-module-type="{module_type}">'
+            f"<!-- unknown module type: {module_type} -->"
+            f"</div>"
+        )
+    rendered = _jinja.from_string(html_source).render(**apply_rich_text(variables, manifest))
+    content_attr = f' data-content-id="{content_id}"' if content_id is not None else ""
+    return (
+        f'<div data-module-id="{module_id}" data-module-type="{module_type}"{content_attr}>\n'
+        f"{rendered}\n"
+        f"</div>"
+    )
+
+
+def email_document(rendered_modules: list[str]) -> str:
+    """Wrap rendered modules into the inlined email document. Shared by the live
+    and the frame render for the same reason as `module_html`."""
+    raw_html = f"""<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Newsletter Preview</title>
+    <style>{_load_brand_css()}</style>
+  </head>
+  <body>
+    {""}
+    {"".join(rendered_modules)}
+  </body>
+</html>"""
+    return _inliner.inline(raw_html)
+
+
 def render_cms_module(
     db: Session,
     module: ModuleInstanceDB,
@@ -369,21 +400,10 @@ def render_cms_module(
             decision_resolution,
         )
 
-    variables = apply_rich_text(variables, manifest)
-
-    html_source = get_template_html(channel, module.module_type)
-    if html_source is None:
-        return render_unknown_module(module), decision_resolution
-
-    rendered = _jinja.from_string(html_source).render(**variables)
-
-    html = (
-        f'<div data-module-id="{module.id}" data-module-type="{module.module_type}"'
-        f' data-content-id="{content["id"]}">\n'
-        f"{rendered}\n"
-        f"</div>"
+    return (
+        module_html(channel, module.module_type, module.id, variables, content_id=content["id"]),
+        decision_resolution,
     )
-    return html, decision_resolution
 
 
 def static_module_variables(
@@ -391,7 +411,8 @@ def static_module_variables(
     module: ModuleInstanceDB,
     manifest: ModuleManifest,
     mode: RenderMode = "preview",
-) -> dict:
+    with_source: bool = False,
+) -> dict | tuple[dict, dict | None]:
     """A static module's declared variables, filled — the `cms: false` twin of
     `resolve_module_variables`, and **no formatting of any kind**.
 
@@ -409,6 +430,7 @@ def static_module_variables(
 
     # If module_data is sparse, fill missing required variables from the
     # linked content record so static modules render something useful.
+    content = None
     if module.content_record_id is not None:
         content = resolve_renderable_content(db=db, content_record_id=module.content_record_id, mode=mode)
         if content:
@@ -424,7 +446,9 @@ def static_module_variables(
         for name, value in override.field_overrides.items():
             variables[name] = value
 
-    return variables
+    # `with_source` hands back the content the fill came from, for a frame that
+    # records which version was used (ADR-183).
+    return (variables, content) if with_source else variables
 
 
 def render_static_module(
@@ -434,20 +458,9 @@ def render_static_module(
     channel: str,
     mode: RenderMode = "preview",
 ) -> str:
-    html_source = get_template_html(channel, module.module_type)
-    if html_source is None:
-        return render_unknown_module(module)
-
-    variables = apply_rich_text(
-        static_module_variables(db, module, manifest, mode=mode), manifest
-    )
-
-    rendered = _jinja.from_string(html_source).render(**variables)
-
-    return (
-        f'<div data-module-id="{module.id}" data-module-type="{module.module_type}">\n'
-        f"{rendered}\n"
-        f"</div>"
+    return module_html(
+        channel, module.module_type, module.id,
+        static_module_variables(db, module, manifest, mode=mode),
     )
 
 
@@ -579,7 +592,11 @@ def resolve_renderable_content(
         )
 
     if version is not None:
-        return {"id": content_record_id, **(version.content or {})}
+        # `_version_id` says which frozen version this is, so a frame can record
+        # the version actually used rather than re-querying "latest" afterwards
+        # (ADR-128, ADR-183). Underscored: no manifest variable can be named it,
+        # so it never reaches a template.
+        return {"id": content_record_id, **(version.content or {}), "_version_id": version.id}
 
     if mode == "send":
         raise UnpublishedContentError(content_record_id)
@@ -592,7 +609,7 @@ def resolve_renderable_content(
     if record is None:
         return None
 
-    return {"id": record.id, **(record.content or {})}
+    return {"id": record.id, **(record.content or {}), "_version_id": None}
 
 
 def resolve_content_for_module(

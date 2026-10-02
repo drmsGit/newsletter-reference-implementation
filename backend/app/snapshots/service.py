@@ -2,11 +2,8 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from app.rendering.service import render_variant, render_variant_html
 from app.snapshots.db_models import SnapshotDB
 from app.snapshots.models import Snapshot
-from app.campaigns.db_models import ModuleInstanceDB, DecisionResolutionDB
-from app.content.service import get_latest_version_for_content
 
 
 SNAPSHOT_STORAGE_DIR = (Path(__file__).parent.parent.parent.parent / "storage" / "snapshots").resolve()
@@ -24,84 +21,6 @@ def to_snapshot(record: SnapshotDB) -> Snapshot:
         render_context=record.render_context,
     )
 
-#Helper
-
-def build_render_context(
-    db: Session,
-    variant_id: int,
-    recipient_id: int | None = None,
-    resolutions_by_module_id: dict[int, DecisionResolutionDB] | None = None,
-) -> dict:
-    from app.campaigns.service import brand_of_variant
-
-    brand_id = brand_of_variant(db, variant_id)
-
-    modules = (
-        db.query(ModuleInstanceDB)
-        .filter(ModuleInstanceDB.variant_id == variant_id)
-        .order_by(ModuleInstanceDB.position.asc())
-        .all()
-    )
-
-    resolutions_by_module_id = resolutions_by_module_id or {}
-
-    context = {
-        "variant_id": variant_id,
-        "recipient_id": recipient_id,
-        "modules": [],
-    }
-
-    for module in modules:
-        module_context = {
-            "module_id": module.id,
-            "module_type": module.module_type,
-            "position": module.position,
-            "content_record_id": module.content_record_id,
-            "content_version_id": None,
-            "decision_slot_id": module.decision_slot_id,
-            "decision_resolution_id": None,
-            "resolution_status": None,
-        }
-
-        if module.decision_slot_id is not None and recipient_id is not None:
-            # Reuse the resolution actually used during rendering (see
-            # render_variant_html's collect_resolutions) instead of
-            # re-querying DecisionResolutionDB here — a second, independent
-            # query could race against a new resolution being inserted
-            # between the two calls, making the snapshot's HTML and its
-            # recorded metadata describe different content (ADR-062).
-            resolution = resolutions_by_module_id.get(module.id)
-
-            if resolution is not None:
-                module_context["content_record_id"] = resolution.content_record_id
-                module_context["content_version_id"] = resolution.content_version_id
-                module_context["decision_resolution_id"] = resolution.id
-                module_context["resolution_status"] = "resolved"
-            else:
-                module_context["resolution_status"] = "no_resolution"
-
-        elif module.content_record_id is not None:
-            # The variant's own brand, resolved once above. A module whose
-            # content belongs to another brand yields no version rather than
-            # rendering it (ADR-172 point 5, and ADR-013's addendum: across a
-            # brand boundary a reference cannot be expressed at all).
-            latest_version = get_latest_version_for_content(
-                db=db,
-                content_record_id=module.content_record_id,
-                brand_id=brand_id,
-            )
-
-            module_context["content_version_id"] = (
-                latest_version.id if latest_version else None
-            )
-            module_context["resolution_status"] = "static_content"
-
-        else:
-            module_context["resolution_status"] = "static_module"
-
-        context["modules"].append(module_context)
-
-    return context
 
 #: What `artifact_location` says for an artifact that is not a file. The column is
 #: NOT NULL and named for HTML because it predates channels; renaming it is
@@ -159,15 +78,14 @@ def create_snapshot_for_variant(
     if get_variant(db, variant_id, brand_id=brand_id) is None:
         raise ValueError(f"variant {variant_id} does not exist")
 
-    artifact = render_variant(
-        db=db, variant_id=variant_id, recipient_id=recipient_id, mode="send",
-    )
-    render_context = build_render_context(
-        db=db,
-        variant_id=variant_id,
-        recipient_id=recipient_id,
-        resolutions_by_module_id=artifact.resolutions_by_module_id,
-    )
+    # **The frame is the snapshot** (ADR-183): the composition frozen with its
+    # values, which the send renders from. The artifact below is that frame
+    # laid out for this recipient (or nobody), so the preview is what the frame
+    # produces rather than a second, live render that could disagree with it.
+    from app.rendering.frame import build_frame, render_frame
+
+    render_context = {**build_frame(db, variant_id), "recipient_id": recipient_id}
+    artifact, _picks = render_frame(db, render_context, recipient_id=recipient_id)
 
     if artifact.body is None:
         # Structured artifact: it IS the render context's business, so it goes
