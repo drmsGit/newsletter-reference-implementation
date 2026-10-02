@@ -4,7 +4,15 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import working_brand
 from app.database import get_db
-from app.insight.models import EngagementEvent, EngagementEventCreate, PreferenceUpdateResult
+from app.insight.graph import category_graph
+from app.insight.models import (
+    CategoryGraph,
+    CategoryGraphEdge,
+    CategoryGraphNode,
+    EngagementEvent,
+    EngagementEventCreate,
+    PreferenceUpdateResult,
+)
 from app.insight.service import (
     create_engagement_event,
     list_events_for_delivery_execution,
@@ -68,3 +76,33 @@ def apply_signals_from_event(
             status_code=400,
             detail=str(error),
         )
+
+@router.get(
+    "/category-graph",
+    response_model=CategoryGraph,
+    summary="The category graph's figures for the working brand",
+    description=(
+        "Every category (the taxonomy is shared, so all appear) with this "
+        "brand's figures, and the graph's edges. **Every figure is scoped to "
+        "the working brand together** (ADR-150): counts are this brand's "
+        "content and resolutions; signal impact sums this brand's audience — "
+        "people whose latest marketing consent for it is opted in on any "
+        "channel. Layout is the client's."
+    ),
+)
+def get_category_graph(
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    figures = category_graph(db, brand_id=brand_id)
+    return CategoryGraph(
+        brand_id=brand_id,
+        nodes=[
+            CategoryGraphNode(
+                id=category.id, name=category.name, type=category.type,
+                **figures["metrics"][category.id],
+            )
+            for category in figures["categories"]
+        ],
+        edges=[CategoryGraphEdge(**edge) for edge in figures["edges"]],
+    )

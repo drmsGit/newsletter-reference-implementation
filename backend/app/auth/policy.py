@@ -326,7 +326,9 @@ BRAND_OWNED: dict[str, str] = {
         "partial — reading a delivery execution's events is brand-owned via "
         "its send instance. Writing events feeds signal contributions, which "
         "carry no brand by ADR-150 point 8, because a recipient does not "
-        "either (point 9)."
+        "either (point 9). `/category-graph` is brand-scoped by QUERY: the "
+        "brand's content, and the brand's consenting audience summed "
+        "(ADR-150's 2026-10-02 addendum)."
     ),
     "/recipients": (
         "partial, and the unresolved one. Recipients carry no brand (ADR-150 "

@@ -190,3 +190,33 @@ def test_edges_count_this_brands_content_and_audience(db, world):
             ContentCategoryAssignmentDB.category_id == second.id).delete()
         db.query(CategoryDB).filter(CategoryDB.id == second.id).delete()
         db.commit()
+
+
+def _graph_over_json(brand):
+    from app.auth.permissions import VIEW
+    from main import app
+    from tests.machine import machine
+
+    client = TestClient(app, raise_server_exceptions=False)
+    with machine([VIEW], brand_id=brand.id) as headers:
+        response = client.get("/insight/category-graph", headers=headers)
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def test_the_json_graph_is_the_declared_brands(world):
+    """Same figures as the service, per brand — a machine declaring brand B
+    sees brand B's audience and content, not the default brand's."""
+    def node(body):
+        return next(n for n in body["nodes"] if n["id"] == world["category"].id)
+
+    ours, theirs = _graph_over_json(world["ours"]), _graph_over_json(world["theirs"])
+    assert ours["brand_id"] == world["ours"].id and theirs["brand_id"] == world["theirs"].id
+    assert (node(ours)["total_delta"], node(ours)["content_count"], node(ours)["selected_count"]) == (3.0, 1, 1)
+    assert (node(theirs)["total_delta"], node(theirs)["content_count"], node(theirs)["selected_count"]) == (4.0, 1, 2)
+
+
+def test_the_json_graph_carries_no_layout(world):
+    body = _graph_over_json(world["ours"])
+    node = body["nodes"][0]
+    assert not {"x", "y", "radius", "color"} & set(node), "layout is the client's"
