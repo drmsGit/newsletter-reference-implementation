@@ -168,6 +168,79 @@ def grant_by_person(
     return grant(db, integration_id, permission, brand_id)
 
 
+def unheld_grants(db: Session, actor, integration_id: int) -> list[tuple[str, int]]:
+    """The `(permission, brand_id)` grants of this integration the actor does
+    not hold themselves, in a stable order. Empty means the actor could have
+    granted every one of them."""
+    grants = db.query(IntegrationGrantDB).filter(
+        IntegrationGrantDB.integration_id == integration_id
+    ).order_by(IntegrationGrantDB.brand_id, IntegrationGrantDB.permission).all()
+    return [
+        (g.permission, g.brand_id)
+        for g in grants
+        if not has_permission(db, actor, g.permission, brand_id=g.brand_id)
+    ]
+
+
+def require_holds_integration(
+    db: Session, actor, integration_id: int, *, enforced: bool = True,
+) -> None:
+    """Refuse an actor who does not hold everything this integration may do.
+
+    **The other half of "no escalation"** (ADR-166 addendum 2026-10-02,
+    corrected the same day). `grant_by_person` stops a person *giving* what
+    they lack; this stops them *using* what somebody else gave. Issuing a key
+    hands the caller the integration's whole power, and `integrations.manage`
+    is platform-level — so without this an Admin of brand A could mint a key
+    for an integration holding `sends.execute` on brand B and send there.
+    Enabling unattended sending widens that power the same way.
+
+    Reductions are not gated: revoking a key, disabling unattended sending
+    and deactivating can only take power away.
+    """
+    if not enforced:
+        return
+    missing = unheld_grants(db, actor, integration_id)
+    if missing:
+        permission, brand_id = missing[0]
+        raise GrantForbidden(
+            "You cannot do that to this integration: it holds "
+            f"{permission} on brand {brand_id}, which you do not."
+        )
+
+
+def issue_credential_by_person(
+    db: Session, actor, integration_id: int, label: str | None = None,
+    *, enforced: bool = True,
+):
+    """`issue_credential`, refused unless the actor holds all the integration may do."""
+    require_holds_integration(db, actor, integration_id, enforced=enforced)
+    return issue_credential(db, integration_id, label=label)
+
+
+def set_unattended_by_person(
+    db: Session, actor, integration_id: int, allowed: bool, *, enforced: bool = True,
+) -> bool:
+    """Switching it ON is gated like issuing a key; switching it off never is."""
+    if allowed:
+        require_holds_integration(db, actor, integration_id, enforced=enforced)
+    return set_unattended_sending(db, integration_id, allowed)
+
+
+def revoke_grant_by_person(
+    db: Session, actor, integration_id: int, permission: str, brand_id: int,
+    *, enforced: bool = True,
+) -> bool:
+    """Removing a grant needs the same holding as giving it: without this, an
+    Admin of brand A could strip brand B's integrations of what B's own people
+    gave them."""
+    if enforced and not has_permission(db, actor, permission, brand_id=brand_id):
+        raise GrantForbidden(
+            f"You cannot remove {permission} on that brand: you do not hold it there."
+        )
+    return revoke_grant(db, integration_id, permission, brand_id)
+
+
 def revoke_grant(db: Session, integration_id: int, permission: str, brand_id: int) -> bool:
     removed = db.query(IntegrationGrantDB).filter(
         IntegrationGrantDB.integration_id == integration_id,

@@ -4105,7 +4105,13 @@ def integration_issue_key(
     """
     from app.auth import integrations as ints
 
-    issued = ints.issue_credential(db, integration_id, label=label)
+    try:
+        issued = ints.issue_credential_by_person(
+            db, user_for_token(db, request.cookies.get(SESSION_COOKIE)), integration_id, label=label, enforced=getattr(request.state, "auth_enforced", True),
+        )
+    except ints.GrantForbidden as error:
+        return RedirectResponse(
+            url="/ui/integrations?error=" + quote(str(error)), status_code=303)
     extra = {}
     if issued is not None:
         credential, secret = issued
@@ -4124,7 +4130,9 @@ def integration_revoke_key(
 ):
     from app.auth import integrations as ints
 
-    ints.revoke_credential(db, credential_id)
+    # Ownership in the query: the URL names an integration, so a key of
+    # another one is not revoked through it.
+    ints.revoke_credential(db, credential_id, integration_id=integration_id)
     return RedirectResponse(url="/ui/integrations", status_code=303)
 
 
@@ -4152,6 +4160,7 @@ def integration_grant(
 
 @router.post("/ui/integrations/{integration_id}/grants/remove")
 def integration_revoke_grant(
+    request: Request,
     integration_id: int,
     permission: str = Form(...),
     brand_id: int = Form(...),
@@ -4159,13 +4168,20 @@ def integration_revoke_grant(
 ):
     from app.auth import integrations as ints
 
-    ints.revoke_grant(db, integration_id, permission, brand_id)
+    try:
+        ints.revoke_grant_by_person(
+            db, user_for_token(db, request.cookies.get(SESSION_COOKIE)), integration_id, permission, brand_id, enforced=getattr(request.state, "auth_enforced", True),
+        )
+    except ints.GrantForbidden as error:
+        return RedirectResponse(
+            url="/ui/integrations?error=" + quote(str(error)), status_code=303)
     return RedirectResponse(url="/ui/integrations", status_code=303)
 
 
 @router.post("/ui/integrations/{integration_id}/unattended")
 def integration_set_unattended(
-    integration_id: int, allowed: str = Form(""), db: Session = Depends(get_db),
+    request: Request, integration_id: int, allowed: str = Form(""),
+    db: Session = Depends(get_db),
 ):
     """ADR-166 point 5: switching this off is the control, so it is logged.
 
@@ -4174,7 +4190,13 @@ def integration_set_unattended(
     """
     from app.auth import integrations as ints
 
-    ints.set_unattended_sending(db, integration_id, allowed == "1")
+    try:
+        ints.set_unattended_by_person(
+            db, user_for_token(db, request.cookies.get(SESSION_COOKIE)), integration_id, allowed == "1", enforced=getattr(request.state, "auth_enforced", True),
+        )
+    except ints.GrantForbidden as error:
+        return RedirectResponse(
+            url="/ui/integrations?error=" + quote(str(error)), status_code=303)
     return RedirectResponse(url="/ui/integrations", status_code=303)
 
 

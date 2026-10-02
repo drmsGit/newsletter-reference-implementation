@@ -276,3 +276,83 @@ class TestUnattended:
             off = admin.put(f"/integrations/{integration['id']}/unattended", json={"allowed": False}, headers=h)
         assert on.json()["may_send_unattended"] is True
         assert off.json()["may_send_unattended"] is False
+
+
+class TestNoEscalationThroughUse:
+    """The second half of the rule, found by review on 2026-10-02.
+
+    `integrations.manage` is platform-level, so an Admin of the default brand
+    only could otherwise mint a key for an integration somebody gave
+    `sends.execute` on another brand — and send there. Issuing a key and
+    enabling unattended sending need every grant the integration holds;
+    removing a grant needs that grant. Each test sets the grant up directly
+    with `ints.grant`, standing in for the other brand's own Admin.
+    """
+
+    @pytest.fixture
+    def foreign_powered(self, db, made, temp_brand):
+        other = temp_brand("powered")
+        integration = ints.create_integration(db, name=_name())
+        assert ints.grant(db, integration.id, SENDS_EXECUTE, other.id)
+        return integration, other
+
+    def _keys(self, db, integration_id):
+        db.expire_all()
+        return db.query(IntegrationCredentialDB).filter(
+            IntegrationCredentialDB.integration_id == integration_id).count()
+
+    def test_a_key_is_refused_to_someone_without_the_integrations_power(
+        self, db, foreign_powered
+    ):
+        integration, _other = foreign_powered
+        with signed_in_admin(db) as (admin, _t, csrf):  # Admin on the default brand only
+            response = admin.post(f"/integrations/{integration.id}/keys", json={},
+                                  headers={"X-CSRF-Token": csrf})
+            assert response.status_code == 403, response.text
+            assert "secret_key" not in response.text
+            assert self._keys(db, integration.id) == 0
+
+    def test_the_same_request_succeeds_for_someone_holding_it(self, db, foreign_powered):
+        """Without this, the refusal above could be refusing everybody."""
+        integration, other = foreign_powered
+        with signed_in_admin(db) as (admin, token, csrf):
+            user = auth.user_for_token(db, token)
+            role = db.query(RoleDB).filter(RoleDB.key == "admin").one()
+            db.add(RoleAssignmentDB(user_id=user.id, role_id=role.id, brand_id=other.id))
+            db.commit()
+            response = admin.post(f"/integrations/{integration.id}/keys", json={},
+                                  headers={"X-CSRF-Token": csrf})
+            assert response.status_code == 201, response.text
+            assert self._keys(db, integration.id) == 1
+
+    def test_the_jinja_page_refuses_the_key_too(self, db, foreign_powered):
+        integration, _other = foreign_powered
+        with signed_in_admin(db) as (admin, token, _csrf):
+            admin.follow_redirects = False
+            response = admin.post(f"/ui/integrations/{integration.id}/keys",
+                                  data={"label": "x", "csrf_token": auth.csrf_token_for(token)})
+            assert response.status_code == 303 and "error=" in response.headers["location"]
+            assert self._keys(db, integration.id) == 0
+
+    def test_unattended_sending_cannot_be_switched_on_but_can_be_off(self, db, foreign_powered):
+        integration, _other = foreign_powered
+        with signed_in_admin(db) as (admin, _t, csrf):
+            h = {"X-CSRF-Token": csrf}
+            on = admin.put(f"/integrations/{integration.id}/unattended", json={"allowed": True}, headers=h)
+            assert on.status_code == 403, on.text
+            db.expire_all()
+            assert db.get(IntegrationDB, integration.id).may_send_unattended is False
+            # Taking power away is never gated.
+            off = admin.put(f"/integrations/{integration.id}/unattended", json={"allowed": False}, headers=h)
+            assert off.status_code == 200, off.text
+
+    def test_another_brands_grant_cannot_be_removed(self, db, foreign_powered):
+        integration, other = foreign_powered
+        with signed_in_admin(db) as (admin, _t, csrf):
+            response = admin.delete(
+                f"/integrations/{integration.id}/grants/{SENDS_EXECUTE}/{other.id}",
+                headers={"X-CSRF-Token": csrf})
+            assert response.status_code == 403, response.text
+            db.expire_all()
+            assert db.query(IntegrationGrantDB).filter(
+                IntegrationGrantDB.integration_id == integration.id).count() == 1

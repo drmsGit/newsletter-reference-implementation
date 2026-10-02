@@ -154,13 +154,25 @@ def create_integration(
     response_model=KeyIssued,
     status_code=201,
     summary="Issue a key. The secret is in this response and nowhere else",
+    description=(
+        "Refused (403) unless the caller holds every grant the integration has, "
+        "on its brand: a key is the integration's whole power."
+    ),
 )
 def issue_key(
-    integration_id: int, payload: KeyCreate, response: Response,
+    integration_id: int, payload: KeyCreate, request: Request, response: Response,
     db: Session = Depends(get_db),
 ):
     _get(db, integration_id)
-    issued = ints.issue_credential(db, integration_id, label=payload.label)
+    try:
+        # A key is the integration's whole power, so the caller must already
+        # hold all of it (ADR-166 addendum 2026-10-02).
+        issued = ints.issue_credential_by_person(
+            db, request_principal(request), integration_id, label=payload.label,
+            enforced=auth_is_enforced(request),
+        )
+    except ints.GrantForbidden as error:
+        raise HTTPException(status_code=403, detail=str(error))
     if issued is None:
         raise HTTPException(status_code=409, detail="That integration is deactivated.")
     credential, secret = issued
@@ -226,10 +238,18 @@ def add_grant(
     summary="Remove one grant",
 )
 def remove_grant(
-    integration_id: int, permission: str, brand_id: int, db: Session = Depends(get_db),
+    integration_id: int, permission: str, brand_id: int, request: Request,
+    db: Session = Depends(get_db),
 ):
     integration = _get(db, integration_id)
-    if not ints.revoke_grant(db, integration_id, permission, brand_id):
+    try:
+        removed = ints.revoke_grant_by_person(
+            db, request_principal(request), integration_id, permission, brand_id,
+            enforced=auth_is_enforced(request),
+        )
+    except ints.GrantForbidden as error:
+        raise HTTPException(status_code=403, detail=str(error))
+    if not removed:
         raise HTTPException(status_code=404, detail="That grant does not exist.")
     return _out(db, integration)
 
@@ -244,10 +264,17 @@ def remove_grant(
     ),
 )
 def set_unattended(
-    integration_id: int, payload: UnattendedRequest, db: Session = Depends(get_db),
+    integration_id: int, payload: UnattendedRequest, request: Request,
+    db: Session = Depends(get_db),
 ):
     integration = _get(db, integration_id)
-    ints.set_unattended_sending(db, integration_id, payload.allowed)
+    try:
+        ints.set_unattended_by_person(
+            db, request_principal(request), integration_id, payload.allowed,
+            enforced=auth_is_enforced(request),
+        )
+    except ints.GrantForbidden as error:
+        raise HTTPException(status_code=403, detail=str(error))
     db.refresh(integration)
     return _out(db, integration)
 
