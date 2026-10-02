@@ -91,8 +91,10 @@ State, before touching any file — whether asked to review, suggest, or impleme
 ## Positioning gate
 Public beta is blocked on the positioning statement, not on features.
 Current state: see `docs/business/POSITIONING.md`.
-One P0 defect still blocks public exposure — gate 3, inbound machine
-authentication. See `docs/business/LAUNCH-GATES.md`.
+Which gates still block public exposure is recorded in
+`docs/business/LAUNCH-GATES.md` and nowhere else — read it rather than a
+summary here. This line once named gate 3 as open for two weeks after it
+closed (2026-09-18).
 
 <!-- BACKLOG.MD GUIDELINES START -->
 <!-- backlog.md-instructions-version: 1.53.0 -->
