@@ -23,17 +23,26 @@ def _validate_content_record_exists(db: Session, field_name: str, content_record
 
 
 def _overrideable_manifest(db: Session, module: ModuleInstanceDB):
-    """A content override needs (a) a module that actually resolves content — a
-    content record or a decision slot — and (b) a manifest, so its overridable
-    fields are known. A pure module_data module (no content reference) isn't
-    content-overridden; its values are edited directly. Applies regardless of
-    the manifest's cms flag — a hero/cta that references a content record is
-    overridable too."""
-    if module.content_record_id is None and module.decision_slot_id is None:
+    """A content override needs (a) a module bound to a **content record** and
+    (b) a manifest, so its overridable fields are known.
+
+    **Never a decision slot** (ADR-178 point 5, task-202): an override on a
+    slot defeats the slot — once a slot returns several picks, they would all
+    wear one pinned headline. A pure module_data module (no content reference)
+    isn't content-overridden either; its values are edited directly. Applies
+    regardless of the manifest's cms flag — a hero/cta that references a
+    content record is overridable too."""
+    if module.decision_slot_id is not None:
         raise ValueError(
-            f"module {module.id} doesn't render a content record or decision slot "
-            "— content overrides only apply to modules that resolve content; edit "
-            "its module_data directly instead"
+            f"module {module.id} is bound to a decision slot, and a decision slot "
+            "may not be overridden — the override would pin one value onto every "
+            "personalized pick (ADR-178 point 5)"
+        )
+    if module.content_record_id is None:
+        raise ValueError(
+            f"module {module.id} doesn't render a content record — content "
+            "overrides only apply to modules bound to one; edit its module_data "
+            "directly instead"
         )
     # An override edits module fields, so it needs the module's manifest — and
     # a manifest is (channel, name) since ADR-162 point 5. The channel comes
@@ -113,12 +122,20 @@ def create_content_override(
 
 def get_active_content_override(db: Session, module_instance_id: int) -> ContentOverrideDB | None:
     """The single active override on a module, if any — the row rendering
-    honors. O(1) via the partial unique index."""
+    honors. O(1) via the partial unique index.
+
+    **None for a module bound to a decision slot**, whatever rows exist
+    (ADR-178 point 5). Creation refuses such an override, but a module can be
+    rebound to a slot after it was overridden; both render paths ask here, so
+    this is the one place that keeps a slot from wearing a pinned value.
+    """
     return (
         db.query(ContentOverrideDB)
+        .join(ModuleInstanceDB, ModuleInstanceDB.id == ContentOverrideDB.module_instance_id)
         .filter(
             ContentOverrideDB.module_instance_id == module_instance_id,
             ContentOverrideDB.active.is_(True),
+            ModuleInstanceDB.decision_slot_id.is_(None),
         )
         .first()
     )

@@ -21,8 +21,11 @@ class ContentOverrideDB(Base):
     precedence over the resolved/static content until it is reset.
 
     An override is **field edits only**: `field_overrides` = {manifest field
-    name: value}, e.g. a consistent headline across the personalized picks or a
-    shorter copy for this send. Swapping the whole content record is deliberately
+    name: value}, e.g. a tighter headline or a shorter copy for this send, on a
+    module bound to a content record. **Never on a decision slot** (ADR-178
+    point 5): "a consistent headline across the personalized picks" stood here
+    as the intended use until 2026-10-02, and it is exactly what that point
+    forbids, because it de-personalises the slot. Swapping the whole content record is deliberately
     NOT an override — for-all swaps mean "use static content, not a decision
     slot", and segment-targeted swaps ("beach recipients get a special offer")
     belong to the separate guaranteed-placement concept, which suppresses the

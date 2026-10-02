@@ -125,9 +125,10 @@ def _allowed_field(module_id: int) -> str:
         db.close()
 
 
-# A module driven by a decision slot, and one that renders neither a content
-# record nor a slot (so overriding it must be rejected). The static-content case
-# gets its own throwaway module — see the static_module fixture.
+# A module driven by a decision slot (overriding it must be refused, ADR-178
+# point 5), and one that renders neither a content record nor a slot (so
+# overriding it must be rejected too). The catalogue-bound case — the only one
+# an override may attach to — gets its own throwaway module: static_module.
 DECISION_MODULE = _find_module(slot=True)
 NON_CONTENT_MODULE = _find_module()
 
@@ -216,13 +217,19 @@ def _delete_override(override_id: int) -> None:
 
 
 @pytest.fixture
-def field_override():
-    """Case 1: a field override on the clean decision module. Cleans up after."""
+def field_override(static_module):
+    """A field override on a catalogue-bound module. Cleans up after.
+
+    It sat on a decision-slot module until 2026-10-02, with the reason
+    "Consistent headline across the personalized picks" — the very use ADR-178
+    point 5 forbids (task-202).
+    """
+    module_id, field = static_module
     response = client.post("/overrides/", json={
-        "module_instance_id": DECISION_MODULE,
-        "field_overrides": {"headline_medium": "This could interest you"},
+        "module_instance_id": module_id,
+        "field_overrides": {field: "This could interest you"},
         "overridden_by": "test@example.com",
-        "reason": "Consistent headline across the personalized picks",
+        "reason": "A tighter headline for this send",
     })
     assert response.status_code == 200, response.text
     data = response.json()
@@ -231,10 +238,11 @@ def field_override():
 
 
 class TestCreateFieldOverride:
-    def test_creates_on_decision_module(self, field_override):
+    def test_creates_on_a_catalogue_bound_module(self, field_override, static_module):
         data = field_override
-        assert data["module_instance_id"] == DECISION_MODULE
-        assert data["field_overrides"]["headline_medium"] == "This could interest you"
+        module_id, field = static_module
+        assert data["module_instance_id"] == module_id
+        assert data["field_overrides"][field] == "This could interest you"
         assert data["active"] is True
 
     def test_creates_on_static_content_module(self, static_module):
@@ -250,6 +258,17 @@ class TestCreateFieldOverride:
 
 
 class TestRejectedOverrides:
+    def test_an_override_on_a_slot_bound_module_is_refused(self):
+        """ADR-178 point 5: an override on a slot defeats the slot — once a
+        slot returns several picks, they would all wear one pinned headline."""
+        response = client.post("/overrides/", json={
+            "module_instance_id": DECISION_MODULE,
+            "field_overrides": {_allowed_field(DECISION_MODULE): "pinned"},
+            "overridden_by": "test@example.com",
+        })
+        assert response.status_code == 400, response.text
+        assert "decision slot" in response.json()["detail"]
+
     def test_override_on_non_content_module_rejected(self):
         response = client.post("/overrides/", json={
             "module_instance_id": NON_CONTENT_MODULE,
@@ -257,29 +276,30 @@ class TestRejectedOverrides:
             "overridden_by": "test@example.com",
         })
         assert response.status_code == 400
-        assert "doesn't render a content record or decision slot" in response.json()["detail"]
+        assert "doesn't render a content record" in response.json()["detail"]
 
-    def test_empty_override_rejected(self):
+    def test_empty_override_rejected(self, static_module):
         response = client.post("/overrides/", json={
-            "module_instance_id": DECISION_MODULE,
+            "module_instance_id": static_module[0],
             "overridden_by": "test@example.com",
         })
         assert response.status_code == 400
         assert "must set field_overrides" in response.json()["detail"]
 
-    def test_unknown_field_key_rejected(self):
+    def test_unknown_field_key_rejected(self, static_module):
         response = client.post("/overrides/", json={
-            "module_instance_id": DECISION_MODULE,
+            "module_instance_id": static_module[0],
             "field_overrides": {"not_a_real_field": "x"},
             "overridden_by": "test@example.com",
         })
         assert response.status_code == 400
         assert "not in the" in response.json()["detail"]
 
-    def test_second_active_on_same_module_rejected(self, field_override):
+    def test_second_active_on_same_module_rejected(self, field_override, static_module):
+        module_id, field = static_module
         response = client.post("/overrides/", json={
-            "module_instance_id": DECISION_MODULE,
-            "field_overrides": {"body_medium": "another edit"},
+            "module_instance_id": module_id,
+            "field_overrides": {field: "another edit"},
             "overridden_by": "test@example.com",
         })
         assert response.status_code == 400
@@ -296,10 +316,11 @@ class TestGetAndList:
         assert client.get("/overrides/999999").status_code == 404
 
     def test_filter_by_module_and_active(self, field_override):
-        response = client.get(f"/overrides/?module_instance_id={DECISION_MODULE}&active=true")
+        module_id = field_override["module_instance_id"]
+        response = client.get(f"/overrides/?module_instance_id={module_id}&active=true")
         assert response.status_code == 200
         results = response.json()
-        assert all(r["module_instance_id"] == DECISION_MODULE and r["active"] for r in results)
+        assert all(r["module_instance_id"] == module_id and r["active"] for r in results)
         assert any(r["id"] == field_override["id"] for r in results)
 
 
@@ -311,11 +332,12 @@ class TestResetAndOutcome:
         assert data["active"] is False
         assert data["reverted_at"] is not None
 
-    def test_reset_frees_the_module(self, field_override):
+    def test_reset_frees_the_module(self, field_override, static_module):
         client.post(f"/overrides/{field_override['id']}/reset")
+        module_id, field = static_module
         response = client.post("/overrides/", json={
-            "module_instance_id": DECISION_MODULE,
-            "field_overrides": {"headline_medium": "new one"},
+            "module_instance_id": module_id,
+            "field_overrides": {field: "new one"},
             "overridden_by": "test@example.com",
         })
         assert response.status_code == 200, response.text
@@ -332,3 +354,26 @@ class TestResetAndOutcome:
     def test_outcome_nonexistent_returns_404(self):
         response = client.patch("/overrides/999999/outcome", json={"outcome_delta": {"x": 1}})
         assert response.status_code == 404
+
+
+class TestASlotNeverWearsAnOverride:
+    def test_rebinding_a_module_to_a_slot_stops_its_override_applying(self, field_override):
+        """The second way a slot could end up overridden: an override made on a
+        catalogue-bound module whose module is later bound to a decision slot.
+        The row survives the rebinding; it must stop applying (ADR-178 point 5,
+        "enforced rather than conventional")."""
+        from app.overrides.service import get_active_content_override
+
+        db = SessionLocal()
+        try:
+            module = db.get(ModuleInstanceDB, field_override["module_instance_id"])
+            slot_id = db.get(ModuleInstanceDB, DECISION_MODULE).decision_slot_id
+            assert get_active_content_override(db, module.id) is not None
+            module.content_record_id, module.decision_slot_id = None, slot_id
+            db.commit()
+            assert get_active_content_override(db, module.id) is None, (
+                "a slot-bound module is still rendering a pinned override"
+            )
+        finally:
+            db.rollback()
+            db.close()
