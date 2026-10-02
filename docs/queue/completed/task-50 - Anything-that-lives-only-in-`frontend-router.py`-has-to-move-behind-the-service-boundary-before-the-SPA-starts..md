@@ -3,11 +3,11 @@ id: TASK-50
 title: >-
   Anything that lives only in `frontend/router.py` has to move behind the
   service boundary before the SPA starts.
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-27 13:56'
-updated_date: '2026-10-02 17:51'
+updated_date: '2026-10-02 18:54'
 labels:
   - backend
 dependencies: []
@@ -43,4 +43,12 @@ Migrated 2026-09-27 from `docs/backlog.md` line 148, section "Features", positio
 2026-10-02: B27 done (except the non-member list, deliberately). GET /api/audience-groups/{id}/preview?channel= (channel required, registered) returns per-block counts, resolved / reachable / unreachable-by-stage after run_exclusion_stack (ADR-163 rider), and a 20-row sample with channel addresses; audience.service.preview_group, shared with the Jinja detail page. tests/test_audience_preview.py: 6 tests, four mutants caught (one only after a second assertion was added). Suite 885 passed. Remaining in task-50: the other read-model rows (B4 dashboard, B10 recipient detail, B11 campaign detail, B17 content detail, B20-B22 categories/decisions, B23/B24 deliveries pages) and C5/C7/C10-C13 one-line capability gaps.
 
 2026-10-02, remaining rows, part 1. Security pass first: task-241 (four cross-brand Jinja paths; S1 turned out not to render, fixed anyway). Campaigns surface done: C7 GET /campaigns/variants/{id}/suggestions; B21 GET /campaigns/decision-slots; B22 GET /campaigns/decision-slots/{id}/stats; B11 GET /campaigns/{id}/composition — each from a campaigns/ai service function the Jinja page now shares; found on the way, the page's override rule still counted slot modules (now overrides.service.is_overrideable). tests/test_read_models.py, every scope and rule mutation-checked. Suite 969 passed. Still open: content (B17 + C5 JSON), deliveries (B23, B24), audience (C11, C12, C13 JSON), B4 dashboard, B10 recipient detail (with the S5 cross-brand leak), B20 category detail (S6) + C10.
+
+2026-10-02, remaining rows, part 2 — all rows done. Content: B17 GET /content/{id}/assignments + /usage (fixed the page's limit-100-then-filter signal bug), C5 DELETE /content/{id}/assignments/{aid}. Deliveries: B23 list rows with campaign/variant and live counts, B24 execution fields + audience name + GET /delivery/executions/{id}/trace (insight.service.event_trace, shared). Audience: C11 criteria-preview (channel required), C12 bulk-add (audiences.manage, user decision), C13 POST /api/audience-groups/suggested. Last rows: B4 GET /insight/overview; B10 GET /recipients/{id}/activity (closed the cross-brand decisions/deliveries leak); B20 GET /insight/categories/{id} (closed the every-brand sum); C10 DELETE /content/category-relations/{id}. Inventory rows C1/C3/C4/C8/C15 marked (done earlier, never marked). Deliberately NOT moved: presentation (labels, summary sentences, headline fallbacks, pretty JSON), the B27 non-member list (loads every recipient; SPA has GET /recipients), the Jinja deliveries LIST page's own live counts (JSON list has them; the page was not rewired). Suite 994 passed.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Everything the Jinja router held that the SPA needs is behind a service and on JSON: rules (brand boundary, channel gate, approval gate, duplication target rule, push readiness, integration credentials, settings validation) and read models (campaign composition, slot stats, AI read-back, content detail, deliveries, audience preview/criteria, dashboard, recipient and category detail). Each Jinja page that computed one now calls the same service, a Jinja freeze guard stops new routes, and five cross-brand paths found on the way were closed (task-241, B10, B20). Verified by tests per row, each scope and rule mutation-checked; full suite 994 passed.
+<!-- SECTION:FINAL_SUMMARY:END -->
