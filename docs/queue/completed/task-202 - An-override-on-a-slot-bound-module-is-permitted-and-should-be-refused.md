@@ -1,10 +1,10 @@
 ---
 id: TASK-202
 title: An override on a slot-bound module is permitted and should be refused
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 14:20'
-updated_date: '2026-10-01 20:54'
+updated_date: '2026-10-02 14:39'
 labels:
   - backend
 dependencies: []
@@ -32,8 +32,22 @@ Source: [[Variant Editor - design interview]] → What Cluster 2 produced, gap 1
 Related: [[ADR-178 — Scope of the Correction, Not Location of the Manager]]; task-109 (`max_results`).
 <!-- SECTION:DESCRIPTION:END -->
 
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [x] #1 Creating an override on a slot-bound module is refused
+- [x] #2 An override row on a module later bound to a slot does not apply
+<!-- AC:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Logged 2026-09-27 from the "What Cluster N produced" sections of the two design interviews, each gap re-verified against the code that day. The plan was reviewed and approved by the session that ran the interviews. Parked: not yet ranked by anyone.
+
+2026-10-02: still true. Refused in overrides.service._overrideable_manifest; get_active_content_override joins the module and ignores slot-bound ones (covers rebinding, which update_module allows). The existing override tests were built on the forbidden case (field_override fixture on a slot module, reason 'Consistent headline across the personalized picks'); moved to the catalogue-bound static_module, and 'creates on decision module' became the refusal test. Two failing tests first, both mutants caught. Seed creates no overrides. Suite 904 passed. ADR-178 also owes a dated addendum on ADR-040 (its own Consequences say so) — not done here.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+An override can no longer attach to a module bound to a decision slot: creation is refused and the render lookup ignores any such row, so rebinding cannot reintroduce one. Verified by two new tests that failed first and catch their mutants; full suite 904 passed.
+<!-- SECTION:FINAL_SUMMARY:END -->
