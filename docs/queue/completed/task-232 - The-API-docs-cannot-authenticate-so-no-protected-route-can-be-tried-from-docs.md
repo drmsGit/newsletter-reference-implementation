@@ -1,10 +1,12 @@
 ---
 id: TASK-232
-title: The API docs cannot authenticate, so no protected route can be tried from /docs
-status: To Do
+title: >-
+  The API docs cannot authenticate, so no protected route can be tried from
+  /docs
+status: Done
 assignee: []
-created_date: 2026-09-28 20:32
-updated_date: 2026-09-28 20:32
+created_date: '2026-09-28 20:32'
+updated_date: '2026-10-02 15:48'
 labels:
   - backend
   - docs
@@ -33,3 +35,15 @@ ordinal: 303200
 
 Found 2026-09-28 by the user while trying to exercise `GET /content/fields`, which had just been built and could not be tried.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-02: decided with the user (a setting, default open) and built with task-31/232 together — ADR-184. main.py: API_DOCS public|signed_in|off; security schemes (SessionCookie+CsrfToken, MachineKey+Brand) with sign-in and provider webhooks marked public; Swagger withCredentials+persistAuthorization; documented in backend/.env.example. tests/test_api_docs.py (7 tests, non-default modes in a subprocess against the test DB); five mutants caught. openapi-typescript output compared before/after: identical. Suite 935 passed.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+API docs exposure is the API_DOCS setting (public by default, signed_in behind view, off), and the OpenAPI document declares the real authentication so Swagger's Try-it-out works with a signed-in session or a machine key. Verified by tests/test_api_docs.py (mutation-checked) and an unchanged generated client; full suite 935 passed.
+<!-- SECTION:FINAL_SUMMARY:END -->

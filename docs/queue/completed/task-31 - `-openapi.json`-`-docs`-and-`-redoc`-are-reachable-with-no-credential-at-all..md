@@ -1,10 +1,10 @@
 ---
 id: TASK-31
 title: '`/openapi.json`, `/docs` and `/redoc` are reachable with no credential at all.'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
-updated_date: '2026-10-01 20:54'
+updated_date: '2026-10-02 15:48'
 labels:
   - backend
 dependencies: []
@@ -23,4 +23,12 @@ ordinal: 103100
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 98, section "Bugs", position 31 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-02: decided with the user (a setting, default open) and built with task-31/232 together — ADR-184. main.py: API_DOCS public|signed_in|off; security schemes (SessionCookie+CsrfToken, MachineKey+Brand) with sign-in and provider webhooks marked public; Swagger withCredentials+persistAuthorization; documented in backend/.env.example. tests/test_api_docs.py (7 tests, non-default modes in a subprocess against the test DB); five mutants caught. openapi-typescript output compared before/after: identical. Suite 935 passed.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+API docs exposure is the API_DOCS setting (public by default, signed_in behind view, off), and the OpenAPI document declares the real authentication so Swagger's Try-it-out works with a signed-in session or a machine key. Verified by tests/test_api_docs.py (mutation-checked) and an unchanged generated client; full suite 935 passed.
+<!-- SECTION:FINAL_SUMMARY:END -->
