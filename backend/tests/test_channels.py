@@ -414,6 +414,7 @@ class TestDuplicationCarriesTheChannel:
             target_brand_id=campaign.brand_id,
             name=_name("copy"),
             content_mode=duplication.KEEP,
+            principal=None, enforced=False,
         )
         copied = db.query(VariantDB).filter(
             VariantDB.campaign_id == report.campaign_id

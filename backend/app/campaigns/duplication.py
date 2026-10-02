@@ -34,7 +34,7 @@ from dataclasses import dataclass, field
 from sqlalchemy.orm import Session
 
 from app.auth.db_models import BrandDB
-from app.auth.permissions import CAMPAIGNS_MANAGE, CONTENT_MANAGE
+from app.auth.permissions import CAMPAIGNS_MANAGE, CONTENT_MANAGE, OVERRIDES_MANAGE
 from app.auth.service import has_permission, list_brands
 from app.campaigns.db_models import (
     CampaignDB,
@@ -44,6 +44,7 @@ from app.campaigns.db_models import (
 )
 from app.content.db_models import ContentCategoryAssignmentDB, ContentRecordDB
 from app.modules.registry import envelope_module_type
+from app.overrides.db_models import ContentOverrideDB
 
 #: What happens to the content the source campaign's modules point at.
 KEEP = "keep"      # same brand only — modules reference the same records
@@ -161,6 +162,10 @@ class DuplicationReport:
     content_records_copied: dict[int, int] = field(default_factory=dict)
     #: Places a brand-specific URL came across verbatim, as readable labels.
     url_carriers: list[str] = field(default_factory=list)
+    #: Active overrides reproduced on the copy, and ones LAYOUT had to drop
+    #: because their module arrived unbound (task-113).
+    overrides_carried: int = 0
+    overrides_not_carried: int = 0
 
     @property
     def crossed_brands(self) -> bool:
@@ -183,6 +188,8 @@ class DuplicationReport:
             "modules": self.modules,
             "decision_slots": self.decision_slots,
             "content_records_copied": self.content_records_copied,
+            "overrides_carried": self.overrides_carried,
+            "overrides_not_carried": self.overrides_not_carried,
         }
 
 
@@ -203,9 +210,13 @@ class VariantDuplicationReport:
     #: copy helper tallies into it.
     content_records_copied: dict[int, int] = field(default_factory=dict)
     url_carriers: list[str] = field(default_factory=list)
+    overrides_carried: int = 0
+    overrides_not_carried: int = 0
 
     def as_detail(self) -> dict:
         return {
+            "overrides_carried": self.overrides_carried,
+            "overrides_not_carried": self.overrides_not_carried,
             "source_variant_id": self.source_variant_id,
             "source_campaign_id": self.source_campaign_id,
             "campaign_id": self.campaign_id,
@@ -275,6 +286,8 @@ def duplicate_campaign(
     name: str,
     content_mode: str,
     variant_ids: list[int] | None = None,
+    principal,
+    enforced: bool,
 ) -> DuplicationReport:
     """Copy one campaign into `target_brand_id`, which may be its own brand.
 
@@ -286,10 +299,16 @@ def duplicate_campaign(
     the content that now exists rather than inherit a filter chosen against
     content that may not.
 
-    Not copied: resolutions, snapshots, send instances, delivery executions,
-    content versions and content overrides. Each of those is a record of
-    something that *happened*, and a copy has no history — reproducing them
-    would fabricate decisions, publications and sends.
+    Not copied: resolutions, snapshots, send instances, delivery executions
+    and content versions. Each of those is a record of something that
+    *happened*, and a copy has no history — reproducing them would fabricate
+    decisions, publications and sends.
+
+    **Active content overrides do come across** (task-113), because an
+    override is two things in one row: a record of a manager's act *and* live
+    configuration that every render reads. Dropping it made the copy render
+    differently from its original with nothing said. So the line is drawn
+    inside the row — see `_carry_override`.
 
     Status is forced to draft throughout, for the same reason: a copy of a sent
     campaign has not been sent.
@@ -332,10 +351,6 @@ def duplicate_campaign(
         content_mode=content_mode,
     )
 
-    campaign = CampaignDB(name=clean_name, status="draft", brand_id=target_brand_id)
-    db.add(campaign)
-    db.flush()
-
     query = db.query(VariantDB).filter(VariantDB.campaign_id == source.id)
     if variant_ids is not None:
         if not variant_ids:
@@ -350,10 +365,22 @@ def duplicate_campaign(
             "None of the chosen variants belong to this campaign."
         )
 
+    # Before anything is written, so a refusal leaves nothing behind.
+    _require_override_grant(
+        db, principal, brand_id=target_brand_id, content_mode=content_mode,
+        variant_ids=[v.id for v in variants], enforced=enforced,
+    )
+    actor = override_author(principal)
+
+    campaign = CampaignDB(name=clean_name, status="draft", brand_id=target_brand_id)
+    db.add(campaign)
+    db.flush()
+
     for source_variant in variants:
         _copy_variant_into(
             db, source_variant, campaign_id=campaign.id, name=source_variant.name,
             content_mode=content_mode, target_brand_id=target_brand_id, report=report,
+            actor=actor,
         )
 
     db.commit()
@@ -389,6 +416,8 @@ def duplicate_variant(
     target_campaign_id: int | None = None,
     name: str | None = None,
     content_mode: str | None = None,
+    principal,
+    enforced: bool,
 ) -> VariantDuplicationReport:
     """Copy one variant into a campaign of the same brand — by default its own.
 
@@ -403,8 +432,8 @@ def duplicate_variant(
     is carried (ADR-160 point 5), status is draft, and nothing that *happened*
     comes across. One commit, for the reason the module docstring gives.
 
-    Active content overrides do not come across yet; that is task-113, which
-    fixes this shared helper for both entry points at once.
+    Active content overrides come across too, by the same rule and the same
+    permission (task-113): see `_carry_override` and `_require_override_grant`.
     """
     from app.campaigns.service import brand_of_variant
 
@@ -430,6 +459,11 @@ def duplicate_variant(
             )
         raise DuplicationRefused(f"Unknown content option: {mode!r}")
 
+    _require_override_grant(
+        db, principal, brand_id=brand_id, content_mode=mode,
+        variant_ids=[source.id], enforced=enforced,
+    )
+
     report = VariantDuplicationReport(
         variant_id=0,
         source_variant_id=source.id,
@@ -441,6 +475,7 @@ def duplicate_variant(
         db, source, campaign_id=target.id,
         name=_clamp(name or "") or f"{source.name} (copy)"[:_NAME_LIMIT],
         content_mode=mode, target_brand_id=brand_id, report=report,
+        actor=override_author(principal),
     )
     db.commit()
     report.variant_id = variant.id
@@ -456,6 +491,7 @@ def _copy_variant_into(
     content_mode: str,
     target_brand_id: int,
     report,
+    actor: str,
 ) -> VariantDB:
     """One variant, its decision slots and its modules, into `campaign_id`,
     inside the caller's transaction (flushed, never committed).
@@ -552,12 +588,121 @@ def _copy_variant_into(
             module_data=source_module.module_data,
         )
         db.add(module)
+        db.flush()
         report.modules += 1
+        _carry_override(db, source_module, module, content_mode=content_mode,
+                        actor=actor, report=report)
         for key in _url_keys(source_module.module_data):
             report.url_carriers.append(
                 f"{source_variant.name} → module {index} ({source_module.module_type}): {key}"
             )
     return variant
+
+
+def override_author(principal) -> str:
+    """Who a carried override is attributed to: **the person duplicating**.
+
+    Not the original author — carrying that name forward would attribute an
+    act they did not perform, in a campaign they may not know exists
+    (task-113). Taken from the authenticated principal and never from a
+    request body, so it cannot be asserted.
+    """
+    from app.auth.db_models import IntegrationDB, UserDB
+
+    if isinstance(principal, UserDB):
+        return principal.email
+    if isinstance(principal, IntegrationDB):
+        return f"integration:{principal.name}"[:255]
+    # Access control is off: nobody is signed in, so nobody can be named.
+    return "duplication (access control off)"
+
+
+def _carried_override_count(db: Session, variant_ids: list[int]) -> int:
+    """Active overrides on these variants that a copy would reproduce: on
+    modules bound to a record and not to a slot (ADR-178 point 5)."""
+    if not variant_ids:
+        return 0
+    return (
+        db.query(ContentOverrideDB)
+        .join(ModuleInstanceDB, ModuleInstanceDB.id == ContentOverrideDB.module_instance_id)
+        .filter(
+            ModuleInstanceDB.variant_id.in_(variant_ids),
+            ModuleInstanceDB.content_record_id.isnot(None),
+            ModuleInstanceDB.decision_slot_id.is_(None),
+            ContentOverrideDB.active.is_(True),
+        )
+        .count()
+    )
+
+
+def _require_override_grant(
+    db: Session, principal, *, brand_id: int, content_mode: str,
+    variant_ids: list[int], enforced: bool,
+) -> None:
+    """Carrying an override writes override rows in the target brand, so it
+    needs `overrides.manage` there (task-113, decided 2026-10-02).
+
+    The same shape as COPY needing `content.manage` on the target
+    (`require_campaign_target`): ADR-150 keeps overriding apart from
+    restructuring a campaign, and without this a person who may only
+    restructure would create overrides by duplicating. LAYOUT carries none, so
+    it needs nothing — which is what the refusal offers.
+    """
+    if not enforced or content_mode == LAYOUT:
+        return
+    count = _carried_override_count(db, variant_ids)
+    if count and not has_permission(db, principal, OVERRIDES_MANAGE, brand_id=brand_id):
+        plural = "s" if count != 1 else ""
+        raise DuplicationForbidden(
+            f"This copy would carry {count} active override{plural}, and you "
+            "cannot manage overrides in that brand. Take the layout only, or ask "
+            "someone who can."
+        )
+
+
+def _carry_override(
+    db: Session, source_module: ModuleInstanceDB, module: ModuleInstanceDB, *,
+    content_mode: str, actor: str, report,
+) -> None:
+    """Reproduce the source module's **active** override on its copy (task-113).
+
+    **The line is drawn inside the row.** Carried: the edit
+    (`field_overrides`), what it was applied to (`system_content_record_id`)
+    and why (`reason`) — the live half, which the renderer reads. Not
+    carried: `outcome_delta` and `send_instance_id`, which measure a send that
+    happened, and `reverted_at`. A reset row is pure history and is never
+    reproduced, which is the fabrication the campaign docstring warns about.
+
+    Under LAYOUT the copy's module is unbound, so an override has nothing to
+    attach to (an override needs a record, ADR-178 point 5). It is dropped and
+    counted, so the report says so rather than the copy quietly differing.
+    """
+    source = (
+        db.query(ContentOverrideDB)
+        .filter(ContentOverrideDB.module_instance_id == source_module.id,
+                ContentOverrideDB.active.is_(True))
+        .first()
+    )
+    if source is None:
+        return
+    if module.content_record_id is None or module.decision_slot_id is not None:
+        report.overrides_not_carried += 1
+        return
+
+    applied_to = source.system_content_record_id
+    if content_mode == COPY and applied_to is not None:
+        # The record it was applied to now has a copy in the target brand;
+        # pointing at the original would cite another brand's row.
+        applied_to = report.content_records_copied.get(applied_to)
+    db.add(ContentOverrideDB(
+        module_instance_id=module.id,
+        field_overrides=dict(source.field_overrides or {}),
+        system_content_record_id=applied_to,
+        reason=source.reason,
+        overridden_by=actor,
+        active=True,
+    ))
+    report.overrides_carried += 1
 
 
 def _target_content_id(

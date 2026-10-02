@@ -1287,6 +1287,8 @@ def campaign_duplicate(
             # anything to choose — the service refuses an explicitly empty
             # list, which is a different thing from not choosing.
             variant_ids=variant_id or None,
+            principal=user_for_token(db, request.cookies.get(SESSION_COOKIE)),
+            enforced=getattr(request.state, "auth_enforced", True),
         )
     except duplication.DuplicationRefused as error:
         return RedirectResponse(url=back + "&error=" + quote(str(error)), status_code=303)

@@ -144,12 +144,17 @@ function VariantSection({
           {duplicate.data.content_mode === 'keep'
             ? 'pointing at the same content.'
             : 'with the layout only — content is unbound.'}
+          {duplicate.data.overrides_carried > 0 &&
+            ` ${duplicate.data.overrides_carried} override(s) came across, now in your name.`}
         </p>
       )}
       {duplicate.isError && (
         <p role="alert">
           {duplicate.error instanceof HttpError && duplicate.error.status === 403
-            ? 'You do not have permission to create variants in this brand.'
+            ? // Two refusals share 403: no campaigns.manage, or a copy that would
+              // carry overrides without overrides.manage (task-113).
+              'You do not have permission for this copy. If the variant has overrides, ' +
+              'copying it needs permission to manage overrides as well.'
             : 'The variant could not be duplicated.'}
         </p>
       )}

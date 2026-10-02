@@ -348,6 +348,7 @@ class TestTheBoundaryDecidesWhetherContentIsCopied:
             target_brand_id=default_brand.id,
             name=_name('Copy in place'),
             content_mode=duplication.KEEP,
+            principal=None, enforced=False,
         )
         try:
             after = db.query(ContentRecordDB).count()
@@ -377,6 +378,7 @@ class TestTheBoundaryDecidesWhetherContentIsCopied:
             target_brand_id=target.id,
             name=_name('Copy across'),
             content_mode=duplication.COPY,
+            principal=None, enforced=False,
         )
         try:
             campaign = db.get(CampaignDB, report.campaign_id)
@@ -411,6 +413,7 @@ class TestTheBoundaryDecidesWhetherContentIsCopied:
             target_brand_id=target.id,
             name=_name('Copy across'),
             content_mode=duplication.COPY,
+            principal=None, enforced=False,
         )
         try:
             new_id = report.content_records_copied[source["record"].id]
@@ -446,6 +449,7 @@ class TestTheBoundaryDecidesWhetherContentIsCopied:
             target_brand_id=target.id,
             name=_name('Copy across'),
             content_mode=duplication.COPY,
+            principal=None, enforced=False,
         )
         try:
             copies = (
@@ -469,6 +473,7 @@ class TestTheBoundaryDecidesWhetherContentIsCopied:
                 target_brand_id=target.id,
                 name=_name('Impossible'),
                 content_mode=duplication.KEEP,
+                principal=None, enforced=False,
             )
 
     def test_copying_inside_one_brand_is_refused(self, db, source, default_brand):
@@ -480,6 +485,7 @@ class TestTheBoundaryDecidesWhetherContentIsCopied:
                 target_brand_id=default_brand.id,
                 name=_name('Pointless fork'),
                 content_mode=duplication.COPY,
+                principal=None, enforced=False,
             )
 
     def test_the_offered_modes_follow_the_boundary(self, db):
@@ -498,6 +504,7 @@ class TestWhatTheCopyArrivesAs:
             target_brand_id=default_brand.id,
             name=_name('Skeleton'),
             content_mode=duplication.LAYOUT,
+            principal=None, enforced=False,
         )
         try:
             modules = _modules(db, report.campaign_id)
@@ -521,6 +528,7 @@ class TestWhatTheCopyArrivesAs:
             target_brand_id=default_brand.id,
             name=_name('Copy in place'),
             content_mode=duplication.KEEP,
+            principal=None, enforced=False,
         )
         try:
             variant_ids = [
@@ -562,6 +570,7 @@ class TestWhatTheCopyArrivesAs:
             target_brand_id=default_brand.id,
             name=_name('Copy in place'),
             content_mode=duplication.KEEP,
+            principal=None, enforced=False,
         )
         try:
             positions = [m.position for m in _modules(db, report.campaign_id)]
@@ -584,6 +593,7 @@ class TestWhatTheCopyArrivesAs:
             target_brand_id=default_brand.id,
             name=_name('Copy in place'),
             content_mode=duplication.KEEP,
+            principal=None, enforced=False,
         )
         try:
             variant_ids = [
@@ -650,6 +660,7 @@ class TestWhatTheCopyArrivesAs:
             target_brand_id=target.id,
             name=_name('Copy across'),
             content_mode=duplication.COPY,
+            principal=None, enforced=False,
         )
         try:
             variant = (
@@ -684,6 +695,7 @@ class TestWhatTheCopyArrivesAs:
             target_brand_id=target.id,
             name=_name('Copy across'),
             content_mode=duplication.COPY,
+            principal=None, enforced=False,
         )
         try:
             joined = " | ".join(report.url_carriers)
@@ -931,6 +943,7 @@ class TestChoosingWhichVariantsComeAcross:
             name=_name("copy"),
             content_mode=duplication.KEEP,
             variant_ids=[push_variant.id],
+            principal=None, enforced=False,
         )
         try:
             copied = db.query(VariantDB).filter(
@@ -952,6 +965,7 @@ class TestChoosingWhichVariantsComeAcross:
             target_brand_id=default_brand.id,
             name=_name("copy"),
             content_mode=duplication.KEEP,
+            principal=None, enforced=False,
         )
         try:
             assert report.variants == 2
@@ -971,6 +985,7 @@ class TestChoosingWhichVariantsComeAcross:
                 name=_name("copy"),
                 content_mode=duplication.KEEP,
                 variant_ids=[],
+                principal=None, enforced=False,
             )
 
     def test_the_content_count_reflects_only_the_chosen_variants(self, db, source):
@@ -999,6 +1014,7 @@ class TestChoosingWhichVariantsComeAcross:
             target_brand_id=default_brand.id,
             name=_name("elsewhere"),
             content_mode=duplication.KEEP,
+            principal=None, enforced=False,
         )
         stranger = db.query(VariantDB).filter(
             VariantDB.campaign_id == other.campaign_id).first()
@@ -1011,6 +1027,7 @@ class TestChoosingWhichVariantsComeAcross:
                     name=_name("copy"),
                     content_mode=duplication.KEEP,
                     variant_ids=[stranger.id],
+                    principal=None, enforced=False,
                 )
         finally:
             _purge_campaigns(db, [other.campaign_id])
@@ -1447,7 +1464,9 @@ class TestDuplicatingAVariant:
     ):
         before = db.query(ContentRecordDB).count()
         report = duplication.duplicate_variant(
-            db, variant_id=source["variant"].id, brand_id=default_brand.id)
+            db, variant_id=source["variant"].id, brand_id=default_brand.id,
+            principal=None, enforced=False,
+        )
 
         copy = db.get(VariantDB, report.variant_id)
         assert copy.campaign_id == source["campaign"].id
@@ -1463,7 +1482,9 @@ class TestDuplicatingAVariant:
         try:
             report = duplication.duplicate_variant(
                 db, variant_id=source["variant"].id, brand_id=default_brand.id,
-                target_campaign_id=other.id)
+                target_campaign_id=other.id,
+                principal=None, enforced=False,
+            )
 
             copy = db.get(VariantDB, report.variant_id)
             assert copy.campaign_id == other.id
@@ -1483,14 +1504,18 @@ class TestDuplicatingAVariant:
     def test_an_explicit_mode_wins_over_the_default(self, db, source, default_brand):
         report = duplication.duplicate_variant(
             db, variant_id=source["variant"].id, brand_id=default_brand.id,
-            content_mode=duplication.LAYOUT)
+            content_mode=duplication.LAYOUT,
+            principal=None, enforced=False,
+        )
         assert report.content_mode == duplication.LAYOUT
         assert all(m.content_record_id is None
                    for m in self._copy_modules(db, report.variant_id))
 
     def test_it_reuses_the_campaign_disciplines(self, db, source, default_brand):
         report = duplication.duplicate_variant(
-            db, variant_id=source["variant"].id, brand_id=default_brand.id)
+            db, variant_id=source["variant"].id, brand_id=default_brand.id,
+            principal=None, enforced=False,
+        )
         copy = db.get(VariantDB, report.variant_id)
 
         assert copy.status == "draft", "a copy of a sent variant has not been sent"
@@ -1513,7 +1538,9 @@ class TestDuplicatingAVariant:
         with pytest.raises(duplication.DuplicationRefused, match="not copied inside a brand"):
             duplication.duplicate_variant(
                 db, variant_id=source["variant"].id, brand_id=default_brand.id,
-                content_mode=duplication.COPY)
+                content_mode=duplication.COPY,
+                principal=None, enforced=False,
+            )
 
     def test_another_brands_variant_or_campaign_answers_as_absent(
         self, db, source, default_brand, temp_brand
@@ -1524,19 +1551,25 @@ class TestDuplicatingAVariant:
             # The source seen from a brand it is not in.
             with pytest.raises(duplication.DuplicationNotFound):
                 duplication.duplicate_variant(
-                    db, variant_id=source["variant"].id, brand_id=elsewhere.id)
+                    db, variant_id=source["variant"].id, brand_id=elsewhere.id,
+                    principal=None, enforced=False,
+                )
             # The source pulled INTO the caller's own campaign. The target check
             # passes here, so only the source check stands between brand B and
             # a copy of brand A's variant — under KEEP, bound to A's content.
             with pytest.raises(duplication.DuplicationNotFound):
                 duplication.duplicate_variant(
                     db, variant_id=source["variant"].id, brand_id=elsewhere.id,
-                    target_campaign_id=foreign.id)
+                    target_campaign_id=foreign.id,
+                    principal=None, enforced=False,
+                )
             # A target campaign in another brand: same-brand only (Q5.6).
             with pytest.raises(duplication.DuplicationNotFound):
                 duplication.duplicate_variant(
                     db, variant_id=source["variant"].id, brand_id=default_brand.id,
-                    target_campaign_id=foreign.id)
+                    target_campaign_id=foreign.id,
+                    principal=None, enforced=False,
+                )
             assert db.query(VariantDB).filter(VariantDB.campaign_id == foreign.id).count() == 0
         finally:
             _purge_brand(db, elsewhere.id)
@@ -1596,3 +1629,196 @@ class TestDuplicatingAVariantOverJson:
             assert conflict.status_code == 409, conflict.text
         finally:
             self.helper.helper._cleanup_user(db, user)
+
+
+class TestActiveOverridesCarry:
+    """task-113: an override is live configuration as well as history.
+
+    `get_active_content_override` reads it on every render, so a copy that
+    drops it renders differently from its original, silently — worst in the
+    duplicate-to-repeat workflow. The line is drawn inside the row: the edit
+    and its reason carry; what measured or ended a past send does not; and the
+    author becomes the person duplicating, who is the one who made this row.
+    """
+
+    @pytest.fixture
+    def overridden(self, db, source):
+        bound = (
+            db.query(ModuleInstanceDB)
+            .filter(ModuleInstanceDB.variant_id == source["variant"].id,
+                    ModuleInstanceDB.content_record_id == source["record"].id)
+            .one()
+        )
+        # History first: a reset row must never come back to life in a copy.
+        db.add(ContentOverrideDB(
+            module_instance_id=bound.id, field_overrides={"headline_medium": "Old"},
+            overridden_by="former@example.invalid", active=False,
+        ))
+        db.add(ContentOverrideDB(
+            module_instance_id=bound.id, field_overrides={"headline_medium": "Shorter"},
+            system_content_record_id=source["record"].id, overridden_by="author@example.invalid",
+            reason="fits the hero", active=True, outcome_delta={"ctr": 0.1},
+        ))
+        db.commit()
+        return source
+
+    def _active_on(self, db, variant_ids):
+        modules = [m.id for m in db.query(ModuleInstanceDB)
+                   .filter(ModuleInstanceDB.variant_id.in_(variant_ids)).all()]
+        return db.query(ContentOverrideDB).filter(
+            ContentOverrideDB.module_instance_id.in_(modules)).all()
+
+    def _variants(self, db, campaign_id):
+        return [v.id for v in db.query(VariantDB).filter(VariantDB.campaign_id == campaign_id)]
+
+    def test_keep_carries_the_edit_and_not_its_history(self, db, overridden, default_brand):
+        user = TestTheTargetBrandIsChecked()._user_on(db, {default_brand: MANAGER})
+        try:
+            report = duplication.duplicate_campaign(
+                db, campaign_id=overridden["campaign"].id, target_brand_id=default_brand.id,
+                name=_name("ovr-keep"), content_mode=duplication.KEEP,
+                principal=user, enforced=True,
+            )
+            rows = self._active_on(db, self._variants(db, report.campaign_id))
+            assert len(rows) == 1, "the reset row came across, or the active one did not"
+            row = rows[0]
+            assert row.active is True
+            assert row.field_overrides == {"headline_medium": "Shorter"}
+            assert row.reason == "fits the hero"
+            assert row.system_content_record_id == overridden["record"].id
+            assert row.overridden_by == user.email, "the original author was carried forward"
+            assert row.outcome_delta is None and row.send_instance_id is None
+            assert row.reverted_at is None
+            assert report.overrides_carried == 1 and report.overrides_not_carried == 0
+        finally:
+            _purge_campaigns(db, [c.id for c in db.query(CampaignDB).filter(
+                CampaignDB.name.like(f"{PREFIX}-ovr-keep-%"))])
+            TestTheTargetBrandIsChecked()._cleanup_user(db, user)
+
+    def test_copy_points_the_override_at_the_copied_record(
+        self, db, overridden, default_brand, temp_brand
+    ):
+        target = temp_brand("ovr-copy")
+        report = duplication.duplicate_campaign(
+            db, campaign_id=overridden["campaign"].id, target_brand_id=target.id,
+            name=_name("ovr-copy"), content_mode=duplication.COPY,
+            principal=None, enforced=False,
+        )
+        rows = self._active_on(db, self._variants(db, report.campaign_id))
+        copied = report.content_records_copied[overridden["record"].id]
+        assert [r.system_content_record_id for r in rows] == [copied]
+        assert report.overrides_carried == 1
+
+    def test_layout_drops_it_and_says_so(self, db, overridden, default_brand):
+        report = duplication.duplicate_campaign(
+            db, campaign_id=overridden["campaign"].id, target_brand_id=default_brand.id,
+            name=_name("ovr-layout"), content_mode=duplication.LAYOUT,
+            principal=None, enforced=False,
+        )
+        try:
+            assert self._active_on(db, self._variants(db, report.campaign_id)) == []
+            assert report.overrides_carried == 0 and report.overrides_not_carried == 1
+        finally:
+            _purge_campaigns(db, [report.campaign_id])
+
+    def test_a_variant_copy_carries_it_through_the_same_helper(
+        self, db, overridden, default_brand
+    ):
+        report = duplication.duplicate_variant(
+            db, variant_id=overridden["variant"].id, brand_id=default_brand.id,
+            principal=None, enforced=False,
+        )
+        rows = self._active_on(db, [report.variant_id])
+        assert [r.field_overrides for r in rows] == [{"headline_medium": "Shorter"}]
+        assert report.overrides_carried == 1
+
+    @pytest.fixture
+    def no_override_grant(self, db, default_brand):
+        """Campaigns, but not overrides — the split ADR-150 keeps, and which no
+        built-in role draws, so the role is made here."""
+        from app.auth.db_models import RolePermissionDB
+        from app.auth.permissions import CONTENT_MANAGE, VIEW
+
+        role = RoleDB(key=_name("role"), name="Campaigns, no overrides", is_builtin=False)
+        db.add(role)
+        db.commit()
+        for permission in (VIEW, CAMPAIGNS_MANAGE, CONTENT_MANAGE):
+            db.add(RolePermissionDB(role_id=role.id, permission=permission))
+        db.commit()
+        user = UserDB(email=f"dup-{uuid.uuid4().hex[:10]}@example.invalid", is_active=True)
+        db.add(user)
+        db.commit()
+        db.add(RoleAssignmentDB(user_id=user.id, role_id=role.id, brand_id=default_brand.id))
+        db.commit()
+        try:
+            yield user
+        finally:
+            db.rollback()
+            TestTheTargetBrandIsChecked()._cleanup_user(db, user)
+            db.query(RolePermissionDB).filter(RolePermissionDB.role_id == role.id).delete()
+            db.query(RoleDB).filter(RoleDB.id == role.id).delete()
+            db.commit()
+
+    def test_carrying_needs_overrides_manage_on_the_target(
+        self, db, overridden, default_brand, no_override_grant
+    ):
+        before = db.query(VariantDB).count()
+        with pytest.raises(duplication.DuplicationForbidden, match="1 active override"):
+            duplication.duplicate_variant(
+                db, variant_id=overridden["variant"].id, brand_id=default_brand.id,
+                principal=no_override_grant, enforced=True,
+            )
+        assert db.query(VariantDB).count() == before, "a refused copy was half-written"
+        # Layout carries nothing, so it needs nothing.
+        report = duplication.duplicate_variant(
+            db, variant_id=overridden["variant"].id, brand_id=default_brand.id,
+            content_mode=duplication.LAYOUT, principal=no_override_grant, enforced=True,
+        )
+        assert report.overrides_not_carried == 1
+
+    def test_over_json_the_refusal_is_403_and_the_author_is_the_caller(
+        self, db, overridden, default_brand, no_override_grant
+    ):
+        helper = TestTheTargetBrandIsCheckedOverJson()
+        token = auth.create_session(db, no_override_grant)
+        auth.set_session_brand(db, token, default_brand.id)
+        from fastapi.testclient import TestClient
+        from main import app
+
+        client = TestClient(app, raise_server_exceptions=False)
+        client.cookies.set(auth.SESSION_COOKIE, token)
+        headers = {"X-CSRF-Token": auth.csrf_token_for(token)}
+        refused = client.post(
+            f"/campaigns/variants/{overridden['variant'].id}/duplicate", json={}, headers=headers)
+        assert refused.status_code == 403, refused.text
+
+        user, manager, manager_headers = helper._person(db, {default_brand: MANAGER}, default_brand)
+        try:
+            ok = manager.post(
+                f"/campaigns/variants/{overridden['variant'].id}/duplicate",
+                json={}, headers=manager_headers)
+            assert ok.status_code == 201, ok.text
+            assert ok.json()["overrides_carried"] == 1
+            rows = self._active_on(db, [ok.json()["variant_id"]])
+            assert [r.overridden_by for r in rows] == [user.email]
+        finally:
+            helper.helper._cleanup_user(db, user)
+
+    def test_a_campaign_copy_is_gated_the_same_way_and_writes_nothing(
+        self, db, overridden, default_brand, no_override_grant
+    ):
+        name = _name("ovr-refused")
+        try:
+            with pytest.raises(duplication.DuplicationForbidden, match="1 active override"):
+                duplication.duplicate_campaign(
+                    db, campaign_id=overridden["campaign"].id,
+                    target_brand_id=default_brand.id, name=name,
+                    content_mode=duplication.KEEP,
+                    principal=no_override_grant, enforced=True,
+                )
+            # The same session the service used: a flushed-but-uncommitted
+            # campaign row would be visible here, which is the point.
+            assert db.query(CampaignDB).filter(CampaignDB.name == name).count() == 0
+        finally:
+            db.rollback()
+            _purge_named(db, name)

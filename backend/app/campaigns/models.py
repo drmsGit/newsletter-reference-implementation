@@ -219,6 +219,10 @@ class CampaignDuplicated(BaseModel):
     # source content record id -> the copy's id. Empty unless `copy`.
     content_records_copied: dict[int, int]
     url_carriers: list[str]
+    # Active overrides reproduced on the copy, and ones LAYOUT dropped because
+    # their module arrived unbound (task-113).
+    overrides_carried: int = 0
+    overrides_not_carried: int = 0
 
 
 class VariantDuplicate(BaseModel):
@@ -244,6 +248,8 @@ class VariantDuplicated(BaseModel):
     modules: int
     decision_slots: int
     url_carriers: list[str]
+    overrides_carried: int = 0
+    overrides_not_carried: int = 0
 
 
 class DuplicationVariantSummary(BaseModel):

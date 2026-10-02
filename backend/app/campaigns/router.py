@@ -619,7 +619,11 @@ def duplicate_campaign_record(
             name=payload.name,
             content_mode=payload.content_mode,
             variant_ids=payload.variant_ids,
+            principal=request_principal(request),
+            enforced=auth_is_enforced(request),
         )
+    except duplication.DuplicationForbidden as error:
+        raise HTTPException(status_code=403, detail=str(error))
     except duplication.DuplicationRefused as error:
         raise HTTPException(status_code=409, detail=str(error))
 
@@ -641,6 +645,8 @@ def duplicate_campaign_record(
         decision_slots=report.decision_slots,
         content_records_copied=report.content_records_copied,
         url_carriers=report.url_carriers,
+        overrides_carried=report.overrides_carried,
+        overrides_not_carried=report.overrides_not_carried,
     )
 
 
@@ -673,9 +679,13 @@ def duplicate_variant_record(
             target_campaign_id=payload.target_campaign_id,
             name=payload.name,
             content_mode=payload.content_mode,
+            principal=request_principal(request),
+            enforced=auth_is_enforced(request),
         )
     except duplication.DuplicationNotFound as error:
         raise HTTPException(status_code=404, detail=str(error))
+    except duplication.DuplicationForbidden as error:
+        raise HTTPException(status_code=403, detail=str(error))
     except duplication.DuplicationRefused as error:
         raise HTTPException(status_code=409, detail=str(error))
 
@@ -693,6 +703,8 @@ def duplicate_variant_record(
         modules=report.modules,
         decision_slots=report.decision_slots,
         url_carriers=report.url_carriers,
+        overrides_carried=report.overrides_carried,
+        overrides_not_carried=report.overrides_not_carried,
     )
 
 

@@ -5081,6 +5081,16 @@ export interface components {
             };
             /** Url Carriers */
             url_carriers: string[];
+            /**
+             * Overrides Carried
+             * @default 0
+             */
+            overrides_carried: number;
+            /**
+             * Overrides Not Carried
+             * @default 0
+             */
+            overrides_not_carried: number;
         };
         /** CampaignWithVariants */
         CampaignWithVariants: {
@@ -7542,6 +7552,16 @@ export interface components {
             decision_slots: number;
             /** Url Carriers */
             url_carriers: string[];
+            /**
+             * Overrides Carried
+             * @default 0
+             */
+            overrides_carried: number;
+            /**
+             * Overrides Not Carried
+             * @default 0
+             */
+            overrides_not_carried: number;
         };
         /** VariantUpdate */
         VariantUpdate: {

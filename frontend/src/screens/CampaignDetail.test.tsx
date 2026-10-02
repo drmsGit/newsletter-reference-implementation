@@ -115,6 +115,7 @@ describe('a campaign in detail', () => {
         jsonResponse({
           variant_id: 13, source_variant_id: 3, campaign_id: 1, source_campaign_id: 1,
           content_mode: 'keep', modules: 4, decision_slots: 1, url_carriers: [],
+          overrides_carried: 1, overrides_not_carried: 0,
         }, 201),
     })
     renderDetail()
@@ -122,6 +123,8 @@ describe('a campaign in detail', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Duplicate this variant' }))
 
     expect(await screen.findByRole('status')).toHaveTextContent(/same content/i)
+    // task-113: the person duplicating is told they now author the carried override.
+    expect(screen.getByRole('status')).toHaveTextContent(/1 override\(s\) came across/)
     const post = fetchMock.mock.calls
       .map(([input]) => input as Request)
       .find((r) => r.method === 'POST')!
