@@ -1071,3 +1071,74 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
         send_instance.status = "no_recipients"
 
     db.commit()
+
+def reconstruct_delivery(db: Session, execution_id: int, *, brand_id: int) -> dict | None:
+    """What one recipient got in one send, as of the send date (ADR-183).
+
+    Rebuilt from the snapshot's frame and the execution's delivery record — the
+    content is exact, because both hold copies of the values that were sent.
+    The layout is today's templates; `templates_match` says whether they are
+    the ones the message was laid out with, and `hash_matches` whether the
+    rebuilt output is byte-for-byte what was sent. Neither is hidden when false.
+
+    None when the execution is not in this brand (it answers as absent, ADR-172
+    point 6). ValueError when it was never sent, or was sent before delivery
+    records existed — there is nothing to rebuild from, and saying so beats
+    rendering today's variant and calling it history.
+    """
+    from app.rendering.frame import artifact_hash, render_frame, templates_fingerprint
+    from app.snapshots.db_models import SnapshotDB
+
+    row = (
+        db.query(DeliveryExecutionDB, SendInstanceDB)
+        .join(SendInstanceDB, SendInstanceDB.id == DeliveryExecutionDB.send_instance_id)
+        .filter(DeliveryExecutionDB.id == execution_id, SendInstanceDB.brand_id == brand_id)
+        .first()
+    )
+    if row is None:
+        return None
+    execution, send_instance = row
+    record = execution.delivery_record
+    if execution.status != "sent" or not record:
+        raise ValueError(
+            f"Execution {execution_id} has no delivery record — it was not sent, "
+            "or it was sent before delivery records existed (ADR-183)."
+        )
+    snapshot = db.get(SnapshotDB, record["snapshot_id"])
+    if snapshot is None:
+        raise ValueError(f"Snapshot {record['snapshot_id']} no longer exists.")
+    frame = snapshot.render_context
+
+    artifact, _ = render_frame(db, frame, recipient_id=execution.recipient_id,
+                               picks=record.get("picks") or [])
+    # The same fallback the send applied, so the two hashes are comparable.
+    if artifact.body is not None and not artifact.envelope.get("subject"):
+        artifact.envelope["subject"] = send_instance.name
+
+    picks = {p["module_id"]: p for p in record.get("picks") or []}
+    modules = []
+    for entry in frame["modules"]:
+        pick = picks.get(entry["module_id"])
+        source = pick or entry
+        modules.append({
+            "module_id": entry["module_id"],
+            "module_type": entry["module_type"],
+            "kind": entry["kind"],
+            "content_record_id": source.get("content_record_id"),
+            "content_version_id": source.get("content_version_id"),
+            "override_id": entry.get("override_id"),
+            "decision_resolution_id": (pick or {}).get("decision_resolution_id"),
+        })
+    return {
+        "execution_id": execution.id,
+        "send_instance_id": send_instance.id,
+        "recipient_id": execution.recipient_id,
+        "channel": execution.channel,
+        "sent_at": execution.sent_at,
+        "envelope": artifact.envelope,
+        "body": artifact.body,
+        "fields": artifact.fields,
+        "modules": modules,
+        "templates_match": templates_fingerprint(frame["channel"]) == record.get("templates_fingerprint"),
+        "hash_matches": artifact_hash(artifact) == execution.artifact_hash,
+    }

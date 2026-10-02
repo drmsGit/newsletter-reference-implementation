@@ -232,3 +232,95 @@ def test_a_frameless_snapshot_is_refused(db, world):
         db.query(SendInstanceDB).filter(SendInstanceDB.id == send.id).delete()
         db.query(SnapshotDB).filter(SnapshotDB.id == snapshot.id).delete()
         db.commit()
+
+
+# --- stage 3: what a recipient got, rebuilt ----------------------------------
+
+def _change_everything(db, world):
+    """Everything a message depends on, changed after the send."""
+    header = db.query(ModuleInstanceDB).filter(
+        ModuleInstanceDB.variant_id == world["variant"].id,
+        ModuleInstanceDB.module_type == "header").one()
+    header.module_data = {"subject": "Rewritten", "preheader": "Rewritten"}
+    db.add(DecisionResolutionDB(decision_slot_id=world["slot_id"], content_record_id=world["later"].id))
+    db.commit()
+    for key in ("fixed", "picked"):
+        record = db.get(ContentRecordDB, world[key].id)
+        record.content = {"headline_medium": f"{key} rewritten", "body_medium": "x"}
+        db.commit()
+        create_content_version(db, content_record_id=record.id, created_by="test",
+                               brand_id=world["brand"].id)
+
+
+def test_the_message_is_rebuilt_exactly_after_everything_changed(db, world, sent):
+    from app.delivery.service import reconstruct_delivery
+
+    _change_everything(db, world)
+    rebuilt = reconstruct_delivery(db, sent["execution"].id, brand_id=world["brand"].id)
+    assert rebuilt["body"] == sent["artifact"].body
+    assert rebuilt["envelope"]["subject"] == "Hello"
+    assert rebuilt["hash_matches"] is True and rebuilt["templates_match"] is True
+    assert rebuilt["sent_at"] == sent["execution"].sent_at
+    kinds = {m["kind"] for m in rebuilt["modules"]}
+    assert kinds == {"static", "content", "slot"}
+
+
+def test_a_template_change_is_reported_not_hidden(db, world, sent, monkeypatch):
+    import app.rendering.frame as frame_module
+    from app.delivery.service import reconstruct_delivery
+
+    monkeypatch.setattr(frame_module, "templates_fingerprint", lambda channel: "different")
+    rebuilt = reconstruct_delivery(db, sent["execution"].id, brand_id=world["brand"].id)
+    assert rebuilt["templates_match"] is False
+    assert rebuilt["body"] == sent["artifact"].body, "the content is still exact"
+
+
+def test_the_route_answers_for_the_brand_only(db, world, sent, foreign_api):
+    from fastapi.testclient import TestClient
+
+    from app.auth.permissions import VIEW
+    from main import app
+    from tests.machine import machine
+
+    client = TestClient(app, raise_server_exceptions=False)
+    path = f"/delivery/executions/{sent['execution'].id}/as-sent"
+    with machine([VIEW]) as headers:
+        ok = client.get(path, headers=headers)
+    with foreign_api([VIEW]) as headers:
+        foreign = client.get(path, headers=headers)
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["body"] == sent["artifact"].body and ok.json()["hash_matches"] is True
+    assert foreign.status_code == 404
+
+
+def test_an_unsent_execution_has_nothing_to_rebuild(db, world, sent):
+    from app.delivery.service import reconstruct_delivery
+
+    execution = sent["execution"]
+    execution.status, execution.delivery_record = "created", None
+    db.commit()
+    with pytest.raises(ValueError, match="no delivery record"):
+        reconstruct_delivery(db, execution.id, brand_id=world["brand"].id)
+
+
+def test_without_a_subject_the_rebuild_uses_the_sends_fallback(db, world, sent):
+    """The send falls back to the send's name when the frame has no subject;
+    the rebuild must apply the same rule, or its hash can never match."""
+    from app.delivery.db_models import SendInstanceDB
+    from app.delivery.service import reconstruct_delivery
+    from app.rendering.frame import artifact_hash, render_frame
+    from app.snapshots.db_models import SnapshotDB
+
+    execution = sent["execution"]
+    snapshot = db.get(SnapshotDB, sent["snapshot_id"])
+    snapshot.render_context = {**snapshot.render_context, "envelope": {}}
+    db.commit()
+    send_name = db.get(SendInstanceDB, execution.send_instance_id).name
+    expected, _ = render_frame(db, snapshot.render_context, picks=execution.delivery_record["picks"])
+    expected.envelope["subject"] = send_name
+    execution.artifact_hash = artifact_hash(expected)
+    db.commit()
+
+    rebuilt = reconstruct_delivery(db, execution.id, brand_id=world["brand"].id)
+    assert rebuilt["envelope"]["subject"] == send_name
+    assert rebuilt["hash_matches"] is True

@@ -122,3 +122,32 @@ class ProcessDueResult(BaseModel):
 
     triggered: int
     send_instance_ids: list[int] = []
+
+
+class ReconstructedModule(BaseModel):
+    module_id: int
+    module_type: str
+    # content | static | slot | empty | unknown
+    kind: str
+    content_record_id: int | None = None
+    content_version_id: int | None = None
+    override_id: int | None = None
+    decision_resolution_id: int | None = None
+
+
+class DeliveryAsSent(BaseModel):
+    """What one recipient got, as of the send date (ADR-183). Content is exact;
+    `templates_match` and `hash_matches` say whether the layout is too."""
+
+    execution_id: int
+    send_instance_id: int
+    recipient_id: int
+    channel: str
+    sent_at: datetime | None = None
+    envelope: dict
+    # Email: the HTML. Push: `fields`.
+    body: str | None = None
+    fields: dict | None = None
+    modules: list[ReconstructedModule]
+    templates_match: bool
+    hash_matches: bool

@@ -14,6 +14,7 @@ from app.delivery.models import (
     SendInstanceCreate,
     SendInstanceDetail,
     SendPlanRequest,
+    DeliveryAsSent,
 )
 from app.delivery.service import (
     send_test_email,
@@ -26,6 +27,7 @@ from app.delivery.service import (
     send_send_instance,
     NotInBrand,
     prepare_send_from_audience,
+    reconstruct_delivery,
     process_due_scheduled_sends
 )
 
@@ -311,3 +313,31 @@ def process_due(db: Session = Depends(get_db)):
         "triggered": len(triggered),
         "send_instance_ids": [getattr(s, "id", s) for s in triggered],
     }
+
+
+@router.get(
+    "/executions/{execution_id}/as-sent",
+    response_model=DeliveryAsSent,
+    summary="What this recipient got, as of the send date",
+    description=(
+        "Rebuilt from the snapshot's frame and the execution's delivery record "
+        "(ADR-183): every value is the one that was sent — content versions, "
+        "static fields, overrides, this recipient's slot picks, the subject. "
+        "The layout is today's templates: `templates_match` says whether they "
+        "are the ones used, `hash_matches` whether the output is byte-identical. "
+        "404 when the execution is not in the working brand; 409 when it was not "
+        "sent, or was sent before delivery records existed."
+    ),
+)
+def get_delivery_as_sent(
+    execution_id: int,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    try:
+        result = reconstruct_delivery(db, execution_id, brand_id=brand_id)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error))
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
+    return result
