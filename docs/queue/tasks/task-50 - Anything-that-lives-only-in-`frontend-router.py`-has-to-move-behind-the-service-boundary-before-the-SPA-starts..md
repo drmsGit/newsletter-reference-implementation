@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-27 13:56'
-updated_date: '2026-10-02 13:13'
+updated_date: '2026-10-02 13:41'
 labels:
   - backend
 dependencies: []
@@ -39,4 +39,6 @@ Migrated 2026-09-27 from `docs/backlog.md` line 148, section "Features", positio
 2026-10-02: B26 JSON shape done. GET /api/audience-groups/ takes an optional channel: pinned_count always; recipient_count + count_channel only for a named, registered channel (422 otherwise), per ADR-176 point 5 — no decision needed, the ADR settles it and task-116's drop carried the rule to the React list. audience.service.list_groups_with_counts. tests/test_audience_counts.py (fixture deliberately asymmetric: a symmetric one let an always-email count pass). The N+1 is moved, not solved — left for task-213. Jinja list untouched (task-116 dropped by user). Suite 858 passed. Remaining in task-50: settings validation with C2 (needs decisions); graph JSON route; B27 and the other read-model rows.
 
 2026-10-02: graph JSON route done — GET /insight/category-graph (insight/router.py) returns the working brand's nodes and edges from insight.graph.category_graph, no layout. Two HTTP tests in tests/test_category_graph.py read a non-default brand, so a default-brand fallback fails them (mutation-checked). BRAND_OWNED /insight text updated. Suite 860 passed.
+
+2026-10-02: B27 done (except the non-member list, deliberately). GET /api/audience-groups/{id}/preview?channel= (channel required, registered) returns per-block counts, resolved / reachable / unreachable-by-stage after run_exclusion_stack (ADR-163 rider), and a 20-row sample with channel addresses; audience.service.preview_group, shared with the Jinja detail page. tests/test_audience_preview.py: 6 tests, four mutants caught (one only after a second assertion was added). Suite 885 passed. Remaining in task-50: the other read-model rows (B4 dashboard, B10 recipient detail, B11 campaign detail, B17 content detail, B20-B22 categories/decisions, B23/B24 deliveries pages) and C5/C7/C10-C13 one-line capability gaps.
 <!-- SECTION:NOTES:END -->

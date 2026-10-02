@@ -6,6 +6,9 @@ from app.audience.models import (
     AudienceGroup,
     AudienceGroupCreate,
     AudienceGroupListed,
+    AudiencePreview,
+    PreviewBlock,
+    PreviewRecipient,
     AudienceGroupMember,
     AudienceRuleBlock,
     AudienceRuleBlockCreate,
@@ -78,6 +81,50 @@ def get_group(group_id: int, db: Session = Depends(get_db), brand_id: int = Depe
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
     return group
+
+
+@router.get(
+    "/{group_id}/preview",
+    response_model=AudiencePreview,
+    summary="What a send to this group on one channel would reach",
+    description=(
+        "Each rule block with its own count, the resolved audience, how many of "
+        "them the send's own exclusion stack would actually reach (and why the "
+        "rest drop, by stage), and the first 20 reachable recipients with their "
+        "address on that channel. `channel` is required: a group resolves to "
+        "different people per channel, so there is no channel-less preview "
+        "(ADR-176 point 5)."
+    ),
+)
+def preview_group(
+    group_id: int,
+    channel: str = Query(...),
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    if not is_registered(channel):
+        raise HTTPException(status_code=422, detail=f"{channel!r} is not a registered channel.")
+    group = service.get_group(db, group_id, brand_id=brand_id)
+    if group is None:
+        raise HTTPException(status_code=404, detail="Audience group not found")
+    preview = service.preview_group(db, group, channel=channel)
+    return AudiencePreview(
+        group_id=group.id,
+        channel=preview["channel"],
+        blocks=[PreviewBlock(**b) for b in preview["blocks"]],
+        resolved_count=preview["resolved_count"],
+        reachable_count=preview["reachable_count"],
+        unreachable_count=preview["unreachable_count"],
+        dropped_by_stage=preview["dropped_by_stage"],
+        sample=[
+            PreviewRecipient(
+                recipient_id=row["recipient"].id, external_id=row["recipient"].external_id,
+                language=row["recipient"].language, status=row["recipient"].status,
+                address=row["address"],
+            )
+            for row in preview["sample"]
+        ],
+    )
 
 
 @router.patch("/{group_id}", response_model=AudienceGroup)

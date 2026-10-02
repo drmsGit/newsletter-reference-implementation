@@ -79,3 +79,41 @@ class BulkAddRequest(BaseModel):
     """
 
     recipient_ids: list[int]
+
+
+class PreviewBlock(BaseModel):
+    id: int
+    kind: str
+    label: str | None = None
+    source: str | None = None
+    criteria: dict
+    # The category the criteria name, resolved so a client need not look it up.
+    category_name: str | None = None
+    count: int
+
+
+class PreviewRecipient(BaseModel):
+    recipient_id: int
+    external_id: str
+    language: str | None = None
+    status: str | None = None
+    # The deliverable value on the preview's channel (an email, a device token).
+    address: str | None = None
+
+
+class AudiencePreview(BaseModel):
+    """What sending to a group on one channel would reach (task-50, B27).
+
+    `reachable_count` is after the send's own exclusion stack (ADR-163's
+    rider); `resolved_count - reachable_count` are the people who match and
+    cannot be reached, counted by stage in `dropped_by_stage`.
+    """
+
+    group_id: int
+    channel: str
+    blocks: list[PreviewBlock]
+    resolved_count: int
+    reachable_count: int
+    unreachable_count: int
+    dropped_by_stage: dict[str, int]
+    sample: list[PreviewRecipient]

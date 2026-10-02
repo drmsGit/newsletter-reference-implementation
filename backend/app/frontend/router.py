@@ -3487,59 +3487,27 @@ def audience_group_detail(group_id: int, request: Request, error: str | None = N
     languages = sorted({r.language for r in all_recipients if r.language})
     statuses = sorted({r.status for r in all_recipients if r.status})
     categories = db.query(CategoryDB).order_by(CategoryDB.name.asc()).all()
-    category_names = {c.id: c.name for c in categories}
 
-    # Rule blocks (live) shown on top, each with its own count so a manager sees
-    # the impact of every include/exclude before sending.
+    # The figures are `preview_group`'s — the same function the JSON preview
+    # uses, so the two cannot disagree. Email explicitly: this screen renders
+    # email addresses, so the audience it shows is the email one (ADR-176
+    # point 5); a channel-aware group screen is the React client's job.
+    preview = audience_service.preview_group(db, group, channel=DEFAULT_CHANNEL)
+
+    # The one-line summary is presentation and stays here.
     blocks = []
-    for b in audience_service.list_blocks(db, group_id, brand_id=working_brand_id(request, db)):
-        crit = b.criteria or {}
+    for b in preview["blocks"]:
+        crit = b["criteria"]
         parts = []
         if crit.get("category_id"):
-            parts.append(f"interested in {category_names.get(crit['category_id'], 'category ' + str(crit['category_id']))}")
+            parts.append(f"interested in {b['category_name'] or 'category ' + str(crit['category_id'])}")
         if crit.get("min_score") not in (None, ""):
             parts.append(f"signal ≥ {crit['min_score']}")
         if crit.get("language"):
             parts.append(f"language {crit['language']}")
         if crit.get("status"):
             parts.append(f"status {crit['status']}")
-        blocks.append({
-            "id": b.id,
-            "kind": b.kind,
-            "label": b.label,
-            "source": b.source,
-            "criteria": crit,
-            "summary": ", ".join(parts) if parts else "everyone (no criteria)",
-            # Email explicitly, not by default. This whole screen previews an
-            # email audience — the line below renders email addresses — and
-            # since 2026-09-29 a count cannot be asked for without saying which
-            # channel it is a count of. A channel-aware group screen is the
-            # React client's job.
-            "count": audience_service.count_for_criteria(
-                db, crit, group.brand_id, DEFAULT_CHANNEL
-            ),
-        })
-
-    # Email is correct here rather than merely preserved: the next line renders
-    # email addresses, so the audience shown is the email-consenting one.
-    resolved = audience_service.resolve_audience(db, group_id, channel=DEFAULT_CHANNEL)
-
-    # **ADR-163 addendum point 3's rider, honoured here rather than inside the
-    # resolver.** That rider says the preview must run the same addressability
-    # stage the send does, "or a displayed count over-reports what will
-    # actually send". Until 2026-09-29 the resolver did its own, email-only
-    # version of that filter; task-233 removed it, because narrowing a
-    # *membership* query by reachability made an exclude block unable to reach
-    # an unaddressable recipient. The rider still stands, so the screen runs
-    # the real stack — which is also the stricter reading: this is the send's
-    # own answer rather than a second implementation that can drift from it.
-    from app.delivery.exclusion import run_exclusion_stack
-
-    gate = run_exclusion_stack(
-        db, {r.id for r in resolved}, group.brand_id, channel=DEFAULT_CHANNEL,
-    )
-    reachable = [r for r in resolved if r.id in gate.eligible]
-    resolved_addresses = resolve_emails(db, [r.id for r in reachable[:20]])
+        blocks.append({**b, "summary": ", ".join(parts) if parts else "everyone (no criteria)"})
 
     # Source campaign (if this group was seeded by "Suggest audience") — enables
     # the Recalculate button and a link back to the campaign.
@@ -3556,16 +3524,17 @@ def audience_group_detail(group_id: int, request: Request, error: str | None = N
         "statuses": statuses,
         "categories": categories,
         "blocks": blocks,
-        "resolved_count": len(reachable),
+        "resolved_count": preview["reachable_count"],
         # Reported, not hidden. Somebody who matches the rules and cannot be
         # reached is a fact a manager can act on — a missing address is fixable
         # in the CRM — and the difference between the two numbers is exactly
         # what a bare count used to swallow.
-        "unreachable_count": len(resolved) - len(reachable),
+        "unreachable_count": preview["unreachable_count"],
         "resolved_preview": [
-            {"id": r.id, "email": resolved_addresses.get(r.id, ""),
-             "external_id": r.external_id, "language": r.language, "status": r.status}
-            for r in reachable[:20]
+            {"id": row["recipient"].id, "email": row["address"] or "",
+             "external_id": row["recipient"].external_id,
+             "language": row["recipient"].language, "status": row["recipient"].status}
+            for row in preview["sample"]
         ],
         "source_campaign": source_campaign,
         "error": error,

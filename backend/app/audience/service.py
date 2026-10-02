@@ -519,6 +519,59 @@ def list_groups_with_counts(
     ]
 
 
+def preview_group(
+    db: Session, group: AudienceGroupDB, *, channel: str, sample_size: int = 20,
+) -> dict:
+    """What sending to this group on `channel` would reach (task-50, B27).
+
+    **The send's own answer, not a second implementation of it.** ADR-163's
+    rider requires the preview to run the same addressability stage the send
+    does, "or a displayed count over-reports what will actually send"; so the
+    resolved audience goes through `run_exclusion_stack`, and the people it
+    drops are counted by stage rather than hidden — someone who matches the
+    rules and cannot be reached is a fact a manager can act on.
+
+    Each rule block carries its own count against the **group's** brand, so a
+    manager sees each include/exclude's impact before sending. There is no
+    channel-less version of any of these numbers (ADR-176 point 5).
+    """
+    from app.content.db_models import CategoryDB
+    from app.delivery.exclusion import run_exclusion_stack
+
+    category_names = dict(db.query(CategoryDB.id, CategoryDB.name).all())
+    blocks = []
+    for block in list_blocks(db, group.id, brand_id=group.brand_id):
+        criteria = block.criteria or {}
+        blocks.append({
+            "id": block.id,
+            "kind": block.kind,
+            "label": block.label,
+            "source": block.source,
+            "criteria": criteria,
+            "category_name": category_names.get(criteria.get("category_id")),
+            "count": count_for_criteria(db, criteria, group.brand_id, channel),
+        })
+
+    resolved = resolve_audience(db, group.id, channel=channel)
+    gate = run_exclusion_stack(db, {r.id for r in resolved}, group.brand_id, channel=channel)
+    reachable = [r for r in resolved if r.id in gate.eligible]
+    dropped_by_stage: dict[str, int] = {}
+    for exclusion in gate.exclusions:
+        dropped_by_stage[exclusion.stage] = dropped_by_stage.get(exclusion.stage, 0) + 1
+    return {
+        "channel": channel,
+        "blocks": blocks,
+        "resolved_count": len(resolved),
+        "reachable_count": len(reachable),
+        "unreachable_count": len(resolved) - len(reachable),
+        "dropped_by_stage": dropped_by_stage,
+        "sample": [
+            {"recipient": r, "address": gate.addresses.get(r.id)}
+            for r in reachable[:sample_size]
+        ],
+    }
+
+
 def resolve_audience(
     db: Session, group_id: int, channel: str
 ) -> list[RecipientDB]:
