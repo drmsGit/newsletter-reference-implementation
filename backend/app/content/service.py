@@ -603,8 +603,27 @@ def delete_category_relation(db: Session, relation_id: int) -> bool:
     return True
 
 
-def delete_category_assignment(db: Session, assignment_id: int) -> bool:
-    assignment = db.query(ContentCategoryAssignmentDB).filter(ContentCategoryAssignmentDB.id == assignment_id).first()
+def delete_category_assignment(
+    db: Session, content_id: int, assignment_id: int, *, brand_id: int,
+) -> bool:
+    """Remove one category from one content record — selected through the
+    record, within the brand (task-241, ADR-172 points 4-6).
+
+    It took only the assignment id until 2026-10-02, so anyone with
+    `content.manage` in any brand could delete any brand's assignment by
+    guessing an integer. An assignment on another record, or a record in
+    another brand, is not found.
+    """
+    assignment = (
+        db.query(ContentCategoryAssignmentDB)
+        .join(ContentRecordDB, ContentRecordDB.id == ContentCategoryAssignmentDB.content_id)
+        .filter(
+            ContentCategoryAssignmentDB.id == assignment_id,
+            ContentCategoryAssignmentDB.content_id == content_id,
+            ContentRecordDB.brand_id == brand_id,
+        )
+        .first()
+    )
     if assignment is None:
         return False
     db.delete(assignment)

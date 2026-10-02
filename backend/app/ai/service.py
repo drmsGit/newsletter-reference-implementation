@@ -293,3 +293,21 @@ def runs_for_brand(db: Session, brand_id: int, limit: int = 50) -> list[AIRunDB]
         .limit(limit)
         .all()
     )
+
+
+def run_for_campaign(db: Session, run_id: int, campaign_id: int) -> AIRunDB | None:
+    """One run, only if it targeted a variant of this campaign (task-241).
+
+    `ai_runs` carries no brand (see `runs_for_brand`), so the campaign — which
+    the caller has already selected within its brand — is what scopes it. A run
+    on another campaign, in this brand or another, answers as absent.
+    """
+    from app.campaigns.db_models import VariantDB
+
+    return (
+        db.query(AIRunDB)
+        .join(VariantDB, VariantDB.id == AIRunDB.target_id)
+        .filter(AIRunDB.id == run_id, AIRunDB.target_type == "variant",
+                VariantDB.campaign_id == campaign_id)
+        .first()
+    )

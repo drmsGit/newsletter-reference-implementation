@@ -464,10 +464,13 @@ async def settings_save(request: Request, db: Session = Depends(get_db)):
     return _settings_done()
 
 
-def _send_test_context(db):
+def _send_test_context(db, brand_id: int):
+    # This brand's variants only (task-241): the picker listed every brand's,
+    # with campaign names. Recipients stay company-wide (ADR-150 point 9).
     variants = (
         db.query(VariantDB.id, VariantDB.name, CampaignDB.name)
         .join(CampaignDB, VariantDB.campaign_id == CampaignDB.id)
+        .filter(CampaignDB.brand_id == brand_id)
         .order_by(VariantDB.id.asc())
         .all()
     )
@@ -485,7 +488,7 @@ def _send_test_context(db):
 
 @router.get("/ui/send-test")
 def send_test_page(request: Request, db: Session = Depends(get_db)):
-    ctx = {"title": "Send test email", "result": None, **_send_test_context(db)}
+    ctx = {"title": "Send test email", "result": None, **_send_test_context(db, working_brand_id(request, db))}
     return templates.TemplateResponse(request, "send_test.html", ctx)
 
 
@@ -527,7 +530,7 @@ def send_test_submit(
         "render_note": sent.render_note,
     }
 
-    ctx = {"title": "Send test email", "result": result, **_send_test_context(db)}
+    ctx = {"title": "Send test email", "result": result, **_send_test_context(db, working_brand_id(request, db))}
     return templates.TemplateResponse(request, "send_test.html", ctx)
 
 
@@ -1193,7 +1196,11 @@ def campaign_detail(
         from app.ai.db_models import AIRunDB
         from app.ai.tasks import subject_preheader as subject_task
 
-        row = db.query(AIRunDB).filter(AIRunDB.id == ai_run).first()
+        from app.ai.service import run_for_campaign
+
+        # Through this campaign, which was selected within the working brand
+        # (task-241): a run id from anywhere else answers as absent.
+        row = run_for_campaign(db, ai_run, campaign.id)
         if row is not None:
             ai_suggestions_variant_id = row.target_id
             ai_run_tokens = (row.input_tokens or 0) + (row.output_tokens or 0)
@@ -1252,11 +1259,14 @@ def campaign_detail(
 
 @router.post("/ui/content/{content_record_id}/categories/{assignment_id}/delete")
 def content_category_delete(
+    request: Request,
     content_record_id: int,
     assignment_id: int,
     db: Session = Depends(get_db),
 ):
-    delete_category_assignment(db, assignment_id)
+    delete_category_assignment(
+        db, content_record_id, assignment_id, brand_id=working_brand_id(request, db),
+    )
     return RedirectResponse(url=f"/ui/content/{content_record_id}", status_code=303)
 
 
@@ -3730,11 +3740,14 @@ def campaign_suggest_audience(request: Request, campaign_id: int, db: Session = 
     """Use case 1: turn the campaign's content categories into a live, editable
     suggested audience (include blocks, one per top category), then drop the
     manager on the group so they can tighten/extend/delete it."""
-    campaign = db.query(CampaignDB).filter(CampaignDB.id == campaign_id).first()
+    brand_id = working_brand_id(request, db)
+    campaign = db.query(CampaignDB).filter(
+        CampaignDB.id == campaign_id, CampaignDB.brand_id == brand_id).first()
     if campaign is None:
         return RedirectResponse("/ui/campaigns", status_code=303)
     try:
-        group = audience_service.create_suggested_group_for_campaign(db, campaign_id, campaign.name)
+        group = audience_service.create_suggested_group_for_campaign(
+            db, campaign_id, campaign.name, brand_id=brand_id)
     except ValueError as error:
         return RedirectResponse(f"/ui/campaigns/{campaign_id}?error={quote(str(error))}", status_code=303)
     return RedirectResponse(f"/ui/audience-groups/{group.id}", status_code=303)

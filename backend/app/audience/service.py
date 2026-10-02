@@ -795,14 +795,21 @@ def suggest_include_blocks_for_campaign(db: Session, campaign_id: int, max_categ
     return suggestions
 
 
-def create_suggested_group_for_campaign(db: Session, campaign_id: int, campaign_name: str) -> AudienceGroupDB:
+def create_suggested_group_for_campaign(
+    db: Session, campaign_id: int, campaign_name: str, *, brand_id: int,
+) -> AudienceGroupDB:
     """Materialize a new group seeded with the campaign's suggested include
     blocks. Blocks are marked source='suggested' so the UI can badge them as the
     system's proposal — fully editable/deletable, never a locked list."""
     # The group belongs to the campaign's brand, not to whoever clicked. Same
     # rule as everywhere else a brand is needed: derive it, never read it off
     # the viewer's context.
-    brand_id = _brand_of_campaign(db, campaign_id)
+    # **And it must be the caller's brand** (task-241, ADR-172). The policy
+    # checked `audiences.manage` in the working brand only, so without this a
+    # manager of brand A built a group in brand B from B's categories. Another
+    # brand's campaign answers as absent.
+    if _brand_of_campaign(db, campaign_id) != brand_id:
+        raise ValueError(f"Campaign {campaign_id} not found")
 
     base_name = f"{campaign_name} — suggested audience"
     name = base_name
