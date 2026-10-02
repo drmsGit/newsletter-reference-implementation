@@ -1,9 +1,10 @@
 ---
 id: TASK-46
 title: Snapshot persistence is not atomic.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-10-02 15:21'
 labels:
   - backend
 dependencies: []
@@ -22,4 +23,12 @@ ordinal: 104600
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 130, section "Bugs", position 46 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-02: resolved by ADR-183 (user decision: reconstruct what each recipient got; drop HTML snapshot storage). The non-atomic write is gone with the file: snapshots store only the frame (render_context), previews render from it. Stages: frame (2cdafea), send renders the frame + delivery record + migration 0027 (9ddf662), reconstruction GET /delivery/executions/{id}/as-sent (e47a20e), no HTML on disk + scripts/drop_frameless_snapshots.py. The user runs the script against the dev database (dry run first).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Snapshot persistence can no longer be half-written: there is no file. ADR-183 makes the snapshot a frame of frozen values in its row; the send renders it and records per recipient what it sent, and previews render the frame on demand. Verified by tests/test_frame.py (parity, freezing, recorded picks, send, reconstruction, no files) and tests/test_drop_frameless_snapshots.py, each mutation-checked; full suite 928 passed.
+<!-- SECTION:FINAL_SUMMARY:END -->

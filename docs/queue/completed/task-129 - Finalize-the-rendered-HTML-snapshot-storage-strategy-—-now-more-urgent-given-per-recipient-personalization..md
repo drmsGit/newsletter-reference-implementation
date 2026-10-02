@@ -3,10 +3,10 @@ id: TASK-129
 title: >-
   Finalize the rendered-HTML/snapshot storage strategy — now more urgent given
   per-recipient personalization.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:57'
-updated_date: '2026-09-27 14:29'
+updated_date: '2026-10-02 15:21'
 labels:
   - needs-adr
   - backend
@@ -25,4 +25,12 @@ ordinal: 301300
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 459, section "Needs ADR", position 13 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-02: decided and built as ADR-183 — no persisted HTML; the snapshot is a frame of copied values the send renders from; each delivery execution records sent_at, its slot picks with copied values, and an output hash; reconstruction re-renders (content exact, layout best-effort with a template fingerprint). Not done here: merge context (none exists yet), retention/erasure of delivery records (task-136).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Decided by ADR-183 and built on 2026-10-02: frames instead of HTML files, per-delivery records, on-demand reconstruction.
+<!-- SECTION:FINAL_SUMMARY:END -->
