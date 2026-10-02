@@ -267,6 +267,15 @@ def list_variants_for_campaign(
     return [to_variant(record, db) for record in records]
 
 
+#: The whole vocabulary of `variants.status` (task-203; Variant Editor design
+#: interview Q4.6). `ready` is the manager's assertion that the variant is done,
+#: which the variant list reads instead of recomputing completeness. `approved`
+#: belongs to the send, `sent` to send instances, `archived` to the
+#: data-lifecycle ADR. Enforced here, as `CONTENT_STATUSES` is; existing rows
+#: are not rewritten.
+VARIANT_STATUSES = ("draft", "ready")
+
+
 def create_variant_for_campaign(
     db: Session,
     campaign_id: int,
@@ -291,6 +300,11 @@ def create_variant_for_campaign(
     # variant cannot be hung off another brand's campaign (ADR-172 point 5).
     if get_campaign(db, campaign_id, brand_id=brand_id) is None:
         raise ValueError(f"Campaign {campaign_id} not found")
+
+    if status not in VARIANT_STATUSES:
+        raise ValueError(
+            f"Unknown variant status '{status}'. Expected one of: {', '.join(VARIANT_STATUSES)}"
+        )
 
     # ADR-160 point 8 again, and this is the call site that matters most: the
     # channel belongs to the variant (point 4) and is fixed at creation (point

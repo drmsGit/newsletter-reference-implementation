@@ -1,6 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel
-from typing import Any
+from typing import Literal, Any
 
 # Module-scope is safe: `app.ai.orchestration` imports nothing from `app`
 # at module scope, so this cannot cycle.
@@ -26,7 +26,9 @@ class VariantCreate(BaseModel):
     name: str = "Variant A"
     subject: str | None = None
     preheader: str | None = None
-    status: str = "draft"
+    # `campaigns.service.VARIANT_STATUSES` (task-203). The read model `Variant`
+    # keeps `str`, since rows written before the rule may hold other values.
+    status: Literal["draft", "ready"] = "draft"
 
 
 class VariantUpdate(BaseModel):
