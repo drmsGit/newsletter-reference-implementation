@@ -49,7 +49,8 @@ def delivered(db):
     db.add(ModuleInstanceDB(variant_id=variant.id, module_type="single_stack", position=1,
                             content_record_id=record.id, module_data={}))
     snapshot = SnapshotDB(variant_id=variant.id, artifact_storage_type="inline",
-                          artifact_location=INLINE_LOCATION, artifact_size=0, render_context={})
+                          artifact_location=INLINE_LOCATION, artifact_size=0,
+                          render_context={"frame_version": 1, "channel": "email", "modules": []})
     db.add(snapshot); db.flush()
     send = SendInstanceDB(snapshot_id=snapshot.id, brand_id=brand.id, name="attr",
                           status="sent", provider="resend")
@@ -58,7 +59,11 @@ def delivered(db):
     message_id = f"msg-{uuid.uuid4().hex}"
     execution = DeliveryExecutionDB(send_instance_id=send.id, recipient_id=recipient.id,
                                     status="sent", provider="resend", channel="email",
-                                    purpose="marketing", provider_message_id=message_id)
+                                    purpose="marketing", provider_message_id=message_id,
+                                    # What the message carried (ADR-183): a click may
+                                    # credit only this (task-240).
+                                    delivery_record={"snapshot_id": snapshot.id, "picks": [
+                                        {"module_id": 0, "content_record_id": record.id}]})
     db.add(execution); db.commit()
     yield {"message_id": message_id, "recipient": recipient, "record": record,
            "execution": execution}
@@ -108,3 +113,39 @@ def test_a_click_that_names_its_content_is_credited(db, delivered):
     db.expire_all()
     assert db.query(SignalContributionDB).filter(
         SignalContributionDB.recipient_id == delivered["recipient"].id).count() == 1
+
+
+
+def test_a_named_content_the_message_did_not_carry_is_not_credited(db, delivered):
+    """A URL is text: a stale or edited link can name anything (task-240). The
+    other record is real and categorised, so only the delivery-record check
+    stands between it and a credit."""
+    brand = ensure_default_brand(db)
+    other = ContentRecordDB(title="not sent", content={}, status="active", brand_id=brand.id)
+    category = CategoryDB(name=f"attr-other-{uuid.uuid4().hex[:6]}", type="main")
+    db.add_all([other, category]); db.flush()
+    db.add(ContentCategoryAssignmentDB(content_id=other.id, category_id=category.id, score=5))
+    db.commit()
+    try:
+        _click(db, delivered, content_record_id=other.id)
+        db.expire_all()
+        assert db.query(SignalContributionDB).filter(
+            SignalContributionDB.recipient_id == delivered["recipient"].id).count() == 0
+    finally:
+        db.rollback()
+        db.query(SignalContributionDB).filter(SignalContributionDB.category_id == category.id).delete()
+        db.query(ContentCategoryAssignmentDB).filter(
+            ContentCategoryAssignmentDB.content_id == other.id).delete()
+        db.query(ContentRecordDB).filter(ContentRecordDB.id == other.id).delete()
+        db.query(CategoryDB).filter(CategoryDB.id == category.id).delete()
+        db.commit()
+
+
+def test_without_a_delivery_record_nothing_can_be_verified_or_credited(db, delivered):
+    execution = db.get(DeliveryExecutionDB, delivered["execution"].id)
+    execution.delivery_record = None
+    db.commit()
+    _click(db, delivered, content_record_id=delivered["record"].id)
+    db.expire_all()
+    assert db.query(SignalContributionDB).filter(
+        SignalContributionDB.recipient_id == delivered["recipient"].id).count() == 0

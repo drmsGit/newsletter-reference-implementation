@@ -59,6 +59,15 @@ class ChannelSetting(BaseModel):
     available: bool
 
 
+class DeliveryProviderSetting(BaseModel):
+    name: str
+    label: str
+    channels: list[str]
+    # ADR-182 point 4: false means clicks count for the email and credit no
+    # category — the provider stays selectable.
+    click_content_attribution: bool
+
+
 class Settings(BaseModel):
     """Everything the settings screen shows. Readable with `view`."""
 
@@ -66,6 +75,7 @@ class Settings(BaseModel):
     known_contribution_types: list[str]
     max_send_recipients: int
     channels: list[ChannelSetting]
+    delivery_providers: list[DeliveryProviderSetting]
     ai_provider: str
     ai_providers: list[str]
     # Whether a key is configured — never the key (ADR-152).

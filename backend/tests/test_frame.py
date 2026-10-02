@@ -34,7 +34,8 @@ def db():
 
 def _published(db, brand, headline):
     record = create_content(db, title=f"frame-{uuid.uuid4().hex[:6]}", brand_id=brand.id,
-                            content={"headline_medium": headline, "body_medium": "Body"})
+                            content={"headline_medium": headline, "body_medium": "Body",
+                                     "button_label": "Read", "button_url": "https://example.com/story"})
     create_content_version(db, content_record_id=record.id, created_by="test", brand_id=brand.id)
     return record
 
@@ -376,4 +377,51 @@ def test_a_frameless_snapshot_says_why_it_has_no_preview(db, world):
         assert "new snapshot" in page.json()["detail"]
     finally:
         db.query(SnapshotDB).filter(SnapshotDB.id == snapshot.id).delete()
+        db.commit()
+
+
+# --- task-240: a click on a delivered link credits that link's content ------
+
+def test_a_click_on_a_delivered_link_credits_exactly_its_content(db, world, sent):
+    """End to end: the link a recipient was sent, clicked, reported by Resend,
+    credits the content it was on — and the check against the delivery record
+    lets it through because that content really was in the message."""
+    import re
+    import uuid as _uuid
+
+    from app.content.db_models import CategoryDB, ContentCategoryAssignmentDB
+    from app.insight.db_models import EngagementEventDB
+    from app.providers.adapters.resend import parse_webhook
+    from app.providers.service import process_provider_webhook_event
+    from app.recipients.db_models import SignalContributionDB
+    from app.rendering.tracking import content_id_from_url
+
+    execution = sent["execution"]
+    tracked = [u for u in re.findall(r'href="([^"]+)"', sent["artifact"].body) if content_id_from_url(u)]
+    assert tracked, "the delivered message carried no tracked link"
+    link = tracked[0]
+    content_id = content_id_from_url(link)
+    category = CategoryDB(name=f"e2e-{_uuid.uuid4().hex[:6]}", type="main")
+    db.add(category); db.flush()
+    db.add(ContentCategoryAssignmentDB(content_id=content_id, category_id=category.id, score=5))
+    db.commit()
+    try:
+        event = parse_webhook({"type": "email.clicked", "created_at": "t-e2e",
+                               "data": {"email_id": execution.provider_message_id,
+                                        "click": {"link": link}}})
+        result = process_provider_webhook_event(db, event)
+        assert result.status == "matched", result
+        db.expire_all()
+        credited = db.query(SignalContributionDB).filter(
+            SignalContributionDB.recipient_id == execution.recipient_id,
+            SignalContributionDB.category_id == category.id).count()
+        assert credited == 1, "the clicked link's content was not credited"
+    finally:
+        db.rollback()
+        db.query(SignalContributionDB).filter(SignalContributionDB.category_id == category.id).delete()
+        db.query(EngagementEventDB).filter(
+            EngagementEventDB.delivery_execution_id == execution.id).delete()
+        db.query(ContentCategoryAssignmentDB).filter(
+            ContentCategoryAssignmentDB.category_id == category.id).delete()
+        db.query(CategoryDB).filter(CategoryDB.id == category.id).delete()
         db.commit()

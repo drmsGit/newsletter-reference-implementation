@@ -355,6 +355,12 @@ def module_html(
             f"</div>"
         )
     rendered = _jinja.from_string(html_source).render(**apply_rich_text(variables, manifest))
+    if content_id is not None:
+        # The link names its content (task-240, ADR-182): only here, inside a
+        # content-bound module, so a non-content link credits nothing.
+        from app.rendering.tracking import tag_links
+
+        rendered = tag_links(rendered, content_id)
     content_attr = f' data-content-id="{content_id}"' if content_id is not None else ""
     return (
         f'<div data-module-id="{module_id}" data-module-type="{module_type}"{content_attr}>\n'

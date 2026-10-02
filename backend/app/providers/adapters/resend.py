@@ -125,11 +125,23 @@ def parse_webhook(payload: dict) -> NormalizedEvent | None:
     else:
         suppresses_consent = False
 
+    # A click names its content through the link it was on (task-240): Resend
+    # reports the clicked URL as `data.click.link`, and a tracked link carries
+    # `nl_content`. Whether that content was in this recipient's message is
+    # checked downstream, against the delivery record.
+    event_data = dict(payload)
+    if event_type == "click":
+        from app.rendering.tracking import content_id_from_url
+
+        content_id = content_id_from_url(((data.get("click") or {}).get("link")))
+        if content_id is not None:
+            event_data["content_record_id"] = content_id
+
     return NormalizedEvent(
         provider="resend",
         provider_message_id=provider_message_id,
         event_type=event_type,
         provider_event_id=provider_event_id,
-        event_data=payload,
+        event_data=event_data,
         suppresses_consent=suppresses_consent,
     )

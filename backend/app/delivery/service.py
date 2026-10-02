@@ -1142,3 +1142,29 @@ def reconstruct_delivery(db: Session, execution_id: int, *, brand_id: int) -> di
         "templates_match": templates_fingerprint(frame["channel"]) == record.get("templates_fingerprint"),
         "hash_matches": artifact_hash(artifact) == execution.artifact_hash,
     }
+
+
+def sent_content_ids(db: Session, execution: DeliveryExecutionDB) -> set[int] | None:
+    """The content records this recipient's message carried (ADR-183), or None
+    when there is no delivery record to ask — a send from before records
+    existed, or one that never went out.
+
+    The frame's content-bound modules plus this recipient's slot picks: exactly
+    what `render_frame` laid out for them, so a click naming anything else names
+    content they were never sent.
+    """
+    from app.rendering.frame import KIND_CONTENT
+    from app.snapshots.db_models import SnapshotDB
+
+    record = execution.delivery_record
+    if not record:
+        return None
+    snapshot = db.get(SnapshotDB, record.get("snapshot_id"))
+    if snapshot is None or not snapshot.render_context:
+        return None
+    ids = {
+        m["content_record_id"] for m in snapshot.render_context.get("modules", [])
+        if m.get("kind") == KIND_CONTENT and m.get("content_record_id") is not None
+    }
+    ids |= {p["content_record_id"] for p in record.get("picks") or [] if p.get("content_record_id")}
+    return ids

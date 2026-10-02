@@ -140,6 +140,27 @@ def process_provider_webhook_event(db: Session, normalized) -> ProviderEventInge
     # recorded — it happened, and counts for the email — and credits nothing.
     event_data = dict(normalized.event_data or {})
 
+    # **Only content this recipient was sent** (task-240). A link names its
+    # content, but a URL is text: a stale, forwarded or edited link could name
+    # anything. The delivery record says what the message carried (ADR-183), so
+    # a named id outside it — or a send with no record to ask — credits nothing.
+    named = event_data.get("content_record_id")
+    if named is not None and normalized.event_type in ("click", "open"):
+        from app.delivery.service import sent_content_ids
+
+        execution = (
+            db.query(DeliveryExecutionDB)
+            .filter(DeliveryExecutionDB.provider_message_id == normalized.provider_message_id)
+            .first()
+        )
+        sent = sent_content_ids(db, execution) if execution is not None else None
+        if sent is None or named not in sent:
+            logger.info(
+                "event for message %s names content %s, which it did not carry — recorded, not credited",
+                normalized.provider_message_id, named,
+            )
+            event_data.pop("content_record_id")
+
     result = ingest_provider_event(
         db=db,
         provider=normalized.provider,

@@ -22,7 +22,7 @@ from app.auth.permissions import AI_RUN
 from app.database import get_db
 from app.settings import service
 from app.settings.models import (
-    AIBudget, AITaskSettings, ApprovalModeChoice, ChannelSetting, ModelChoice,
+    AIBudget, AITaskSettings, ApprovalModeChoice, ChannelSetting, DeliveryProviderSetting, ModelChoice,
     PromptPublish, PromptVersion, ProviderUpdate, SendCapUpdate, Settings,
     SignalTuning, SpendCapUpdate,
 )
@@ -69,6 +69,7 @@ def read_settings(db: Session = Depends(get_db)):
         known_contribution_types=sorted(service.known_contribution_types()),
         max_send_recipients=service.get_max_send_recipients(db),
         channels=[ChannelSetting(name=c.name, available=c.name in enabled) for c in list_channels()],
+        delivery_providers=_delivery_providers(),
         ai_provider=service.get_ai_provider_name(db),
         ai_providers=list(AVAILABLE_AI_PROVIDERS),
         ai_key_present=bool(os.environ.get("ANTHROPIC_API_KEY")),
@@ -78,6 +79,26 @@ def read_settings(db: Session = Depends(get_db)):
         ai_tasks=tasks,
         governed_models=service.governed_models(),
     )
+
+
+def _delivery_providers() -> list[DeliveryProviderSetting]:
+    """Each provider once, with the channels it carries and whether its clicks
+    can name their content (task-240)."""
+    from app.channels.registry import list_channels
+    from app.delivery.providers.factory import providers_for_channel
+
+    found: dict[str, dict] = {}
+    for channel in (c.name for c in list_channels()):
+        for provider in providers_for_channel(channel):
+            entry = found.setdefault(provider["name"], {**provider, "channels": []})
+            entry["channels"].append(channel)
+    return [
+        DeliveryProviderSetting(
+            name=p["name"], label=p["label"], channels=p["channels"],
+            click_content_attribution=p["click_content_attribution"],
+        )
+        for p in found.values()
+    ]
 
 
 @router.put(

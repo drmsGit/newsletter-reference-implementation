@@ -101,6 +101,8 @@ class TestReading:
         assert isinstance(body["ai_key_present"], bool)
         assert task_key in {t["key"] for t in body["ai_tasks"]}
         assert {"tokens_remaining", "over_warn"} <= set(body["ai_budget"])
+        attribution = {p["name"]: p["click_content_attribution"] for p in body["delivery_providers"]}
+        assert attribution == {"mock": False, "resend": True}, "which providers credit content (task-240)"
 
     def test_a_switched_off_channel_reads_as_unavailable(self, db):
         settings.set_channel_available(db, "push", False)

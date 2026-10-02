@@ -63,6 +63,8 @@ def providers_for_channel(channel: str) -> list[dict]:
             "name": name,
             "label": PROVIDER_LABELS.get(name, name),
             "needs_from_address": name in PROVIDERS_WITH_FROM_ADDRESS,
+            # ADR-182 point 4: without it, clicks credit no category.
+            "click_content_attribution": cls.click_content_attribution,
         }
         for name, cls in (("mock", MockProvider), ("resend", ResendProvider))
         if cls().supports(channel)

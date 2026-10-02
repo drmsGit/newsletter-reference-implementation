@@ -144,6 +144,9 @@ def seed(extended: bool = False):
                 "headline_medium": title,
                 "body_medium": f"An editorial piece about {primary.lower()} — issue {i}.",
                 "button_label": "Read more",
+                # A link to click: without one a content module renders no
+                # anchor, so no click can name its content (task-240).
+                "button_url": f"https://example.com/stories/{i}",
                 "image_url": f"/static/img/demo-{i}.jpg",
             }
             rec = ContentRecordDB(title=title, description=body["body_medium"], content=body,

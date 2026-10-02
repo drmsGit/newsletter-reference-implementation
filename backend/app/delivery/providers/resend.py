@@ -34,6 +34,9 @@ class ResendProvider(DeliveryProvider):
     #: malformed request, which is a bad way to learn about a configuration
     #: mistake. The factory refuses it up front instead (ADR-101).
     channels = frozenset({"email"})
+    # Its click event reports the clicked URL, and a tracked link names its
+    # content there (task-240).
+    click_content_attribution = True
 
     def __init__(self, api_key: str | None = None, from_address: str | None = None):
         self.api_key = api_key if api_key is not None else os.environ.get("RESEND_API_KEY")

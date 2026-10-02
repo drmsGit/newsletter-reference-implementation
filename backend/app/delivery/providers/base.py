@@ -50,6 +50,10 @@ class DeliveryProvider(ABC):
     #: Channel names this adapter can deliver. Empty means every channel,
     #: which only a mock should claim.
     channels: frozenset[str] = frozenset()
+    #: Whether a click on this provider can say which content it was on
+    #: (ADR-182 point 4, ADR-101). False is not a fault: the provider stays
+    #: selectable, and its clicks count for the email and credit no category.
+    click_content_attribution: bool = False
 
     def supports(self, channel: str) -> bool:
         return not self.channels or channel in self.channels
