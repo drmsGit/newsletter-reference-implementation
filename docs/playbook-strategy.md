@@ -386,6 +386,49 @@ and the authentication question the React manager client was blocked on.
 
 **Status:** built and in force. The development database is baselined. task-12 — does replaying the migrations build the models' schema? — is now a command rather than a project.
 
+### 2026-10-02 — The SPA's backend is complete, and every rule it needs lives behind a service
+
+**Context:** task-49 (the gaps blocking the first React screen) and task-50 (anything living only in `frontend/router.py` must move behind the service boundary before the SPA starts) were worked to the end in one session. The task-50 entry was largely stale on its three headline rules, which had been fixed in September. What remained was a long tail, and the decisions were in the tail.
+
+1. **Everything the SPA needs is on JSON, and each Jinja page that computed it now calls the same service.** That covers planning a send, the settings surface, campaign composition, decision-slot stats, AI suggestions read back, content detail, deliveries with per-execution traces, audience previews and criteria, the dashboard, and recipient and category detail. **The Jinja UI is frozen** by a test that pins its exact route list. **Its retirement is not on record, by decision:** ADR-170 decides the SPA, not the end of the Jinja UI, and several places that claimed it gives a deletion date were corrected.
+
+2. **Who may act across a boundary was decided case by case, against one principle: a person or machine may do only what they hold where it lands.**
+   - Duplicating into another brand is open to integrations holding the grant there, the same rule as everywhere else.
+   - **Integration management is people only, with no escalation in either direction.** You grant only what you hold on that brand, and you may issue a key or enable unattended sending only for an integration whose every grant you hold. That second half was found by review the same day: a platform-level `integrations.manage` would otherwise have let an Admin of brand A mint a key carrying brand B's `sends.execute`. Recorded in [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]]'s addendum.
+   - **Settings writes are people only.** Publishing a prompt or choosing a model needs `settings.manage` *and* `ai.run`. A future "type a topic" dialog needs `ai.run` alone, as long as the text is an input to the prompt and never edits it. **Settings changes are not approvable**: whoever holds `settings.manage` is the authority, and risky settings may later move to a "danger zone". Recorded in the [[ADR-150 — Tenancy and Access Model]] and [[ADR-142 — Autonomous Workflows and the Automation Boundary]] addenda. Channel availability is readable, not writable.
+   - **Bulk-adding audience members by criteria needs `audiences.manage`, not `audiences.pin`**: a rule that adds hundreds reshapes the audience.
+   - **API documentation exposure is a deployment setting**, `API_DOCS=public|signed_in|off`, default `public` for this reference build. Swagger's Try-it-out can now authenticate. See [[ADR-184 — API Documentation Exposure Is a Deployment Setting]].
+
+3. **Five cross-brand paths were found and closed, none of them by the audit that was looking for them.**
+   - A manager of brand A could build a suggested audience in brand B, or delete brand B's category assignments.
+   - The send-test picker listed every brand's campaigns.
+   - Recipient and category detail showed other brands' sends and content and summed every brand's signals.
+
+   A sixth, an AI run read across brands, turned out not to render and was scoped anyway.
+
+4. **A mid-session quality review changed the outcome, and is worth repeating as a habit.** Re-reading the session's own work turned up the escalation-through-use hole, machine-made changes being audited as made by nobody, and a plan route that accepted any provider string and failed only at send time. **A build that passes its tests can still be wrong in the place nobody wrote a test for**, and a deliberate second look found what the first pass did not.
+
+**Status:** 994 tests passing, every new scope and rule mutation-checked. The JSON surface for the core loop is complete; no React screen for deliveries, settings, decision slots, recipient or category detail is built yet.
+
+### 2026-10-02 — What a recipient got is now a fact the system keeps (ADR-182, ADR-183)
+
+**Context:** two old findings shared a root. A click credited a guessed "primary" content record, so in a multi-content newsletter a click on the fourth item taught the profile about the first (task-45). And a send ignored the snapshot it was planned from: it re-rendered every recipient from live data and kept nothing, so an edit made after approval went out unreviewed, and "what did this person actually receive?" had no answer (task-46, the storage question task-129).
+
+1. **A click credits content only when the link names it.** There is no guessing, no exception for a one-item email, and an unidentified click is still recorded for the email. A provider that cannot return the content stays selectable, because attribution is learning quality, not a compliance duty as bounces are. See [[ADR-182 — A Click Credits Content Only When the Link Names It]].
+   - **The carrier is a query parameter** on content links, `nl_content=<id>`. Any send API that reports the clicked URL can deliver it, because we interpret the link and the provider only reports it.
+   - A named id is credited only if the recipient's delivery record says that content was in their message.
+
+2. **The snapshot is a frame, the send renders the frame, and every delivery records what it sent.** See [[ADR-183 — A Snapshot Freezes the Composition and Every Delivery Records What It Got]], which **supersedes [[ADR-062 — Snapshot Stores Final Render State]]**: the repo's second supersession.
+   - The frame copies every value in: content versions, static fields, overrides, subject. A late edit no longer reaches the recipient.
+   - Personalised picks and consent are still decided at send time.
+   - **Content is exact, layout best-effort:** a reconstruction says whether today's templates and the output hash still match. Pixel-exact template versioning and per-recipient HTML storage were both declined, the latter because it is what was being dropped and it holds personal data.
+   - HTML snapshot files are gone, so task-46's half-written row can no longer happen.
+   - Snapshots from before the change were dropped rather than kept in a refused state, because this is not a live environment.
+
+3. **Building it found a live defect in the same family.** A recipient added by the re-check just before a push send was planned as an email: the column defaults survived. Consent purpose is now required everywhere, as brand already was, and executions have no default channel or purpose left.
+
+**Status:** built and tested end to end, including a delivered link clicked back through a Resend webhook. The demo seed can now actually send: its call-to-action had the wrong field names, and every demo campaign was refused for missing content. The seed gained push, a second brand and a real send with delivery records. **Testing never sends through Resend and never raises the send cap (200)**: the free tier is 3,000 emails a month.
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*
@@ -510,7 +553,21 @@ Not blocked by code — can be worked on alongside other phases.
 
 ---
 
-### Suggested next steps — updated 2026-08-02
+### Suggested next steps — updated 2026-10-02
+
+The backend for the SPA's core loop is complete (see the two 2026-10-02 entries in §5). In rough order of value:
+
+1. **Build the React screens on it.** Deliveries (with "as sent"), settings, decision slots, and recipient and category detail have JSON and no screen. The campaign composition read is the variant editor's whole model.
+2. **The P1 queue:** `duplicate_variant` (task-229), response models that expose less than their tables (task-208), approvals filters and pagination (task-209), a campaign-level state view (task-216). task-212 is likely already done and should be verified and closed.
+3. **Decisions recorded and not yet taken:**
+   - step-up or second approval before granting an integration `sends.execute`;
+   - credential expiry;
+   - whether settings changes are audited;
+   - an [[ADR-101 — Provider Capabilities Are Explicit]] addendum naming the click-attribution capability;
+   - the ADR-040 addendum that ADR-178 says it owes.
+4. **The public-beta gate is the positioning statement**, not features (`docs/business/POSITIONING.md`). The product name (task-29) stays on hold until a candidate is legally cleared.
+
+### Suggested next steps — 2026-08-02 (superseded by the list above; kept as the record of that day)
 
 The core end-to-end demo path is complete: **build campaign → editable modules (hero/CTA) → suggest/edit audience → prepare send (audience + provider + timing) → trigger or scheduled send**, with the signal layer feeding suggestions. The **automation design conversation is now also done** (ADR-140–144), so the previous #1 item is closed. Decided direction (2026-07-31):
 
