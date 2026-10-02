@@ -481,6 +481,44 @@ def delete_block(db: Session, block_id: int, *, brand_id: int) -> bool:
     return True
 
 
+def list_groups_with_counts(
+    db: Session, *, brand_id: int, channel: str | None,
+) -> list[dict]:
+    """The brand's groups, each with its pinned count and — **only when the
+    caller names a channel** — its live resolved count for that channel (task-50, B26).
+
+    ADR-176 point 5: a resolved count is meaningless without a channel, so
+    there is no channel-less number to return; with `channel=None` the count is
+    `None`, never an email figure in disguise (the defect task-116 recorded
+    about the Jinja list). The count is the same consent-gated
+    `resolve_audience` a send uses, not the pin count, because a rule-only
+    group has no pins and real recipients.
+
+    **Still one `resolve_audience` per group** — the N+1 the migration
+    inventory flagged, moved here rather than solved. A set-based resolver
+    belongs with task-213, which reshapes what `resolve_audience` returns.
+    """
+    groups = list_groups(db, brand_id=brand_id)
+    pinned = dict(
+        db.query(AudienceGroupMemberDB.group_id, func.count(AudienceGroupMemberDB.id))
+        .filter(AudienceGroupMemberDB.group_id.in_([g.id for g in groups]))
+        .group_by(AudienceGroupMemberDB.group_id)
+        .all()
+    ) if groups else {}
+    return [
+        {
+            "group": group,
+            "pinned_count": pinned.get(group.id, 0),
+            "recipient_count": (
+                len(resolve_audience(db, group.id, channel=channel))
+                if channel is not None else None
+            ),
+            "count_channel": channel,
+        }
+        for group in groups
+    ]
+
+
 def resolve_audience(
     db: Session, group_id: int, channel: str
 ) -> list[RecipientDB]:

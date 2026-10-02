@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.audience import service
 from app.audience.models import (
     AudienceGroup,
     AudienceGroupCreate,
+    AudienceGroupListed,
     AudienceGroupMember,
     AudienceRuleBlock,
     AudienceRuleBlockCreate,
@@ -12,15 +13,42 @@ from app.audience.models import (
     BulkAddRequest,
 )
 from app.auth.dependencies import working_brand
+from app.channels.registry import is_registered
 from app.database import get_db
 
 
 router = APIRouter(prefix="/api/audience-groups", tags=["audience"])
 
 
-@router.get("/", response_model=list[AudienceGroup])
-def list_groups(db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
-    return service.list_groups(db, brand_id=brand_id)
+@router.get(
+    "/",
+    response_model=list[AudienceGroupListed],
+    summary="The brand's audience groups, with counts",
+    description=(
+        "Each group with its pinned-member count. Pass `channel` to add the live, "
+        "consent-gated recipient count for that channel — the number a send on "
+        "that channel would reach. **Without `channel` there is no recipient "
+        "count** (ADR-176 point 5: a group resolves to different people per "
+        "channel, so a channel-less number would be a guess). Asking for counts "
+        "resolves every group, so it costs one resolution per group."
+    ),
+)
+def list_groups(
+    channel: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    if channel is not None and not is_registered(channel):
+        raise HTTPException(status_code=422, detail=f"{channel!r} is not a registered channel.")
+    return [
+        AudienceGroupListed(
+            id=row["group"].id, name=row["group"].name, description=row["group"].description,
+            created_at=row["group"].created_at, updated_at=row["group"].updated_at,
+            pinned_count=row["pinned_count"], recipient_count=row["recipient_count"],
+            count_channel=row["count_channel"],
+        )
+        for row in service.list_groups_with_counts(db, brand_id=brand_id, channel=channel)
+    ]
 
 
 @router.post("/", response_model=AudienceGroup, status_code=201)

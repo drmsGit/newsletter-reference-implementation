@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-27 13:56'
-updated_date: '2026-10-02 12:42'
+updated_date: '2026-10-02 13:10'
 labels:
   - backend
 dependencies: []
@@ -35,4 +35,6 @@ Migrated 2026-09-27 from `docs/backlog.md` line 148, section "Features", positio
 2026-10-02 review pass (user asked for a quality check of the session's work; model switched to Opus): fixed (1) escalation through use — issuing a key / enabling unattended now needs every grant the integration holds, removing a grant needs that grant (require_holds_integration; ADR-166 addendum corrected); (2) audit: record_from_request now names an integration as actor on the JSON plane, and every integration change is an audit entry on both planes; (3) plan-a-send validates provider against the channel at plan time and caps name at 255; (4) NotInBrand replaces 'not found' string matching; (5)(6) duplication looks the brand up by id, imports at module level. Then B14: GET /campaigns/{id}/duplicate-options and GET /content/{id}/duplicate-targets from duplication.target_brands / allowed_modes, which the Jinja wizard and content page now use too; brands_with_permission removed (no callers left). Render tests added for both Jinja pages, which had none. Suite 847 passed. Remaining: settings validation with C2, task-57/B26, the Jinja freeze guard; open decisions listed in the C14 note.
 
 2026-10-02: Jinja freeze guard done (user chose 'route list frozen'). tests/test_jinja_freeze.py pins the exact (method, path) set of every /ui route and everything in app/frontend/router.py, across both routers that serve Jinja (app/auth/router.py has /ui/login, /ui/users, /ui/roles, /ui/brands). New route fails; a retired route left in FROZEN fails, so the list only shrinks. A third test asserts the guard sees both routers, so a module rename cannot empty both sides. Mutation-checked: new frontend route, new auth /ui route, route dropped from list, stale entry. Not caught by design: logic added inside an existing route. Suite 850 passed. Remaining in task-50: settings validation with C2, task-57/B26.
+
+2026-10-02: B26 JSON shape done. GET /api/audience-groups/ takes an optional channel: pinned_count always; recipient_count + count_channel only for a named, registered channel (422 otherwise), per ADR-176 point 5 — no decision needed, the ADR settles it and task-116's drop carried the rule to the React list. audience.service.list_groups_with_counts. tests/test_audience_counts.py (fixture deliberately asymmetric: a symmetric one let an always-email count pass). The N+1 is moved, not solved — left for task-213. Jinja list untouched (task-116 dropped by user). Suite 858 passed. Remaining in task-50: settings validation with C2 (needs decisions); graph JSON route; B27 and the other read-model rows.
 <!-- SECTION:NOTES:END -->

@@ -13,6 +13,20 @@ class AudienceGroup(BaseModel):
     updated_at: datetime
 
 
+class AudienceGroupListed(AudienceGroup):
+    """A group as the list shows it (task-50, B26).
+
+    `recipient_count` is the live, consent-gated audience **for
+    `count_channel`**, and both are null unless the caller asked for a channel
+    (ADR-176 point 5: there is no channel-less count). `pinned_count` is the
+    manual pins, which a rule-only group has none of.
+    """
+
+    pinned_count: int
+    recipient_count: int | None = None
+    count_channel: str | None = None
+
+
 class AudienceGroupCreate(BaseModel):
     name: str
     description: str | None = None
