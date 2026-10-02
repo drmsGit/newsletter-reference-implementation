@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func, text
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, func, text
 
 from app.database import Base
 
@@ -102,6 +102,15 @@ class DeliveryExecutionDB(Base):
     # is now a NOT NULL error rather than a silent email.
     channel = Column(String(50), nullable=False)
     purpose = Column(String(50), nullable=False)
+    # **What this recipient got** (ADR-183, migration 0027), written in the
+    # send loop. With the snapshot's frame it answers "what content did this
+    # person receive, as of the send date": `sent_at` (not `updated_at`, which
+    # later updates overwrite), `delivery_record` (their decision-slot picks,
+    # each with a copy of its values and the content version used, and the
+    # frame's template fingerprint), and `artifact_hash` over what was rendered.
+    sent_at = Column(DateTime(timezone=True), nullable=True)
+    delivery_record = Column(JSON, nullable=True)
+    artifact_hash = Column(String(64), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime(timezone=True),

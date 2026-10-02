@@ -123,3 +123,112 @@ def test_recorded_picks_survive_a_later_pick(db, world):
     replayed, _ = render_frame(db, frame, picks=picks)
     assert "Later pick" in now_artifact.body
     assert "Picked headline" in replayed.body and "Later pick" not in replayed.body
+
+
+# --- stage 2: the send renders the frame and records what it sent -----------
+
+@pytest.fixture
+def sent(db, world, monkeypatch):
+    """Snapshot the world, then edit it, then send to one consenting recipient.
+    Returns what the provider was handed and the execution."""
+    from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
+    from app.delivery.providers import mock as mock_module
+    from app.delivery.service import send_send_instance
+    from app.recipients.consent import record_consent
+    from app.recipients.db_models import AddressabilityDB, ConsentEventDB, RecipientDB
+    from app.snapshots.db_models import SnapshotDB
+    from app.snapshots.service import create_snapshot_for_variant
+
+    brand = world["brand"]
+    snapshot = create_snapshot_for_variant(db, world["variant"].id, brand_id=brand.id)
+    # Edited after the snapshot: must not reach the recipient.
+    record = db.get(ContentRecordDB, world["fixed"].id)
+    record.content = {"headline_medium": "Edited after approval", "body_medium": "x"}
+    db.commit()
+    create_content_version(db, content_record_id=record.id, created_by="test", brand_id=brand.id)
+
+    recipient = RecipientDB(external_id=f"frame-{uuid.uuid4()}", status="active")
+    db.add(recipient); db.flush()
+    db.add(AddressabilityDB(recipient_id=recipient.id, channel="email",
+                            value={"email": f"{uuid.uuid4().hex[:8]}@example.invalid"},
+                            status="active", is_primary=True))
+    record_consent(db, recipient.id, "opted_in", brand.id, channel="email",
+                   purpose="marketing", source="test", commit=False)
+    send = SendInstanceDB(snapshot_id=snapshot.id, brand_id=brand.id, name="frame send",
+                          status="draft", provider="mock")
+    db.add(send); db.flush()
+    execution = DeliveryExecutionDB(send_instance_id=send.id, recipient_id=recipient.id,
+                                    status="created", provider="mock", channel="email",
+                                    purpose="marketing")
+    db.add(execution); db.commit()
+
+    captured = {}
+    original = mock_module.MockProvider.send
+
+    def capture(self, address, artifact):
+        captured["artifact"] = artifact
+        return original(self, address, artifact)
+
+    monkeypatch.setattr(mock_module.MockProvider, "send", capture)
+    send_send_instance(db, send.id, brand_id=brand.id)
+    db.expire_all()
+    yield {"artifact": captured["artifact"], "execution": db.get(DeliveryExecutionDB, execution.id),
+           "snapshot_id": snapshot.id}
+
+    db.rollback()
+    from app.decision.service import execute_decision_slot  # noqa: F401
+    db.query(DecisionResolutionDB).filter(DecisionResolutionDB.recipient_id == recipient.id).delete()
+    db.query(DeliveryExecutionDB).filter(DeliveryExecutionDB.send_instance_id == send.id).delete()
+    db.query(SendInstanceDB).filter(SendInstanceDB.id == send.id).delete()
+    db.query(SnapshotDB).filter(SnapshotDB.id == snapshot.id).delete()
+    db.query(ConsentEventDB).filter(ConsentEventDB.recipient_id == recipient.id).delete()
+    db.query(AddressabilityDB).filter(AddressabilityDB.recipient_id == recipient.id).delete()
+    db.query(RecipientDB).filter(RecipientDB.id == recipient.id).delete()
+    db.commit()
+
+
+def test_the_send_delivers_the_frame_not_the_live_variant(sent):
+    body = sent["artifact"].body
+    assert "Fixed headline" in body and "Edited after approval" not in body, (
+        "an edit made after the snapshot reached the recipient"
+    )
+
+
+def test_the_send_records_what_it_sent(sent):
+    from app.rendering.frame import artifact_hash
+
+    execution = sent["execution"]
+    assert execution.status == "sent"
+    assert execution.sent_at is not None
+    assert execution.artifact_hash == artifact_hash(sent["artifact"])
+    record = execution.delivery_record
+    assert record["snapshot_id"] == sent["snapshot_id"]
+    # The pick the send made for this recipient (their own resolution, made at
+    # send time — personalisation), with the values that were in the message.
+    [pick] = record["picks"]
+    assert pick["decision_resolution_id"] is not None
+    assert pick["variables"]["headline_medium"] in sent["artifact"].body
+
+
+def test_a_frameless_snapshot_is_refused(db, world):
+    from app.delivery.db_models import SendInstanceDB
+    from app.delivery.service import send_send_instance
+    from app.snapshots.db_models import SnapshotDB
+    from app.snapshots.service import INLINE_LOCATION
+
+    snapshot = SnapshotDB(variant_id=world["variant"].id, artifact_storage_type="inline",
+                          artifact_location=INLINE_LOCATION, artifact_size=0, render_context={})
+    db.add(snapshot); db.flush()
+    send = SendInstanceDB(snapshot_id=snapshot.id, brand_id=world["brand"].id, name="old",
+                          status="draft", provider="mock")
+    db.add(send); db.commit()
+    try:
+        with pytest.raises(ValueError, match="new snapshot"):
+            send_send_instance(db, send.id, brand_id=world["brand"].id)
+        db.refresh(send)
+        assert send.status == "draft"
+    finally:
+        db.rollback()
+        db.query(SendInstanceDB).filter(SendInstanceDB.id == send.id).delete()
+        db.query(SnapshotDB).filter(SnapshotDB.id == snapshot.id).delete()
+        db.commit()

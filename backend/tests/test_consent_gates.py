@@ -67,6 +67,7 @@ from app.recipients.service import (
     suppress_recipient,
     sync_consent_from_crm,
 )
+from app.rendering.frame import build_frame
 from app.snapshots.db_models import SnapshotDB
 
 # The states the gates must treat as non-consenting. "pending" is included
@@ -240,7 +241,9 @@ def db():
                     artifact_storage_type="inline",
                     artifact_location=INLINE_LOCATION,
                     artifact_size=0,
-                    render_context={},
+                    # A real frame (ADR-183): a frameless snapshot is refused at
+                    # send time, which these consent tests must get past.
+                    render_context=build_frame(self.session, variant.id),
                 )
                 self.session.add(snapshot)
                 self.session.flush()

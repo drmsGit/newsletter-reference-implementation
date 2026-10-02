@@ -246,3 +246,27 @@ def render_frame(
             envelope=dict(frame.get("envelope") or {}),
         )
     return artifact, made
+
+
+def missing_required_in_frame(frame: dict) -> list[tuple[int, str, str]]:
+    """Required fields the frame would send empty — the frame twin of
+    `rendering.service.missing_required_fields` (ADR-174 point 3).
+
+    Asked of the frame because the frame is what is sent: checking the live
+    variant would pass a send whose frozen copy is empty, or refuse one whose
+    frozen copy is fine. Slot modules are per recipient and are not checked
+    here, for the reason the live check gives.
+    """
+    missing = []
+    for entry in frame["modules"]:
+        if entry["kind"] not in (KIND_CONTENT, KIND_STATIC):
+            continue
+        manifest = get_manifest(frame["channel"], entry["module_type"])
+        for var in manifest.variables:
+            if var.required and not str(entry["variables"].get(var.name, "") or "").strip():
+                missing.append((entry["module_id"], entry["module_type"], var.name))
+    return missing
+
+
+def slot_ids(frame: dict) -> list[int]:
+    return [m["decision_slot_id"] for m in frame["modules"] if m["kind"] == KIND_SLOT]

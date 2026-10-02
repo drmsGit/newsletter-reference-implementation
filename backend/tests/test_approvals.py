@@ -537,10 +537,13 @@ class TestTheSendAction:
                 name="not-blocked fixture", status="draft",
             )
             db.add(variant); db.flush()
+            from app.rendering.frame import build_frame
+
+            # A frame (ADR-183): a frameless snapshot is blocked, correctly.
             snapshot = SnapshotDB(
                 variant_id=variant.id, artifact_storage_type="inline",
                 artifact_location=INLINE_LOCATION, artifact_size=0,
-                render_context={},
+                render_context=build_frame(db, variant.id),
             )
             db.add(snapshot); db.flush()
             draft = SendInstanceDB(

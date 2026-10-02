@@ -133,14 +133,21 @@ def describe(db: Session, payload: dict, *, brand_id: int) -> ActionDescription:
     # ADR-174 point 3. Advisory here — `send_send_instance` refuses on its own,
     # because a disabled button is a courtesy and not a control — but the
     # reviewer is the person who can fix it, so they are the person to tell.
-    from app.rendering.service import missing_required_fields
+    from app.rendering.frame import is_frame, missing_required_in_frame
     from app.snapshots.db_models import SnapshotDB
 
     snapshot = db.query(SnapshotDB).filter(
         SnapshotDB.id == send_instance.snapshot_id
     ).first()
     if snapshot is not None:
-        gaps = missing_required_fields(db, snapshot.variant_id)
+        # The frame is what would be sent (ADR-183), so it is what is checked
+        # — the same answer `send_send_instance` will give.
+        if not is_frame(snapshot.render_context):
+            blocked_reason = (
+                "This send's snapshot was made before snapshots froze their "
+                "content and cannot be sent. Take a new snapshot."
+            )
+        gaps = missing_required_in_frame(snapshot.render_context) if is_frame(snapshot.render_context) else []
         if gaps:
             named = ", ".join(f"{kind}.{field}" for _, kind, field in gaps[:4])
             more = f" and {len(gaps) - 4} more" if len(gaps) > 4 else ""

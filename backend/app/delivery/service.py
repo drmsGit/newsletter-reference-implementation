@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import logging
 
 from sqlalchemy import func
@@ -752,7 +753,6 @@ def send_send_instance(
     # per-recipient half — a slot that resolved, for one person, to content
     # missing a field — is a skip rather than a block and is deliberately not
     # here.
-    from app.rendering.service import missing_required_fields
     from app.snapshots.db_models import SnapshotDB as _Snapshot
 
     snapshot = db.query(_Snapshot).filter(
@@ -762,7 +762,17 @@ def send_send_instance(
         raise ValueError(
             f"Snapshot {send_instance.snapshot_id} not found"
         )
-    gaps = missing_required_fields(db, snapshot.variant_id)
+    # **The frame is what is sent** (ADR-183): a snapshot made before it has
+    # none, and is refused rather than sent from live state — which is exactly
+    # what made an edit after approval go out unreviewed.
+    from app.rendering.frame import is_frame, missing_required_in_frame
+
+    if not is_frame(snapshot.render_context):
+        raise ValueError(
+            f"Snapshot {snapshot.id} was made before snapshots froze their content "
+            "(ADR-183) and cannot be sent. Take a new snapshot and plan the send from it."
+        )
+    gaps = missing_required_in_frame(snapshot.render_context)
     if gaps:
         named = ", ".join(f"{kind}.{field}" for _, kind, field in gaps)
         raise ValueError(
@@ -857,9 +867,13 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
     from app.campaigns.db_models import DecisionSlotDB
     from app.decision.service import execute_decision_slot
 
+    from app.rendering.frame import render_frame, slot_ids, artifact_hash
+
+    # The frame's slots, not the variant's: a slot added after the snapshot is
+    # not in what was approved (ADR-183).
     decision_slots = (
         db.query(DecisionSlotDB)
-        .filter(DecisionSlotDB.variant_id == snapshot.variant_id)
+        .filter(DecisionSlotDB.id.in_(slot_ids(snapshot.render_context)))
         .all()
     )
 
@@ -971,11 +985,11 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
         # a push comes back as fields. Per recipient rather than reusing
         # the snapshot, because decision-slot personalisation can resolve
         # different content per recipient within one variant (ADR-083).
-        artifact = render_variant(
-            db=db,
-            variant_id=snapshot.variant_id,
-            recipient_id=execution.recipient_id,
-            mode="send",
+        # From the snapshot's frame, not the live variant (ADR-183): what was
+        # approved is what is sent. Each slot's pick is made now, per
+        # recipient, and returned so it can be recorded.
+        artifact, picks = render_frame(
+            db, snapshot.render_context, recipient_id=execution.recipient_id,
         )
         # Subject lives on the variant until ADR-162 point 1 moves it into
         # a header module, so the renderer put it in the envelope. The send
@@ -1006,6 +1020,18 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
         execution.provider_message_id = (
             result.provider_message_id
         )
+        if result.success:
+            # The delivery record (ADR-183): with the frame, enough to say
+            # exactly what this recipient got. The frame is the snapshot's,
+            # so it is referenced; the picks are this recipient's, so they are
+            # copied. The hash lets a reconstruction say whether it matches.
+            execution.sent_at = datetime.now(timezone.utc)
+            execution.delivery_record = {
+                "snapshot_id": snapshot.id,
+                "templates_fingerprint": snapshot.render_context["templates_fingerprint"],
+                "picks": picks,
+            }
+            execution.artifact_hash = artifact_hash(artifact)
 
         # Commit after each execution — if provider.send() raises mid-batch,
         # executions already sent must not lose their persisted status just

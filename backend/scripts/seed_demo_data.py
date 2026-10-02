@@ -305,8 +305,14 @@ def seed():
         db.commit()
 
         # --- engagement: clicks -> click contributions (event_id set) ----
-        snap = SnapshotDB(variant_id=slots[0][1].id, artifact_storage_type="file",
-                          artifact_location="/tmp/demo.html", artifact_size=0)
+        # A frame, like every snapshot since ADR-183: the composition frozen
+        # with its values, which is what a send renders from.
+        from app.rendering.frame import build_frame
+        from app.snapshots.service import INLINE_LOCATION
+
+        snap = SnapshotDB(variant_id=slots[0][1].id, artifact_storage_type="inline",
+                          artifact_location=INLINE_LOCATION, artifact_size=0,
+                          render_context=build_frame(db, slots[0][1].id))
         db.add(snap); db.flush()
         si = SendInstanceDB(snapshot_id=snap.id, name="Demo send", status="sent",
                             provider="mock", brand_id=BRAND_ID)

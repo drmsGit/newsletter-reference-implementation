@@ -3112,9 +3112,13 @@ class TestARequiredFieldIsCheckedBeforeASendFires:
 
         brand = ensure_default_brand(db)
         variant = self._variant_with(db, "cta", {"label": "", "url": ""})
+        from app.rendering.frame import build_frame
+
+        # The blank is in the frame, which is what is checked and sent (ADR-183).
         snapshot = SnapshotDB(
             variant_id=variant.id, artifact_storage_type="inline",
-            artifact_location=INLINE_LOCATION, artifact_size=0, render_context={},
+            artifact_location=INLINE_LOCATION, artifact_size=0,
+            render_context=build_frame(db, variant.id),
         )
         db.add(snapshot); db.flush()
         send = SendInstanceDB(
