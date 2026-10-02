@@ -213,12 +213,84 @@ TAGS_METADATA = [
     {"name": "frontend", "description": "Server-rendered HTML admin UI (post/redirect/get) — **not a JSON API**. Documented as a route index in `docs/architecture/Code/frontend.md`."},
 ]
 
+# --- API documentation exposure (ADR-184, tasks 31 and 232) -----------------
+# `/openapi.json`, `/docs` and `/redoc` belong to the app, not to a router, so
+# no JSON guard ever reached them: an anonymous caller got the whole route
+# inventory of an API this file calls guarded. Who may see them is now a
+# deployment setting, because a reference architecture wants its contract
+# legible (ADR-002) and the typed client is generated from it (ADR-170 point
+# 4), while a deployed instance probably wants /docs closed.
+API_DOCS_MODES = ("public", "signed_in", "off")
+API_DOCS = (os.environ.get("API_DOCS") or "public").strip()
+if API_DOCS not in API_DOCS_MODES:
+    # Refused rather than defaulted: a typo in a setting that closes the docs
+    # must not silently leave them open.
+    raise RuntimeError(
+        f"API_DOCS={API_DOCS!r} is not one of {', '.join(API_DOCS_MODES)} (ADR-184)."
+    )
+
+# Try-it-out sends the browser's cookies, so a person signed in on this origin
+# can exercise guarded routes; a machine key goes into Authorize (task-232).
+SWAGGER_UI_PARAMETERS = {"withCredentials": True, "persistAuthorization": True}
+
 app = FastAPI(
     title="Newsletter Reference Architecture API",
     version="0.1.0",
     description=API_DESCRIPTION,
     openapi_tags=TAGS_METADATA,
+    # Built-in routes only when public; `signed_in` serves its own guarded
+    # copies below, and `off` serves none.
+    openapi_url="/openapi.json" if API_DOCS == "public" else None,
+    docs_url="/docs" if API_DOCS == "public" else None,
+    redoc_url="/redoc" if API_DOCS == "public" else None,
+    swagger_ui_parameters=SWAGGER_UI_PARAMETERS,
 )
+
+
+def _openapi_with_security() -> dict:
+    """The generated document, plus the authentication that actually exists.
+
+    Without this the document said nothing about authentication, so Swagger had
+    no Authorize control and every guarded route answered 401 from Try-it-out.
+    Two ways in, as `enforce_api_policy` accepts them: a session cookie with
+    the CSRF header for writes (ADR-168), or a machine key with its declared
+    brand (ADR-166). Sign-in routes and provider webhooks need neither — the
+    former are how a credential is obtained, the latter are signed by the
+    provider — and are marked so.
+    """
+    if app.openapi_schema:
+        return app.openapi_schema
+    from fastapi.openapi.utils import get_openapi
+
+    from app.auth.dependencies import BRAND_HEADER
+    from app.auth.service import SESSION_COOKIE
+
+    schema = get_openapi(
+        title=app.title, version=app.version, description=app.description,
+        routes=app.routes, tags=app.openapi_tags,
+    )
+    schema.setdefault("components", {})["securitySchemes"] = {
+        "SessionCookie": {"type": "apiKey", "in": "cookie", "name": SESSION_COOKIE,
+                          "description": "Sign in at /manager first; the browser sends it."},
+        "CsrfToken": {"type": "apiKey", "in": "header", "name": "X-CSRF-Token",
+                      "description": "Writes with a session. The value is in GET /auth/session."},
+        "MachineKey": {"type": "http", "scheme": "bearer",
+                       "description": "An integration key, `key_id.secret` (ADR-166)."},
+        "Brand": {"type": "apiKey", "in": "header", "name": BRAND_HEADER,
+                  "description": "The brand a machine key acts in (ADR-166 point 8)."},
+    }
+    schema["security"] = [{"SessionCookie": [], "CsrfToken": []}, {"MachineKey": [], "Brand": []}]
+    public_paths = {route.path for route in session_router.routes}
+    for path, operations in schema.get("paths", {}).items():
+        if path in public_paths or path.startswith("/provider/webhooks/"):
+            for operation in operations.values():
+                if isinstance(operation, dict):
+                    operation["security"] = []
+    app.openapi_schema = schema
+    return schema
+
+
+app.openapi = _openapi_with_security
 
 
 templates = Jinja2Templates(directory="app/templates")
@@ -802,6 +874,30 @@ def spa_fallback(spa_path: str):
     first is a 404.
     """
     return _spa_index()
+
+
+# `signed_in`: the same three routes, behind the JSON guard like any other
+# read — a session or machine key holding `view` (ADR-184 point 1).
+if API_DOCS == "signed_in":
+    from fastapi import APIRouter
+    from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
+
+    docs_router = APIRouter(include_in_schema=False)
+
+    @docs_router.get("/openapi.json")
+    def openapi_signed_in():
+        return app.openapi()
+
+    @docs_router.get("/docs")
+    def docs_signed_in():
+        return get_swagger_ui_html(openapi_url="/openapi.json", title=app.title,
+                                   swagger_ui_parameters=SWAGGER_UI_PARAMETERS)
+
+    @docs_router.get("/redoc")
+    def redoc_signed_in():
+        return get_redoc_html(openapi_url="/openapi.json", title=app.title)
+
+    app.include_router(docs_router, dependencies=_api)
 
 
 @app.get("/")
