@@ -123,48 +123,6 @@ def list_quarantined_events(db: Session) -> list[ProviderEventQuarantine]:
     )
     return [to_provider_event_quarantine(record) for record in records]
 
-def _primary_content_id_for_delivery(db: Session, delivery_execution: DeliveryExecutionDB) -> int | None:
-    """The content a recipient actually received in a delivery, for attributing
-    an open/click to per-category affinity. Prefers the recipient's *resolved
-    decision content* (their personalized pick, ADR-083); falls back to the
-    variant's first fixed-content module. Resend clicks report a URL, not our
-    content id, so we attribute to what was shown rather than parsing the link —
-    mapping specific links to content ids (tracking params) is a later refinement."""
-    from app.delivery.db_models import SendInstanceDB
-    from app.snapshots.db_models import SnapshotDB
-    from app.campaigns.db_models import ModuleInstanceDB, DecisionSlotDB, DecisionResolutionDB
-
-    send_instance = db.query(SendInstanceDB).filter(SendInstanceDB.id == delivery_execution.send_instance_id).first()
-    if send_instance is None:
-        return None
-    snapshot = db.query(SnapshotDB).filter(SnapshotDB.id == send_instance.snapshot_id).first()
-    if snapshot is None:
-        return None
-    variant_id = snapshot.variant_id
-
-    slot_ids = [s.id for s in db.query(DecisionSlotDB.id).filter(DecisionSlotDB.variant_id == variant_id).all()]
-    if slot_ids:
-        resolution = (
-            db.query(DecisionResolutionDB)
-            .filter(
-                DecisionResolutionDB.decision_slot_id.in_(slot_ids),
-                DecisionResolutionDB.recipient_id == delivery_execution.recipient_id,
-            )
-            .order_by(DecisionResolutionDB.created_at.desc())
-            .first()
-        )
-        if resolution is not None:
-            return resolution.content_record_id
-
-    module = (
-        db.query(ModuleInstanceDB)
-        .filter(ModuleInstanceDB.variant_id == variant_id, ModuleInstanceDB.content_record_id.isnot(None))
-        .order_by(ModuleInstanceDB.position.asc())
-        .first()
-    )
-    return module.content_record_id if module is not None else None
-
-
 def process_provider_webhook_event(db: Session, normalized) -> ProviderEventIngestResult:
     """End-to-end handling of one normalized webhook event: correlate → record
     (dedup/quarantine via ingest_provider_event) → and, for a content-tied
@@ -173,20 +131,14 @@ def process_provider_webhook_event(db: Session, normalized) -> ProviderEventInge
     provider adapter (e.g. app.providers.adapters.resend.parse_webhook)."""
     from app.insight.service import apply_event_to_signals
 
+    # **The content is the event's to name, never ours to guess** (ADR-182,
+    # task-45). Until 2026-10-02 a "primary" record — the latest personalized
+    # pick, else the first content-bound module — was attached to every click
+    # and open, so in a multi-content mail a click on the fourth item credited
+    # the first. Now a click credits a category only when the provider's event
+    # carries `content_record_id` (a tracked link, ADR-102); otherwise it is
+    # recorded — it happened, and counts for the email — and credits nothing.
     event_data = dict(normalized.event_data or {})
-
-    # Attach the content the recipient received so the signal layer can locate
-    # the affinity — only meaningful for content-tied events.
-    if normalized.event_type in ("click", "open"):
-        delivery_execution = (
-            db.query(DeliveryExecutionDB)
-            .filter(DeliveryExecutionDB.provider_message_id == normalized.provider_message_id)
-            .first()
-        )
-        if delivery_execution is not None:
-            content_id = _primary_content_id_for_delivery(db, delivery_execution)
-            if content_id is not None:
-                event_data["content_record_id"] = content_id
 
     result = ingest_provider_event(
         db=db,
@@ -201,6 +153,8 @@ def process_provider_webhook_event(db: Session, normalized) -> ProviderEventInge
         result.status == "matched"
         and normalized.event_type in ("click", "open")
         and result.engagement_event is not None
+        # Only an event that names its content can locate an affinity.
+        and event_data.get("content_record_id") is not None
     ):
         try:
             apply_event_to_signals(db, result.engagement_event.id)
