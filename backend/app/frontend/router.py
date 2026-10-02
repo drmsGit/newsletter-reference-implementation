@@ -1826,6 +1826,7 @@ def snapshot_create(
 
 @router.post("/ui/campaigns/{campaign_id}/snapshots/{snapshot_id}/send-instances")
 def send_instance_create(
+    request: Request,
     campaign_id: int,
     snapshot_id: int,
     name: str = Form(...),
@@ -1929,6 +1930,7 @@ def decision_slot_edit(
 
 @router.post("/ui/send-instances/{send_instance_id}/send")
 def send_instance_trigger(
+    request: Request,
     send_instance_id: int,
     db: Session = Depends(get_db),
 ):
