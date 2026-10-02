@@ -192,8 +192,9 @@ for a script; what changes is that a person at a browser is no longer required t
 Prompted by task-50 (C14). The operations that manage integrations — create an
 integration, issue and revoke a credential, add and remove a grant, set unattended
 sending, deactivate — had no JSON equivalent and lived only in
-`backend/frontend/router.py`, which [[ADR-170 — The Manager Client Is a Plain React SPA, Not Next.js]]
-gives a deletion date. The manager SPA cannot administer integrations until they
+`backend/app/frontend/router.py`, the Jinja UI that the SPA of
+[[ADR-170 — The Manager Client Is a Plain React SPA, Not Next.js]] is meant to replace
+(no ADR records that retirement or a date; it is task-50's premise). The manager SPA cannot administer integrations until they
 exist as JSON. **This does not touch the Decision.** It decides three things the
 Decision left open, and it changes one behaviour that was in force until today.
 

@@ -399,6 +399,94 @@ with the audience as `brand_audience` beside it; `/ui/graph` in
 
 **Nothing in this record's Decision changes.**
 
+## Addendum 2026-10-02 (second) — who may change settings: people only, and AI configuration needs `settings.manage` and `ai.run` together
+
+Prompted by task-49 (C2) and task-50, which give the settings surface a JSON API for
+the React client of [[ADR-170 — The Manager Client Is a Plain React SPA, Not Next.js]],
+and decided by the user on 2026-10-02. The Jinja settings page that surface replaces
+is the one point 3's correction is about.
+
+**1. Publishing a prompt version and choosing a model need both keys.** Publishing a
+new version of an AI task's prompt ([[ADR-140 — AI Capability Layer]] point 4) and
+choosing the model an AI task runs on ([[ADR-144 — AI Data and Model Governance]])
+each require **`settings.manage` and `ai.run` together**. Either one alone is refused.
+The reason is what the change reaches: each one alters what *every later* AI run does
+and what it spends. That is authority over settings and authority over AI spend at
+once, and the 2026-09-15 addendum above already names spend as the thing `ai.run`
+protects. Holding only `settings.manage` would let someone redirect spend they may not
+incur; holding only `ai.run` would let someone who may run a task rewrite it for
+everybody.
+
+Both keys are platform-level under the 2026-09-15 classification, so requiring both
+raises no brand question: neither is checked against a brand, and the result is
+platform-level too.
+
+**2. Settings writes are people only.** A bearer (machine) credential is refused on
+**every** settings write route, even when it holds `settings.manage` — and, for the
+routes in point 1, `ai.run` as well. The guard is the one approvals and integration
+management already use: `require_person` and `require_person_with` in
+`backend/app/auth/dependencies.py`, which refuse a machine credential before any
+permission is looked at, so the answer does not depend on what the credential holds
+([[ADR-166 — Inbound Machine Callers Are Authenticated Principals]] and its addendum
+of 2026-10-02). The reason is what a machine with `settings.manage` could do: raise
+the send cap, change the AI spend limits, or switch an AI task from require-approval
+to auto-apply. Each of those takes the human out of the loop that the setting exists
+to keep them in — the same reason a machine may request an approval and never grant
+one. **Settings reads stay open to any principal holding `view`**, machine or person;
+the refusal is on writes only.
+
+**3. A correction: reading settings has always been `view`.** It would be easy to
+describe `settings.manage` as the key that lets somebody *into* settings. That is not
+how the platform works and never was. `required_permission` in
+`backend/app/auth/policy.py` returns `view` for every non-write method, and `/ui/settings`
+appears in `WRITE_POLICY` under `settings.manage`, which governs writes only. So the
+Jinja settings page has always been readable by anyone holding `view`; only saving
+needs `settings.manage`. **Reading stays `view`, and the JSON read does the same.**
+Nothing is tightened by this addendum on the read side.
+
+**4. Recorded for later, not built: free text typed into an AI action at run time needs
+`ai.run` only — on one condition.** A feature in which a user types free text into an
+AI action — for example a "create email" dialog where the user narrows the topic —
+needs `ai.run` and nothing else, **provided the free text enters as an input to the
+published prompt and never edits the prompt itself.** The condition is what keeps
+point 1 intact. If typed text could alter the prompt, `ai.run` alone would become a
+way to rewrite a prompt that point 1 says needs `settings.manage` as well. Whoever
+builds such a feature has to show the text arrives as an input the published prompt
+version receives, not as a change to that version.
+
+**5. Channel availability is readable through the settings API, and not writable
+anywhere yet.** Which channels this deployment has switched off — the settings row of
+[[ADR-160 — Channel Model and Composition]] point 8 — becomes readable through the
+settings API, so a client offers only the enabled channels rather than offering one
+the server will then refuse. **No route writes it**, JSON or otherwise. Switching a
+channel off while campaigns are planned on it raises questions nobody has answered,
+starting with what happens to sends already scheduled on that channel. Writing it
+therefore waits until somebody needs it, and it is a candidate for the "danger zone"
+section that [[ADR-142 — Autonomous Workflows and the Automation Boundary]]'s addendum
+of today names. ADR-160 point 8's server-side refusal of a disabled channel is
+unchanged.
+
+**What it costs.**
+
+- **`WRITE_POLICY` maps one key per route prefix**, so a route that needs two keys is
+  not expressible in that table as it stands. The second check has to be made
+  somewhere the table does not describe, which makes it one more place a reader of the
+  policy table will not see. How it is made is an implementation matter, not decided
+  here.
+- **No orchestrator can tune settings**, however it is granted. An adopter who wanted a
+  flow to adjust a threshold or a cap has to put a person in front of that change. That
+  is intended, and it is consistent with [[ADR-142 — Autonomous Workflows and the Automation Boundary]] §10, which keeps AI-driven settings tuning as direction only.
+- **A company whose Admin role lacks `ai.run`**, or whose Manager role lacks
+  `settings.manage`, finds that neither can change a prompt or a model until one
+  role carries both. The seeded Admin preset is the intended holder; an adopter with a
+  custom scheme has to grant it deliberately.
+- **A channel can only be switched off by editing the settings row directly** until the
+  write path is designed, which is the same position it was in before this addendum.
+
+**Nothing in this record's Decision changes.** Point 5's sixteen keys and the 2026-09-15
+classification are untouched; this addendum says who may make settings writes and which
+combination two specific writes require.
+
 ## Related ADRs
 
 ### Depends On

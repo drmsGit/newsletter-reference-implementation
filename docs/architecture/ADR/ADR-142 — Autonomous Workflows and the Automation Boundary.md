@@ -7,7 +7,7 @@ topic:
   - automation
   - governance
 created: 2026-07-31
-modified: 2026-09-29
+modified: 2026-10-02
 source:
   - "AI Layer design interview (interview-prep, 2026-07-27 – 31), Cluster 3"
 depends_on:
@@ -512,6 +512,57 @@ inherits an explicit question rather than a silent default.
 Nothing else in §4 changes: the inbox, the audit trail shared with ADR-141, the
 notification-only rule for email and push, the state-based claim and the brand check of
 the two addenda above are untouched, and §10 remains direction only.
+
+## Addendum 2026-10-02 — settings changes are not approvable
+
+Prompted by task-49 (C2) and task-50, which give the settings surface a JSON API, and
+decided by the user on 2026-10-02. §10 stands as written: AI-driven settings tuning is
+direction, not built. What this addendum settles is the narrower question underneath it
+— whether a **settings change**, by whoever proposes it, goes through the approval inbox
+at all. It does not, for now.
+
+**1. Settings changes are not approvable.** Whoever holds `settings.manage` is the
+authority for a settings change, and the change takes effect when they make it. An
+approval step in front of it would not add a check; it would move the same trust to a
+second person who holds the same authority. The inbox exists for actions where the
+party proposing is *not* trusted to execute — a machine that may request a send and
+never grant one — and a settings write by a holder of `settings.manage` is not that
+case. That holder is, since
+[[ADR-150 — Tenancy and Access Model]]'s second addendum of 2026-10-02, always a
+person: a bearer credential is refused on every settings write route whatever it holds,
+so there is no machine-proposed settings change for an approval step to catch.
+
+**2. The subject-identity question §10 left open does not need answering yet.** The
+third addendum of 2026-09-29 withdrew the model's accommodation for a subject-less
+*"proposed settings change"* and left §10 to decide what identifies one before it could
+ship. With no approvable settings change, there is no such request to identify. The
+question is not answered here, and it is not closed: it returns, unchanged, the day
+anything about settings becomes approvable — including §10's AI-proposed configuration
+changes, if they are ever built.
+
+**3. If specific settings turn out to carry security or system risk, they move to a
+separate "danger zone" section of the settings screen**, and approval — or other
+friction — can be added for those settings only. Which settings belong there, what the
+friction is, and whether it is an approval at all are **not designed now**. The first
+named candidate is writing channel availability, which
+[[ADR-150 — Tenancy and Access Model]]'s second addendum of 2026-10-02 leaves without
+a write path because switching a channel off while sends are scheduled on it has
+unanswered consequences. Naming the section is a placement rule, not a commitment to
+build it: the everyday settings stay frictionless, and anything that earns friction is
+moved out to where the friction lives, rather than slowing every setting down.
+
+**What it costs.**
+
+- **There is no second pair of eyes on any settings change.** A holder of
+  `settings.manage` who raises a send cap or changes an AI spend limit by mistake is
+  caught by the audit trail afterwards ([[ADR-153 — Audit and Accountability]]), not
+  by a review beforehand. Accepted, because a review by someone with the same authority
+  catches the same mistakes at the cost of a round-trip on every change.
+- **The identity question is deferred, not dissolved.** §10, or a danger-zone approval,
+  will still have to answer it before either ships.
+
+Nothing else changes: §4's inbox and its addenda, and §10's status as direction only,
+are untouched.
 
 ## Related ADRs
 
