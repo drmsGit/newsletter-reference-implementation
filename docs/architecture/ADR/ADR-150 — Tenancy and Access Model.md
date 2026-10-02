@@ -7,7 +7,7 @@ topic:
   - access
   - governance
 created: 2026-08-02
-modified: 2026-09-24
+modified: 2026-10-02
 source:
   - "Security Chapter design interview, Part 1 (playbook-strategy.md Decision Log, 2026-08-02)"
 depends_on:
@@ -336,6 +336,68 @@ permission, and `settings.manage` is platform-level because what it governs is.
 
 **Nothing in this record's Decision changes.** The category vocabulary stays global and
 the classification of permissions is not affected.
+
+## Addendum 2026-10-02 — the category graph's brand filter is built, and "brand A's audience" is defined
+
+Prompted by task-57, decided by the user on 2026-10-02 and implemented the same day.
+
+**The 2026-09-15 addendum resolved this and parked it; the blocker had cleared without
+the work being picked up.** That addendum settled the shape — scope *which people are
+summed*, "a query, not a column" — and held it back on the consent work, because
+"consented to this brand" could not be expressed until a consent grant carried a brand.
+`consent_events.brand_id` has been NOT NULL since 2026-09-15 under
+[[ADR-163 — Per-Channel Consent and Addressability]]'s addendum of that date, so the
+dependency was met the same day it was recorded. Nothing was waiting any more; the
+filter had simply not been built. It is now.
+
+**The decision: "brand A's audience" is every recipient whose latest *marketing*
+consent for brand A is `opted_in` on any registered channel** — email or push as the
+channel registry stands today. Three cases follow from it and are stated so nobody has
+to derive them:
+
+- a **push-only** subscriber to brand A counts in brand A's graph;
+- someone who has consented **only to another brand** does not;
+- someone with **no consent at all** counts in no brand's graph.
+
+Two narrower definitions were weighed and not taken. **Email-only** was refused because
+it would silently drop push-only subscribers from an audience they are plainly part of.
+A **per-channel selector** was refused as premature: nothing yet asks for a per-channel
+view of the graph, and the any-channel definition does not preclude adding one.
+
+**All figures are scoped together, as the 2026-09-15 addendum required.** That addendum's
+"do not half-ship it" is honoured in full:
+
+- **content counts** and **co-occurrence edges** count only the brand's content records;
+- **selection counts** count only resolutions of the brand's content;
+- **signal impact**, on nodes and on edges alike, sums only the brand's audience.
+
+No figure on the canvas averages across brands while its neighbour does not. The
+category vocabulary and its relations stay the shared vocabulary this record's
+2026-09-15 addendum keeps global, so **every category appears in every brand's graph**,
+at zero where the brand has nothing in it — an empty brand shows the full taxonomy with
+no weight on it, rather than a smaller taxonomy.
+
+**Point 8 is untouched.** One person keeps one affinity profile, and nothing derives a
+brand per contribution: `signal_contributions` still carries no `brand_id`, and the
+filter selects which recipients' contributions are summed rather than tagging any
+contribution with a brand. This is exactly the re-framing the 2026-09-15 addendum
+recorded, now in code.
+
+**Where it lives.** The computation is `category_graph` in `backend/app/insight/graph.py`,
+with the audience as `brand_audience` beside it; `/ui/graph` in
+`backend/app/frontend/router.py` only lays the result out. Tests are in
+`backend/tests/test_category_graph.py`.
+
+**Not done, and named so it is not mistaken for done:**
+
+- **There is no JSON route for the graph yet.** The SPA will need one. Because the
+  computation now sits behind the service boundary rather than in the UI router, that
+  route is a thin wrapper over `category_graph`, not a second implementation.
+- **The "how did unsubscribers behave" analytics stays parked** exactly as the
+  2026-09-15 addendum left it — an analytics scope not yet discussed, not part of the
+  brand filter.
+
+**Nothing in this record's Decision changes.**
 
 ## Related ADRs
 
