@@ -45,6 +45,29 @@ class Campaign(BaseModel):
     updated_at: datetime
 
 
+class MonitoredVariant(BaseModel):
+    id: int
+    name: str
+    channel: str
+    # sending | scheduled | planned | snapshotted | sent | composing
+    stage: str
+    has_failures: bool
+
+
+class MonitoredCampaign(BaseModel):
+    """Where one campaign is, derived from its variants (task-216)."""
+
+    id: int
+    name: str
+    # in_flight | in_preparation | sent
+    state: str
+    has_failures: bool
+    next_scheduled_at: datetime | None = None
+    last_sent_at: datetime | None = None
+    updated_at: datetime
+    variants: list[MonitoredVariant]
+
+
 class CampaignCreate(BaseModel):
     name: str
     # The channel of the initial variant this creates, not a property of the

@@ -2268,6 +2268,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/campaigns/monitoring": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Where every campaign in the brand is: in flight, in preparation, or sent
+         * @description Derived from each variant's snapshots and sends, never stored (task-216). In flight: a snapshot no send has used yet, or a send planned, scheduled or sending. In flight first, then in preparation, then sent; newest first within each. Campaign-level: what a single send did is the deliveries list.
+         */
+        get: operations["get_campaign_monitoring_campaigns_monitoring_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/campaigns/{campaign_id}/variants": {
         parameters: {
             query?: never;
@@ -6372,6 +6392,44 @@ export interface components {
             name: string;
             /** Required */
             required: boolean;
+        };
+        /**
+         * MonitoredCampaign
+         * @description Where one campaign is, derived from its variants (task-216).
+         */
+        MonitoredCampaign: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** State */
+            state: string;
+            /** Has Failures */
+            has_failures: boolean;
+            /** Next Scheduled At */
+            next_scheduled_at?: string | null;
+            /** Last Sent At */
+            last_sent_at?: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Variants */
+            variants: components["schemas"]["MonitoredVariant"][];
+        };
+        /** MonitoredVariant */
+        MonitoredVariant: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Channel */
+            channel: string;
+            /** Stage */
+            stage: string;
+            /** Has Failures */
+            has_failures: boolean;
         };
         /** OutcomeDeltaUpdate */
         OutcomeDeltaUpdate: {
@@ -11702,6 +11760,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_campaign_monitoring_campaigns_monitoring_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonitoredCampaign"][];
                 };
             };
         };

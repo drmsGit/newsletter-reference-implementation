@@ -13,6 +13,7 @@ export type SendInstanceListed = components['schemas']['SendInstanceListed']
 export type DeliveryExecution = components['schemas']['DeliveryExecution']
 export type DeliveryAsSent = components['schemas']['DeliveryAsSent']
 export type CampaignComposition = components['schemas']['CampaignComposition']
+export type MonitoredCampaign = components['schemas']['MonitoredCampaign']
 export type ComposedVariant = components['schemas']['ComposedVariant']
 export type ComposedModule = components['schemas']['ComposedModule']
 export type VariantDuplicated = components['schemas']['VariantDuplicated']
@@ -32,6 +33,7 @@ export type VariantDuplicated = components['schemas']['VariantDuplicated']
 export const keys = {
   campaigns: ['campaigns'] as const,
   composition: (id: number) => ['campaigns', id, 'composition'] as const,
+  monitoring: ['campaigns', 'monitoring'] as const,
   content: ['content'] as const,
   contentRecord: (id: number) => ['content', id] as const,
   audienceGroups: ['audience-groups'] as const,
@@ -199,5 +201,17 @@ export function useDuplicateVariant(campaignId: number) {
         }),
       ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.composition(campaignId) }),
+  })
+}
+
+/**
+ * Where every campaign is (task-216): in flight, in preparation, or sent.
+ * Derived by the server from snapshots and sends -- this client never works a
+ * state out for itself, so the definition of "in flight" lives in one place.
+ */
+export function useMonitoring() {
+  return useQuery({
+    queryKey: keys.monitoring,
+    queryFn: () => read(api.GET('/campaigns/monitoring')),
   })
 }

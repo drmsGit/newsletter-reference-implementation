@@ -11,6 +11,7 @@ from app.campaigns.models import (
     Campaign,
     CampaignDuplicate,
     CampaignDuplicated,
+    MonitoredCampaign,
     VariantDuplicate,
     VariantDuplicated,
     DuplicationOptions,
@@ -67,6 +68,25 @@ def get_campaigns(
     brand_id: int = Depends(working_brand),
 ):
     return list_campaigns(db, brand_id=brand_id)
+
+
+@router.get(
+    "/monitoring",
+    response_model=list[MonitoredCampaign],
+    summary="Where every campaign in the brand is: in flight, in preparation, or sent",
+    description=(
+        "Derived from each variant's snapshots and sends, never stored (task-216). "
+        "In flight: a snapshot no send has used yet, or a send planned, scheduled "
+        "or sending. In flight first, then in preparation, then sent; newest first "
+        "within each. Campaign-level: what a single send did is the deliveries list."
+    ),
+)
+def get_campaign_monitoring(
+    db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.campaigns.monitoring import campaign_monitoring
+
+    return campaign_monitoring(db, brand_id=brand_id)
 
 
 @router.post("/", response_model=CampaignWithVariants)

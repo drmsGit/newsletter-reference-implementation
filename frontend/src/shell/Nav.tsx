@@ -7,6 +7,7 @@ import { NavLink } from 'react-router'
 const SCREENS = [
   { to: '/approvals', label: 'Approvals' },
   { to: '/campaigns', label: 'Campaigns' },
+  { to: '/monitoring', label: 'Monitoring' },
   { to: '/content', label: 'Content' },
   { to: '/audiences', label: 'Audiences' },
   { to: '/deliveries', label: 'Deliveries' },
