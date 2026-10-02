@@ -254,3 +254,27 @@ class DuplicationOptions(BaseModel):
     # is the one the copy will produce. Equals `summary` when none are chosen.
     selected_summary: DuplicationSummary
     targets: list[DuplicationTarget]
+
+
+class SuggestionOption(BaseModel):
+    subject: str
+    preheader: str
+
+
+class SuggestionRun(BaseModel):
+    """One AI suggestion run for a variant, read back (task-50, C7)."""
+
+    run_id: int
+    status: str
+    created_at: datetime
+    provider: str
+    model: str | None = None
+    prompt_version: int | None = None
+    input_tokens: int
+    output_tokens: int
+    options: list[SuggestionOption]
+    # What a manager must be told before using an option (truncation, fewer
+    # options than asked for).
+    notices: list[str]
+    reply: str
+    message: str | None = None

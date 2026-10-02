@@ -311,3 +311,44 @@ def run_for_campaign(db: Session, run_id: int, campaign_id: int) -> AIRunDB | No
                 VariantDB.campaign_id == campaign_id)
         .first()
     )
+
+
+def suggestions_for_variant(db: Session, variant_id: int, *, brand_id: int) -> list[dict] | None:
+    """Every subject/preheader suggestion run for one variant, read back (C7).
+
+    The JSON plane could start a run (`POST .../suggest-subject` returns only
+    `ai_run_id`) and could not read one: the options, the notices a manager
+    must see before using one, the raw reply when nothing parsed, the prompt
+    version and the cost lived only in the Jinja page. One projection, shared
+    by both. None when the variant is not in this brand (it answers as absent).
+    """
+    from app.ai.tasks import subject_preheader as subject_task
+    from app.campaigns.service import get_variant
+
+    if get_variant(db, variant_id, brand_id=brand_id) is None:
+        return None
+    versions = {}
+    result = []
+    for run in runs_for_target(db, "variant", variant_id):
+        options = subject_task.parse_options(run.output_text or "") if run.status == "ok" else []
+        if run.prompt_id is not None and run.prompt_id not in versions:
+            prompt = db.get(AIPromptDB, run.prompt_id)
+            versions[run.prompt_id] = prompt.version if prompt else None
+        result.append({
+            "run_id": run.id,
+            "status": run.status,
+            "created_at": run.created_at,
+            "provider": run.provider,
+            "model": run.model,
+            "prompt_version": versions.get(run.prompt_id),
+            "input_tokens": run.input_tokens or 0,
+            "output_tokens": run.output_tokens or 0,
+            "options": options,
+            "notices": subject_task.option_notices(options, run.message) if run.status == "ok" else [],
+            # The reply as written: what the manager is shown when no option
+            # parsed, because a refusal can be the most useful answer the task
+            # gives (the Jinja page's reasoning).
+            "reply": (run.output_text or "").strip(),
+            "message": run.message,
+        })
+    return result

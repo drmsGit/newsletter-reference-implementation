@@ -13,6 +13,7 @@ from app.campaigns.models import (
     CampaignDuplicated,
     DuplicationOptions,
     DuplicationTarget,
+    SuggestionRun,
     SubjectSuggestionResult,
     CampaignCreate,
     CampaignWithVariants,
@@ -636,3 +637,27 @@ def duplicate_campaign_record(
         content_records_copied=report.content_records_copied,
         url_carriers=report.url_carriers,
     )
+
+
+@router.get(
+    "/variants/{variant_id}/suggestions",
+    response_model=list[SuggestionRun],
+    summary="Every AI subject/preheader suggestion for this variant, newest first",
+    description=(
+        "Reads back what `POST /campaigns/variants/{id}/suggest-subject` started: "
+        "the options, the notices to show before using one, the raw reply when "
+        "nothing parsed, the prompt version and the tokens. 404 when the variant "
+        "is not in the working brand."
+    ),
+)
+def get_variant_suggestions(
+    variant_id: int,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    from app.ai.service import suggestions_for_variant
+
+    runs = suggestions_for_variant(db, variant_id, brand_id=brand_id)
+    if runs is None:
+        raise HTTPException(status_code=404, detail=f"Variant {variant_id} not found")
+    return runs
