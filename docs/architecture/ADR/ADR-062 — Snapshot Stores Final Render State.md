@@ -1,6 +1,6 @@
 ---
 type: adr
-status: accepted
+status: superseded by ADR-183
 topic:
   - architecture
   - snapshot
@@ -18,7 +18,7 @@ enables:
 
 
 ## Status
-Accepted
+Superseded by ADR-183
 
 ## Context
 A snapshot can be visual, technical or both.
@@ -86,3 +86,6 @@ Decision above already requires for the email case.
 ### Referenced By
 
 - [[ADR-162 — Channel Rendering and Artifacts]]
+
+### Superseded By
+- [[ADR-183 — A Snapshot Freezes the Composition and Every Delivery Records What It Got]]
