@@ -1,7 +1,8 @@
 """Managing integrations over JSON — the SPA's administration surface (task-50, C14).
 
-This was `POST /ui/integrations...` in `frontend/router.py` only, and ADR-170
-gives that file a deletion date. **People only**: every route carries
+This was `POST /ui/integrations...` in `frontend/router.py` only — the Jinja
+UI the SPA is meant to replace (task-50's premise; no ADR records that
+retirement yet). **People only**: every route carries
 `require_person_with(INTEGRATIONS_MANAGE)`, so a bearer credential is refused
 even when it holds the permission — a machine that could mint credentials could
 mint itself any grant (ADR-166 addendum, 2026-10-02). Reads carry the guard

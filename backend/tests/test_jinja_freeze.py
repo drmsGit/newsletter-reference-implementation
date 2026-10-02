@@ -1,8 +1,10 @@
-"""The Jinja UI is frozen: it gets no new routes (task-50, ADR-170).
+"""The Jinja UI is frozen: it gets no new routes (task-50).
 
-[[ADR-170 — The Manager Client Is a Plain React SPA, Not Next.js]] gives the
-server-rendered UI a deletion date, and task-50 asked for it to be frozen for
-new features the day the migration audit was done. Nothing enforced that, so
+The React SPA ([[ADR-170 — The Manager Client Is a Plain React SPA, Not Next.js]])
+is meant to replace the server-rendered UI, and task-50 asked for that UI to
+be frozen for new features the day the migration audit was done. **No ADR
+records the retirement or a date** — ADR-170 decides the SPA, not the end of
+the Jinja UI; the retirement is task-50's premise. Nothing enforced that, so
 the freeze held only as long as everyone remembered it — and every route added
 here is one more rule the SPA migration has to find and move.
 
@@ -145,7 +147,7 @@ def test_no_route_was_added_to_the_jinja_ui():
     added = sorted(_jinja_routes() - FROZEN)
     assert not added, (
         f"New Jinja route(s): {added}. The server-rendered UI is frozen "
-        "(ADR-170, task-50): build this on the JSON API, where the SPA will "
+        "(task-50): build this on the JSON API, where the SPA will "
         "look for it. If it truly cannot wait, add it to FROZEN in the same "
         "commit and say why."
     )

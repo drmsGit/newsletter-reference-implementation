@@ -1,8 +1,8 @@
 """The category graph's figures, for one brand (task-57, ADR-150).
 
 Moved out of `frontend/router.py`, which only lays the graph out now: the
-figures are what the SPA will need, and a file with a deletion date was the
-only place they could be computed.
+figures are what the SPA will need, and the Jinja UI the SPA is meant to
+replace (task-50) was the only place they could be computed.
 
 **Everything is scoped to one brand, together.** ADR-150's addendum of
 2026-09-15 forbade scoping some figures and not others, because two

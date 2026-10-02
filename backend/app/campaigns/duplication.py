@@ -83,8 +83,8 @@ def require_target_access(
     *working* brand only, and duplication names a second one. Without this, a
     Manager on brand A creates a campaign in brand B by choosing B as the
     target — the check passes because it never looked at the destination. The
-    rule lived in `frontend/router.py`, a file with a deletion date
-    (ADR-170), so deleting it would have deleted the only enforcement.
+    rule lived in `frontend/router.py`, the Jinja UI the SPA is meant to
+    replace (task-50), so retiring it would have retired the only enforcement.
 
     **One answer for a brand that does not exist and a brand the caller holds
     no grant on** — the difference would tell a signed-in caller which brands

@@ -1014,7 +1014,7 @@ class TestChoosingWhichVariantsComeAcross:
 class TestTheTargetBrandIsCheckedOverJson:
     """The same rule on the SPA's plane (task-50).
 
-    It lived only in `frontend/router.py`, which has a deletion date, so a JSON
+    It lived only in `frontend/router.py`, which the SPA is meant to replace, so a JSON
     route written without it would have let a Manager on brand A create a
     campaign in brand B. These pin the rule at the HTTP surface for both kinds
     of principal. Cleanup mirrors `TestTheTargetBrandIsChecked`.

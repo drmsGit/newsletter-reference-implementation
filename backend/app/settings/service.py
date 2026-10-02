@@ -299,7 +299,7 @@ def set_task_approval_mode(db: Session, task_key: str, mode: str | None) -> dict
 # --- validated writes, for every plane (task-50 B5–B8, C2) -------------------
 #
 # The rules below lived only in `frontend/router.py`'s form handlers, which
-# ADR-170 gives a deletion date. They move here so the JSON settings API and the
+# the SPA is meant to replace (task-50). They move here so the JSON settings API and the
 # Jinja page refuse the same things. Parsing a form string stays with the form;
 # what a value is *allowed to be* is decided here.
 
