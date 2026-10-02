@@ -122,7 +122,7 @@ Beyond B1–B3 above:
 | B21 | `GET /ui/decisions` | slot list joined through variant/campaign for brand scoping, with resolution aggregates | moderate |
 | B22 | `GET /ui/decisions/slots/{id}` | per-content share %, reason histogram, and the per-strategy field manifests the edit form needs | moderate |
 | B23–B24 | `GET /ui/deliveries`, `.../send-instances/{id}` | per-send counts; nested execution → event → contribution tree | moderate |
-| B25 | `GET /ui/graph` | ~400 lines: category co-occurrence edges, per-edge event attribution, radial layout, radius/colour/thickness formulas, rankings. Entirely router-local | substantial |
+| B25 | `GET /ui/graph` | ~400 lines: category co-occurrence edges, per-edge event attribution, radial layout, radius/colour/thickness formulas, rankings. Entirely router-local | ◐ **Figures moved 2026-10-02 (task-57):** `insight.graph.category_graph(db, brand_id=)` computes every node and edge figure, brand-scoped together (ADR-150). Still router-local: the radial layout and the radius/colour/thickness formulas, which are presentation. **No JSON route yet** — now a thin one | substantial |
 | B26 | `GET /ui/audience-groups` | `recipient_count` is a **live consent-gated `resolve_audience` per group**, not the pinned member count. Also an N+1 | moderate |
 | B27 | `GET /ui/audience-groups/{id}` | human-readable rule-block summaries from criteria, per-block counts against the **group's** brand, resolved preview, non-member list | moderate |
 

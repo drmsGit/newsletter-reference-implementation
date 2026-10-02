@@ -3,7 +3,6 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
-from itertools import combinations
 from urllib.parse import quote
 from datetime import datetime
 import logging
@@ -3195,225 +3194,17 @@ def category_graph(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    categories = (
-        db.query(CategoryDB)
-        .order_by(CategoryDB.type.asc(), CategoryDB.name.asc())
-        .all()
-    )
+    """The category graph for the working brand (task-57, ADR-150).
 
-    category_lookup = {
-        category.id: category
-        for category in categories
-    }
+    The figures come from `insight.graph.category_graph`, scoped to one brand
+    all together; this route only lays them out.
+    """
+    from app.insight.graph import category_graph as graph_figures
 
-    # ---------------------------------------------------------
-    # Node metrics
-    # ---------------------------------------------------------
-
-    selection_rows = (
-        db.query(
-            ContentCategoryAssignmentDB.category_id,
-            func.count(DecisionResolutionDB.id),
-        )
-        .join(
-            DecisionResolutionDB,
-            DecisionResolutionDB.content_record_id
-            == ContentCategoryAssignmentDB.content_id,
-        )
-        .group_by(ContentCategoryAssignmentDB.category_id)
-        .all()
-    )
-
-    selections_by_category = {
-        category_id: count
-        for category_id, count in selection_rows
-    }
-
-    content_rows = (
-        db.query(
-            ContentCategoryAssignmentDB.category_id,
-            func.count(func.distinct(ContentCategoryAssignmentDB.content_id)),
-        )
-        .group_by(ContentCategoryAssignmentDB.category_id)
-        .all()
-    )
-
-    content_count_by_category = {
-        category_id: count
-        for category_id, count in content_rows
-    }
-
-    impact_rows = (
-        db.query(
-            SignalContributionDB.category_id,
-            func.count(SignalContributionDB.id),
-            func.coalesce(func.sum(SignalContributionDB.base_weight), 0),
-            func.coalesce(func.avg(SignalContributionDB.base_weight), 0),
-            func.count(func.distinct(SignalContributionDB.event_id)),
-        )
-        .group_by(SignalContributionDB.category_id)
-        .all()
-    )
-
-    impact_by_category = {
-        category_id: {
-            "update_count": update_count,
-            "total_delta": round(float(total_delta), 2),
-            "avg_delta": round(float(avg_delta), 2),
-            "event_count": event_count,
-        }
-        for (
-            category_id,
-            update_count,
-            total_delta,
-            avg_delta,
-            event_count,
-        ) in impact_rows
-    }
-
-    parent_count_rows = (
-        db.query(
-            CategoryRelationDB.child_category_id,
-            func.count(CategoryRelationDB.id),
-        )
-        .group_by(CategoryRelationDB.child_category_id)
-        .all()
-    )
-
-    parent_count_by_category = {
-        category_id: count
-        for category_id, count in parent_count_rows
-    }
-
-    child_count_rows = (
-        db.query(
-            CategoryRelationDB.parent_category_id,
-            func.count(CategoryRelationDB.id),
-        )
-        .group_by(CategoryRelationDB.parent_category_id)
-        .all()
-    )
-
-    child_count_by_category = {
-        category_id: count
-        for category_id, count in child_count_rows
-    }
-
-    # ---------------------------------------------------------
-    # Content-category map for co-occurrence and combination impact
-    # ---------------------------------------------------------
-
-    assignments = db.query(ContentCategoryAssignmentDB).all()
-
-    content_to_categories = {}
-
-    for assignment in assignments:
-        content_to_categories.setdefault(
-            assignment.content_id,
-            set(),
-        ).add(assignment.category_id)
-
-    # ---------------------------------------------------------
-    # Edge metrics: category relations
-    # ---------------------------------------------------------
-
-    edge_map = {}
-
-    relations = db.query(CategoryRelationDB).all()
-
-    for relation in relations:
-        key = tuple(
-            sorted(
-                [
-                    relation.parent_category_id,
-                    relation.child_category_id,
-                ]
-            )
-        )
-
-        edge_map[key] = {
-            "source": relation.parent_category_id,
-            "target": relation.child_category_id,
-            "type": "relation",
-            "cooccurrence_count": 0,
-            "event_count": 0,
-            "total_delta": 0,
-            "strength": 1,
-        }
-
-    # ---------------------------------------------------------
-    # Edge metrics: category co-occurrence on content
-    # ---------------------------------------------------------
-
-    for category_ids in content_to_categories.values():
-        for source_id, target_id in combinations(
-            sorted(category_ids),
-            2,
-        ):
-            key = (source_id, target_id)
-
-            if key not in edge_map:
-                edge_map[key] = {
-                    "source": source_id,
-                    "target": target_id,
-                    "type": "cooccurrence",
-                    "cooccurrence_count": 0,
-                    "event_count": 0,
-                    "total_delta": 0,
-                    "strength": 0,
-                }
-
-            edge_map[key]["cooccurrence_count"] += 1
-            edge_map[key]["strength"] += 1
-
-    # ---------------------------------------------------------
-    # Edge impact: preference updates by content/category pair
-    # ---------------------------------------------------------
-
-    update_events = (
-        db.query(
-            SignalContributionDB,
-            EngagementEventDB,
-        )
-        .join(
-            EngagementEventDB,
-            SignalContributionDB.event_id == EngagementEventDB.id,
-        )
-        .all()
-    )
-
-    edge_event_ids = {
-        key: set()
-        for key in edge_map.keys()
-    }
-
-    for update, event in update_events:
-        event_data = event.event_data or {}
-        content_id = event_data.get("content_record_id")
-
-        if not content_id:
-            continue
-
-        category_ids = content_to_categories.get(content_id, set())
-
-        for source_id, target_id in combinations(
-            sorted(category_ids),
-            2,
-        ):
-            key = (source_id, target_id)
-
-            if key not in edge_map:
-                continue
-
-            edge_map[key]["total_delta"] += float(update.base_weight)
-            edge_event_ids[key].add(event.id)
-
-    for key, event_ids in edge_event_ids.items():
-        edge_map[key]["event_count"] = len(event_ids)
-        edge_map[key]["total_delta"] = round(
-            edge_map[key]["total_delta"],
-            2,
-        )
+    figures = graph_figures(db, brand_id=working_brand_id(request, db))
+    categories = figures["categories"]
+    metrics = figures["metrics"]
+    category_lookup = {category.id: category for category in categories}
 
     # ---------------------------------------------------------
     # Layout
@@ -3457,17 +3248,8 @@ def category_graph(
     nodes = []
 
     for category in categories:
-        impact = impact_by_category.get(
-            category.id,
-            {
-                "update_count": 0,
-                "total_delta": 0,
-                "avg_delta": 0,
-                "event_count": 0,
-            },
-        )
-
-        selected_count = selections_by_category.get(category.id, 0)
+        impact = metrics[category.id]
+        selected_count = impact["selected_count"]
         total_delta = impact["total_delta"]
         avg_delta = impact["avg_delta"]
 
@@ -3493,13 +3275,13 @@ def category_graph(
                 "radius": round(radius, 2),
                 "color": color,
                 "selected_count": selected_count,
-                "content_count": content_count_by_category.get(category.id, 0),
+                "content_count": impact["content_count"],
                 "update_count": impact["update_count"],
                 "event_count": impact["event_count"],
                 "total_delta": total_delta,
                 "avg_delta": avg_delta,
-                "parent_count": parent_count_by_category.get(category.id, 0),
-                "child_count": child_count_by_category.get(category.id, 0),
+                "parent_count": impact["parent_count"],
+                "child_count": impact["child_count"],
             }
         )
 
@@ -3510,7 +3292,7 @@ def category_graph(
 
     edges = []
 
-    for edge in edge_map.values():
+    for edge in figures["edges"]:
         source = node_lookup.get(edge["source"])
         target = node_lookup.get(edge["target"])
 
