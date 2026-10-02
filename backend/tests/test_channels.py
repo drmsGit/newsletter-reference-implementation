@@ -785,9 +785,11 @@ class TestAPushSnapshotLivesInTheRowNotOnDisk:
     first channel whose artifact lives in a table.
     """
 
-    def test_a_push_snapshot_writes_no_file(self, db, campaign):
+    def test_a_push_snapshot_is_a_frame_with_its_payload(self, db, campaign):
+        """Since ADR-183 no snapshot writes a file; this checks the push payload
+        comes back from the frame rather than from a stored copy."""
         from app.snapshots.db_models import SnapshotDB
-        from app.snapshots.service import SNAPSHOT_STORAGE_DIR, create_snapshot_for_variant
+        from app.snapshots.service import create_snapshot_for_variant, get_snapshot_artifact
         from app.content.service import create_content, create_content_version
 
         record = create_content(
@@ -802,17 +804,14 @@ class TestAPushSnapshotLivesInTheRowNotOnDisk:
             db, variant_id=variant.id, module_type="notification",
             content_record_id=record.id, brand_id=brand_of_variant(db, variant.id))
 
-        before = set(SNAPSHOT_STORAGE_DIR.glob("*")) if SNAPSHOT_STORAGE_DIR.exists() else set()
         snapshot = create_snapshot_for_variant(
                 db, variant_id=variant.id, brand_id=brand_of_variant(db, variant.id))
         try:
-            after = set(SNAPSHOT_STORAGE_DIR.glob("*")) if SNAPSHOT_STORAGE_DIR.exists() else set()
-            assert after == before, f"a push snapshot wrote files: {after - before}"
-
             row = db.get(SnapshotDB, snapshot.id)
             assert row.artifact_storage_type == "inline"
             assert row.artifact_location == "inline:render_context"
-            stored = row.render_context["artifact"]
+            assert row.render_context["channel"] == "push"
+            stored = get_snapshot_artifact(db, snapshot.id, brand_id=brand_of_variant(db, variant.id))
             assert stored["role"] == "payload"
             assert stored["fields"]["push_title"] == "Ready"
             assert row.artifact_size > 0, "an inline artifact still has a size"
@@ -873,10 +872,6 @@ class TestAPushSnapshotLivesInTheRowNotOnDisk:
                 "catching a case it should not"
             )
         finally:
-            from pathlib import Path
-            row = db.get(SnapshotDB, email_snap.id)
-            if row and row.artifact_location not in ("pending", "inline:render_context"):
-                Path(row.artifact_location).unlink(missing_ok=True)
             db.query(SnapshotDB).filter(
                 SnapshotDB.id.in_([push_snap.id, email_snap.id])).delete(
                     synchronize_session=False)

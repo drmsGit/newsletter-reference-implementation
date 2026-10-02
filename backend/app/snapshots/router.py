@@ -66,14 +66,24 @@ def get_snapshot_html_file(
         # about the snapshot, which is present and complete.
         from app.snapshots.db_models import SnapshotDB
 
+        from app.rendering.frame import is_frame
+
         snapshot = db.query(SnapshotDB).filter(SnapshotDB.id == snapshot_id).first()
-        if snapshot is not None and snapshot.artifact_storage_type == "inline":
+        context = snapshot.render_context if snapshot is not None else None
+        if snapshot is not None and not is_frame(context):
             raise HTTPException(
                 status_code=404,
                 detail=(
-                    "This snapshot is not an HTML document — its artifact is a "
-                    "field payload stored in the snapshot row. Read it from the "
-                    "snapshot itself."
+                    "This snapshot was made before snapshots froze their content "
+                    "(ADR-183) and has nothing to render. Take a new snapshot."
+                ),
+            )
+        if snapshot is not None and context.get("channel") != "email":
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    "This snapshot is not an HTML document — it is a field "
+                    "payload. Read it from the snapshot's artifact."
                 ),
             )
         raise HTTPException(status_code=404, detail="Snapshot HTML not found")

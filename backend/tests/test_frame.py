@@ -324,3 +324,56 @@ def test_without_a_subject_the_rebuild_uses_the_sends_fallback(db, world, sent):
     rebuilt = reconstruct_delivery(db, execution.id, brand_id=world["brand"].id)
     assert rebuilt["envelope"]["subject"] == send_name
     assert rebuilt["hash_matches"] is True
+
+
+# --- stage 4: no HTML on disk; previews are the frame laid out ---------------
+
+def test_a_snapshot_writes_nothing_to_disk_and_previews_from_its_frame(db, world):
+    from pathlib import Path
+
+    from fastapi.testclient import TestClient
+
+    from app.auth.permissions import VIEW
+    from app.snapshots.db_models import SnapshotDB
+    from app.snapshots.service import create_snapshot_for_variant
+    from main import app
+    from tests.machine import machine
+
+    storage = Path(__file__).resolve().parents[2] / "storage" / "snapshots"
+    before = set(storage.glob("*")) if storage.exists() else set()
+    snapshot = create_snapshot_for_variant(db, world["variant"].id, brand_id=world["brand"].id)
+    try:
+        after = set(storage.glob("*")) if storage.exists() else set()
+        assert after == before, f"a snapshot wrote files: {after - before}"
+        client = TestClient(app, raise_server_exceptions=False)
+        with machine([VIEW]) as headers:
+            page = client.get(f"/snapshots/{snapshot.id}/html", headers=headers)
+        assert page.status_code == 200, page.text[:200]
+        expected, _ = render_frame(db, db.get(SnapshotDB, snapshot.id).render_context)
+        assert page.text == expected.body
+    finally:
+        db.query(SnapshotDB).filter(SnapshotDB.id == snapshot.id).delete()
+        db.commit()
+
+
+def test_a_frameless_snapshot_says_why_it_has_no_preview(db, world):
+    from fastapi.testclient import TestClient
+
+    from app.auth.permissions import VIEW
+    from app.snapshots.db_models import SnapshotDB
+    from app.snapshots.service import INLINE_LOCATION
+    from main import app
+    from tests.machine import machine
+
+    snapshot = SnapshotDB(variant_id=world["variant"].id, artifact_storage_type="file",
+                          artifact_location="/tmp/old.html", artifact_size=0, render_context={})
+    db.add(snapshot); db.commit()
+    try:
+        client = TestClient(app, raise_server_exceptions=False)
+        with machine([VIEW]) as headers:
+            page = client.get(f"/snapshots/{snapshot.id}/html", headers=headers)
+        assert page.status_code == 404
+        assert "new snapshot" in page.json()["detail"]
+    finally:
+        db.query(SnapshotDB).filter(SnapshotDB.id == snapshot.id).delete()
+        db.commit()

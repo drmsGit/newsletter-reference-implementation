@@ -37,7 +37,7 @@ from app.content.service import delete_content_record, delete_category, ContentR
 from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB, ModuleInstanceDB, DecisionSlotDB
 from app.campaigns.service import ChannelUnavailable, create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant, update_decision_slot, update_variant, update_module, delete_module, move_module
 from app.rendering.service import UnpublishedContentError, envelope_fields_for_variant, render_variant_html
-from app.snapshots.service import create_snapshot_for_variant
+from app.snapshots.service import create_snapshot_for_variant, get_snapshot_artifact
 from app.delivery.service import create_send_instance, prepare_send_from_audience, process_due_scheduled_sends, send_send_instance
 from app.delivery.providers.factory import get_provider
 from app.recipients.db_models import RecipientDB, SignalContributionDB
@@ -1044,11 +1044,15 @@ def campaign_detail(
             {
                 "id": snapshot.id,
                 "recipient_id": snapshot.recipient_id,
-                # A push artifact lives in the row, not on disk (2026-09-17),
-                # so "Open HTML" would link to a handler that correctly answers
-                # nothing. The template needs to know which it is.
-                "is_inline": snapshot.artifact_storage_type == "inline",
-                "artifact_fields": (snapshot.render_context or {}).get("artifact", {}).get("fields"),
+                # A push snapshot is not an HTML document, so "Open HTML" would
+                # link to a handler that correctly answers nothing. The
+                # template needs to know which it is; the fields are the frame
+                # laid out (ADR-183), not a stored copy.
+                "is_inline": (snapshot.render_context or {}).get("channel", "email") != "email",
+                "artifact_fields": (
+                    (get_snapshot_artifact(db, snapshot.id, brand_id=working_brand_id(request, db)) or {}).get("fields")
+                    if (snapshot.render_context or {}).get("channel", "email") != "email" else None
+                ),
                 "artifact_size": snapshot.artifact_size,
                 "created_at": snapshot.created_at,
                 "render_context": snapshot.render_context,

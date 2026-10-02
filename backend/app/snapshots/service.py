@@ -1,12 +1,7 @@
-from pathlib import Path
-
 from sqlalchemy.orm import Session
 
 from app.snapshots.db_models import SnapshotDB
 from app.snapshots.models import Snapshot
-
-
-SNAPSHOT_STORAGE_DIR = (Path(__file__).parent.parent.parent.parent / "storage" / "snapshots").resolve()
 
 
 def to_snapshot(record: SnapshotDB) -> Snapshot:
@@ -49,26 +44,17 @@ def _snapshot_in_brand(db: Session, snapshot_id: int, brand_id: int):
 def create_snapshot_for_variant(
     db: Session, variant_id: int, recipient_id: int | None = None, *, brand_id: int
 ) -> Snapshot:
-    """Freeze a variant for approval and planning.
+    """Freeze a variant for approval and planning: its frame (ADR-183).
 
-    **Two storage shapes, and the split is deliberate rather than tidy.** Email
-    keeps writing an HTML file, exactly as before. A non-HTML artifact — push,
-    today — is stored *in the row*, under `render_context["artifact"]`, with
-    `artifact_storage_type="inline"` and no file at all.
+    The frame is the composition with its values copied in — what the send
+    renders from and what was approved. It lives in the row for every channel;
+    nothing is written to disk. A preview is the frame laid out on demand
+    (`get_snapshot_html`, `get_snapshot_artifact`).
 
-    Decided 2026-09-17 (user). Writing a push payload to a `.json` beside the
-    `.html` files was the smaller diff and was rejected: it would harden the
-    artifact the project has a recorded lean away from — the same reasoning
-    that put the snapshot-atomicity bug on hold on 2026-09-14 — and leave
-    columns named `html_*` holding a push payload, which is a lie the next
-    reader has to decode.
-
-    **This does not decide the snapshot-storage question**, which is still an
-    open Needs-ADR item covering approval-snapshot vs per-delivery package, the
-    medium, and whether per-recipient renders are persisted at all. It makes
-    push the first channel whose artifact lives in a table, which is the
-    direction that item is already leaning, and leaves email where it is. Two
-    shapes coexisting is visible rather than hidden, and that is the point.
+    History, kept because the reasoning still holds: push was the first
+    channel stored in the row (2026-09-17), and the email HTML file it sat
+    beside was held back from being hardened (task-46, 2026-09-14) because the
+    project leaned toward exactly this. ADR-183 settled the storage question.
     """
     # The variant is resolved within the brand before anything is rendered or
     # written (ADR-172 point 5). A snapshot freezes one brand's composition; a
@@ -87,59 +73,22 @@ def create_snapshot_for_variant(
     render_context = {**build_frame(db, variant_id), "recipient_id": recipient_id}
     artifact, _picks = render_frame(db, render_context, recipient_id=recipient_id)
 
-    if artifact.body is None:
-        # Structured artifact: it IS the render context's business, so it goes
-        # in beside the per-module resolutions rather than to disk.
-        render_context = {
-            **(render_context or {}),
-            "artifact": {
-                "role": artifact.role,
-                "media_type": artifact.media_type,
-                "fields": artifact.fields or {},
-            },
-        }
-        snapshot = SnapshotDB(
-            variant_id=variant_id,
-            recipient_id=recipient_id,
-            artifact_storage_type="inline",
-            artifact_location=INLINE_LOCATION,
-            artifact_size=artifact.size_bytes(),
-            render_context=render_context,
-        )
-        db.add(snapshot)
-        db.commit()
-        db.refresh(snapshot)
-        return to_snapshot(snapshot)
-
-    SNAPSHOT_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
-
+    # **One storage shape, and no file** (ADR-183 point 5). The frame is the
+    # snapshot; a preview is rendered from it on demand. Until 2026-10-02 email
+    # wrote an HTML file — committed as "pending" before the file existed
+    # (task-46) — that the send never read, and push kept a copy of its payload
+    # in the row. Both were copies of something the frame now produces.
     snapshot = SnapshotDB(
         variant_id=variant_id,
         recipient_id=recipient_id,
-        artifact_storage_type="file",
-        artifact_location="pending",
+        artifact_storage_type="inline",
+        artifact_location=INLINE_LOCATION,
         artifact_size=artifact.size_bytes(),
         render_context=render_context,
     )
-
     db.add(snapshot)
     db.commit()
     db.refresh(snapshot)
-
-    recipient_part = (
-        f"recipient-{recipient_id}"
-        if recipient_id is not None
-        else "global"
-    )
-
-    file_name = f"variant-{variant_id}-{recipient_part}-snapshot-{snapshot.id}.html"
-    file_path = SNAPSHOT_STORAGE_DIR / file_name
-    file_path.write_text(artifact.body, encoding="utf-8")
-
-    snapshot.artifact_location = str(file_path)
-    db.commit()
-    db.refresh(snapshot)
-
     return to_snapshot(snapshot)
 
 
@@ -163,43 +112,40 @@ def list_snapshots_for_variant(
     return [to_snapshot(record) for record in records]
 
 
-def get_snapshot_html(db: Session, snapshot_id: int, *, brand_id: int) -> str | None:
-    snapshot = _snapshot_in_brand(db, snapshot_id, brand_id)
+def _render_snapshot(db: Session, snapshot: SnapshotDB):
+    """The snapshot's frame laid out — for its recipient, or nobody. None for a
+    snapshot made before ADR-183, which has no frame to render."""
+    from app.rendering.frame import is_frame, render_frame
 
+    if not is_frame(snapshot.render_context):
+        return None
+    artifact, _ = render_frame(db, snapshot.render_context, recipient_id=snapshot.recipient_id)
+    return artifact
+
+
+def get_snapshot_html(db: Session, snapshot_id: int, *, brand_id: int) -> str | None:
+    """The snapshot as an email document, rendered from its frame. None when it
+    is not in this brand, has no frame, or is not an email (a push payload)."""
+    snapshot = _snapshot_in_brand(db, snapshot_id, brand_id)
     if snapshot is None:
         return None
-
-    if snapshot.artifact_storage_type == "inline":
-        # Not a file, and not a failure either. Returning None here would be
-        # indistinguishable from "the file went missing", which is the state
-        # this function was written to report — so the caller is told plainly
-        # via `get_snapshot_artifact` instead.
-        return None
-
-    file_path = Path(snapshot.artifact_location)
-
-    if not file_path.exists():
-        return None
-
-    return file_path.read_text(encoding="utf-8")
+    artifact = _render_snapshot(db, snapshot)
+    return artifact.body if artifact is not None else None
 
 
 def get_snapshot_artifact(db: Session, snapshot_id: int, *, brand_id: int) -> dict | None:
-    """What this snapshot froze, whatever shape it is in.
-
-    Answers for both storage shapes so a caller does not have to know which one
-    a channel uses: `{"role": "html", "body": ...}` for email,
-    `{"role": "payload", "fields": {...}}` for push.
-    """
+    """What this snapshot froze, laid out: `{"role": "html", "body": ...}` for
+    email, `{"role": "payload", "fields": {...}}` for push. Same call for every
+    channel, because the frame is the same shape for every channel."""
     snapshot = _snapshot_in_brand(db, snapshot_id, brand_id)
     if snapshot is None:
         return None
-
-    if snapshot.artifact_storage_type == "inline":
-        stored = (snapshot.render_context or {}).get("artifact")
-        return dict(stored) if stored else None
-
-    html = get_snapshot_html(db, snapshot_id, brand_id=brand_id)
-    if html is None:
+    artifact = _render_snapshot(db, snapshot)
+    if artifact is None:
         return None
-    return {"role": "html", "media_type": "text/html", "body": html}
+    result = {"role": artifact.role, "media_type": artifact.media_type}
+    if artifact.body is not None:
+        result["body"] = artifact.body
+    else:
+        result["fields"] = artifact.fields or {}
+    return result
