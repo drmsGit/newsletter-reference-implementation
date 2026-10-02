@@ -42,7 +42,7 @@ from app.delivery.service import create_send_instance, prepare_send_from_audienc
 from app.delivery.providers.factory import get_provider
 from app.recipients.db_models import RecipientDB, SignalContributionDB
 from app.insight.signals import operational_signals_for_recipient, operational_signals_for_category
-from app.settings.service import get_signal_weights, get_half_lives, get_max_send_recipients, set_config, SIGNAL_WEIGHTS, HALF_LIFE_DAYS_KEY, MAX_SEND_RECIPIENTS_KEY
+from app.settings.service import get_signal_weights, get_half_lives, get_max_send_recipients
 from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB
 from app.audience import service as audience_service
 from app.decision.strategies.registry import list_strategies
@@ -208,7 +208,10 @@ def dashboard(
 
 
 @router.get("/ui/settings")
-def settings_page(request: Request, saved: bool = False, db: Session = Depends(get_db)):
+def settings_page(
+    request: Request, saved: bool = False, error: str | None = None,
+    db: Session = Depends(get_db),
+):
     """Parametric config an admin/BI person can retune without touching code
     (ADR-132's "tunable weights/half-lives"). The decay *model* and scoring
     logic stay in code — only these values are editable here."""
@@ -225,17 +228,15 @@ def settings_page(request: Request, saved: bool = False, db: Session = Depends(g
         for t in types
     ]
     # AI budget + the manager-owned prompt (ADR-140/144).
-    from app.ai.service import (
-        get_published_prompt, list_prompt_versions, spend_to_date, tokens_used,
-    )
+    from app.ai.service import get_published_prompt, list_prompt_versions
     from app.ai.tasks.registry import list_tasks
     from app.ai.adapters.claude import DEFAULT_MODEL as CLAUDE_DEFAULT_MODEL
     from app.ai.adapters.factory import AVAILABLE_AI_PROVIDERS
-    from app.settings.service import get_ai_provider_name, get_ai_spend_cap
+    from app.settings.service import get_ai_provider_name
 
-    ai_cap = get_ai_spend_cap(db)
-    ai_used = tokens_used(db)
-    ai_spend = spend_to_date(db)
+    from app.settings.service import ai_budget_status
+
+    budget = ai_budget_status(db)
     # One entry per discovered task rather than the single task this page used
     # to import by name. A second task now appears here by existing — no
     # import, no context keys, no duplicated card.
@@ -267,6 +268,7 @@ def settings_page(request: Request, saved: bool = False, db: Session = Depends(g
             "signal_rows": signal_rows,
             "max_send_recipients": get_max_send_recipients(db),
             "saved": saved,
+            "error": error,
             "ai_provider": get_ai_provider_name(db),
             "ai_providers": AVAILABLE_AI_PROVIDERS,
             "ai_key_present": bool(os.environ.get("ANTHROPIC_API_KEY")),
@@ -275,48 +277,63 @@ def settings_page(request: Request, saved: bool = False, db: Session = Depends(g
             # the adapter, not the model, and the audit records the model.
             "ai_model": os.environ.get("ANTHROPIC_MODEL") or CLAUDE_DEFAULT_MODEL,
             "ai_model_from_env": bool(os.environ.get("ANTHROPIC_MODEL")),
-            "ai_cap": ai_cap,
-            "ai_tokens_used": ai_used,
-            "ai_spend": ai_spend,
-            "ai_tokens_remaining": max(0, ai_cap["hard_stop_tokens"] - ai_used),
-            "ai_used_pct": min(100, round(ai_used / max(1, ai_cap["hard_stop_tokens"]) * 100)),
-            "ai_over_warn": ai_used >= ai_cap["warn_tokens"],
+            "ai_cap": budget["cap"],
+            "ai_tokens_used": budget["tokens_used"],
+            "ai_spend": budget["spend"],
+            "ai_tokens_remaining": budget["tokens_remaining"],
+            "ai_used_pct": budget["used_pct"],
+            "ai_over_warn": budget["over_warn"],
             "ai_tasks": ai_tasks,
             "ai_governed_models": governed_models(),
         },
     )
 
 
+def _settings_done(error: Exception | None = None) -> RedirectResponse:
+    if error is not None:
+        return RedirectResponse(url="/ui/settings?error=" + quote(str(error)), status_code=303)
+    return RedirectResponse(url="/ui/settings?saved=true", status_code=303)
+
+
+def _may_configure_ai(request: Request, db: Session) -> bool:
+    """Publishing a prompt or choosing a model needs `ai.run` as well as the
+    `settings.manage` the policy table checked (ADR-150 addendum 2026-10-02)."""
+    if not getattr(request.state, "auth_enforced", True):
+        return True
+    from app.auth.permissions import AI_RUN
+    from app.auth.service import ALL_BRANDS, has_permission
+
+    user = user_for_token(db, request.cookies.get(SESSION_COOKIE))
+    return has_permission(db, user, AI_RUN, brand_id=ALL_BRANDS)
+
+
 @router.post("/ui/settings/ai")
 async def settings_save_ai(request: Request, db: Session = Depends(get_db)):
     """Persist the AI token budget. Blank/invalid values keep the code defaults."""
-    from app.settings.service import AI_SPEND_CAP_KEY, get_ai_spend_cap
+    from app.settings.service import SettingsInvalid, save_ai_spend_cap
 
     form = await request.form()
-    current = get_ai_spend_cap(db)
-    values = dict(current)
+    # Form parsing only: blank or non-numeric keeps the current value, and a
+    # comma decimal is accepted. What a value may BE is the service's rule.
+    parsed = {}
     for field, key in (("ai_warn_tokens", "warn_tokens"),
                        ("ai_hard_stop_tokens", "hard_stop_tokens")):
         raw = (form.get(field) or "").strip()
-        if not raw:
-            continue
         try:
-            num = int(raw)
+            parsed[key] = int(raw) if raw else None
         except ValueError:
-            continue
-        if num > 0:
-            values[key] = num
-
-    # Reference figure only, so 0/blank is meaningful here — it clears the
-    # denominator from the money readout rather than being rejected as invalid.
+            parsed[key] = None
     raw_budget = (form.get("ai_budget_usd") or "").strip().replace(",", ".")
     try:
-        values["budget_usd"] = max(0.0, float(raw_budget))
+        # Reference figure only, so 0 is meaningful: it clears the denominator.
+        parsed["budget_usd"] = max(0.0, float(raw_budget)) if raw_budget else None
     except ValueError:
-        pass
-
-    set_config(db, AI_SPEND_CAP_KEY, values)
-    return RedirectResponse(url="/ui/settings?saved=true", status_code=303)
+        parsed["budget_usd"] = None
+    try:
+        save_ai_spend_cap(db, **parsed)
+    except SettingsInvalid as error:
+        return _settings_done(error)
+    return _settings_done()
 
 
 @router.post("/ui/settings/ai-provider")
@@ -327,27 +344,30 @@ async def settings_save_ai_provider(request: Request, db: Session = Depends(get_
     be stored — every later run would otherwise fail on a value saved once
     (ADR-140: enablement is a governed choice, not free text).
     """
-    from app.ai.adapters.factory import AVAILABLE_AI_PROVIDERS
-    from app.settings.service import AI_PROVIDER_KEY
+    from app.settings.service import SettingsInvalid, save_ai_provider
 
     form = await request.form()
-    name = (form.get("ai_provider") or "").strip()
-    if name in AVAILABLE_AI_PROVIDERS:
-        set_config(db, AI_PROVIDER_KEY, name)
-    return RedirectResponse(url="/ui/settings?saved=true", status_code=303)
+    try:
+        save_ai_provider(db, (form.get("ai_provider") or "").strip())
+    except SettingsInvalid as error:
+        return _settings_done(error)
+    return _settings_done()
 
 
 @router.post("/ui/settings/ai-prompt")
 async def settings_publish_ai_prompt(request: Request, db: Session = Depends(get_db)):
     """Publish a new prompt version (never mutates an existing one — ADR-140 §3)."""
-    from app.ai.service import publish_prompt
+    from app.settings.service import SettingsInvalid, publish_task_prompt
 
+    if not _may_configure_ai(request, db):
+        return _settings_done(SettingsInvalid(
+            "Publishing a prompt needs ai.run as well as settings.manage."))
     form = await request.form()
-    task_key = (form.get("task_key") or "").strip()
-    body = (form.get("body") or "").strip()
-    if task_key and body:
-        publish_prompt(db, task_key, body)
-    return RedirectResponse(url="/ui/settings?saved=true", status_code=303)
+    try:
+        publish_task_prompt(db, (form.get("task_key") or "").strip(), form.get("body") or "")
+    except SettingsInvalid as error:
+        return _settings_done(error)
+    return _settings_done()
 
 
 @router.post("/ui/settings/ai-task-approval")
@@ -362,16 +382,20 @@ async def settings_set_task_approval(request: Request, db: Session = Depends(get
     trusts is a manager's decision that changes as trust is earned — the same
     split as permission keys being code and role composition being data.
     """
-    from app.settings.service import set_task_approval_mode
+    from app.settings.service import (
+        AUTO_APPLY, SettingsInvalid, choose_task_approval_mode,
+    )
 
     form = await request.form()
-    task_key = (form.get("task_key") or "").strip()
-    mode = (form.get("mode") or "").strip()
-    if task_key:
-        # Anything other than `require_approval` clears back to the default,
-        # so a stale form cannot leave a task in a state nothing branches on.
-        set_task_approval_mode(db, task_key, mode or None)
-    return RedirectResponse(url="/ui/settings?saved=true", status_code=303)
+    try:
+        # An empty selection is the default, which is auto-apply.
+        choose_task_approval_mode(
+            db, (form.get("task_key") or "").strip(),
+            (form.get("mode") or "").strip() or AUTO_APPLY,
+        )
+    except SettingsInvalid as error:
+        return _settings_done(error)
+    return _settings_done()
 
 
 @router.post("/ui/settings/ai-task-model")
@@ -384,23 +408,32 @@ async def settings_set_task_model(request: Request, db: Session = Depends(get_db
     is an open question** the backlog records — the same prompt on a different
     model is arguably a different thing — and it is not decided here.
     """
-    from app.settings.service import set_task_model
+    from app.settings.service import SettingsInvalid, choose_task_model
 
+    if not _may_configure_ai(request, db):
+        return _settings_done(SettingsInvalid(
+            "Choosing a model needs ai.run as well as settings.manage."))
     form = await request.form()
-    task_key = (form.get("task_key") or "").strip()
-    model = (form.get("model") or "").strip()
-    if task_key:
-        # An empty selection clears it; `set_task_model` also refuses anything
-        # outside the governed list rather than storing it.
-        set_task_model(db, task_key, model or None)
-    return RedirectResponse(url="/ui/settings?saved=true", status_code=303)
+    try:
+        # An empty selection clears it back to the deployment default.
+        choose_task_model(db, (form.get("task_key") or "").strip(),
+                          (form.get("model") or "").strip() or None)
+    except SettingsInvalid as error:
+        return _settings_done(error)
+    return _settings_done()
 
 
 @router.post("/ui/settings")
 async def settings_save(request: Request, db: Session = Depends(get_db)):
     """Persist weight / half-life overrides. Only keys that parse as numbers are
     stored; blank fields fall back to the code defaults."""
+    from app.settings.service import (
+        SettingsInvalid, save_max_send_recipients, save_signal_tuning,
+    )
+
     form = await request.form()
+    # Form parsing only: blank or non-numeric fields are dropped, which puts
+    # that type back on its code default.
     weights: dict[str, float] = {}
     half_lives: dict[str, float] = {}
     for field, value in form.items():
@@ -415,21 +448,20 @@ async def settings_save(request: Request, db: Session = Depends(get_db)):
             weights[field[len("weight__"):]] = num
         elif field.startswith("halflife__"):
             half_lives[field[len("halflife__"):]] = num
-    set_config(db, SIGNAL_WEIGHTS, weights)
-    set_config(db, HALF_LIFE_DAYS_KEY, half_lives)
-
-    # Recipient cap: a single scalar setting, stored only when it parses as a
-    # positive int (blank/invalid leaves the code default in place).
     raw_cap = (form.get("max_send_recipients") or "").strip()
-    if raw_cap:
-        try:
-            cap = int(raw_cap)
-            if cap > 0:
-                set_config(db, MAX_SEND_RECIPIENTS_KEY, cap)
-        except ValueError:
-            pass
-
-    return RedirectResponse(url="/ui/settings?saved=true", status_code=303)
+    # Blank or non-numeric leaves the current cap in place.
+    cap = int(raw_cap) if raw_cap.lstrip("-").isdigit() else None
+    try:
+        # The cap is checked before anything is written, so a refused cap
+        # does not leave the signal tuning half-saved.
+        if cap is not None and cap <= 0:
+            save_max_send_recipients(db, cap)  # raises, with the reason
+        save_signal_tuning(db, weights, half_lives)
+        if cap is not None:
+            save_max_send_recipients(db, cap)
+    except SettingsInvalid as error:
+        return _settings_done(error)
+    return _settings_done()
 
 
 def _send_test_context(db):

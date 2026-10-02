@@ -294,3 +294,144 @@ def set_task_approval_mode(db: Session, task_key: str, mode: str | None) -> dict
         modes.pop(task_key, None)
     set_config(db, AI_TASK_APPROVAL_KEY, modes)
     return modes
+
+
+# --- validated writes, for every plane (task-50 B5–B8, C2) -------------------
+#
+# The rules below lived only in `frontend/router.py`'s form handlers, which
+# ADR-170 gives a deletion date. They move here so the JSON settings API and the
+# Jinja page refuse the same things. Parsing a form string stays with the form;
+# what a value is *allowed to be* is decided here.
+
+
+class SettingsInvalid(ValueError):
+    """A settings value this deployment must not store. The message says why."""
+
+
+def known_contribution_types() -> set[str]:
+    return set(CONTRIBUTION_WEIGHTS) | set(HALF_LIFE_DAYS)
+
+
+def save_signal_tuning(
+    db: Session, weights: dict[str, float], half_lives: dict[str, float],
+) -> None:
+    """Replace the weight and half-life overrides (ADR-132's tunable values).
+
+    **Replaces, as the form always did**: a type not named falls back to its
+    code default. A type outside the known contribution types is refused — it
+    would be stored and read by nothing. A half-life must be positive: decay
+    divides by it, so 0 would fail the next affinity computation and a negative
+    one would make old signals grow.
+    """
+    unknown = sorted((set(weights) | set(half_lives)) - known_contribution_types())
+    if unknown:
+        raise SettingsInvalid(f"Unknown contribution type(s): {', '.join(unknown)}.")
+    bad = sorted(t for t, days in half_lives.items() if not days > 0)
+    if bad:
+        raise SettingsInvalid(f"A half-life must be more than 0 days ({', '.join(bad)}).")
+    set_config(db, SIGNAL_WEIGHTS, {t: float(w) for t, w in weights.items()})
+    set_config(db, HALF_LIFE_DAYS_KEY, {t: float(d) for t, d in half_lives.items()})
+
+
+def save_max_send_recipients(db: Session, cap: int) -> None:
+    if cap <= 0:
+        raise SettingsInvalid("The send cap must be at least 1 recipient.")
+    set_config(db, MAX_SEND_RECIPIENTS_KEY, int(cap))
+
+
+def save_ai_spend_cap(
+    db: Session, *, warn_tokens: int | None = None, hard_stop_tokens: int | None = None,
+    budget_usd: float | None = None,
+) -> dict:
+    """Change any of the three; None keeps the current value.
+
+    Token figures must be positive, the budget zero or more (zero is
+    meaningful: it removes the money denominator). **A warn threshold above the
+    hard stop is refused** rather than stored and clamped on read, which is
+    what happened before: a value that cannot do its job should be said no to,
+    not quietly rewritten.
+    """
+    values = dict(get_ai_spend_cap(db))
+    for key, value in (("warn_tokens", warn_tokens), ("hard_stop_tokens", hard_stop_tokens)):
+        if value is not None:
+            if value <= 0:
+                raise SettingsInvalid(f"{key} must be more than 0.")
+            values[key] = int(value)
+    if budget_usd is not None:
+        if budget_usd < 0:
+            raise SettingsInvalid("The budget cannot be negative.")
+        values["budget_usd"] = float(budget_usd)
+    if values["warn_tokens"] > values["hard_stop_tokens"]:
+        raise SettingsInvalid("The warning threshold cannot be above the hard stop.")
+    set_config(db, AI_SPEND_CAP_KEY, values)
+    return get_ai_spend_cap(db)
+
+
+def save_ai_provider(db: Session, name: str) -> None:
+    """A governed choice, never free text (ADR-140). Refused rather than
+    silently ignored, which is what the form did."""
+    if name not in AVAILABLE_AI_PROVIDERS:
+        raise SettingsInvalid(
+            f"{name!r} is not an AI provider. Choose one of: {', '.join(AVAILABLE_AI_PROVIDERS)}."
+        )
+    set_config(db, AI_PROVIDER_KEY, name)
+
+
+def require_known_task(task_key: str):
+    """The task's metadata, or SettingsInvalid. A prompt, model or approval
+    mode stored for a task that does not exist is configuration for nothing."""
+    from app.ai.tasks.registry import get_task
+
+    meta = get_task(task_key)
+    if meta is None:
+        raise SettingsInvalid(f"There is no AI task {task_key!r}.")
+    return meta
+
+
+def publish_task_prompt(db: Session, task_key: str, body: str):
+    """A new, immutable prompt version (ADR-140 §3), for a task that exists."""
+    from app.ai.service import publish_prompt
+
+    require_known_task(task_key)
+    text = (body or "").strip()
+    if not text:
+        raise SettingsInvalid("A prompt cannot be empty.")
+    return publish_prompt(db, task_key, text)
+
+
+def choose_task_model(db: Session, task_key: str, model: str | None) -> None:
+    """Point a task at a governed model, or None for the deployment default.
+
+    `set_task_model` clears an unknown model; a caller that names one is told
+    instead, so a typo is not silently a reset.
+    """
+    require_known_task(task_key)
+    if model is not None and model not in governed_models():
+        raise SettingsInvalid(
+            f"{model!r} is not a governed model. Choose one of: {', '.join(governed_models())}."
+        )
+    set_task_model(db, task_key, model)
+
+
+def choose_task_approval_mode(db: Session, task_key: str, mode: str) -> None:
+    require_known_task(task_key)
+    if mode not in APPROVAL_MODES:
+        raise SettingsInvalid(f"{mode!r} is not an approval mode: {', '.join(APPROVAL_MODES)}.")
+    set_task_approval_mode(db, task_key, mode)
+
+
+def ai_budget_status(db: Session) -> dict:
+    """The cap and where spend stands against it — computed once, for every
+    screen, so no client re-derives "remaining" or "over the warning"."""
+    from app.ai.service import spend_to_date, tokens_used
+
+    cap = get_ai_spend_cap(db)
+    used = tokens_used(db)
+    return {
+        "cap": cap,
+        "tokens_used": used,
+        "spend": spend_to_date(db),
+        "tokens_remaining": max(0, cap["hard_stop_tokens"] - used),
+        "used_pct": min(100, round(used / max(1, cap["hard_stop_tokens"]) * 100)),
+        "over_warn": used >= cap["warn_tokens"],
+    }

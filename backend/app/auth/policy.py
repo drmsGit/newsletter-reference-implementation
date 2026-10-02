@@ -186,6 +186,7 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
     ("/ui/integrations", INTEGRATIONS_MANAGE),
     ("/integrations", INTEGRATIONS_MANAGE),
     ("/ui/settings", SETTINGS_MANAGE),
+    ("/settings", SETTINGS_MANAGE),
     ("/ui/users", USERS_MANAGE),
     ("/ui/roles", USERS_MANAGE),
 
@@ -344,6 +345,10 @@ BRAND_OWNED: dict[str, str] = {
         "no — provider configuration and signed callbacks. A webhook arrives "
         "from a vendor with no notion of brands, and is exempt from the guard "
         "entirely via `PROVIDER_SIGNED`."
+    ),
+    "/settings": (
+        "no — deployment-wide configuration, like `settings.manage` itself "
+        "(ADR-150). Nothing here carries a brand."
     ),
     "/integrations": (
         "no — an integration is platform-level, like `integrations.manage` itself. "

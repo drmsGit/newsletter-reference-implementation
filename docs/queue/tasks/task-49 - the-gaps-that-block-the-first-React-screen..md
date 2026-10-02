@@ -4,7 +4,7 @@ title: the gaps that block the first React screen.
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:56'
-updated_date: '2026-10-02 07:15'
+updated_date: '2026-10-02 13:31'
 labels:
   - backend
 dependencies: []
@@ -24,4 +24,6 @@ ordinal: 200200
 Migrated 2026-09-27 from `docs/backlog.md` line 146, section "Features", position 2 in that section (top = do next). The description is the original entry, verbatim.
 
 2026-10-02: C8 done. POST /delivery/snapshots/{snapshot_id}/send-instances (backend/app/delivery/router.py plan_send, SendPlanRequest in models.py), tests/test_send_plan_api.py (10 tests, mutation-checked) plus a policy pair in tests/test_auth_policy.py. Rides the existing /delivery/ -> sends.plan entry. Refusals: 404 for a snapshot/audience not in the brand, 409 for an empty or over-cap audience. Not idempotent (ADR-142 §10). C2 (settings/AI routers) remains and is blocked on decisions: settings.manage vs ai.run for prompt publish/model choice, whether settings writes become approvable (ADR-142 §10), channel availability exposure. Found on the way: task-239 (NameError in the two Jinja send routes), fixed.
+
+2026-10-02: C2 done. User decisions: prompt publish and model choice need settings.manage AND ai.run (a future run-time free-text input needs ai.run only, if it enters as input to the prompt, never editing it); settings changes are not approvable (danger zone later for risky ones); settings writes are people only; channel availability readable, not writable. Built: GET /settings (view) and PUT /settings/signals, /send-cap, /ai/spend-cap, /ai/provider, /ai/tasks/{key}/approval, PUT /ai/tasks/{key}/model, POST /ai/tasks/{key}/prompt — app/settings/router.py + models.py; rules in settings.service, shared with the Jinja page, which now also refuses a half-life <= 0, a warning above the hard stop, an unknown provider, an unknown task, and checks ai.run for prompts/models. tests/test_settings_api.py: 19 tests, ten mutants caught. Suite 879 passed. Not done: settings changes are not audited.
 <!-- SECTION:NOTES:END -->

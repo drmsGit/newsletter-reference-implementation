@@ -4,6 +4,9 @@
 
 <h1 class="mb-4">Settings</h1>
 
+{% if error %}
+<div class="alert alert-danger" role="alert">{{ error }}</div>
+{% endif %}
 {% if saved %}
 <div class="alert alert-success">Settings saved.</div>
 {% endif %}

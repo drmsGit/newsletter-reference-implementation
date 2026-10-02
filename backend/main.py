@@ -131,6 +131,7 @@ from app.providers.router import router as provider_router
 from app.modules.router import router as modules_router
 from app.approvals.router import router as approvals_router
 from app.auth.integrations_router import router as integrations_router
+from app.settings.router import router as settings_router
 from app.auth.router import context_router
 
 from app.overrides.db_models import ContentOverrideDB
@@ -725,6 +726,9 @@ app.include_router(context_router, dependencies=_api)
 # Person-only administration (ADR-166 addendum 2026-10-02): `require_person_with`
 # sits on the router, so every route, including the GETs, refuses a machine.
 app.include_router(integrations_router, dependencies=_api)
+# Reads are `view`; writes are people only and `settings.manage` (ADR-150's
+# addendum of 2026-10-02), with `ai.run` too for prompts and models.
+app.include_router(settings_router, dependencies=_api)
 
 
 # --- the manager client (ADR-170 point 1, ADR-168 point 3) ------------------
