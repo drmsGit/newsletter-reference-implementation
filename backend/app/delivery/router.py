@@ -24,6 +24,7 @@ from app.delivery.service import (
     list_send_instances_for_snapshot,
     send_instance_detail,
     send_send_instance,
+    NotInBrand,
     prepare_send_from_audience,
     process_due_scheduled_sends
 )
@@ -103,8 +104,9 @@ def create_send_instance_record(
         "when `scheduled_at` is given) with one execution per recipient. "
         "Nothing is sent; fire it with `POST /delivery/send-instances/{id}/send`. "
         "Refused with 409 when the audience resolves to nobody or to more than "
-        "the send cap, 404 when the snapshot or audience is not in the working "
-        "brand. **Not idempotent:** a retried request plans a second send."
+        "the send cap, or the provider cannot carry the variant's channel; 404 "
+        "when the snapshot or audience is not in the working brand. "
+        "**Not idempotent:** a retried request plans a second send."
     ),
 )
 def plan_send(
@@ -124,11 +126,11 @@ def plan_send(
             scheduled_at=payload.scheduled_at,
             brand_id=brand_id,
         )
+    except NotInBrand as error:
+        # Another brand's row and a missing one answer alike (ADR-172 point 6).
+        raise HTTPException(status_code=404, detail=str(error))
     except ValueError as error:
-        # The service refuses with ValueError throughout; "not found" is the
-        # brand boundary (another brand's row and a missing one answer alike).
-        missing = str(error).endswith("not found")
-        raise HTTPException(status_code=404 if missing else 409, detail=str(error))
+        raise HTTPException(status_code=409, detail=str(error))
 
 
 @router.get(

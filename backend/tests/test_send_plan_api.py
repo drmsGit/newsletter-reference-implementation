@@ -251,3 +251,48 @@ def test_a_session_without_a_csrf_token_is_refused(world, db):
 
     assert refused.status_code == 403, refused.text
     assert allowed.status_code == 201, allowed.text
+
+
+def test_a_provider_that_cannot_carry_the_channel_is_refused_at_plan_time(world, db):
+    """Not at fire time, after the send was reviewed and scheduled."""
+    before = db.query(SendInstanceDB).count()
+    with machine([VIEW, SENDS_PLAN]) as headers:
+        unknown = _plan(headers, world, provider="carrier-pigeon")
+    assert unknown.status_code == 409, unknown.text
+    assert "mock" in unknown.json()["detail"], "the refusal should say what is offered"
+    db.expire_all()
+    assert db.query(SendInstanceDB).count() == before
+
+
+def test_a_name_too_long_for_the_column_is_422_not_500(world):
+    with machine([VIEW, SENDS_PLAN]) as headers:
+        response = client.post(
+            f"/delivery/snapshots/{world['snapshot_id']}/send-instances",
+            json={"name": "x" * 256, "audience_group_id": world["group_id"]},
+            headers=headers,
+        )
+    assert response.status_code == 422, response.text
+
+
+def test_resend_cannot_be_planned_for_a_push_variant(world, db):
+    """The case `providers_for_channel` was written for: the form stopped
+    offering it, and the JSON route must refuse it rather than rely on that."""
+    variant = db.get(VariantDB, db.get(SnapshotDB, world["snapshot_id"]).variant_id)
+    push = VariantDB(campaign_id=variant.campaign_id, channel="push", name="push", status="draft")
+    db.add(push)
+    db.flush()
+    snapshot = SnapshotDB(
+        variant_id=push.id, artifact_storage_type="inline",
+        artifact_location=INLINE_LOCATION, artifact_size=0, render_context={},
+    )
+    db.add(snapshot)
+    db.commit()
+    try:
+        with machine([VIEW, SENDS_PLAN]) as headers:
+            response = _plan(headers, world, snapshot_id=snapshot.id, provider="resend")
+        assert response.status_code == 409, response.text
+        assert "push" in response.json()["detail"]
+    finally:
+        db.query(SnapshotDB).filter(SnapshotDB.id == snapshot.id).delete()
+        db.query(VariantDB).filter(VariantDB.id == push.id).delete()
+        db.commit()

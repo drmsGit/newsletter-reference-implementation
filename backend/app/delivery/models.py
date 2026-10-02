@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class DeliveryExecution(BaseModel):
@@ -50,7 +50,8 @@ class SendPlanRequest(BaseModel):
     is nothing to choose.
     """
 
-    name: str
+    # The column is String(255); longer used to reach the database and 500.
+    name: str = Field(min_length=1, max_length=255)
     audience_group_id: int
     provider: str = "mock"
     from_address: str | None = None

@@ -9,7 +9,7 @@ from app.delivery.models import DeliveryExecution, SendInstance, SendInstanceDet
 
 from app.campaigns.db_models import VariantDB
 from app.delivery.exclusion import run_exclusion_stack
-from app.delivery.providers.factory import get_provider
+from app.delivery.providers.factory import get_provider, providers_for_channel
 from app.recipients.consent import DEFAULT_CHANNEL, DEFAULT_PURPOSE, ConsentDenied
 from app.rendering.service import render_variant, render_variant_html
 from app.snapshots.db_models import SnapshotDB
@@ -249,6 +249,13 @@ def _audience_group_in_brand(db: Session, group_id: int, brand_id: int):
     return get_group(db, group_id, brand_id=brand_id)
 
 
+class NotInBrand(ValueError):
+    """A snapshot or audience the caller's brand does not own — which answers
+    exactly as a missing one does (ADR-172 point 6). Its own type so a JSON
+    route maps it to 404 without reading the message; a `ValueError` so the
+    Jinja route, which catches that, is unchanged."""
+
+
 def prepare_send_from_audience(
     db: Session,
     snapshot_id: int,
@@ -326,9 +333,21 @@ def prepare_send_from_audience(
     # because this function writes one execution per recipient.
     snapshot_brand = brand_for_snapshot(db, snapshot_id)
     if snapshot_brand != brand_id:
-        raise ValueError(f"Snapshot {snapshot_id} not found")
+        raise NotInBrand(f"Snapshot {snapshot_id} not found")
     if _audience_group_in_brand(db, audience_group_id, brand_id) is None:
-        raise ValueError(f"Audience group {audience_group_id} not found")
+        raise NotInBrand(f"Audience group {audience_group_id} not found")
+
+    # Refused now rather than when somebody fires it. `get_provider` would
+    # refuse a provider that cannot carry this channel at send time — a push
+    # planned through resend, or a name that is no provider at all — and by
+    # then the send has been reviewed and scheduled. The Jinja form only offers
+    # what `providers_for_channel` lists; a JSON client is told the same list.
+    offered = [p["name"] for p in providers_for_channel(plan_channel)]
+    if provider not in offered:
+        raise ValueError(
+            f"Provider {provider!r} cannot deliver on the {plan_channel!r} channel. "
+            f"Choose one of: {', '.join(offered)}."
+        )
 
     recipients = resolve_audience(db, audience_group_id, channel=plan_channel)
     if not recipients:
