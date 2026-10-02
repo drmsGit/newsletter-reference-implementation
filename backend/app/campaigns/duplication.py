@@ -34,6 +34,8 @@ from dataclasses import dataclass, field
 from sqlalchemy.orm import Session
 
 from app.auth.db_models import BrandDB
+from app.auth.permissions import CAMPAIGNS_MANAGE, CONTENT_MANAGE
+from app.auth.service import has_permission
 from app.campaigns.db_models import (
     CampaignDB,
     DecisionSlotDB,
@@ -74,7 +76,7 @@ def require_target_access(
     noun: str,
     permission: str,
     enforced: bool = True,
-) -> "BrandDB":
+) -> BrandDB:
     """The target half of the duplication rule (task-50), enforced once.
 
     **Why this exists.** The policy table checks a permission against the
@@ -92,9 +94,7 @@ def require_target_access(
     grants to read): any existing brand is a legal target, matching what
     `working_brand_id` does on the Jinja plane.
     """
-    from app.auth.service import has_permission, list_brands
-
-    brand = next((b for b in list_brands(db) if b.id == target_brand_id), None)
+    brand = db.get(BrandDB, target_brand_id)
     if brand is None or (
         enforced and not has_permission(db, principal, permission, brand_id=brand.id)
     ):
@@ -109,9 +109,6 @@ def require_campaign_target(
     """`campaigns.manage` on the target, and for COPY also `content.manage`
     there: copying creates content rows in the target brand, so the working
     brand's content permission says nothing about it."""
-    from app.auth.permissions import CAMPAIGNS_MANAGE, CONTENT_MANAGE
-    from app.auth.service import has_permission
-
     brand = require_target_access(
         db, principal, target_brand_id=target_brand_id, noun="campaigns",
         permission=CAMPAIGNS_MANAGE, enforced=enforced,
@@ -131,8 +128,6 @@ def require_campaign_target(
 def require_content_target(
     db: Session, principal, *, target_brand_id: int, enforced: bool = True,
 ):
-    from app.auth.permissions import CONTENT_MANAGE
-
     return require_target_access(
         db, principal, target_brand_id=target_brand_id, noun="content",
         permission=CONTENT_MANAGE, enforced=enforced,
