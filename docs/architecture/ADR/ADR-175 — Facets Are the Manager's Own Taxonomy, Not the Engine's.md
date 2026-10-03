@@ -111,6 +111,16 @@ The product must not assume a record count — a reference architecture is copie
 - **Two concrete gaps this record opens, both already visible in `docs/backlog.md`:** `duplicate_campaign` cannot accept a facet-value mapping (point 8), and `GET /campaigns/decision-slots/{id}/resolutions` returns every row unpaginated on the fastest-growing table in the schema — the worst single instance of what point 7 rules against.
 - **The decision log has no entry for the interview that produced this.** `docs/playbook-strategy.md` §5 ends at 2026-09-19, so Cluster 2's resolutions of 2026-09-21 live in [[Manager Workflow - design interview]] and in `docs/backlog.md` and nowhere in the log that records where decisions were made. That is a gap in the process rather than in this decision, and it is recorded so the next reader looking for the log entry behind this record knows why there is none.
 
+## Addendum 2026-10-03 — point 7 means every list whose length grows with use
+
+[[ADR-185 — Lists That Grow With Data Are Paged in One Envelope]], accepted on 2026-10-03 in task-88, decides *how* point 7's pagination is done, which this record left open: one envelope `{items, total, limit, offset}`, one shared query-parameter dependency, and — in its point 1 — lists whose length is fixed by code or configuration stay plain arrays. Those are categories, field definitions, module types, decision strategies and one variant's modules. Read literally, point 7 above says *every* list route pages, so the two records disagree in wording. ADR-185's Notes stated that tension and left open whether this record should carry an addendum saying how it resolves. The user decided on 2026-10-03 that it should, and this is it.
+
+**Point 7 is read as "every list route whose length grows with use".** Point 7's own reason is that the product must not assume a record count, because a reference architecture is copied by adopters of very different sizes. A list fixed by code or configuration has no record count to assume: it is the same length for an adopter with two hundred records as for one with two million, and paging it protects nobody. This narrows the wording of point 7, not its intent. Which side of the line a list falls on is decided by ADR-185's test — does it grow with use, not is it long today — and the borderline cases that record names are judged there, not here.
+
+**This is not a supersession.** The Decision above stands unchanged, point 7 included; this section records how point 7 is read. ADR-185 does not replace any part of this record. It supplies the mechanism and the shape that point 7 required and did not specify.
+
+**The filtering requirement in point 7 is unchanged by this addendum.** Every facet filter, every readiness filter and every search from points 1 and 5 is still a query parameter the API must accept. ADR-185 leaves filtering route-specific and undecided, with one rule that binds it now: a filter applies identically to `items` and `total`. The filters themselves are still owed, and work on them starts on 2026-10-03.
+
 ## Related ADRs
 
 ### Depends On
