@@ -437,8 +437,11 @@ def set_envelope_fields(
     allowed = {var.name for var in manifest.variables if var.envelope}
     # Only what the manifest declares, and only what has a value. An empty
     # string would read as "authored and left blank", which is a different
-    # claim from "never written".
-    data = {k: v for k, v in fields.items() if k in allowed and v}
+    # claim from "never written". Trimmed here rather than by each caller:
+    # only the Jinja forms used to, so " " arrived over JSON as a subject
+    # (task-250), and this is the one place every path writes through.
+    trimmed = {k: v.strip() if isinstance(v, str) else v for k, v in fields.items()}
+    data = {k: v for k, v in trimmed.items() if k in allowed and v}
 
     existing = (
         db.query(ModuleInstanceDB)

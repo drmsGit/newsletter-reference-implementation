@@ -161,6 +161,8 @@ def create_campaign_variant(
             campaign_id=campaign_id,
             name=payload.name,
             channel=payload.channel,
+            subject=payload.subject,
+            preheader=payload.preheader,
             status=payload.status,
             brand_id=brand_id,
         )
