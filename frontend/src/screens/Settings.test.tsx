@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import Settings from './Settings'
@@ -47,6 +47,8 @@ const SETTINGS = {
     },
   ],
   governed_models: ['claude-opus-5'],
+  may_manage: false,
+  may_configure_ai: false,
 }
 
 describe('the settings screen', () => {
@@ -80,5 +82,85 @@ describe('the settings screen', () => {
     expect(main.queryAllByRole('button')).toHaveLength(0)
     expect(main.queryAllByRole('textbox')).toHaveLength(0)
     expect(main.queryAllByRole('combobox')).toHaveLength(0)
+  })
+})
+
+
+describe('editing settings', () => {
+  const MANAGER = { ...SETTINGS, may_manage: true, may_configure_ai: false }
+
+  function sentBodies(fetchMock: ReturnType<typeof stubFetch>, method: string) {
+    return Promise.all(
+      fetchMock.mock.calls
+        .map(([input]) => input as Request)
+        .filter((r) => r.method === method)
+        .map((r) => r.clone().json()),
+    )
+  }
+
+  it('saves the send cap the person typed, then re-reads what the server kept', async () => {
+    let reads = 0
+    const fetchMock = stubFetch({
+      'GET /settings': () => {
+        reads += 1
+        return jsonResponse(MANAGER)
+      },
+      'PUT /settings/send-cap': () => jsonResponse({ max_send_recipients: 150 }),
+    })
+    renderWithProviders(<Settings />)
+
+    const field = await screen.findByLabelText('Most recipients one send may reach')
+    fireEvent.change(field, { target: { value: '150' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save send cap' }))
+
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+    expect(await sentBodies(fetchMock, 'PUT')).toEqual([{ max_send_recipients: 150 }])
+    await waitFor(() => expect(reads).toBe(2))
+  })
+
+  it("shows the server's reason when it refuses a value", async () => {
+    stubFetch({
+      'GET /settings': () => jsonResponse(MANAGER),
+      'PUT /settings/ai/spend-cap': () =>
+        jsonResponse({ detail: 'the warning threshold is above the hard stop' }, 422),
+    })
+    renderWithProviders(<Settings />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Save AI budget' }))
+    expect(await screen.findByText('Not saved: the warning threshold is above the hard stop'))
+      .toBeInTheDocument()
+  })
+
+  it('does not send something that is not a whole number', async () => {
+    const fetchMock = stubFetch({ 'GET /settings': () => jsonResponse(MANAGER) })
+    renderWithProviders(<Settings />)
+
+    const field = await screen.findByLabelText('Most recipients one send may reach')
+    fireEvent.change(field, { target: { value: 'lots' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save send cap' }))
+
+    expect(await screen.findByText('Enter a whole number.')).toBeInTheDocument()
+    expect(fetchMock.mock.calls.filter(([r]) => (r as Request).method === 'PUT')).toHaveLength(0)
+  })
+
+  it('offers the model only to someone who may also run AI', async () => {
+    /** `may_configure_ai` is the server's answer (settings.manage + ai.run). */
+    stubFetch({ 'GET /settings': () => jsonResponse(MANAGER) })
+    const { unmount } = renderWithProviders(<Settings />)
+    await screen.findByRole('button', { name: 'Save send cap' })
+    expect(screen.queryByRole('button', { name: 'Save model' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save output mode' })).toBeInTheDocument()
+    unmount()
+    vi.unstubAllGlobals()
+
+    const fetchMock = stubFetch({
+      'GET /settings': () => jsonResponse({ ...MANAGER, may_configure_ai: true }),
+      'PUT /settings/ai/tasks/subject_preheader/model': () => jsonResponse({ model: null }),
+    })
+    renderWithProviders(<Settings />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Save model' }))
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+    // "the default" is sent as null, which points the task back at the deployment default.
+    expect(await sentBodies(fetchMock, 'PUT')).toEqual([{ model: null }])
   })
 })

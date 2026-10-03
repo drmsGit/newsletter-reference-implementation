@@ -5,9 +5,19 @@ import type { components } from './schema'
 
 export type SessionContext = components['schemas']['SessionContext']
 
-/** An HTTP failure that kept its status code, so callers can tell 401 apart. */
+/**
+ * An HTTP failure that kept its status code, so callers can tell 401 apart.
+ *
+ * `detail` is the server's own explanation when it sent a plain-text one --
+ * FastAPI's `{"detail": "..."}`. A settings refusal says *why* ("the warning
+ * threshold is above the hard stop"), and showing that beats a generic error.
+ * Validation errors carry a structured detail instead, which is not shown.
+ */
 export class HttpError extends Error {
-  constructor(readonly status: number) {
+  constructor(
+    readonly status: number,
+    readonly detail?: string,
+  ) {
     super(`Request failed with status ${status}`)
   }
 }

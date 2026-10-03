@@ -1,20 +1,47 @@
-import { useSettings, type SettingsView } from '../api/resources'
+import { useState, type ReactNode } from 'react'
+import {
+  Button,
+  Input,
+  Label,
+  ListBox,
+  ListBoxItem,
+  Popover,
+  Select,
+  SelectValue,
+  TextField,
+} from 'react-aria-components'
+
+import {
+  useSaveAiProvider,
+  useSaveSendCap,
+  useSaveSpendCap,
+  useSetTaskApproval,
+  useSetTaskModel,
+  useSettings,
+  type SettingsView,
+} from '../api/resources'
+import { HttpError } from '../api/session'
 import DataTable from '../components/DataTable'
 import ScreenState from '../components/ScreenState'
 import { formatDate } from './Campaigns'
 
 /**
- * Settings, read-only (first pass, decided 2026-10-03).
+ * Settings.
  *
- * Every value here can be changed over JSON by a person holding
- * `settings.manage` -- never by a machine, and never through an approval
- * (ADR-142's addendum) -- and every change is audited (task-245). The edit
- * controls come in a later pass; until then the screen shows what is set,
- * without a button that would suggest otherwise.
+ * **Who may change what is the server's answer.** `may_manage` and
+ * `may_configure_ai` come with the settings themselves, computed by the same
+ * rules the write routes apply: a person -- never a machine -- holding
+ * `settings.manage`, plus `ai.run` for a task's model. Without them the screen
+ * is the read-only view; with them, each value gets its own control. This
+ * screen never decides that for itself.
  *
- * Nothing is derived here. The budget percentage, whether the warning
- * threshold is crossed, which provider credits content -- all are the
- * server's answers.
+ * **Each change is saved on purpose**, with its own button: these values decide
+ * how many people one send may reach and how much AI may spend, and a control
+ * that saved as you typed would make an accident one keystroke long. No setting
+ * is approvable (ADR-142's addendum) and every change is audited (task-245).
+ *
+ * Not editable here yet, by decision: signal tuning and prompt publishing come
+ * in their own pass. Channels and delivery providers have no write route.
  */
 export default function Settings() {
   const settings = useSettings()
@@ -22,12 +49,273 @@ export default function Settings() {
   return (
     <>
       <h1>Settings</h1>
-      <p className="muted">
-        Read-only for now. Changes are made by a person with permission to manage
-        settings, and every change is recorded in the audit log.
-      </p>
-      <ScreenState query={settings}>{settings.data && <Sections s={settings.data} />}</ScreenState>
+      <ScreenState query={settings}>
+        {settings.data && (
+          <>
+            <p className="muted">
+              {settings.data.may_manage
+                ? 'Changes take effect for the whole deployment, and each one is recorded in the audit log.'
+                : 'Read-only: changing settings needs permission to manage them. Every change is recorded in the audit log.'}
+            </p>
+            <Sections s={settings.data} />
+          </>
+        )}
+      </ScreenState>
     </>
+  )
+}
+
+/** What a save did, said once beside its control. */
+function Outcome({ write }: { write: { isSuccess: boolean; isError: boolean; error: unknown } }) {
+  if (write.isSuccess) return <p role="status">Saved.</p>
+  if (!write.isError) return null
+  const error = write.error instanceof HttpError ? write.error : undefined
+  return (
+    <p role="alert">
+      {error?.status === 403
+        ? 'You do not have permission to change this.'
+        : error?.detail
+          ? `Not saved: ${error.detail}`
+          : 'Not saved. The server refused the value.'}
+    </p>
+  )
+}
+
+function NumberField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <TextField value={value} onChange={onChange} inputMode="decimal">
+      <Label>{label}</Label>
+      <Input />
+    </TextField>
+  )
+}
+
+function Choice({
+  label,
+  options,
+  selected,
+  onChange,
+}: {
+  label: string
+  options: { id: string; name: string }[]
+  selected: string
+  onChange: (id: string) => void
+}) {
+  return (
+    <Select selectedKey={selected} onSelectionChange={(key) => onChange(String(key))}>
+      <Label>{label}</Label>
+      <Button>
+        <SelectValue />
+      </Button>
+      <Popover>
+        <ListBox items={options}>{(item) => <ListBoxItem id={item.id}>{item.name}</ListBoxItem>}</ListBox>
+      </Popover>
+    </Select>
+  )
+}
+
+function Form({ children, onSave, saving, label }: {
+  children: ReactNode
+  onSave: () => void
+  saving: boolean
+  label: string
+}) {
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault()
+        onSave()
+      }}
+    >
+      {children}
+      <Button type="submit" isDisabled={saving}>
+        {saving ? 'Saving…' : label}
+      </Button>
+    </form>
+  )
+}
+
+/** Whole numbers only; anything else is not sent at all. What a value may BE
+ * (positive, warn not above hard stop) is the server's rule, not this one. */
+function parseWhole(raw: string): number | null {
+  const trimmed = raw.trim()
+  return /^\d+$/.test(trimmed) ? Number(trimmed) : null
+}
+
+function SendCap({ s }: { s: SettingsView }) {
+  const save = useSaveSendCap()
+  const [value, setValue] = useState(String(s.max_send_recipients))
+  const [invalid, setInvalid] = useState(false)
+  if (!s.may_manage) {
+    return (
+      <dl className="facts">
+        <dt>Most recipients one send may reach</dt>
+        <dd>{s.max_send_recipients}</dd>
+      </dl>
+    )
+  }
+  return (
+    <Form
+      label="Save send cap"
+      saving={save.isPending}
+      onSave={() => {
+        const cap = parseWhole(value)
+        setInvalid(cap === null)
+        if (cap !== null) save.mutate(cap)
+      }}
+    >
+      <NumberField label="Most recipients one send may reach" value={value} onChange={setValue} />
+      {invalid && <p role="alert">Enter a whole number.</p>}
+      <Outcome write={save} />
+    </Form>
+  )
+}
+
+function SpendCap({ s }: { s: SettingsView }) {
+  const save = useSaveSpendCap()
+  const cap = s.ai_budget.cap
+  const [warn, setWarn] = useState(String(cap.warn_tokens))
+  const [stop, setStop] = useState(String(cap.hard_stop_tokens))
+  const [usd, setUsd] = useState(String(cap.budget_usd))
+  const [invalid, setInvalid] = useState(false)
+  if (!s.may_manage) return null
+  return (
+    <Form
+      label="Save AI budget"
+      saving={save.isPending}
+      onSave={() => {
+        const warnTokens = parseWhole(warn)
+        const stopTokens = parseWhole(stop)
+        const budget = Number(usd.trim().replace(',', '.'))
+        const ok = warnTokens !== null && stopTokens !== null && usd.trim() !== '' && !Number.isNaN(budget)
+        setInvalid(!ok)
+        if (ok) save.mutate({ warn_tokens: warnTokens, hard_stop_tokens: stopTokens, budget_usd: budget })
+      }}
+    >
+      <NumberField label="Warn at (tokens)" value={warn} onChange={setWarn} />
+      <NumberField label="Stop at (tokens)" value={stop} onChange={setStop} />
+      <NumberField label="Budget (USD)" value={usd} onChange={setUsd} />
+      {invalid && <p role="alert">Tokens are whole numbers; the budget is a number.</p>}
+      <Outcome write={save} />
+    </Form>
+  )
+}
+
+function Provider({ s }: { s: SettingsView }) {
+  const save = useSaveAiProvider()
+  const [provider, setProvider] = useState(s.ai_provider)
+  if (!s.may_manage) {
+    return (
+      <dl className="facts">
+        <dt>Provider</dt>
+        <dd>{s.ai_provider}</dd>
+      </dl>
+    )
+  }
+  return (
+    <Form label="Save provider" saving={save.isPending} onSave={() => save.mutate(provider)}>
+      <Choice
+        label="AI provider"
+        options={s.ai_providers.map((p) => ({ id: p, name: p }))}
+        selected={provider}
+        onChange={setProvider}
+      />
+      <Outcome write={save} />
+    </Form>
+  )
+}
+
+const DEFAULT_MODEL = '__default__'
+
+function Task({ s, task }: { s: SettingsView; task: SettingsView['ai_tasks'][number] }) {
+  const approval = useSetTaskApproval()
+  const model = useSetTaskModel()
+  const [mode, setMode] = useState(task.approval_mode)
+  const [chosen, setChosen] = useState(task.model ?? DEFAULT_MODEL)
+
+  return (
+    <section aria-labelledby={`task-${task.key}`}>
+      <h3 id={`task-${task.key}`}>{task.label}</h3>
+      <p>{task.description}</p>
+
+      {s.may_configure_ai ? (
+        <Form
+          label="Save model"
+          saving={model.isPending}
+          onSave={() => model.mutate({ task: task.key, model: chosen === DEFAULT_MODEL ? null : chosen })}
+        >
+          <Choice
+            label={`Model for ${task.label}`}
+            options={[
+              { id: DEFAULT_MODEL, name: `the default (${s.ai_model})` },
+              ...s.governed_models.map((m) => ({ id: m, name: m })),
+            ]}
+            selected={chosen}
+            onChange={setChosen}
+          />
+          <Outcome write={model} />
+        </Form>
+      ) : (
+        <dl className="facts">
+          <dt>Model</dt>
+          <dd>{task.model ?? `the default (${s.ai_model})`}</dd>
+        </dl>
+      )}
+
+      {s.may_manage ? (
+        <Form
+          label="Save output mode"
+          saving={approval.isPending}
+          onSave={() =>
+            approval.mutate({ task: task.key, mode: mode as 'auto_apply' | 'require_approval' })
+          }
+        >
+          <Choice
+            label={`Output of ${task.label}`}
+            options={[
+              // The service's own words for the two modes (settings.service).
+              { id: 'auto_apply', name: 'applied directly' },
+              { id: 'require_approval', name: 'held for review' },
+            ]}
+            selected={mode}
+            onChange={setMode}
+          />
+          <Outcome write={approval} />
+        </Form>
+      ) : (
+        <dl className="facts">
+          <dt>Output</dt>
+          <dd>{task.approval_mode === 'require_approval' ? 'held for review' : 'applied directly'}</dd>
+        </dl>
+      )}
+
+      <dl className="facts">
+        <dt>Prompt</dt>
+        <dd>
+          {task.prompt_version != null
+            ? `version ${task.prompt_version} of ${task.versions.length}`
+            : 'the built-in default (never published)'}
+        </dd>
+      </dl>
+      <details>
+        <summary>The live prompt</summary>
+        <pre style={{ whiteSpace: 'pre-wrap' }}>{task.prompt_body}</pre>
+        {task.versions.length > 0 && (
+          <p className="muted">
+            Published versions:{' '}
+            {task.versions.map((v) => `v${v.version} (${formatDate(v.created_at)})`).join(', ')}
+          </p>
+        )}
+      </details>
+    </section>
   )
 }
 
@@ -44,9 +332,8 @@ function Sections({ s }: { s: SettingsView }) {
     <>
       <section aria-labelledby="sending">
         <h2 id="sending">Sending</h2>
+        <SendCap s={s} />
         <dl className="facts">
-          <dt>Most recipients one send may reach</dt>
-          <dd>{s.max_send_recipients}</dd>
           {s.channels.map((c) => (
             <div key={c.name} style={{ display: 'contents' }}>
               <dt>Channel: {c.name}</dt>
@@ -82,11 +369,7 @@ function Sections({ s }: { s: SettingsView }) {
           columns={[
             { key: 'type', header: 'Contribution', isRowHeader: true, render: (r) => r.type },
             { key: 'weight', header: 'Weight', render: (r) => r.weight ?? '—' },
-            {
-              key: 'half',
-              header: 'Half-life (days)',
-              render: (r) => r.halfLife ?? '—',
-            },
+            { key: 'half', header: 'Half-life (days)', render: (r) => r.halfLife ?? '—' },
           ]}
           items={signalRows}
           emptyMessage="No contribution types are known."
@@ -98,9 +381,8 @@ function Sections({ s }: { s: SettingsView }) {
         {budget.over_warn && (
           <p role="alert">AI use has passed the warning threshold ({budget.used_pct}% of the cap).</p>
         )}
+        <Provider s={s} />
         <dl className="facts">
-          <dt>Provider</dt>
-          <dd>{s.ai_provider}</dd>
           <dt>Default model</dt>
           <dd>
             {s.ai_model}
@@ -122,41 +404,10 @@ function Sections({ s }: { s: SettingsView }) {
             {budget.spend.unpriced_runs > 0 ? ` (${budget.spend.unpriced_runs} runs unpriced)` : ''}
           </dd>
         </dl>
+        <SpendCap s={s} />
 
         {s.ai_tasks.map((task) => (
-          <section key={task.key} aria-labelledby={`task-${task.key}`}>
-            <h3 id={`task-${task.key}`}>{task.label}</h3>
-            <p>{task.description}</p>
-            <dl className="facts">
-              <dt>Model</dt>
-              <dd>{task.model ?? `the default (${s.ai_model})`}</dd>
-              <dt>Output</dt>
-              <dd>
-                {/* The service's own words for the two modes (settings.service). */}
-                {task.approval_mode === 'require_approval'
-                  ? 'held for review'
-                  : 'applied directly'}
-              </dd>
-              <dt>Prompt</dt>
-              <dd>
-                {task.prompt_version != null
-                  ? `version ${task.prompt_version} of ${task.versions.length}`
-                  : 'the built-in default (never published)'}
-              </dd>
-            </dl>
-            <details>
-              <summary>The live prompt</summary>
-              <pre style={{ whiteSpace: 'pre-wrap' }}>{task.prompt_body}</pre>
-              {task.versions.length > 0 && (
-                <p className="muted">
-                  Published versions:{' '}
-                  {task.versions
-                    .map((v) => `v${v.version} (${formatDate(v.created_at)})`)
-                    .join(', ')}
-                </p>
-              )}
-            </details>
-          </section>
+          <Task key={task.key} s={s} task={task} />
         ))}
       </section>
     </>

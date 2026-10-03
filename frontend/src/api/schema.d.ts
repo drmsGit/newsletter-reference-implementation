@@ -7216,6 +7216,16 @@ export interface components {
             ai_tasks: components["schemas"]["AITaskSettings"][];
             /** Governed Models */
             governed_models: string[];
+            /**
+             * May Manage
+             * @default false
+             */
+            may_manage: boolean;
+            /**
+             * May Configure Ai
+             * @default false
+             */
+            may_configure_ai: boolean;
         };
         /**
          * SignalTuning

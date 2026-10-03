@@ -39,14 +39,34 @@ def _invalid(error: service.SettingsInvalid) -> HTTPException:
     return HTTPException(status_code=422, detail=str(error))
 
 
+def _capabilities(request: Request, db: Session) -> tuple[bool, bool]:
+    """(may_manage, may_configure_ai) for this caller, by the write routes' own
+    rules: a person — never a machine credential, whatever it holds
+    (`require_person`) — holding `settings.manage`, and `ai.run` as well for
+    prompts and models (`require_person_with`). Both platform-wide, as the
+    policy guard checks them."""
+    from app.auth.dependencies import _machine_credential, auth_is_enforced, request_principal
+    from app.auth.permissions import SETTINGS_MANAGE
+    from app.auth.service import ALL_BRANDS, has_permission
+
+    if _machine_credential(request) is not None:
+        return False, False
+    if not auth_is_enforced(request):
+        return True, True
+    principal = request_principal(request)
+    manage = has_permission(db, principal, SETTINGS_MANAGE, brand_id=ALL_BRANDS)
+    return manage, manage and has_permission(db, principal, AI_RUN, brand_id=ALL_BRANDS)
+
+
 @router.get("", response_model=Settings, summary="Everything the settings screen shows")
-def read_settings(db: Session = Depends(get_db)):
+def read_settings(request: Request, db: Session = Depends(get_db)):
     from app.ai.adapters.claude import DEFAULT_MODEL as CLAUDE_DEFAULT_MODEL
     from app.ai.adapters.factory import AVAILABLE_AI_PROVIDERS
     from app.ai.service import get_published_prompt, list_prompt_versions
     from app.ai.tasks.registry import list_tasks
     from app.channels.registry import list_channels
 
+    may_manage, may_configure_ai = _capabilities(request, db)
     enabled = {c.name for c in service.available_channels(db)}
     tasks = []
     for meta in list_tasks():
@@ -79,6 +99,8 @@ def read_settings(db: Session = Depends(get_db)):
         ai_budget=AIBudget(**service.ai_budget_status(db)),
         ai_tasks=tasks,
         governed_models=service.governed_models(),
+        may_manage=may_manage,
+        may_configure_ai=may_configure_ai,
     )
 
 

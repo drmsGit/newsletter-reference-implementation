@@ -400,3 +400,45 @@ class TestEverySettingsWriteIsAudited:
         assert row.detail["task"] == task_key
         assert row.detail["version"] == response.json()["version"]
         assert "a body that must not reach the log" not in str(row.detail)
+
+
+class TestTheScreenIsToldWhatThisCallerMayChange:
+    """`may_manage` / `may_configure_ai` on GET /settings (2026-10-03).
+
+    The settings screen shows edit controls only to someone the write routes
+    would accept. The flags are the server's answer — the approval inbox's
+    `may_decide` pattern — so a client never re-derives who may change what.
+    Each case pairs the flag with the write it predicts, so the two cannot drift.
+    """
+
+    def _flags(self, c, h):
+        body = c.get("/settings", headers=h).json()
+        return body["may_manage"], body["may_configure_ai"]
+
+    def test_a_viewer_may_change_nothing(self, db):
+        with person_with(db, [VIEW]) as (c, h, _t):
+            assert self._flags(c, h) == (False, False)
+            current = settings.get_max_send_recipients(db)
+            assert c.put("/settings/send-cap", json={"max_send_recipients": current},
+                         headers=h).status_code == 403
+
+    def test_settings_manage_alone_may_not_configure_ai(self, db, task_key):
+        with person_with(db, [VIEW, SETTINGS_MANAGE]) as (c, h, _t):
+            assert self._flags(c, h) == (True, False)
+            assert c.put(f"/settings/ai/tasks/{task_key}/model", json={"model": None},
+                         headers=h).status_code == 403
+
+    def test_with_ai_run_too_it_may(self, db, task_key):
+        from app.auth.permissions import AI_RUN
+
+        with person_with(db, [VIEW, SETTINGS_MANAGE, AI_RUN]) as (c, h, _t):
+            assert self._flags(c, h) == (True, True)
+            assert c.put(f"/settings/ai/tasks/{task_key}/model", json={"model": None},
+                         headers=h).status_code == 200
+
+    def test_a_machine_may_never_change_settings_whatever_it_holds(self):
+        from app.auth.permissions import AI_RUN
+
+        with machine([VIEW, SETTINGS_MANAGE, AI_RUN]) as headers:
+            body = client.get("/settings", headers=headers).json()
+        assert (body["may_manage"], body["may_configure_ai"]) == (False, False)

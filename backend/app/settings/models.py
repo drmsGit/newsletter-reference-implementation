@@ -85,6 +85,11 @@ class Settings(BaseModel):
     ai_budget: AIBudget
     ai_tasks: list[AITaskSettings]
     governed_models: list[str]
+    # What THIS caller may change (2026-10-03), so the screen offers controls
+    # only where a write would be accepted — computed by the same rules the
+    # write routes apply, never by the client. People only, platform-wide.
+    may_manage: bool = False
+    may_configure_ai: bool = False
 
 
 class SendCapUpdate(BaseModel):

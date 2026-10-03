@@ -56,9 +56,14 @@ export const keys = {
  * function throws. This is the one place that translates between the two, so
  * no screen has to remember to check.
  */
-async function read<T>(call: Promise<{ data?: T; response: Response }>): Promise<T> {
+async function read<T>(
+  call: Promise<{ data?: T; error?: unknown; response: Response }>,
+): Promise<T> {
   const result = await call
-  if (!result.response.ok) throw new HttpError(result.response.status)
+  if (!result.response.ok) {
+    const detail = (result.error as { detail?: unknown } | undefined)?.detail
+    throw new HttpError(result.response.status, typeof detail === 'string' ? detail : undefined)
+  }
   return result.data as T
 }
 
@@ -224,4 +229,61 @@ export function useSettings() {
     queryKey: keys.settings,
     queryFn: () => read(api.GET('/settings')),
   })
+}
+
+/**
+ * The settings writes (2026-10-03). Each one re-reads the whole settings view
+ * on success, because the server normalises what it stores -- a spend cap's
+ * warning is clamped to its hard stop, an unknown approval mode clears to the
+ * default -- and the screen should show what was kept, not what was typed.
+ * Every one of these is audited server-side (task-245).
+ */
+function useSettingsWrite<V>(write: (value: V) => Promise<unknown>) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: write,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.settings }),
+  })
+}
+
+export function useSaveSendCap() {
+  return useSettingsWrite((cap: number) =>
+    read(api.PUT('/settings/send-cap', { body: { max_send_recipients: cap } })),
+  )
+}
+
+export function useSaveSpendCap() {
+  return useSettingsWrite(
+    (cap: { warn_tokens: number; hard_stop_tokens: number; budget_usd: number }) =>
+      read(api.PUT('/settings/ai/spend-cap', { body: cap })),
+  )
+}
+
+export function useSaveAiProvider() {
+  return useSettingsWrite((provider: string) =>
+    read(api.PUT('/settings/ai/provider', { body: { provider } })),
+  )
+}
+
+export function useSetTaskApproval() {
+  return useSettingsWrite(
+    ({ task, mode }: { task: string; mode: 'auto_apply' | 'require_approval' }) =>
+      read(
+        api.PUT('/settings/ai/tasks/{task_key}/approval', {
+          params: { path: { task_key: task } },
+          body: { mode },
+        }),
+      ),
+  )
+}
+
+export function useSetTaskModel() {
+  return useSettingsWrite(({ task, model }: { task: string; model: string | null }) =>
+    read(
+      api.PUT('/settings/ai/tasks/{task_key}/model', {
+        params: { path: { task_key: task } },
+        body: { model },
+      }),
+    ),
+  )
 }
