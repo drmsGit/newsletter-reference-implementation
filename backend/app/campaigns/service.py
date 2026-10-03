@@ -493,6 +493,9 @@ def create_module_for_variant(
     variant = get_variant(db, variant_id, brand_id=brand_id)
     if variant is None:
         raise ValueError(f"variant {variant_id} does not exist")
+    _refuse_foreign_binding(
+        db, variant_id, content_record_id, decision_slot_id, brand_id=brand_id
+    )
 
     channel = get_channel(variant.channel)
     channel_label = channel.label if channel else variant.channel
@@ -549,6 +552,39 @@ def create_module_for_variant(
     return to_module_instance(module)
 
 
+def _refuse_foreign_binding(
+    db: Session,
+    variant_id: int,
+    content_record_id: int | None,
+    decision_slot_id: int | None,
+    *,
+    brand_id: int,
+) -> None:
+    """A module binds its own brand's content and its own variant's slot (task-248).
+
+    The variant or module is already selected within the brand; the ids it is
+    being bound to were not, and rendering loads a bound record by id alone.
+    So a record from another brand would be previewed, snapshotted and sent
+    under this one (ADR-150 point 8). A record outside the brand is "not
+    found", as `get_content_record` treats it, rather than named as foreign.
+    A slot must hang off this very variant: slots are per-variant layout
+    (ADR-083), and one on another variant would resolve that variant's picks.
+    """
+    from app.content.service import get_content_record
+
+    if content_record_id is not None and get_content_record(
+        db, content_record_id, brand_id=brand_id
+    ) is None:
+        raise ValueError(f"Content record {content_record_id} not found")
+    if decision_slot_id is not None and (
+        db.query(DecisionSlotDB.id)
+        .filter(DecisionSlotDB.id == decision_slot_id, DecisionSlotDB.variant_id == variant_id)
+        .first()
+        is None
+    ):
+        raise ValueError(f"Decision slot {decision_slot_id} is not on this variant")
+
+
 def update_module(
     db: Session,
     module_id: int,
@@ -572,6 +608,9 @@ def update_module(
     module = get_module(db, module_id, brand_id=brand_id)
     if module is None:
         return None
+    _refuse_foreign_binding(
+        db, module.variant_id, content_record_id, decision_slot_id, brand_id=brand_id
+    )
 
     module.module_type = module_type
     module.content_record_id = content_record_id
