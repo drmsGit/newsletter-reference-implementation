@@ -195,19 +195,18 @@ def get_send_instances_for_snapshot(
 
 @router.get(
     "/send-instances/{send_instance_id}/executions",
-    response_model=list[DeliveryExecution],
+    response_model=Page[DeliveryExecution],
     summary="List executions for a send",
 )
 def get_executions_for_send_instance(
     send_instance_id: int,
+    params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
-    return list_delivery_executions_for_send_instance(
-        db=db,
-        send_instance_id=send_instance_id,
-        brand_id=brand_id,
-    )
+    from app.delivery.service import page_delivery_executions_for_send_instance
+
+    return page_delivery_executions_for_send_instance(db, send_instance_id, params, brand_id=brand_id)
 
 
 @router.post(

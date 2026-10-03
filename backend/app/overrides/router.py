@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import request_principal, working_brand
 from app.auth.service import actor_label
+from app.pagination import Page, PageParams, page_of_list, page_params
 from app.database import get_db
 from app.overrides.models import ContentOverride, ContentOverrideCreate, OutcomeDeltaUpdate
 from app.overrides.service import (
@@ -30,11 +31,12 @@ def create(
         raise HTTPException(status_code=400, detail=str(error))
 
 
-@router.get("/", response_model=list[ContentOverride])
+@router.get("/", response_model=Page[ContentOverride])
 def list_overrides(
     module_instance_id: int | None = None,
     send_instance_id: int | None = None,
     active: bool | None = None,
+    params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
@@ -44,6 +46,7 @@ def list_overrides(
         send_instance_id=send_instance_id,
         active=active,
         brand_id=brand_id,
+        params=params,
     )
 
 

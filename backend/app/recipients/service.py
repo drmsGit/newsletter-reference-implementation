@@ -394,6 +394,19 @@ def sync_consent_from_crm(
     return to_recipient(db, recipient, brand_id)
 
 
+def page_consent_sync_logs(db: Session, params, recipient_id: int | None = None):
+    """One ADR-185 page of the consent sync log, newest first."""
+    from app.pagination import page_of_query
+
+    q = db.query(ConsentSyncLogDB)
+    if recipient_id is not None:
+        q = q.filter(ConsentSyncLogDB.recipient_id == recipient_id)
+    return page_of_query(q, params, ConsentSyncLogDB.synced_at.desc(), ConsentSyncLogDB.id.desc(),
+                         convert=lambda r: ConsentSyncLog(
+                             id=r.id, recipient_id=r.recipient_id, external_id=r.external_id,
+                             ok=r.ok, changes_applied=r.changes_applied, source=r.source,
+                             note=r.note, synced_at=r.synced_at))
+
 def list_consent_sync_logs(
     db: Session,
     recipient_id: int | None = None,
@@ -499,6 +512,14 @@ def detect_consent_drift(db: Session) -> list[ConsentDriftItem]:
         )
     return drift
 
+
+def page_recipients(db: Session, params, *, brand_id: int):
+    """One ADR-185 page of recipients, newest first, projected for `brand_id`
+    (consent is per brand) in a fixed number of queries for the page."""
+    from app.pagination import page_of_query
+
+    return page_of_query(db.query(RecipientDB), params, RecipientDB.id.desc(),
+                         convert_all=lambda rows: to_recipients(db, rows, brand_id))
 
 def list_recipients(db: Session, *, brand_id: int) -> list[Recipient]:
     """Every recipient, with consent projected against one brand.

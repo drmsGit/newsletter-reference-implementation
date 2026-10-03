@@ -153,9 +153,12 @@ def delete_group(group_id: int, db: Session = Depends(get_db), brand_id: int = D
         raise HTTPException(status_code=404, detail="Group not found")
 
 
-@router.get("/{group_id}/members", response_model=list[AudienceGroupMember])
-def list_members(group_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
-    return service.list_members(db, group_id, brand_id=brand_id)
+@router.get("/{group_id}/members", response_model=Page[AudienceGroupMember])
+def list_members(
+    group_id: int, params: PageParams = Depends(page_params),
+    db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    return service.page_members(db, group_id, params, brand_id=brand_id)
 
 
 @router.post("/{group_id}/members/{recipient_id}", response_model=AudienceGroupMember, status_code=201)

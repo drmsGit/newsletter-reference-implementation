@@ -167,13 +167,14 @@ export function useDelivery(id: number) {
   })
 }
 
-export function useDeliveryExecutions(id: number) {
+/** One ADR-185 page of a send's recipients, newest first. */
+export function useDeliveryExecutions(id: number, offset = 0) {
   return useQuery({
-    queryKey: keys.deliveryExecutions(id),
+    queryKey: [...keys.deliveryExecutions(id), 'page', offset],
     queryFn: () =>
       read(
         api.GET('/delivery/send-instances/{send_instance_id}/executions', {
-          params: { path: { send_instance_id: id } },
+          params: { path: { send_instance_id: id }, query: { limit: PAGE_SIZE, offset } },
         }),
       ),
   })

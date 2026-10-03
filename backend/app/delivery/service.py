@@ -78,6 +78,35 @@ def create_delivery_execution(
     return to_delivery_execution(execution)
 
 
+def page_delivery_executions_for_send_instance(db: Session, send_instance_id: int, params, *, brand_id: int):
+    """One ADR-185 page of a send's executions, newest first."""
+    from app.pagination import page_of_query
+    from app.recipients.db_models import RecipientDB
+
+    query = (
+        db.query(DeliveryExecutionDB)
+        .join(SendInstanceDB, SendInstanceDB.id == DeliveryExecutionDB.send_instance_id)
+        .filter(DeliveryExecutionDB.send_instance_id == send_instance_id,
+                SendInstanceDB.brand_id == brand_id)
+    )
+
+    def convert_all(records):
+        external = dict(
+            db.query(RecipientDB.id, RecipientDB.external_id)
+            .filter(RecipientDB.id.in_({r.recipient_id for r in records})).all()
+        ) if records else {}
+        return [
+            to_delivery_execution(record).model_copy(update={
+                "recipient_external_id": external.get(record.recipient_id),
+                "exclusion_reason": record.exclusion_reason,
+                "sent_at": record.sent_at,
+            })
+            for record in records
+        ]
+
+    return page_of_query(query, params, DeliveryExecutionDB.created_at.desc(),
+                         DeliveryExecutionDB.id.desc(), convert_all=convert_all)
+
 def list_delivery_executions_for_send_instance(
     db: Session,
     send_instance_id: int,

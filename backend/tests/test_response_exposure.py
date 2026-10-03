@@ -92,7 +92,7 @@ def test_an_execution_says_its_channel_and_purpose():
     try:
         send, _ = _demo_send(db)
         with _admin(db) as (c, _token, _csrf):
-            rows = c.get(f"/delivery/send-instances/{send.id}/executions").json()
+            rows = c.get(f"/delivery/send-instances/{send.id}/executions").json()["items"]
         assert rows and {"channel", "purpose"} <= set(rows[0])
         assert (rows[0]["channel"], rows[0]["purpose"]) == ("email", "marketing")
     finally:

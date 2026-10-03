@@ -822,6 +822,32 @@ def create_decision_resolution(
     return to_decision_resolution(resolution)
 
 
+def page_resolutions_for_decision_slot(db: Session, decision_slot_id: int, params, *, brand_id: int):
+    """One ADR-185 page of a slot's resolutions, newest first — the worst
+    unbounded read the Manager Workflow interview named (Cluster 3 gap 10)."""
+    from app.pagination import page_of_query
+
+    query = (
+        db.query(DecisionResolutionDB)
+        .join(DecisionSlotDB, DecisionSlotDB.id == DecisionResolutionDB.decision_slot_id)
+        .join(VariantDB, VariantDB.id == DecisionSlotDB.variant_id)
+        .join(CampaignDB, CampaignDB.id == VariantDB.campaign_id)
+        .filter(DecisionResolutionDB.decision_slot_id == decision_slot_id,
+                CampaignDB.brand_id == brand_id)
+    )
+    return page_of_query(query, params, DecisionResolutionDB.created_at.desc(),
+                         DecisionResolutionDB.id.desc(), convert=to_decision_resolution)
+
+
+def page_decision_slots_with_stats(db: Session, params, *, brand_id: int):
+    """One ADR-185 page of the brand's slots with their counts. Ordered by
+    campaign, variant, slot — the order a person reads a campaign in."""
+    from app.pagination import page_of_list
+
+    # Grouped and aggregated in one query already; paging the assembled rows
+    # keeps that one query instead of a second count over a GROUP BY.
+    return page_of_list(list_decision_slots_with_stats(db, brand_id=brand_id), params)
+
 def list_resolutions_for_decision_slot(
     db: Session,
     decision_slot_id: int,

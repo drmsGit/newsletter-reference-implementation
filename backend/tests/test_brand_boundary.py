@@ -392,7 +392,8 @@ class TestTheNestedChainIsWalkedNotTrusted:
                     f"/campaigns/decision-slots/{ids['slot']}/resolutions",
                     headers=headers)
                 assert response.status_code == 200, response.text
-                assert response.json() == []
+                # Neither the rows nor the count may say the slot has any (ADR-185).
+                assert (response.json()["items"], response.json()["total"]) == ([], 0)
         finally:
             self._remove(ids)
 
@@ -891,7 +892,7 @@ class TestASendCannotBeFiredFromAnotherBrand:
                 response = client.get(
                     f"/delivery/send-instances/{send_id}/executions", headers=headers)
                 assert response.status_code == 200, response.text
-                assert response.json() == []
+                assert (response.json()["items"], response.json()["total"]) == ([], 0)
         finally:
             self._remove(send_id)
 
@@ -1230,7 +1231,7 @@ def test_listing_recipients_returns_rather_than_raising():
     with machine([VIEW, RECIPIENTS_MANAGE]) as headers:
         response = client.get("/recipients/", headers=headers)
         assert response.status_code == 200, response.text
-        assert isinstance(response.json(), list)
+        assert isinstance(response.json()["items"], list)
 
 
 class TestAPermittedWriteLandsOnTheDeclaredBrand:

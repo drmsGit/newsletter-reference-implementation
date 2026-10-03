@@ -54,6 +54,27 @@ def create_engagement_event(
     return to_engagement_event(event)
 
 
+def page_events_for_delivery_execution(db: Session, delivery_execution_id: int, params, *, brand_id: int):
+    """One ADR-185 page of an execution's engagement events, newest first.
+
+    **Brand-scoped through the execution's send** (ADR-172 point 5). The route
+    passed a brand that `list_events_for_delivery_execution` never accepted,
+    so it raised TypeError on every call until 2026-10-03 — and, had it run,
+    would have answered for any brand's execution.
+    """
+    from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
+    from app.pagination import page_of_query
+
+    query = (
+        db.query(EngagementEventDB)
+        .join(DeliveryExecutionDB, DeliveryExecutionDB.id == EngagementEventDB.delivery_execution_id)
+        .join(SendInstanceDB, SendInstanceDB.id == DeliveryExecutionDB.send_instance_id)
+        .filter(EngagementEventDB.delivery_execution_id == delivery_execution_id,
+                SendInstanceDB.brand_id == brand_id)
+    )
+    return page_of_query(query, params, EngagementEventDB.occurred_at.desc(),
+                         EngagementEventDB.id.desc(), convert=to_engagement_event)
+
 def list_events_for_delivery_execution(
     db: Session,
     delivery_execution_id: int,

@@ -230,7 +230,8 @@ def list_content_overrides(
     active: bool | None = None,
     *,
     brand_id: int,
-) -> list[ContentOverrideDB]:
+    params=None,
+):
     from app.campaigns.db_models import CampaignDB, ModuleInstanceDB, VariantDB
 
     q = (
@@ -246,6 +247,13 @@ def list_content_overrides(
         q = q.filter(ContentOverrideDB.send_instance_id == send_instance_id)
     if active is not None:
         q = q.filter(ContentOverrideDB.active.is_(active))
+    if params is not None:
+        # One ADR-185 page; the same filters build the rows and the total.
+        from app.overrides.models import ContentOverride
+        from app.pagination import page_of_query
+
+        return page_of_query(q, params, ContentOverrideDB.created_at.desc(),
+                             ContentOverrideDB.id.desc(), convert=ContentOverride.model_validate)
     return q.order_by(ContentOverrideDB.created_at.desc()).all()
 
 

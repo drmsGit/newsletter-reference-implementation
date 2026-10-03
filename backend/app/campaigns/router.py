@@ -325,17 +325,16 @@ def create_variant_decision_slot(
         raise HTTPException(status_code=400, detail=str(error))
 
 
-@router.get("/decision-slots/{decision_slot_id}/resolutions", response_model=list[DecisionResolution])
+@router.get("/decision-slots/{decision_slot_id}/resolutions", response_model=Page[DecisionResolution])
 def get_decision_slot_resolutions(
     decision_slot_id: int,
+    params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
-    return list_resolutions_for_decision_slot(
-        db=db,
-        decision_slot_id=decision_slot_id,
-        brand_id=brand_id,
-    )
+    from app.campaigns.service import page_resolutions_for_decision_slot
+
+    return page_resolutions_for_decision_slot(db, decision_slot_id, params, brand_id=brand_id)
 
 
 @router.post("/decision-slots/{decision_slot_id}/resolutions", response_model=DecisionResolution)
@@ -762,13 +761,16 @@ def get_variant_suggestions(
 
 @router.get(
     "/decision-slots",
-    response_model=list[DecisionSlotListed],
+    response_model=Page[DecisionSlotListed],
     summary="Every decision slot in the working brand, with its resolution counts",
 )
-def get_decision_slots(db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
-    from app.campaigns.service import list_decision_slots_with_stats
+def get_decision_slots(
+    params: PageParams = Depends(page_params),
+    db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.campaigns.service import page_decision_slots_with_stats
 
-    return list_decision_slots_with_stats(db, brand_id=brand_id)
+    return page_decision_slots_with_stats(db, params, brand_id=brand_id)
 
 
 @router.get(

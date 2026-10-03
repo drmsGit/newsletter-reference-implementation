@@ -4112,6 +4112,17 @@ export interface components {
             /** Offset */
             offset: number;
         };
+        /** Page[AudienceGroupMember] */
+        Page_AudienceGroupMember_: {
+            /** Items */
+            items: components["schemas"]["AudienceGroupMember"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
         /** Page[Campaign] */
         Page_Campaign_: {
             /** Items */
@@ -4123,10 +4134,87 @@ export interface components {
             /** Offset */
             offset: number;
         };
+        /** Page[ConsentDriftItem] */
+        Page_ConsentDriftItem_: {
+            /** Items */
+            items: components["schemas"]["ConsentDriftItem"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[ConsentSyncLog] */
+        Page_ConsentSyncLog_: {
+            /** Items */
+            items: components["schemas"]["ConsentSyncLog"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[ContentOverride] */
+        Page_ContentOverride_: {
+            /** Items */
+            items: components["schemas"]["ContentOverride"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
         /** Page[ContentRecord] */
         Page_ContentRecord_: {
             /** Items */
             items: components["schemas"]["ContentRecord"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[DecisionResolution] */
+        Page_DecisionResolution_: {
+            /** Items */
+            items: components["schemas"]["DecisionResolution"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[DecisionSlotListed] */
+        Page_DecisionSlotListed_: {
+            /** Items */
+            items: components["schemas"]["DecisionSlotListed"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[DeliveryExecution] */
+        Page_DeliveryExecution_: {
+            /** Items */
+            items: components["schemas"]["DeliveryExecution"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[EngagementEvent] */
+        Page_EngagementEvent_: {
+            /** Items */
+            items: components["schemas"]["EngagementEvent"][];
             /** Total */
             total: number;
             /** Limit */
@@ -4149,6 +4237,28 @@ export interface components {
         Page_PendingActionRow_: {
             /** Items */
             items: components["schemas"]["PendingActionRow"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[ProviderEventQuarantine] */
+        Page_ProviderEventQuarantine_: {
+            /** Items */
+            items: components["schemas"]["ProviderEventQuarantine"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[Recipient] */
+        Page_Recipient_: {
+            /** Items */
+            items: components["schemas"]["Recipient"][];
             /** Total */
             total: number;
             /** Limit */
@@ -6734,7 +6844,12 @@ export interface operations {
     };
     get_decision_slot_resolutions_campaigns_decision_slots__decision_slot_id__resolutions_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Rows per page (1-200). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
             header?: never;
             path: {
                 decision_slot_id: number;
@@ -6749,7 +6864,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DecisionResolution"][];
+                    "application/json": components["schemas"]["Page_DecisionResolution_"];
                 };
             };
             /** @description Validation Error */
@@ -7039,7 +7154,12 @@ export interface operations {
     };
     get_decision_slots_campaigns_decision_slots_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Rows per page (1-200). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -7052,7 +7172,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DecisionSlotListed"][];
+                    "application/json": components["schemas"]["Page_DecisionSlotListed_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7447,7 +7576,12 @@ export interface operations {
     };
     get_executions_for_send_instance_delivery_send_instances__send_instance_id__executions_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Rows per page (1-200). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
             header?: never;
             path: {
                 send_instance_id: number;
@@ -7462,7 +7596,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DeliveryExecution"][];
+                    "application/json": components["schemas"]["Page_DeliveryExecution_"];
                 };
             };
             /** @description Validation Error */
@@ -7676,7 +7810,12 @@ export interface operations {
     };
     get_events_for_delivery_execution_insight_delivery_executions__delivery_execution_id__events_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Rows per page (1-200). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
             header?: never;
             path: {
                 delivery_execution_id: number;
@@ -7691,7 +7830,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EngagementEvent"][];
+                    "application/json": components["schemas"]["Page_EngagementEvent_"];
                 };
             };
             /** @description Validation Error */
@@ -7864,7 +8003,12 @@ export interface operations {
     };
     get_recipients_recipients__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Rows per page (1-200). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -7877,7 +8021,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Recipient"][];
+                    "application/json": components["schemas"]["Page_Recipient_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7917,7 +8070,12 @@ export interface operations {
     };
     get_consent_drift_recipients_consent_drift_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Rows per page (1-200). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -7930,7 +8088,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ConsentDriftItem"][];
+                    "application/json": components["schemas"]["Page_ConsentDriftItem_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7939,6 +8106,10 @@ export interface operations {
         parameters: {
             query?: {
                 recipient_id?: number | null;
+                /** @description Rows per page (1-200). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -7952,7 +8123,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ConsentSyncLog"][];
+                    "application/json": components["schemas"]["Page_ConsentSyncLog_"];
                 };
             };
             /** @description Validation Error */
@@ -8162,7 +8333,12 @@ export interface operations {
     };
     get_quarantined_events_provider_quarantine_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Rows per page (1-200). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -8175,7 +8351,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProviderEventQuarantine"][];
+                    "application/json": components["schemas"]["Page_ProviderEventQuarantine_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -8270,6 +8455,10 @@ export interface operations {
                 module_instance_id?: number | null;
                 send_instance_id?: number | null;
                 active?: boolean | null;
+                /** @description Rows per page (1-200). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -8283,7 +8472,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ContentOverride"][];
+                    "application/json": components["schemas"]["Page_ContentOverride_"];
                 };
             };
             /** @description Validation Error */
@@ -8625,7 +8814,12 @@ export interface operations {
     };
     list_members_api_audience_groups__group_id__members_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Rows per page (1-200). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
             header?: never;
             path: {
                 group_id: number;
@@ -8640,7 +8834,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AudienceGroupMember"][];
+                    "application/json": components["schemas"]["Page_AudienceGroupMember_"];
                 };
             };
             /** @description Validation Error */

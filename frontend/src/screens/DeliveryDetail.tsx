@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router'
 
 import { useDelivery, useDeliveryExecutions, type DeliveryExecution } from '../api/resources'
 import DataTable, { type DataColumn } from '../components/DataTable'
+import Pager, { useOffset } from '../components/Pager'
 import ScreenState from '../components/ScreenState'
 import { formatDate } from './Campaigns'
 
@@ -49,7 +50,7 @@ function executionColumns(sendId: number): DataColumn<DeliveryExecution>[] {
 export default function DeliveryDetail() {
   const id = Number(useParams().id)
   const delivery = useDelivery(id)
-  const executions = useDeliveryExecutions(id)
+  const executions = useDeliveryExecutions(id, useOffset())
 
   return (
     <>
@@ -92,9 +93,10 @@ export default function DeliveryDetail() {
               <DataTable
                 label="Recipients of this send"
                 columns={executionColumns(id)}
-                items={executions.data ?? []}
+                items={executions.data?.items ?? []}
                 emptyMessage="This send has no recipients."
               />
+              <Pager page={executions.data} />
             </ScreenState>
           </>
         )}

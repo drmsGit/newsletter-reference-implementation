@@ -90,7 +90,8 @@ class TestB21B22DecisionSlotStats:
     def test_the_list_carries_the_counts(self, slot):
         s, _, _ = slot
         with machine([VIEW]) as headers:
-            rows = client.get("/campaigns/decision-slots", headers=headers).json()
+            rows = client.get("/campaigns/decision-slots", params={"limit": 200},
+                              headers=headers).json()["items"]
         row = next(r for r in rows if r["id"] == s.id)
         assert (row["resolution_count"], row["unique_content_count"]) == (4, 2)
 
@@ -112,7 +113,8 @@ class TestB21B22DecisionSlotStats:
         db.add(foreign); db.commit()
         try:
             with machine([VIEW]) as headers:
-                rows = client.get("/campaigns/decision-slots", headers=headers).json()
+                rows = client.get("/campaigns/decision-slots", params={"limit": 200},
+                                  headers=headers).json()["items"]
                 stats = client.get(f"/campaigns/decision-slots/{foreign.id}/stats", headers=headers)
             assert foreign.id not in {r["id"] for r in rows}
             assert stats.status_code == 404
@@ -374,7 +376,8 @@ class TestB23B24Deliveries:
     def test_executions_say_who_and_why(self, demo):
         send, _ = demo
         with machine([VIEW]) as headers:
-            rows = client.get(f"/delivery/send-instances/{send.id}/executions", headers=headers).json()
+            rows = client.get(f"/delivery/send-instances/{send.id}/executions",
+                              params={"limit": 200}, headers=headers).json()["items"]
         assert all(r["recipient_external_id"].startswith("demo-") for r in rows)
 
     def test_the_trace_carries_what_each_click_taught(self, demo):

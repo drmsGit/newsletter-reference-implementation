@@ -147,6 +147,19 @@ def delete_group(db: Session, group_id: int, *, brand_id: int) -> bool:
     return True
 
 
+def page_members(db: Session, group_id: int, params, *, brand_id: int):
+    """One ADR-185 page of a group's pinned members, most recently added first."""
+    from app.audience.models import AudienceGroupMember
+    from app.pagination import page_of_query
+
+    query = (
+        db.query(AudienceGroupMemberDB)
+        .join(AudienceGroupDB, AudienceGroupDB.id == AudienceGroupMemberDB.group_id)
+        .filter(AudienceGroupMemberDB.group_id == group_id, AudienceGroupDB.brand_id == brand_id)
+    )
+    return page_of_query(query, params, AudienceGroupMemberDB.added_at.desc(),
+                         AudienceGroupMemberDB.id.desc(), convert=lambda m: AudienceGroupMember.model_validate(m, from_attributes=True))
+
 def list_members(
     db: Session, group_id: int, *, brand_id: int
 ) -> list[AudienceGroupMemberDB]:

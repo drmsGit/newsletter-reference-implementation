@@ -47,7 +47,11 @@ class Page(BaseModel, Generic[T]):
     offset: int
 
 
-def page_of_query(query, params: PageParams, *order, convert: Callable = lambda row: row) -> Page:
+def page_of_query(
+    query, params: PageParams, *order,
+    convert: Callable = lambda row: row,
+    convert_all: Callable | None = None,
+) -> Page:
     """Page a SQLAlchemy query in the database.
 
     `order` is the route's declared order; it MUST end with the model's `id`
@@ -57,8 +61,11 @@ def page_of_query(query, params: PageParams, *order, convert: Callable = lambda 
     """
     total = query.order_by(None).count()
     rows = query.order_by(*order).offset(params.offset).limit(params.limit).all()
-    return Page(items=[convert(r) for r in rows], total=total,
-                limit=params.limit, offset=params.offset)
+    # `convert_all` for a projection that is batched by design (a recipient's
+    # addresses and consent come in a fixed number of queries for the whole
+    # page, not per row); `convert` otherwise.
+    items = convert_all(rows) if convert_all is not None else [convert(r) for r in rows]
+    return Page(items=items, total=total, limit=params.limit, offset=params.offset)
 
 
 def page_of_list(rows: Iterable, params: PageParams) -> Page:

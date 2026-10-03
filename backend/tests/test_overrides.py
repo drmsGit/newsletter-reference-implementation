@@ -319,7 +319,9 @@ class TestGetAndList:
         module_id = field_override["module_instance_id"]
         response = client.get(f"/overrides/?module_instance_id={module_id}&active=true")
         assert response.status_code == 200
-        results = response.json()
+        results = response.json()["items"]
+        # The filters apply to the total too (ADR-185 point 6).
+        assert response.json()["total"] == len(results)
         assert all(r["module_instance_id"] == module_id and r["active"] for r in results)
         assert any(r["id"] == field_override["id"] for r in results)
 

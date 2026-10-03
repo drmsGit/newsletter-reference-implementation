@@ -3,6 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import working_brand
+from app.pagination import Page, PageParams, page_of_list, page_params
 from app.database import get_db
 from app.insight.graph import category_graph
 from app.insight.models import (
@@ -49,17 +50,16 @@ def create_event(
         )
 
 
-@router.get("/delivery-executions/{delivery_execution_id}/events", response_model=list[EngagementEvent])
+@router.get("/delivery-executions/{delivery_execution_id}/events", response_model=Page[EngagementEvent])
 def get_events_for_delivery_execution(
     delivery_execution_id: int,
+    params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
-    return list_events_for_delivery_execution(
-        db=db,
-        delivery_execution_id=delivery_execution_id,
-        brand_id=brand_id,
-    )
+    from app.insight.service import page_events_for_delivery_execution
+
+    return page_events_for_delivery_execution(db, delivery_execution_id, params, brand_id=brand_id)
 
 
 @router.post("/events/{event_id}/apply-signals", response_model=PreferenceUpdateResult)

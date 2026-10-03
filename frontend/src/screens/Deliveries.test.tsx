@@ -112,10 +112,10 @@ describe('a send in detail', () => {
           audience_group_name: 'Spring travellers',
         }),
       'GET /delivery/send-instances/4/executions': () =>
-        jsonResponse([
+        jsonResponse(page([
           execution(11, 'sent'),
           execution(12, 'excluded', { exclusion_reason: 'consent' }),
-        ]),
+        ])),
     })
     renderWithProviders(
       <Routes>
@@ -149,7 +149,7 @@ describe('a send in detail', () => {
   it("answers another brand's send as absent", async () => {
     stubFetch({
       'GET /delivery/send-instances/4': () => jsonResponse({ detail: 'not found' }, 404),
-      'GET /delivery/send-instances/4/executions': () => jsonResponse([]),
+      'GET /delivery/send-instances/4/executions': () => jsonResponse(page([])),
     })
     renderWithProviders(
       <Routes>

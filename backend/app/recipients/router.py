@@ -5,6 +5,7 @@ from app.auth.dependencies import enforce_api_policy
 from app.auth.permissions import RECIPIENTS_CONSENT
 from app.auth.service import has_permission
 from app.auth.dependencies import working_brand
+from app.pagination import Page, PageParams, page_of_list, page_params
 from app.database import get_db
 from app.recipients.models import (
     RecipientActivity,
@@ -110,15 +111,18 @@ def create_recipient_record(
         raise HTTPException(status_code=400, detail=str(error))
 
 
-@router.get("/", response_model=list[Recipient])
+@router.get("/", response_model=Page[Recipient])
 def get_recipients(
+    params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
     # A brand as CONTEXT, not authorisation: `recipients.manage` stays
     # platform-level because recipients carry no brand, but their consent does,
     # so projecting it needs one named (ADR-150's 2026-09-20 addendum).
-    return list_recipients(db, brand_id=brand_id)
+    from app.recipients.service import page_recipients
+
+    return page_recipients(db, params, brand_id=brand_id)
 
 
 # --- Consent (CRM-synced) -------------------------------------------------
@@ -127,19 +131,23 @@ def get_recipients(
 # swallowed by the single-segment "/{external_id}" route regardless of order.
 
 
-@router.get("/consent/drift", response_model=list[ConsentDriftItem])
-def get_consent_drift(db: Session = Depends(get_db)):
+@router.get("/consent/drift", response_model=Page[ConsentDriftItem])
+def get_consent_drift(params: PageParams = Depends(page_params), db: Session = Depends(get_db)):
     """Recipients whose platform consent_status diverges from the CRM's most
     recent assertion — a sync that failed to stick, which must not be silent."""
-    return detect_consent_drift(db)
+    # Computed across the log, so paged after (ADR-185, `page_of_list`).
+    return page_of_list(detect_consent_drift(db), params)
 
 
-@router.get("/consent/sync-log", response_model=list[ConsentSyncLog])
+@router.get("/consent/sync-log", response_model=Page[ConsentSyncLog])
 def get_consent_sync_log(
     recipient_id: int | None = None,
+    params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
 ):
-    return list_consent_sync_logs(db, recipient_id=recipient_id)
+    from app.recipients.service import page_consent_sync_logs
+
+    return page_consent_sync_logs(db, params, recipient_id=recipient_id)
 
 
 @router.post("/{external_id}/consent", response_model=Recipient)

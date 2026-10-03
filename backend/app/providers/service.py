@@ -115,6 +115,15 @@ def ingest_provider_event(
     return ProviderEventIngestResult(status="matched", engagement_event=engagement_event)
 
 
+def page_quarantined_events(db: Session, params):
+    """One ADR-185 page of quarantined provider events, newest first."""
+    from app.pagination import page_of_query
+
+    return page_of_query(db.query(ProviderEventQuarantineDB), params,
+                         ProviderEventQuarantineDB.created_at.desc(),
+                         ProviderEventQuarantineDB.id.desc(),
+                         convert=to_provider_event_quarantine)
+
 def list_quarantined_events(db: Session) -> list[ProviderEventQuarantine]:
     records = (
         db.query(ProviderEventQuarantineDB)

@@ -24,6 +24,16 @@ PAGED = {
     "/content/",
     "/api/audience-groups/",
     "/campaigns/monitoring",
+    "/recipients/",
+    "/api/audience-groups/{group_id}/members",
+    "/campaigns/decision-slots",
+    "/campaigns/decision-slots/{decision_slot_id}/resolutions",
+    "/delivery/send-instances/{send_instance_id}/executions",
+    "/insight/delivery-executions/{delivery_execution_id}/events",
+    "/overrides/",
+    "/provider/quarantine",
+    "/recipients/consent/sync-log",
+    "/recipients/consent/drift",
 }
 
 #: Lists fixed by code or configuration, or bounded by one parent record
@@ -51,20 +61,10 @@ FIXED = {
     "/delivery/snapshots/{snapshot_id}/send-instances",
 }
 
-#: Lists that grow with use and are adopted in the next step of task-88.
-#: **This set must be empty when task-88 closes.**
-NOT_YET = {
-    "/recipients/",
-    "/api/audience-groups/{group_id}/members",
-    "/campaigns/decision-slots",
-    "/campaigns/decision-slots/{decision_slot_id}/resolutions",
-    "/delivery/send-instances/{send_instance_id}/executions",
-    "/insight/delivery-executions/{delivery_execution_id}/events",
-    "/overrides/",
-    "/provider/quarantine",
-    "/recipients/consent/sync-log",
-    "/recipients/consent/drift",
-}
+#: Lists that grow with use and are not yet paged. Empty since task-88 closed;
+#: the classification test still reads it, so a route can be parked here
+#: honestly rather than misfiled as FIXED.
+NOT_YET: set[str] = set()
 
 
 def _get_routes():
@@ -131,7 +131,7 @@ def test_a_page_of_a_query_counts_the_filtered_set_and_pages_do_not_overlap():
         db.close()
 
 
-@pytest.mark.parametrize("path", sorted(PAGED))
+@pytest.mark.parametrize("path", sorted(p for p in PAGED if "{" not in p))
 def test_over_json_each_paged_route_answers_with_the_envelope(path):
     from app.auth.permissions import VIEW
     from tests.machine import machine
@@ -145,3 +145,48 @@ def test_over_json_each_paged_route_answers_with_the_envelope(path):
     assert set(body) == {"items", "total", "limit", "offset"}
     assert body["limit"] == 1 and len(body["items"]) <= 1 and body["total"] >= len(body["items"])
     assert too_many.status_code == 422, "the page size has a ceiling"
+
+
+def test_an_executions_events_answer_and_stay_in_their_brand():
+    """GET /insight/delivery-executions/{id}/events returned 500 on every call
+    until 2026-10-03: the route passed a brand its service never accepted. It
+    now answers, paged, and is scoped through the execution's send (ADR-172) —
+    another brand sees no rows and a total of 0."""
+    from app.auth.db_models import BrandDB
+    from app.auth.permissions import VIEW
+    from app.database import SessionLocal
+    from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
+    from app.insight.db_models import EngagementEventDB
+    from tests.machine import machine
+
+    db = SessionLocal()
+    try:
+        clicked = (
+            db.query(DeliveryExecutionDB)
+            .join(SendInstanceDB, SendInstanceDB.id == DeliveryExecutionDB.send_instance_id)
+            .join(EngagementEventDB, EngagementEventDB.delivery_execution_id == DeliveryExecutionDB.id)
+            .filter(SendInstanceDB.name == "Demo send")
+            .first()
+        )
+        assert clicked is not None, "the seeded Demo send has no clicked execution"
+        expected = db.query(EngagementEventDB).filter(
+            EngagementEventDB.delivery_execution_id == clicked.id).count()
+        other = BrandDB(key="pagination-events-other", name="Events other")
+        db.add(other)
+        db.commit()
+        client = TestClient(app, raise_server_exceptions=False)
+        path = f"/insight/delivery-executions/{clicked.id}/events"
+        try:
+            with machine([VIEW]) as headers:
+                own = client.get(path, params={"limit": 1}, headers=headers)
+            with machine([VIEW], brand_id=other.id) as headers:
+                foreign = client.get(path, headers=headers)
+        finally:
+            db.query(BrandDB).filter(BrandDB.id == other.id).delete()
+            db.commit()
+        assert own.status_code == 200, own.text
+        assert own.json()["total"] == expected and len(own.json()["items"]) == 1
+        assert foreign.status_code == 200, foreign.text
+        assert (foreign.json()["items"], foreign.json()["total"]) == ([], 0)
+    finally:
+        db.close()

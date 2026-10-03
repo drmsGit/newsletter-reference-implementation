@@ -3,6 +3,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
+from app.pagination import Page, PageParams, page_of_list, page_params
 from app.database import get_db
 from app.providers.adapters.resend import parse_webhook, verify_signature
 from app.providers.models import ProviderEventCreate, ProviderEventIngestResult, ProviderEventQuarantine
@@ -34,10 +35,12 @@ def create_provider_event(
 
 @router.get(
     "/quarantine",
-    response_model=list[ProviderEventQuarantine],
+    response_model=Page[ProviderEventQuarantine],
 )
-def get_quarantined_events(db: Session = Depends(get_db)):
-    return list_quarantined_events(db)
+def get_quarantined_events(params: PageParams = Depends(page_params), db: Session = Depends(get_db)):
+    from app.providers.service import page_quarantined_events
+
+    return page_quarantined_events(db, params)
 
 
 @router.post("/webhooks/resend")
