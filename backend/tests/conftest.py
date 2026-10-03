@@ -101,23 +101,59 @@ def _ensure_database_exists(url: str) -> None:
         connection.close()
 
 
+def _start_from_an_empty_schema(url: str) -> None:
+    """Empty the test database before anything imports `main`.
+
+    **It has to happen before `main` is first imported.**
+    Test modules import `main` at collection time, and `main`'s import path
+    does real work against the database: `create_all` (which skips a table that
+    already exists, so a new column never reaches it) and then
+    `create_demo_content_if_empty`, which selects `content_records` with every
+    model column. On 2026-10-03 migration 0029 added
+    `content_records.updated_at`, and the next run died at collection with
+    `UndefinedColumn` against the stale test database — before the fixture
+    that would have rebuilt it ever ran.
+
+    An empty schema is the one state `main` already knows how to handle:
+    ADR-181's startup check sees no application tables, builds every one from
+    the models, and records the ledger as `built`. So the schema `main` meets
+    is current whatever the last run left behind, and the ledger needs no help
+    at this point. (An earlier version of this step only stamped the ledger,
+    which fixed the startup refusal but not the stale columns.)
+
+    The whole schema rather than `drop_all`: at this point no model module has
+    been imported, so `Base.metadata` knows no tables to drop. The guard is
+    asked again here, on purpose — this is the one line in the suite that would
+    destroy real work if the URL were wrong — which is also why it is called
+    before `DATABASE_URL` is pointed at the test database below: after that,
+    the guard would be comparing the URL with itself.
+    """
+    _refuse_the_dev_database(url)
+    import psycopg2
+
+    connection = psycopg2.connect(url)
+    try:
+        connection.autocommit = True
+        with connection.cursor() as cursor:
+            cursor.execute("DROP SCHEMA public CASCADE")
+            cursor.execute("CREATE SCHEMA public")
+    finally:
+        connection.close()
+
+
 # --- and this must happen before anything imports app.database --------------
 TEST_DATABASE_URL = _test_database_url()
 _refuse_the_dev_database(TEST_DATABASE_URL)
 _ensure_database_exists(TEST_DATABASE_URL)
+_start_from_an_empty_schema(TEST_DATABASE_URL)
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
 
 def _record_as_built_from_the_models() -> None:
     """Tell ADR-181's startup check that this database is at head.
 
-    **True by construction, and it has to be said before `main` is imported.**
-    Test modules import `main` at collection time, which runs the startup
-    check, and that happens before `_known_state` below drops and rebuilds the
-    schema. Without this, the first migration added after a test database was
-    created would make the suite refuse to start — against a database that is
-    about to be rebuilt from the models anyway.
-
+    True by construction: called right after `_build_known_state` below drops and
+    rebuilds the schema from the models, which takes the ledger with it.
     `built` rather than `baseline`: nobody checked anything; the schema is the
     models' because the fixture makes it so. What this does NOT prove is that
     the migrations build the same schema — that is task-12.
@@ -132,12 +168,17 @@ def _record_as_built_from_the_models() -> None:
         )
 
 
-_record_as_built_from_the_models()
-
-
-@pytest.fixture(scope="session", autouse=True)
-def _known_state():
+def _build_known_state() -> None:
     """Build the schema and put a known dataset in it, once per run.
+
+    **Called at conftest load, not from a session fixture — and it used to be
+    one.** Test modules read the seed at collection time (`test_overrides.py`
+    resolves `DECISION_MODULE` at module level), and collection happens before
+    any fixture runs. As the autouse fixture `_known_state`, this rebuilt the
+    database only *after* those reads, so they saw whatever the previous run
+    had left behind — which happened to be the same seed, until a run started
+    from an empty schema (`_start_from_an_empty_schema`, 2026-10-03) and
+    collection found nothing. Built here, collection reads this run's data.
 
     **Known state is the point, not merely isolation.** The 2026-07-31 entry
     that asked for this database diagnosed the real damage precisely: tests had
@@ -191,7 +232,6 @@ def _known_state():
 
     seed_demo_data.seed()
     _ensure_send_instances_in_both_states()
-    yield
 
 
 def _ensure_send_instances_in_both_states() -> None:
@@ -237,6 +277,9 @@ def _ensure_send_instances_in_both_states() -> None:
         session.commit()
     finally:
         session.close()
+
+
+_build_known_state()
 
 
 # --- the brand boundary (ADR-172) -------------------------------------------
