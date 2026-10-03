@@ -252,3 +252,68 @@ input[data-focus-visible] {
   align-items: center;
   margin-top: 1rem;
 }
+
+/*
+ * The variant editor (task-255): the module stack beside the selected
+ * module's fields (Variant Editor interview 2.1), the envelope above both.
+ */
+.editor {
+  display: grid;
+  grid-template-columns: minmax(24rem, 1fr) 2fr;
+  gap: calc(var(--brand-space) * 3);
+  align-items: start;
+}
+
+.envelope,
+.editor__fields {
+  display: grid;
+  gap: calc(var(--brand-space) * 2);
+  max-width: 40rem;
+}
+
+.envelope {
+  margin-bottom: calc(var(--brand-space) * 3);
+}
+
+.stack {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 calc(var(--brand-space) * 2);
+  display: grid;
+  gap: var(--brand-space);
+}
+
+.stack__item {
+  display: flex;
+  gap: calc(var(--brand-space) / 2);
+  align-items: center;
+}
+
+.stack__item[aria-current] .stack__select {
+  border-color: var(--brand-accent);
+}
+
+.stack__select {
+  flex: 1;
+  text-align: left;
+}
+
+.add-module,
+.create-form {
+  display: flex;
+  gap: var(--brand-space);
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.field textarea {
+  font: inherit;
+  padding: var(--brand-space);
+  border: 1px solid var(--brand-line);
+  border-radius: var(--brand-radius);
+}
+
+.field-error {
+  color: var(--brand-danger);
+  margin: 0;
+}

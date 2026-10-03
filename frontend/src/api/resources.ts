@@ -447,3 +447,193 @@ export function useSlotCandidates(id: number) {
       ),
   })
 }
+
+// --- the variant editor's writes (task-255) ----------------------------------
+
+export type ModuleManifest = components['schemas']['ModuleManifestOut']
+export type ModuleVariable = components['schemas']['ModuleVariableOut']
+
+/** The modules a channel offers, with each field as an authoring form needs it. */
+export function useModuleManifests(channel: string | undefined) {
+  return useQuery({
+    queryKey: ['modules', channel],
+    queryFn: () => read(api.GET('/modules', { params: { query: { channel: channel! } } })),
+    enabled: !!channel,
+    // Manifests are files read at startup; they do not change under a session.
+    staleTime: Infinity,
+  })
+}
+
+
+type Variant = CampaignComposition['variants'][number]['variant']
+
+/**
+ * The entity a save is about, as the cache holds it **when the save is sent**,
+ * not when the field was edited.
+ *
+ * Two fields of one module blurred in quick succession make two saves. The
+ * second must carry the version the first one produced (task-110), or it is
+ * refused as stale against the person's own edit — and it must merge into the
+ * data the first one wrote, or it writes the first field's old value back.
+ * So saves run one after another (`scope`); each one's success waits for the
+ * composition to be read again before the next starts, and each reads the
+ * entity from that fresh read at its own start. A save states only what
+ * changed (`changes`), never a copy of the whole entity taken at edit time.
+ */
+function cachedOf(composition: CampaignComposition | undefined, kind: 'variant', id: number): Variant | undefined
+function cachedOf(composition: CampaignComposition | undefined, kind: 'module', id: number): ComposedModule | undefined
+function cachedOf(composition: CampaignComposition | undefined, kind: 'variant' | 'module', id: number) {
+  for (const composed of composition?.variants ?? []) {
+    if (kind === 'variant' && composed.variant.id === id) return composed.variant
+    if (kind === 'module') {
+      const found = composed.modules.find((m) => m.id === id)
+      if (found) return found
+    }
+  }
+  return undefined
+}
+
+function useComposerWrite<TArgs extends { id: number }, TEntity, TResult>(
+  campaignId: number,
+  kind: 'variant' | 'module',
+  current: (composition: CampaignComposition | undefined, id: number) => TEntity | undefined,
+  send: (args: TArgs, entity: TEntity | undefined) => Promise<TResult>,
+) {
+  const queryClient = useQueryClient()
+  const key = keys.composition(campaignId)
+  return useMutation({
+    // One queue per kind of entity: every module write on the screen waits for
+    // the one before it, and so does every variant write. A scope is fixed per
+    // hook rather than per call, so this is coarser than one queue per module;
+    // the cost is a little latency between saves, never a refused one.
+    scope: { id: `composer-${kind}` },
+    mutationFn: (args: TArgs) =>
+      send(args, current(queryClient.getQueryData<CampaignComposition>(key), args.id)),
+    // Returned, so the mutation — and the next one queued behind it — waits
+    // for the re-read that carries the new version.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: key }),
+  })
+}
+
+/**
+ * Change some of a variant's name, subject and preheader. The PUT replaces all
+ * three, so the ones not changed are sent as the cache holds them now.
+ */
+export function useSaveVariant(campaignId: number) {
+  return useComposerWrite(
+    campaignId,
+    'variant',
+    (composition, id) => cachedOf(composition, 'variant', id),
+    (
+      { id, changes }: { id: number; changes: { name?: string; subject?: string | null; preheader?: string | null } },
+      variant,
+    ) =>
+      read(
+        api.PUT('/campaigns/variants/{variant_id}', {
+          params: { path: { variant_id: id }, header: { 'If-Match': variant?.updated_at } },
+          body: {
+            name: variant?.name ?? '',
+            subject: variant?.subject ?? null,
+            preheader: variant?.preheader ?? null,
+            ...changes,
+          },
+        }),
+      ),
+  )
+}
+
+/**
+ * Change some of a module's fields. The PUT replaces type, binding and data
+ * together, so everything else is sent as the cache holds it now.
+ */
+export function useSaveModule(campaignId: number) {
+  return useComposerWrite(
+    campaignId,
+    'module',
+    (composition, id) => cachedOf(composition, 'module', id),
+    ({ id, changes }: { id: number; changes: Record<string, unknown> }, module) =>
+      read(
+        api.PUT('/campaigns/modules/{module_id}', {
+          params: { path: { module_id: id }, header: { 'If-Match': module?.updated_at } },
+          body: {
+            module_type: module?.module_type ?? '',
+            content_record_id: module?.content_record_id ?? null,
+            decision_slot_id: module?.decision_slot_id ?? null,
+            module_data: { ...(module?.module_data ?? {}), ...changes },
+          },
+        }),
+      ),
+  )
+}
+
+export function useMoveModule(campaignId: number) {
+  return useComposerWrite(
+    campaignId,
+    'module',
+    (composition, id) => cachedOf(composition, 'module', id),
+    ({ id, direction }: { id: number; direction: 'up' | 'down' }, module) =>
+      read(
+        api.POST('/campaigns/modules/{module_id}/move', {
+          params: { path: { module_id: id }, query: { direction }, header: { 'If-Match': module?.updated_at } },
+        }),
+      ),
+  )
+}
+
+export function useDeleteModule(campaignId: number) {
+  return useComposerWrite(
+    campaignId,
+    'module',
+    (composition, id) => cachedOf(composition, 'module', id),
+    async ({ id }: { id: number }, module) => {
+      await read(
+        api.DELETE('/campaigns/modules/{module_id}', {
+          params: { path: { module_id: id }, header: { 'If-Match': module?.updated_at } },
+        }),
+      )
+      return undefined
+    },
+  )
+}
+
+export function useAddModule(campaignId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ variantId, moduleType }: { variantId: number; moduleType: string }) =>
+      read(
+        api.POST('/campaigns/variants/{variant_id}/modules', {
+          params: { path: { variant_id: variantId } },
+          body: { module_type: moduleType },
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.composition(campaignId) }),
+  })
+}
+
+/** A new campaign; the server creates its first variant with it. */
+export function useCreateCampaign() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    // The generated types make defaulted fields required, so they are stated:
+    // a new campaign is a draft, and its first variant takes the name the
+    // server would give it anyway.
+    mutationFn: (body: { name: string; channel: string }) =>
+      read(api.POST('/campaigns/', {
+        body: { ...body, status: 'draft', initial_variant_name: 'Variant A' },
+      })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.campaigns }),
+  })
+}
+
+/** A blank variant: secondary to Duplicate, which stays the primary way (VE 5.1). */
+export function useCreateVariant(campaignId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { name: string; channel: string }) =>
+      read(api.POST('/campaigns/{campaign_id}/variants', {
+        params: { path: { campaign_id: campaignId } },
+        body: { ...body, status: 'draft' },
+      })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.composition(campaignId) }),
+  })
+}

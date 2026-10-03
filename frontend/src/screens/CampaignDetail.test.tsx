@@ -144,3 +144,56 @@ describe('a campaign in detail', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/permission/i)
   })
 })
+
+// task-255: the two ways in, and the way to the editor.
+const CHANNELS = { channels: [{ name: 'email', available: true }, { name: 'push', available: false }] }
+
+describe('creating', () => {
+  it('creates a campaign on an available channel and opens its first variant in the editor', async () => {
+    const fetchMock = stubFetch({
+      'GET /campaigns/': () => jsonResponse(page([])),
+      'GET /settings': () => jsonResponse(CHANNELS),
+      'POST /campaigns/': () => jsonResponse({ id: 7, name: 'Autumn', variants: [{ id: 21 }] }),
+    })
+    renderWithProviders(
+      <Routes>
+        <Route path="/campaigns" element={<Campaigns />} />
+        <Route path="/campaigns/:id/variants/:variantId" element={<p>editor 7/21</p>} />
+      </Routes>,
+      { route: '/campaigns' },
+    )
+    fireEvent.change(await screen.findByLabelText(/^New campaign/), { target: { value: 'Autumn' } })
+    // Only the switched-on channel is offered.
+    await waitFor(() => expect(screen.getByRole('button', { name: /email/ })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Create campaign' }))
+    expect(await screen.findByText('editor 7/21')).toBeInTheDocument()
+    const post = fetchMock.mock.calls.map(([r]) => r as Request).find((r) => r.method === 'POST')!
+    expect(await post.clone().json()).toEqual({
+      name: 'Autumn', channel: 'email', status: 'draft', initial_variant_name: 'Variant A',
+    })
+  })
+
+  it('creates a blank variant below the variants and opens it in the editor', async () => {
+    const fetchMock = stubFetch({
+      'GET /campaigns/1/composition': () => jsonResponse(COMPOSITION),
+      'GET /settings': () => jsonResponse(CHANNELS),
+      'POST /campaigns/1/variants': () => jsonResponse({ id: 22 }),
+    })
+    renderWithProviders(
+      <Routes>
+        <Route path="/campaigns/:id" element={<CampaignDetail />} />
+        <Route path="/campaigns/:id/variants/:variantId" element={<p>editor 1/22</p>} />
+      </Routes>,
+      { route: '/campaigns/1' },
+    )
+    expect(await screen.findByRole('link', { name: 'Edit Variant A' })).toHaveAttribute(
+      'href', '/campaigns/1/variants/3',
+    )
+    fireEvent.change(screen.getByLabelText(/^New blank variant/), { target: { value: 'Plain' } })
+    await waitFor(() => expect(screen.getByRole('button', { name: /email/ })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Create blank variant' }))
+    expect(await screen.findByText('editor 1/22')).toBeInTheDocument()
+    const post = fetchMock.mock.calls.map(([r]) => r as Request).find((r) => r.method === 'POST')!
+    expect(await post.clone().json()).toEqual({ name: 'Plain', channel: 'email', status: 'draft' })
+  })
+})

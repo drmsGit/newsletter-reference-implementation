@@ -11,6 +11,7 @@ import DecisionSlotDetail from './screens/DecisionSlotDetail'
 import DecisionSlots from './screens/DecisionSlots'
 import ContentDetail from './screens/ContentDetail'
 import Monitoring from './screens/Monitoring'
+import VariantEditor from './screens/VariantEditor'
 import Settings from './screens/Settings'
 import Deliveries from './screens/Deliveries'
 import DeliveryAsSent from './screens/DeliveryAsSent'
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="/approvals/:id" element={<ApprovalDetail />} />
         <Route path="/campaigns" element={<Campaigns />} />
         <Route path="/campaigns/:id" element={<CampaignDetail />} />
+        <Route path="/campaigns/:id/variants/:variantId" element={<VariantEditor />} />
         <Route path="/monitoring" element={<Monitoring />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/content" element={<Content />} />

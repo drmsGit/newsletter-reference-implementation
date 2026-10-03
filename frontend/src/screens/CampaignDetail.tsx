@@ -1,14 +1,16 @@
 import { Button } from 'react-aria-components'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 
 import {
   useComposition,
+  useCreateVariant,
   useDuplicateVariant,
   type ComposedModule,
   type ComposedVariant,
 } from '../api/resources'
 import { HttpError } from '../api/session'
 import DataTable, { type DataColumn } from '../components/DataTable'
+import NameAndChannel from '../components/NameAndChannel'
 import ScreenState from '../components/ScreenState'
 import { formatDate } from './Campaigns'
 
@@ -49,10 +51,36 @@ export default function CampaignDetail() {
             {composition.data.variants.map((composed) => (
               <VariantSection key={composed.variant.id} campaignId={id} composed={composed} />
             ))}
+            <BlankVariant campaignId={id} />
           </>
         )}
       </ScreenState>
     </>
+  )
+}
+
+/**
+ * A variant from nothing. Secondary on purpose: duplicating is the primary way
+ * a variant comes into being (Variant Editor interview Q5.1), so this sits
+ * after the variants, below every Duplicate button.
+ */
+function BlankVariant({ campaignId }: { campaignId: number }) {
+  const create = useCreateVariant(campaignId)
+  const navigate = useNavigate()
+  return (
+    <div>
+      <NameAndChannel
+        nameLabel="New blank variant"
+        submitLabel="Create blank variant"
+        pending={create.isPending}
+        error={create.error}
+        onSubmit={(value) =>
+          create.mutate(value, {
+            onSuccess: (created) => navigate(`/campaigns/${campaignId}/variants/${created.id}`),
+          })
+        }
+      />
+    </div>
   )
 }
 
@@ -131,6 +159,9 @@ function VariantSection({
         </dd>
       </dl>
 
+      <p>
+        <Link to={`/campaigns/${campaignId}/variants/${variant.id}`}>Edit {variant.name}</Link>
+      </p>
       <p>
         <Button
           isDisabled={duplicate.isPending}

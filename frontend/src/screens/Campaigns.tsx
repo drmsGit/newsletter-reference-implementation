@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router'
 
-import { useCampaigns, type Campaign } from '../api/resources'
+import { useCampaigns, useCreateCampaign, type Campaign } from '../api/resources'
 import DataTable, { type DataColumn } from '../components/DataTable'
+import NameAndChannel from '../components/NameAndChannel'
 import Pager, { useOffset } from '../components/Pager'
 import { SearchBox, useSearch } from '../components/RecipientSearch'
 import ScreenState from '../components/ScreenState'
@@ -14,14 +15,31 @@ const columns: DataColumn<Campaign>[] = [
 
 /**
  * The campaign list. A row opens the campaign, variant by variant.
+ *
+ * A new campaign opens straight in the editor of its first variant, which the
+ * server creates with it: pick the channel and the editor opens empty
+ * (Manager Workflow interview Q4).
  */
 export default function Campaigns() {
   const campaigns = useCampaigns(useOffset(), useSearch())
+  const create = useCreateCampaign()
   const navigate = useNavigate()
 
   return (
     <>
       <h1>Campaigns</h1>
+      <NameAndChannel
+        nameLabel="New campaign"
+        submitLabel="Create campaign"
+        pending={create.isPending}
+        error={create.error}
+        onSubmit={(value) =>
+          create.mutate(value, {
+            onSuccess: (created) =>
+              navigate(`/campaigns/${created.id}/variants/${created.variants[0].id}`),
+          })
+        }
+      />
       <SearchBox label="Find a campaign by name" />
       <ScreenState query={campaigns}>
         <DataTable
