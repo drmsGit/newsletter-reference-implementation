@@ -181,11 +181,17 @@ def list_campaigns(db: Session, *, brand_id: int) -> list[Campaign]:
     ]
 
 
-def page_campaigns(db: Session, params, *, brand_id: int):
-    """One ADR-185 page of the brand's campaigns, newest first."""
+def page_campaigns(db: Session, params, *, brand_id: int, q: str | None = None):
+    """One ADR-185 page of the brand's campaigns, newest first, narrowed by name.
+
+    No status filter, deliberately: `CampaignDB.status` is set at creation and
+    nothing moves it (task-216), so it would sort every campaign into 'draft'.
+    Where a campaign stands is the monitoring read model's answer."""
     from app.pagination import page_of_query
 
     query = db.query(CampaignDB).filter(CampaignDB.brand_id == brand_id)
+    if (q or "").strip():
+        query = query.filter(CampaignDB.name.icontains(q.strip(), autoescape=True))
     return page_of_query(query, params, CampaignDB.created_at.desc(), CampaignDB.id.desc(),
                          convert=to_campaign)
 

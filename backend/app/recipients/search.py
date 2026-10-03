@@ -40,13 +40,40 @@ def clause(q: str | None, recipient_id_column, channel: str):
     needle = _needle(q)
     if needle is None:
         return None
-    pattern = f"%{needle}%"
-    key = address_key_for(channel)
-    by_identifier = exists().where(
-        RecipientDB.id == recipient_id_column, RecipientDB.external_id.ilike(pattern))
-    by_address = exists().where(
-        AddressabilityDB.recipient_id == recipient_id_column,
-        AddressabilityDB.channel == channel,
-        AddressabilityDB.value[key].as_string().ilike(pattern),
-    )
-    return or_(by_identifier, by_address)
+    return or_(_by_identifier(needle, recipient_id_column),
+               _by_address(needle, recipient_id_column, [channel]))
+
+
+def clause_any_channel(q: str | None, recipient_id_column):
+    """The same rule, matching an address on ANY registered channel — for the
+    recipients list, where no channel is in question. Each channel's own
+    address key is read, never the JSON as text: searching "email" must not
+    match every row because it is a key name."""
+    from app.channels.registry import list_channels
+
+    needle = _needle(q)
+    if needle is None:
+        return None
+    channels = [c.name for c in list_channels()]
+    return or_(_by_identifier(needle, recipient_id_column),
+               _by_address(needle, recipient_id_column, channels))
+
+
+# `icontains(..., autoescape=True)`: a typed % or _ is a character to find,
+# not a wildcard — "50%" finds "50%", not everything starting with "50".
+
+def _by_identifier(needle: str, recipient_id_column):
+    return exists().where(RecipientDB.id == recipient_id_column,
+                          RecipientDB.external_id.icontains(needle, autoescape=True))
+
+
+def _by_address(needle: str, recipient_id_column, channels: list[str]):
+    return or_(*[
+        exists().where(
+            AddressabilityDB.recipient_id == recipient_id_column,
+            AddressabilityDB.channel == channel,
+            AddressabilityDB.value[address_key_for(channel)].as_string()
+            .icontains(needle, autoescape=True),
+        )
+        for channel in channels
+    ])

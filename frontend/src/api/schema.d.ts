@@ -5647,6 +5647,10 @@ export interface operations {
     get_content_records_content__get: {
         parameters: {
             query?: {
+                /** @description Find by title (part, any case). */
+                q?: string | null;
+                /** @description Only records in this status. */
+                status?: ("active" | "inactive") | null;
                 /** @description Rows per page (1-200). */
                 limit?: number;
                 /** @description Rows to skip. */
@@ -6421,6 +6425,8 @@ export interface operations {
     get_campaigns_campaigns__get: {
         parameters: {
             query?: {
+                /** @description Find by name (part, any case). */
+                q?: string | null;
                 /** @description Rows per page (1-200). */
                 limit?: number;
                 /** @description Rows to skip. */
@@ -8011,6 +8017,8 @@ export interface operations {
     get_recipients_recipients__get: {
         parameters: {
             query?: {
+                /** @description Find by identifier or address on any channel (part, any case). */
+                q?: string | null;
                 /** @description Rows per page (1-200). */
                 limit?: number;
                 /** @description Rows to skip. */
@@ -8627,6 +8635,8 @@ export interface operations {
         parameters: {
             query?: {
                 channel?: string | null;
+                /** @description Find by name (part, any case). */
+                q?: string | null;
                 /** @description Rows per page (1-200). */
                 limit?: number;
                 /** @description Rows to skip. */

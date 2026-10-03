@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { useAudienceGroups, type AudienceGroup } from '../api/resources'
 import DataTable, { type DataColumn } from '../components/DataTable'
 import Pager, { useOffset } from '../components/Pager'
+import { SearchBox, useSearch } from '../components/RecipientSearch'
 import ScreenState from '../components/ScreenState'
 import { formatDate } from './Campaigns'
 
@@ -17,12 +18,13 @@ const columns: DataColumn<AudienceGroup>[] = [
 ]
 
 export default function Audiences() {
-  const groups = useAudienceGroups(useOffset())
+  const groups = useAudienceGroups(useOffset(), useSearch())
   const navigate = useNavigate()
 
   return (
     <>
       <h1>Audiences</h1>
+      <SearchBox label="Find an audience by name" />
       <ScreenState query={groups}>
         <DataTable
           label="Audience groups"

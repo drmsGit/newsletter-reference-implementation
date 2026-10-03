@@ -68,19 +68,23 @@ async function read<T>(
   return result.data as T
 }
 
-export function useCampaigns(offset = 0) {
+export function useCampaigns(offset = 0, q = '') {
   return useQuery({
-    queryKey: [...keys.campaigns, 'page', offset],
+    queryKey: [...keys.campaigns, 'page', offset, q],
     queryFn: () =>
-      read(api.GET('/campaigns/', { params: { query: { limit: PAGE_SIZE, offset } } })),
+      read(api.GET('/campaigns/', { params: { query: { limit: PAGE_SIZE, offset, q: q || undefined } } })),
   })
 }
 
-export function useContentList(offset = 0) {
+export function useContentList(offset = 0, q = '', status?: 'active' | 'inactive') {
   return useQuery({
-    queryKey: [...keys.content, 'page', offset],
+    queryKey: [...keys.content, 'page', offset, q, status],
     queryFn: () =>
-      read(api.GET('/content/', { params: { query: { limit: PAGE_SIZE, offset } } })),
+      read(
+        api.GET('/content/', {
+          params: { query: { limit: PAGE_SIZE, offset, q: q || undefined, status } },
+        }),
+      ),
   })
 }
 
@@ -92,11 +96,15 @@ export function useContentRecord(id: number) {
   })
 }
 
-export function useAudienceGroups(offset = 0) {
+export function useAudienceGroups(offset = 0, q = '') {
   return useQuery({
-    queryKey: [...keys.audienceGroups, 'page', offset],
+    queryKey: [...keys.audienceGroups, 'page', offset, q],
     queryFn: () =>
-      read(api.GET('/api/audience-groups/', { params: { query: { limit: PAGE_SIZE, offset } } })),
+      read(
+        api.GET('/api/audience-groups/', {
+          params: { query: { limit: PAGE_SIZE, offset, q: q || undefined } },
+        }),
+      ),
   })
 }
 

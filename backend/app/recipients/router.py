@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import enforce_api_policy
@@ -113,6 +113,7 @@ def create_recipient_record(
 
 @router.get("/", response_model=Page[Recipient])
 def get_recipients(
+    q: str | None = Query(None, description="Find by identifier or address on any channel (part, any case)."),
     params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
@@ -122,7 +123,7 @@ def get_recipients(
     # so projecting it needs one named (ADR-150's 2026-09-20 addendum).
     from app.recipients.service import page_recipients
 
-    return page_recipients(db, params, brand_id=brand_id)
+    return page_recipients(db, params, brand_id=brand_id, q=q)
 
 
 # --- Consent (CRM-synced) -------------------------------------------------

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { useCampaigns, type Campaign } from '../api/resources'
 import DataTable, { type DataColumn } from '../components/DataTable'
 import Pager, { useOffset } from '../components/Pager'
+import { SearchBox, useSearch } from '../components/RecipientSearch'
 import ScreenState from '../components/ScreenState'
 
 const columns: DataColumn<Campaign>[] = [
@@ -15,12 +16,13 @@ const columns: DataColumn<Campaign>[] = [
  * The campaign list. A row opens the campaign, variant by variant.
  */
 export default function Campaigns() {
-  const campaigns = useCampaigns(useOffset())
+  const campaigns = useCampaigns(useOffset(), useSearch())
   const navigate = useNavigate()
 
   return (
     <>
       <h1>Campaigns</h1>
+      <SearchBox label="Find a campaign by name" />
       <ScreenState query={campaigns}>
         <DataTable
           label="Campaigns"

@@ -65,6 +65,7 @@ router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
 @router.get("/", response_model=Page[Campaign])
 def get_campaigns(
+    q: str | None = Query(None, description="Find by name (part, any case)."),
     params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
@@ -72,7 +73,7 @@ def get_campaigns(
     """One ADR-185 page of the brand's campaigns, newest first."""
     from app.campaigns.service import page_campaigns
 
-    return page_campaigns(db, params, brand_id=brand_id)
+    return page_campaigns(db, params, brand_id=brand_id, q=q)
 
 
 @router.get(

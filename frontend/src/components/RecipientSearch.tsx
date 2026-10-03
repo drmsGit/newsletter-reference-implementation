@@ -18,6 +18,16 @@ export function useSearch(): string {
  * words and shows what comes back. Runs on Enter or Search, not per keystroke.
  */
 export default function RecipientSearch() {
+  return <SearchBox label="Find a recipient (identifier or address)" />
+}
+
+/**
+ * A search box over one list, held in the URL as `?q=`. Running a search starts
+ * from the first page again: page 3 of the old results means nothing for the
+ * new ones. Used for recipients above, and for content, campaign and audience
+ * names (2026-10-03).
+ */
+export function SearchBox({ label }: { label: string }) {
   const [params, setParams] = useSearchParams()
   const [value, setValue] = useState(params.get('q') ?? '')
 
@@ -25,6 +35,7 @@ export default function RecipientSearch() {
     const next = new URLSearchParams(params)
     if (q.trim()) next.set('q', q.trim())
     else next.delete('q')
+    next.delete('offset')
     setParams(next)
   }
 
@@ -38,7 +49,7 @@ export default function RecipientSearch() {
       }}
     >
       <TextField value={value} onChange={setValue}>
-        <Label>Find a recipient (identifier or address)</Label>
+        <Label>{label}</Label>
         <Input />
       </TextField>
       <Button type="submit">Search</Button>

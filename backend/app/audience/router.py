@@ -43,6 +43,7 @@ router = APIRouter(prefix="/api/audience-groups", tags=["audience"])
 )
 def list_groups(
     channel: str | None = Query(default=None),
+    q: str | None = Query(None, description="Find by name (part, any case)."),
     params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
@@ -59,7 +60,7 @@ def list_groups(
             pinned_count=row["pinned_count"], recipient_count=row["recipient_count"],
             count_channel=row["count_channel"],
         )
-        for row in service.list_groups_with_counts(db, brand_id=brand_id, channel=channel)
+        for row in service.list_groups_with_counts(db, brand_id=brand_id, channel=channel, q=q)
     ], params)
 
 

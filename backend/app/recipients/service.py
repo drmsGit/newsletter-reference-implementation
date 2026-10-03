@@ -513,12 +513,18 @@ def detect_consent_drift(db: Session) -> list[ConsentDriftItem]:
     return drift
 
 
-def page_recipients(db: Session, params, *, brand_id: int):
+def page_recipients(db: Session, params, *, brand_id: int, q: str | None = None):
     """One ADR-185 page of recipients, newest first, projected for `brand_id`
     (consent is per brand) in a fixed number of queries for the page."""
     from app.pagination import page_of_query
 
-    return page_of_query(db.query(RecipientDB), params, RecipientDB.id.desc(),
+    from app.recipients import search
+
+    query = db.query(RecipientDB)
+    condition = search.clause_any_channel(q, RecipientDB.id)
+    if condition is not None:
+        query = query.filter(condition)
+    return page_of_query(query, params, RecipientDB.id.desc(),
                          convert_all=lambda rows: to_recipients(db, rows, brand_id))
 
 def list_recipients(db: Session, *, brand_id: int) -> list[Recipient]:

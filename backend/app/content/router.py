@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.audit import service as audit
@@ -58,6 +60,8 @@ router = APIRouter(prefix="/content", tags=["content"])
 
 @router.get("/", response_model=Page[ContentRecord])
 def get_content_records(
+    q: str | None = Query(None, description="Find by title (part, any case)."),
+    status: Literal["active", "inactive"] | None = Query(None, description="Only records in this status."),
     params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
@@ -65,7 +69,7 @@ def get_content_records(
     """One ADR-185 page of the brand's content records, newest first."""
     from app.content.service import page_content_records
 
-    return page_content_records(db, params, brand_id=brand_id)
+    return page_content_records(db, params, brand_id=brand_id, q=q, status=status)
 
 
 # These fixed-path routes (/categories, /category-relations) must be

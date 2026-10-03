@@ -495,7 +495,7 @@ def delete_block(db: Session, block_id: int, *, brand_id: int) -> bool:
 
 
 def list_groups_with_counts(
-    db: Session, *, brand_id: int, channel: str | None,
+    db: Session, *, brand_id: int, channel: str | None, q: str | None = None,
 ) -> list[dict]:
     """The brand's groups, each with its pinned count and — **only when the
     caller names a channel** — its live resolved count for that channel (task-50, B26).
@@ -512,6 +512,11 @@ def list_groups_with_counts(
     belongs with task-213, which reshapes what `resolve_audience` returns.
     """
     groups = list_groups(db, brand_id=brand_id)
+    # Narrowed by name BEFORE counting: resolving a group for its count is the
+    # expensive part (task-213), and a group the search excludes needs none.
+    needle = (q or "").strip().lower()
+    if needle:
+        groups = [g for g in groups if needle in (g.name or "").lower()]
     pinned = dict(
         db.query(AudienceGroupMemberDB.group_id, func.count(AudienceGroupMemberDB.id))
         .filter(AudienceGroupMemberDB.group_id.in_([g.id for g in groups]))
