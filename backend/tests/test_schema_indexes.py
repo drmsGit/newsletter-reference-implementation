@@ -115,17 +115,30 @@ def _snapshot_columns() -> set[str]:
         }
 
 
-def test_the_snapshot_columns_are_named_for_what_they_hold():
-    columns = _snapshot_columns()
-    missing = [new for new in ARTIFACT_COLUMNS.values() if new not in columns]
-    lingering = [old for old in ARTIFACT_COLUMNS if old in columns]
+MIGRATION_0028 = (
+    pathlib.Path(__file__).resolve().parent.parent
+    / "scripts" / "migrate_0028_drop_snapshot_artifact_columns.sql"
+)
 
-    assert not missing, f"snapshots is missing {missing} — was it rebuilt from the models?"
-    assert not lingering, (
-        f"snapshots still has {lingering}. Both names existing at once is worse "
-        "than either alone: two columns holding the same fact, and nothing "
-        "saying which one a reader should trust."
-    )
+
+def test_the_snapshot_has_no_artifact_columns_under_either_name():
+    """0019 renamed them; 0028 dropped them (task-247), because ADR-183 point 5
+    stopped writing snapshot files and the frame is the snapshot. Neither the
+    old names nor the new may survive: a column describing a file that does
+    not exist is a fact nobody can trust."""
+    columns = _snapshot_columns()
+    lingering = [c for pair in ARTIFACT_COLUMNS.items() for c in pair if c in columns]
+    assert not lingering, f"snapshots still has {lingering}"
+    assert "render_context" in columns, "the frame is the snapshot (ADR-183)"
+
+
+def test_migration_0028_drops_the_same_three():
+    """The other creation path: the models build a fresh database without
+    them, and this file takes them out of every existing one."""
+    sql = MIGRATION_0028.read_text()
+    missing = [new for new in ARTIFACT_COLUMNS.values()
+               if f"DROP COLUMN IF EXISTS {new}" not in sql]
+    assert not missing, f"0028 does not drop {missing}"
 
 
 def test_migration_0019_renames_the_same_three():

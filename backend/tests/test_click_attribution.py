@@ -20,7 +20,6 @@ from app.providers.adapters.resend import NormalizedEvent
 from app.providers.service import process_provider_webhook_event
 from app.recipients.db_models import RecipientDB, SignalContributionDB
 from app.snapshots.db_models import SnapshotDB
-from app.snapshots.service import INLINE_LOCATION
 
 
 @pytest.fixture
@@ -48,8 +47,7 @@ def delivered(db):
     db.add(variant); db.flush()
     db.add(ModuleInstanceDB(variant_id=variant.id, module_type="single_stack", position=1,
                             content_record_id=record.id, module_data={}))
-    snapshot = SnapshotDB(variant_id=variant.id, artifact_storage_type="inline",
-                          artifact_location=INLINE_LOCATION, artifact_size=0,
+    snapshot = SnapshotDB(variant_id=variant.id,
                           render_context={"frame_version": 1, "channel": "email", "modules": []})
     db.add(snapshot); db.flush()
     send = SendInstanceDB(snapshot_id=snapshot.id, brand_id=brand.id, name="attr",

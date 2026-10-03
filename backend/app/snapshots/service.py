@@ -9,18 +9,11 @@ def to_snapshot(record: SnapshotDB) -> Snapshot:
         id=record.id,
         variant_id=record.variant_id,
         recipient_id=record.recipient_id,
-        artifact_storage_type=record.artifact_storage_type,
-        artifact_location=record.artifact_location,
-        artifact_size=record.artifact_size,
         created_at=record.created_at,
         render_context=record.render_context,
     )
 
 
-#: What `artifact_location` says for an artifact that is not a file. The column is
-#: NOT NULL and named for HTML because it predates channels; renaming it is
-#: part of the open snapshot-storage question, not of this change.
-INLINE_LOCATION = "inline:render_context"
 
 
 def _snapshot_in_brand(db: Session, snapshot_id: int, brand_id: int):
@@ -71,7 +64,10 @@ def create_snapshot_for_variant(
     from app.rendering.frame import build_frame, render_frame
 
     render_context = {**build_frame(db, variant_id), "recipient_id": recipient_id}
-    artifact, _picks = render_frame(db, render_context, recipient_id=recipient_id)
+    # Rendered and discarded: **the check that this composition can be laid
+    # out at all**, so a broken snapshot is refused now rather than at send.
+    # Its size was stored until task-247; nothing read it.
+    render_frame(db, render_context, recipient_id=recipient_id)
 
     # **One storage shape, and no file** (ADR-183 point 5). The frame is the
     # snapshot; a preview is rendered from it on demand. Until 2026-10-02 email
@@ -81,9 +77,6 @@ def create_snapshot_for_variant(
     snapshot = SnapshotDB(
         variant_id=variant_id,
         recipient_id=recipient_id,
-        artifact_storage_type="inline",
-        artifact_location=INLINE_LOCATION,
-        artifact_size=artifact.size_bytes(),
         render_context=render_context,
     )
     db.add(snapshot)

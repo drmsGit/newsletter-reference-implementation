@@ -946,7 +946,6 @@ def campaign_detail(
                     (get_snapshot_artifact(db, snapshot.id, brand_id=working_brand_id(request, db)) or {}).get("fields")
                     if (snapshot.render_context or {}).get("channel", "email") != "email" else None
                 ),
-                "artifact_size": snapshot.artifact_size,
                 "created_at": snapshot.created_at,
                 "render_context": snapshot.render_context,
                 "render_context_pretty": json.dumps(

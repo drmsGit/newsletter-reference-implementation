@@ -26,7 +26,6 @@ from app.database import SessionLocal
 from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
 from app.recipients.db_models import RecipientDB  # noqa: F401 — mapper registration
 from app.snapshots.db_models import SnapshotDB
-from app.snapshots.service import INLINE_LOCATION
 
 PREFIX = "montest"
 
@@ -61,8 +60,7 @@ def build(db):
             db.add(variant)
             db.flush()
             for event in history:
-                snapshot = SnapshotDB(variant_id=variant.id, artifact_storage_type="inline",
-                                      artifact_location=INLINE_LOCATION, artifact_size=0)
+                snapshot = SnapshotDB(variant_id=variant.id)
                 db.add(snapshot)
                 db.flush()
                 if event == "snapshot":

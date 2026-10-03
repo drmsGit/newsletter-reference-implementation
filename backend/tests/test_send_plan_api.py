@@ -25,7 +25,6 @@ from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
 from app.recipients.consent import record_consent
 from app.recipients.db_models import AddressabilityDB, RecipientDB
 from app.snapshots.db_models import SnapshotDB
-from app.snapshots.service import INLINE_LOCATION
 from main import app
 from tests.machine import machine
 
@@ -56,8 +55,7 @@ def world(db):
     db.add(variant)
     db.flush()
     snapshot = SnapshotDB(
-        variant_id=variant.id, artifact_storage_type="inline",
-        artifact_location=INLINE_LOCATION, artifact_size=0, render_context={},
+        variant_id=variant.id, render_context={},
     )
     db.add(snapshot)
     recipient = RecipientDB(external_id=f"planapi-{uuid.uuid4()}", status="active")
@@ -190,8 +188,7 @@ def test_another_brands_audience_is_not_found(world, foreign_brand, foreign_api,
     db.add(variant)
     db.flush()
     snapshot = SnapshotDB(
-        variant_id=variant.id, artifact_storage_type="inline",
-        artifact_location=INLINE_LOCATION, artifact_size=0, render_context={},
+        variant_id=variant.id, render_context={},
     )
     db.add(snapshot)
     db.commit()
@@ -282,8 +279,7 @@ def test_resend_cannot_be_planned_for_a_push_variant(world, db):
     db.add(push)
     db.flush()
     snapshot = SnapshotDB(
-        variant_id=push.id, artifact_storage_type="inline",
-        artifact_location=INLINE_LOCATION, artifact_size=0, render_context={},
+        variant_id=push.id, render_context={},
     )
     db.add(snapshot)
     db.commit()

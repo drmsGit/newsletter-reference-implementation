@@ -527,7 +527,6 @@ class TestTheSendAction:
             # of the test. A variant with no modules declares no required
             # fields, so it passes the gate without a module or storage path.
             from app.campaigns.db_models import CampaignDB, VariantDB
-            from app.snapshots.service import INLINE_LOCATION
 
             brand = ensure_default_brand(db)
             campaign = CampaignDB(brand_id=brand.id, name=f"draft-{uuid.uuid4()}")
@@ -541,8 +540,7 @@ class TestTheSendAction:
 
             # A frame (ADR-183): a frameless snapshot is blocked, correctly.
             snapshot = SnapshotDB(
-                variant_id=variant.id, artifact_storage_type="inline",
-                artifact_location=INLINE_LOCATION, artifact_size=0,
+                variant_id=variant.id,
                 render_context=build_frame(db, variant.id),
             )
             db.add(snapshot); db.flush()

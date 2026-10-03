@@ -135,11 +135,8 @@ def _sweep():
 
     session.query(ContentOverrideDB).filter(
         ContentOverrideDB.module_instance_id.in_(mids or [-1])).delete(synchronize_session=False)
-    # A snapshot that wrote a file leaves one behind too — an inline one does
-    # not, which is half the point of storing it in the row.
-    for row in session.query(SnapshotDB).filter(SnapshotDB.variant_id.in_(vids or [-1])).all():
-        if row.artifact_storage_type != "inline" and row.artifact_location not in ("pending", ""):
-            Path(row.artifact_location).unlink(missing_ok=True)
+    # No snapshot writes a file since ADR-183 point 5, so there is none to
+    # remove (the columns that pointed at one were dropped by 0028).
     session.query(SnapshotDB).filter(
         SnapshotDB.variant_id.in_(vids or [-1])).delete(synchronize_session=False)
     session.query(ModuleInstanceDB).filter(
@@ -808,13 +805,11 @@ class TestAPushSnapshotLivesInTheRowNotOnDisk:
                 db, variant_id=variant.id, brand_id=brand_of_variant(db, variant.id))
         try:
             row = db.get(SnapshotDB, snapshot.id)
-            assert row.artifact_storage_type == "inline"
-            assert row.artifact_location == "inline:render_context"
+            # The frame is in the row (ADR-183), and the payload renders from it.
             assert row.render_context["channel"] == "push"
             stored = get_snapshot_artifact(db, snapshot.id, brand_id=brand_of_variant(db, variant.id))
             assert stored["role"] == "payload"
             assert stored["fields"]["push_title"] == "Ready"
-            assert row.artifact_size > 0, "an inline artifact still has a size"
         finally:
             db.query(SnapshotDB).filter(SnapshotDB.id == snapshot.id).delete()
             db.commit()
@@ -2095,11 +2090,6 @@ class TestTheSendFormOffersOnlyWhatTheChannelCanDo:
             )
         finally:
             self._cleanup_user(db, user)
-            from pathlib import Path
-            for snap in snapshots:
-                row = db.get(SnapshotDB, snap.id)
-                if row and row.artifact_storage_type != "inline":
-                    Path(row.artifact_location).unlink(missing_ok=True)
             db.query(SnapshotDB).filter(
                 SnapshotDB.id.in_([s.id for s in snapshots])).delete(synchronize_session=False)
             db.commit()
@@ -3101,7 +3091,6 @@ class TestARequiredFieldIsCheckedBeforeASendFires:
         from app.delivery.db_models import SendInstanceDB
         from app.delivery.service import send_send_instance
         from app.snapshots.db_models import SnapshotDB
-        from app.snapshots.service import INLINE_LOCATION
         from app.auth.service import ensure_default_brand
         import pytest as _pytest
 
@@ -3111,8 +3100,7 @@ class TestARequiredFieldIsCheckedBeforeASendFires:
 
         # The blank is in the frame, which is what is checked and sent (ADR-183).
         snapshot = SnapshotDB(
-            variant_id=variant.id, artifact_storage_type="inline",
-            artifact_location=INLINE_LOCATION, artifact_size=0,
+            variant_id=variant.id,
             render_context=build_frame(db, variant.id),
         )
         db.add(snapshot); db.flush()

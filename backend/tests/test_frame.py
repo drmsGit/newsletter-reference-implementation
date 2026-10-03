@@ -215,10 +215,8 @@ def test_a_frameless_snapshot_is_refused(db, world):
     from app.delivery.db_models import SendInstanceDB
     from app.delivery.service import send_send_instance
     from app.snapshots.db_models import SnapshotDB
-    from app.snapshots.service import INLINE_LOCATION
 
-    snapshot = SnapshotDB(variant_id=world["variant"].id, artifact_storage_type="inline",
-                          artifact_location=INLINE_LOCATION, artifact_size=0, render_context={})
+    snapshot = SnapshotDB(variant_id=world["variant"].id, render_context={})
     db.add(snapshot); db.flush()
     send = SendInstanceDB(snapshot_id=snapshot.id, brand_id=world["brand"].id, name="old",
                           status="draft", provider="mock")
@@ -362,12 +360,12 @@ def test_a_frameless_snapshot_says_why_it_has_no_preview(db, world):
 
     from app.auth.permissions import VIEW
     from app.snapshots.db_models import SnapshotDB
-    from app.snapshots.service import INLINE_LOCATION
     from main import app
     from tests.machine import machine
 
-    snapshot = SnapshotDB(variant_id=world["variant"].id, artifact_storage_type="file",
-                          artifact_location="/tmp/old.html", artifact_size=0, render_context={})
+    # A row from before ADR-183: no frame. (It also had a file path once; the
+    # columns that held it were dropped by migration 0028.)
+    snapshot = SnapshotDB(variant_id=world["variant"].id, render_context={})
     db.add(snapshot); db.commit()
     try:
         client = TestClient(app, raise_server_exceptions=False)

@@ -54,10 +54,8 @@ def test_it_drops_a_frameless_snapshot_and_its_chain_and_keeps_frames(db, tmp_pa
     db.add(campaign); db.flush()
     variant = VariantDB(campaign_id=campaign.id, channel="email", name="v", status="draft")
     db.add(variant); db.flush()
-    old = SnapshotDB(variant_id=variant.id, artifact_storage_type="file",
-                     artifact_location="/tmp/x.html", artifact_size=0, render_context={})
-    kept = SnapshotDB(variant_id=variant.id, artifact_storage_type="inline",
-                      artifact_location="inline:render_context", artifact_size=0,
+    old = SnapshotDB(variant_id=variant.id, render_context={})
+    kept = SnapshotDB(variant_id=variant.id,
                       render_context=build_frame(db, variant.id))
     recipient = RecipientDB(external_id=f"drop-{uuid.uuid4()}", status="active")
     category = CategoryDB(name=f"drop-{uuid.uuid4().hex[:6]}", type="main")

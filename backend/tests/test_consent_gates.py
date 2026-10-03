@@ -222,7 +222,6 @@ def db():
                 # pains to avoid. These tests assert who is excluded, never
                 # what the mail says.
                 from app.campaigns.db_models import CampaignDB
-                from app.snapshots.service import INLINE_LOCATION
 
                 brand = ensure_default_brand(self.session)
                 campaign = CampaignDB(
@@ -238,9 +237,6 @@ def db():
                 self.session.flush()
                 snapshot = SnapshotDB(
                     variant_id=variant.id,
-                    artifact_storage_type="inline",
-                    artifact_location=INLINE_LOCATION,
-                    artifact_size=0,
                     # A real frame (ADR-183): a frameless snapshot is refused at
                     # send time, which these consent tests must get past.
                     render_context=build_frame(self.session, variant.id),

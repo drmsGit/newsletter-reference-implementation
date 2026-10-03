@@ -605,8 +605,7 @@ class TestB10RecipientActivity:
         made = {"sends": [], "slots": [], "content": []}
         for brand, tag in ((default_brand, "OWN"), (foreign_brand, "FOREIGN")):
             variant = _variant(db, brand)
-            snapshot = SnapshotDB(variant_id=variant.id, artifact_storage_type="inline",
-                                  artifact_location="inline:render_context", artifact_size=0,
+            snapshot = SnapshotDB(variant_id=variant.id,
                                   render_context={})
             content = ContentRecordDB(title=f"{tag}-content-{uuid.uuid4().hex[:4]}", content={},
                                       status="active", brand_id=brand.id)
