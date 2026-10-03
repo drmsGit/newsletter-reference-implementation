@@ -108,24 +108,75 @@ async function edit(label: RegExp, value: string) {
   fireEvent.blur(input)
 }
 
-describe('a catalogue field', () => {
-  it('shows the record and edits the record, stating its version and its channel', async () => {
+describe('a catalogue field (ADR-186: override by default)', () => {
+  it('writes an override for this module when typed in, never the record', async () => {
     const { handlers, writes } = server()
     open(handlers)
     expect(await screen.findByLabelText(/^Headline/)).toHaveValue('Lisbon')
-    await edit(/^Headline/, 'Lisbon, again')
+    await edit(/^Headline/, 'Lisbon, shorter')
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect(new URL(writes[0].url).pathname).toBe('/overrides/modules/12')
+    expect(writes[0].headers.get('If-Match')).toBe(T(1))
+    expect(await writes[0].json()).toEqual({ field_overrides: { headline_hero: 'Lisbon, shorter' }, reason: null })
+    const overridden = await screen.findByLabelText(/Headline — overridden here/)
+    expect(within(overridden.closest('.overridden') as HTMLElement).getByText('Catalogue: Lisbon'))
+      .toBeInTheDocument()
+  })
+
+  it('writes nothing when the value is left as the catalogue has it', async () => {
+    const { handlers, writes } = server()
+    open(handlers)
+    const input = await screen.findByLabelText(/^Headline/)
+    fireEvent.change(input, { target: { value: 'Lisbon!' } })
+    fireEvent.change(input, { target: { value: 'Lisbon' } })
+    fireEvent.blur(input)
+    await new Promise((r) => setTimeout(r, 50))
+    expect(writes).toHaveLength(0)
+  })
+
+  it('changes the catalogue only through the explicit act, reach shown first, then closes', async () => {
+    const { handlers, writes } = server()
+    open(handlers)
+    fireEvent.click(await screen.findByRole('button', { name: 'Change Headline in catalogue' }))
+    const act = screen.getByRole('group', { name: 'Change Headline in the catalogue' })
+    // The reach is on screen before anything is typed (ADR-186 point 8).
+    expect(await within(act).findByText(/2 unsent campaigns/)).toBeInTheDocument()
+    fireEvent.click(within(act).getByRole('button', { name: 'Show which' }))
+    expect(within(act).getByRole('link', { name: 'Summer' })).toHaveAttribute('href', '/campaigns/9')
+    fireEvent.change(within(act).getByLabelText('Headline in the catalogue'), { target: { value: 'Lisbon, fixed' } })
+    expect(writes).toHaveLength(0)
+    fireEvent.click(within(act).getByRole('button', { name: 'Save to the catalogue' }))
     await waitFor(() => expect(writes).toHaveLength(1))
     expect(new URL(writes[0].url).pathname).toBe('/content/42')
     expect(writes[0].headers.get('If-Match')).toBe(T(1))
-    expect(await writes[0].json()).toEqual({ content: { headline_hero: 'Lisbon, again' }, groups: ['email'] })
+    expect(await writes[0].json()).toEqual({ content: { headline_hero: 'Lisbon, fixed' }, groups: ['email'] })
+    // One edit: the field is back to normal, now showing the new catalogue value.
+    await waitFor(() => expect(screen.queryByRole('group', { name: /in the catalogue/ })).not.toBeInTheDocument())
+    expect(await screen.findByLabelText(/^Headline/)).toHaveValue('Lisbon, fixed')
   })
 
-  it('shows how many unsent campaigns the record reaches, and which on request', async () => {
-    open(server().handlers)
-    expect(await screen.findByText(/used by 2 unsent campaigns/)).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Summer' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Show which' }))
-    expect(screen.getByRole('link', { name: 'Summer' })).toHaveAttribute('href', '/campaigns/9')
+  it('cancelling the explicit act writes nothing', async () => {
+    const { handlers, writes } = server()
+    open(handlers)
+    fireEvent.click(await screen.findByRole('button', { name: 'Change Headline in catalogue' }))
+    fireEvent.change(screen.getByLabelText('Headline in the catalogue'), { target: { value: 'No' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await new Promise((r) => setTimeout(r, 50))
+    expect(writes).toHaveLength(0)
+  })
+
+  it('takes typing meant for the catalogue there, without overriding on the way (task-261)', async () => {
+    const { handlers, writes } = server()
+    open(handlers)
+    const input = await screen.findByLabelText(/^Headline/)
+    fireEvent.change(input, { target: { value: 'Typo fixed' } })
+    // Focus leaves the field for its own "Change in catalogue" button.
+    const button = screen.getByRole('button', { name: 'Change Headline in catalogue' })
+    fireEvent.blur(input, { relatedTarget: button })
+    fireEvent.click(button)
+    expect(await screen.findByLabelText('Headline in the catalogue')).toHaveValue('Typo fixed')
+    await new Promise((r) => setTimeout(r, 50))
+    expect(writes).toHaveLength(0)
   })
 
   it('says when a send would not carry the edit yet, and publishes', async () => {
@@ -141,20 +192,6 @@ describe('a catalogue field', () => {
 })
 
 describe('overriding', () => {
-  it('converts one field, keeps the catalogue value in view, and writes with the module version', async () => {
-    const { handlers, writes } = server()
-    open(handlers)
-    fireEvent.click(await screen.findByRole('button', { name: 'Override Headline here' }))
-    await waitFor(() => expect(writes).toHaveLength(1))
-    expect(writes[0].headers.get('If-Match')).toBe(T(1))
-    expect(await writes[0].json()).toEqual({ field_overrides: { headline_hero: 'Lisbon' }, reason: null })
-    const overridden = await screen.findByLabelText(/Headline — overridden here/)
-    expect(within(overridden.closest('.overridden') as HTMLElement).getByText('Catalogue: Lisbon'))
-      .toBeInTheDocument()
-    // The other field is still the catalogue's.
-    expect(screen.getByLabelText(/^Button/)).toHaveValue('Go')
-  })
-
   it('saves an overridden field into the override, keeping the others', async () => {
     const { handlers, writes } = server({
       override: { id: 70, field_overrides: { headline_hero: 'Short', button_label_hero: 'Book' }, reason: null },

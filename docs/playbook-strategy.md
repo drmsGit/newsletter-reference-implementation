@@ -485,6 +485,16 @@ and the authentication question the React manager client was blocked on.
 **Status:** 1168 backend and 75 client tests passing; client types match the live schema. Every fix was reproduced by a failing test first and mutation-checked. The development database held no rows any new rule refuses. Next: slice 5, the variant editor's structure.
 
 
+### 2026-10-03 — In the composer an override is the default; changing the catalogue is explicit
+
+**Context:** the user tried slice 6 on the dev server and found approved catalogue content one blur away from change: a fix typed before remembering "Override here" went straight into the record. The audit log of that test also showed two bugs (task-261, task-262).
+
+1. **[[ADR-186 — In the Composer an Override Is the Default and a Catalogue Edit Is Explicit]] supersedes ADR-178.** It is the second supersession in the repo. Typing in a catalogue-bound field writes an override for this module. The catalogue changes only through "Change in catalogue": one field, one edit, its reach shown first, saved with an explicit button. ADR-178 points 4–10 carry over.
+2. **The explicit act is per field, not a module-wide switch.** The user rejected the switch because it is a mode a manager can forget is on.
+3. **Choosing content by topic rather than title needs its own design session** (task-263).
+
+**Status:** built and checked live (task-260, task-261, task-262). 98 client tests.
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*

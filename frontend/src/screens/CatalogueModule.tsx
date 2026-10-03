@@ -18,16 +18,17 @@ import { AutosaveField, SaveState, fieldError } from '../components/EditorFields
 import ScreenState from '../components/ScreenState'
 
 /**
- * A catalogue-bound module in the variant editor (task-258, slice 6):
- * ADR-178 made concrete.
+ * A catalogue-bound module in the variant editor (task-258, slice 6), as
+ * ADR-186 decides it (it superseded ADR-178 on 2026-10-03):
  *
- * - A field shows the record's value, and typing edits **the record** — the
- *   default, because a typo is wrong everywhere (point 1).
- * - "Override here" converts **that one field**; from then on it edits this
- *   module only, and the catalogue value it covers stays visible (points 2, 4).
+ * - Typing in a field writes an **override for this module** — the default,
+ *   so approved catalogue content is never one blur away from change (point 1).
+ * - "Change in catalogue" is the explicit act: one field, one edit, its reach
+ *   shown first (points 2, 8). An overridden field keeps the catalogue value
+ *   it covers in view (4).
  * - Reset one field, or every override on the module after a confirmation (6).
- * - Beside the fields, how many unsent campaigns use the record (8), and
- *   whether a send would carry the edits yet, with Publish (design pass D5).
+ * - Whether a send would carry the record's edits yet, with Publish (point 11,
+ *   design pass D5).
  * - An optional reason, as presets or Other (9). No outcome figures (10).
  *
  * A module bound to a decision slot gets none of this (point 5).
@@ -105,49 +106,20 @@ function CatalogueFields({
             </Button>
           </p>
           {rebinding && <BindRecord campaignId={campaignId} module={module} />}
-          <Reach recordId={recordId} />
           <PublishState recordId={recordId} detail={record.data} />
 
-          {fields.map((field) => {
-            const catalogue = record.data.content[field.name]
-            const catalogueText = typeof catalogue === 'string' ? catalogue : ''
-            if (field.name in overrides) {
-              const value = overrides[field.name]
-              return (
-                <div key={field.name} className="overridden">
-                  <AutosaveField
-                    field={{ ...field, label: `${field.label ?? field.name} — overridden here` }}
-                    value={typeof value === 'string' ? value : ''}
-                    onSave={(next) => setOverride.mutate({ id: module.id, set: { [field.name]: next } })}
-                    error={fieldError(setOverride.error, field.name)}
-                  />
-                  <Text className="muted">Catalogue: {catalogueText || '—'}</Text>{' '}
-                  <Button onPress={() => setOverride.mutate({ id: module.id, unset: [field.name] })}>
-                    Back to the catalogue value
-                  </Button>
-                </div>
-              )
-            }
-            return (
-              <div key={field.name}>
-                <AutosaveField
-                  field={field}
-                  value={catalogueText}
-                  onSave={(next) => saveField.mutate({ [field.name]: next.trim() ? next : null })}
-                  error={fieldError(saveField.error, field.name)}
-                />
-                {module.overrideable && (
-                  <Button
-                    onPress={() =>
-                      setOverride.mutate({ id: module.id, set: { [field.name]: catalogueText } })
-                    }
-                  >
-                    Override {field.label ?? field.name} here
-                  </Button>
-                )}
-              </div>
-            )
-          })}
+          {fields.map((field) => (
+            <CatalogueField
+              key={field.name}
+              module={module}
+              field={field}
+              catalogue={record.data.content[field.name]}
+              overrides={overrides}
+              setOverride={setOverride}
+              saveField={saveField}
+              recordId={recordId}
+            />
+          ))}
 
           {module.active_override && (
             <>
@@ -181,7 +153,7 @@ function CatalogueFields({
   )
 }
 
-/** ADR-178 point 8: passive, before anyone types; the list only on request. */
+/** ADR-186 point 8: shown with the catalogue act, before anyone types; the list on request. */
 function Reach({ recordId }: { recordId: number }) {
   const reach = useContentReach(recordId)
   const [open, setOpen] = useState(false)
@@ -190,8 +162,8 @@ function Reach({ recordId }: { recordId: number }) {
   return (
     <div className="reach">
       <Text className="muted">
-        Editing a field here changes the catalogue record, used by {count} unsent campaign
-        {count === 1 ? '' : 's'}.
+        Saving this changes the catalogue record for every campaign that uses it: {count} unsent
+        campaign{count === 1 ? '' : 's'}.
       </Text>{' '}
       {count > 0 && (
         <Button onPress={() => setOpen(!open)}>{open ? 'Hide which' : 'Show which'}</Button>
@@ -308,6 +280,123 @@ function BindRecord({ campaignId, module }: { campaignId: number; module: Compos
         </ul>
       )}
       <SaveState mutation={bind} what="the module" />
+    </div>
+  )
+}
+
+/**
+ * One catalogue-bound field (ADR-186).
+ *
+ * Typing writes an override for this module — the default, because approved
+ * catalogue content should not be one blur away from change (point 1). The
+ * catalogue changes only through "Change in catalogue": one field, one edit,
+ * with its reach shown before anything is typed, saved with an explicit
+ * button, and closed afterwards (points 2, 8). Nothing stays switched on (3).
+ */
+function CatalogueField({
+  module,
+  field,
+  catalogue,
+  overrides,
+  setOverride,
+  saveField,
+  recordId,
+}: {
+  module: ComposedModule
+  field: ModuleManifest['variables'][number]
+  catalogue: unknown
+  overrides: Record<string, unknown>
+  setOverride: ReturnType<typeof useSetOverride>
+  saveField: ReturnType<typeof useSaveCatalogueField>
+  recordId: number
+}) {
+  const label = field.label ?? field.name
+  const catalogueText = typeof catalogue === 'string' ? catalogue : ''
+  const overridden = field.name in overrides
+  const own = overrides[field.name]
+  const [catalogueDraft, setCatalogueDraft] = useState<string | null>(null)
+
+  if (catalogueDraft !== null) {
+    return (
+      // Keyed apart from the field below, so React replaces the subtree rather
+      // than reusing its nodes: otherwise the press that opened this lands on
+      // "Save to the catalogue", which took over the button's DOM node.
+      <div
+        key="catalogue-edit"
+        className="catalogue-edit"
+        role="group"
+        aria-label={`Change ${label} in the catalogue`}
+      >
+        <Reach recordId={recordId} />
+        <TextField value={catalogueDraft} onChange={setCatalogueDraft} autoFocus>
+          <Label>{label} in the catalogue</Label>
+          <Input />
+        </TextField>
+        <Button
+          isDisabled={saveField.isPending}
+          onPress={() =>
+            saveField.mutate(
+              { [field.name]: catalogueDraft.trim() ? catalogueDraft : null },
+              { onSuccess: () => setCatalogueDraft(null) },
+            )
+          }
+        >
+          Save to the catalogue
+        </Button>{' '}
+        <Button onPress={() => setCatalogueDraft(null)}>Cancel</Button>
+        {fieldError(saveField.error, field.name) && (
+          <p role="alert" className="field-error">{fieldError(saveField.error, field.name)}</p>
+        )}
+      </div>
+    )
+  }
+
+  const changeInCatalogue = (
+    <Button data-catalogue-for={field.name} onPress={() => setCatalogueDraft(catalogueText)}>
+      Change {label} in catalogue
+    </Button>
+  )
+
+  if (!module.overrideable) {
+    // Not overridable (no manifest knowledge of the module): the catalogue
+    // value is shown, and the explicit act is the only way to change it.
+    return (
+      <div>
+        <p>
+          <span className="muted">{label}:</span> {catalogueText || '—'}
+        </p>
+        {changeInCatalogue}
+      </div>
+    )
+  }
+
+  return (
+    <div key="field" className={overridden ? 'overridden' : undefined}>
+      <AutosaveField
+        field={{ ...field, label: overridden ? `${label} — overridden here` : label }}
+        value={overridden ? (typeof own === 'string' ? own : '') : catalogueText}
+        // AutosaveField saves only a changed value, so an untouched catalogue
+        // value never becomes an override.
+        onSave={(next) => setOverride.mutate({ id: module.id, set: { [field.name]: next } })}
+        // Typing that leaves the field for its own "Change in catalogue"
+        // was meant for the catalogue: it goes there, and no override is
+        // written on the way (task-261).
+        onLeave={(draft, next) => {
+          if ((next as HTMLElement | null)?.dataset?.catalogueFor !== field.name) return false
+          setCatalogueDraft(draft)
+          return true
+        }}
+        error={fieldError(setOverride.error, field.name)}
+      />
+      {overridden && (
+        <>
+          <Text className="muted">Catalogue: {catalogueText || '—'}</Text>{' '}
+          <Button onPress={() => setOverride.mutate({ id: module.id, unset: [field.name] })}>
+            Back to the catalogue value
+          </Button>{' '}
+        </>
+      )}
+      {changeInCatalogue}
     </div>
   )
 }

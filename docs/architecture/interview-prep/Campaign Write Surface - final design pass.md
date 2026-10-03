@@ -167,7 +167,10 @@ editor screen that shows them. **Slice 5 is built too** (task-255): the
 variant editor with envelope, module stack and static fields, saving on blur,
 plus creating a campaign and a blank variant. **Slice 6 is built too**
 (task-256, task-257, task-224, task-258): catalogue fields, overrides, reach
-and publish state. Next is slice 7, slots on modules.
+and publish state. **Its default was then reversed by the user** after trying it:
+[[ADR-186 — In the Composer an Override Is the Default and a Catalogue Edit Is Explicit]]
+supersedes ADR-178, so typing overrides and the catalogue changes through an
+explicit per-field act (task-260). Next is slice 7, slots on modules.
 
 1. **Close defects 1–4** (task-248, task-249, task-250, task-251). These are backend fixes with tests. Defect 1 first:
    it is the only one that crosses a brand.

@@ -9,16 +9,23 @@ import { HttpError } from '../api/session'
  *
  * The draft follows the saved value whenever the server's answer changes —
  * after a save, and after a reload that discards a refused edit.
+ *
+ * `onLeave` lets the caller see where the focus went before anything is
+ * saved, and take the draft elsewhere instead (return true). A field whose
+ * typing was meant for another act — ADR-186's "Change in catalogue" — must
+ * not save it to this one on the way there (task-261).
  */
 export function AutosaveField({
   field,
   value,
   onSave,
+  onLeave,
   error,
 }: {
   field: ModuleVariable
   value: string
   onSave: (value: string) => void
+  onLeave?: (draft: string, next: Element | null) => boolean
   error: string | undefined
 }) {
   const [draft, setDraft] = useState(value)
@@ -31,8 +38,10 @@ export function AutosaveField({
       className="react-aria-TextField field"
       value={draft}
       onChange={setDraft}
-      onBlur={() => {
-        if (draft !== value) onSave(draft)
+      onBlur={(event) => {
+        if (draft === value) return
+        if (onLeave?.(draft, event.relatedTarget as Element | null)) return
+        onSave(draft)
       }}
       isInvalid={!!error}
     >
