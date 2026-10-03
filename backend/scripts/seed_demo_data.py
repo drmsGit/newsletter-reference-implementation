@@ -324,41 +324,83 @@ def seed(extended: bool = False):
             ))
         db.commit()
 
-        # --- engagement: clicks -> click contributions (event_id set) ----
-        # A frame, like every snapshot since ADR-183: the composition frozen
-        # with its values, which is what a send renders from.
-        from app.rendering.frame import build_frame
-        from app.snapshots.service import INLINE_LOCATION
+        # --- engagement: a real send two months ago, and its clicks ------
+        #
+        # **Sent through the real path, then dated back** (task-242, decided
+        # 2026-10-03). This send used to be written by hand: a `sent` row and 32
+        # `sent` executions with no delivery record and no counts, so the
+        # deliveries screen showed "sent 0/0/0" beside 32 recipients whose "as
+        # sent" all said there was nothing to show. That taught the opposite of
+        # ADR-183: that "sent" and "has a record of what it got" can come apart.
+        #
+        # Now: snapshot, plan, fire with the mock provider, so every execution
+        # that went out has a delivery record and the send has real counts, and
+        # recipients without consent are excluded like anyone else's. Then the
+        # whole send is moved to 61 days ago, so the 60 days of clicks below
+        # come after it rather than before. Seed data is invented either way;
+        # what matters is that it is internally consistent.
+        from app.audience.service import add_member, create_group
+        from app.delivery.service import (
+            prepare_send_from_audience, send_send_instance, sent_content_ids,
+        )
+        from app.settings.service import get_max_send_recipients
+        from app.snapshots.db_models import SnapshotDB
+        from app.snapshots.service import create_snapshot_for_variant
 
-        snap = SnapshotDB(variant_id=slots[0][1].id, artifact_storage_type="inline",
-                          artifact_location=INLINE_LOCATION, artifact_size=0,
-                          render_context=build_frame(db, slots[0][1].id))
-        db.add(snap); db.flush()
-        si = SendInstanceDB(snapshot_id=snap.id, name="Demo send", status="sent",
-                            provider="mock", brand_id=BRAND_ID)
-        db.add(si); db.flush()
+        demo_variant = slots[0][1]
+        # Never above the deployment's cap: the seed must not change a setting
+        # somebody chose (a dev database once had it at 10).
+        size = min(32, get_max_send_recipients(db))
+        demo_group = create_group(db, "Demo send audience", brand_id=BRAND_ID,
+                                  description="The seeded Demo send went to these (seeded)")
+        for r in random.sample(recipients, size):
+            add_member(db, demo_group.id, r.id, brand_id=BRAND_ID)
+        snap = create_snapshot_for_variant(db, demo_variant.id, brand_id=BRAND_ID)
+        si = prepare_send_from_audience(
+            db, snapshot_id=snap.id, name="Demo send", audience_group_id=demo_group.id,
+            provider="mock", brand_id=BRAND_ID,
+        )
+        send_send_instance(db, si.id, brand_id=BRAND_ID)
+
+        sent_on = NOW - timedelta(days=61)
+        db.query(SnapshotDB).filter(SnapshotDB.id == snap.id).update(
+            {"created_at": sent_on}, synchronize_session=False)
+        db.query(SendInstanceDB).filter(SendInstanceDB.id == si.id).update(
+            {"created_at": sent_on, "updated_at": sent_on}, synchronize_session=False)
+        executions = db.query(DeliveryExecutionDB).filter(
+            DeliveryExecutionDB.send_instance_id == si.id).all()
+        for ex in executions:
+            ex.created_at = sent_on
+            ex.updated_at = sent_on
+            if ex.sent_at is not None:
+                ex.sent_at = sent_on
         db.commit()
 
-        # content whose categories are all positive (keeps red nodes clean)
+        # Clicks name only content the recipient was actually sent (ADR-182,
+        # task-240): the delivery record says what each message carried. And
+        # only content whose categories are all positive, as before, so the
+        # graph's red nodes stay the unsubscribe ones.
         pos_name_set = set(POSITIVE)
-        clickable = []
+        name_by_id = {v.id: k for k, v in cat.items()}
+        clickable = set()
         for rec, primary in contents:
             rec_cats = {a.category_id for a in db.query(ContentCategoryAssignmentDB).filter(ContentCategoryAssignmentDB.content_id == rec.id)}
             names = {name_by_id[cid] for cid in rec_cats}
             if names and names.issubset(pos_name_set):
-                clickable.append(rec.id)
+                clickable.add(rec.id)
 
         event_count = 0
-        for r in random.sample(recipients, 32):
-            ex = DeliveryExecutionDB(send_instance_id=si.id, recipient_id=r.id, status="sent",
-                                     provider="mock", channel="email", purpose="marketing")
-            db.add(ex); db.flush()
+        for ex in executions:
+            if ex.status != "sent":
+                continue
+            carried = sorted((sent_content_ids(db, ex) or set()) & clickable)
+            if not carried:
+                continue
             for _ in range(random.randint(2, 6)):
-                content_id = random.choice(clickable)
                 ev = EngagementEventDB(
                     delivery_execution_id=ex.id, event_type="click", provider="mock",
-                    provider_event_id=f"evt-{r.id}-{event_count}",
-                    event_data={"content_record_id": content_id},
+                    provider_event_id=f"evt-{ex.recipient_id}-{event_count}",
+                    event_data={"content_record_id": random.choice(carried)},
                     occurred_at=NOW - timedelta(days=random.randint(0, 60)),
                 )
                 db.add(ev); db.flush()
