@@ -1669,6 +1669,26 @@ export interface paths {
         patch: operations["update_outcome_overrides__override_id__outcome_patch"];
         trace?: never;
     };
+    "/overrides/modules/{module_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set a module's overridden fields, all at once
+         * @description The whole set of overridden fields for one module: an override is created, changed in place, or reset (an empty set). Overriding one more field, or resetting one, is this set with that key added or removed (ADR-178 point 6). If-Match takes the module's updated_at, which every override write moves.
+         */
+        put: operations["set_fields_overrides_modules__module_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audience-groups/": {
         parameters: {
             query?: never;
@@ -4059,6 +4079,21 @@ export interface components {
             variables: components["schemas"]["ModuleVariableOut"][];
         };
         /**
+         * ModuleOverrideState
+         * @description A module's override after a write, and the module's new version — the
+         *     token the next write states, since an override write moves it (task-256).
+         */
+        ModuleOverrideState: {
+            /** Module Id */
+            module_id: number;
+            /**
+             * Module Updated At
+             * Format: date-time
+             */
+            module_updated_at: string;
+            override?: components["schemas"]["ContentOverride"] | null;
+        };
+        /**
          * ModuleVariableOut
          * @description One field of a module, as an authoring form needs it (task-208).
          *
@@ -4136,6 +4171,23 @@ export interface components {
             outcome_delta: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * OverrideFieldsSet
+         * @description The whole set of a module's overridden fields (task-256).
+         *
+         *     One write states what the override should be: an empty set resets it. So
+         *     "override one more field" and "reset one field" (ADR-178 point 6) are each
+         *     this set with a key added or removed, and never a reset followed by a
+         *     create. The author is the caller, as on create (task-243).
+         */
+        OverrideFieldsSet: {
+            /** Field Overrides */
+            field_overrides: {
+                [key: string]: unknown;
+            };
+            /** Reason */
+            reason?: string | null;
         };
         /** Page[AudienceGroupListed] */
         Page_AudienceGroupListed_: {
@@ -8715,6 +8767,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContentOverride"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_fields_overrides_modules__module_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
+            path: {
+                module_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OverrideFieldsSet"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleOverrideState"];
                 };
             };
             /** @description Validation Error */

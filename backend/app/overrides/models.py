@@ -38,3 +38,25 @@ class ContentOverride(BaseModel):
 
 class OutcomeDeltaUpdate(BaseModel):
     outcome_delta: dict[str, Any]
+
+
+class OverrideFieldsSet(BaseModel):
+    """The whole set of a module's overridden fields (task-256).
+
+    One write states what the override should be: an empty set resets it. So
+    "override one more field" and "reset one field" (ADR-178 point 6) are each
+    this set with a key added or removed, and never a reset followed by a
+    create. The author is the caller, as on create (task-243).
+    """
+
+    field_overrides: dict[str, Any]
+    reason: str | None = None
+
+
+class ModuleOverrideState(BaseModel):
+    """A module's override after a write, and the module's new version — the
+    token the next write states, since an override write moves it (task-256)."""
+
+    module_id: int
+    module_updated_at: datetime
+    override: ContentOverride | None = None

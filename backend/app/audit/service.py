@@ -65,6 +65,8 @@ DECISION_SLOT_CREATED = "decision_slot.created"
 DECISION_SLOT_UPDATED = "decision_slot.updated"
 OVERRIDE_CREATED = "override.created"
 OVERRIDE_RESET = "override.reset"
+# task-256: an active override whose fields were changed in place.
+OVERRIDE_CHANGED = "override.changed"
 # task-245: every settings write, both planes, and the access-control switch.
 SETTINGS_CHANGED = "settings.changed"
 # ADR-166's administration surface (task-50). Logged lines were the only trace

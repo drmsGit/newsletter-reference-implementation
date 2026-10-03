@@ -360,7 +360,7 @@ class StaleWrite(Exception):
     """
 
 
-def _refuse_stale(db: Session, row, expected_updated_at: datetime | None, label: str) -> None:
+def refuse_stale(db: Session, row, expected_updated_at: datetime | None, label: str) -> None:
     """Refuse the write when the caller's token no longer matches the row.
 
     `updated_at` is the version token (ADR-180 point 2). The row is re-read
@@ -393,7 +393,7 @@ def update_variant(
     variant = get_variant(db, variant_id, brand_id=brand_id)
     if variant is None:
         return None
-    _refuse_stale(db, variant, expected_updated_at, "variant")
+    refuse_stale(db, variant, expected_updated_at, "variant")
     variant.name = name
     # Moved by hand: subject and preheader live in the header module, so an
     # edit to them alone leaves this row clean and `onupdate` never fires —
@@ -733,7 +733,7 @@ def update_module(
     module = get_module(db, module_id, brand_id=brand_id)
     if module is None:
         return None
-    _refuse_stale(db, module, expected_updated_at, "module")
+    refuse_stale(db, module, expected_updated_at, "module")
     channel_key = db.get(VariantDB, module.variant_id).channel
     _refuse_module_type(channel_key, module_type)
     _refuse_module_data(channel_key, module_type, module_data)
@@ -768,7 +768,7 @@ def delete_module(
     module = get_module(db, module_id, brand_id=brand_id)
     if module is None:
         return None
-    _refuse_stale(db, module, expected_updated_at, "module")
+    refuse_stale(db, module, expected_updated_at, "module")
 
     from app.overrides.db_models import ContentOverrideDB
 
@@ -802,7 +802,7 @@ def move_module(
     module = get_module(db, module_id, brand_id=brand_id)
     if module is None:
         return None
-    _refuse_stale(db, module, expected_updated_at, "module")
+    refuse_stale(db, module, expected_updated_at, "module")
 
     neighbors = db.query(ModuleInstanceDB).filter(
         ModuleInstanceDB.variant_id == module.variant_id
@@ -867,7 +867,7 @@ def update_decision_slot(
     slot = get_decision_slot(db, slot_id, brand_id=brand_id)
     if slot is None:
         return None
-    _refuse_stale(db, slot, expected_updated_at, "decision slot")
+    refuse_stale(db, slot, expected_updated_at, "decision slot")
     # Lock the config/filter structure to the (possibly newly-chosen) strategy
     # before persisting — no more "accepts any shape for any strategy, only
     # fails at resolution time". Switching strategies re-derives the structure.

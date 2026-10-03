@@ -5,8 +5,14 @@ from app.auth.dependencies import request_principal, working_brand
 from app.auth.service import actor_label
 from app.pagination import Page, PageParams, page_of_list, page_params
 from app.database import get_db
-from app.overrides.models import ContentOverride, ContentOverrideCreate, OutcomeDeltaUpdate
+from app.overrides.models import (
+    ContentOverride, ContentOverrideCreate, ModuleOverrideState, OutcomeDeltaUpdate, OverrideFieldsSet,
+)
 from app.audit import service as audit
+# The version-token helpers the composer routes use (task-110), so an
+# override write states and checks a module's version the same way.
+from app.campaigns.router import IF_MATCH, _expected
+from app.campaigns.service import StaleWrite
 from app.overrides.service import (
     override_audit_detail,
     create_content_override,
@@ -14,6 +20,7 @@ from app.overrides.service import (
     list_content_overrides,
     record_outcome_delta,
     reset_content_override,
+    set_override_fields,
 )
 
 router = APIRouter(prefix="/overrides", tags=["overrides"])
@@ -87,3 +94,52 @@ def update_outcome(override_id: int, data: OutcomeDeltaUpdate, db: Session = Dep
     if override is None:
         raise HTTPException(status_code=404, detail="Content override not found")
     return override
+
+
+#: The audit action for each thing a field-set write can do (task-256).
+_SET_ACTIONS = {
+    "created": audit.OVERRIDE_CREATED,
+    "changed": audit.OVERRIDE_CHANGED,
+    "reset": audit.OVERRIDE_RESET,
+}
+
+
+@router.put(
+    "/modules/{module_id}",
+    response_model=ModuleOverrideState,
+    summary="Set a module's overridden fields, all at once",
+    description=(
+        "The whole set of overridden fields for one module: an override is "
+        "created, changed in place, or reset (an empty set). Overriding one more "
+        "field, or resetting one, is this set with that key added or removed "
+        "(ADR-178 point 6). If-Match takes the module's updated_at, which every "
+        "override write moves."
+    ),
+)
+def set_fields(
+    module_id: int,
+    data: OverrideFieldsSet,
+    request: Request,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+    if_match: str | None = IF_MATCH,
+):
+    try:
+        result = set_override_fields(
+            db, module_id, data.field_overrides, data.reason,
+            brand_id=brand_id, author=actor_label(request_principal(request)),
+            expected_updated_at=_expected(if_match),
+        )
+    except StaleWrite as error:
+        raise HTTPException(status_code=409, detail=str(error))
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    if result is None:
+        raise HTTPException(status_code=404, detail="Module not found")
+    module, live, happened, row = result
+    if happened is not None:
+        audit.record_from_request(
+            request, db, _SET_ACTIONS[happened], subject_type="override", subject_id=row.id,
+            detail=override_audit_detail(row),
+        )
+    return {"module_id": module.id, "module_updated_at": module.updated_at, "override": live}

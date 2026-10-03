@@ -145,6 +145,79 @@ def create_content_override(
     return override
 
 
+def set_override_fields(
+    db: Session,
+    module_id: int,
+    field_overrides: dict,
+    reason: str | None,
+    *,
+    brand_id: int,
+    author: str,
+    expected_updated_at=None,
+):
+    """Make a module's override exactly `field_overrides`, in one transaction
+    (task-256). Returns `(module, live override or None, what happened, the row
+    it happened to)` — the row even after a reset, for the audit entry — or
+    None when the module is not in this brand.
+
+    - none active and a non-empty set: create one — `"created"`;
+    - one active and a non-empty set: change it in place — `"changed"`;
+    - one active and an empty set: deactivate it — `"reset"` (ADR-178 point 6:
+      "if the dict empties, the row deactivates"; a reset keeps the row);
+    - none active and an empty set: nothing — None.
+
+    **The module's `updated_at` is the version** (ADR-180 point 2): the module
+    row is locked and compared first, and moved on every change, so a stale
+    override write is refused and two writers never both land. Changed in
+    place rather than reset-and-recreated: the row keeps its id, and the
+    values it held are in the audit log (design pass D2). `overridden_by`
+    becomes whoever changed it last, as on a duplicate (ADR-178 point 7).
+    """
+    from sqlalchemy import func
+
+    from app.campaigns.service import get_module, refuse_stale
+
+    module = get_module(db, module_id, brand_id=brand_id)
+    if module is None:
+        return None
+    refuse_stale(db, module, expected_updated_at, "module")
+    manifest = _overrideable_manifest(db, module)
+    if field_overrides:
+        _validate_field_overrides(manifest, module, field_overrides)
+
+    active = (
+        db.query(ContentOverrideDB)
+        .filter(ContentOverrideDB.module_instance_id == module.id, ContentOverrideDB.active.is_(True))
+        .with_for_update()
+        .first()
+    )
+    if active is None and not field_overrides:
+        return module, None, None, None
+    if active is None:
+        active = ContentOverrideDB(
+            module_instance_id=module.id, field_overrides=dict(field_overrides),
+            overridden_by=author, reason=reason, active=True,
+        )
+        db.add(active)
+        happened = "created"
+    elif field_overrides:
+        # A new dict, not a mutation: SQLAlchemy does not see changes inside a
+        # plain JSON value.
+        active.field_overrides = dict(field_overrides)
+        active.reason = reason
+        active.overridden_by = author
+        happened = "changed"
+    else:
+        active.active = False
+        active.reverted_at = datetime.now(timezone.utc)
+        happened = "reset"
+    module.updated_at = func.now()
+    db.commit()
+    db.refresh(module)
+    db.refresh(active)
+    return module, (active if active.active else None), happened, active
+
+
 def get_active_content_override(db: Session, module_instance_id: int) -> ContentOverrideDB | None:
     """The single active override on a module, if any — the row rendering
     honors. O(1) via the partial unique index.
