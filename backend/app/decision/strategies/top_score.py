@@ -3,7 +3,9 @@ from sqlalchemy.orm import Session
 from app.campaigns.db_models import DecisionSlotDB
 from app.content.db_models import ContentCategoryAssignmentDB, ContentRecordDB
 from app.content.service import get_latest_version_for_content
-from app.decision.strategies.base import ConfigField, DecisionStrategy, StrategyMeta, StrategyResult, sending_brand_id
+from app.decision.strategies.base import (
+    ConfigField, DecisionStrategy, StrategyMeta, StrategyResult, candidate_query, sending_brand_id,
+)
 
 
 class TopScoreStrategy(DecisionStrategy):
@@ -43,25 +45,7 @@ class TopScoreStrategy(DecisionStrategy):
         # would be two chances for them to disagree.
         brand_id = sending_brand_id(db, slot)
 
-        query = (
-            db.query(ContentRecordDB, ContentCategoryAssignmentDB.score)
-            .join(
-                ContentCategoryAssignmentDB,
-                ContentRecordDB.id == ContentCategoryAssignmentDB.content_id,
-            )
-            .filter(ContentRecordDB.status == "active")
-            # ADR-150 point 8: a decision slot resolves ONLY the sending
-            # brand's content. Safe by construction — widening it is the
-            # configurable filter point 10 defers, not this default. A slot
-            # whose campaign chain is broken never gets here: `sending_brand_id`
-            # raises rather than handing this filter None (task-18).
-            .filter(ContentRecordDB.brand_id == brand_id)
-        )
-
-        if category_ids:
-            query = query.filter(
-                ContentCategoryAssignmentDB.category_id.in_(category_ids)
-            )
+        query = candidate_query(db, slot, brand_id=brand_id)
 
         result = query.order_by(
             ContentCategoryAssignmentDB.score.desc(),
@@ -71,7 +55,7 @@ class TopScoreStrategy(DecisionStrategy):
         if result is None:
             return None
 
-        content_record, score = result
+        content_record, score, _category_id = result
         latest_version = get_latest_version_for_content(
             db=db, content_record_id=content_record.id, brand_id=brand_id
         )

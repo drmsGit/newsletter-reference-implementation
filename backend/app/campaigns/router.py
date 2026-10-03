@@ -20,6 +20,7 @@ from app.campaigns.models import (
     SuggestionRun,
     DecisionSlotListed,
     DecisionSlotStats,
+    SlotCandidates,
     CampaignComposition,
     SubjectSuggestionResult,
     CampaignCreate,
@@ -788,6 +789,33 @@ def get_decision_slot_stats(
     if stats is None:
         raise HTTPException(status_code=404, detail=f"Decision slot {slot_id} not found")
     return {**stats, "slot": to_decision_slot(stats["slot"])}
+
+
+@router.get(
+    "/decision-slots/{slot_id}/candidates",
+    response_model=SlotCandidates,
+    summary="How many content records one decision slot would choose between",
+    description=(
+        "Counted over the same query the strategy picks from, without picking: "
+        "nothing is resolved or written. For a strategy that picks per recipient, "
+        "one person may be offered fewer."
+    ),
+)
+def get_decision_slot_candidates(
+    slot_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.campaigns.service import slot_candidate_count
+    from app.decision.strategies.base import BrokenCampaignChain
+
+    try:
+        candidates = slot_candidate_count(db, slot_id, brand_id=brand_id)
+    except BrokenCampaignChain as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if candidates is None:
+        raise HTTPException(status_code=404, detail=f"Decision slot {slot_id} not found")
+    return candidates
 
 
 @router.get(

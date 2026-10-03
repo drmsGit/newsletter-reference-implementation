@@ -3,9 +3,10 @@ import random
 from sqlalchemy.orm import Session
 
 from app.campaigns.db_models import DecisionSlotDB
-from app.content.db_models import ContentCategoryAssignmentDB, ContentRecordDB
 from app.content.service import get_latest_version_for_content
-from app.decision.strategies.base import ConfigField, DecisionStrategy, StrategyMeta, StrategyResult, sending_brand_id
+from app.decision.strategies.base import (
+    ConfigField, DecisionStrategy, StrategyMeta, StrategyResult, candidate_query, sending_brand_id,
+)
 from app.insight.signals import operational_signals_for_recipient
 
 DEFAULT_CONFIG = {
@@ -76,29 +77,7 @@ class RecipientTopScoreStrategy(DecisionStrategy):
         # consumes signals, not raw events (ADR-111).
         signals = operational_signals_for_recipient(db, recipient_id)
 
-        query = (
-            db.query(
-                ContentRecordDB,
-                ContentCategoryAssignmentDB.score,
-                ContentCategoryAssignmentDB.category_id,
-            )
-            .join(
-                ContentCategoryAssignmentDB,
-                ContentRecordDB.id == ContentCategoryAssignmentDB.content_id,
-            )
-            .filter(ContentRecordDB.status == "active")
-            # ADR-150 point 8: a decision slot resolves ONLY the sending
-            # brand's content. Safe by construction — widening it is the
-            # configurable filter point 10 defers, not this default. A slot
-            # whose campaign chain is broken never gets here: `sending_brand_id`
-            # raises rather than handing this filter None (task-18).
-            .filter(ContentRecordDB.brand_id == brand_id)
-        )
-
-        if category_ids:
-            query = query.filter(
-                ContentCategoryAssignmentDB.category_id.in_(category_ids)
-            )
+        query = candidate_query(db, slot, brand_id=brand_id)
 
         # Only categories the recipient actually has a signal for count — same
         # as the old inner join against a preference row, but now the "score" is

@@ -1,10 +1,11 @@
 ---
 id: TASK-205
 title: A read-only candidate count for a decision slot
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-27 14:20'
-updated_date: '2026-10-01 20:54'
+updated_date: '2026-10-03 13:14'
 labels:
   - backend
 dependencies: []
@@ -22,6 +23,16 @@ Source: [[Manager Workflow - design interview]] → What Cluster 2 produced, req
 
 **Verified against the code 2026-09-27:** `backend/app/decision/router.py:25-40` is the only slot route. `execute_decision_slot` (`backend/app/decision/service.py:12`) updates a resolution in place (`:90-96`) or creates one (`:104-113`). There is no count or dry-run route.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Lift the candidate query both strategies copied into decision/strategies/base.py:candidate_query(db, slot, *, brand_id); strategies keep their own ordering/signal filtering.
+2. campaigns/service.py:slot_candidate_count(db, slot_id, *, brand_id) counts distinct records over it, writes nothing.
+3. GET /campaigns/decision-slots/{slot_id}/candidates -> SlotCandidates (slot_id, candidate_count, category_ids, requires_recipient); 404 foreign, 409 broken chain, 400 unknown strategy.
+4. Tests in test_read_models.py::TestSlotCandidateCount on a fresh brand, mutation-checked.
+5. React decision-slot screen consumes it (same session).
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 

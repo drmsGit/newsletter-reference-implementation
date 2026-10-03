@@ -385,6 +385,24 @@ class SlotReason(BaseModel):
     count: int
 
 
+class SlotCandidates(BaseModel):
+    """What a slot would choose between right now, without choosing (task-205).
+
+    Counted over the same query the strategies pick from
+    (`decision.strategies.base.candidate_query`); asking writes nothing.
+    """
+
+    slot_id: int
+    # Distinct content records: the brand's active content in the slot's categories.
+    candidate_count: int
+    # The category filter applied; empty means every category.
+    category_ids: list[int]
+    # The strategy declares it picks per recipient. Such a strategy may draw
+    # from fewer than `candidate_count` for any one person — the recipient
+    # top score keeps only categories that person has a signal for.
+    requires_recipient: bool
+
+
 class DecisionSlotStats(BaseModel):
     """One slot and what it has picked (task-50, B22)."""
 

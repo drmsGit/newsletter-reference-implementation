@@ -737,3 +737,102 @@ class TestB20CategoryDetailAndC10:
             assert own.title in html and theirs.title not in html
         finally:
             _drop_user(db, user)
+
+
+class TestSlotCandidateCount:
+    """task-205: what a slot would choose between, asked without choosing.
+
+    The slot sits on a fresh brand, so the dev database's seeded content
+    cannot move the counts; a foreign brand's record shares a category to
+    prove the brand filter, not an empty table, keeps it out.
+    """
+
+    @pytest.fixture
+    def home(self, temp_brand):
+        return temp_brand("home")
+
+    @pytest.fixture
+    def setup(self, db, home, foreign_brand):
+        from app.campaigns.db_models import DecisionResolutionDB, DecisionSlotDB
+        from app.content.db_models import CategoryDB, ContentCategoryAssignmentDB, ContentRecordDB
+
+        variant = _variant(db, home)
+        one, two = CategoryDB(name=f"cc-{uuid.uuid4().hex[:6]}"), CategoryDB(name=f"cc-{uuid.uuid4().hex[:6]}")
+        a = ContentRecordDB(title="A", content={}, status="active", brand_id=home.id)
+        b = ContentRecordDB(title="B", content={}, status="active", brand_id=home.id)
+        retired = ContentRecordDB(title="R", content={}, status="archived", brand_id=home.id)
+        elsewhere = ContentRecordDB(title="F", content={}, status="active", brand_id=foreign_brand.id)
+        db.add_all([one, two, a, b, retired, elsewhere]); db.flush()
+        assignments = [
+            ContentCategoryAssignmentDB(content_id=a.id, category_id=one.id, score=9),
+            ContentCategoryAssignmentDB(content_id=a.id, category_id=two.id, score=1),
+            ContentCategoryAssignmentDB(content_id=b.id, category_id=two.id, score=5),
+            ContentCategoryAssignmentDB(content_id=retired.id, category_id=one.id, score=99),
+            ContentCategoryAssignmentDB(content_id=elsewhere.id, category_id=one.id, score=99),
+        ]
+        db.add_all(assignments); db.flush()
+
+        def slot(strategy="top_score", category_ids=None):
+            s = DecisionSlotDB(variant_id=variant.id, name="c", decision_type="content_recommendation",
+                               decision_strategy=strategy,
+                               candidate_filter={"category_ids": category_ids} if category_ids else None)
+            db.add(s); db.commit()
+            made.append(s.id)
+            return s
+
+        made: list[int] = []
+        db.commit()
+        yield slot, one, two, a
+        db.query(DecisionResolutionDB).filter(DecisionResolutionDB.decision_slot_id.in_(made)).delete(
+            synchronize_session=False)
+        db.query(DecisionSlotDB).filter(DecisionSlotDB.id.in_(made)).delete(synchronize_session=False)
+        db.query(ContentCategoryAssignmentDB).filter(
+            ContentCategoryAssignmentDB.id.in_([x.id for x in assignments])).delete(synchronize_session=False)
+        db.query(ContentRecordDB).filter(ContentRecordDB.id == elsewhere.id).delete()
+        db.query(CategoryDB).filter(CategoryDB.id.in_([one.id, two.id])).delete(synchronize_session=False)
+        db.commit()
+
+    def _get(self, slot_id, brand):
+        with machine([VIEW], brand_id=brand.id) as headers:
+            return client.get(f"/campaigns/decision-slots/{slot_id}/candidates", headers=headers)
+
+    def test_every_category_counts_each_active_record_once(self, setup, home):
+        make, *_ = setup
+        response = self._get(make().id, home)
+        assert response.status_code == 200, response.text
+        # A is in both categories and counts once; the archived record and the
+        # foreign brand's record are out.
+        assert response.json() == {"slot_id": response.json()["slot_id"], "candidate_count": 2,
+                                   "category_ids": [], "requires_recipient": False}
+
+    def test_the_category_filter_narrows_it(self, setup, home):
+        make, one, _, _ = setup
+        body = self._get(make(category_ids=[one.id]).id, home).json()
+        assert (body["candidate_count"], body["category_ids"]) == (1, [one.id])
+
+    def test_a_per_recipient_strategy_says_so(self, setup, home):
+        make, *_ = setup
+        assert self._get(make("recipient_top_score").id, home).json()["requires_recipient"] is True
+
+    def test_asking_resolves_nothing(self, db, setup, home):
+        from app.campaigns.db_models import DecisionResolutionDB
+
+        make, *_ = setup
+        s = make()
+        assert self._get(s.id, home).status_code == 200
+        assert db.query(DecisionResolutionDB).filter(
+            DecisionResolutionDB.decision_slot_id == s.id).count() == 0
+
+    def test_another_brands_slot_is_not_found(self, setup, foreign_brand):
+        make, *_ = setup
+        assert self._get(make().id, foreign_brand).status_code == 404
+
+    def test_the_strategy_still_picks_from_the_same_set(self, db, setup, home):
+        """The candidate query was lifted out of the strategies; top score
+        must still take the highest-scored row of it (A in category one, 9),
+        not the archived or foreign 99s."""
+        from app.decision.service import execute_decision_slot
+
+        make, one, _, a = setup
+        resolution = execute_decision_slot(db, make(category_ids=[one.id]).id, brand_id=home.id)
+        assert resolution.content_record_id == a.id

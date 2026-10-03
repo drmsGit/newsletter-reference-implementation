@@ -982,6 +982,34 @@ def decision_slot_stats(db: Session, slot_id: int, *, brand_id: int) -> dict | N
 
 
 
+def slot_candidate_count(db: Session, slot_id: int, *, brand_id: int) -> dict | None:
+    """How many content records one slot would choose between, without
+    resolving it (task-205). `POST /decision/slots/{id}/execute` writes a
+    resolution, so it cannot answer this; this reads only.
+
+    None when the slot is not in this brand. Raises `BrokenCampaignChain` as
+    execution does, and `ValueError` for a strategy the registry does not know.
+    """
+    from app.decision.strategies.registry import get_strategy
+    from app.decision.strategies.base import candidate_query, sending_brand_id
+
+    slot = get_decision_slot(db, slot_id, brand_id=brand_id)
+    if slot is None:
+        return None
+    meta = get_strategy(slot.decision_strategy).meta
+    count = (
+        candidate_query(db, slot, brand_id=sending_brand_id(db, slot))
+        .with_entities(func.count(func.distinct(ContentRecordDB.id)))
+        .scalar()
+    )
+    return {
+        "slot_id": slot.id,
+        "candidate_count": count or 0,
+        "category_ids": (slot.candidate_filter or {}).get("category_ids", []),
+        "requires_recipient": meta.requires_recipient,
+    }
+
+
 def campaign_composition(db: Session, campaign_id: int, *, brand_id: int) -> dict | None:
     """A campaign as the variant editor shows it (task-50, B11). None when the
     campaign is not in this brand.

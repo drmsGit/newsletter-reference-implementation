@@ -171,3 +171,44 @@ def sending_brand_id(db, slot) -> int:
             "an empty result — refusing rather than resolving nothing."
         )
     return brand_id
+
+
+def candidate_query(db, slot, *, brand_id: int):
+    """The rows a slot chooses between: `(record, category score, category id)`
+    for the brand's active content, narrowed to the slot's `category_ids` when
+    it names any (empty = all).
+
+    One row per record **and category assignment**, so a record in two
+    categories appears twice — count `distinct(ContentRecordDB.id)` for how
+    many records that is. Strategies add their own ordering or recipient
+    filtering on top; the read-only candidate count (task-205) uses it as is,
+    which is what keeps the count and the pick drawing on the same set.
+
+    `brand_id` is the slot's sending brand (`sending_brand_id`), taken as an
+    argument because each strategy also scopes its version lookup with it and
+    the two must agree.
+    """
+    from app.content.db_models import ContentCategoryAssignmentDB, ContentRecordDB
+
+    query = (
+        db.query(
+            ContentRecordDB,
+            ContentCategoryAssignmentDB.score,
+            ContentCategoryAssignmentDB.category_id,
+        )
+        .join(
+            ContentCategoryAssignmentDB,
+            ContentRecordDB.id == ContentCategoryAssignmentDB.content_id,
+        )
+        .filter(ContentRecordDB.status == "active")
+        # ADR-150 point 8: a decision slot resolves ONLY the sending
+        # brand's content. Safe by construction — widening it is the
+        # configurable filter point 10 defers, not this default. A slot
+        # whose campaign chain is broken never gets here: `sending_brand_id`
+        # raises rather than handing this filter None (task-18).
+        .filter(ContentRecordDB.brand_id == brand_id)
+    )
+    category_ids = (slot.candidate_filter or {}).get("category_ids", [])
+    if category_ids:
+        query = query.filter(ContentCategoryAssignmentDB.category_id.in_(category_ids))
+    return query
