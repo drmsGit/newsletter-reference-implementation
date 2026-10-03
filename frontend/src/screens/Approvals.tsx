@@ -1,5 +1,5 @@
 import { Button } from 'react-aria-components'
-import { useNavigate, useSearchParams } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 
 import {
   useApprovalFilterOptions,
@@ -12,23 +12,39 @@ import DataTable, { type DataColumn } from '../components/DataTable'
 import ScreenState from '../components/ScreenState'
 import { formatDate } from './Campaigns'
 
-const columns: DataColumn<PendingActionRow>[] = [
+/**
+ * The requester as the server names them, with their kind beside it --
+ * ADR-166 point 3's person/integration distinction is never dropped.
+ */
+function requester(a: PendingActionRow) {
+  return a.requested_by_name ? `${a.requested_by_name} (${a.requested_by_type})` : a.requested_by_type
+}
+
+const waitingColumns: DataColumn<PendingActionRow>[] = [
   { key: 'label', header: 'Request', isRowHeader: true, render: (a) => a.label },
   { key: 'summary', header: 'Summary', render: (a) => a.summary },
-  { key: 'status', header: 'Status', render: (a) => a.status },
-  {
-    key: 'requested_by',
-    header: 'Requested by',
-    /**
-     * The actor type comes from the server and is shown as the server says it.
-     *
-     * ADR-166 point 3 made the distinction between a person and an integration
-     * durable, and an inbox that silently rendered both as "someone" would
-     * discard the one fact that explains why a request exists.
-     */
-    render: (a) => a.requested_by_type,
-  },
+  { key: 'requested_by', header: 'Requested by', render: requester },
   { key: 'expires', header: 'Expires', render: (a) => formatDate(a.expires_at) },
+]
+
+const historyColumns: DataColumn<PendingActionRow>[] = [
+  { key: 'label', header: 'Request', isRowHeader: true, render: (a) => a.label },
+  { key: 'summary', header: 'Summary', render: (a) => a.summary },
+  { key: 'outcome', header: 'Outcome', render: (a) => a.status },
+  { key: 'requested_by', header: 'Requested by', render: requester },
+  {
+    key: 'decided_by',
+    header: 'Decided by',
+    // An expired request was decided by nobody, and says so.
+    render: (a) => a.decided_by_name ?? (a.status === 'expired' ? 'nobody (expired)' : '—'),
+  },
+  {
+    key: 'ended',
+    header: 'Ended',
+    // The server orders the history by this: decided, or the deadline it lapsed at.
+    render: (a) => formatDate(a.decided_at ?? a.expires_at),
+  },
+  { key: 'reason', header: 'Reason', render: (a) => a.decision_reason ?? '—' },
 ]
 
 /** Rows per page. The server allows up to 200; 50 is its default too. */
@@ -36,38 +52,43 @@ const PAGE = 50
 const ANY = '__any__'
 
 /**
- * The approval inbox.
+ * The approval inbox, and the decision history.
  *
- * ADR-169 put this close to the manager's home screen, and ADR-168's addendum
- * is what makes it reachable at all -- approving requires a session-authenticated
- * person, and until that record the JSON plane had no way to carry one.
+ * **Two screens, one list** (Manager Workflow Q1.6: log and queue stay
+ * separate). The inbox answers *does anything need me* and holds only what is
+ * waiting; a decided request leaves it and appears in the history, which reads
+ * by when each request ended. They share everything else -- the filters, the
+ * paging, the table -- so they are one component in two modes rather than two
+ * copies that drift.
  *
- * **One flat list, newest first, narrowed by the manager** (Manager Workflow
- * Q1.3): the system does not decide which requests matter enough to separate.
- * The filters offer only what this brand's requests carry -- the server's
- * `filter-options` -- so a requester is chosen by name ("what did Acme Agency
- * send"), and nothing is offered that would match no row.
+ * ADR-169 put the inbox close to the manager's home screen, and ADR-168's
+ * addendum is what makes it reachable at all -- approving requires a
+ * session-authenticated person.
  *
- * **The filters live in the URL**, so a narrowed inbox survives a reload, the
+ * **One flat list, newest first, narrowed by the manager** (Q1.3): the system
+ * does not decide which requests matter enough to separate. The filters offer
+ * only what this brand's requests carry -- the server's `filter-options` -- so
+ * a requester is chosen by name ("what did Acme Agency send").
+ *
+ * **The filters live in the URL**, so a narrowed list survives a reload, the
  * back button undoes a filter, and a link to it can be shared.
-
  *
  * Deciding happens on a request's own screen (`ApprovalDetail`), where what it
  * would do is shown in full first.
  */
-export default function Approvals() {
+export default function Approvals({ mode = 'waiting' }: { mode?: 'waiting' | 'history' }) {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const options = useApprovalFilterOptions()
+  const history = mode === 'history'
 
-  const status = (params.get('status') ?? 'pending') as NonNullable<ApprovalQuery['status']>
   const action = params.get('action') ?? ANY
-  const requester = params.get('requester') ?? ANY // "type:id", or "type:" for no id
+  const requesterKey = params.get('requester') ?? ANY // "type:id", or "type:" for no id
   const offset = Math.max(0, Number(params.get('offset') ?? 0) || 0)
 
-  const [byType, byId] = requester === ANY ? [undefined, undefined] : requester.split(':')
+  const [byType, byId] = requesterKey === ANY ? [undefined, undefined] : requesterKey.split(':')
   const query: ApprovalQuery = {
-    status,
+    status: history ? 'decided' : 'pending',
     action_key: action === ANY ? undefined : action,
     requested_by_type: byType,
     requested_by_id: byId ? Number(byId) : undefined,
@@ -79,7 +100,7 @@ export default function Approvals() {
   /** Change one filter. Any change starts again from the first page. */
   function set(name: string, value: string) {
     const next = new URLSearchParams(params)
-    if (value === ANY || (name === 'status' && value === 'pending')) next.delete(name)
+    if (value === ANY) next.delete(name)
     else next.set(name, value)
     next.delete('offset')
     setParams(next)
@@ -92,38 +113,20 @@ export default function Approvals() {
     setParams(next)
   }
 
-  const names = new Map(
-    (options.data?.requesters ?? []).map((r) => [`${r.type}:${r.id ?? ''}`, r.name]),
-  )
   const rows = approvals.data ?? []
-  const named = columns.map((c) =>
-    c.key === 'requested_by'
-      ? {
-          ...c,
-          // The requester's name where the server gave one, else its kind --
-          // ADR-166 point 3's person/integration distinction is never dropped.
-          render: (a: PendingActionRow) => {
-            const name = names.get(`${a.requested_by_type}:${a.requested_by_id ?? ''}`)
-            return name ? `${name} (${a.requested_by_type})` : a.requested_by_type
-          },
-        }
-      : c,
-  )
+  const filtered = action !== ANY || requesterKey !== ANY || offset > 0
 
   return (
     <>
-      <h1>Approvals</h1>
+      <h1>{history ? 'Decision history' : 'Approvals'}</h1>
+      <p>
+        {history ? (
+          <Link to="/approvals">← Waiting for a decision</Link>
+        ) : (
+          <Link to="/approvals/history">Decision history →</Link>
+        )}
+      </p>
       <div className="filters">
-        <Choice
-          label="Status"
-          options={[
-            { id: 'pending', name: 'Waiting for a decision' },
-            { id: 'decided', name: 'Decided' },
-            { id: 'all', name: 'All' },
-          ]}
-          selected={status}
-          onChange={(v) => set('status', v)}
-        />
         <Choice
           label="Action"
           options={[
@@ -142,26 +145,28 @@ export default function Approvals() {
               name: `${r.name} (${r.type})`,
             })),
           ]}
-          selected={requester}
+          selected={requesterKey}
           onChange={(v) => set('requester', v)}
         />
       </div>
       <ScreenState query={approvals}>
         <DataTable
-          label="Approvals"
-          columns={named}
+          label={history ? 'Decided requests' : 'Waiting for a decision'}
+          columns={history ? historyColumns : waitingColumns}
           items={rows}
           emptyMessage={
-            status === 'pending' && action === ANY && requester === ANY && offset === 0
-              ? 'Nothing is waiting for a decision.'
-              : 'No request matches these filters.'
+            filtered
+              ? 'No request matches these filters.'
+              : history
+                ? 'Nothing has been decided yet.'
+                : 'Nothing is waiting for a decision.'
           }
           onRowAction={(a) => navigate(`/approvals/${a.id}`)}
         />
         {/*
-          No total yet (task-88 brings one), so "next" is offered when this page
-          came back full. The cost is honest and small: when the last page is
-          exactly full, "next" leads to an empty page that says so.
+          No total yet (task-88 brings one), so "older" is offered when this
+          page came back full. The cost is honest and small: when the last page
+          is exactly full, "older" leads to an empty page that says so.
         */}
         {(offset > 0 || rows.length === PAGE) && (
           <nav aria-label="Pages" className="pager">

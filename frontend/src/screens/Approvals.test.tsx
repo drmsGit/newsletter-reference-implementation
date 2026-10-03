@@ -89,13 +89,14 @@ describe('narrowing and paging the inbox', () => {
     return calls[calls.length - 1].searchParams
   }
 
-  it('names each requester, from the filter options the server gives', async () => {
+  it('names each requester as the server names them, with their kind', async () => {
     stubFetch({
-      'GET /approvals/': () => jsonResponse([{ ...A_ROW, requested_by_id: 5 }]),
+      'GET /approvals/': () =>
+        jsonResponse([{ ...A_ROW, requested_by_id: 5, requested_by_name: 'Acme Agency' }]),
       'GET /approvals/filter-options': () => jsonResponse(OPTIONS),
     })
     renderWithProviders(<Approvals />)
-    const table = await screen.findByRole('grid', { name: 'Approvals' })
+    const table = await screen.findByRole('grid', { name: 'Waiting for a decision' })
     expect(await within(table).findByText('Acme Agency (integration)')).toBeInTheDocument()
   })
 
@@ -108,11 +109,12 @@ describe('narrowing and paging the inbox', () => {
       <Routes>
         <Route path="/approvals" element={<Approvals />} />
       </Routes>,
-      { route: '/approvals?status=all&action=send.fire&requester=integration:5' },
+      { route: '/approvals?action=send.fire&requester=integration:5' },
     )
     expect(await screen.findByText('No request matches these filters.')).toBeInTheDocument()
     const sent = lastListQuery(fetchMock)
-    expect(sent.get('status')).toBe('all')
+    // The inbox holds only what is waiting (Q1.6); no status is chosen here.
+    expect(sent.get('status')).toBe('pending')
     expect(sent.get('action_key')).toBe('send.fire')
     expect(sent.get('requested_by_type')).toBe('integration')
     expect(sent.get('requested_by_id')).toBe('5')
@@ -264,5 +266,52 @@ describe('deciding a request', () => {
       .toBeInTheDocument()
     expect(screen.getByText('Wrong audience')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Reject' })).not.toBeInTheDocument()
+  })
+})
+
+
+describe('the decision history', () => {
+  const OPTIONS = { actions: [], requesters: [] }
+
+  function lastQuery(fetchMock: ReturnType<typeof stubFetch>) {
+    const calls = fetchMock.mock.calls
+      .map(([input]) => new URL((input as Request).url))
+      .filter((u) => u.pathname === '/approvals/')
+    return calls[calls.length - 1].searchParams
+  }
+
+  it('lists what was decided, who decided it and why, apart from the inbox', async () => {
+    /** Manager Workflow Q1.6: log and queue stay separate. */
+    const fetchMock = stubFetch({
+      'GET /approvals/': () =>
+        jsonResponse([
+          { ...A_ROW, id: 1, status: 'rejected', decided_at: '2026-10-01T10:00:00Z',
+            decided_by_type: 'user', decided_by_id: 3, decided_by_name: 'Robin Approver',
+            decision_reason: 'Wrong audience' },
+          { ...A_ROW, id: 2, status: 'expired', decided_at: null, decided_by_name: null },
+        ]),
+      'GET /approvals/filter-options': () => jsonResponse(OPTIONS),
+    })
+    renderWithProviders(<Approvals mode="history" />)
+
+    const table = await screen.findByRole('grid', { name: 'Decided requests' })
+    expect(within(table).getByText('Robin Approver')).toBeInTheDocument()
+    expect(within(table).getByText('Wrong audience')).toBeInTheDocument()
+    expect(within(table).getByText('nobody (expired)')).toBeInTheDocument()
+    expect(lastQuery(fetchMock).get('status')).toBe('decided')
+    expect(screen.getByRole('link', { name: /Waiting for a decision/ })).toHaveAttribute(
+      'href', '/approvals')
+  })
+
+  it('the inbox offers no status choice and links to the history instead', async () => {
+    stubFetch({
+      'GET /approvals/': () => jsonResponse([]),
+      'GET /approvals/filter-options': () => jsonResponse(OPTIONS),
+    })
+    renderWithProviders(<Approvals />)
+    expect(await screen.findByText('Nothing is waiting for a decision.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Status/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Decision history/ })).toHaveAttribute(
+      'href', '/approvals/history')
   })
 })

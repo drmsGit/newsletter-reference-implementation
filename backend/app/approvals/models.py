@@ -38,6 +38,11 @@ class PendingActionRow(BaseModel):
     decided_by_type: str | None = None
     decided_by_id: int | None = None
     decision_reason: str | None = None
+    # Readable names for both actors (2026-10-03), so the inbox and the
+    # decision history read without a lookup. `decided_by_name` is None when
+    # nobody decided — an expired request.
+    requested_by_name: str | None = None
+    decided_by_name: str | None = None
 
 
 class DescriptionRow(BaseModel):

@@ -597,12 +597,45 @@ def list_for_brand(
         query = query.filter(PendingActionDB.requested_by_type == requested_by_type)
     if requested_by_id is not None:
         query = query.filter(PendingActionDB.requested_by_id == requested_by_id)
-    query = query.order_by(PendingActionDB.created_at.desc(), PendingActionDB.id.desc())
+    if status == "decided":
+        # The history reads by when each request ENDED (Manager Workflow Q1.6):
+        # decided, or — for one that lapsed with nobody deciding — its deadline.
+        from sqlalchemy import func
+
+        ended = func.coalesce(PendingActionDB.decided_at, PendingActionDB.expires_at)
+        query = query.order_by(ended.desc(), PendingActionDB.id.desc())
+    else:
+        query = query.order_by(PendingActionDB.created_at.desc(), PendingActionDB.id.desc())
     if offset:
         query = query.offset(offset)
     if limit is not None:
         query = query.limit(limit)
     return query.all()
+
+
+def actor_names(db: Session, pairs) -> dict:
+    """{(type, id): readable name} for requesters and deciders, in two queries.
+
+    An integration's name; a person's display name, else email. One that no
+    longer exists is named honestly ("integration #6") rather than dropped:
+    the request it made is real history. Shown to anyone who may view the
+    inbox — decided with the user 2026-10-03.
+    """
+    from app.auth.db_models import IntegrationDB, UserDB
+
+    pairs = {(t, i) for t, i in pairs if t}
+    user_ids = [i for t, i in pairs if t == "user" and i is not None]
+    integration_ids = [i for t, i in pairs if t == "integration" and i is not None]
+    known = {
+        "user": {u.id: (u.display_name or u.email) for u in
+                 db.query(UserDB).filter(UserDB.id.in_(user_ids or [-1]))},
+        "integration": {i.id: i.name for i in
+                        db.query(IntegrationDB).filter(IntegrationDB.id.in_(integration_ids or [-1]))},
+    }
+    return {
+        (t, i): known.get(t, {}).get(i) or (f"{t} #{i}" if i is not None else t)
+        for t, i in pairs
+    }
 
 
 def filter_options(db: Session, brand_id: int) -> dict:
@@ -615,7 +648,6 @@ def filter_options(db: Session, brand_id: int) -> dict:
     still offered — its requests are real history — and named honestly.
     """
     from app.approvals.actions.registry import get_action
-    from app.auth.db_models import IntegrationDB, UserDB
 
     keys = [k for (k,) in db.query(PendingActionDB.action_key)
             .filter(PendingActionDB.brand_id == brand_id).distinct()]
@@ -625,17 +657,9 @@ def filter_options(db: Session, brand_id: int) -> dict:
     )
     pairs = (db.query(PendingActionDB.requested_by_type, PendingActionDB.requested_by_id)
              .filter(PendingActionDB.brand_id == brand_id).distinct().all())
-    user_ids = [i for t, i in pairs if t == "user" and i is not None]
-    integration_ids = [i for t, i in pairs if t == "integration" and i is not None]
-    users = {u.id: (u.display_name or u.email) for u in
-             db.query(UserDB).filter(UserDB.id.in_(user_ids or [-1]))}
-    integrations = {i.id: i.name for i in
-                    db.query(IntegrationDB).filter(IntegrationDB.id.in_(integration_ids or [-1]))}
-    known = {"user": users, "integration": integrations}
+    names = actor_names(db, pairs)
     requesters = sorted(
-        ({"type": t, "id": i,
-          "name": known.get(t, {}).get(i) or (f"{t} #{i}" if i is not None else t)}
-         for t, i in pairs),
+        ({"type": t, "id": i, "name": names[(t, i)]} for t, i in pairs if (t, i) in names),
         key=lambda r: (r["type"], r["name"].lower()),
     )
     return {"actions": actions, "requesters": requesters}

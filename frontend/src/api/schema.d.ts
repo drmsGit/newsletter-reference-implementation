@@ -4143,6 +4143,10 @@ export interface components {
             decided_by_id?: number | null;
             /** Decision Reason */
             decision_reason?: string | null;
+            /** Requested By Name */
+            requested_by_name?: string | null;
+            /** Decided By Name */
+            decided_by_name?: string | null;
             /**
              * Rows
              * @default []
@@ -4210,6 +4214,10 @@ export interface components {
             decided_by_id?: number | null;
             /** Decision Reason */
             decision_reason?: string | null;
+            /** Requested By Name */
+            requested_by_name?: string | null;
+            /** Decided By Name */
+            decided_by_name?: string | null;
         };
         /** PreferenceUpdateResult */
         PreferenceUpdateResult: {

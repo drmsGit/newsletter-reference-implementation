@@ -187,3 +187,48 @@ class TestFilterOptions:
             db.query(PendingActionDB).filter(PendingActionDB.id == foreign.id).delete()
             db.query(BrandDB).filter(BrandDB.id == other.id).delete()
             db.commit()
+
+
+class TestDecisionHistory:
+    """The history screen (Manager Workflow Q1.6: log and queue stay separate).
+
+    Decided requests are listed by when they ENDED — decided, or expired — newest
+    first, not by when they were asked for; and each row names who asked and who
+    decided, so the history reads without a second lookup.
+    """
+
+    def test_decided_requests_come_newest_ending_first(self, db, rows):
+        # rows[2] lapsed by timestamp an hour ago and has no decided_at;
+        # rows[3] and rows[4] were decided "now".
+        # rows[3] was ASKED before rows[4] but DECIDED after it, so creation
+        # order and ending order disagree — only the ending order passes.
+        rows[3].decided_at = NOW - timedelta(minutes=1)
+        rows[4].decided_at = NOW - timedelta(minutes=5)
+        db.commit()
+        found = approvals.list_for_brand(db, rows[0].brand_id, "decided", at=NOW)
+        # Ended: rows[5] expired exactly at NOW, rows[3] decided 1 min before,
+        # rows[4] 5 min before, rows[2] expired an hour before.
+        assert _ours(found, rows) == [rows[5].id, rows[3].id, rows[4].id, rows[2].id]
+
+    def test_rows_name_who_asked_and_who_decided(self, db, rows):
+        from app.auth.db_models import UserDB
+
+        decider = UserDB(email="history-decider@example.invalid", display_name="Robin Approver",
+                         is_active=True)
+        db.add(decider)
+        db.commit()
+        rows[3].decided_by_type, rows[3].decided_by_id = "user", decider.id
+        db.commit()
+        try:
+            with machine([VIEW]) as headers:
+                body = client.get("/approvals/", headers=headers,
+                                  params={"status": "decided", "action_key": "listtest.content.ready"}).json()
+            mine = next(r for r in body if r["id"] == rows[3].id)
+            assert mine["decided_by_name"] == "Robin Approver"
+            assert mine["requested_by_name"] == "integration #5"
+            lapsed = next(r for r in body if r["id"] == rows[5].id)
+            assert lapsed["decided_by_name"] is None, "an expired request was decided by nobody"
+        finally:
+            db.rollback()
+            db.query(UserDB).filter(UserDB.id == decider.id).delete()
+            db.commit()

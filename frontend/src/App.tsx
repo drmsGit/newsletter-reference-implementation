@@ -43,6 +43,9 @@ export default function App() {
         */}
         <Route path="/" element={<Approvals />} />
         <Route path="/approvals" element={<Approvals />} />
+        {/* Static before dynamic is how React Router ranks these anyway; listed
+            first so the reader sees "history" is not an approval id. */}
+        <Route path="/approvals/history" element={<Approvals mode="history" />} />
         <Route path="/approvals/:id" element={<ApprovalDetail />} />
         <Route path="/campaigns" element={<Campaigns />} />
         <Route path="/campaigns/:id" element={<CampaignDetail />} />

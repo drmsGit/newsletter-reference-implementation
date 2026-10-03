@@ -37,8 +37,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/approvals", tags=["approvals"])
 
 
-def _row(row) -> PendingActionRow:
+def _row(row, names: dict | None = None) -> PendingActionRow:
     meta = get_action(row.action_key)
+    names = names or {}
     return PendingActionRow(
         id=row.id,
         action_key=row.action_key,
@@ -57,7 +58,17 @@ def _row(row) -> PendingActionRow:
         decided_by_type=row.decided_by_type,
         decided_by_id=row.decided_by_id,
         decision_reason=row.decision_reason,
+        requested_by_name=names.get((row.requested_by_type, row.requested_by_id)),
+        decided_by_name=names.get((row.decided_by_type, row.decided_by_id))
+        if row.decided_by_type else None,
     )
+
+
+def _names_for(db, rows) -> dict:
+    """Every actor these rows name, resolved in two queries, not per row."""
+    pairs = [(r.requested_by_type, r.requested_by_id) for r in rows]
+    pairs += [(r.decided_by_type, r.decided_by_id) for r in rows if r.decided_by_type]
+    return approvals.actor_names(db, pairs)
 
 
 @router.get(
@@ -86,14 +97,13 @@ def list_pending(
 ):
     # A plain list with limit/offset, as GET /delivery/send-instances does
     # (decided 2026-10-03). One envelope with a total for every list is task-88's.
-    return [
-        _row(row)
-        for row in approvals.list_for_brand(
+    found = approvals.list_for_brand(
             db, brand_id, status=status, action_key=action_key,
             requested_by_type=requested_by_type, requested_by_id=requested_by_id,
             limit=limit, offset=offset,
-        )
-    ]
+    )
+    names = _names_for(db, found)
+    return [_row(row, names) for row in found]
 
 
 @router.get(
@@ -166,7 +176,7 @@ def get_pending(
 
     user = user_for_token(db, request.cookies.get(SESSION_COOKIE))
     return PendingActionDetail(
-        **_row(row).model_dump(),
+        **_row(row, _names_for(db, [row])).model_dump(),
         rows=rows,
         blocked_reason=blocked_reason,
         describe_error=describe_error,
