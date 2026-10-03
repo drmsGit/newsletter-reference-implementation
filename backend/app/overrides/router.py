@@ -6,7 +6,9 @@ from app.auth.service import actor_label
 from app.pagination import Page, PageParams, page_of_list, page_params
 from app.database import get_db
 from app.overrides.models import ContentOverride, ContentOverrideCreate, OutcomeDeltaUpdate
+from app.audit import service as audit
 from app.overrides.service import (
+    override_audit_detail,
     create_content_override,
     get_content_override,
     list_content_overrides,
@@ -25,10 +27,15 @@ def create(
     brand_id: int = Depends(working_brand),
 ):
     try:
-        return create_content_override(
+        created = create_content_override(
             db, data, brand_id=brand_id, author=actor_label(request_principal(request)))
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
+    audit.record_from_request(
+        request, db, audit.OVERRIDE_CREATED, subject_type="override", subject_id=created.id,
+        detail=override_audit_detail(created),
+    )
+    return created
 
 
 @router.get("/", response_model=Page[ContentOverride])
@@ -59,12 +66,18 @@ def get(override_id: int, db: Session = Depends(get_db), brand_id: int = Depends
 
 
 @router.post("/{override_id}/reset", response_model=ContentOverride)
-def reset(override_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
+def reset(override_id: int, request: Request, db: Session = Depends(get_db),
+          brand_id: int = Depends(working_brand)):
     """Reset-to-original: deactivate the override, reverting the module to
-    system-governed content. Keeps the row as history."""
+    system-governed content. Keeps the row as history; who reset it is the
+    audit entry's actor (task-252)."""
     override = reset_content_override(db, override_id, brand_id=brand_id)
     if override is None:
         raise HTTPException(status_code=404, detail="Content override not found")
+    audit.record_from_request(
+        request, db, audit.OVERRIDE_RESET, subject_type="override", subject_id=override_id,
+        detail=override_audit_detail(override),
+    )
     return override
 
 

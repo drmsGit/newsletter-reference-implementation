@@ -86,6 +86,17 @@ def _validate_field_overrides(manifest, module: ModuleInstanceDB, field_override
         )
 
 
+def override_audit_detail(override) -> dict:
+    """What an override.created / override.reset entry records (task-252),
+    the same on both planes: the module, and the fields with their values.
+    Who created or reset it is the entry's actor, not a field here."""
+    return {
+        "module_instance_id": override.module_instance_id,
+        "field_overrides": override.field_overrides,
+        "reason": override.reason,
+    }
+
+
 def create_content_override(
     db: Session, data: ContentOverrideCreate, *, brand_id: int, author: str
 ) -> ContentOverrideDB:

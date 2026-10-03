@@ -35,7 +35,7 @@ from app.content.service import create_content, get_content_record, update_conte
 from app.content.service import create_category, create_category_relation
 from app.content.service import delete_content_record, delete_category, ContentRecordHasHistoryError, HasRelationsError
 from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, VariantDB, ModuleInstanceDB, DecisionSlotDB
-from app.campaigns.service import ChannelUnavailable, create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant, update_decision_slot, update_variant, update_module, delete_module, move_module
+from app.campaigns.service import ChannelUnavailable, create_campaign, create_variant_for_campaign, create_module_for_variant, create_decision_slot_for_variant, update_decision_slot, update_variant, update_module, delete_module, move_module, module_audit_detail, slot_audit_detail
 from app.rendering.service import UnpublishedContentError, envelope_fields_for_variant, render_variant_html
 from app.snapshots.service import create_snapshot_for_variant, get_snapshot_artifact
 from app.delivery.service import create_send_instance, prepare_send_from_audience, process_due_scheduled_sends, send_send_instance
@@ -51,6 +51,7 @@ from app.overrides.service import (
     create_content_override,
     get_active_content_override,
     list_content_overrides,
+    override_audit_detail,
     reset_content_override,
 )
 from app.overrides.models import ContentOverrideCreate
@@ -1183,6 +1184,11 @@ def campaign_create(
             url="/ui/campaigns?error=" + quote(str(error)),
             status_code=303,
         )
+    audit.record_from_request(
+        request, db, audit.CAMPAIGN_CREATED, subject_type="campaign", subject_id=campaign.id,
+        detail={"name": campaign.name, "channel": channel,
+                "variant_ids": [v.id for v in campaign.variants]},
+    )
     return RedirectResponse(url=f"/ui/campaigns/{campaign.id}", status_code=303)
 
 
@@ -1362,7 +1368,7 @@ def variant_create(
     # the channel belongs to the variant and is fixed at creation, so this is
     # the only moment it can be refused at all.
     try:
-        create_variant_for_campaign(
+        created = create_variant_for_campaign(
             db,
             campaign_id=campaign_id,
             name=name,
@@ -1376,6 +1382,10 @@ def variant_create(
             url=f"/ui/campaigns/{campaign_id}?error=" + quote(str(error)),
             status_code=303,
         )
+    audit.record_from_request(
+        request, db, audit.VARIANT_CREATED, subject_type="variant", subject_id=created.id,
+        detail={"campaign_id": campaign_id, "name": created.name, "channel": created.channel},
+    )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
@@ -1389,7 +1399,7 @@ def variant_edit(
     preheader: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    update_variant(
+    updated = update_variant(
         db,
         variant_id=variant_id,
         name=name,
@@ -1397,6 +1407,12 @@ def variant_edit(
         preheader=preheader.strip() or None,
         brand_id=working_brand_id(request, db),
     )
+    if updated is not None:
+        audit.record_from_request(
+            request, db, audit.VARIANT_UPDATED, subject_type="variant", subject_id=variant_id,
+            detail={"name": updated.name, "subject": updated.subject,
+                    "preheader": updated.preheader},
+        )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
@@ -1515,7 +1531,7 @@ def variant_apply_subject(
     """Apply a chosen suggestion — the human decision that turns it into content."""
     variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
     if variant is not None:
-        update_variant(
+        updated = update_variant(
             db,
             variant_id=variant_id,
             name=variant.name,
@@ -1523,6 +1539,14 @@ def variant_apply_subject(
             preheader=preheader.strip() or None,
             brand_id=working_brand_id(request, db),
         )
+        if updated is not None:
+            # The person's choice of an AI suggestion is a variant edit like
+            # any other; `applied_suggestion` says where the copy came from.
+            audit.record_from_request(
+                request, db, audit.VARIANT_UPDATED, subject_type="variant", subject_id=variant_id,
+                detail={"name": updated.name, "subject": updated.subject,
+                        "preheader": updated.preheader, "applied_suggestion": True},
+            )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
@@ -1550,7 +1574,7 @@ def module_create(
                 status_code=303,
             )
     try:
-        create_module_for_variant(
+        created = create_module_for_variant(
             db,
             variant_id=variant_id,
             module_type=module_type,
@@ -1564,6 +1588,10 @@ def module_create(
             url=f"/ui/campaigns/{campaign_id}?error={quote(str(error))}",
             status_code=303,
         )
+    audit.record_from_request(
+        request, db, audit.MODULE_CREATED, subject_type="module", subject_id=created.id,
+        detail=module_audit_detail(created),
+    )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
@@ -1589,7 +1617,7 @@ def module_edit(
                 status_code=303,
             )
     try:
-        update_module(
+        updated = update_module(
             db,
             module_id=module_id,
             module_type=module_type,
@@ -1603,12 +1631,22 @@ def module_edit(
             url=f"/ui/campaigns/{campaign_id}?error={quote(str(error))}",
             status_code=303,
         )
+    if updated is not None:
+        audit.record_from_request(
+            request, db, audit.MODULE_UPDATED, subject_type="module", subject_id=module_id,
+            detail=module_audit_detail(updated),
+        )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
 @router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/modules/{module_id}/delete")
 def module_delete(request: Request, campaign_id: int, variant_id: int, module_id: int, db: Session = Depends(get_db)):
-    delete_module(db, module_id, brand_id=working_brand_id(request, db))
+    removed = delete_module(db, module_id, brand_id=working_brand_id(request, db))
+    if removed is not None:
+        audit.record_from_request(
+            request, db, audit.MODULE_DELETED, subject_type="module", subject_id=module_id,
+            detail={"overrides_removed": removed},
+        )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
@@ -1622,12 +1660,17 @@ def module_move(
     db: Session = Depends(get_db),
 ):
     try:
-        move_module(
+        moved = move_module(
             db, module_id, direction,
             brand_id=working_brand_id(request, db),
         )
     except ValueError:
-        pass
+        moved = None
+    if moved is not None:
+        audit.record_from_request(
+            request, db, audit.MODULE_MOVED, subject_type="module", subject_id=module_id,
+            detail={"direction": direction, "position": moved.position},
+        )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
@@ -1641,7 +1684,7 @@ def decision_slot_create(
     db: Session = Depends(get_db),
 ):
     try:
-        create_decision_slot_for_variant(
+        created = create_decision_slot_for_variant(
             db,
             variant_id=variant_id,
             name=name,
@@ -1655,6 +1698,10 @@ def decision_slot_create(
             url=f"/ui/campaigns/{campaign_id}?error={quote(str(error))}",
             status_code=303,
         )
+    audit.record_from_request(
+        request, db, audit.DECISION_SLOT_CREATED, subject_type="decision_slot",
+        subject_id=created.id, detail=slot_audit_detail(created),
+    )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
@@ -1678,7 +1725,7 @@ def content_override_create(
                 status_code=303,
             )
     try:
-        create_content_override(
+        created = create_content_override(
             db,
             ContentOverrideCreate(
                 module_instance_id=module_instance_id,
@@ -1696,6 +1743,10 @@ def content_override_create(
             url=f"/ui/campaigns/{campaign_id}?error={quote(str(error))}",
             status_code=303,
         )
+    audit.record_from_request(
+        request, db, audit.OVERRIDE_CREATED, subject_type="override", subject_id=created.id,
+        detail=override_audit_detail(created),
+    )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
@@ -1706,9 +1757,14 @@ def content_override_reset(
     override_id: int,
     db: Session = Depends(get_db),
 ):
-    reset_content_override(
+    override = reset_content_override(
         db, override_id, brand_id=working_brand_id(request, db)
     )
+    if override is not None:
+        audit.record_from_request(
+            request, db, audit.OVERRIDE_RESET, subject_type="override", subject_id=override_id,
+            detail=override_audit_detail(override),
+        )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
@@ -1822,7 +1878,7 @@ def decision_slot_edit(
         candidate_filter.pop("category_ids", None)
     candidate_filter = candidate_filter or None
     try:
-        update_decision_slot(
+        updated = update_decision_slot(
             db, slot_id, decision_strategy, candidate_filter, strategy_config,
             brand_id=working_brand_id(request, db),
         )
@@ -1832,6 +1888,11 @@ def decision_slot_edit(
         return RedirectResponse(
             url=f"/ui/decisions/slots/{slot_id}?error={quote(str(error))}",
             status_code=303,
+        )
+    if updated is not None:
+        audit.record_from_request(
+            request, db, audit.DECISION_SLOT_UPDATED, subject_type="decision_slot",
+            subject_id=slot_id, detail=slot_audit_detail(updated),
         )
     return RedirectResponse(url=f"/ui/decisions/slots/{slot_id}", status_code=303)
 

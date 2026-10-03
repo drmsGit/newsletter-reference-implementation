@@ -51,6 +51,20 @@ BRAND_CREATED = "brand.created"
 CAMPAIGN_DUPLICATED = "campaign.duplicated"
 CONTENT_DUPLICATED = "content.duplicated"
 VARIANT_DUPLICATED = "variant.duplicated"
+# task-252: the composer's writes, both planes (ADR-153 point 4). A module
+# delete names the overrides it erased, which is where their history survives
+# (campaign write surface design pass, D2).
+CAMPAIGN_CREATED = "campaign.created"
+VARIANT_CREATED = "variant.created"
+VARIANT_UPDATED = "variant.updated"
+MODULE_CREATED = "module.created"
+MODULE_UPDATED = "module.updated"
+MODULE_DELETED = "module.deleted"
+MODULE_MOVED = "module.moved"
+DECISION_SLOT_CREATED = "decision_slot.created"
+DECISION_SLOT_UPDATED = "decision_slot.updated"
+OVERRIDE_CREATED = "override.created"
+OVERRIDE_RESET = "override.reset"
 # task-245: every settings write, both planes, and the access-control switch.
 SETTINGS_CHANGED = "settings.changed"
 # ADR-166's administration surface (task-50). Logged lines were the only trace

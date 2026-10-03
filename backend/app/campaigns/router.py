@@ -56,6 +56,8 @@ from app.campaigns.service import (
     update_module,
     update_decision_slot,
     get_decision_slot,
+    module_audit_detail,
+    slot_audit_detail,
     to_decision_slot
 )
 
@@ -102,6 +104,7 @@ def get_campaign_monitoring(
 @router.post("/", response_model=CampaignWithVariants)
 def create_campaign_record(
     payload: CampaignCreate,
+    request: Request,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
@@ -119,7 +122,7 @@ def create_campaign_record(
     # being true when gate 3 closed, and a stale caveat about authentication is
     # the kind a reader trusts.
     try:
-        return create_campaign(
+        created = create_campaign(
             db=db,
             name=payload.name,
             brand_id=brand_id,
@@ -129,6 +132,12 @@ def create_campaign_record(
         )
     except ChannelUnavailable as error:
         raise HTTPException(status_code=400, detail=str(error))
+    audit.record_from_request(
+        request, db, audit.CAMPAIGN_CREATED, subject_type="campaign", subject_id=created.id,
+        detail={"name": created.name, "channel": payload.channel,
+                "variant_ids": [v.id for v in created.variants]},
+    )
+    return created
 
 
 @router.get("/{campaign_id}/variants", response_model=list[Variant])
@@ -148,6 +157,7 @@ def get_campaign_variants(
 def create_campaign_variant(
     campaign_id: int,
     payload: VariantCreate,
+    request: Request,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
@@ -156,7 +166,7 @@ def create_campaign_variant(
     # before writing — the alternative would create a row nobody can reach,
     # attached to a campaign nobody meant.
     try:
-        return create_variant_for_campaign(
+        created = create_variant_for_campaign(
             db=db,
             campaign_id=campaign_id,
             name=payload.name,
@@ -172,6 +182,11 @@ def create_campaign_variant(
         raise HTTPException(status_code=400, detail=str(error))
     except ValueError as error:
         raise HTTPException(status_code=404, detail=str(error))
+    audit.record_from_request(
+        request, db, audit.VARIANT_CREATED, subject_type="variant", subject_id=created.id,
+        detail={"campaign_id": campaign_id, "name": created.name, "channel": created.channel},
+    )
+    return created
 
 
 @router.get("/variants/{variant_id}/modules", response_model=list[ModuleInstance])
@@ -191,11 +206,12 @@ def get_variant_modules(
 def create_variant_module(
     variant_id: int,
     payload: ModuleInstanceCreate,
+    request: Request,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
     try:
-        return create_module_for_variant(
+        created = create_module_for_variant(
             db=db,
             variant_id=variant_id,
             module_type=payload.module_type,
@@ -206,16 +222,27 @@ def create_variant_module(
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
+    audit.record_from_request(
+        request, db, audit.MODULE_CREATED, subject_type="module", subject_id=created.id,
+        detail=module_audit_detail(created),
+    )
+    return created
 
 
 @router.delete("/modules/{module_id}")
 def delete_variant_module(
     module_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
-    if not delete_module(db, module_id, brand_id=brand_id):
+    removed = delete_module(db, module_id, brand_id=brand_id)
+    if removed is None:
         raise HTTPException(status_code=404, detail="Module not found")
+    audit.record_from_request(
+        request, db, audit.MODULE_DELETED, subject_type="module", subject_id=module_id,
+        detail={"overrides_removed": removed},
+    )
     return {"status": "deleted", "module_id": module_id}
 
 
@@ -223,6 +250,7 @@ def delete_variant_module(
 def move_variant_module(
     module_id: int,
     direction: str,
+    request: Request,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
@@ -233,6 +261,10 @@ def move_variant_module(
         raise HTTPException(status_code=400, detail=str(error))
     if result is None:
         raise HTTPException(status_code=404, detail="Module not found")
+    audit.record_from_request(
+        request, db, audit.MODULE_MOVED, subject_type="module", subject_id=module_id,
+        detail={"direction": direction, "position": result.position},
+    )
     return result
 
 
@@ -310,11 +342,12 @@ def get_variant_decision_slots(
 def create_variant_decision_slot(
     variant_id: int,
     payload: DecisionSlotCreate,
+    request: Request,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
     try:
-        return create_decision_slot_for_variant(
+        created = create_decision_slot_for_variant(
             db=db,
             variant_id=variant_id,
             name=payload.name,
@@ -327,6 +360,11 @@ def create_variant_decision_slot(
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
+    audit.record_from_request(
+        request, db, audit.DECISION_SLOT_CREATED, subject_type="decision_slot",
+        subject_id=created.id, detail=slot_audit_detail(created),
+    )
+    return created
 
 
 @router.get("/decision-slots/{decision_slot_id}/resolutions", response_model=Page[DecisionResolution])
@@ -373,6 +411,7 @@ def create_decision_slot_resolution(
 def update_variant_record(
     variant_id: int,
     payload: VariantUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
@@ -394,6 +433,10 @@ def update_variant_record(
     )
     if updated is None:
         raise HTTPException(status_code=404, detail="Variant not found")
+    audit.record_from_request(
+        request, db, audit.VARIANT_UPDATED, subject_type="variant", subject_id=variant_id,
+        detail={"name": updated.name, "subject": updated.subject, "preheader": updated.preheader},
+    )
     return updated
 
 
@@ -401,6 +444,7 @@ def update_variant_record(
 def update_module_record(
     module_id: int,
     payload: ModuleInstanceUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
@@ -429,6 +473,10 @@ def update_module_record(
         raise HTTPException(status_code=400, detail=str(error))
     if updated is None:
         raise HTTPException(status_code=404, detail="Module not found")
+    audit.record_from_request(
+        request, db, audit.MODULE_UPDATED, subject_type="module", subject_id=module_id,
+        detail=module_audit_detail(updated),
+    )
     return updated
 
 
@@ -436,6 +484,7 @@ def update_module_record(
 def update_decision_slot_record(
     slot_id: int,
     payload: DecisionSlotUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
@@ -486,6 +535,10 @@ def update_decision_slot_record(
         raise HTTPException(status_code=400, detail=str(error))
     if updated is None:
         raise HTTPException(status_code=404, detail="Decision slot not found")
+    audit.record_from_request(
+        request, db, audit.DECISION_SLOT_UPDATED, subject_type="decision_slot",
+        subject_id=slot_id, detail=slot_audit_detail(updated),
+    )
     return to_decision_slot(updated)
 
 
@@ -493,6 +546,7 @@ def update_decision_slot_record(
 def patch_decision_slot_record(
     slot_id: int,
     payload: DecisionSlotPatch,
+    request: Request,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
@@ -555,6 +609,10 @@ def patch_decision_slot_record(
 
     if updated is None:
         raise HTTPException(status_code=404, detail="Decision slot not found")
+    audit.record_from_request(
+        request, db, audit.DECISION_SLOT_UPDATED, subject_type="decision_slot",
+        subject_id=slot_id, detail=slot_audit_detail(updated),
+    )
     return to_decision_slot(updated)
 
 

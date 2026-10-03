@@ -370,6 +370,27 @@ def update_variant(
     return to_variant(variant, db)
 
 
+def module_audit_detail(module) -> dict:
+    """What a module.created / module.updated entry records (task-252), the
+    same on both planes. Takes the row or its response model. `module_data` is
+    left out: it is the module's copy, edited field by field, and the entry
+    records what the module is and what it is bound to."""
+    return {
+        "variant_id": module.variant_id, "module_type": module.module_type,
+        "content_record_id": module.content_record_id,
+        "decision_slot_id": module.decision_slot_id,
+    }
+
+
+def slot_audit_detail(slot) -> dict:
+    """What a decision_slot.created / .updated entry records (task-252)."""
+    return {
+        "variant_id": slot.variant_id, "name": slot.name,
+        "decision_strategy": slot.decision_strategy,
+        "candidate_filter": slot.candidate_filter, "strategy_config": slot.strategy_config,
+    }
+
+
 def to_module_instance(record: ModuleInstanceDB) -> ModuleInstance:
     return ModuleInstance(
         id=record.id,
@@ -651,24 +672,36 @@ def update_module(
     return to_module_instance(module)
 
 
-def delete_module(db: Session, module_id: int, *, brand_id: int) -> bool:
+def delete_module(db: Session, module_id: int, *, brand_id: int) -> list[dict] | None:
     """Remove a module from its variant. Positions of the remaining modules are
     left as-is — the (variant_id, position) uniqueness only requires no
     duplicates, not a contiguous sequence, and rendering orders by position, so
     a gap is harmless. Any content overrides on the module go with it (they're
-    meaningless once the module is gone)."""
+    meaningless once the module is gone).
+
+    **Returns the overrides it erased** — possibly none — so the route can name
+    them in the audit log, which is where their history survives (task-252,
+    design pass D2). None means the module was not found; test with `is None`,
+    because an empty list is falsy.
+    """
     module = get_module(db, module_id, brand_id=brand_id)
     if module is None:
-        return False
+        return None
 
     from app.overrides.db_models import ContentOverrideDB
 
-    db.query(ContentOverrideDB).filter(
+    overrides = db.query(ContentOverrideDB).filter(
         ContentOverrideDB.module_instance_id == module_id
-    ).delete()
+    )
+    removed = [
+        {"id": o.id, "field_overrides": o.field_overrides, "active": o.active,
+         "overridden_by": o.overridden_by}
+        for o in overrides.all()
+    ]
+    overrides.delete()
     db.delete(module)
     db.commit()
-    return True
+    return removed
 
 
 def move_module(
