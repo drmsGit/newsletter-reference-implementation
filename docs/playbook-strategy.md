@@ -461,6 +461,16 @@ and the authentication question the React manager client was blocked on.
 
 **Status:** 1095 backend and 66 client tests passing; the client's generated types match the live schema.
 
+### 2026-10-03 — Decision slots get a screen, and asking what a slot could pick no longer picks
+
+**Context:** the first of the screens still missing after the core loop. The client showed slots only as a table inside campaign detail. Two queue items from the 2026-09-27 interviews stood in front of a screen: no way to see what a slot chooses between (task-205), and no distribution of what it chose (task-211).
+
+1. **The distribution already existed.** The slot stats route has returned the top content with its share since 2026-10-02 (task-50). task-211 was closed as covered, by the user's choice, rather than adding a full paged distribution. Its limits stay as they are: top 20, and one row per record *and version*.
+2. **A slot's candidates are counted, not chosen.** The only way to ask before was `execute`, which writes a pick. `GET /campaigns/decision-slots/{id}/candidates` counts distinct records over the same query the strategies pick from. That query is now one function both strategies call, so the count and the pick cannot drift apart. For a strategy that picks per recipient, the screen says one person may be offered fewer.
+3. **The screen is read-only.** It shows setup, candidates, top content, reasons and the latest picks. Editing a slot comes with the campaign write surface, where the slot lives. Categories show as ids because no read gives their names yet.
+
+**Status:** 1101 backend and 71 client tests passing, every new check mutation-tested; browser-checked on the development database. Opening a slot made only GET requests, and its pick count did not change.
+
 
 ## 6. Roadmap
 
@@ -591,7 +601,7 @@ Not blocked by code — can be worked on alongside other phases.
 The core loop has screens (see the two 2026-10-03 entries in §5). In rough order of value:
 
 1. **Facets.** ADR-175's main filter for content and campaigns, and the one requirement-5 filter still missing. They need their own ADRs (model, per-brand scope, governance) and probably a short design interview before code (task-207).
-2. **The screens still missing:** decision slots, recipient and category detail. And the write surface of the campaign screen: editing modules, overrides and slots, and creating a campaign or a blank variant.
+2. **The screens still missing:** recipient and category detail (decision slots done 2026-10-03, read-only; recipient detail waits on task-214's reverse-membership question under ADR-093). And the write surface of the campaign screen: editing modules, overrides and slots, and creating a campaign or a blank variant.
 3. **Decisions recorded and not yet taken:** step-up or second approval before granting an integration `sends.execute`; credential expiry; an [[ADR-101 — Provider Capabilities Are Explicit]] addendum naming the click-attribution capability; the ADR-040 addendum ADR-178 owes; what a consent note may hold (task-246).
 4. **Housekeeping:** re-seed the development database to get the real Demo send (this resets demo edits); correct the test docstrings that still say "shared dev database"; drop a duplicate index on `delivery_executions.provider_message_id` in the development database.
 5. **The public-beta gate is the positioning statement**, not features (`docs/business/POSITIONING.md`). The product name (task-29) stays on hold until a candidate is legally cleared.
