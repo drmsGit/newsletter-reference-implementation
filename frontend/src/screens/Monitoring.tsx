@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router'
 
 import { useMonitoring, type MonitoredCampaign } from '../api/resources'
 import DataTable, { type DataColumn } from '../components/DataTable'
+import Pager, { useOffset } from '../components/Pager'
 import ScreenState from '../components/ScreenState'
 import { formatDate } from './Campaigns'
 
@@ -57,7 +58,7 @@ const columns: DataColumn<MonitoredCampaign>[] = [
  * In flight first, as the server orders it. A row opens the campaign.
  */
 export default function Monitoring() {
-  const monitoring = useMonitoring()
+  const monitoring = useMonitoring(useOffset())
   const navigate = useNavigate()
 
   return (
@@ -67,10 +68,11 @@ export default function Monitoring() {
         <DataTable
           label="Campaign states"
           columns={columns}
-          items={monitoring.data ?? []}
+          items={monitoring.data?.items ?? []}
           emptyMessage="No campaigns in this brand yet."
           onRowAction={(c) => navigate(`/campaigns/${c.id}`)}
         />
+        <Pager page={monitoring.data} />
       </ScreenState>
     </>
   )

@@ -5,7 +5,7 @@ import { Route, Routes } from 'react-router'
 import Deliveries from './Deliveries'
 import DeliveryAsSent from './DeliveryAsSent'
 import DeliveryDetail from './DeliveryDetail'
-import { jsonResponse, renderWithProviders, stubFetch } from '../test-utils'
+import { jsonResponse, page, renderWithProviders, stubFetch } from '../test-utils'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -79,7 +79,7 @@ describe('the deliveries list', () => {
   it("shows the server's counts and where each send came from", async () => {
     stubFetch({
       'GET /delivery/send-instances': () =>
-        jsonResponse([
+        jsonResponse(page([
           {
             ...A_SEND,
             campaign_id: 1,
@@ -89,13 +89,15 @@ describe('the deliveries list', () => {
             execution_count: 3,
             event_count: 0,
           },
-        ]),
+        ])),
     })
     renderWithProviders(<Deliveries />)
 
     expect(await screen.findByText('Spring launch — send 1')).toBeInTheDocument()
     expect(screen.getByText('Spring / Main')).toBeInTheDocument()
     expect(screen.getByText('2 / 0 / 1')).toBeInTheDocument()
+    // Everything fits on one page, so there is nothing to page through.
+    expect(screen.queryByRole('navigation', { name: 'Pages' })).not.toBeInTheDocument()
   })
 })
 
@@ -199,5 +201,30 @@ describe('a message as sent', () => {
 
     expect(await screen.findByRole('status')).toHaveTextContent(/nothing to show/i)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
+describe('paging the deliveries list', () => {
+  it('asks the server for the page in the URL and shows where it is', async () => {
+    const fetchMock = stubFetch({
+      'GET /delivery/send-instances': (request) => {
+        const offset = Number(new URL(request.url).searchParams.get('offset') ?? 0)
+        return jsonResponse(page([{ ...A_SEND, campaign_id: 1, campaign_name: 'Spring',
+          variant_id: 2, variant_name: 'Main', execution_count: 3, event_count: 0 }],
+        { total: 51, offset }))
+      },
+    })
+    renderWithProviders(
+      <Routes>
+        <Route path="/deliveries" element={<Deliveries />} />
+      </Routes>,
+      { route: '/deliveries?offset=50' },
+    )
+    expect(await screen.findByText('51–51 of 51')).toBeInTheDocument()
+    const asked = fetchMock.mock.calls
+      .map(([input]) => new URL((input as Request).url))
+      .find((u) => u.pathname === '/delivery/send-instances')!
+    expect(asked.searchParams.get('offset')).toBe('50')
+    expect(asked.searchParams.get('limit')).toBe('50')
   })
 })

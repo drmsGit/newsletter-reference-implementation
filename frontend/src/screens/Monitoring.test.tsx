@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router'
 
 import Monitoring from './Monitoring'
-import { jsonResponse, renderWithProviders, stubFetch } from '../test-utils'
+import { jsonResponse, page, renderWithProviders, stubFetch } from '../test-utils'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -23,7 +23,7 @@ const ROW = {
 
 describe('the monitoring screen', () => {
   it("shows the server's state and each variant's stage, failures included", async () => {
-    stubFetch({ 'GET /campaigns/monitoring': () => jsonResponse([ROW]) })
+    stubFetch({ 'GET /campaigns/monitoring': () => jsonResponse(page([ROW])) })
     renderWithProviders(<Monitoring />)
 
     expect(await screen.findByText('In flight — with failures')).toBeInTheDocument()
@@ -33,7 +33,7 @@ describe('the monitoring screen', () => {
   })
 
   it('opens the campaign from its row', async () => {
-    stubFetch({ 'GET /campaigns/monitoring': () => jsonResponse([ROW]) })
+    stubFetch({ 'GET /campaigns/monitoring': () => jsonResponse(page([ROW])) })
     renderWithProviders(
       <Routes>
         <Route path="/monitoring" element={<Monitoring />} />

@@ -119,7 +119,9 @@ def test_over_json_the_filters_and_paging_reach_the_query(db, rows):
         })
     assert response.status_code == 200, response.text
     body = response.json()
-    assert [r["id"] for r in body] == [rows[5].id], "newest matching row only"
+    assert [r["id"] for r in body["items"]] == [rows[5].id], "newest matching row only"
+    # ADR-185: the total counts the whole filtered set, not the page.
+    assert body["total"] >= 1 and (body["limit"], body["offset"]) == (1, 0)
     with machine([VIEW]) as headers:
         refused = client.get("/approvals/", headers=headers, params={"limit": 500})
     assert refused.status_code == 422, "the page size has a ceiling"
@@ -222,7 +224,8 @@ class TestDecisionHistory:
         try:
             with machine([VIEW]) as headers:
                 body = client.get("/approvals/", headers=headers,
-                                  params={"status": "decided", "action_key": "listtest.content.ready"}).json()
+                                  params={"status": "decided", "action_key": "listtest.content.ready",
+                                          "limit": 200}).json()["items"]
             mine = next(r for r in body if r["id"] == rows[3].id)
             assert mine["decided_by_name"] == "Robin Approver"
             assert mine["requested_by_name"] == "integration #5"

@@ -299,6 +299,16 @@ def set_content_status(
     return to_content_record(record)
 
 
+def page_content_records(db: Session, params, *, brand_id: int):
+    """One ADR-185 page of the brand's content records, newest first."""
+    from app.pagination import page_of_query
+
+    query = db.query(ContentRecordDB).filter(ContentRecordDB.brand_id == brand_id)
+    # The table has no timestamps; ids rise with creation, so newest first is
+    # id descending, which is its own tie-breaker (ADR-185 point 4).
+    return page_of_query(query, params, ContentRecordDB.id.desc(), convert=to_content_record)
+
+
 def list_content_records(db: Session, *, brand_id: int) -> list[ContentRecord]:
     """Content records for one brand (ADR-150 point 2, ADR-172 point 4).
 

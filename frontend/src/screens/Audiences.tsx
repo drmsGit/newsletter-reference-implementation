@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router'
 
 import { useAudienceGroups, type AudienceGroup } from '../api/resources'
 import DataTable, { type DataColumn } from '../components/DataTable'
+import Pager, { useOffset } from '../components/Pager'
 import ScreenState from '../components/ScreenState'
 import { formatDate } from './Campaigns'
 
@@ -16,7 +17,7 @@ const columns: DataColumn<AudienceGroup>[] = [
 ]
 
 export default function Audiences() {
-  const groups = useAudienceGroups()
+  const groups = useAudienceGroups(useOffset())
   const navigate = useNavigate()
 
   return (
@@ -26,10 +27,11 @@ export default function Audiences() {
         <DataTable
           label="Audience groups"
           columns={columns}
-          items={groups.data ?? []}
+          items={groups.data?.items ?? []}
           emptyMessage="No audience groups in this brand yet."
           onRowAction={(g) => navigate(`/audiences/${g.id}`)}
         />
+        <Pager page={groups.data} />
       </ScreenState>
     </>
   )

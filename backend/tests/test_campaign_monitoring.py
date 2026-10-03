@@ -195,9 +195,9 @@ class TestOverJson:
             auth.set_session_brand(db, token, campaign.brand_id)
             client = TestClient(app, raise_server_exceptions=False)
             client.cookies.set(auth.SESSION_COOKIE, token)
-            response = client.get("/campaigns/monitoring")
+            response = client.get("/campaigns/monitoring", params={"limit": 200})
             assert response.status_code == 200, response.text
-            row = next(r for r in response.json() if r["id"] == campaign.id)
+            row = next(r for r in response.json()["items"] if r["id"] == campaign.id)
             assert row["state"] == "in_flight"
             assert row["variants"][0]["stage"] == "scheduled"
         finally:

@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router'
 
 import { useDeliveries, type SendInstanceListed } from '../api/resources'
 import DataTable, { type DataColumn } from '../components/DataTable'
+import Pager, { useOffset } from '../components/Pager'
 import ScreenState from '../components/ScreenState'
 import { formatDate } from './Campaigns'
 
@@ -40,7 +41,7 @@ const columns: DataColumn<SendInstanceListed>[] = [
  * is a different question -- task-216's monitoring view, not this one.
  */
 export default function Deliveries() {
-  const deliveries = useDeliveries()
+  const deliveries = useDeliveries(useOffset())
   const navigate = useNavigate()
 
   return (
@@ -50,10 +51,11 @@ export default function Deliveries() {
         <DataTable
           label="Sends"
           columns={columns}
-          items={deliveries.data ?? []}
+          items={deliveries.data?.items ?? []}
           emptyMessage="Nothing has been planned or sent in this brand yet."
           onRowAction={(s) => navigate(`/deliveries/${s.id}`)}
         />
+        <Pager page={deliveries.data} />
       </ScreenState>
     </>
   )

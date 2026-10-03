@@ -4,7 +4,7 @@ import { Route, Routes } from 'react-router'
 
 import ApprovalDetail from './ApprovalDetail'
 import Approvals from './Approvals'
-import { jsonResponse, renderWithProviders, stubFetch } from '../test-utils'
+import { jsonResponse, page, renderWithProviders, stubFetch } from '../test-utils'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -29,7 +29,7 @@ describe('the approval inbox', () => {
      * actors. An inbox that rendered both as "someone" would discard the fact
      * that explains why a request exists at all.
      */
-    stubFetch({ 'GET /approvals/': () => jsonResponse([A_ROW]) })
+    stubFetch({ 'GET /approvals/': () => jsonResponse(page([A_ROW])) })
     renderWithProviders(<Approvals />)
 
     expect(await screen.findByText('Apply a suggested subject')).toBeInTheDocument()
@@ -92,7 +92,7 @@ describe('narrowing and paging the inbox', () => {
   it('names each requester as the server names them, with their kind', async () => {
     stubFetch({
       'GET /approvals/': () =>
-        jsonResponse([{ ...A_ROW, requested_by_id: 5, requested_by_name: 'Acme Agency' }]),
+        jsonResponse(page([{ ...A_ROW, requested_by_id: 5, requested_by_name: 'Acme Agency' }])),
       'GET /approvals/filter-options': () => jsonResponse(OPTIONS),
     })
     renderWithProviders(<Approvals />)
@@ -102,7 +102,7 @@ describe('narrowing and paging the inbox', () => {
 
   it('sends the filters held in the URL, so a narrowed inbox can be linked to', async () => {
     const fetchMock = stubFetch({
-      'GET /approvals/': () => jsonResponse([]),
+      'GET /approvals/': () => jsonResponse(page([])),
       'GET /approvals/filter-options': () => jsonResponse(OPTIONS),
     })
     renderWithProviders(
@@ -124,7 +124,12 @@ describe('narrowing and paging the inbox', () => {
   it('pages older from a full page, and a new filter starts from the first page', async () => {
     const full = Array.from({ length: 50 }, (_, i) => ({ ...A_ROW, id: 1000 + i }))
     const fetchMock = stubFetch({
-      'GET /approvals/': () => jsonResponse(full),
+      // 120 in total: three pages. The server's total drives the pager (ADR-185).
+      'GET /approvals/': (request) =>
+        jsonResponse(page(full, {
+          total: 120,
+          offset: Number(new URL(request.url).searchParams.get('offset') ?? 0),
+        })),
       'GET /approvals/filter-options': () => jsonResponse(OPTIONS),
     })
     renderWithProviders(
@@ -133,6 +138,7 @@ describe('narrowing and paging the inbox', () => {
       </Routes>,
       { route: '/approvals' },
     )
+    expect(await screen.findByText('1–50 of 120')).toBeInTheDocument()
     fireEvent.click(await screen.findByRole('button', { name: 'Older' }))
     await waitFor(() => expect(lastListQuery(fetchMock).get('offset')).toBe('50'))
     expect(screen.getByRole('button', { name: 'Newer' })).not.toBeDisabled()
@@ -284,12 +290,12 @@ describe('the decision history', () => {
     /** Manager Workflow Q1.6: log and queue stay separate. */
     const fetchMock = stubFetch({
       'GET /approvals/': () =>
-        jsonResponse([
+        jsonResponse(page([
           { ...A_ROW, id: 1, status: 'rejected', decided_at: '2026-10-01T10:00:00Z',
             decided_by_type: 'user', decided_by_id: 3, decided_by_name: 'Robin Approver',
             decision_reason: 'Wrong audience' },
           { ...A_ROW, id: 2, status: 'expired', decided_at: null, decided_by_name: null },
-        ]),
+        ])),
       'GET /approvals/filter-options': () => jsonResponse(OPTIONS),
     })
     renderWithProviders(<Approvals mode="history" />)
@@ -305,7 +311,7 @@ describe('the decision history', () => {
 
   it('the inbox offers no status choice and links to the history instead', async () => {
     stubFetch({
-      'GET /approvals/': () => jsonResponse([]),
+      'GET /approvals/': () => jsonResponse(page([])),
       'GET /approvals/filter-options': () => jsonResponse(OPTIONS),
     })
     renderWithProviders(<Approvals />)
@@ -313,5 +319,26 @@ describe('the decision history', () => {
     expect(screen.queryByRole('button', { name: /Status/ })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Decision history/ })).toHaveAttribute(
       'href', '/approvals/history')
+  })
+})
+
+
+describe('the pager', () => {
+  it('disables Older exactly on the last page, because it knows the total', async () => {
+    /** Before ADR-185 a full last page led to an empty one; the total ends that. */
+    const last = Array.from({ length: 20 }, (_, i) => ({ ...A_ROW, id: 2000 + i }))
+    stubFetch({
+      'GET /approvals/': () => jsonResponse(page(last, { total: 120, offset: 100 })),
+      'GET /approvals/filter-options': () => jsonResponse({ actions: [], requesters: [] }),
+    })
+    renderWithProviders(
+      <Routes>
+        <Route path="/approvals" element={<Approvals />} />
+      </Routes>,
+      { route: '/approvals?offset=100' },
+    )
+    expect(await screen.findByText('101–120 of 120')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Older' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Newer' })).not.toBeDisabled()
   })
 })

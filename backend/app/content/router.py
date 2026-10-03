@@ -5,6 +5,7 @@ from app.audit import service as audit
 from app.auth.permissions import CONTENT_MANAGE
 from app.auth.dependencies import auth_is_enforced, request_principal, working_brand
 from app.campaigns import duplication
+from app.pagination import Page, PageParams, page_of_list, page_params
 from app.database import get_db
 from app.content.models import (
     ContentField,
@@ -55,12 +56,16 @@ from app.content.service import (
 router = APIRouter(prefix="/content", tags=["content"])
 
 
-@router.get("/", response_model=list[ContentRecord])
+@router.get("/", response_model=Page[ContentRecord])
 def get_content_records(
+    params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
-    return list_content_records(db, brand_id=brand_id)
+    """One ADR-185 page of the brand's content records, newest first."""
+    from app.content.service import page_content_records
+
+    return page_content_records(db, params, brand_id=brand_id)
 
 
 # These fixed-path routes (/categories, /category-relations) must be

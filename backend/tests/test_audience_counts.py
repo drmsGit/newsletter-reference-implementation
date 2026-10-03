@@ -62,9 +62,10 @@ def group(db):
 
 def _row(params, group_id):
     with machine([VIEW]) as headers:
-        response = client.get("/api/audience-groups/", params=params, headers=headers)
+        response = client.get("/api/audience-groups/", params={**params, "limit": 200},
+                              headers=headers)
     assert response.status_code == 200, response.text
-    return next(r for r in response.json() if r["id"] == group_id)
+    return next(r for r in response.json()["items"] if r["id"] == group_id)
 
 
 def test_the_count_is_per_channel_and_says_which(group):

@@ -565,6 +565,33 @@ def _status_clause(status: str, at: datetime):
     return or_(PendingActionDB.status.in_(DECIDED), lapsed)
 
 
+def _inbox_query(
+    db: Session, brand_id: int | None, status: str, *, action_key=None,
+    requested_by_type=None, requested_by_id=None, at: datetime | None = None,
+):
+    """The inbox's filters, built once for the list AND its count, so the
+    total can never be counted with different filters than the rows
+    (ADR-185 point 6)."""
+    query = db.query(PendingActionDB)
+    if brand_id is not None:
+        query = query.filter(PendingActionDB.brand_id == brand_id)
+    if status != "all":
+        query = query.filter(_status_clause(status, at or now()))
+    if action_key is not None:
+        query = query.filter(PendingActionDB.action_key == action_key)
+    if requested_by_type is not None:
+        query = query.filter(PendingActionDB.requested_by_type == requested_by_type)
+    if requested_by_id is not None:
+        query = query.filter(PendingActionDB.requested_by_id == requested_by_id)
+    return query
+
+
+def count_for_brand(db: Session, brand_id: int | None, status: str = PENDING, **filters) -> int:
+    """How many requests `list_for_brand` would return without a limit —
+    the `total` of the inbox's page (ADR-185)."""
+    return _inbox_query(db, brand_id, status, **filters).count()
+
+
 def list_for_brand(
     db: Session, brand_id: int | None, status: str = PENDING, *,
     action_key: str | None = None,
@@ -586,17 +613,9 @@ def list_for_brand(
     status rule is SQL for that reason (task-209). `limit=None` is every row,
     which is what the Jinja inbox asks for. `id` breaks ties so pages are stable.
     """
-    query = db.query(PendingActionDB)
-    if brand_id is not None:
-        query = query.filter(PendingActionDB.brand_id == brand_id)
-    if status != "all":
-        query = query.filter(_status_clause(status, at or now()))
-    if action_key is not None:
-        query = query.filter(PendingActionDB.action_key == action_key)
-    if requested_by_type is not None:
-        query = query.filter(PendingActionDB.requested_by_type == requested_by_type)
-    if requested_by_id is not None:
-        query = query.filter(PendingActionDB.requested_by_id == requested_by_id)
+    query = _inbox_query(db, brand_id, status, action_key=action_key,
+                         requested_by_type=requested_by_type,
+                         requested_by_id=requested_by_id, at=at)
     if status == "decided":
         # The history reads by when each request ENDED (Manager Workflow Q1.6):
         # decided, or — for one that lapsed with nobody deciding — its deadline.

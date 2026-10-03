@@ -194,9 +194,11 @@ class TestContentIsAddressableOnlyWithinItsBrand:
         record_id = self._default_brand_record()
         try:
             with foreign_api([VIEW]) as headers:
-                response = client.get("/content/", headers=headers)
+                # Newest first (ADR-185 point 4), so a record created just now
+                # would be on this page if the brand boundary let it through.
+                response = client.get("/content/", params={"limit": 200}, headers=headers)
                 assert response.status_code == 200, response.text
-                assert record_id not in [row["id"] for row in response.json()]
+                assert record_id not in [row["id"] for row in response.json()["items"]]
         finally:
             self._remove(record_id)
 
@@ -804,13 +806,13 @@ class TestASendCannotBeFiredFromAnotherBrand:
         send_id = self._draft_send_in_default_brand()
         try:
             with machine([VIEW]) as home:
-                mine = client.get("/delivery/send-instances", headers=home)
+                mine = client.get("/delivery/send-instances", params={"limit": 200}, headers=home)
             with foreign_api([VIEW]) as headers:
-                theirs = client.get("/delivery/send-instances", headers=headers)
+                theirs = client.get("/delivery/send-instances", params={"limit": 200}, headers=headers)
 
             assert mine.status_code == 200, mine.text
-            assert send_id in {s["id"] for s in mine.json()}
-            assert send_id not in {s["id"] for s in theirs.json()}, (
+            assert send_id in {s["id"] for s in mine.json()["items"]}
+            assert send_id not in {s["id"] for s in theirs.json()["items"]}, (
                 "another brand's deliveries list included this brand's send"
             )
         finally:
@@ -826,7 +828,8 @@ class TestASendCannotBeFiredFromAnotherBrand:
                 page = client.get("/delivery/send-instances", params={"limit": 1}, headers=home)
                 too_many = client.get("/delivery/send-instances", params={"limit": 500}, headers=home)
 
-            assert [s["id"] for s in page.json()] == [second], "not newest first, or not limited"
+            assert [s["id"] for s in page.json()["items"]] == [second], "not newest first, or not limited"
+            assert page.json()["total"] >= 2, "the total counts every send, not the page"
             assert too_many.status_code == 422, "an unbounded page was accepted"
         finally:
             self._remove(first)

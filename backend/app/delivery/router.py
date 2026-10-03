@@ -3,6 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import working_brand
+from app.pagination import Page, PageParams, page_of_list, page_params
 from app.database import get_db
 from app.delivery.models import (
     TestSendRequest,
@@ -139,12 +140,11 @@ def plan_send(
 
 @router.get(
     "/send-instances",
-    response_model=list[SendInstanceListed],
+    response_model=Page[SendInstanceListed],
     summary="List sends in the working brand, newest first",
 )
 def get_send_instances(
-    limit: int = Query(50, ge=1, le=200),
-    offset: int = Query(0, ge=0),
+    params: PageParams = Depends(page_params),
     status: str | None = None,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
@@ -155,7 +155,8 @@ def get_send_instances(
     including ones that have sent nothing, is the separate monitoring screen
     (task-216); one screen answering both would answer neither well.
     """
-    return list_send_instances(db, brand_id=brand_id, limit=limit, offset=offset, status=status)
+    return list_send_instances(
+        db, brand_id=brand_id, limit=params.limit, offset=params.offset, status=status)
 
 
 @router.get(

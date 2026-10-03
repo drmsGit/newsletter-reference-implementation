@@ -43,13 +43,15 @@ export function renderWithProviders(
  * An unhandled route throws rather than returning a default, so a test that
  * quietly starts calling something new fails loudly.
  */
-export function stubFetch(handlers: Record<string, () => Response>) {
+export function stubFetch(handlers: Record<string, (request: Request) => Response>) {
   const mock = vi.fn(async (input: Request | string) => {
     const request = typeof input === 'string' ? new Request(input) : input
     const key = `${request.method} ${new URL(request.url).pathname}`
     const handler = handlers[key]
     if (!handler) throw new Error(`no stub for ${key}`)
-    return handler()
+    // The request is passed on for a stub that must answer like the server,
+    // e.g. a paged route echoing the offset it was asked for (ADR-185).
+    return handler(request)
   })
   vi.stubGlobal('fetch', mock)
   return mock
@@ -71,4 +73,12 @@ export const A_SESSION = {
     { id: 2, name: 'Beta' },
   ],
   csrf_token: 'a-csrf-token',
+}
+
+/**
+ * One ADR-185 page, the way a paged route answers: `{items, total, limit,
+ * offset}`. `total` defaults to the items given, i.e. everything on one page.
+ */
+export function page<T>(items: T[], { total = items.length, limit = 50, offset = 0 } = {}) {
+  return { items, total, limit, offset }
 }

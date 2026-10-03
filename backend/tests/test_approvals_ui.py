@@ -802,7 +802,8 @@ class TestTheInboxOverJson:
         row = _held(db, {"path": "/tmp/secret-looking-path"})
         client, _user = self._api(db)
 
-        listed = [r for r in client.get("/approvals/").json() if r["id"] == row.id][0]
+        listed = [r for r in client.get("/approvals/", params={"limit": 200}).json()["items"]
+                  if r["id"] == row.id][0]
         assert "payload" not in listed, listed
         # The list carries no description at all, so nothing of the payload
         # reaches it even by an action's choice.

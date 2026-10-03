@@ -181,6 +181,15 @@ def list_campaigns(db: Session, *, brand_id: int) -> list[Campaign]:
     ]
 
 
+def page_campaigns(db: Session, params, *, brand_id: int):
+    """One ADR-185 page of the brand's campaigns, newest first."""
+    from app.pagination import page_of_query
+
+    query = db.query(CampaignDB).filter(CampaignDB.brand_id == brand_id)
+    return page_of_query(query, params, CampaignDB.created_at.desc(), CampaignDB.id.desc(),
+                         convert=to_campaign)
+
+
 def list_all_campaigns(db: Session) -> list[Campaign]:
     """Every campaign, across every brand — the ADR-172 point 4 escape hatch.
 

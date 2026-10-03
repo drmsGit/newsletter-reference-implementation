@@ -52,10 +52,10 @@ def test_a_held_action_names_its_subject_and_its_decision():
     db.commit()
     try:
         with machine([VIEW]) as headers:
-            listed = client.get("/approvals/", params={"status": "all"}, headers=headers)
+            listed = client.get("/approvals/", params={"status": "all", "limit": 200}, headers=headers)
             detail = client.get(f"/approvals/{row.id}", headers=headers)
         assert listed.status_code == 200 and detail.status_code == 200, detail.text
-        mine = next(r for r in listed.json() if r["id"] == row.id)
+        mine = next(r for r in listed.json()["items"] if r["id"] == row.id)
         for body in (mine, detail.json()):
             assert (body["subject_type"], body["subject_id"]) == ("send_instance", 42)
             assert (body["decided_by_type"], body["decided_by_id"]) == ("user", 7)
@@ -134,7 +134,7 @@ def test_a_suggested_group_names_the_campaign_it_came_from():
                           headers={"X-CSRF-Token": csrf})
             assert made.status_code == 201, made.text
             assert made.json()["source_campaign_id"] == campaign.id
-            listed = c.get("/api/audience-groups/").json()
+            listed = c.get("/api/audience-groups/", params={"limit": 200}).json()["items"]
             # Through the API's own delete, which removes the group's blocks too.
             assert c.delete(f"/api/audience-groups/{made.json()['id']}",
                             headers={"X-CSRF-Token": csrf}).status_code == 204

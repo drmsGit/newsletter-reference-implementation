@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router'
 
 import { useCampaigns, type Campaign } from '../api/resources'
 import DataTable, { type DataColumn } from '../components/DataTable'
+import Pager, { useOffset } from '../components/Pager'
 import ScreenState from '../components/ScreenState'
 
 const columns: DataColumn<Campaign>[] = [
@@ -14,7 +15,7 @@ const columns: DataColumn<Campaign>[] = [
  * The campaign list. A row opens the campaign, variant by variant.
  */
 export default function Campaigns() {
-  const campaigns = useCampaigns()
+  const campaigns = useCampaigns(useOffset())
   const navigate = useNavigate()
 
   return (
@@ -24,10 +25,11 @@ export default function Campaigns() {
         <DataTable
           label="Campaigns"
           columns={columns}
-          items={campaigns.data ?? []}
+          items={campaigns.data?.items ?? []}
           emptyMessage="No campaigns in this brand yet."
           onRowAction={(c) => navigate(`/campaigns/${c.id}`)}
         />
+        <Pager page={campaigns.data} />
       </ScreenState>
     </>
   )

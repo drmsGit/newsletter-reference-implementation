@@ -103,7 +103,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Content Records */
+        /**
+         * Get Content Records
+         * @description One ADR-185 page of the brand's content records, newest first.
+         */
         get: operations["get_content_records_content__get"];
         put?: never;
         /** Create Content Record */
@@ -470,7 +473,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Campaigns */
+        /**
+         * Get Campaigns
+         * @description One ADR-185 page of the brand's campaigns, newest first.
+         */
         get: operations["get_campaigns_campaigns__get"];
         put?: never;
         /**
@@ -1886,7 +1892,7 @@ export interface paths {
         };
         /**
          * The approval inbox for the working brand
-         * @description Newest first, filterable by `action_key` and by requester (`requested_by_type`, `requested_by_id`), paged by `limit` (max 200) and `offset`. `status` is one of `pending` (the default), `decided` or `all`. Pending excludes a request whose deadline has passed but whose stored status has not caught up: the list agrees with what approving would actually do, which is read from the timestamp.
+         * @description Newest first, filterable by `action_key` and by requester (`requested_by_type`, `requested_by_id`), paged by `limit` (max 200) and `offset` into one ADR-185 envelope with the filtered `total`. `status` is one of `pending` (the default), `decided` or `all`. Pending excludes a request whose deadline has passed but whose stored status has not caught up: the list agrees with what approving would actually do, which is read from the timestamp.
          */
         get: operations["list_pending_approvals__get"];
         put?: never;
@@ -4095,6 +4101,72 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** Page[AudienceGroupListed] */
+        Page_AudienceGroupListed_: {
+            /** Items */
+            items: components["schemas"]["AudienceGroupListed"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[Campaign] */
+        Page_Campaign_: {
+            /** Items */
+            items: components["schemas"]["Campaign"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[ContentRecord] */
+        Page_ContentRecord_: {
+            /** Items */
+            items: components["schemas"]["ContentRecord"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[MonitoredCampaign] */
+        Page_MonitoredCampaign_: {
+            /** Items */
+            items: components["schemas"]["MonitoredCampaign"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[PendingActionRow] */
+        Page_PendingActionRow_: {
+            /** Items */
+            items: components["schemas"]["PendingActionRow"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[SendInstanceListed] */
+        Page_SendInstanceListed_: {
+            /** Items */
+            items: components["schemas"]["SendInstanceListed"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
         /**
          * PendingActionDetail
          * @description The review surface: what the frozen line said, and what is true now.
@@ -5459,7 +5531,12 @@ export interface operations {
     };
     get_content_records_content__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Rows per page (1-200). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -5472,7 +5549,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ContentRecord"][];
+                    "application/json": components["schemas"]["Page_ContentRecord_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6219,7 +6305,12 @@ export interface operations {
     };
     get_campaigns_campaigns__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Rows per page (1-200). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6232,7 +6323,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Campaign"][];
+                    "application/json": components["schemas"]["Page_Campaign_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6272,7 +6372,12 @@ export interface operations {
     };
     get_campaign_monitoring_campaigns_monitoring_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Rows per page (1-200). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6285,7 +6390,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MonitoredCampaign"][];
+                    "application/json": components["schemas"]["Page_MonitoredCampaign_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7169,9 +7283,11 @@ export interface operations {
     get_send_instances_delivery_send_instances_get: {
         parameters: {
             query?: {
-                limit?: number;
-                offset?: number;
                 status?: string | null;
+                /** @description Rows per page (1-200). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -7185,7 +7301,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SendInstanceListed"][];
+                    "application/json": components["schemas"]["Page_SendInstanceListed_"];
                 };
             };
             /** @description Validation Error */
@@ -8315,6 +8431,10 @@ export interface operations {
         parameters: {
             query?: {
                 channel?: string | null;
+                /** @description Rows per page (1-200). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -8328,7 +8448,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AudienceGroupListed"][];
+                    "application/json": components["schemas"]["Page_AudienceGroupListed_"];
                 };
             };
             /** @description Validation Error */
@@ -8906,7 +9026,9 @@ export interface operations {
                 action_key?: string | null;
                 requested_by_type?: string | null;
                 requested_by_id?: number | null;
+                /** @description Rows per page (1-200). */
                 limit?: number;
+                /** @description Rows to skip. */
                 offset?: number;
             };
             header?: never;
@@ -8921,7 +9043,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PendingActionRow"][];
+                    "application/json": components["schemas"]["Page_PendingActionRow_"];
                 };
             };
             /** @description Validation Error */

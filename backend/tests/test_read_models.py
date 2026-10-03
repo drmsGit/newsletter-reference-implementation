@@ -366,7 +366,7 @@ class TestB23B24Deliveries:
     def test_the_list_says_what_each_send_sent_with_live_counts(self, demo):
         send, _ = demo
         with machine([VIEW]) as headers:
-            rows = client.get("/delivery/send-instances", params={"limit": 200}, headers=headers).json()
+            rows = client.get("/delivery/send-instances", params={"limit": 200}, headers=headers).json()["items"]
         row = next(r for r in rows if r["id"] == send.id)
         assert row["campaign_name"] == "Demo Campaign 1" and row["variant_name"]
         assert row["execution_count"] == 32 and row["event_count"] > 0

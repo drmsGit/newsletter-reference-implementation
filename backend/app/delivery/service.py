@@ -150,8 +150,9 @@ def to_send_instance(record: SendInstanceDB) -> SendInstance:
 def list_send_instances(
     db: Session, *, brand_id: int, limit: int = 50, offset: int = 0,
     status: str | None = None,
-) -> list[SendInstance]:
+):
     """Every send in one brand, newest first — the deliveries list (task-28).
+    One ADR-185 page: the count uses the same filtered query as the rows.
 
     The only way to list sends used to be per snapshot, so a screen had to walk
     campaigns → variants → snapshots → sends itself, which the screen inventory
@@ -163,12 +164,15 @@ def list_send_instances(
     query = db.query(SendInstanceDB).filter(SendInstanceDB.brand_id == brand_id)
     if status:
         query = query.filter(SendInstanceDB.status == status)
+    from app.pagination import Page
+
+    total = query.count()
     records = (
         query.order_by(SendInstanceDB.created_at.desc(), SendInstanceDB.id.desc())
         .offset(offset).limit(limit).all()
     )
     if not records:
-        return []
+        return Page(items=[], total=total, limit=limit, offset=offset)
     # Three grouped queries for the page, not three per send (task-50, B23).
     from sqlalchemy import func
 
@@ -206,7 +210,7 @@ def list_send_instances(
             campaign_id=cid, campaign_name=cname, variant_id=vid, variant_name=vname,
             execution_count=executions.get(record.id, 0), event_count=events.get(record.id, 0),
         ))
-    return listed
+    return Page(items=listed, total=total, limit=limit, offset=offset)
 
 
 def send_instance_detail(

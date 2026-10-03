@@ -21,6 +21,7 @@ from app.audience.models import (
 )
 from app.auth.dependencies import working_brand
 from app.channels.registry import is_registered
+from app.pagination import Page, PageParams, page_of_list, page_params
 from app.database import get_db
 
 
@@ -29,7 +30,7 @@ router = APIRouter(prefix="/api/audience-groups", tags=["audience"])
 
 @router.get(
     "/",
-    response_model=list[AudienceGroupListed],
+    response_model=Page[AudienceGroupListed],
     summary="The brand's audience groups, with counts",
     description=(
         "Each group with its pinned-member count. Pass `channel` to add the live, "
@@ -42,12 +43,15 @@ router = APIRouter(prefix="/api/audience-groups", tags=["audience"])
 )
 def list_groups(
     channel: str | None = Query(default=None),
+    params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
     if channel is not None and not is_registered(channel):
         raise HTTPException(status_code=422, detail=f"{channel!r} is not a registered channel.")
-    return [
+    # Counts are assembled per group (task-213 records the cost), so this
+    # pages the assembled list (ADR-185, `page_of_list`).
+    return page_of_list([
         AudienceGroupListed(
             id=row["group"].id, name=row["group"].name, description=row["group"].description,
             created_at=row["group"].created_at, updated_at=row["group"].updated_at,
@@ -56,7 +60,7 @@ def list_groups(
             count_channel=row["count_channel"],
         )
         for row in service.list_groups_with_counts(db, brand_id=brand_id, channel=channel)
-    ]
+    ], params)
 
 
 @router.post("/", response_model=AudienceGroup, status_code=201)

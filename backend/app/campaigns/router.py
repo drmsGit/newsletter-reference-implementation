@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.audit import service as audit
 from app.auth.permissions import CAMPAIGNS_MANAGE
 from app.auth.dependencies import auth_is_enforced, request_principal, working_brand
+from app.pagination import Page, PageParams, page_of_list, page_params
 from app.database import get_db
 from app.campaigns import duplication
 from app.campaigns.db_models import CampaignDB
@@ -62,17 +63,21 @@ from app.campaigns.service import (
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
 
-@router.get("/", response_model=list[Campaign])
+@router.get("/", response_model=Page[Campaign])
 def get_campaigns(
+    params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
-    return list_campaigns(db, brand_id=brand_id)
+    """One ADR-185 page of the brand's campaigns, newest first."""
+    from app.campaigns.service import page_campaigns
+
+    return page_campaigns(db, params, brand_id=brand_id)
 
 
 @router.get(
     "/monitoring",
-    response_model=list[MonitoredCampaign],
+    response_model=Page[MonitoredCampaign],
     summary="Where every campaign in the brand is: in flight, in preparation, or sent",
     description=(
         "Derived from each variant's snapshots and sends, never stored (task-216). "
@@ -82,11 +87,14 @@ def get_campaigns(
     ),
 )
 def get_campaign_monitoring(
+    params: PageParams = Depends(page_params),
     db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
 ):
     from app.campaigns.monitoring import campaign_monitoring
 
-    return campaign_monitoring(db, brand_id=brand_id)
+    # Assembled in Python from several queries, so paged after (ADR-185;
+    # `page_of_list` says what that costs).
+    return page_of_list(campaign_monitoring(db, brand_id=brand_id), params)
 
 
 @router.post("/", response_model=CampaignWithVariants)

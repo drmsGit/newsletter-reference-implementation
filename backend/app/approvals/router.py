@@ -30,6 +30,7 @@ from app.approvals.models import (
 from app.audit.service import ACTOR_USER, events_for_subject
 from app.auth.dependencies import require_person, working_brand
 from app.auth.service import SESSION_COOKIE, user_for_token
+from app.pagination import Page, PageParams, page_of_list, page_params
 from app.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -73,12 +74,12 @@ def _names_for(db, rows) -> dict:
 
 @router.get(
     "/",
-    response_model=list[PendingActionRow],
+    response_model=Page[PendingActionRow],
     summary="The approval inbox for the working brand",
     description=(
         "Newest first, filterable by `action_key` and by requester "
         "(`requested_by_type`, `requested_by_id`), paged by `limit` (max 200) and "
-        "`offset`. "
+        "`offset` into one ADR-185 envelope with the filtered `total`. "
         "`status` is one of `pending` (the default), `decided` or `all`. "
         "Pending excludes a request whose deadline has passed but whose stored "
         "status has not caught up: the list agrees with what approving would "
@@ -90,20 +91,23 @@ def list_pending(
     action_key: str | None = None,
     requested_by_type: str | None = None,
     requested_by_id: int | None = None,
-    limit: int = Query(50, ge=1, le=200),
-    offset: int = Query(0, ge=0),
+    params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
-    # A plain list with limit/offset, as GET /delivery/send-instances does
-    # (decided 2026-10-03). One envelope with a total for every list is task-88's.
+    # One ADR-185 page. The rows and the total come from the same filters
+    # (`_inbox_query`), so the total cannot disagree with what it counts.
+    filters = dict(action_key=action_key, requested_by_type=requested_by_type,
+                   requested_by_id=requested_by_id)
     found = approvals.list_for_brand(
-            db, brand_id, status=status, action_key=action_key,
-            requested_by_type=requested_by_type, requested_by_id=requested_by_id,
-            limit=limit, offset=offset,
+        db, brand_id, status=status, limit=params.limit, offset=params.offset, **filters,
     )
     names = _names_for(db, found)
-    return [_row(row, names) for row in found]
+    return Page(
+        items=[_row(row, names) for row in found],
+        total=approvals.count_for_brand(db, brand_id, status, **filters),
+        limit=params.limit, offset=params.offset,
+    )
 
 
 @router.get(

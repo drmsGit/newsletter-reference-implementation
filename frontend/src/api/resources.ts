@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
+import { PAGE_SIZE } from '../components/Pager'
 import { api } from './client'
 import { HttpError } from './session'
 import type { components } from './schema'
@@ -67,17 +68,19 @@ async function read<T>(
   return result.data as T
 }
 
-export function useCampaigns() {
+export function useCampaigns(offset = 0) {
   return useQuery({
-    queryKey: keys.campaigns,
-    queryFn: () => read(api.GET('/campaigns/')),
+    queryKey: [...keys.campaigns, 'page', offset],
+    queryFn: () =>
+      read(api.GET('/campaigns/', { params: { query: { limit: PAGE_SIZE, offset } } })),
   })
 }
 
-export function useContentList() {
+export function useContentList(offset = 0) {
   return useQuery({
-    queryKey: keys.content,
-    queryFn: () => read(api.GET('/content/')),
+    queryKey: [...keys.content, 'page', offset],
+    queryFn: () =>
+      read(api.GET('/content/', { params: { query: { limit: PAGE_SIZE, offset } } })),
   })
 }
 
@@ -89,10 +92,11 @@ export function useContentRecord(id: number) {
   })
 }
 
-export function useAudienceGroups() {
+export function useAudienceGroups(offset = 0) {
   return useQuery({
-    queryKey: keys.audienceGroups,
-    queryFn: () => read(api.GET('/api/audience-groups/')),
+    queryKey: [...keys.audienceGroups, 'page', offset],
+    queryFn: () =>
+      read(api.GET('/api/audience-groups/', { params: { query: { limit: PAGE_SIZE, offset } } })),
   })
 }
 
@@ -142,16 +146,12 @@ export function useApproval(id: number) {
   })
 }
 
-/**
- * The first page of sends, newest first -- the server's default of 50.
- *
- * No pager yet: one standard pagination mechanism is task-88's to build, and a
- * screen-local one would be the second answer it exists to prevent.
- */
-export function useDeliveries() {
+/** One ADR-185 page of sends, newest first. */
+export function useDeliveries(offset = 0) {
   return useQuery({
-    queryKey: keys.deliveries,
-    queryFn: () => read(api.GET('/delivery/send-instances')),
+    queryKey: [...keys.deliveries, 'page', offset],
+    queryFn: () =>
+      read(api.GET('/delivery/send-instances', { params: { query: { limit: PAGE_SIZE, offset } } })),
   })
 }
 
@@ -239,10 +239,11 @@ export function useDuplicateVariant(campaignId: number) {
  * Derived by the server from snapshots and sends -- this client never works a
  * state out for itself, so the definition of "in flight" lives in one place.
  */
-export function useMonitoring() {
+export function useMonitoring(offset = 0) {
   return useQuery({
-    queryKey: keys.monitoring,
-    queryFn: () => read(api.GET('/campaigns/monitoring')),
+    queryKey: [...keys.monitoring, 'page', offset],
+    queryFn: () =>
+      read(api.GET('/campaigns/monitoring', { params: { query: { limit: PAGE_SIZE, offset } } })),
   })
 }
 

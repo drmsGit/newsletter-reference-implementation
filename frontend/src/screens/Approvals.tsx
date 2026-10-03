@@ -1,4 +1,3 @@
-import { Button } from 'react-aria-components'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 
 import {
@@ -8,6 +7,7 @@ import {
   type PendingActionRow,
 } from '../api/resources'
 import Choice from '../components/Choice'
+import Pager, { PAGE_SIZE, useOffset } from '../components/Pager'
 import DataTable, { type DataColumn } from '../components/DataTable'
 import ScreenState from '../components/ScreenState'
 import { formatDate } from './Campaigns'
@@ -47,8 +47,6 @@ const historyColumns: DataColumn<PendingActionRow>[] = [
   { key: 'reason', header: 'Reason', render: (a) => a.decision_reason ?? '—' },
 ]
 
-/** Rows per page. The server allows up to 200; 50 is its default too. */
-const PAGE = 50
 const ANY = '__any__'
 
 /**
@@ -84,7 +82,7 @@ export default function Approvals({ mode = 'waiting' }: { mode?: 'waiting' | 'hi
 
   const action = params.get('action') ?? ANY
   const requesterKey = params.get('requester') ?? ANY // "type:id", or "type:" for no id
-  const offset = Math.max(0, Number(params.get('offset') ?? 0) || 0)
+  const offset = useOffset()
 
   const [byType, byId] = requesterKey === ANY ? [undefined, undefined] : requesterKey.split(':')
   const query: ApprovalQuery = {
@@ -92,7 +90,7 @@ export default function Approvals({ mode = 'waiting' }: { mode?: 'waiting' | 'hi
     action_key: action === ANY ? undefined : action,
     requested_by_type: byType,
     requested_by_id: byId ? Number(byId) : undefined,
-    limit: PAGE,
+    limit: PAGE_SIZE,
     offset,
   }
   const approvals = useApprovals(query)
@@ -106,14 +104,7 @@ export default function Approvals({ mode = 'waiting' }: { mode?: 'waiting' | 'hi
     setParams(next)
   }
 
-  function page(to: number) {
-    const next = new URLSearchParams(params)
-    if (to > 0) next.set('offset', String(to))
-    else next.delete('offset')
-    setParams(next)
-  }
-
-  const rows = approvals.data ?? []
+  const rows = approvals.data?.items ?? []
   const filtered = action !== ANY || requesterKey !== ANY || offset > 0
 
   return (
@@ -163,24 +154,8 @@ export default function Approvals({ mode = 'waiting' }: { mode?: 'waiting' | 'hi
           }
           onRowAction={(a) => navigate(`/approvals/${a.id}`)}
         />
-        {/*
-          No total yet (task-88 brings one), so "older" is offered when this
-          page came back full. The cost is honest and small: when the last page
-          is exactly full, "older" leads to an empty page that says so.
-        */}
-        {(offset > 0 || rows.length === PAGE) && (
-          <nav aria-label="Pages" className="pager">
-            <Button isDisabled={offset === 0} onPress={() => page(Math.max(0, offset - PAGE))}>
-              Newer
-            </Button>
-            <span className="muted">
-              {rows.length > 0 ? `${offset + 1}–${offset + rows.length}` : 'No more'}
-            </span>
-            <Button isDisabled={rows.length < PAGE} onPress={() => page(offset + PAGE)}>
-              Older
-            </Button>
-          </nav>
-        )}
+        {/* The server's total (ADR-185): Older is disabled exactly on the last page. */}
+        <Pager page={approvals.data} />
       </ScreenState>
     </>
   )

@@ -4,7 +4,7 @@ import { Route, Routes } from 'react-router'
 
 import CampaignDetail from './CampaignDetail'
 import Campaigns from './Campaigns'
-import { jsonResponse, renderWithProviders, stubFetch } from '../test-utils'
+import { jsonResponse, page, renderWithProviders, stubFetch } from '../test-utils'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -72,7 +72,7 @@ function renderDetail() {
 describe('the campaign list', () => {
   it('opens a campaign from its row', async () => {
     stubFetch({
-      'GET /campaigns/': () => jsonResponse([COMPOSITION.campaign]),
+      'GET /campaigns/': () => jsonResponse(page([COMPOSITION.campaign])),
       'GET /campaigns/1/composition': () => jsonResponse(COMPOSITION),
     })
     renderWithProviders(
