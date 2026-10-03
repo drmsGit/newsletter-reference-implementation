@@ -429,6 +429,39 @@ and the authentication question the React manager client was blocked on.
 
 **Status:** built and tested end to end, including a delivered link clicked back through a Resend webhook. The demo seed can now actually send: its call-to-action had the wrong field names, and every demo campaign was refused for missing content. The seed gained push, a second brand and a real send with delivery records. **Testing never sends through Resend and never raises the send cap (200)**: the free tier is 3,000 emails a month.
 
+### 2026-10-03 — The manager client covers the core loop, and every growing list pages or searches
+
+**Context:** a long build session on the React client, after the 2026-10-02 backend completion. The core loop now has screens: campaigns (with Duplicate), deliveries and what each recipient got, monitoring, approvals (decide, filter, history) and settings (read and edit). Most decisions were about what a screen should *not* do.
+
+1. **Every list that grows with use pages in one envelope, `{items, total, limit, offset}`.** Lists fixed by code or configuration stay plain arrays. See [[ADR-185 — Lists That Grow With Data Are Paged in One Envelope]]; [[ADR-175 — Facets Are the Manager's Own Taxonomy, Not the Engine's]] gained an addendum reading its point 7 the same way. A guard test sorts every list route into paged or fixed, so a new one cannot arrive unclassified.
+
+2. **Inside a segment or a send, a sample and a search, not pages.** An audience's reach and a send's recipients show twenty, and a manager looking for someone searches by identifier or address (part, any case), server-side, with the match count. *"If a manager needs a specific they will likely have that one or multiple recipients they are looking for."* A pager built for the audience was removed before it was committed.
+
+3. **Filtering this round covers fields that already exist; facets are their own work.** Content filters by title and status, campaigns, audiences and recipients by search. **Campaigns get no status filter**, because the stored campaign status never moves; where a campaign stands is the monitoring screen's answer.
+
+4. **"In flight" means approved but not finished:** a snapshot no send has used yet, or a send that is planned, scheduled or sending. The campaign state is derived from what the variants have done and is never stored.
+
+5. **Approving is one press, and a reason is optional.** The detail already shows what approving will run, and a confirm step on every approval trains people to click through it. The inbox holds only what is waiting; decided requests have their own history, ordered by when they ended (the interview's "log and queue stay separate").
+
+6. **Duplicating a variant keeps content inside its own campaign and takes the layout elsewhere,** and it carries active overrides, authored by whoever duplicates. Carrying them needs `overrides.manage` in the target brand, as copying content needs `content.manage` there.
+
+7. **Who authored something is a fact the server knows, never one the caller states.** An override's author is the signed-in caller; the request field is gone. The author stays text, because the audit log keeps the id-based record.
+
+8. **Settings: read, then edit, all audited.** Settings changes were *not* audited, and [[ADR-153 — Audit and Accountability]] already required it, so that was a gap, not an open decision. It is closed, and the switch that turns access control off is included. A saved signal value equal to its code default is no longer stored as an override. The dev database held seven pinned defaults and one real change, a click weight of 500 against a default of 5, which the user corrected.
+
+**Status:** built, browser-checked against the development database, and every new rule mutation-checked; tests that could not fail were found and fixed several times (a sort that happened to match creation order, a seed that skipped the branch under test, assertions a default value satisfied).
+
+### 2026-10-03 — Four routes failed on every call, and a guard now stops the fifth
+
+**Context:** building screens on routes nothing had exercised turned up the same defect four times. A function gained a required brand (ADR-172) and one caller was not updated: the Jinja override form, looking up one recipient, the approval seed, and the reverse case, the engagement-events route passing a brand its service never took (which would also have answered for any brand). Each returned an error every time and was found by a person clicking.
+
+1. **A sweep found no remaining case,** and the sweep is now a test. It reads the source and fails on a call that drops a required brand, or passes one where none is taken. Reintroducing three of the four bugs fails it.
+2. **The test suite runs on its own database,** rebuilt every run, never the development one. Several test docstrings still say otherwise.
+3. **The seeded Demo send is a real send now**, dated two months back so its clicks follow it, and the approval demo comes from a named integration with a real person deciding. The development database has not been re-seeded.
+
+**Status:** 1095 backend and 66 client tests passing; the client's generated types match the live schema.
+
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*
@@ -553,7 +586,17 @@ Not blocked by code — can be worked on alongside other phases.
 
 ---
 
-### Suggested next steps — updated 2026-10-02
+### Suggested next steps — updated 2026-10-03
+
+The core loop has screens (see the two 2026-10-03 entries in §5). In rough order of value:
+
+1. **Facets.** ADR-175's main filter for content and campaigns, and the one requirement-5 filter still missing. They need their own ADRs (model, per-brand scope, governance) and probably a short design interview before code (task-207).
+2. **The screens still missing:** decision slots, recipient and category detail. And the write surface of the campaign screen: editing modules, overrides and slots, and creating a campaign or a blank variant.
+3. **Decisions recorded and not yet taken:** step-up or second approval before granting an integration `sends.execute`; credential expiry; an [[ADR-101 — Provider Capabilities Are Explicit]] addendum naming the click-attribution capability; the ADR-040 addendum ADR-178 owes; what a consent note may hold (task-246).
+4. **Housekeeping:** re-seed the development database to get the real Demo send (this resets demo edits); correct the test docstrings that still say "shared dev database"; drop a duplicate index on `delivery_executions.provider_message_id` in the development database.
+5. **The public-beta gate is the positioning statement**, not features (`docs/business/POSITIONING.md`). The product name (task-29) stays on hold until a candidate is legally cleared.
+
+### Suggested next steps — updated 2026-10-02 (superseded by the list above; kept as the record of that day)
 
 The backend for the SPA's core loop is complete (see the two 2026-10-02 entries in §5). In rough order of value:
 

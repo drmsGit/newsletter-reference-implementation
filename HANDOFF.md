@@ -1,5 +1,17 @@
 # HANDOFF — Newsletter Blueprint
 
+> **Stale since 2026-09-20 — do not start a session from this file.** Its paste
+> block and its numbers predate the React client and most of the October work.
+> The current state lives in three places that are kept up to date:
+>
+> - `docs/playbook-strategy.md` §5, the decision log (newest entries last), and
+>   §6 "Suggested next steps" (the dated list at the top is current);
+> - the queue: `backlog task list --status "To Do" --sort ordinal --plain`;
+> - `docs/architecture/ADR/` — run `ls` for the current set, never trust a
+>   number written down anywhere, this file included.
+>
+> What follows is kept as the record of the September backend phase.
+
 **Last updated:** 2026-09-20 · **Branch:** `main` · **Backend phase complete — the SPA is buildable**
 
 > **If you are starting the React client, do not use the paste block below.**
