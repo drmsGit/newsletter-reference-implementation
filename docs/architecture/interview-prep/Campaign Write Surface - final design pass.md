@@ -158,6 +158,13 @@ accepted record, not an open question.
 
 ## Proposed slices, in order
 
+**Progress, 2026-10-03: slices 1–4 are built** (task-248 to task-253 and
+task-110, each reproduced by a failing test first and mutation-checked).
+Slice 4 was narrowed with the user: optimistic concurrency only, with an
+optional `If-Match` token that the React editor always sends. ADR-180's
+advisory lock and "last updated by" moved to task-254, to be built with the
+editor screen that shows them. Next is slice 5.
+
 1. **Close defects 1–4** (task-248, task-249, task-250, task-251). These are backend fixes with tests. Defect 1 first:
    it is the only one that crosses a brand.
 2. **Audit the composer's writes and record who resets an override**

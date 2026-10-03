@@ -471,6 +471,19 @@ and the authentication question the React manager client was blocked on.
 
 **Status:** 1101 backend and 71 client tests passing, every new check mutation-tested; browser-checked on the development database. Opening a slot made only GET requests, and its pick count did not change.
 
+### 2026-10-03 — The write path is made safe before the editor is built on it
+
+**Context:** the [[Campaign Write Surface - final design pass]] found six defects on the routes the React editor will use, and chose autosave on blur, which makes a stale save a normal event. All of it was fixed before any editor screen, in the pass's order.
+
+1. **A module binds only its own brand's content and its own variant's slot** (task-248). The user questioned how many brand checks are worth having, since a wrong content block is not a personal-data leak. **Decided: check where data is written, with no second layer on the read side.** No follow-up task for rendering's unscoped lookup.
+2. **Module types, the envelope and the module limit** (task-249). A module's type is checked on update as well as create. The header module is written only through the variant.
+3. **Small refusals that were silent or 500s:** a variant created over JSON now keeps its subject and preheader (task-250), and a rejected slot config is a 400 (task-251).
+4. **Every composer write is audited on both planes** (task-252). An override reset records who reset it. A module delete names the overrides it erased (design pass D2).
+5. **Module data holds only its manifest's fields, as text** (task-253). Required fields and lengths stay advisory (ADR-177). The client now carries per-field 422 errors.
+6. **A stale write is refused with 409** (task-110). The `If-Match` token is optional, by the user's choice, so the Jinja forms and integrations are unchanged. The advisory lock was split off into task-254, at the user's choice.
+
+**Status:** 1168 backend and 75 client tests passing; client types match the live schema. Every fix was reproduced by a failing test first and mutation-checked. The development database held no rows any new rule refuses. Next: slice 5, the variant editor's structure.
+
 
 ## 6. Roadmap
 
