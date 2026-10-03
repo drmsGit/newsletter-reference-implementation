@@ -163,7 +163,9 @@ task-110, each reproduced by a failing test first and mutation-checked).
 Slice 4 was narrowed with the user: optimistic concurrency only, with an
 optional `If-Match` token that the React editor always sends. ADR-180's
 advisory lock and "last updated by" moved to task-254, to be built with the
-editor screen that shows them. Next is slice 5.
+editor screen that shows them. **Slice 5 is built too** (task-255): the
+variant editor with envelope, module stack and static fields, saving on blur,
+plus creating a campaign and a blank variant. Next is slice 6.
 
 1. **Close defects 1–4** (task-248, task-249, task-250, task-251). These are backend fixes with tests. Defect 1 first:
    it is the only one that crosses a brand.
