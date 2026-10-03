@@ -2488,6 +2488,11 @@ export interface components {
             dropped_by_stage: {
                 [key: string]: number;
             };
+            /**
+             * Sample Matching
+             * @default 0
+             */
+            sample_matching: number;
             /** Sample */
             sample: components["schemas"]["PreviewRecipient"][];
         };
@@ -7577,6 +7582,8 @@ export interface operations {
     get_executions_for_send_instance_delivery_send_instances__send_instance_id__executions_get: {
         parameters: {
             query?: {
+                /** @description Find recipients by identifier or address (part, any case). */
+                q?: string | null;
                 /** @description Rows per page (1-200). */
                 limit?: number;
                 /** @description Rows to skip. */
@@ -8783,6 +8790,8 @@ export interface operations {
         parameters: {
             query: {
                 channel: string;
+                /** @description Find recipients by identifier or address (part, any case). */
+                q?: string | null;
             };
             header?: never;
             path: {

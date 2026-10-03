@@ -167,14 +167,41 @@ export function useDelivery(id: number) {
   })
 }
 
-/** One ADR-185 page of a send's recipients, newest first. */
-export function useDeliveryExecutions(id: number, offset = 0) {
+/** How many recipients a screen shows before the person searches. */
+export const SAMPLE_SIZE = 20
+
+/**
+ * A send's first twenty recipients, newest first, or the ones matching `q`
+ * (identifier or address), with how many match in all. A sample and a search,
+ * not a paged list -- decided with the user 2026-10-03.
+ */
+export function useDeliveryExecutions(id: number, q = '') {
   return useQuery({
-    queryKey: [...keys.deliveryExecutions(id), 'page', offset],
+    queryKey: [...keys.deliveryExecutions(id), 'search', q],
     queryFn: () =>
       read(
         api.GET('/delivery/send-instances/{send_instance_id}/executions', {
-          params: { path: { send_instance_id: id }, query: { limit: PAGE_SIZE, offset } },
+          params: {
+            path: { send_instance_id: id },
+            query: { limit: SAMPLE_SIZE, offset: 0, q: q || undefined },
+          },
+        }),
+      ),
+  })
+}
+
+/**
+ * What a send to this group on `channel` would reach: each rule block's count,
+ * resolved vs reachable and why the rest drop (task-50, B27), plus the first
+ * twenty reachable recipients -- or those matching `q` -- and how many match.
+ */
+export function useAudiencePreview(id: number, channel: string, q = '') {
+  return useQuery({
+    queryKey: [...keys.audienceGroup(id), 'preview', channel, q],
+    queryFn: () =>
+      read(
+        api.GET('/api/audience-groups/{group_id}/preview', {
+          params: { path: { group_id: id }, query: { channel, q: q || undefined } },
         }),
       ),
   })

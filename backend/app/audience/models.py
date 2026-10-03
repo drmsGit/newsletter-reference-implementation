@@ -120,6 +120,8 @@ class AudiencePreview(BaseModel):
     reachable_count: int
     unreachable_count: int
     dropped_by_stage: dict[str, int]
+    # Reachable recipients matching the search (all of them with no search).
+    sample_matching: int = 0
     sample: list[PreviewRecipient]
 
 

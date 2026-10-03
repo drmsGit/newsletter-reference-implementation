@@ -78,7 +78,9 @@ def create_delivery_execution(
     return to_delivery_execution(execution)
 
 
-def page_delivery_executions_for_send_instance(db: Session, send_instance_id: int, params, *, brand_id: int):
+def page_delivery_executions_for_send_instance(
+    db: Session, send_instance_id: int, params, *, brand_id: int, q: str | None = None,
+):
     """One ADR-185 page of a send's executions, newest first."""
     from app.pagination import page_of_query
     from app.recipients.db_models import RecipientDB
@@ -89,6 +91,15 @@ def page_delivery_executions_for_send_instance(db: Session, send_instance_id: in
         .filter(DeliveryExecutionDB.send_instance_id == send_instance_id,
                 SendInstanceDB.brand_id == brand_id)
     )
+    if q:
+        # Find a recipient by identifier or address on this send's channel —
+        # the same rule an audience's search uses (`recipients.search`).
+        from app.recipients import search
+
+        send = db.get(SendInstanceDB, send_instance_id)
+        if send is not None:
+            query = query.filter(search.clause(q, DeliveryExecutionDB.recipient_id,
+                                               channel_of_send(db, send)))
 
     def convert_all(records):
         external = dict(

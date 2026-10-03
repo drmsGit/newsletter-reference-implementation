@@ -2,7 +2,7 @@ import { Link, useParams } from 'react-router'
 
 import { useDelivery, useDeliveryExecutions, type DeliveryExecution } from '../api/resources'
 import DataTable, { type DataColumn } from '../components/DataTable'
-import Pager, { useOffset } from '../components/Pager'
+import RecipientSearch, { useSearch } from '../components/RecipientSearch'
 import ScreenState from '../components/ScreenState'
 import { formatDate } from './Campaigns'
 
@@ -50,7 +50,8 @@ function executionColumns(sendId: number): DataColumn<DeliveryExecution>[] {
 export default function DeliveryDetail() {
   const id = Number(useParams().id)
   const delivery = useDelivery(id)
-  const executions = useDeliveryExecutions(id, useOffset())
+  const q = useSearch()
+  const executions = useDeliveryExecutions(id, q)
 
   return (
     <>
@@ -89,6 +90,7 @@ export default function DeliveryDetail() {
             </dl>
 
             <h2>Recipients</h2>
+            <RecipientSearch />
             <ScreenState query={executions}>
               <DataTable
                 label="Recipients of this send"
@@ -96,7 +98,13 @@ export default function DeliveryDetail() {
                 items={executions.data?.items ?? []}
                 emptyMessage="This send has no recipients."
               />
-              <Pager page={executions.data} />
+              {executions.data && (
+                <p className="muted" role="status">
+                  {q
+                    ? `${executions.data.total} matching “${q}”, showing ${executions.data.items.length}.`
+                    : `Showing ${executions.data.items.length} of ${executions.data.total}. Search to find someone.`}
+                </p>
+              )}
             </ScreenState>
           </>
         )}

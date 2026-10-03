@@ -534,6 +534,7 @@ def list_groups_with_counts(
 
 def preview_group(
     db: Session, group: AudienceGroupDB, *, channel: str, sample_size: int = 20,
+    q: str | None = None,
 ) -> dict:
     """What sending to this group on `channel` would reach (task-50, B27).
 
@@ -568,6 +569,10 @@ def preview_group(
     resolved = resolve_audience(db, group.id, channel=channel)
     gate = run_exclusion_stack(db, {r.id for r in resolved}, group.brand_id, channel=channel, purpose=MARKETING)
     reachable = [r for r in resolved if r.id in gate.eligible]
+    from app.recipients import search
+
+    matching = [r for r in reachable
+                if search.matches(q, r.external_id, gate.addresses.get(r.id))]
     dropped_by_stage: dict[str, int] = {}
     for exclusion in gate.exclusions:
         dropped_by_stage[exclusion.stage] = dropped_by_stage.get(exclusion.stage, 0) + 1
@@ -578,10 +583,14 @@ def preview_group(
         "reachable_count": len(reachable),
         "unreachable_count": len(resolved) - len(reachable),
         "dropped_by_stage": dropped_by_stage,
+        # The sample is the first `sample_size` reachable recipients matching
+        # the search, and `sample_matching` how many match in all — the counts
+        # above describe the segment, never the search (2026-10-03).
         "sample": [
             {"recipient": r, "address": gate.addresses.get(r.id)}
-            for r in reachable[:sample_size]
+            for r in matching[:sample_size]
         ],
+        "sample_matching": len(matching),
     }
 
 

@@ -108,6 +108,7 @@ def get_group(group_id: int, db: Session = Depends(get_db), brand_id: int = Depe
 def preview_group(
     group_id: int,
     channel: str = Query(...),
+    q: str | None = Query(None, description="Find recipients by identifier or address (part, any case)."),
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
@@ -116,7 +117,7 @@ def preview_group(
     group = service.get_group(db, group_id, brand_id=brand_id)
     if group is None:
         raise HTTPException(status_code=404, detail="Audience group not found")
-    preview = service.preview_group(db, group, channel=channel)
+    preview = service.preview_group(db, group, channel=channel, q=q)
     return AudiencePreview(
         group_id=group.id,
         channel=preview["channel"],
@@ -125,6 +126,7 @@ def preview_group(
         reachable_count=preview["reachable_count"],
         unreachable_count=preview["unreachable_count"],
         dropped_by_stage=preview["dropped_by_stage"],
+        sample_matching=preview["sample_matching"],
         sample=[
             PreviewRecipient(
                 recipient_id=row["recipient"].id, external_id=row["recipient"].external_id,

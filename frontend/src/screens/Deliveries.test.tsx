@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router'
 
@@ -226,5 +226,39 @@ describe('paging the deliveries list', () => {
       .find((u) => u.pathname === '/delivery/send-instances')!
     expect(asked.searchParams.get('offset')).toBe('50')
     expect(asked.searchParams.get('limit')).toBe('50')
+  })
+})
+
+describe("finding someone in a send", () => {
+  it('shows twenty and searches the server for the rest', async () => {
+    /** Decided 2026-10-03: a sample and a search, not a paged list. */
+    const fetchMock = stubFetch({
+      'GET /delivery/send-instances/4': () =>
+        jsonResponse({ ...A_SEND, execution_count: 300, exclusions_by_stage: {},
+          audience_group_name: 'Big' }),
+      'GET /delivery/send-instances/4/executions': (request) => {
+        const q = new URL(request.url).searchParams.get('q')
+        return q
+          ? jsonResponse(page([execution(77, 'sent')], { total: 1, limit: 20 }))
+          : jsonResponse(page([execution(11, 'sent'), execution(12, 'sent')], { total: 300, limit: 20 }))
+      },
+    })
+    renderWithProviders(
+      <Routes>
+        <Route path="/deliveries/:id" element={<DeliveryDetail />} />
+      </Routes>,
+      { route: '/deliveries/4' },
+    )
+    expect(await screen.findByText(/Showing 2 of 300/)).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Pages' })).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText(/Find a recipient/), { target: { value: ' anna@ ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }))
+    expect(await screen.findByText(/1 matching “anna@”/)).toBeInTheDocument()
+    const asked = fetchMock.mock.calls
+      .map(([input]) => new URL((input as Request).url))
+      .filter((u) => u.pathname === '/delivery/send-instances/4/executions')
+      .at(-1)!.searchParams
+    expect([asked.get('q'), asked.get('limit')]).toEqual(['anna@', '20'])
   })
 })

@@ -200,13 +200,15 @@ def get_send_instances_for_snapshot(
 )
 def get_executions_for_send_instance(
     send_instance_id: int,
+    q: str | None = Query(None, description="Find recipients by identifier or address (part, any case)."),
     params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
     from app.delivery.service import page_delivery_executions_for_send_instance
 
-    return page_delivery_executions_for_send_instance(db, send_instance_id, params, brand_id=brand_id)
+    return page_delivery_executions_for_send_instance(
+        db, send_instance_id, params, brand_id=brand_id, q=q)
 
 
 @router.post(
