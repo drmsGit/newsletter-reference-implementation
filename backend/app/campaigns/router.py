@@ -470,14 +470,20 @@ def update_decision_slot_record(
                 "strategy"
             ),
         )
-    updated = update_decision_slot(
-        db,
-        slot_id=slot_id,
-        decision_strategy=payload.decision_strategy,
-        candidate_filter=payload.candidate_filter,
-        strategy_config=payload.strategy_config,
-        brand_id=brand_id,
-    )
+    try:
+        updated = update_decision_slot(
+            db,
+            slot_id=slot_id,
+            decision_strategy=payload.decision_strategy,
+            candidate_filter=payload.candidate_filter,
+            strategy_config=payload.strategy_config,
+            brand_id=brand_id,
+        )
+    except ValueError as error:
+        # The filter or config does not match the strategy's declared shape
+        # (`normalize_slot_config`). PATCH already answered 400 here; PUT
+        # answered 500 (task-251).
+        raise HTTPException(status_code=400, detail=str(error))
     if updated is None:
         raise HTTPException(status_code=404, detail="Decision slot not found")
     return to_decision_slot(updated)

@@ -1640,13 +1640,21 @@ def decision_slot_create(
     decision_strategy: str = Form("top_score"),
     db: Session = Depends(get_db),
 ):
-    create_decision_slot_for_variant(
-        db,
-        variant_id=variant_id,
-        name=name,
-        decision_strategy=decision_strategy,
-        brand_id=working_brand_id(request, db),
-    )
+    try:
+        create_decision_slot_for_variant(
+            db,
+            variant_id=variant_id,
+            name=name,
+            decision_strategy=decision_strategy,
+            brand_id=working_brand_id(request, db),
+        )
+    except ValueError as error:
+        # An unknown strategy, or a variant outside the brand: shown on the
+        # page like every other composer refusal, not a 500 (task-251).
+        return RedirectResponse(
+            url=f"/ui/campaigns/{campaign_id}?error={quote(str(error))}",
+            status_code=303,
+        )
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
