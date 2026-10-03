@@ -184,12 +184,6 @@ describe('the variant editor', () => {
     expect(await puts[0].json()).toEqual({ name: 'Variant A', subject: 'Summer', preheader: 'Peek' })
   })
 
-  it('shows where a catalogue-bound module\'s fields come from instead of a form', async () => {
-    open(server().handlers)
-    fireEvent.click(await screen.findByRole('button', { name: /Hero · record #42/ }))
-    expect(await screen.findByRole('link', { name: 'content record #42' })).toHaveAttribute('href', '/content/42')
-    expect(screen.queryByLabelText(/^Button label/)).not.toBeInTheDocument()
-  })
 })
 
 describe('the module stack', () => {

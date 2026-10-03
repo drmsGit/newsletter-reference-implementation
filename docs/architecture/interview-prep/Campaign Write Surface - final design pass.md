@@ -165,7 +165,9 @@ optional `If-Match` token that the React editor always sends. ADR-180's
 advisory lock and "last updated by" moved to task-254, to be built with the
 editor screen that shows them. **Slice 5 is built too** (task-255): the
 variant editor with envelope, module stack and static fields, saving on blur,
-plus creating a campaign and a blank variant. Next is slice 6.
+plus creating a campaign and a blank variant. **Slice 6 is built too**
+(task-256, task-257, task-224, task-258): catalogue fields, overrides, reach
+and publish state. Next is slice 7, slots on modules.
 
 1. **Close defects 1–4** (task-248, task-249, task-250, task-251). These are backend fixes with tests. Defect 1 first:
    it is the only one that crosses a brand.
@@ -208,6 +210,16 @@ detect a conflict.
 - ✅ **D4. The write surface is the next line of work (user, 2026-10-03),**
   ahead of category detail and facets: slices 1–4, then the editor screens.
   The bug tasks are ordered at the front of the queue, task-248 first.
+- ✅ **D5. A catalogue edit from the composer is shown as unpublished, with a
+  one-click Publish (user, 2026-10-03).** A send uses the record's latest
+  published version, so a fix reaches the next send only once published. The
+  editor says "changed since version N was published — sends still use
+  version N" beside the fields. It does not publish on every save: with
+  autosave that would turn versions into edit history rather than releases.
+- ✅ **D6. Override reasons are four presets plus Other (user, 2026-10-03):**
+  "Shorter for this send", "Different tone for this audience", "Out of date
+  for this campaign", "Legal or compliance". They are stored as text in the
+  existing reason column; task-225 may turn them into codes.
 
 ## What could break
 

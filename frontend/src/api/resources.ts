@@ -637,3 +637,109 @@ export function useCreateVariant(campaignId: number) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.composition(campaignId) }),
   })
 }
+
+// --- slice 6: catalogue fields and overrides (task-258) ----------------------
+
+export type ContentRecordDetail = components['schemas']['ContentRecordDetail']
+
+/** The unsent campaigns an edit to this record would reach (ADR-178 point 8). */
+export function useContentReach(recordId: number | null | undefined) {
+  return useQuery({
+    queryKey: [...keys.contentRecord(recordId ?? 0), 'unsent-campaigns'],
+    queryFn: () =>
+      read(api.GET('/content/{content_id}/unsent-campaigns', { params: { path: { content_id: recordId! } } })),
+    enabled: recordId != null,
+  })
+}
+
+/**
+ * Edit one catalogue field of a record (ADR-178 point 1: the default is the
+ * catalogue). PATCH with the channel as the field group, so only this
+ * channel's fields can be cleared; the record's version is read from the
+ * cache when the save is sent and stated in If-Match (task-257), and saves
+ * to records run one after another, as the composer's do.
+ */
+export function useSaveCatalogueField(recordId: number, channel: string) {
+  const queryClient = useQueryClient()
+  const key = keys.contentRecord(recordId)
+  return useMutation({
+    scope: { id: 'composer-content' },
+    mutationFn: (changes: Record<string, unknown>) =>
+      read(
+        api.PATCH('/content/{content_id}', {
+          params: {
+            path: { content_id: recordId },
+            header: { 'If-Match': queryClient.getQueryData<ContentRecordDetail>(key)?.updated_at },
+          },
+          body: { content: changes, groups: [channel] },
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: key }),
+  })
+}
+
+/** Publish the record's current content, which is what sends then use (D5). */
+export function usePublishRecord(recordId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => read(api.POST('/content/versions', { body: { content_record_id: recordId } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.contentRecord(recordId) }),
+  })
+}
+
+/**
+ * Change a module's override (task-256): fields to set, fields to drop, and
+ * optionally the reason. The whole set is built from the override **as the
+ * cache holds it when the save is sent**, and the module's version goes in
+ * If-Match — the same queue as every other module write, because an override
+ * write moves the module's version.
+ */
+export function useSetOverride(campaignId: number) {
+  return useComposerWrite(
+    campaignId,
+    'module',
+    (composition, id) => cachedOf(composition, 'module', id),
+    (
+      { id, set = {}, unset = [], reason }: {
+        id: number
+        set?: Record<string, unknown>
+        unset?: string[]
+        reason?: string | null
+      },
+      module,
+    ) => {
+      const current = { ...(module?.active_override?.field_overrides ?? {}), ...set }
+      for (const field of unset) delete current[field]
+      return read(
+        api.PUT('/overrides/modules/{module_id}', {
+          params: { path: { module_id: id }, header: { 'If-Match': module?.updated_at } },
+          body: {
+            field_overrides: current,
+            reason: reason === undefined ? (module?.active_override?.reason ?? null) : reason,
+          },
+        }),
+      )
+    },
+  )
+}
+
+/** Bind a catalogue module to a record (or rebind it). */
+export function useBindModule(campaignId: number) {
+  return useComposerWrite(
+    campaignId,
+    'module',
+    (composition, id) => cachedOf(composition, 'module', id),
+    ({ id, contentRecordId }: { id: number; contentRecordId: number }, module) =>
+      read(
+        api.PUT('/campaigns/modules/{module_id}', {
+          params: { path: { module_id: id }, header: { 'If-Match': module?.updated_at } },
+          body: {
+            module_type: module?.module_type ?? '',
+            content_record_id: contentRecordId,
+            decision_slot_id: null,
+            module_data: module?.module_data ?? {},
+          },
+        }),
+      ),
+  )
+}

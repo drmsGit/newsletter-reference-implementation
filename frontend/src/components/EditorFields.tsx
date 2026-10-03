@@ -1,0 +1,113 @@
+import { useEffect, useState } from 'react'
+import { Button, Input, Label, Text, TextArea, TextField } from 'react-aria-components'
+
+import type { ModuleVariable } from '../api/resources'
+import { HttpError } from '../api/session'
+
+/**
+ * A field that saves when it loses focus, and only when its value changed.
+ *
+ * The draft follows the saved value whenever the server's answer changes —
+ * after a save, and after a reload that discards a refused edit.
+ */
+export function AutosaveField({
+  field,
+  value,
+  onSave,
+  error,
+}: {
+  field: ModuleVariable
+  value: string
+  onSave: (value: string) => void
+  error: string | undefined
+}) {
+  const [draft, setDraft] = useState(value)
+  useEffect(() => setDraft(value), [value])
+  const label = field.label ?? field.name
+  const multiline = field.type === 'richtext'
+
+  return (
+    <TextField
+      className="react-aria-TextField field"
+      value={draft}
+      onChange={setDraft}
+      onBlur={() => {
+        if (draft !== value) onSave(draft)
+      }}
+      isInvalid={!!error}
+    >
+      <Label>
+        {label}
+        {field.required && <span className="muted"> (required)</span>}
+      </Label>
+      {multiline ? <TextArea rows={4} /> : <Input type={field.type === 'url' ? 'url' : 'text'} />}
+      {multiline && (
+        // VE 2.5: raw markdown, no toolbar, and the syntax said where it is typed.
+        <Text slot="description" className="muted">
+          **bold**, *italic*, [link](https://…), and a line starting with - for a bullet.
+        </Text>
+      )}
+      {field.note && field.note !== label && (
+        <Text slot="description" className="muted">
+          {field.note}
+        </Text>
+      )}
+      {field.required && !draft.trim() && !error && (
+        // Shown here and only here (VE 2.2): a manager decides when it is ready.
+        <Text slot="description" className="muted">
+          Empty — needed before this is sent.
+        </Text>
+      )}
+      {error && (
+        <p role="alert" className="field-error">
+          {error}
+        </p>
+      )}
+    </TextField>
+  )
+}
+
+export function fieldError(error: unknown, name: string): string | undefined {
+  return error instanceof HttpError ? error.fields[name] : undefined
+}
+
+/**
+ * What a write ended in, in place: a stale save (409) offers a reload, a
+ * permission refusal says so, anything else shows the server's reason.
+ * Per-field errors (422) are shown on their fields, not repeated here.
+ */
+export function SaveState({
+  mutation,
+  what,
+  reload,
+}: {
+  mutation: { isError: boolean; error: unknown; reset: () => void }
+  what: string
+  reload?: () => void
+}) {
+  if (!mutation.isError) return null
+  const error = mutation.error instanceof HttpError ? mutation.error : undefined
+  if (error && Object.keys(error.fields).length > 0) return null
+  return (
+    <p role="alert">
+      {error?.status === 409 ? (
+        <>
+          Somebody changed {what} after you loaded it, so your change was not saved.{' '}
+          <Button
+            onPress={() => {
+              mutation.reset()
+              reload?.()
+            }}
+          >
+            Load their version
+          </Button>
+        </>
+      ) : error?.status === 403 ? (
+        `You do not have permission to change ${what}.`
+      ) : (
+        `Not saved: ${error?.detail ?? `${what} could not be changed.`}`
+      )}
+    </p>
+  )
+}
+

@@ -317,3 +317,26 @@ input[data-focus-visible] {
   color: var(--brand-danger);
   margin: 0;
 }
+
+/*
+ * ADR-178 point 4: an overridden field is shown distinctly, with the
+ * catalogue value it covers visible beneath it (task-258).
+ */
+.overridden {
+  border-left: 3px solid var(--brand-accent);
+  padding-left: calc(var(--brand-space) * 1.5);
+}
+
+.reach,
+.publish-state,
+.reason,
+.bind {
+  margin: var(--brand-space) 0;
+}
+
+.bind__results {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: calc(var(--brand-space) / 2);
+}

@@ -1,5 +1,5 @@
-import { useEffect, useState, type KeyboardEvent } from 'react'
-import { Button, Input, Label, Text, TextArea, TextField } from 'react-aria-components'
+import { useState, type KeyboardEvent } from 'react'
+import { Button } from 'react-aria-components'
 import { Link, useParams } from 'react-router'
 
 import {
@@ -13,11 +13,11 @@ import {
   type ComposedModule,
   type ComposedVariant,
   type ModuleManifest,
-  type ModuleVariable,
 } from '../api/resources'
-import { HttpError } from '../api/session'
 import Choice from '../components/Choice'
+import { AutosaveField, SaveState, fieldError } from '../components/EditorFields'
 import ScreenState from '../components/ScreenState'
+import CatalogueModule from './CatalogueModule'
 
 /**
  * One variant, edited (task-255, slice 5 of the campaign write surface).
@@ -111,6 +111,7 @@ function Editor({
               campaignId={campaignId}
               module={selected}
               manifest={byName.get(selected.module_type)}
+              channel={variant.channel}
               reload={reload}
             />
           ) : (
@@ -303,16 +304,18 @@ function AddModule({
   )
 }
 
-/** The selected module's fields. Only a static module's are edited here (slice 5). */
+/** The selected module's fields: a static module's here, a catalogue-bound one's in CatalogueModule. */
 function ModuleFields({
   campaignId,
   module,
   manifest,
+  channel,
   reload,
 }: {
   campaignId: number
   module: ComposedModule
   manifest: ModuleManifest | undefined
+  channel: string
   reload: () => void
 }) {
   const save = useSaveModule(campaignId)
@@ -327,25 +330,17 @@ function ModuleFields({
     )
   }
   if (manifest.cms) {
-    // Catalogue-bound (ADR-179): its fields come from a content record or a
-    // slot's pick. Editing those, and overriding them, is slice 6; slots, 7.
+    // Catalogue-bound (ADR-179): ADR-178's edit-or-override, slice 6.
     return (
       <>
         <h2 id="fields-heading">{title}</h2>
-        {module.content_record_id != null ? (
-          <p>
-            Its fields come from{' '}
-            <Link to={`/content/${module.content_record_id}`}>content record #{module.content_record_id}</Link>.
-          </p>
-        ) : module.decision_slot_id != null ? (
-          <p>
-            Its fields come from{' '}
-            <Link to={`/decision-slots/${module.decision_slot_id}`}>decision slot #{module.decision_slot_id}</Link>,
-            per recipient.
-          </p>
-        ) : (
-          <p>Not bound to content yet. It is reported at send, never blocked (VE 1.4).</p>
-        )}
+        <CatalogueModule
+          campaignId={campaignId}
+          module={module}
+          manifest={manifest}
+          channel={channel}
+          reload={reload}
+        />
       </>
     )
   }
@@ -368,113 +363,6 @@ function ModuleFields({
       ))}
       <SaveState mutation={save} reload={reload} what="the module" />
     </>
-  )
-}
-
-/**
- * A field that saves when it loses focus, and only when its value changed.
- *
- * The draft follows the saved value whenever the server's answer changes —
- * after a save, and after a reload that discards a refused edit.
- */
-function AutosaveField({
-  field,
-  value,
-  onSave,
-  error,
-}: {
-  field: ModuleVariable
-  value: string
-  onSave: (value: string) => void
-  error: string | undefined
-}) {
-  const [draft, setDraft] = useState(value)
-  useEffect(() => setDraft(value), [value])
-  const label = field.label ?? field.name
-  const multiline = field.type === 'richtext'
-
-  return (
-    <TextField
-      className="react-aria-TextField field"
-      value={draft}
-      onChange={setDraft}
-      onBlur={() => {
-        if (draft !== value) onSave(draft)
-      }}
-      isInvalid={!!error}
-    >
-      <Label>
-        {label}
-        {field.required && <span className="muted"> (required)</span>}
-      </Label>
-      {multiline ? <TextArea rows={4} /> : <Input type={field.type === 'url' ? 'url' : 'text'} />}
-      {multiline && (
-        // VE 2.5: raw markdown, no toolbar, and the syntax said where it is typed.
-        <Text slot="description" className="muted">
-          **bold**, *italic*, [link](https://…), and a line starting with - for a bullet.
-        </Text>
-      )}
-      {field.note && field.note !== label && (
-        <Text slot="description" className="muted">
-          {field.note}
-        </Text>
-      )}
-      {field.required && !draft.trim() && !error && (
-        // Shown here and only here (VE 2.2): a manager decides when it is ready.
-        <Text slot="description" className="muted">
-          Empty — needed before this is sent.
-        </Text>
-      )}
-      {error && (
-        <p role="alert" className="field-error">
-          {error}
-        </p>
-      )}
-    </TextField>
-  )
-}
-
-function fieldError(error: unknown, name: string): string | undefined {
-  return error instanceof HttpError ? error.fields[name] : undefined
-}
-
-/**
- * What a write ended in, in place: a stale save (409) offers a reload, a
- * permission refusal says so, anything else shows the server's reason.
- * Per-field errors (422) are shown on their fields, not repeated here.
- */
-function SaveState({
-  mutation,
-  what,
-  reload,
-}: {
-  mutation: { isError: boolean; error: unknown; reset: () => void }
-  what: string
-  reload?: () => void
-}) {
-  if (!mutation.isError) return null
-  const error = mutation.error instanceof HttpError ? mutation.error : undefined
-  if (error && Object.keys(error.fields).length > 0) return null
-  return (
-    <p role="alert">
-      {error?.status === 409 ? (
-        <>
-          Somebody changed {what} after you loaded it, so your change was not saved.{' '}
-          <Button
-            onPress={() => {
-              mutation.reset()
-              reload?.()
-            }}
-          >
-            Load their version
-          </Button>
-        </>
-      ) : error?.status === 403 ? (
-        `You do not have permission to change ${what}.`
-      ) : (
-        `Not saved: ${error?.detail ?? `${what} could not be changed.`}`
-      )}
-    </p>
   )
 }
 
