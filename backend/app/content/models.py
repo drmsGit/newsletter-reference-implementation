@@ -177,3 +177,17 @@ class ContentUsage(BaseModel):
 
     resolutions: list[ContentResolutionUse]
     signals: list[ContentSignal]
+
+
+class UnsentCampaign(BaseModel):
+    id: int
+    name: str
+
+
+class ContentReach(BaseModel):
+    """Which unsent campaigns use a record (task-224, ADR-178 point 8): the
+    count the composer shows beside a catalogue field, and the list behind it.
+    Ids and names only — the composer reports scope, not people."""
+
+    count: int
+    campaigns: list[UnsentCampaign]

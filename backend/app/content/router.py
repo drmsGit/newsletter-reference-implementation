@@ -18,6 +18,7 @@ from app.content.models import (
     ContentField,
     ContentRecord,
     ContentRecordDetail,
+    ContentReach,
     ContentCreate,
     ContentDuplicate,
     ContentDuplicateTarget,
@@ -576,3 +577,24 @@ def delete_category_relation_route(relation_id: int, db: Session = Depends(get_d
 
     if not delete_category_relation(db, relation_id):
         raise HTTPException(status_code=404, detail="Category relation not found")
+
+
+@router.get(
+    "/{content_id}/unsent-campaigns",
+    response_model=ContentReach,
+    summary="The unsent campaigns an edit to this record would reach",
+    description=(
+        "Campaigns in the brand with a module bound to the record and a variant "
+        "using it that has not been sent. Sent campaigns are snapshotted and "
+        "immune, so they are left out (ADR-178 point 8)."
+    ),
+)
+def get_unsent_campaigns(
+    content_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.campaigns.monitoring import unsent_campaigns_using
+
+    if get_content_record(db, content_id, brand_id=brand_id) is None:
+        raise HTTPException(status_code=404, detail="Content record not found")
+    campaigns = unsent_campaigns_using(db, content_id, brand_id=brand_id)
+    return {"count": len(campaigns), "campaigns": campaigns}

@@ -466,6 +466,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/content/{content_id}/unsent-campaigns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The unsent campaigns an edit to this record would reach
+         * @description Campaigns in the brand with a module bound to the record and a variant using it that has not been sent. Sent campaigns are snapshotted and immune, so they are left out (ADR-178 point 8).
+         */
+        get: operations["get_unsent_campaigns_content__content_id__unsent_campaigns_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/campaigns/": {
         parameters: {
             query?: never;
@@ -3353,6 +3373,18 @@ export interface components {
              */
             groups: string[];
         };
+        /**
+         * ContentReach
+         * @description Which unsent campaigns use a record (task-224, ADR-178 point 8): the
+         *     count the composer shows beside a catalogue field, and the list behind it.
+         *     Ids and names only — the composer reports scope, not people.
+         */
+        ContentReach: {
+            /** Count */
+            count: number;
+            /** Campaigns */
+            campaigns: components["schemas"]["UnsentCampaign"][];
+        };
         /** ContentRecord */
         ContentRecord: {
             /** Id */
@@ -5548,6 +5580,13 @@ export interface components {
             /** Allowed */
             allowed: boolean;
         };
+        /** UnsentCampaign */
+        UnsentCampaign: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -6554,6 +6593,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_unsent_campaigns_content__content_id__unsent_campaigns_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                content_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentReach"];
+                };
             };
             /** @description Validation Error */
             422: {

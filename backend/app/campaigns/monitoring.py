@@ -22,7 +22,7 @@ from collections import defaultdict
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.campaigns.db_models import CampaignDB, VariantDB
+from app.campaigns.db_models import CampaignDB, ModuleInstanceDB, VariantDB
 from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
 from app.snapshots.db_models import SnapshotDB
 
@@ -141,3 +141,29 @@ def campaign_monitoring(db: Session, *, brand_id: int) -> list[dict]:
     rows.sort(key=lambda r: r["updated_at"], reverse=True)
     rows.sort(key=lambda r: _STATE_ORDER[r["state"]])
     return rows
+
+
+def unsent_campaigns_using(db: Session, content_record_id: int, *, brand_id: int) -> list[dict]:
+    """The brand's campaigns a catalogue edit to this record can still reach
+    (task-224, ADR-178 point 8): campaigns with a module bound to it, kept when
+    any variant that uses it has not been sent.
+
+    "Sent" is this module's own definition — a variant whose stage is "sent" —
+    so the composer's count and the monitoring screen never disagree. A sent
+    variant is snapshotted and immune; counting it would overstate the reach.
+    Only bound modules count: a slot that might pick the record at send time
+    is not "using" it. Id and name only — no owners on the composer.
+    """
+    using = {
+        variant_id
+        for (variant_id,) in db.query(ModuleInstanceDB.variant_id)
+        .filter(ModuleInstanceDB.content_record_id == content_record_id)
+        .distinct()
+    }
+    if not using:
+        return []
+    return [
+        {"id": row["id"], "name": row["name"]}
+        for row in campaign_monitoring(db, brand_id=brand_id)
+        if any(v["id"] in using and v["stage"] != "sent" for v in row["variants"])
+    ]
