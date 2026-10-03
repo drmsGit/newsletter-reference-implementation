@@ -23,6 +23,11 @@ const BACKEND = 'http://127.0.0.1:8000'
  * `/api/audience-groups` while every other router sits at a bare top-level
  * prefix. A wildcard rule would have been shorter and would have swallowed
  * Vite's own dev routes; an inferred list would have missed audience entirely.
+ *
+ * **Kept honest by `backend/tests/test_dev_proxy.py`**, which compares this list
+ * with the routes the backend registers. `/settings` and `/integrations` were
+ * missing until 2026-10-03, so the settings screen got a 404 in development
+ * and passed every test, because tests stub `fetch` and never touch this file.
  */
 const API_PREFIXES = [
   '/api',
@@ -34,6 +39,7 @@ const API_PREFIXES = [
   '/delivery',
   '/docs',
   '/insight',
+  '/integrations',
   '/modules',
   '/openapi.json',
   '/overrides',
@@ -41,6 +47,7 @@ const API_PREFIXES = [
   '/recipients',
   '/redoc',
   '/rendering',
+  '/settings',
   '/snapshots',
   '/ui',
 ]

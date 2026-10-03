@@ -11,6 +11,8 @@ const SCREENS = [
   { to: '/content', label: 'Content' },
   { to: '/audiences', label: 'Audiences' },
   { to: '/deliveries', label: 'Deliveries' },
+  // Administration last, as the inventory orders it.
+  { to: '/settings', label: 'Settings' },
 ]
 
 export default function Nav() {

@@ -14,6 +14,7 @@ export type DeliveryExecution = components['schemas']['DeliveryExecution']
 export type DeliveryAsSent = components['schemas']['DeliveryAsSent']
 export type CampaignComposition = components['schemas']['CampaignComposition']
 export type MonitoredCampaign = components['schemas']['MonitoredCampaign']
+export type SettingsView = components['schemas']['Settings']
 export type ComposedVariant = components['schemas']['ComposedVariant']
 export type ComposedModule = components['schemas']['ComposedModule']
 export type VariantDuplicated = components['schemas']['VariantDuplicated']
@@ -34,6 +35,7 @@ export const keys = {
   campaigns: ['campaigns'] as const,
   composition: (id: number) => ['campaigns', id, 'composition'] as const,
   monitoring: ['campaigns', 'monitoring'] as const,
+  settings: ['settings'] as const,
   content: ['content'] as const,
   contentRecord: (id: number) => ['content', id] as const,
   audienceGroups: ['audience-groups'] as const,
@@ -213,5 +215,13 @@ export function useMonitoring() {
   return useQuery({
     queryKey: keys.monitoring,
     queryFn: () => read(api.GET('/campaigns/monitoring')),
+  })
+}
+
+/** Everything the settings screen shows. Readable with `view`. */
+export function useSettings() {
+  return useQuery({
+    queryKey: keys.settings,
+    queryFn: () => read(api.GET('/settings')),
   })
 }
