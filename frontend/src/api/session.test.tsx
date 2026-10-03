@@ -4,7 +4,7 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { currentCsrfToken, setCsrfToken } from './client'
-import { useSession, useSwitchBrand } from './session'
+import { HttpError, useSession, useSwitchBrand } from './session'
 import { A_SESSION, jsonResponse, makeQueryClient } from '../test-utils'
 
 function wrapper(client: ReturnType<typeof makeQueryClient>) {
@@ -66,5 +66,29 @@ describe('switching the working brand', () => {
     // No argument means every key. A filter here would be a list somebody has
     // to maintain as screens are added, and forgetting one is silent.
     expect(invalidate).toHaveBeenCalledWith()
+  })
+})
+
+describe('turning a refusal into an HttpError (task-253)', () => {
+  it('keeps a plain-text detail as it is', () => {
+    const error = HttpError.from(400, 'Content record 9 not found')
+    expect([error.detail, error.fields]).toEqual(['Content record 9 not found', {}])
+  })
+
+  it('maps a validation list to its fields, and joins the messages for a one-line screen', () => {
+    const error = HttpError.from(422, [
+      { loc: ['body', 'module_data', 'colour'], msg: "'cta' has no field 'colour'", type: 'value_error' },
+      { loc: ['body', 'module_data', 'label'], msg: "'label' must be text, not int", type: 'value_error' },
+    ])
+    expect(error.fields).toEqual({
+      colour: "'cta' has no field 'colour'",
+      label: "'label' must be text, not int",
+    })
+    expect(error.detail).toBe("'cta' has no field 'colour'; 'label' must be text, not int")
+  })
+
+  it('has no detail when the body had none', () => {
+    const error = HttpError.from(500, undefined)
+    expect([error.status, error.detail, error.fields]).toEqual([500, undefined, {}])
   })
 })

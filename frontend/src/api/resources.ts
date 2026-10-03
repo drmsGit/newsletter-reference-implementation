@@ -68,7 +68,7 @@ async function read<T>(
   const result = await call
   if (!result.response.ok) {
     const detail = (result.error as { detail?: unknown } | undefined)?.detail
-    throw new HttpError(result.response.status, typeof detail === 'string' ? detail : undefined)
+    throw HttpError.from(result.response.status, detail)
   }
   return result.data as T
 }

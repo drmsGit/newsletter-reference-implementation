@@ -132,6 +132,20 @@ describe('editing settings', () => {
       .toBeInTheDocument()
   })
 
+  it('shows a validation list from the server as its messages, not a generic refusal', async () => {
+    stubFetch({
+      'GET /settings': () => jsonResponse(MANAGER),
+      'PUT /settings/ai/spend-cap': () =>
+        jsonResponse({ detail: [{ loc: ['body', 'hard_stop_usd'], msg: 'must be positive', type: 'value_error' }] }, 422),
+    })
+    renderWithProviders(<Settings />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Save AI budget' }))
+    // Before task-253 a list detail was dropped and the screen said only that
+    // the value was refused, not why.
+    expect(await screen.findByText('Not saved: must be positive')).toBeInTheDocument()
+  })
+
   it('does not send something that is not a whole number', async () => {
     const fetchMock = stubFetch({ 'GET /settings': () => jsonResponse(MANAGER) })
     renderWithProviders(<Settings />)

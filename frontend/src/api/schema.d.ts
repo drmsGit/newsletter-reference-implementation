@@ -1642,7 +1642,8 @@ export interface paths {
         /**
          * Reset
          * @description Reset-to-original: deactivate the override, reverting the module to
-         *     system-governed content. Keeps the row as history.
+         *     system-governed content. Keeps the row as history; who reset it is the
+         *     audit entry's actor (task-252).
          */
         post: operations["reset_overrides__override_id__reset_post"];
         delete?: never;

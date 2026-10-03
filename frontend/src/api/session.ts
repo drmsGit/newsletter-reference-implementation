@@ -11,14 +11,35 @@ export type SessionContext = components['schemas']['SessionContext']
  * `detail` is the server's own explanation when it sent a plain-text one --
  * FastAPI's `{"detail": "..."}`. A settings refusal says *why* ("the warning
  * threshold is above the hard stop"), and showing that beats a generic error.
- * Validation errors carry a structured detail instead, which is not shown.
+ *
+ * A validation error carries a list instead, one entry per field (task-253):
+ * FastAPI's own 422, and the server's manifest check on module fields, which
+ * answers in the same shape. `fields` maps each field name to its message, so
+ * a form can mark the field that was refused; `detail` joins the messages, so
+ * a screen that shows only one line still says what was wrong.
  */
 export class HttpError extends Error {
   constructor(
     readonly status: number,
     readonly detail?: string,
+    readonly fields: Record<string, string> = {},
   ) {
     super(`Request failed with status ${status}`)
+  }
+
+  /** Build one from a status and whatever the body's `detail` was. */
+  static from(status: number, detail: unknown): HttpError {
+    if (typeof detail === 'string') return new HttpError(status, detail)
+    if (!Array.isArray(detail)) return new HttpError(status)
+    const fields: Record<string, string> = {}
+    const messages: string[] = []
+    for (const entry of detail as { loc?: unknown[]; msg?: unknown }[]) {
+      if (typeof entry?.msg !== 'string') continue
+      messages.push(entry.msg)
+      const field = entry.loc?.[entry.loc.length - 1]
+      if (typeof field === 'string') fields[field] = entry.msg
+    }
+    return new HttpError(status, messages.join('; ') || undefined, fields)
   }
 }
 
