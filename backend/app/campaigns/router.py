@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.audit import service as audit
@@ -41,6 +41,7 @@ from app.campaigns.models import (
 from app.campaigns.service import (
     ChannelUnavailable,
     ModuleDataInvalid,
+    StaleWrite,
     create_campaign,
     create_variant_for_campaign,
     list_campaigns,
@@ -65,6 +66,34 @@ from app.campaigns.service import (
 
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
+
+
+#: The version a write was based on (task-110, ADR-180 point 2): the
+#: `updated_at` the caller read, sent back. Optional — a write without it is
+#: not checked (user, 2026-10-03) — and a header rather than a body field so
+#: PUT, PATCH, DELETE and the body-less move carry it the same way.
+IF_MATCH = Header(None, alias="If-Match", description=(
+    "The `updated_at` this write is based on. When it no longer matches, the "
+    "write is refused with 409 and nothing changes. Omit it to write unchecked."))
+
+
+def _expected(if_match: str | None):
+    """The If-Match header as a timestamp, or None when absent."""
+    from datetime import datetime
+
+    if if_match is None:
+        return None
+    try:
+        return datetime.fromisoformat(if_match.strip().strip('"'))
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="If-Match must be the updated_at you read, as an ISO 8601 timestamp",
+        )
+
+
+def _stale(error: StaleWrite) -> HTTPException:
+    return HTTPException(status_code=409, detail=str(error))
 
 
 def _module_data_refused(error: ModuleDataInvalid) -> HTTPException:
@@ -248,8 +277,14 @@ def delete_variant_module(
     request: Request,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
+    if_match: str | None = IF_MATCH,
 ):
-    removed = delete_module(db, module_id, brand_id=brand_id)
+    try:
+        removed = delete_module(
+            db, module_id, brand_id=brand_id, expected_updated_at=_expected(if_match)
+        )
+    except StaleWrite as error:
+        raise _stale(error)
     if removed is None:
         raise HTTPException(status_code=404, detail="Module not found")
     audit.record_from_request(
@@ -266,10 +301,15 @@ def move_variant_module(
     request: Request,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
+    if_match: str | None = IF_MATCH,
 ):
     """Move a module one step 'up' or 'down' within its variant."""
     try:
-        result = move_module(db, module_id, direction, brand_id=brand_id)
+        result = move_module(
+            db, module_id, direction, brand_id=brand_id, expected_updated_at=_expected(if_match)
+        )
+    except StaleWrite as error:
+        raise _stale(error)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
     if result is None:
@@ -427,6 +467,7 @@ def update_variant_record(
     request: Request,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
+    if_match: str | None = IF_MATCH,
 ):
     """Rename a variant and set its envelope copy.
 
@@ -436,14 +477,18 @@ def update_variant_record(
     envelope simply has nowhere to put them and they are ignored rather than
     refused.
     """
-    updated = update_variant(
-        db,
-        variant_id=variant_id,
-        name=payload.name,
-        subject=payload.subject,
-        preheader=payload.preheader,
-        brand_id=brand_id,
-    )
+    try:
+        updated = update_variant(
+            db,
+            variant_id=variant_id,
+            name=payload.name,
+            subject=payload.subject,
+            preheader=payload.preheader,
+            brand_id=brand_id,
+            expected_updated_at=_expected(if_match),
+        )
+    except StaleWrite as error:
+        raise _stale(error)
     if updated is None:
         raise HTTPException(status_code=404, detail="Variant not found")
     audit.record_from_request(
@@ -460,6 +505,7 @@ def update_module_record(
     request: Request,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
+    if_match: str | None = IF_MATCH,
 ):
     """Edit a module's type, source and static data.
 
@@ -481,7 +527,10 @@ def update_module_record(
             module_data=payload.module_data,
             decision_slot_id=payload.decision_slot_id,
             brand_id=brand_id,
+            expected_updated_at=_expected(if_match),
         )
+    except StaleWrite as error:
+        raise _stale(error)
     except ModuleDataInvalid as error:
         raise _module_data_refused(error)
     except ValueError as error:
@@ -502,6 +551,7 @@ def update_decision_slot_record(
     request: Request,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
+    if_match: str | None = IF_MATCH,
 ):
     """Change a slot's strategy and its configuration. **Both are replaced.**
 
@@ -542,7 +592,10 @@ def update_decision_slot_record(
             candidate_filter=payload.candidate_filter,
             strategy_config=payload.strategy_config,
             brand_id=brand_id,
+            expected_updated_at=_expected(if_match),
         )
+    except StaleWrite as error:
+        raise _stale(error)
     except ValueError as error:
         # The filter or config does not match the strategy's declared shape
         # (`normalize_slot_config`). PATCH already answered 400 here; PUT
@@ -564,6 +617,7 @@ def patch_decision_slot_record(
     request: Request,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
+    if_match: str | None = IF_MATCH,
 ):
     """Edit a slot, leaving untouched whatever the caller did not send.
 
@@ -613,7 +667,12 @@ def patch_decision_slot_record(
                 else existing.strategy_config
             ),
             brand_id=brand_id,
+            # Checked against the row as it is now, so the sections merged in
+            # above from `existing` are only ever written when they are current.
+            expected_updated_at=_expected(if_match),
         )
+    except StaleWrite as error:
+        raise _stale(error)
     except ValueError as error:
         # The filter or config did not match the chosen strategy's declared
         # shape. Surfaced now rather than crashing later at resolution time —

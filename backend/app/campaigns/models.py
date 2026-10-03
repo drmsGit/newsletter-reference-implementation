@@ -348,6 +348,8 @@ class DecisionSlotListed(BaseModel):
     resolution_count: int
     unique_content_count: int
     last_resolution_at: datetime | None = None
+    # The version token a write sends back in If-Match (task-110).
+    updated_at: datetime
 
 
 class SlotSummary(BaseModel):
@@ -436,6 +438,8 @@ class ComposedModule(BaseModel):
     # A manager may override its fields (content-bound, never a slot).
     overrideable: bool
     active_override: ActiveOverride | None = None
+    # The version token a write sends back in If-Match (task-110).
+    updated_at: datetime
 
 
 class ComposedVariant(BaseModel):

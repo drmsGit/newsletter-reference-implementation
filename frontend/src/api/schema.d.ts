@@ -2965,6 +2965,11 @@ export interface components {
             /** Overrideable */
             overrideable: boolean;
             active_override?: components["schemas"]["ActiveOverride"] | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** ComposedVariant */
         ComposedVariant: {
@@ -3613,6 +3618,11 @@ export interface components {
             unique_content_count: number;
             /** Last Resolution At */
             last_resolution_at?: string | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /**
          * DecisionSlotPatch
@@ -6698,7 +6708,10 @@ export interface operations {
     update_module_record_campaigns_modules__module_id__put: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
             path: {
                 module_id: number;
             };
@@ -6733,7 +6746,10 @@ export interface operations {
     delete_variant_module_campaigns_modules__module_id__delete: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
             path: {
                 module_id: number;
             };
@@ -6766,7 +6782,10 @@ export interface operations {
             query: {
                 direction: string;
             };
-            header?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
             path: {
                 module_id: number;
             };
@@ -6965,7 +6984,10 @@ export interface operations {
     update_variant_record_campaigns_variants__variant_id__put: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
             path: {
                 variant_id: number;
             };
@@ -7000,7 +7022,10 @@ export interface operations {
     update_decision_slot_record_campaigns_decision_slots__slot_id__put: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
             path: {
                 slot_id: number;
             };
@@ -7035,7 +7060,10 @@ export interface operations {
     patch_decision_slot_record_campaigns_decision_slots__slot_id__patch: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
             path: {
                 slot_id: number;
             };

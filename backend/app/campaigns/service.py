@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
@@ -348,6 +350,36 @@ def create_variant_for_campaign(
     return to_variant(variant, db)
 
 
+class StaleWrite(Exception):
+    """A write based on an out-of-date read (task-110, ADR-180 point 2).
+
+    **Deliberately not a ValueError**, like `BrokenCampaignChain`: every
+    composer route turns ValueError into a 400 "your request is wrong", and
+    this is "your request was right when you read, and someone has since
+    changed it" — a 409.
+    """
+
+
+def _refuse_stale(db: Session, row, expected_updated_at: datetime | None, label: str) -> None:
+    """Refuse the write when the caller's token no longer matches the row.
+
+    `updated_at` is the version token (ADR-180 point 2). The row is re-read
+    `FOR UPDATE`, so a second writer waits here until the first commits and
+    then compares against the first's timestamp, rather than both passing the
+    check and the later one winning. No token means no check: the token is
+    optional (user, 2026-10-03), which keeps the Jinja forms and existing
+    integrations working unchanged while the React editor always sends it.
+    """
+    if expected_updated_at is None:
+        return
+    db.refresh(row, with_for_update=True)
+    if row.updated_at != expected_updated_at:
+        raise StaleWrite(
+            f"This {label} was changed at {row.updated_at.isoformat()}, after you "
+            f"loaded it. Reload it and apply your change again."
+        )
+
+
 def update_variant(
     db: Session,
     variant_id: int,
@@ -356,11 +388,17 @@ def update_variant(
     preheader: str | None = None,
     *,
     brand_id: int,
+    expected_updated_at: datetime | None = None,
 ) -> Variant | None:
     variant = get_variant(db, variant_id, brand_id=brand_id)
     if variant is None:
         return None
+    _refuse_stale(db, variant, expected_updated_at, "variant")
     variant.name = name
+    # Moved by hand: subject and preheader live in the header module, so an
+    # edit to them alone leaves this row clean and `onupdate` never fires —
+    # two editors changing the subject would never conflict (task-110).
+    variant.updated_at = func.now()
     db.commit()
     set_envelope_fields(
         db, variant.id, {"subject": subject, "preheader": preheader},
@@ -680,6 +718,7 @@ def update_module(
     decision_slot_id: int | None = None,
     *,
     brand_id: int,
+    expected_updated_at: datetime | None = None,
 ) -> ModuleInstance | None:
     """Update a module's type, content source and static field data in place.
     Position is untouched (reorder via move_module). Same mutual-exclusion
@@ -694,6 +733,7 @@ def update_module(
     module = get_module(db, module_id, brand_id=brand_id)
     if module is None:
         return None
+    _refuse_stale(db, module, expected_updated_at, "module")
     channel_key = db.get(VariantDB, module.variant_id).channel
     _refuse_module_type(channel_key, module_type)
     _refuse_module_data(channel_key, module_type, module_data)
@@ -711,7 +751,9 @@ def update_module(
     return to_module_instance(module)
 
 
-def delete_module(db: Session, module_id: int, *, brand_id: int) -> list[dict] | None:
+def delete_module(
+    db: Session, module_id: int, *, brand_id: int, expected_updated_at: datetime | None = None
+) -> list[dict] | None:
     """Remove a module from its variant. Positions of the remaining modules are
     left as-is — the (variant_id, position) uniqueness only requires no
     duplicates, not a contiguous sequence, and rendering orders by position, so
@@ -726,6 +768,7 @@ def delete_module(db: Session, module_id: int, *, brand_id: int) -> list[dict] |
     module = get_module(db, module_id, brand_id=brand_id)
     if module is None:
         return None
+    _refuse_stale(db, module, expected_updated_at, "module")
 
     from app.overrides.db_models import ContentOverrideDB
 
@@ -744,16 +787,22 @@ def delete_module(db: Session, module_id: int, *, brand_id: int) -> list[dict] |
 
 
 def move_module(
-    db: Session, module_id: int, direction: str, *, brand_id: int
+    db: Session, module_id: int, direction: str, *, brand_id: int,
+    expected_updated_at: datetime | None = None,
 ) -> ModuleInstance | None:
     """Move a module one step up or down within its variant by swapping its
-    position with the adjacent module. No-op if already at the top/bottom."""
+    position with the adjacent module. No-op if already at the top/bottom.
+
+    The token is the moved module's own: the neighbour it swaps with moves as
+    a consequence, and the caller never read the neighbour's version to state
+    it."""
     if direction not in ("up", "down"):
         raise ValueError("direction must be 'up' or 'down'")
 
     module = get_module(db, module_id, brand_id=brand_id)
     if module is None:
         return None
+    _refuse_stale(db, module, expected_updated_at, "module")
 
     neighbors = db.query(ModuleInstanceDB).filter(
         ModuleInstanceDB.variant_id == module.variant_id
@@ -813,10 +862,12 @@ def update_decision_slot(
     strategy_config: dict | None,
     *,
     brand_id: int,
+    expected_updated_at: datetime | None = None,
 ) -> DecisionSlotDB | None:
     slot = get_decision_slot(db, slot_id, brand_id=brand_id)
     if slot is None:
         return None
+    _refuse_stale(db, slot, expected_updated_at, "decision slot")
     # Lock the config/filter structure to the (possibly newly-chosen) strategy
     # before persisting — no more "accepts any shape for any strategy, only
     # fails at resolution time". Switching strategies re-derives the structure.
@@ -1046,6 +1097,7 @@ def list_decision_slots_with_stats(db: Session, *, brand_id: int) -> list[dict]:
             "variant_id": variant_id, "variant_name": variant_name,
             "campaign_id": campaign_id, "campaign_name": campaign_name,
             "resolution_count": count, "unique_content_count": unique, "last_resolution_at": last,
+            "updated_at": slot.updated_at,
         }
         for slot, variant_id, variant_name, campaign_id, campaign_name, count, unique, last in rows
     ]
@@ -1184,7 +1236,7 @@ def campaign_composition(db: Session, campaign_id: int, *, brand_id: int) -> dic
                 "id": m.id, "position": m.position, "module_type": m.module_type,
                 "content_record_id": m.content_record_id, "decision_slot_id": m.decision_slot_id,
                 "module_data": m.module_data or {},
-                "known": manifest is not None,
+                "known": manifest is not None, "updated_at": m.updated_at,
                 "overrideable": overrideable,
                 "active_override": (
                     {"id": active.id, "field_overrides": active.field_overrides or {},
