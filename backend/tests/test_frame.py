@@ -15,6 +15,7 @@ from app.auth.service import ensure_default_brand
 from app.campaigns.db_models import CampaignDB, DecisionResolutionDB, DecisionSlotDB, ModuleInstanceDB, VariantDB
 from app.campaigns.service import (
     create_campaign, create_decision_slot_for_variant, create_module_for_variant,
+    set_envelope_fields,
 )
 from app.content.db_models import ContentRecordDB, ContentVersionDB
 from app.content.service import create_content, create_content_version
@@ -51,9 +52,8 @@ def world(db):
     fixed = _published(db, brand, "Fixed headline")
     picked = _published(db, brand, "Picked headline")
     later = _published(db, brand, "Later pick")
-    create_module_for_variant(db, variant_id=variant.id, module_type="header",
-                              module_data={"subject": "Hello", "preheader": "Peek"},
-                              brand_id=brand.id)
+    set_envelope_fields(db, variant.id, {"subject": "Hello", "preheader": "Peek"},
+                        brand_id=brand.id)
     create_module_for_variant(db, variant_id=variant.id, module_type="img_right",
                               content_record_id=fixed.id, brand_id=brand.id)
     slot = create_decision_slot_for_variant(db, variant_id=variant.id, name="slot",

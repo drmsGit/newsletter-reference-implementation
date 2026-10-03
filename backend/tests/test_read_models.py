@@ -149,7 +149,7 @@ class TestB11CampaignComposition:
     @pytest.fixture
     def composed(self, db, default_brand):
         from app.campaigns.db_models import DecisionSlotDB, ModuleInstanceDB
-        from app.campaigns.service import create_campaign, create_module_for_variant
+        from app.campaigns.service import create_campaign, create_module_for_variant, set_envelope_fields
         from app.content.service import create_content, create_content_version
         from app.overrides.db_models import ContentOverrideDB
 
@@ -159,8 +159,10 @@ class TestB11CampaignComposition:
         record = create_content(db, title=f"comp-{uuid.uuid4().hex[:6]}", brand_id=default_brand.id,
                                 content={"headline_medium": "H", "body_medium": "B"})
         create_content_version(db, content_record_id=record.id, created_by="t", brand_id=default_brand.id)
-        header = create_module_for_variant(db, variant_id=variant.id, module_type="header",
-                                           module_data={"subject": "S"}, brand_id=default_brand.id)
+        # The envelope is written through the variant, never added as a module (task-249).
+        set_envelope_fields(db, variant.id, {"subject": "S"}, brand_id=default_brand.id)
+        header = db.query(ModuleInstanceDB).filter(ModuleInstanceDB.variant_id == variant.id,
+                                                   ModuleInstanceDB.module_type == "header").one()
         content = create_module_for_variant(db, variant_id=variant.id, module_type="img_right",
                                             content_record_id=record.id, brand_id=default_brand.id)
         slot = DecisionSlotDB(variant_id=variant.id, name="slot", decision_type="content_recommendation",

@@ -500,26 +500,22 @@ def create_module_for_variant(
     channel = get_channel(variant.channel)
     channel_label = channel.label if channel else variant.channel
 
-    # (1) The module must belong to this channel. ADR-161 point 7: a channel is
-    # "an attribute on the variant plus **which manifests it accepts**". The
-    # composer's dropdown is already scoped, but a dropdown is not a control —
-    # a hand-crafted POST never sees it, and this is the same shape of hole the
-    # channel-availability check closes one level up.
-    if get_manifest(variant.channel, module_type) is None:
-        raise ValueError(
-            f"'{module_type}' is not a {channel_label} module, so nothing could "
-            f"render it. Each channel accepts only its own modules."
-        )
+    # (1) The module must belong to this channel, and not be its envelope.
+    _refuse_module_type(variant.channel, module_type)
 
     # (2) Cardinality — ADR-161 point 7's one genuinely channel-level fact, and
     # what keeps ADR-160 point 2's promise that push is "one ModuleInstanceDB"
     # **as a declared capability rather than the composition code special-casing
     # push**. Nothing here knows what push is; it reads a number from a file.
+    # The envelope module is not counted, as the composition read does not
+    # count it: it is the email's header, not one of its modules (task-249).
     limit = max_modules_for(variant.channel)
     if limit is not None:
+        envelope_type = envelope_module_type(variant.channel)
         current = (
             db.query(ModuleInstanceDB)
             .filter(ModuleInstanceDB.variant_id == variant_id)
+            .filter(ModuleInstanceDB.module_type != envelope_type if envelope_type else True)
             .count()
         )
         if current >= limit:
@@ -550,6 +546,35 @@ def create_module_for_variant(
     db.refresh(module)
 
     return to_module_instance(module)
+
+
+def _refuse_module_type(channel_key: str, module_type: str) -> None:
+    """A module's type must be one its channel accepts, and not the envelope.
+
+    ADR-161 point 7: a channel is "an attribute on the variant plus **which
+    manifests it accepts**". The composer's dropdown is already scoped, but a
+    dropdown is not a control — a hand-crafted request never sees it, and this
+    is the same shape of hole the channel-availability check closes one level
+    up. Checked on create and, since task-249, on update too: an update used to
+    overwrite the type unchecked.
+
+    The envelope module (email's header) is refused here because subject and
+    preheader are written through the variant (`set_envelope_fields`,
+    ADR-162 point 1), which keeps exactly one of it, first. One added as an
+    ordinary module lands at the end, where nothing reads it.
+    """
+    channel = get_channel(channel_key)
+    channel_label = channel.label if channel else channel_key
+    if get_manifest(channel_key, module_type) is None:
+        raise ValueError(
+            f"'{module_type}' is not a {channel_label} module, so nothing could "
+            f"render it. Each channel accepts only its own modules."
+        )
+    if module_type == envelope_module_type(channel_key):
+        raise ValueError(
+            f"'{module_type}' carries the subject and preheader. Set those on the "
+            f"variant; it keeps the one {module_type} module itself."
+        )
 
 
 def _refuse_foreign_binding(
@@ -608,6 +633,7 @@ def update_module(
     module = get_module(db, module_id, brand_id=brand_id)
     if module is None:
         return None
+    _refuse_module_type(db.get(VariantDB, module.variant_id).channel, module_type)
     _refuse_foreign_binding(
         db, module.variant_id, content_record_id, decision_slot_id, brand_id=brand_id
     )
