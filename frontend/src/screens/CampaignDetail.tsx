@@ -125,11 +125,19 @@ function VariantSection({
     },
     {
       key: 'override',
-      header: 'Override',
-      render: (m) =>
-        m.active_override
-          ? `Overridden${m.active_override.overridden_by ? ` by ${m.active_override.overridden_by}` : ''}`
-          : '—',
+      header: 'Overridden here',
+      /**
+       * Which fields this module overrides, not just that it has an override
+       * (task-262): a module with one overridden headline still takes its body
+       * from the catalogue, and a catalogue edit to that body is not an
+       * override. Every other field is the catalogue's.
+       */
+      render: (m) => {
+        const fields = Object.keys(m.active_override?.field_overrides ?? {})
+        if (!m.active_override || fields.length === 0) return '—'
+        const by = m.active_override.overridden_by ? ` by ${m.active_override.overridden_by}` : ''
+        return `${fields.join(', ')}${by}`
+      },
     },
   ]
 

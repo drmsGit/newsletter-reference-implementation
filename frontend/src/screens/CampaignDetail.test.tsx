@@ -43,7 +43,7 @@ const COMPOSITION = {
       modules: [
         module(10, 1, {
           content_record_id: 42, overrideable: true,
-          active_override: { id: 1, field_overrides: {}, overridden_by: 'sam', reason: null },
+          active_override: { id: 1, field_overrides: { headline_medium: 'Short' }, overridden_by: 'sam', reason: null },
         }),
         module(11, 2, { decision_slot_id: 5 }),
         module(12, 3, { module_type: 'cta', module_data: { button_label: 'Book' } }),
@@ -97,7 +97,8 @@ describe('a campaign in detail', () => {
     expect(screen.getByRole('link', { name: 'Slot: Top pick' })).toHaveAttribute('href', '/decision-slots/5')
     expect(screen.getByRole('link', { name: 'Top pick' })).toHaveAttribute('href', '/decision-slots/5')
     expect(screen.getByText('Typed in the module')).toBeInTheDocument()
-    expect(screen.getByText('Overridden by sam')).toBeInTheDocument()
+    // The fields, not just that there is an override (task-262).
+    expect(screen.getByText('headline_medium by sam')).toBeInTheDocument()
     expect(screen.getByText('3 of 10')).toBeInTheDocument()
   })
 
