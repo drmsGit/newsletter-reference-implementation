@@ -543,25 +543,66 @@ def resolve_for_decision(db: Session, pending_id: int, *, brand_id: int, user):
     return row, meta, None
 
 
+def _status_clause(status: str, at: datetime):
+    """`effective_status` as SQL, so the inbox can page in the database (task-209).
+
+    **The second implementation of "expired", kept beside the first on
+    purpose**, because two of them are how they drift apart (`is_expired`'s
+    docstring). `test_approvals_list` holds this to `effective_status`'s answers
+    for every status shape, deadline boundary included: a `pending` row whose
+    `expires_at` is at or before `at` reads as expired, exactly as `is_expired`
+    decides it.
+    """
+    from sqlalchemy import and_, or_
+
+    still_pending = and_(
+        PendingActionDB.status == PENDING,
+        or_(PendingActionDB.expires_at.is_(None), PendingActionDB.expires_at > at),
+    )
+    if status == PENDING:
+        return still_pending
+    lapsed = and_(PendingActionDB.status == PENDING, PendingActionDB.expires_at <= at)
+    return or_(PendingActionDB.status.in_(DECIDED), lapsed)
+
+
 def list_for_brand(
-    db: Session, brand_id: int | None, status: str = PENDING,
+    db: Session, brand_id: int | None, status: str = PENDING, *,
+    action_key: str | None = None,
+    requested_by_type: str | None = None,
+    requested_by_id: int | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+    at: datetime | None = None,
 ) -> list[PendingActionDB]:
-    """The inbox query.
+    """The inbox query: one flat list, newest first (Manager Workflow Q1.3).
 
     `status="pending"` deliberately excludes a row whose deadline has passed but
     whose column has not caught up — the list must agree with what `approve()`
     would do, and `approve()` reads the timestamp.
+
+    Narrowed by action type and by requester (ADR-166 point 3 makes the
+    requester a durable actor, so "what did this integration send" is
+    answerable), and paged with `limit`/`offset` **in the database** — the
+    status rule is SQL for that reason (task-209). `limit=None` is every row,
+    which is what the Jinja inbox asks for. `id` breaks ties so pages are stable.
     """
     query = db.query(PendingActionDB)
     if brand_id is not None:
         query = query.filter(PendingActionDB.brand_id == brand_id)
-
-    rows = query.order_by(PendingActionDB.created_at.desc()).all()
-    if status == "all":
-        return rows
-    if status == PENDING:
-        return [r for r in rows if effective_status(r) == PENDING]
-    return [r for r in rows if effective_status(r) in DECIDED]
+    if status != "all":
+        query = query.filter(_status_clause(status, at or now()))
+    if action_key is not None:
+        query = query.filter(PendingActionDB.action_key == action_key)
+    if requested_by_type is not None:
+        query = query.filter(PendingActionDB.requested_by_type == requested_by_type)
+    if requested_by_id is not None:
+        query = query.filter(PendingActionDB.requested_by_id == requested_by_id)
+    query = query.order_by(PendingActionDB.created_at.desc(), PendingActionDB.id.desc())
+    if offset:
+        query = query.offset(offset)
+    if limit is not None:
+        query = query.limit(limit)
+    return query.all()
 
 
 def due_count(db: Session) -> int:

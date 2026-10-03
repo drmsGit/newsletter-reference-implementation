@@ -1,0 +1,125 @@
+"""The approval inbox narrows and pages (task-209).
+
+Manager Workflow interview Q1.3: one flat list, newest first, with filters by
+action type and by requester — ADR-166 point 3 makes the requester a durable
+actor, so "what did Acme Agency send" is a question the data can answer.
+
+**The status rule moved into SQL** so paging pages the right rows; until then
+`list_for_brand` loaded everything and filtered in Python. Expiry is read from
+`expires_at` (ADR-142 §4), so `test_the_sql_status_agrees_with_effective_status`
+holds the two implementations of "expired" to the same answers — the drift the
+`is_expired` docstring warns about.
+"""
+from datetime import datetime, timedelta, timezone
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.approvals import service as approvals
+from app.approvals.db_models import PendingActionDB
+from app.auth import service as auth
+from app.auth.permissions import VIEW
+from app.database import SessionLocal
+from main import app
+from tests.machine import machine
+
+client = TestClient(app, raise_server_exceptions=False)
+NOW = datetime.now(timezone.utc)
+
+
+@pytest.fixture
+def db():
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+@pytest.fixture
+def rows(db):
+    """Six requests, oldest first, across two actions, two requesters and every
+    status shape — including a `pending` row whose deadline has passed and one
+    that expires exactly now (the boundary)."""
+    brand = auth.ensure_default_brand(db)
+    spec = [
+        # (action_key, requester type, requester id, stored status, expires in)
+        ("send.fire", "integration", 5, "pending", timedelta(hours=1)),
+        ("content.ready", "user", 1, "pending", timedelta(hours=1)),
+        ("send.fire", "user", 1, "pending", -timedelta(hours=1)),   # expired by timestamp
+        ("content.ready", "integration", 5, "approved", timedelta(hours=1)),
+        ("send.fire", "integration", 6, "failed", timedelta(hours=1)),
+        ("content.ready", "user", 2, "pending", timedelta(0)),       # expires right now
+    ]
+    made = []
+    for index, (key, by_type, by_id, status, ttl) in enumerate(spec):
+        row = PendingActionDB(
+            action_key=f"listtest.{key}", payload={}, summary=f"row {index}",
+            requested_by_type=by_type, requested_by_id=by_id,
+            subject_type="listtest", subject_id=10_000 + index, brand_id=brand.id,
+            status=status, expires_at=NOW + ttl,
+            created_at=NOW - timedelta(minutes=60 - index),
+            decided_at=None if status == "pending" else NOW,
+        )
+        db.add(row)
+        made.append(row)
+    db.commit()
+    yield made
+    db.rollback()
+    db.query(PendingActionDB).filter(PendingActionDB.id.in_([r.id for r in made])).delete(
+        synchronize_session=False)
+    db.commit()
+
+
+def _ours(found, rows):
+    ids = {r.id for r in rows}
+    return [r.id for r in found if r.id in ids]
+
+
+def test_the_sql_status_agrees_with_effective_status(db, rows):
+    for status in ("pending", "decided", "all"):
+        listed = set(_ours(approvals.list_for_brand(db, rows[0].brand_id, status, at=NOW), rows))
+        expected = {
+            r.id for r in rows
+            if status == "all"
+            or (status == "pending") == (approvals.effective_status(r, NOW) == "pending")
+        }
+        assert listed == expected, status
+
+
+def test_filtered_by_action_type(db, rows):
+    found = approvals.list_for_brand(db, rows[0].brand_id, "all",
+                                     action_key="listtest.send.fire")
+    assert _ours(found, rows) == [rows[4].id, rows[2].id, rows[0].id]
+
+
+def test_filtered_by_requester(db, rows):
+    found = approvals.list_for_brand(db, rows[0].brand_id, "all",
+                                     requested_by_type="integration", requested_by_id=5)
+    assert _ours(found, rows) == [rows[3].id, rows[0].id]
+    by_type = approvals.list_for_brand(db, rows[0].brand_id, "all", requested_by_type="user")
+    assert _ours(by_type, rows) == [rows[5].id, rows[2].id, rows[1].id]
+
+
+def test_pages_are_newest_first_and_do_not_overlap(db, rows):
+    key = dict(action_key=None, requested_by_type=None)
+    first = approvals.list_for_brand(db, rows[0].brand_id, "all", limit=2, offset=0, **key)
+    second = approvals.list_for_brand(db, rows[0].brand_id, "all", limit=2, offset=2, **key)
+    assert len(first) == 2 and len(second) == 2
+    assert not {r.id for r in first} & {r.id for r in second}
+    stamps = [r.created_at for r in first + second]
+    assert stamps == sorted(stamps, reverse=True)
+
+
+def test_over_json_the_filters_and_paging_reach_the_query(db, rows):
+    with machine([VIEW]) as headers:
+        response = client.get("/approvals/", headers=headers, params={
+            "status": "all", "action_key": "listtest.content.ready",
+            "requested_by_type": "user", "limit": 1, "offset": 0,
+        })
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert [r["id"] for r in body] == [rows[5].id], "newest matching row only"
+    with machine([VIEW]) as headers:
+        refused = client.get("/approvals/", headers=headers, params={"limit": 500})
+    assert refused.status_code == 422, "the page size has a ceiling"

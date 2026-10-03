@@ -1886,7 +1886,7 @@ export interface paths {
         };
         /**
          * The approval inbox for the working brand
-         * @description `status` is one of `pending` (the default), `decided` or `all`. Pending excludes a request whose deadline has passed but whose stored status has not caught up: the list agrees with what approving would actually do, which is read from the timestamp.
+         * @description Newest first, filterable by `action_key` and by requester (`requested_by_type`, `requested_by_id`), paged by `limit` (max 200) and `offset`. `status` is one of `pending` (the default), `decided` or `all`. Pending excludes a request whose deadline has passed but whose stored status has not caught up: the list agrees with what approving would actually do, which is read from the timestamp.
          */
         get: operations["list_pending_approvals__get"];
         put?: never;
@@ -8837,6 +8837,11 @@ export interface operations {
         parameters: {
             query?: {
                 status?: string;
+                action_key?: string | null;
+                requested_by_type?: string | null;
+                requested_by_id?: number | null;
+                limit?: number;
+                offset?: number;
             };
             header?: never;
             path?: never;

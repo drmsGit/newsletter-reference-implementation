@@ -16,7 +16,7 @@ depends on the row. The Jinja plane asks the same function (ADR-172 point 7).
 """
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.approvals import service as approvals
@@ -63,6 +63,9 @@ def _row(row) -> PendingActionRow:
     response_model=list[PendingActionRow],
     summary="The approval inbox for the working brand",
     description=(
+        "Newest first, filterable by `action_key` and by requester "
+        "(`requested_by_type`, `requested_by_id`), paged by `limit` (max 200) and "
+        "`offset`. "
         "`status` is one of `pending` (the default), `decided` or `all`. "
         "Pending excludes a request whose deadline has passed but whose stored "
         "status has not caught up: the list agrees with what approving would "
@@ -71,10 +74,24 @@ def _row(row) -> PendingActionRow:
 )
 def list_pending(
     status: str = approvals.PENDING,
+    action_key: str | None = None,
+    requested_by_type: str | None = None,
+    requested_by_id: int | None = None,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
-    return [_row(row) for row in approvals.list_for_brand(db, brand_id, status=status)]
+    # A plain list with limit/offset, as GET /delivery/send-instances does
+    # (decided 2026-10-03). One envelope with a total for every list is task-88's.
+    return [
+        _row(row)
+        for row in approvals.list_for_brand(
+            db, brand_id, status=status, action_key=action_key,
+            requested_by_type=requested_by_type, requested_by_id=requested_by_id,
+            limit=limit, offset=offset,
+        )
+    ]
 
 
 @router.get(
