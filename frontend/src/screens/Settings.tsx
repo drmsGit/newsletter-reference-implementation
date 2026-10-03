@@ -1,16 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import {
-  Button,
-  Input,
-  Label,
-  ListBox,
-  ListBoxItem,
-  Popover,
-  Select,
-  SelectValue,
-  TextArea,
-  TextField,
-} from 'react-aria-components'
+import { Button, Input, Label, TextArea, TextField } from 'react-aria-components'
 
 import {
   usePublishPrompt,
@@ -24,6 +13,7 @@ import {
   type SettingsView,
 } from '../api/resources'
 import { HttpError } from '../api/session'
+import Choice from '../components/Choice'
 import DataTable from '../components/DataTable'
 import ScreenState from '../components/ScreenState'
 import { formatDate } from './Campaigns'
@@ -98,30 +88,6 @@ function NumberField({
       <Label>{label}</Label>
       <Input />
     </TextField>
-  )
-}
-
-function Choice({
-  label,
-  options,
-  selected,
-  onChange,
-}: {
-  label: string
-  options: { id: string; name: string }[]
-  selected: string
-  onChange: (id: string) => void
-}) {
-  return (
-    <Select selectedKey={selected} onSelectionChange={(key) => onChange(String(key))}>
-      <Label>{label}</Label>
-      <Button>
-        <SelectValue />
-      </Button>
-      <Popover>
-        <ListBox items={options}>{(item) => <ListBoxItem id={item.id}>{item.name}</ListBoxItem>}</ListBox>
-      </Popover>
-    </Select>
   )
 }
 

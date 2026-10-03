@@ -123,3 +123,67 @@ def test_over_json_the_filters_and_paging_reach_the_query(db, rows):
     with machine([VIEW]) as headers:
         refused = client.get("/approvals/", headers=headers, params={"limit": 500})
     assert refused.status_code == 422, "the page size has a ceiling"
+
+
+class TestFilterOptions:
+    """GET /approvals/filter-options (2026-10-03): what the inbox can be narrowed
+    by, drawn only from this brand's own requests — Q1.3's "what did Acme Agency
+    send" needs the requester by NAME, and the integrations list is
+    `integrations.manage` only. Decided with the user: names are shown to anyone
+    who may view the inbox."""
+
+    def test_it_offers_this_brands_actions_and_requesters_by_name(self, db, rows):
+        from app.auth.db_models import IntegrationDB, UserDB
+
+        person = UserDB(email="filters-person@example.invalid", display_name="Sam Planner",
+                        is_active=True)
+        integration = IntegrationDB(name="Acme Agency")
+        db.add_all([person, integration])
+        db.commit()
+        rows[0].requested_by_type, rows[0].requested_by_id = "integration", integration.id
+        rows[1].requested_by_type, rows[1].requested_by_id = "user", person.id
+        db.commit()
+        try:
+            with machine([VIEW]) as headers:
+                response = client.get("/approvals/filter-options", headers=headers)
+            assert response.status_code == 200, response.text
+            body = response.json()
+            actions = {a["key"]: a["label"] for a in body["actions"]}
+            assert {"listtest.send.fire", "listtest.content.ready"} <= set(actions)
+            # An action no module describes any more still has a label: its key.
+            assert actions["listtest.send.fire"] == "listtest.send.fire"
+            named = {(r["type"], r["id"]): r["name"] for r in body["requesters"]}
+            assert named[("integration", integration.id)] == "Acme Agency"
+            assert named[("user", person.id)] == "Sam Planner"
+            # A requester that no longer exists is still offered, named honestly.
+            assert named[("integration", 6)] == "integration #6"
+        finally:
+            db.rollback()
+            db.query(UserDB).filter(UserDB.id == person.id).delete()
+            db.query(IntegrationDB).filter(IntegrationDB.id == integration.id).delete()
+            db.commit()
+
+    def test_another_brands_requests_are_not_offered(self, db, rows):
+        from app.auth.db_models import BrandDB
+
+        other = BrandDB(key="filters-other", name="Filters other")
+        db.add(other)
+        db.commit()
+        foreign = PendingActionDB(
+            action_key="listtest.foreign.only", payload={}, summary="theirs",
+            requested_by_type="integration", requested_by_id=99, subject_type="listtest",
+            subject_id=20_000, brand_id=other.id, status="pending",
+            expires_at=NOW + timedelta(hours=1),
+        )
+        db.add(foreign)
+        db.commit()
+        try:
+            with machine([VIEW]) as headers:
+                body = client.get("/approvals/filter-options", headers=headers).json()
+            assert "listtest.foreign.only" not in {a["key"] for a in body["actions"]}
+            assert ("integration", 99) not in {(r["type"], r["id"]) for r in body["requesters"]}
+        finally:
+            db.rollback()
+            db.query(PendingActionDB).filter(PendingActionDB.id == foreign.id).delete()
+            db.query(BrandDB).filter(BrandDB.id == other.id).delete()
+            db.commit()

@@ -238,3 +238,17 @@ input[data-focus-visible] {
 .facts dd {
   margin: 0;
 }
+
+/* The approval inbox's filters and pager: one row each, wrapping on narrow screens. */
+.filters,
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+.pager {
+  align-items: center;
+  margin-top: 1rem;
+}

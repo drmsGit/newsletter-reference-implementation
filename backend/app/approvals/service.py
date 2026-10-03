@@ -605,6 +605,42 @@ def list_for_brand(
     return query.all()
 
 
+def filter_options(db: Session, brand_id: int) -> dict:
+    """What this brand's inbox can be narrowed by (2026-10-03).
+
+    Drawn only from this brand's own requests, so it never says which actions
+    or integrations exist elsewhere. Requesters are named because Q1.3's "what
+    did Acme Agency send" is asked by name; the integrations list itself is
+    `integrations.manage` only. A requester or action that no longer exists is
+    still offered — its requests are real history — and named honestly.
+    """
+    from app.approvals.actions.registry import get_action
+    from app.auth.db_models import IntegrationDB, UserDB
+
+    keys = [k for (k,) in db.query(PendingActionDB.action_key)
+            .filter(PendingActionDB.brand_id == brand_id).distinct()]
+    actions = sorted(
+        ({"key": k, "label": (get_action(k).label if get_action(k) else k)} for k in keys),
+        key=lambda a: a["label"].lower(),
+    )
+    pairs = (db.query(PendingActionDB.requested_by_type, PendingActionDB.requested_by_id)
+             .filter(PendingActionDB.brand_id == brand_id).distinct().all())
+    user_ids = [i for t, i in pairs if t == "user" and i is not None]
+    integration_ids = [i for t, i in pairs if t == "integration" and i is not None]
+    users = {u.id: (u.display_name or u.email) for u in
+             db.query(UserDB).filter(UserDB.id.in_(user_ids or [-1]))}
+    integrations = {i.id: i.name for i in
+                    db.query(IntegrationDB).filter(IntegrationDB.id.in_(integration_ids or [-1]))}
+    known = {"user": users, "integration": integrations}
+    requesters = sorted(
+        ({"type": t, "id": i,
+          "name": known.get(t, {}).get(i) or (f"{t} #{i}" if i is not None else t)}
+         for t, i in pairs),
+        key=lambda r: (r["type"], r["name"].lower()),
+    )
+    return {"actions": actions, "requesters": requesters}
+
+
 def due_count(db: Session) -> int:
     """How many requests are past their deadline and not yet retired.
 

@@ -71,6 +71,25 @@ class PendingActionDetail(PendingActionRow):
     execution_error: str | None = None
 
 
+class FilterAction(BaseModel):
+    key: str
+    label: str
+
+
+class FilterRequester(BaseModel):
+    type: str
+    id: int | None = None
+    name: str
+
+
+class ApprovalFilterOptions(BaseModel):
+    """What this brand's inbox can be narrowed by: only values its own requests
+    carry (2026-10-03)."""
+
+    actions: list[FilterAction]
+    requesters: list[FilterRequester]
+
+
 class DecisionRequest(BaseModel):
     reason: str | None = None
     #: ADR-141 §4's "pick-one for options": N options are ONE request, and the

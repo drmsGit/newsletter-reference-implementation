@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from app.approvals import service as approvals
 from app.approvals.actions.registry import get_action, get_action_module
 from app.approvals.models import (
+    ApprovalFilterOptions,
     DecisionRequest, DecisionResult, DescriptionRow, PendingActionDetail,
     PendingActionRow, ProcessExpiredResult,
 )
@@ -92,6 +93,24 @@ def list_pending(
             limit=limit, offset=offset,
         )
     ]
+
+
+@router.get(
+    "/filter-options",
+    response_model=ApprovalFilterOptions,
+    summary="What this brand's inbox can be narrowed by",
+    description=(
+        "The action types and requesters that appear in this brand's own "
+        "requests, each with a readable label: an action's label, an "
+        "integration's name, a person's display name or email. Nothing from "
+        "another brand. Declared before `/{pending_id}`, which would otherwise "
+        "take 'filter-options' as an id."
+    ),
+)
+def get_filter_options(
+    db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    return approvals.filter_options(db, brand_id)
 
 
 @router.get(

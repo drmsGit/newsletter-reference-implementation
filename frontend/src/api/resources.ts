@@ -104,10 +104,33 @@ export function useAudienceGroup(id: number) {
   })
 }
 
-export function useApprovals() {
+/** The inbox's narrowing and paging (task-209): every field optional. */
+export type ApprovalQuery = {
+  status?: 'pending' | 'decided' | 'all'
+  action_key?: string
+  requested_by_type?: string
+  requested_by_id?: number
+  limit?: number
+  offset?: number
+}
+
+/**
+ * The inbox, narrowed. The query is part of the key, so each filter combination
+ * is cached on its own -- and still under `keys.approvals`, so anything that
+ * invalidates the inbox (a decision) invalidates every filtered view of it.
+ */
+export function useApprovals(query: ApprovalQuery = {}) {
   return useQuery({
-    queryKey: keys.approvals,
-    queryFn: () => read(api.GET('/approvals/')),
+    queryKey: [...keys.approvals, 'list', query],
+    queryFn: () => read(api.GET('/approvals/', { params: { query } })),
+  })
+}
+
+/** What this brand's inbox can be narrowed by: only values its requests carry. */
+export function useApprovalFilterOptions() {
+  return useQuery({
+    queryKey: [...keys.approvals, 'filter-options'],
+    queryFn: () => read(api.GET('/approvals/filter-options')),
   })
 }
 

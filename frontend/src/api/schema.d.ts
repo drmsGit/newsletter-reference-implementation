@@ -1897,6 +1897,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/approvals/filter-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What this brand's inbox can be narrowed by
+         * @description The action types and requesters that appear in this brand's own requests, each with a readable label: an action's label, an integration's name, a person's display name or email. Nothing from another brand. Declared before `/{pending_id}`, which would otherwise take 'filter-options' as an id.
+         */
+        get: operations["get_filter_options_approvals_filter_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/approvals/{pending_id}": {
         parameters: {
             query?: never;
@@ -2340,6 +2360,17 @@ export interface components {
             overridden_by?: string | null;
             /** Reason */
             reason?: string | null;
+        };
+        /**
+         * ApprovalFilterOptions
+         * @description What this brand's inbox can be narrowed by: only values its own requests
+         *     carry (2026-10-03).
+         */
+        ApprovalFilterOptions: {
+            /** Actions */
+            actions: components["schemas"]["FilterAction"][];
+            /** Requesters */
+            requesters: components["schemas"]["FilterRequester"][];
         };
         /** ApprovalModeChoice */
         ApprovalModeChoice: {
@@ -3813,6 +3844,22 @@ export interface components {
             execution_id: number;
             /** Events */
             events: components["schemas"]["TraceEvent"][];
+        };
+        /** FilterAction */
+        FilterAction: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+        };
+        /** FilterRequester */
+        FilterRequester: {
+            /** Type */
+            type: string;
+            /** Id */
+            id?: number | null;
+            /** Name */
+            name: string;
         };
         /** GrantOut */
         GrantOut: {
@@ -8859,6 +8906,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_filter_options_approvals_filter_options_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalFilterOptions"];
                 };
             };
         };
