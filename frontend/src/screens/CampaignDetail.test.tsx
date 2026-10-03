@@ -94,7 +94,8 @@ describe('a campaign in detail', () => {
 
     expect(await screen.findByText('Spring is here')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Record #42' })).toHaveAttribute('href', '/content/42')
-    expect(screen.getByText('Slot: Top pick')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Slot: Top pick' })).toHaveAttribute('href', '/decision-slots/5')
+    expect(screen.getByRole('link', { name: 'Top pick' })).toHaveAttribute('href', '/decision-slots/5')
     expect(screen.getByText('Typed in the module')).toBeInTheDocument()
     expect(screen.getByText('Overridden by sam')).toBeInTheDocument()
     expect(screen.getByText('3 of 10')).toBeInTheDocument()

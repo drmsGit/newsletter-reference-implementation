@@ -11,6 +11,8 @@ const SCREENS = [
   { to: '/content', label: 'Content' },
   { to: '/audiences', label: 'Audiences' },
   { to: '/deliveries', label: 'Deliveries' },
+  // Supporting, read-mostly screens after the core loop.
+  { to: '/decision-slots', label: 'Decision slots' },
   // Administration last, as the inventory orders it.
   { to: '/settings', label: 'Settings' },
 ]

@@ -19,6 +19,9 @@ export type SettingsView = components['schemas']['Settings']
 export type ComposedVariant = components['schemas']['ComposedVariant']
 export type ComposedModule = components['schemas']['ComposedModule']
 export type VariantDuplicated = components['schemas']['VariantDuplicated']
+export type DecisionSlotListed = components['schemas']['DecisionSlotListed']
+export type SlotTopContent = components['schemas']['SlotTopContent']
+export type SlotResolution = components['schemas']['SlotResolution']
 
 /**
  * **Every key here names its resource, and none mentions the brand.**
@@ -36,6 +39,8 @@ export const keys = {
   campaigns: ['campaigns'] as const,
   composition: (id: number) => ['campaigns', id, 'composition'] as const,
   monitoring: ['campaigns', 'monitoring'] as const,
+  decisionSlots: ['decision-slots'] as const,
+  decisionSlot: (id: number) => ['decision-slots', id] as const,
   settings: ['settings'] as const,
   content: ['content'] as const,
   contentRecord: (id: number) => ['content', id] as const,
@@ -404,5 +409,41 @@ export function useDecide(id: number) {
       )
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.approvals }),
+  })
+}
+
+/** Every decision slot in the brand, with what it has picked (inventory B21). */
+export function useDecisionSlots(offset = 0) {
+  return useQuery({
+    queryKey: [...keys.decisionSlots, 'page', offset],
+    queryFn: () =>
+      read(api.GET('/campaigns/decision-slots', { params: { query: { limit: PAGE_SIZE, offset } } })),
+  })
+}
+
+/**
+ * One slot and what it has picked: summary, top content with its share, the
+ * latest picks and the reasons given (inventory B22, task-211).
+ */
+export function useDecisionSlotStats(id: number) {
+  return useQuery({
+    queryKey: [...keys.decisionSlot(id), 'stats'],
+    queryFn: () =>
+      read(api.GET('/campaigns/decision-slots/{slot_id}/stats', { params: { path: { slot_id: id } } })),
+  })
+}
+
+/**
+ * How many content records the slot would choose between (task-205). A GET
+ * that resolves nothing -- unlike execute, which writes a pick -- so opening
+ * the screen never changes what the slot has done.
+ */
+export function useSlotCandidates(id: number) {
+  return useQuery({
+    queryKey: [...keys.decisionSlot(id), 'candidates'],
+    queryFn: () =>
+      read(
+        api.GET('/campaigns/decision-slots/{slot_id}/candidates', { params: { path: { slot_id: id } } }),
+      ),
   })
 }

@@ -88,7 +88,9 @@ function VariantSection({
         m.content_record_id != null ? (
           <Link to={`/content/${m.content_record_id}`}>Record #{m.content_record_id}</Link>
         ) : m.decision_slot_id != null ? (
-          `Slot: ${slotNames.get(m.decision_slot_id) ?? `#${m.decision_slot_id}`}`
+          <Link to={`/decision-slots/${m.decision_slot_id}`}>
+            Slot: {slotNames.get(m.decision_slot_id) ?? `#${m.decision_slot_id}`}
+          </Link>
         ) : (
           'Typed in the module'
         ),
@@ -172,7 +174,12 @@ function VariantSection({
           <DataTable
             label={`Decision slots of ${variant.name}`}
             columns={[
-              { key: 'name', header: 'Slot', isRowHeader: true, render: (s) => s.name },
+              {
+                key: 'name',
+                header: 'Slot',
+                isRowHeader: true,
+                render: (s) => <Link to={`/decision-slots/${s.id}`}>{s.name}</Link>,
+              },
               { key: 'strategy', header: 'Strategy', render: (s) => s.decision_strategy },
               { key: 'picks', header: 'Picks made', render: (s) => s.resolution_count },
               { key: 'unique', header: 'Distinct content', render: (s) => s.unique_content_count },

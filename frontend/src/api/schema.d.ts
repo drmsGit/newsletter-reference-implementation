@@ -847,6 +847,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/campaigns/decision-slots/{slot_id}/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How many content records one decision slot would choose between
+         * @description Counted over the same query the strategy picks from, without picking: nothing is resolved or written. For a strategy that picks per recipient, one person may be offered fewer.
+         */
+        get: operations["get_decision_slot_candidates_campaigns_decision_slots__slot_id__candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/campaigns/{campaign_id}/composition": {
         parameters: {
             query?: never;
@@ -5134,6 +5154,23 @@ export interface components {
                 [key: string]: number;
             };
         };
+        /**
+         * SlotCandidates
+         * @description What a slot would choose between right now, without choosing (task-205).
+         *
+         *     Counted over the same query the strategies pick from
+         *     (`decision.strategies.base.candidate_query`); asking writes nothing.
+         */
+        SlotCandidates: {
+            /** Slot Id */
+            slot_id: number;
+            /** Candidate Count */
+            candidate_count: number;
+            /** Category Ids */
+            category_ids: number[];
+            /** Requires Recipient */
+            requires_recipient: boolean;
+        };
         /** SlotReason */
         SlotReason: {
             /** Reason */
@@ -7215,6 +7252,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DecisionSlotStats"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_decision_slot_candidates_campaigns_decision_slots__slot_id__candidates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slot_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlotCandidates"];
                 };
             };
             /** @description Validation Error */
