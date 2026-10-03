@@ -4942,12 +4942,6 @@ export interface components {
             variant_id: number;
             /** Recipient Id */
             recipient_id?: number | null;
-            /** Artifact Storage Type */
-            artifact_storage_type: string;
-            /** Artifact Location */
-            artifact_location: string;
-            /** Artifact Size */
-            artifact_size: number;
             /**
              * Created At
              * Format: date-time
