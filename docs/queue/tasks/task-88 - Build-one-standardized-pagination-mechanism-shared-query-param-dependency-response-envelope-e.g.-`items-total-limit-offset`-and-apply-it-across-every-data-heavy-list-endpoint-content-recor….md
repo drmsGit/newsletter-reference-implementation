@@ -4,10 +4,11 @@ title: >-
   Build one standardized pagination mechanism (shared query-param dependency +
   response envelope, e.g. `{items, total, limit, offset}`) and apply it across
   every data-heavy list endpoint: content recor…
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-27 13:57'
-updated_date: '2026-09-27 14:20'
+updated_date: '2026-10-03 12:02'
 labels:
   - backend
 dependencies: []
