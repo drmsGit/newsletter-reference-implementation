@@ -275,7 +275,8 @@ def _may_configure_ai(request: Request, db: Session) -> bool:
 @router.post("/ui/settings/ai")
 async def settings_save_ai(request: Request, db: Session = Depends(get_db)):
     """Persist the AI token budget. Blank/invalid values keep the code defaults."""
-    from app.settings.service import SettingsInvalid, save_ai_spend_cap
+    from app.settings.audited import audited_settings
+    from app.settings.service import AI_SPEND_CAP_KEY, SettingsInvalid, save_ai_spend_cap
 
     form = await request.form()
     # Form parsing only: blank or non-numeric keeps the current value, and a
@@ -295,7 +296,8 @@ async def settings_save_ai(request: Request, db: Session = Depends(get_db)):
     except ValueError:
         parsed["budget_usd"] = None
     try:
-        save_ai_spend_cap(db, **parsed)
+        with audited_settings(request, db, "ai_spend_cap", [AI_SPEND_CAP_KEY]):
+            save_ai_spend_cap(db, **parsed)
     except SettingsInvalid as error:
         return _settings_done(error)
     return _settings_done()
@@ -309,11 +311,13 @@ async def settings_save_ai_provider(request: Request, db: Session = Depends(get_
     be stored — every later run would otherwise fail on a value saved once
     (ADR-140: enablement is a governed choice, not free text).
     """
-    from app.settings.service import SettingsInvalid, save_ai_provider
+    from app.settings.audited import audited_settings
+    from app.settings.service import AI_PROVIDER_KEY, SettingsInvalid, save_ai_provider
 
     form = await request.form()
     try:
-        save_ai_provider(db, (form.get("ai_provider") or "").strip())
+        with audited_settings(request, db, "ai_provider", [AI_PROVIDER_KEY]):
+            save_ai_provider(db, (form.get("ai_provider") or "").strip())
     except SettingsInvalid as error:
         return _settings_done(error)
     return _settings_done()
@@ -322,14 +326,18 @@ async def settings_save_ai_provider(request: Request, db: Session = Depends(get_
 @router.post("/ui/settings/ai-prompt")
 async def settings_publish_ai_prompt(request: Request, db: Session = Depends(get_db)):
     """Publish a new prompt version (never mutates an existing one — ADR-140 §3)."""
+    from app.settings.audited import audited_settings
     from app.settings.service import SettingsInvalid, publish_task_prompt
 
     if not _may_configure_ai(request, db):
         return _settings_done(SettingsInvalid(
             "Publishing a prompt needs ai.run as well as settings.manage."))
     form = await request.form()
+    task_key = (form.get("task_key") or "").strip()
     try:
-        publish_task_prompt(db, (form.get("task_key") or "").strip(), form.get("body") or "")
+        with audited_settings(request, db, "ai_task_prompt", []) as note:
+            row = publish_task_prompt(db, task_key, form.get("body") or "")
+            note.update(task=task_key, version=row.version)
     except SettingsInvalid as error:
         return _settings_done(error)
     return _settings_done()
@@ -347,17 +355,19 @@ async def settings_set_task_approval(request: Request, db: Session = Depends(get
     trusts is a manager's decision that changes as trust is earned — the same
     split as permission keys being code and role composition being data.
     """
+    from app.settings.audited import audited_settings
     from app.settings.service import (
-        AUTO_APPLY, SettingsInvalid, choose_task_approval_mode,
+        AI_TASK_APPROVAL_KEY, AUTO_APPLY, SettingsInvalid, choose_task_approval_mode,
     )
 
     form = await request.form()
     try:
         # An empty selection is the default, which is auto-apply.
-        choose_task_approval_mode(
-            db, (form.get("task_key") or "").strip(),
-            (form.get("mode") or "").strip() or AUTO_APPLY,
-        )
+        with audited_settings(request, db, "ai_task_approval", [AI_TASK_APPROVAL_KEY]):
+            choose_task_approval_mode(
+                db, (form.get("task_key") or "").strip(),
+                (form.get("mode") or "").strip() or AUTO_APPLY,
+            )
     except SettingsInvalid as error:
         return _settings_done(error)
     return _settings_done()
@@ -373,7 +383,8 @@ async def settings_set_task_model(request: Request, db: Session = Depends(get_db
     is an open question** the backlog records — the same prompt on a different
     model is arguably a different thing — and it is not decided here.
     """
-    from app.settings.service import SettingsInvalid, choose_task_model
+    from app.settings.audited import audited_settings
+    from app.settings.service import AI_TASK_MODELS_KEY, SettingsInvalid, choose_task_model
 
     if not _may_configure_ai(request, db):
         return _settings_done(SettingsInvalid(
@@ -381,8 +392,9 @@ async def settings_set_task_model(request: Request, db: Session = Depends(get_db
     form = await request.form()
     try:
         # An empty selection clears it back to the deployment default.
-        choose_task_model(db, (form.get("task_key") or "").strip(),
-                          (form.get("model") or "").strip() or None)
+        with audited_settings(request, db, "ai_task_model", [AI_TASK_MODELS_KEY]):
+            choose_task_model(db, (form.get("task_key") or "").strip(),
+                              (form.get("model") or "").strip() or None)
     except SettingsInvalid as error:
         return _settings_done(error)
     return _settings_done()
@@ -392,8 +404,10 @@ async def settings_set_task_model(request: Request, db: Session = Depends(get_db
 async def settings_save(request: Request, db: Session = Depends(get_db)):
     """Persist weight / half-life overrides. Only keys that parse as numbers are
     stored; blank fields fall back to the code defaults."""
+    from app.settings.audited import audited_settings
     from app.settings.service import (
-        SettingsInvalid, save_max_send_recipients, save_signal_tuning,
+        HALF_LIFE_DAYS_KEY, MAX_SEND_RECIPIENTS_KEY, SIGNAL_WEIGHTS, SettingsInvalid,
+        save_max_send_recipients, save_signal_tuning,
     )
 
     form = await request.form()
@@ -421,9 +435,11 @@ async def settings_save(request: Request, db: Session = Depends(get_db)):
         # does not leave the signal tuning half-saved.
         if cap is not None and cap <= 0:
             save_max_send_recipients(db, cap)  # raises, with the reason
-        save_signal_tuning(db, weights, half_lives)
-        if cap is not None:
-            save_max_send_recipients(db, cap)
+        with audited_settings(request, db, "signals_and_send_cap",
+                              [SIGNAL_WEIGHTS, HALF_LIFE_DAYS_KEY, MAX_SEND_RECIPIENTS_KEY]):
+            save_signal_tuning(db, weights, half_lives)
+            if cap is not None:
+                save_max_send_recipients(db, cap)
     except SettingsInvalid as error:
         return _settings_done(error)
     return _settings_done()

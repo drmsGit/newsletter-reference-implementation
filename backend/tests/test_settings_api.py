@@ -244,3 +244,159 @@ class TestTheValueRules:
         assert response.status_code == 303 and "error=" in response.headers["location"]
         db.expire_all()
         assert settings.get_half_lives(db) == before
+
+
+class TestEverySettingsWriteIsAudited:
+    """task-245: ADR-153 point 4 makes writes the audit floor, and until
+    2026-10-03 no settings write recorded anything — the send cap, the AI
+    spend limit, auto-apply for AI output, and the access-control switch
+    itself. ADR-142's addendum makes no settings change approvable, so this
+    log is the only after-the-fact accountability they have.
+
+    **The guard walks the routes the app actually registers.** A settings write
+    added later that is not listed here fails `test_every_route_is_covered`, so
+    the author has to give it a payload — and then it is held to the audit too.
+
+    **Every write here is a no-op**: the current value, written back. The send
+    cap is never raised and access control is never switched off.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _remove_own_audit_rows(self, db):
+        """The admin users these tests sign in as are deleted afterwards; their
+        audit rows would otherwise stay in the shared dev database's log."""
+        from app.audit.db_models import AuditEventDB
+
+        start = self._last_audit_id(db)
+        yield
+        db.rollback()
+        db.query(AuditEventDB).filter(
+            AuditEventDB.id > start, AuditEventDB.action == "settings.changed",
+        ).delete(synchronize_session=False)
+        db.commit()
+
+    def _audit_rows(self, db, since_id):
+        from app.audit.db_models import AuditEventDB
+
+        db.expire_all()
+        return (
+            db.query(AuditEventDB)
+            .filter(AuditEventDB.id > since_id, AuditEventDB.action == "settings.changed")
+            .order_by(AuditEventDB.id.asc())
+            .all()
+        )
+
+    def _last_audit_id(self, db):
+        from app.audit.db_models import AuditEventDB
+        from sqlalchemy import func
+
+        return db.query(func.coalesce(func.max(AuditEventDB.id), 0)).scalar()
+
+    def _noop_writes(self, db, task_key, csrf):
+        from app.ai.service import get_published_prompt
+        from app.ai.tasks.registry import get_task
+        from app.auth.dependencies import AUTH_ENFORCED_KEY
+
+        weights, half = settings.get_signal_weights(db), settings.get_half_lives(db)
+        cap = settings.get_max_send_recipients(db)
+        spend = settings.get_ai_spend_cap(db)
+        provider = settings.get_ai_provider_name(db)
+        mode = settings.get_task_approval_mode(db, task_key)
+        model = settings.get_task_model(db, task_key)
+        published = get_published_prompt(db, task_key)
+        body = published.body if published else get_task(task_key).default_prompt
+        enforced = bool(settings.get_config(db, AUTH_ENFORCED_KEY, True))
+        spend_json = {k: spend[k] for k in ("warn_tokens", "hard_stop_tokens", "budget_usd")}
+        form = {"csrf_token": csrf}
+        tuning_form = {**form, "max_send_recipients": str(cap),
+                       **{f"weight__{t}": str(w) for t, w in weights.items()},
+                       **{f"halflife__{t}": str(d) for t, d in half.items()}}
+        return {
+            ("PUT", "/settings/signals"): ("signals", {"json": {"weights": weights, "half_lives": half}}),
+            ("PUT", "/settings/send-cap"): ("send_cap", {"json": {"max_send_recipients": cap}}),
+            ("PUT", "/settings/ai/spend-cap"): ("ai_spend_cap", {"json": spend_json}),
+            ("PUT", "/settings/ai/provider"): ("ai_provider", {"json": {"provider": provider}}),
+            ("PUT", "/settings/ai/tasks/{task_key}/approval"):
+                ("ai_task_approval", {"json": {"mode": mode}}),
+            ("POST", "/settings/ai/tasks/{task_key}/prompt"):
+                ("ai_task_prompt", {"json": {"body": body}}),
+            ("PUT", "/settings/ai/tasks/{task_key}/model"):
+                ("ai_task_model", {"json": {"model": model}}),
+            ("POST", "/ui/settings"): ("signals_and_send_cap", {"data": tuning_form}),
+            ("POST", "/ui/settings/ai"): ("ai_spend_cap", {"data": {
+                **form, "ai_warn_tokens": str(spend["warn_tokens"]),
+                "ai_hard_stop_tokens": str(spend["hard_stop_tokens"]),
+                "ai_budget_usd": str(spend["budget_usd"])}}),
+            ("POST", "/ui/settings/ai-provider"): ("ai_provider", {"data": {**form, "ai_provider": provider}}),
+            ("POST", "/ui/settings/ai-prompt"):
+                ("ai_task_prompt", {"data": {**form, "task_key": task_key, "body": body}}),
+            ("POST", "/ui/settings/ai-task-approval"):
+                ("ai_task_approval", {"data": {**form, "task_key": task_key, "mode": mode}}),
+            ("POST", "/ui/settings/ai-task-model"):
+                ("ai_task_model", {"data": {**form, "task_key": task_key, "model": model or ""}}),
+            # Posted as it already is: this suite must never switch access control off.
+            ("POST", "/ui/users/enforcement"):
+                ("access_control", {"data": {**form, "enforced": "1" if enforced else ""}}),
+        }
+
+    def _registered_writes(self):
+        found = set()
+        for route in app.routes:
+            path = getattr(route, "path", "")
+            if not (path.startswith("/settings") or path.startswith("/ui/settings")
+                    or path == "/ui/users/enforcement"):
+                continue
+            for method in getattr(route, "methods", set()) - {"GET", "HEAD", "OPTIONS"}:
+                found.add((method, path))
+        return found
+
+    def test_every_route_is_covered(self, db, task_key):
+        listed = set(self._noop_writes(db, task_key, "x"))
+        unlisted = self._registered_writes() - listed
+        assert not unlisted, f"settings writes with no audit test: {sorted(unlisted)}"
+
+    def test_each_write_records_who_changed_which_setting(self, db, task_key):
+        with admin(db) as (c, h):
+            csrf = h["X-CSRF-Token"]
+            for (method, path), (setting, kwargs) in self._noop_writes(db, task_key, csrf).items():
+                since = self._last_audit_id(db)
+                url = path.replace("{task_key}", task_key)
+                extra = {"headers": h} if "json" in kwargs else {}
+                response = c.request(method, url, follow_redirects=False, **kwargs, **extra)
+                assert response.status_code in (200, 201, 303), (path, response.text[:200])
+                if response.status_code == 303:
+                    assert "error=" not in response.headers["location"], (path, response.headers["location"])
+                rows = self._audit_rows(db, since)
+                assert len(rows) == 1, f"{method} {path}: {len(rows)} audit rows"
+                assert rows[0].detail["setting"] == setting, path
+                assert rows[0].actor_id is not None, f"{path}: recorded as nobody"
+                assert rows[0].brand_id is None, f"{path}: settings are not brand-owned"
+
+    def test_the_entry_carries_before_and_after(self, db):
+        current = settings.get_ai_spend_cap(db)["budget_usd"]
+        since = self._last_audit_id(db)
+        with admin(db) as (c, h):
+            response = c.put("/settings/ai/spend-cap", json={"budget_usd": current + 1}, headers=h)
+        assert response.status_code == 200, response.text
+        (row,) = self._audit_rows(db, since)
+        change = row.detail["changes"]["ai_spend_cap"]
+        assert (change["before"] or {}).get("budget_usd") != current + 1
+        assert change["after"]["budget_usd"] == current + 1
+
+    def test_a_refused_change_records_nothing(self, db):
+        since = self._last_audit_id(db)
+        with admin(db) as (c, h):
+            response = c.put("/settings/ai/provider", json={"provider": "no-such-provider"}, headers=h)
+        assert response.status_code == 422, response.text
+        assert self._audit_rows(db, since) == []
+
+    def test_a_published_prompt_is_named_by_version_never_by_body(self, db, task_key):
+        since = self._last_audit_id(db)
+        with admin(db) as (c, h):
+            response = c.post(f"/settings/ai/tasks/{task_key}/prompt",
+                              json={"body": "a body that must not reach the log"}, headers=h)
+        assert response.status_code == 201, response.text
+        (row,) = self._audit_rows(db, since)
+        assert row.detail["task"] == task_key
+        assert row.detail["version"] == response.json()["version"]
+        assert "a body that must not reach the log" not in str(row.detail)

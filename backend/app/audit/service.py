@@ -51,6 +51,8 @@ BRAND_CREATED = "brand.created"
 CAMPAIGN_DUPLICATED = "campaign.duplicated"
 CONTENT_DUPLICATED = "content.duplicated"
 VARIANT_DUPLICATED = "variant.duplicated"
+# task-245: every settings write, both planes, and the access-control switch.
+SETTINGS_CHANGED = "settings.changed"
 # ADR-166's administration surface (task-50). Logged lines were the only trace
 # of these until 2026-10-02; the subject is always the integration.
 INTEGRATION_CREATED = "integration.created"

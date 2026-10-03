@@ -14,13 +14,14 @@ Jinja page; this file only maps them to HTTP.
 """
 import os
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_person, require_person_with
 from app.auth.permissions import AI_RUN
 from app.database import get_db
 from app.settings import service
+from app.settings.audited import audited_settings
 from app.settings.models import (
     AIBudget, AITaskSettings, ApprovalModeChoice, ChannelSetting, DeliveryProviderSetting, ModelChoice,
     PromptPublish, PromptVersion, ProviderUpdate, SendCapUpdate, Settings,
@@ -109,9 +110,11 @@ def _delivery_providers() -> list[DeliveryProviderSetting]:
         "default. Unknown types and a half-life of 0 or less are refused (422)."
     ),
 )
-def put_signals(payload: SignalTuning, db: Session = Depends(get_db)):
+def put_signals(payload: SignalTuning, request: Request, db: Session = Depends(get_db)):
     try:
-        service.save_signal_tuning(db, payload.weights, payload.half_lives)
+        with audited_settings(request, db, "signals",
+                              [service.SIGNAL_WEIGHTS, service.HALF_LIFE_DAYS_KEY]):
+            service.save_signal_tuning(db, payload.weights, payload.half_lives)
     except service.SettingsInvalid as error:
         raise _invalid(error)
     return SignalTuning(weights=service.get_signal_weights(db),
@@ -120,8 +123,9 @@ def put_signals(payload: SignalTuning, db: Session = Depends(get_db)):
 
 @router.put("/send-cap", response_model=SendCapUpdate, dependencies=_PERSON,
             summary="The most recipients one send may reach")
-def put_send_cap(payload: SendCapUpdate, db: Session = Depends(get_db)):
-    service.save_max_send_recipients(db, payload.max_send_recipients)
+def put_send_cap(payload: SendCapUpdate, request: Request, db: Session = Depends(get_db)):
+    with audited_settings(request, db, "send_cap", [service.MAX_SEND_RECIPIENTS_KEY]):
+        service.save_max_send_recipients(db, payload.max_send_recipients)
     return SendCapUpdate(max_send_recipients=service.get_max_send_recipients(db))
 
 
@@ -130,9 +134,10 @@ def put_send_cap(payload: SendCapUpdate, db: Session = Depends(get_db)):
     summary="The AI token cap and the stated budget",
     description="Omitted fields keep their value. A warning above the hard stop is refused.",
 )
-def put_spend_cap(payload: SpendCapUpdate, db: Session = Depends(get_db)):
+def put_spend_cap(payload: SpendCapUpdate, request: Request, db: Session = Depends(get_db)):
     try:
-        service.save_ai_spend_cap(db, **payload.model_dump())
+        with audited_settings(request, db, "ai_spend_cap", [service.AI_SPEND_CAP_KEY]):
+            service.save_ai_spend_cap(db, **payload.model_dump())
     except service.SettingsInvalid as error:
         raise _invalid(error)
     return AIBudget(**service.ai_budget_status(db))
@@ -140,9 +145,10 @@ def put_spend_cap(payload: SpendCapUpdate, db: Session = Depends(get_db)):
 
 @router.put("/ai/provider", response_model=ProviderUpdate, dependencies=_PERSON,
             summary="Which AI provider runs the tasks (a governed list)")
-def put_provider(payload: ProviderUpdate, db: Session = Depends(get_db)):
+def put_provider(payload: ProviderUpdate, request: Request, db: Session = Depends(get_db)):
     try:
-        service.save_ai_provider(db, payload.provider)
+        with audited_settings(request, db, "ai_provider", [service.AI_PROVIDER_KEY]):
+            service.save_ai_provider(db, payload.provider)
     except service.SettingsInvalid as error:
         raise _invalid(error)
     return ProviderUpdate(provider=service.get_ai_provider_name(db))
@@ -150,9 +156,12 @@ def put_provider(payload: ProviderUpdate, db: Session = Depends(get_db)):
 
 @router.put("/ai/tasks/{task_key}/approval", response_model=ApprovalModeChoice,
             dependencies=_PERSON, summary="Apply this task's output directly, or hold it")
-def put_approval_mode(task_key: str, payload: ApprovalModeChoice, db: Session = Depends(get_db)):
+def put_approval_mode(
+    task_key: str, payload: ApprovalModeChoice, request: Request, db: Session = Depends(get_db),
+):
     try:
-        service.choose_task_approval_mode(db, task_key, payload.mode)
+        with audited_settings(request, db, "ai_task_approval", [service.AI_TASK_APPROVAL_KEY]):
+            service.choose_task_approval_mode(db, task_key, payload.mode)
     except service.SettingsInvalid as error:
         raise HTTPException(status_code=404, detail=str(error))
     return ApprovalModeChoice(mode=service.get_task_approval_mode(db, task_key))
@@ -164,13 +173,17 @@ def put_approval_mode(task_key: str, payload: ApprovalModeChoice, db: Session = 
     summary="Publish a new prompt version (needs settings.manage and ai.run)",
     description="A new immutable version becomes the live one; no version is ever edited (ADR-140 §3).",
 )
-def post_prompt(task_key: str, payload: PromptPublish, db: Session = Depends(get_db)):
+def post_prompt(
+    task_key: str, payload: PromptPublish, request: Request, db: Session = Depends(get_db),
+):
     try:
         service.require_known_task(task_key)
     except service.SettingsInvalid as error:
         raise HTTPException(status_code=404, detail=str(error))
     try:
-        row = service.publish_task_prompt(db, task_key, payload.body)
+        with audited_settings(request, db, "ai_task_prompt", []) as note:
+            row = service.publish_task_prompt(db, task_key, payload.body)
+            note.update(task=task_key, version=row.version)
     except service.SettingsInvalid as error:
         raise _invalid(error)
     return PromptVersion(version=row.version, body=row.body,
@@ -182,13 +195,16 @@ def post_prompt(task_key: str, payload: PromptPublish, db: Session = Depends(get
     dependencies=_PERSON_WITH_AI_RUN,
     summary="Point a task at a governed model, or null for the default (needs ai.run too)",
 )
-def put_model(task_key: str, payload: ModelChoice, db: Session = Depends(get_db)):
+def put_model(
+    task_key: str, payload: ModelChoice, request: Request, db: Session = Depends(get_db),
+):
     try:
         service.require_known_task(task_key)
     except service.SettingsInvalid as error:
         raise HTTPException(status_code=404, detail=str(error))
     try:
-        service.choose_task_model(db, task_key, payload.model)
+        with audited_settings(request, db, "ai_task_model", [service.AI_TASK_MODELS_KEY]):
+            service.choose_task_model(db, task_key, payload.model)
     except service.SettingsInvalid as error:
         raise _invalid(error)
     return ModelChoice(model=service.get_task_model(db, task_key))

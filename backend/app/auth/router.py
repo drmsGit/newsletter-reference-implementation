@@ -449,6 +449,7 @@ def role_delete(
 
 @router.post("/ui/users/enforcement")
 def set_enforcement(
+    request: Request,
     enforced: str = Form(""),
     db: Session = Depends(get_db),
     _user=Depends(require_permission(USERS_MANAGE)),
@@ -459,7 +460,12 @@ def set_enforcement(
     variable, and an operator who has locked themselves out cannot edit one
     without shell access to the server.
     """
-    set_config(db, AUTH_ENFORCED_KEY, enforced == "1")
+    from app.settings.audited import audited_settings
+
+    # The most consequential setting there is (task-245): off means nobody's
+    # permissions are checked. Audited like every other settings write.
+    with audited_settings(request, db, "access_control", [AUTH_ENFORCED_KEY]):
+        set_config(db, AUTH_ENFORCED_KEY, enforced == "1")
     return RedirectResponse(url="/ui/users", status_code=303)
 
 

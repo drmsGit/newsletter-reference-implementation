@@ -562,7 +562,7 @@ The backend for the SPA's core loop is complete (see the two 2026-10-02 entries 
 3. **Decisions recorded and not yet taken:**
    - step-up or second approval before granting an integration `sends.execute`;
    - credential expiry;
-   - whether settings changes are audited;
+   - ~~whether settings changes are audited~~ — not an open decision: [[ADR-153 — Audit and Accountability]] point 4 already made writes the floor. It was a gap, closed 2026-10-03 (task-245), access-control switch included;
    - an [[ADR-101 — Provider Capabilities Are Explicit]] addendum naming the click-attribution capability;
    - the ADR-040 addendum that ADR-178 says it owes.
 4. **The public-beta gate is the positioning statement**, not features (`docs/business/POSITIONING.md`). The product name (task-29) stays on hold until a candidate is legally cleared.
