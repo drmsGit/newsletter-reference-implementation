@@ -900,6 +900,21 @@ if API_DOCS == "signed_in":
     app.include_router(docs_router, dependencies=_api)
 
 
-@app.get("/")
-def root():
-    return {"message": "Newsletter Reference Architecture API"}
+# --- the schema describes the JSON plane only (task-244) ---------------------
+#
+# The Jinja UI still serves every page and form post it did (frozen by
+# `tests/test_jinja_freeze.py`), but it is not part of the contract ADR-002 and
+# ADR-170 point 4 describe, and `frontend/src/api/schema.d.ts` is generated
+# from this schema: on 2026-10-02 88 of its 198 paths were `/ui` routes the
+# React client never calls. Hidden by what the route IS rather than by which
+# router declared it, because the auth router serves `/ui/login`, `/ui/users`
+# and `/ui/roles` itself — and the frontend router's dashboard is `GET /`.
+# Done after every include, so a router added later is covered too.
+#
+# A JSON `GET /` that returned an API banner used to sit here. The frontend
+# router's dashboard is registered first and always won, so it was never
+# reachable — and the schema documented a response nobody could get.
+_JINJA_ENDPOINTS = {route.endpoint for route in frontend_router.routes}
+for _route in app.routes:
+    if getattr(_route, "path", "").startswith("/ui") or getattr(_route, "endpoint", None) in _JINJA_ENDPOINTS:
+        _route.include_in_schema = False
