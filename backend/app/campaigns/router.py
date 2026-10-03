@@ -40,6 +40,7 @@ from app.campaigns.models import (
 )
 from app.campaigns.service import (
     ChannelUnavailable,
+    ModuleDataInvalid,
     create_campaign,
     create_variant_for_campaign,
     list_campaigns,
@@ -64,6 +65,16 @@ from app.campaigns.service import (
 
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
+
+
+def _module_data_refused(error: ModuleDataInvalid) -> HTTPException:
+    """A 422 in FastAPI's own validation shape, one entry per bad field
+    (task-253). The client then reads a single kind of field error, whether
+    pydantic or the manifest refused it, and marks each field in its form."""
+    return HTTPException(status_code=422, detail=[
+        {"loc": ["body", "module_data", field], "msg": message, "type": "value_error"}
+        for field, message in error.errors
+    ])
 
 
 @router.get("/", response_model=Page[Campaign])
@@ -220,6 +231,8 @@ def create_variant_module(
             module_data=payload.module_data,
             brand_id=brand_id,
         )
+    except ModuleDataInvalid as error:
+        raise _module_data_refused(error)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
     audit.record_from_request(
@@ -469,6 +482,8 @@ def update_module_record(
             decision_slot_id=payload.decision_slot_id,
             brand_id=brand_id,
         )
+    except ModuleDataInvalid as error:
+        raise _module_data_refused(error)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
     if updated is None:

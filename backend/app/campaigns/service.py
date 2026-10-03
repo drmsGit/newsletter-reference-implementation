@@ -526,6 +526,7 @@ def create_module_for_variant(
 
     # (1) The module must belong to this channel, and not be its envelope.
     _refuse_module_type(variant.channel, module_type)
+    _refuse_module_data(variant.channel, module_type, module_data)
 
     # (2) Cardinality — ADR-161 point 7's one genuinely channel-level fact, and
     # what keeps ADR-160 point 2's promise that push is "one ModuleInstanceDB"
@@ -570,6 +571,42 @@ def create_module_for_variant(
     db.refresh(module)
 
     return to_module_instance(module)
+
+
+class ModuleDataInvalid(ValueError):
+    """Module data with fields its manifest does not declare, or values that
+    are not text (task-253). Carries every bad field at once, so a form can
+    mark each; a `ValueError`, so a caller that shows the message as a whole
+    (the Jinja forms) needs nothing new."""
+
+    def __init__(self, errors: list[tuple[str, str]]):
+        self.errors = errors
+        super().__init__("; ".join(f"{field}: {message}" for field, message in errors))
+
+
+def _refuse_module_data(channel_key: str, module_type: str, module_data: dict | None) -> None:
+    """`module_data` holds only the manifest's fields, each as text or empty.
+
+    The same rule overrides apply to their keys (`overrides/service.py`), now
+    applied to the module's own copy. What stays allowed is deliberate:
+    ADR-177 keeps `required` and lengths advisory while editing — completeness
+    is shown in the editor (Variant Editor interview 2.2) — so a missing field,
+    a None, or a long value is accepted. Every field type `fields.json`
+    declares today (text, richtext, url) is a string; a URL is not checked for
+    shape, for the same reason a length is not.
+    """
+    if not module_data:
+        return
+    manifest = get_manifest(channel_key, module_type)
+    declared = {variable.name for variable in manifest.variables} if manifest else set()
+    errors = []
+    for field, value in module_data.items():
+        if field not in declared:
+            errors.append((field, f"'{module_type}' has no field '{field}'"))
+        elif value is not None and not isinstance(value, str):
+            errors.append((field, f"'{field}' must be text, not {type(value).__name__}"))
+    if errors:
+        raise ModuleDataInvalid(errors)
 
 
 def _refuse_module_type(channel_key: str, module_type: str) -> None:
@@ -657,7 +694,9 @@ def update_module(
     module = get_module(db, module_id, brand_id=brand_id)
     if module is None:
         return None
-    _refuse_module_type(db.get(VariantDB, module.variant_id).channel, module_type)
+    channel_key = db.get(VariantDB, module.variant_id).channel
+    _refuse_module_type(channel_key, module_type)
+    _refuse_module_data(channel_key, module_type, module_data)
     _refuse_foreign_binding(
         db, module.variant_id, content_record_id, decision_slot_id, brand_id=brand_id
     )
