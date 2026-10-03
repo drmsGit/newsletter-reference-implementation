@@ -67,6 +67,10 @@ OVERRIDE_CREATED = "override.created"
 OVERRIDE_RESET = "override.reset"
 # task-256: an active override whose fields were changed in place.
 OVERRIDE_CHANGED = "override.changed"
+# task-257: catalogue edits, from the composer or the content screen, and
+# publishing a version (which is what a send then uses).
+CONTENT_UPDATED = "content.updated"
+CONTENT_PUBLISHED = "content.published"
 # task-245: every settings write, both planes, and the access-control switch.
 SETTINGS_CHANGED = "settings.changed"
 # ADR-166's administration surface (task-50). Logged lines were the only trace

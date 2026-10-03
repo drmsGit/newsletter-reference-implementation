@@ -16,6 +16,14 @@ class ContentRecordDB(Base):
     description = Column(String(500), nullable=True)
     content = Column(JSON, nullable=False, default=dict)
     status = Column(String(50), nullable=False, default="active")
+    # The version token a write states in If-Match (task-257, ADR-180 point 2),
+    # as campaigns, variants, modules and slots have. Migration 0029.
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
 
 
 class CategoryDB(Base):

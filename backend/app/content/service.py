@@ -38,7 +38,24 @@ def to_content_record(record: ContentRecordDB) -> ContentRecord:
         description=record.description,
         content=record.content or {},
         status=record.status,
+        updated_at=record.updated_at,
     )
+
+
+def publish_state(db: Session, record: ContentRecordDB) -> tuple[int | None, bool]:
+    """`(latest version number, whether the live content differs from it)`
+    (task-257). A send uses the latest version, so "differs" means the next
+    send would not carry what the record says now. Nothing published counts as
+    differing: a send would refuse it outright (`UnpublishedContentError`)."""
+    latest = (
+        db.query(ContentVersionDB)
+        .filter(ContentVersionDB.content_record_id == record.id)
+        .order_by(ContentVersionDB.version_number.desc())
+        .first()
+    )
+    if latest is None:
+        return None, True
+    return latest.version_number, (latest.content or {}) != (record.content or {})
 
 
 def get_content_record(
@@ -256,12 +273,18 @@ def update_content_record(
     description: str | None = None,
     *,
     brand_id: int,
+    expected_updated_at=None,
 ) -> ContentRecord | None:
     # `status` is intentionally not updatable here — editing a record must not be
     # able to silently reactivate it. Use set_content_status().
+    from app.campaigns.service import refuse_stale
+
     record = get_content_record(db, content_id, brand_id=brand_id)
     if record is None:
         return None
+    # The variant editor saves catalogue fields on blur (task-257): a stale
+    # write is refused rather than overwriting somebody else's newer edit.
+    refuse_stale(db, record, expected_updated_at, "content record")
     record.title = title
     record.description = description
     record.content = without_empty_presence_fields(content)

@@ -26,6 +26,23 @@ class ContentRecord(BaseModel):
     description: str | None = None
     content: dict[str, Any]
     status: str = "active"
+    # The version token a write states in If-Match (task-257).
+    updated_at: datetime | None = None
+
+
+class ContentRecordDetail(ContentRecord):
+    """One record, with whether a send would use what it says now (task-257).
+
+    A send renders the latest *published* version, not the live record
+    (`rendering.service.resolve_renderable_content`), so an edit reaches the
+    next send only once it is published. The variant editor says so beside a
+    catalogue field, with a Publish button (design pass D5).
+    """
+
+    latest_version_number: int | None = None
+    # True when the live content differs from the latest version, or when
+    # nothing has been published yet.
+    unpublished_changes: bool
 
 
 class ContentCreate(BaseModel):
@@ -93,8 +110,12 @@ class ContentVersion(BaseModel):
 
 
 class ContentVersionCreate(BaseModel):
+    """Publish a record's current content as its next version. **No author
+    field**: who published is the caller, set by the server (the task-243 rule,
+    applied here 2026-10-03). A body still sending `created_by` is not refused;
+    the value is ignored."""
+
     content_record_id: int
-    created_by: str | None = None
 
 
 class CategoryRelation(BaseModel):

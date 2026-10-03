@@ -282,10 +282,7 @@
             <p class="text-muted small">Freezing a version copies the record's current content fields (above) into an immutable snapshot for audit/rollback. Sends and snapshots resolve against the latest frozen version, not live edits.</p>
             <form method="post" action="/ui/content/{{ record.id }}/publish-version">
                 <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
-                <div class="mb-3">
-                    <label class="form-label">Created by <span class="text-muted">(optional)</span></label>
-                    <input type="text" name="created_by" class="form-control" placeholder="e.g. your name">
-                </div>
+                {# The version is recorded as published by whoever is signed in (task-257). #}
                 <button type="submit" class="btn btn-primary btn-sm">Freeze current content as new version</button>
             </form>
         </div>

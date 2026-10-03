@@ -3370,6 +3370,40 @@ export interface components {
              * @default active
              */
             status: string;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /**
+         * ContentRecordDetail
+         * @description One record, with whether a send would use what it says now (task-257).
+         *
+         *     A send renders the latest *published* version, not the live record
+         *     (`rendering.service.resolve_renderable_content`), so an edit reaches the
+         *     next send only once it is published. The variant editor says so beside a
+         *     catalogue field, with a Publish button (design pass D5).
+         */
+        ContentRecordDetail: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /** Content */
+            content: {
+                [key: string]: unknown;
+            };
+            /**
+             * Status
+             * @default active
+             */
+            status: string;
+            /** Updated At */
+            updated_at?: string | null;
+            /** Latest Version Number */
+            latest_version_number?: number | null;
+            /** Unpublished Changes */
+            unpublished_changes: boolean;
         };
         /** ContentResolutionUse */
         ContentResolutionUse: {
@@ -3444,12 +3478,16 @@ export interface components {
              */
             created_at: string;
         };
-        /** ContentVersionCreate */
+        /**
+         * ContentVersionCreate
+         * @description Publish a record's current content as its next version. **No author
+         *     field**: who published is the caller, set by the server (the task-243 rule,
+         *     applied here 2026-10-03). A body still sending `created_by` is not refused;
+         *     the value is ignored.
+         */
         ContentVersionCreate: {
             /** Content Record Id */
             content_record_id: number;
-            /** Created By */
-            created_by?: string | null;
         };
         /** CredentialOut */
         CredentialOut: {
@@ -5991,7 +6029,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ContentRecord"];
+                    "application/json": components["schemas"]["ContentRecordDetail"];
                 };
             };
             /** @description Validation Error */
@@ -6008,7 +6046,10 @@ export interface operations {
     update_content_record_by_id_content__content_id__put: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
             path: {
                 content_id: number;
             };
@@ -6076,7 +6117,10 @@ export interface operations {
     patch_content_record_content__content_id__patch: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
             path: {
                 content_id: number;
             };

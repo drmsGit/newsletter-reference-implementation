@@ -7,11 +7,17 @@ from app.audit import service as audit
 from app.auth.permissions import CONTENT_MANAGE
 from app.auth.dependencies import auth_is_enforced, request_principal, working_brand
 from app.campaigns import duplication
+# The version-token helpers the composer routes use (task-110), so a catalogue
+# edit states and checks its version the same way (task-257).
+from app.campaigns.router import IF_MATCH, _expected
+from app.campaigns.service import StaleWrite
+from app.auth.service import actor_label
 from app.pagination import Page, PageParams, page_of_list, page_params
 from app.database import get_db
 from app.content.models import (
     ContentField,
     ContentRecord,
+    ContentRecordDetail,
     ContentCreate,
     ContentDuplicate,
     ContentDuplicateTarget,
@@ -33,6 +39,7 @@ from app.content.service import (
     merge_content_fields,
     list_content_records,
     get_content_record,
+    publish_state,
     to_content_record,
     update_content_record,
     set_content_status,
@@ -121,7 +128,7 @@ def get_content_fields():
     return [ContentField(**field) for field in catalogue_fields()]
 
 
-@router.get("/{content_id}", response_model=ContentRecord)
+@router.get("/{content_id}", response_model=ContentRecordDetail)
 def get_content_record_by_id(
     content_id: int,
     db: Session = Depends(get_db),
@@ -132,15 +139,28 @@ def get_content_record_by_id(
     record = get_content_record(db, content_id, brand_id=brand_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Content record not found")
-    return to_content_record(record)
+    latest, unpublished = publish_state(db, record)
+    return {**to_content_record(record).model_dump(),
+            "latest_version_number": latest, "unpublished_changes": unpublished}
+
+
+def _record_edit(request, db, record, fields) -> None:
+    """The audit entry for a catalogue edit (task-257, ADR-153 point 4): which
+    record, and which content keys the caller wrote."""
+    audit.record_from_request(
+        request, db, audit.CONTENT_UPDATED, subject_type="content", subject_id=record.id,
+        detail={"title": record.title, "fields": sorted(fields)},
+    )
 
 
 @router.put("/{content_id}", response_model=ContentRecord)
 def update_content_record_by_id(
     content_id: int,
     payload: ContentCreate,
+    request: Request,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
+    if_match: str | None = IF_MATCH,
 ):
     """Replace a content record wholesale. **`content` is replaced, not merged.**
 
@@ -153,12 +173,16 @@ def update_content_record_by_id(
     authoritative for and merges accordingly, which is the rule
     `content.service.merge_content_fields` holds for both planes.
     """
-    record = update_content_record(
-        db, content_id, payload.title, payload.content, payload.description,
-        brand_id=brand_id,
-    )
+    try:
+        record = update_content_record(
+            db, content_id, payload.title, payload.content, payload.description,
+            brand_id=brand_id, expected_updated_at=_expected(if_match),
+        )
+    except StaleWrite as error:
+        raise HTTPException(status_code=409, detail=str(error))
     if record is None:
         raise HTTPException(status_code=404, detail="Content record not found")
+    _record_edit(request, db, record, payload.content)
     return record
 
 
@@ -166,8 +190,10 @@ def update_content_record_by_id(
 def patch_content_record(
     content_id: int,
     payload: ContentPatch,
+    request: Request,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
+    if_match: str | None = IF_MATCH,
 ):
     """Edit a content record, merging onto what is stored.
 
@@ -192,15 +218,22 @@ def patch_content_record(
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
 
-    record = update_content_record(
-        db, content_id,
-        payload.title if payload.title is not None else existing.title,
-        merged,
-        payload.description if payload.description is not None else existing.description,
-        brand_id=brand_id,
-    )
+    try:
+        record = update_content_record(
+            db, content_id,
+            payload.title if payload.title is not None else existing.title,
+            merged,
+            payload.description if payload.description is not None else existing.description,
+            brand_id=brand_id,
+            # Checked against the row as it is now, so the merge above — made
+            # from `existing` — is only written when it was made from current data.
+            expected_updated_at=_expected(if_match),
+        )
+    except StaleWrite as error:
+        raise HTTPException(status_code=409, detail=str(error))
     if record is None:
         raise HTTPException(status_code=404, detail="Content record not found")
+    _record_edit(request, db, record, payload.content)
     return record
 
 
@@ -327,17 +360,24 @@ def assign_category(
 @router.post("/versions", response_model=ContentVersion)
 def create_version(
     payload: ContentVersionCreate,
+    request: Request,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
     version = create_content_version(
         db=db,
         content_record_id=payload.content_record_id,
-        created_by=payload.created_by,
+        # Who published is the caller, never a field of the body (task-243's
+        # rule; this route took `created_by` from the body until 2026-10-03).
+        created_by=actor_label(request_principal(request)),
         brand_id=brand_id,
     )
     if version is None:
         raise HTTPException(status_code=404, detail="Content record not found")
+    audit.record_from_request(
+        request, db, audit.CONTENT_PUBLISHED, subject_type="content",
+        subject_id=payload.content_record_id, detail={"version_number": version.version_number},
+    )
     return version
 
 

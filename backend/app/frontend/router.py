@@ -2299,7 +2299,7 @@ def content_edit(
         groups=["email"] + (["push"] if "push" in channel_sections_present else []),
     )
 
-    update_content_record(
+    record = update_content_record(
         db,
         content_record_id,
         brand_id=working_brand_id(request, db),
@@ -2307,6 +2307,11 @@ def content_edit(
         description=description or None,
         content=content,
     )
+    if record is not None:
+        audit.record_from_request(
+            request, db, audit.CONTENT_UPDATED, subject_type="content", subject_id=record.id,
+            detail={"title": record.title, "fields": sorted(content)},
+        )
     return RedirectResponse(url=f"/ui/content/{content_record_id}", status_code=303)
 
 
@@ -2314,15 +2319,21 @@ def content_edit(
 def content_publish_version(
     request: Request,
     content_record_id: int,
-    created_by: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    create_content_version(
+    # Who published is the signed-in person, never a form field (task-243's
+    # rule; this form took `created_by` from the page until 2026-10-03).
+    version = create_content_version(
         db,
         content_record_id=content_record_id,
-        created_by=created_by or None,
+        created_by=actor_label(user_for_token(db, request.cookies.get(SESSION_COOKIE))),
         brand_id=working_brand_id(request, db),
     )
+    if version is not None:
+        audit.record_from_request(
+            request, db, audit.CONTENT_PUBLISHED, subject_type="content",
+            subject_id=content_record_id, detail={"version_number": version.version_number},
+        )
     return RedirectResponse(url=f"/ui/content/{content_record_id}", status_code=303)
 
 
