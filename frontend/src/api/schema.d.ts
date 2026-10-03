@@ -3429,6 +3429,16 @@ export interface components {
             /** Recipient Id */
             recipient_id?: number | null;
         };
+        /**
+         * DecisionOption
+         * @description One option of a pick-one (ADR-141 §4). `index` is what approve takes.
+         */
+        DecisionOption: {
+            /** Index */
+            index: number;
+            /** Label */
+            label: string;
+        };
         /** DecisionRequest */
         DecisionRequest: {
             /** Reason */
@@ -4149,6 +4159,13 @@ export interface components {
             may_decide: boolean;
             /** Execution Error */
             execution_error?: string | null;
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
+            /** Options */
+            options?: components["schemas"]["DecisionOption"][] | null;
         };
         /**
          * PendingActionRow

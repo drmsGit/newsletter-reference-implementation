@@ -50,10 +50,10 @@ const ANY = '__any__'
  *
  * **The filters live in the URL**, so a narrowed inbox survives a reload, the
  * back button undoes a filter, and a link to it can be shared.
+
  *
- * **Read-only for now.** Approve and reject are writes and land with the rest
- * of the write surface; showing the buttons before they work would be worse
- * than not showing them.
+ * Deciding happens on a request's own screen (`ApprovalDetail`), where what it
+ * would do is shown in full first.
  */
 export default function Approvals() {
   const [params, setParams] = useSearchParams()

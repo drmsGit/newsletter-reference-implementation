@@ -54,6 +54,8 @@ describe('an approval in detail', () => {
           rows: [{ label: 'Variant', value: 'Spring launch / 3' }],
           may_decide: false,
           blocked_reason: 'You requested this yourself.',
+          warnings: [],
+          options: null,
         }),
     })
 
@@ -138,5 +140,129 @@ describe('narrowing and paging the inbox', () => {
     fireEvent.click(await screen.findByRole('option', { name: 'Acme Agency (integration)' }))
     await waitFor(() => expect(lastListQuery(fetchMock).get('requested_by_id')).toBe('5'))
     expect(lastListQuery(fetchMock).get('offset')).toBe('0')
+  })
+})
+
+
+describe('deciding a request', () => {
+  const PENDING = {
+    ...A_ROW,
+    status: 'pending',
+    rows: [{ label: 'Send', value: 'Spring launch' }],
+    may_decide: true,
+    blocked_reason: null,
+    describe_error: null,
+    warnings: [] as string[],
+    options: null as null | { index: number; label: string }[],
+  }
+
+  function renderDetail() {
+    return renderWithProviders(
+      <Routes>
+        <Route path="/approvals/:id" element={<ApprovalDetail />} />
+      </Routes>,
+      { route: '/approvals/7' },
+    )
+  }
+
+  function bodies(fetchMock: ReturnType<typeof stubFetch>, path: string) {
+    return Promise.all(
+      fetchMock.mock.calls
+        .map(([input]) => input as Request)
+        .filter((r) => r.method === 'POST' && new URL(r.url).pathname === path)
+        .map((r) => r.clone().json()),
+    )
+  }
+
+  it('approves in one press, says what happened, and re-reads the request', async () => {
+    let reads = 0
+    const fetchMock = stubFetch({
+      'GET /approvals/7': () => {
+        reads += 1
+        return jsonResponse(PENDING)
+      },
+      'POST /approvals/7/approve': () =>
+        jsonResponse({ ok: true, message: 'Approved and executed.', status: 'approved' }),
+    })
+    renderDetail()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Approve and run' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Approved and executed.')
+    // No reason typed: sent as nothing, never as an empty string to store.
+    expect(await bodies(fetchMock, '/approvals/7/approve')).toEqual([
+      { reason: null, choice_index: null },
+    ])
+    await waitFor(() => expect(reads).toBe(2))
+  })
+
+  it('rejects with the reason the person typed', async () => {
+    const fetchMock = stubFetch({
+      'GET /approvals/7': () => jsonResponse(PENDING),
+      'POST /approvals/7/reject': () =>
+        jsonResponse({ ok: true, message: 'Rejected.', status: 'rejected' }),
+    })
+    renderDetail()
+
+    fireEvent.change(await screen.findByLabelText(/Reason/), {
+      target: { value: '  Wrong audience  ' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Reject' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Rejected.')
+    expect(await bodies(fetchMock, '/approvals/7/reject')).toEqual([
+      { reason: 'Wrong audience', choice_index: null },
+    ])
+  })
+
+  it('needs an option chosen before a pick-one can be approved, and sends its index', async () => {
+    const fetchMock = stubFetch({
+      'GET /approvals/7': () =>
+        jsonResponse({
+          ...PENDING,
+          options: [
+            { index: 0, label: 'Spring is here' },
+            { index: 1, label: 'Go now' },
+          ],
+        }),
+      'POST /approvals/7/approve': () =>
+        jsonResponse({ ok: true, message: 'Approved and executed.', status: 'approved' }),
+    })
+    renderDetail()
+
+    const approve = await screen.findByRole('button', { name: 'Approve and run' })
+    expect(approve).toBeDisabled()
+    fireEvent.click(screen.getByRole('radio', { name: 'Go now' }))
+    expect(approve).not.toBeDisabled()
+    fireEvent.click(approve)
+    await screen.findByRole('status')
+    expect(await bodies(fetchMock, '/approvals/7/approve')).toEqual([
+      { reason: null, choice_index: 1 },
+    ])
+  })
+
+  it('can still reject what the action says it cannot run, but never approve it', async () => {
+    stubFetch({
+      'GET /approvals/7': () =>
+        jsonResponse({ ...PENDING, blocked_reason: 'The send was already fired.' }),
+    })
+    renderDetail()
+    expect(await screen.findByRole('button', { name: 'Approve and run' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Reject' })).not.toBeDisabled()
+  })
+
+  it('shows the warnings, and offers no decision once a request is decided', async () => {
+    stubFetch({
+      'GET /approvals/7': () =>
+        jsonResponse({
+          ...PENDING,
+          status: 'rejected',
+          warnings: ['The audience changed since this was requested.'],
+          decision_reason: 'Wrong audience',
+        }),
+    })
+    renderDetail()
+    expect(await screen.findByText('The audience changed since this was requested.'))
+      .toBeInTheDocument()
+    expect(screen.getByText('Wrong audience')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reject' })).not.toBeInTheDocument()
   })
 })

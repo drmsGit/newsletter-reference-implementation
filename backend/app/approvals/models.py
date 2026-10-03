@@ -45,6 +45,13 @@ class DescriptionRow(BaseModel):
     value: str
 
 
+class DecisionOption(BaseModel):
+    """One option of a pick-one (ADR-141 §4). `index` is what approve takes."""
+
+    index: int
+    label: str
+
+
 class PendingActionDetail(PendingActionRow):
     """The review surface: what the frozen line said, and what is true now.
 
@@ -69,6 +76,12 @@ class PendingActionDetail(PendingActionRow):
     # Why a held action failed to run, when it did: on the detail only, not on
     # every inbox row. The approver already sees this text when they decide.
     execution_error: str | None = None
+    # From the action's live description: what should give the approver pause
+    # (rendered, never enforced), and the options of a pick-one, without which
+    # an action that refuses to run without a choice could not be approved
+    # from the JSON plane at all.
+    warnings: list[str] = []
+    options: list[DecisionOption] | None = None
 
 
 class FilterAction(BaseModel):

@@ -333,3 +333,39 @@ export function usePublishPrompt() {
     ),
   )
 }
+
+/**
+ * Decide a held action. Approving RUNS it (ADR-142 §4) -- for a held send,
+ * that fires the send -- which the screen says on the button.
+ *
+ * A reason is optional on both, never required (Manager Workflow Q1.5: a
+ * required field produces `---`, not reasons). A pick-one passes the index of
+ * the chosen option; the action refuses without one rather than defaulting.
+ *
+ * Re-reads everything under `keys.approvals`: the detail (its status changed),
+ * every filtered inbox view (the request left "waiting") and the filter
+ * options.
+ */
+export function useDecide(id: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      verdict,
+      reason,
+      choice,
+    }: {
+      verdict: 'approve' | 'reject'
+      reason?: string
+      choice?: number
+    }) => {
+      const body = { reason: reason?.trim() || null, choice_index: choice ?? null }
+      const path = { params: { path: { pending_id: id } }, body }
+      return read(
+        verdict === 'approve'
+          ? api.POST('/approvals/{pending_id}/approve', path)
+          : api.POST('/approvals/{pending_id}/reject', path),
+      )
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.approvals }),
+  })
+}

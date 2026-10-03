@@ -23,6 +23,7 @@ from app.approvals import service as approvals
 from app.approvals.actions.registry import get_action, get_action_module
 from app.approvals.models import (
     ApprovalFilterOptions,
+    DecisionOption,
     DecisionRequest, DecisionResult, DescriptionRow, PendingActionDetail,
     PendingActionRow, ProcessExpiredResult,
 )
@@ -137,6 +138,8 @@ def get_pending(
     meta = get_action(row.action_key)
     module = get_action_module(row.action_key)
     rows: list[DescriptionRow] = []
+    warnings: list[str] = []
+    options: list[DecisionOption] | None = None
     blocked_reason = None
     describe_error = None
     if module is not None and hasattr(module, "describe"):
@@ -148,6 +151,12 @@ def get_pending(
             description = module.describe(db, row.payload or {}, brand_id=row.brand_id)
             rows = [DescriptionRow(label=k, value=str(v)) for k, v in description.rows]
             blocked_reason = description.blocked_reason
+            warnings = list(description.warnings or [])
+            if description.options:
+                options = [
+                    DecisionOption(index=i, label=str(o.get("label", f"Option {i + 1}")))
+                    for i, o in enumerate(description.options)
+                ]
         except Exception as failure:
             # A description that raises must not hide the request: the reviewer
             # still needs to see something is waiting, and still needs to be
@@ -163,6 +172,8 @@ def get_pending(
         describe_error=describe_error,
         may_decide=bool(meta) and approvals.may_decide(db, user, meta, row),
         execution_error=row.execution_error,
+        warnings=warnings,
+        options=options,
     )
 
 

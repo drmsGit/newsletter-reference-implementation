@@ -189,3 +189,45 @@ def test_one_recipient_can_be_read_at_all():
         assert response.json()["external_id"] == recipient.external_id
     finally:
         db.close()
+
+
+def test_a_held_actions_detail_carries_its_warnings_and_options(monkeypatch):
+    """The approver must see what the action's own description says: anything
+    that should give them pause, and — for ADR-141 §4's pick-one — the options,
+    each with the index approve takes. Without the options the SPA could not
+    approve the AI subject action at all: it refuses without a choice."""
+    from types import SimpleNamespace
+
+    from app.approvals import router as approvals_router
+    from app.approvals.actions.base import ActionDescription
+
+    fake = SimpleNamespace(describe=lambda db, payload, brand_id=None: ActionDescription(
+        summary="pick one", rows=[("Variant", "Spring")],
+        warnings=["The audience changed since this was requested."],
+        options=[{"label": "Spring is here — Three trips", "subject": "Spring is here"},
+                 {"label": "Go now — Last seats", "subject": "Go now"}],
+    ))
+    monkeypatch.setattr(approvals_router, "get_action_module", lambda key: fake)
+
+    db = SessionLocal()
+    brand = auth.ensure_default_brand(db)
+    now = datetime.now(timezone.utc)
+    row = PendingActionDB(
+        action_key="exposure.pick", payload={}, summary="pick", requested_by_type="user",
+        requested_by_id=1, subject_type="exposure", subject_id=31_000, brand_id=brand.id,
+        status="pending", expires_at=now + timedelta(hours=1),
+    )
+    db.add(row)
+    db.commit()
+    try:
+        with machine([VIEW]) as headers:
+            body = client.get(f"/approvals/{row.id}", headers=headers).json()
+        assert body["warnings"] == ["The audience changed since this was requested."]
+        assert body["options"] == [
+            {"index": 0, "label": "Spring is here — Three trips"},
+            {"index": 1, "label": "Go now — Last seats"},
+        ]
+    finally:
+        db.query(PendingActionDB).filter(PendingActionDB.id == row.id).delete()
+        db.commit()
+        db.close()
