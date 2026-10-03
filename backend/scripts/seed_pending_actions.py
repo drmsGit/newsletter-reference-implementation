@@ -24,8 +24,14 @@ Two consequences worth knowing before clicking:
   * **Approving a seeded request really fires that send.** The demo instances
     below use the mock provider, so nothing leaves the building — but the send
     instance's status does change, and that is the point.
-  * The requester is recorded as `integration #0`, which is a stand-in. Once
-    the guard rewiring lands, a real machine principal fills that in.
+  * **The actors are real** (2026-10-03). Requests come from a named demo
+    integration, "Acme Agency (demo)", created through the integrations
+    service and holding `sends.execute` on the brand — the grant a real
+    integration needs before it may even ask for a held send (launch gate 3).
+    It is given no key. The rejection is decided by a real person, the first
+    active admin. Until then every request read `integration #0` (a stand-in
+    from before machine principals existed) and the rejection "decided by:
+    user", with nobody behind it.
 """
 
 import sys
@@ -33,8 +39,6 @@ from datetime import timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from sqlalchemy import text  # noqa: E402
 
 from app.approvals import service as approvals  # noqa: E402
 from app.approvals.actions.send_fire import summarise  # noqa: E402
@@ -46,14 +50,53 @@ from app.delivery.db_models import SendInstanceDB  # noqa: E402
 
 ACTION = "send.fire_send_instance"
 SEED_MARK = "seed"
+DEMO_INTEGRATION = "Acme Agency (demo)"
+
+
+def _demo_integration(db, brand_id: int):
+    """The named integration the demo requests come from, made once."""
+    from app.auth import integrations as ints
+    from app.auth.db_models import IntegrationDB
+    from app.auth.permissions import SENDS_EXECUTE
+
+    integration = db.query(IntegrationDB).filter(IntegrationDB.name == DEMO_INTEGRATION).first()
+    if integration is None:
+        integration = ints.create_integration(
+            db, DEMO_INTEGRATION,
+            description="Raises the approval inbox's demo requests (seed_pending_actions.py).",
+        )
+    ints.grant(db, integration.id, SENDS_EXECUTE, brand_id)
+    return integration
+
+
+def _deciding_person(db):
+    """A real person to decide with: the first active admin, or None."""
+    from app.auth.db_models import RoleAssignmentDB, RoleDB, UserDB
+    from app.auth.permissions import ADMIN
+
+    return (
+        db.query(UserDB)
+        .join(RoleAssignmentDB, RoleAssignmentDB.user_id == UserDB.id)
+        .join(RoleDB, RoleDB.id == RoleAssignmentDB.role_id)
+        .filter(RoleDB.key == ADMIN, UserDB.is_active.is_(True))
+        .order_by(UserDB.id.asc())
+        .first()
+    )
 
 
 def _seed_ids(db) -> list[int]:
+    """This seed's rows: requested by the demo integration — or, from before
+    2026-10-03, by the `integration #0` stand-in, so old rows clear too."""
+    from app.auth.db_models import IntegrationDB
+
+    demo = db.query(IntegrationDB.id).filter(IntegrationDB.name == DEMO_INTEGRATION).scalar()
+    requesters = [0] + ([demo] if demo is not None else [])
     return [
-        row[0] for row in db.execute(text(
-            "SELECT id FROM pending_actions WHERE action_key = :k "
-            "AND requested_by_type = 'integration' AND requested_by_id = 0"),
-            {"k": ACTION}).all()
+        row.id for row in db.query(PendingActionDB.id).filter(
+            PendingActionDB.action_key == ACTION,
+            PendingActionDB.requested_by_type == "integration",
+            PendingActionDB.requested_by_id.in_(requesters),
+        )
     ]
 
 
@@ -71,14 +114,15 @@ def clear(db) -> int:
     return len(ids)
 
 
-def _request(db, send_instance, brand_id, ttl_seconds=None):
+def _request(db, send_instance, brand_id, requester_id: int, ttl_seconds=None):
     return approvals.request_approval(
         db, ACTION,
         payload={"send_instance_id": send_instance.id},
-        summary=summarise(db, send_instance.id),
+        # `summarise` has taken the brand since ADR-172; this call missed it,
+        # so the seed raised TypeError before writing anything (found 2026-10-03).
+        summary=summarise(db, send_instance.id, brand_id=brand_id),
         requested_by_type="integration",
-        # A stand-in until a real machine principal raises these.
-        requested_by_id=0,
+        requested_by_id=requester_id,
         brand_id=brand_id,
         subject_id=send_instance.id,
         ttl_seconds=ttl_seconds,
@@ -103,29 +147,32 @@ def seed(db) -> None:
     others = [i for i in instances if i.status != "draft"]
 
     made: list[tuple[str, PendingActionDB]] = []
+    requester = _demo_integration(db, brand_id)
+    person = _deciding_person(db)
 
     # 1. Waiting, and genuinely approvable.
     if drafts:
-        made.append(("waiting (approvable)", _request(db, drafts[0], brand_id)))
+        made.append(("waiting (approvable)", _request(db, drafts[0], brand_id, requester.id)))
 
     # 2. Waiting, but the send has already gone out — the case where `describe()`
     #    warns you and approving would be refused. Worth seeing on the screen.
     if others:
         made.append(("waiting (already sent — shows a warning)",
-                     _request(db, others[0], brand_id)))
+                     _request(db, others[0], brand_id, requester.id)))
 
     # 3. Rejected, through the real path so the history reads correctly.
     if len(others) > 1:
-        rejected = _request(db, others[1], brand_id)
+        rejected = _request(db, others[1], brand_id, requester.id)
         approvals.reject(
-            db, rejected.id, approver_type="user", approver_id=None,
+            db, rejected.id, approver_type="user",
+            approver_id=person.id if person else None,
             reason="Not this week — the offer changed.",
         )
         made.append(("rejected", rejected))
 
     # 4. Expired, also for real: requested with a one-second life, then swept.
     if len(others) > 2:
-        lapsed = _request(db, others[2], brand_id, ttl_seconds=1)
+        lapsed = _request(db, others[2], brand_id, requester.id, ttl_seconds=1)
         lapsed.expires_at = approvals.now() - timedelta(minutes=5)
         db.commit()
         approvals.expire_due_pending_actions(db)
