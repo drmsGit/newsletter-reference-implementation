@@ -72,6 +72,8 @@ class Settings(BaseModel):
     """Everything the settings screen shows. Readable with `view`."""
 
     signals: SignalTuning
+    # The code defaults (ADR-132), so a screen can say what a blank means.
+    signal_defaults: SignalTuning
     known_contribution_types: list[str]
     max_send_recipients: int
     channels: list[ChannelSetting]

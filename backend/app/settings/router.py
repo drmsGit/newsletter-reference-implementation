@@ -87,6 +87,9 @@ def read_settings(request: Request, db: Session = Depends(get_db)):
         signals=SignalTuning(
             weights=service.get_signal_weights(db), half_lives=service.get_half_lives(db),
         ),
+        signal_defaults=SignalTuning(
+            weights=dict(service.CONTRIBUTION_WEIGHTS), half_lives=dict(service.HALF_LIFE_DAYS),
+        ),
         known_contribution_types=sorted(service.known_contribution_types()),
         max_send_recipients=service.get_max_send_recipients(db),
         channels=[ChannelSetting(name=c.name, available=c.name in enabled) for c in list_channels()],

@@ -8,6 +8,7 @@ afterEach(() => vi.unstubAllGlobals())
 
 const SETTINGS = {
   signals: { weights: { click: 500, open: 0 }, half_lives: { click: 45, open: 45 } },
+  signal_defaults: { weights: { click: 500, open: 0 }, half_lives: { click: 45, open: 45 } },
   known_contribution_types: ['click', 'open'],
   max_send_recipients: 200,
   channels: [
@@ -162,5 +163,79 @@ describe('editing settings', () => {
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
     // "the default" is sent as null, which points the task back at the deployment default.
     expect(await sentBodies(fetchMock, 'PUT')).toEqual([{ model: null }])
+  })
+})
+
+describe('signal tuning and prompts', () => {
+  const MANAGER = { ...SETTINGS, may_manage: true, may_configure_ai: false }
+  const AI = { ...SETTINGS, may_manage: true, may_configure_ai: true }
+
+  function puts(fetchMock: ReturnType<typeof stubFetch>, method: string) {
+    return Promise.all(
+      fetchMock.mock.calls
+        .map(([input]) => input as Request)
+        .filter((r) => r.method === method)
+        .map((r) => r.clone().json()),
+    )
+  }
+
+  it('says what each default is, and leaves a blank field out so it falls back', async () => {
+    const fetchMock = stubFetch({
+      'GET /settings': () => jsonResponse(MANAGER),
+      'PUT /settings/signals': () => jsonResponse(SETTINGS.signals),
+    })
+    renderWithProviders(<Settings />)
+
+    const clickWeight = await screen.findByLabelText('Weight for click (default 500)')
+    fireEvent.change(clickWeight, { target: { value: '400' } })
+    fireEvent.change(screen.getByLabelText('Weight for open (default 0)'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save signal tuning' }))
+
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+    expect(await puts(fetchMock, 'PUT')).toEqual([
+      { weights: { click: 400 }, half_lives: { click: 45, open: 45 } },
+    ])
+  })
+
+  it('does not send a value that is not a number', async () => {
+    const fetchMock = stubFetch({ 'GET /settings': () => jsonResponse(MANAGER) })
+    renderWithProviders(<Settings />)
+
+    fireEvent.change(await screen.findByLabelText('Half-life in days for open (default 45)'), {
+      target: { value: 'soon' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save signal tuning' }))
+
+    expect(await screen.findByText('Not a number: open.')).toBeInTheDocument()
+    expect(fetchMock.mock.calls.filter(([r]) => (r as Request).method === 'PUT')).toHaveLength(0)
+  })
+
+  it('offers publishing only to someone who may also run AI', async () => {
+    stubFetch({ 'GET /settings': () => jsonResponse(MANAGER) })
+    renderWithProviders(<Settings />)
+    await screen.findByRole('button', { name: 'Save signal tuning' })
+    expect(screen.queryByRole('button', { name: /Publish as version/ })).not.toBeInTheDocument()
+  })
+
+  it('publishes a NEW version, named before and confirmed after by the server', async () => {
+    /**
+     * ADR-140 §3: a prompt is never edited, only superseded. The button names
+     * the version it will create; the confirmation uses the server's number.
+     */
+    const fetchMock = stubFetch({
+      'GET /settings': () => jsonResponse(AI),
+      'POST /settings/ai/tasks/subject_preheader/prompt': () =>
+        jsonResponse({ version: 3, body: 'Shorter.', is_published: true, created_at: '2026-10-03T00:00:00Z' }, 201),
+    })
+    renderWithProviders(<Settings />)
+
+    fireEvent.change(await screen.findByLabelText('Prompt for Subject & preheader'), {
+      target: { value: 'Shorter.' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Publish as version 3' }))
+
+    expect(await screen.findByText('Published as version 3; it is now the live prompt.'))
+      .toBeInTheDocument()
+    expect(await puts(fetchMock, 'POST')).toEqual([{ body: 'Shorter.' }])
   })
 })

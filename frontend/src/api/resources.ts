@@ -238,7 +238,7 @@ export function useSettings() {
  * default -- and the screen should show what was kept, not what was typed.
  * Every one of these is audited server-side (task-245).
  */
-function useSettingsWrite<V>(write: (value: V) => Promise<unknown>) {
+function useSettingsWrite<V, R>(write: (value: V) => Promise<R>) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: write,
@@ -283,6 +283,29 @@ export function useSetTaskModel() {
       api.PUT('/settings/ai/tasks/{task_key}/model', {
         params: { path: { task_key: task } },
         body: { model },
+      }),
+    ),
+  )
+}
+
+/** Replace the signal tuning. A type left out goes back to its code default. */
+export function useSaveSignals() {
+  return useSettingsWrite(
+    (tuning: { weights: Record<string, number>; half_lives: Record<string, number> }) =>
+      read(api.PUT('/settings/signals', { body: tuning })),
+  )
+}
+
+/**
+ * Publish a new prompt version (ADR-140 §3): never an edit, always a new
+ * immutable version that becomes the live one. Needs `ai.run` as well.
+ */
+export function usePublishPrompt() {
+  return useSettingsWrite(({ task, body }: { task: string; body: string }) =>
+    read(
+      api.POST('/settings/ai/tasks/{task_key}/prompt', {
+        params: { path: { task_key: task } },
+        body: { body },
       }),
     ),
   )

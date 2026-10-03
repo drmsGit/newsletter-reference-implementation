@@ -329,8 +329,14 @@ def save_signal_tuning(
     bad = sorted(t for t, days in half_lives.items() if not days > 0)
     if bad:
         raise SettingsInvalid(f"A half-life must be more than 0 days ({', '.join(bad)}).")
-    set_config(db, SIGNAL_WEIGHTS, {t: float(w) for t, w in weights.items()})
-    set_config(db, HALF_LIFE_DAYS_KEY, {t: float(d) for t, d in half_lives.items()})
+    # **A value equal to its code default is not an override** (2026-10-03).
+    # Storing it would pin the default: a later change to the code default
+    # would never reach this deployment, and nothing would say so. Both
+    # screens send their whole table, so without this every save pinned all.
+    set_config(db, SIGNAL_WEIGHTS, {
+        t: float(w) for t, w in weights.items() if float(w) != CONTRIBUTION_WEIGHTS.get(t)})
+    set_config(db, HALF_LIFE_DAYS_KEY, {
+        t: float(d) for t, d in half_lives.items() if float(d) != HALF_LIFE_DAYS.get(t)})
 
 
 def save_max_send_recipients(db: Session, cap: int) -> None:

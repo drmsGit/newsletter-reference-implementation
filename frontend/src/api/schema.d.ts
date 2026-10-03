@@ -7193,6 +7193,7 @@ export interface components {
          */
         Settings: {
             signals: components["schemas"]["SignalTuning"];
+            signal_defaults: components["schemas"]["SignalTuning"];
             /** Known Contribution Types */
             known_contribution_types: string[];
             /** Max Send Recipients */

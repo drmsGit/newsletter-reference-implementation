@@ -442,3 +442,30 @@ class TestTheScreenIsToldWhatThisCallerMayChange:
         with machine([VIEW, SETTINGS_MANAGE, AI_RUN]) as headers:
             body = client.get("/settings", headers=headers).json()
         assert (body["may_manage"], body["may_configure_ai"]) == (False, False)
+
+
+class TestSignalTuningKeepsDefaultsLive:
+    """A value equal to its code default is not stored as an override
+    (2026-10-03). Storing it would pin the default: a later change to the code
+    default would never reach this deployment, and nothing on screen would say
+    so. The screen shows the defaults, so a person can see what blank means."""
+
+    def test_the_defaults_are_readable(self):
+        from app.settings.service import CONTRIBUTION_WEIGHTS, HALF_LIFE_DAYS
+
+        with machine([VIEW]) as headers:
+            body = client.get("/settings", headers=headers).json()
+        assert body["signal_defaults"]["weights"] == CONTRIBUTION_WEIGHTS
+        assert body["signal_defaults"]["half_lives"] == HALF_LIFE_DAYS
+
+    def test_saving_the_defaults_stores_no_override(self, db):
+        from app.settings.service import CONTRIBUTION_WEIGHTS, HALF_LIFE_DAYS
+
+        any_type = sorted(CONTRIBUTION_WEIGHTS)[0]
+        weights = {**CONTRIBUTION_WEIGHTS, any_type: CONTRIBUTION_WEIGHTS[any_type] + 1}
+        settings.save_signal_tuning(db, weights, dict(HALF_LIFE_DAYS))
+        db.expire_all()
+        assert settings.get_config(db, settings.SIGNAL_WEIGHTS) == {
+            any_type: CONTRIBUTION_WEIGHTS[any_type] + 1}, "a default was pinned as an override"
+        assert settings.get_config(db, settings.HALF_LIFE_DAYS_KEY) == {}
+        assert settings.get_signal_weights(db)[any_type] == CONTRIBUTION_WEIGHTS[any_type] + 1

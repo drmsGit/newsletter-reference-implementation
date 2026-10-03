@@ -8,11 +8,14 @@ import {
   Popover,
   Select,
   SelectValue,
+  TextArea,
   TextField,
 } from 'react-aria-components'
 
 import {
+  usePublishPrompt,
   useSaveAiProvider,
+  useSaveSignals,
   useSaveSendCap,
   useSaveSpendCap,
   useSetTaskApproval,
@@ -40,8 +43,8 @@ import { formatDate } from './Campaigns'
  * that saved as you typed would make an accident one keystroke long. No setting
  * is approvable (ADR-142's addendum) and every change is audited (task-245).
  *
- * Not editable here yet, by decision: signal tuning and prompt publishing come
- * in their own pass. Channels and delivery providers have no write route.
+ * Channels and delivery providers are shown, not edited: there is no write
+ * route for either.
  */
 export default function Settings() {
   const settings = useSettings()
@@ -305,6 +308,7 @@ function Task({ s, task }: { s: SettingsView; task: SettingsView['ai_tasks'][num
             : 'the built-in default (never published)'}
         </dd>
       </dl>
+      {s.may_configure_ai && <PromptEditor task={task} />}
       <details>
         <summary>The live prompt</summary>
         <pre style={{ whiteSpace: 'pre-wrap' }}>{task.prompt_body}</pre>
@@ -316,6 +320,108 @@ function Task({ s, task }: { s: SettingsView; task: SettingsView['ai_tasks'][num
         )}
       </details>
     </section>
+  )
+}
+
+/** A decimal number, comma or point; negative allowed (an unsubscribe weighs
+ * against). Blank is not a number here -- it means "the default". */
+function parseNumber(raw: string): number | null {
+  const trimmed = raw.trim().replace(',', '.')
+  return trimmed !== '' && !Number.isNaN(Number(trimmed)) ? Number(trimmed) : null
+}
+
+/**
+ * Weights and half-lives, one row per contribution type (ADR-132).
+ *
+ * **A blank field means the code default**, and each field says what that is:
+ * the save replaces the whole table, so a type left out falls back. The server
+ * stores only values that differ from the default, so saving the table
+ * unchanged pins nothing. Whether a half-life is valid (more than 0 days) is
+ * the server's rule, and its reason is shown when it refuses one.
+ */
+function SignalsEditor({ s }: { s: SettingsView }) {
+  const save = useSaveSignals()
+  const types = s.known_contribution_types
+  const [weights, setWeights] = useState(() =>
+    Object.fromEntries(types.map((t) => [t, String(s.signals.weights[t] ?? '')])),
+  )
+  const [halves, setHalves] = useState(() =>
+    Object.fromEntries(types.map((t) => [t, String(s.signals.half_lives[t] ?? '')])),
+  )
+  const [invalid, setInvalid] = useState<string[]>([])
+
+  return (
+    <Form
+      label="Save signal tuning"
+      saving={save.isPending}
+      onSave={() => {
+        const bad: string[] = []
+        const pick = (values: Record<string, string>) =>
+          Object.fromEntries(
+            types.flatMap((t) => {
+              if (values[t].trim() === '') return []
+              const n = parseNumber(values[t])
+              if (n === null) bad.push(t)
+              return n === null ? [] : [[t, n]]
+            }),
+          )
+        const tuning = { weights: pick(weights), half_lives: pick(halves) }
+        setInvalid([...new Set(bad)])
+        if (bad.length === 0) save.mutate(tuning)
+      }}
+    >
+      {types.map((t) => (
+        <div key={t}>
+          <NumberField
+            label={`Weight for ${t} (default ${s.signal_defaults.weights[t] ?? '—'})`}
+            value={weights[t]}
+            onChange={(v) => setWeights({ ...weights, [t]: v })}
+          />
+          <NumberField
+            label={`Half-life in days for ${t} (default ${s.signal_defaults.half_lives[t] ?? '—'})`}
+            value={halves[t]}
+            onChange={(v) => setHalves({ ...halves, [t]: v })}
+          />
+        </div>
+      ))}
+      {invalid.length > 0 && <p role="alert">Not a number: {invalid.join(', ')}.</p>}
+      <Outcome write={save} />
+    </Form>
+  )
+}
+
+/**
+ * Publish a new version of one task's prompt (ADR-140 §3).
+ *
+ * **Never an edit.** Every publish is a new, immutable version that becomes
+ * the live one -- an audit entry naming version 3 must keep meaning the text
+ * version 3 had. Going back means publishing the old text again. The button
+ * names the version it will create, so nobody believes they are correcting
+ * the current one in place.
+ */
+function PromptEditor({ task }: { task: SettingsView['ai_tasks'][number] }) {
+  const publish = usePublishPrompt()
+  const [body, setBody] = useState(task.prompt_body)
+  const next = Math.max(0, ...task.versions.map((v) => v.version)) + 1
+
+  return (
+    <Form
+      label={`Publish as version ${next}`}
+      saving={publish.isPending}
+      onSave={() => publish.mutate({ task: task.key, body })}
+    >
+      <TextField value={body} onChange={setBody}>
+        <Label>Prompt for {task.label}</Label>
+        <TextArea rows={10} style={{ width: '100%' }} />
+      </TextField>
+      {publish.isSuccess ? (
+        <p role="status">
+          Published as version {publish.data.version}; it is now the live prompt.
+        </p>
+      ) : (
+        <Outcome write={publish} />
+      )}
+    </Form>
   )
 }
 
@@ -364,16 +470,20 @@ function Sections({ s }: { s: SettingsView }) {
 
       <section aria-labelledby="signals">
         <h2 id="signals">Signals</h2>
-        <DataTable
-          label="Signal weights and half-lives"
-          columns={[
-            { key: 'type', header: 'Contribution', isRowHeader: true, render: (r) => r.type },
-            { key: 'weight', header: 'Weight', render: (r) => r.weight ?? '—' },
-            { key: 'half', header: 'Half-life (days)', render: (r) => r.halfLife ?? '—' },
-          ]}
-          items={signalRows}
-          emptyMessage="No contribution types are known."
-        />
+        {s.may_manage ? (
+          <SignalsEditor s={s} />
+        ) : (
+          <DataTable
+            label="Signal weights and half-lives"
+            columns={[
+              { key: 'type', header: 'Contribution', isRowHeader: true, render: (r) => r.type },
+              { key: 'weight', header: 'Weight', render: (r) => r.weight ?? '—' },
+              { key: 'half', header: 'Half-life (days)', render: (r) => r.halfLife ?? '—' },
+            ]}
+            items={signalRows}
+            emptyMessage="No contribution types are known."
+          />
+        )}
       </section>
 
       <section aria-labelledby="ai">
