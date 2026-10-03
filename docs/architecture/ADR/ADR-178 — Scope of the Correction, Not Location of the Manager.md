@@ -1,6 +1,6 @@
 ---
 type: adr
-status: accepted
+status: superseded by ADR-186
 topic:
   - architecture
   - overrides
@@ -20,7 +20,7 @@ depends_on:
 ---
 
 ## Status
-Accepted
+Superseded by ADR-186
 
 ## Context
 
