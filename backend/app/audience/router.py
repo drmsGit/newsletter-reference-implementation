@@ -51,6 +51,7 @@ def list_groups(
         AudienceGroupListed(
             id=row["group"].id, name=row["group"].name, description=row["group"].description,
             created_at=row["group"].created_at, updated_at=row["group"].updated_at,
+            source_campaign_id=row["group"].source_campaign_id,
             pinned_count=row["pinned_count"], recipient_count=row["recipient_count"],
             count_channel=row["count_channel"],
         )

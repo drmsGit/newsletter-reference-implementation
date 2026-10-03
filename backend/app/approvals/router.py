@@ -50,6 +50,11 @@ def _row(row) -> PendingActionRow:
         created_at=row.created_at,
         expires_at=row.expires_at,
         decided_at=row.decided_at,
+        subject_type=row.subject_type,
+        subject_id=row.subject_id,
+        decided_by_type=row.decided_by_type,
+        decided_by_id=row.decided_by_id,
+        decision_reason=row.decision_reason,
     )
 
 
@@ -121,6 +126,7 @@ def get_pending(
         blocked_reason=blocked_reason,
         describe_error=describe_error,
         may_decide=bool(meta) and approvals.may_decide(db, user, meta, row),
+        execution_error=row.execution_error,
     )
 
 

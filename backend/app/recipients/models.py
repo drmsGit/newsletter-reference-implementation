@@ -22,6 +22,10 @@ class RecipientAddress(BaseModel):
     channel: str
     value: str
     status: str
+    # Which of a channel's addresses is used, and whether it was ever verified
+    # (task-208). Neither is personal data; `value` beside them already is.
+    is_primary: bool = False
+    verified_at: datetime | None = None
 
 
 class ConsentCell(BaseModel):
@@ -190,6 +194,10 @@ class RecipientDelivery(BaseModel):
     send_instance_name: str
     status: str
     channel: str
+    # The purpose it was sent for, and why it was NOT sent when it was not
+    # (task-208): ADR-163 point 8's "why didn't this person get it".
+    purpose: str | None = None
+    exclusion_reason: str | None = None
     provider: str | None = None
     provider_message_id: str | None = None
     sent_at: datetime | None = None

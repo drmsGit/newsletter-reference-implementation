@@ -17,6 +17,10 @@ class DeliveryExecution(BaseModel):
     recipient_external_id: str | None = None
     exclusion_reason: str | None = None
     sent_at: datetime | None = None
+    # Which channel and purpose this delivery was (task-208): without them a
+    # client cannot tell an email delivery from a push one. Both NOT NULL.
+    channel: str | None = None
+    purpose: str | None = None
 
 
 class DeliveryExecutionCreate(BaseModel):

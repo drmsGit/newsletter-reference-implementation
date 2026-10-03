@@ -2367,6 +2367,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Source Campaign Id */
+            source_campaign_id?: number | null;
         };
         /** AudienceGroupCreate */
         AudienceGroupCreate: {
@@ -2401,6 +2403,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Source Campaign Id */
+            source_campaign_id?: number | null;
             /** Pinned Count */
             pinned_count: number;
             /** Recipient Count */
@@ -3669,6 +3673,10 @@ export interface components {
             exclusion_reason?: string | null;
             /** Sent At */
             sent_at?: string | null;
+            /** Channel */
+            channel?: string | null;
+            /** Purpose */
+            purpose?: string | null;
         };
         /** DeliveryExecutionCreate */
         DeliveryExecutionCreate: {
@@ -3951,12 +3959,39 @@ export interface components {
             /** Variables */
             variables: components["schemas"]["ModuleVariableOut"][];
         };
-        /** ModuleVariableOut */
+        /**
+         * ModuleVariableOut
+         * @description One field of a module, as an authoring form needs it (task-208).
+         *
+         *     `label` is optional (a form falls back to `name`); `envelope` says the field
+         *     belongs on the delivery envelope rather than in the body (ADR-162 point 1);
+         *     `type`, `size`, `note` and `concept` come from `storage/fields.json`
+         *     (ADR-177), the one home for what a field is. Only `name` and `required`
+         *     were exposed until 2026-10-03, so no client could build a form from this.
+         */
         ModuleVariableOut: {
             /** Name */
             name: string;
             /** Required */
             required: boolean;
+            /** Label */
+            label?: string | null;
+            /**
+             * Envelope
+             * @default false
+             */
+            envelope: boolean;
+            /**
+             * Type
+             * @default text
+             */
+            type: string;
+            /** Size */
+            size?: string | null;
+            /** Note */
+            note?: string | null;
+            /** Concept */
+            concept?: string | null;
         };
         /**
          * MonitoredCampaign
@@ -4041,6 +4076,16 @@ export interface components {
             expires_at: string;
             /** Decided At */
             decided_at: string | null;
+            /** Subject Type */
+            subject_type?: string | null;
+            /** Subject Id */
+            subject_id?: number | null;
+            /** Decided By Type */
+            decided_by_type?: string | null;
+            /** Decided By Id */
+            decided_by_id?: number | null;
+            /** Decision Reason */
+            decision_reason?: string | null;
             /**
              * Rows
              * @default []
@@ -4055,6 +4100,8 @@ export interface components {
              * @default false
              */
             may_decide: boolean;
+            /** Execution Error */
+            execution_error?: string | null;
         };
         /**
          * PendingActionRow
@@ -4089,6 +4136,16 @@ export interface components {
             expires_at: string;
             /** Decided At */
             decided_at: string | null;
+            /** Subject Type */
+            subject_type?: string | null;
+            /** Subject Id */
+            subject_id?: number | null;
+            /** Decided By Type */
+            decided_by_type?: string | null;
+            /** Decided By Id */
+            decided_by_id?: number | null;
+            /** Decision Reason */
+            decision_reason?: string | null;
         };
         /** PreferenceUpdateResult */
         PreferenceUpdateResult: {
@@ -4312,6 +4369,13 @@ export interface components {
             value: string;
             /** Status */
             status: string;
+            /**
+             * Is Primary
+             * @default false
+             */
+            is_primary: boolean;
+            /** Verified At */
+            verified_at?: string | null;
         };
         /** RecipientConsentEvent */
         RecipientConsentEvent: {
@@ -4397,6 +4461,10 @@ export interface components {
             status: string;
             /** Channel */
             channel: string;
+            /** Purpose */
+            purpose?: string | null;
+            /** Exclusion Reason */
+            exclusion_reason?: string | null;
             /** Provider */
             provider?: string | null;
             /** Provider Message Id */

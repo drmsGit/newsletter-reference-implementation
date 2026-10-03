@@ -8,8 +8,23 @@ router = APIRouter(prefix="/modules", tags=["modules"])
 
 
 class ModuleVariableOut(BaseModel):
+    """One field of a module, as an authoring form needs it (task-208).
+
+    `label` is optional (a form falls back to `name`); `envelope` says the field
+    belongs on the delivery envelope rather than in the body (ADR-162 point 1);
+    `type`, `size`, `note` and `concept` come from `storage/fields.json`
+    (ADR-177), the one home for what a field is. Only `name` and `required`
+    were exposed until 2026-10-03, so no client could build a form from this.
+    """
+
     name: str
     required: bool
+    label: str | None = None
+    envelope: bool = False
+    type: str = "text"
+    size: str | None = None
+    note: str | None = None
+    concept: str | None = None
 
 
 class ModuleManifestOut(BaseModel):
@@ -29,7 +44,10 @@ def _to_out(manifest: ModuleManifest) -> ModuleManifestOut:
         description=manifest.description,
         cms=manifest.cms,
         variables=[
-            ModuleVariableOut(name=v.name, required=v.required)
+            ModuleVariableOut(
+                name=v.name, required=v.required, label=v.label, envelope=v.envelope,
+                type=v.type, size=v.size, note=v.note, concept=v.concept,
+            )
             for v in manifest.variables
         ],
     )

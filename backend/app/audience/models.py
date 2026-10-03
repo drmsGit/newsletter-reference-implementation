@@ -11,6 +11,10 @@ class AudienceGroup(BaseModel):
     description: str | None = None
     created_at: datetime
     updated_at: datetime
+    # The campaign a suggested group was derived from; null for a hand-made
+    # one (task-208). It is what makes Recalculate meaningful, and the link
+    # back to the campaign.
+    source_campaign_id: int | None = None
 
 
 class AudienceGroupListed(AudienceGroup):

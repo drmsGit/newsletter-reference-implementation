@@ -187,6 +187,8 @@ def to_recipients(db: Session, records: list[RecipientDB], brand_id: int) -> lis
                     # projects its token rather than an empty string.
                     value=address_value(row, address_key_for(row.channel)) or "",
                     status=row.status,
+                    is_primary=row.is_primary,
+                    verified_at=row.verified_at,
                 )
                 for row in address_rows.get(record.id, [])
             ],
@@ -520,7 +522,16 @@ def list_recipients(db: Session, *, brand_id: int) -> list[Recipient]:
 def get_recipient_by_external_id(
     db: Session,
     external_id: str,
+    *,
+    brand_id: int,
 ) -> Recipient | None:
+    """One recipient as `brand_id` sees them: consent is per brand (ADR-163
+    addendum 2026-09-15), so the projection needs to know who is asking.
+
+    The brand was missing here from 2026-09-16 (619194b, which made
+    `to_recipient` take it) until 2026-10-03, so GET /recipients/{external_id}
+    raised TypeError for every recipient, and nothing tested the route.
+    """
     record = (
         db.query(RecipientDB)
         .filter(RecipientDB.external_id == external_id)
@@ -530,7 +541,7 @@ def get_recipient_by_external_id(
     if record is None:
         return None
 
-    return to_recipient(db, record)
+    return to_recipient(db, record, brand_id)
 
 
 def create_recipient_preference(
@@ -636,7 +647,8 @@ def recipient_activity(db: Session, recipient_id: int, *, brand_id: int) -> dict
         ],
         "deliveries": [
             {"id": e.id, "send_instance_id": e.send_instance_id, "send_instance_name": name,
-             "status": e.status, "channel": e.channel, "provider": e.provider,
+             "status": e.status, "channel": e.channel, "purpose": e.purpose,
+             "exclusion_reason": e.exclusion_reason, "provider": e.provider,
              "provider_message_id": e.provider_message_id, "sent_at": e.sent_at,
              "created_at": e.created_at, "events": trace.get(e.id, [])}
             for e, name in deliveries

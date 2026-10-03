@@ -28,6 +28,8 @@ def to_delivery_execution(record: DeliveryExecutionDB) -> DeliveryExecution:
         provider_message_id=record.provider_message_id,
         created_at=record.created_at,
         updated_at=record.updated_at,
+        channel=record.channel,
+        purpose=record.purpose,
     )
 
 

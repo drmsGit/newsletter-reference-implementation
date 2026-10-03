@@ -29,6 +29,15 @@ class PendingActionRow(BaseModel):
     created_at: datetime
     expires_at: datetime
     decided_at: datetime | None
+    # What is being decided, so a client can link to it (task-208), and who
+    # decided it and why, for decision history. Exposed since 2026-10-03.
+    # **`payload` is not here, deliberately**: it is the action's internal
+    # arguments, and the detail's `rows` are its readable description.
+    subject_type: str | None = None
+    subject_id: int | None = None
+    decided_by_type: str | None = None
+    decided_by_id: int | None = None
+    decision_reason: str | None = None
 
 
 class DescriptionRow(BaseModel):
@@ -57,6 +66,9 @@ class PendingActionDetail(PendingActionRow):
     #: Whether *this* caller may decide *this* row — the action's own
     #: `approve_permission`, checked against the row's brand.
     may_decide: bool = False
+    # Why a held action failed to run, when it did: on the detail only, not on
+    # every inbox row. The approver already sees this text when they decide.
+    execution_error: str | None = None
 
 
 class DecisionRequest(BaseModel):

@@ -194,10 +194,12 @@ def sync_recipient_consent(
 def get_recipient(
     external_id: str,
     db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
 ):
     recipient = get_recipient_by_external_id(
         db=db,
         external_id=external_id,
+        brand_id=brand_id,
     )
 
     if recipient is None:
