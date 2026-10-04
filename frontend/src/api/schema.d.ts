@@ -696,6 +696,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/campaigns/variants/{variant_id}/fence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unblock a variant
+         * @description Clears the advisory fence (ADR-180). A person may clear any fence; a machine only one it holds, and is refused with 423 otherwise. The next edit sets a new fence.
+         */
+        delete: operations["unblock_variant_campaigns_variants__variant_id__fence_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/campaigns/variants/{variant_id}": {
         parameters: {
             query?: never;
@@ -3034,6 +3054,7 @@ export interface components {
         /** ComposedVariant */
         ComposedVariant: {
             variant: components["schemas"]["Variant"];
+            fence?: components["schemas"]["VariantFence"] | null;
             /** Module Limit */
             module_limit?: number | null;
             /** Can Add Module */
@@ -5781,6 +5802,25 @@ export interface components {
              */
             overrides_not_carried: number;
         };
+        /**
+         * VariantFence
+         * @description Who last edited a variant, and whether that still holds machines off
+         *     (ADR-180 and its 2026-10-04 addendum, task-254). Lapsed or not, it is
+         *     "last edited by X at HH:MM"; `active` says whether it is a fence.
+         */
+        VariantFence: {
+            /** By */
+            by?: string | null;
+            /** By Type */
+            by_type?: string | null;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Active */
+            active: boolean;
+        };
         /** VariantUpdate */
         VariantUpdate: {
             /** Name */
@@ -7254,6 +7294,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DecisionResolution"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unblock_variant_campaigns_variants__variant_id__fence_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                variant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariantFence"] | null;
                 };
             };
             /** @description Validation Error */

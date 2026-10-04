@@ -848,3 +848,17 @@ export function useRecipientSearch(q: string) {
     enabled: q.trim().length > 0,
   })
 }
+
+// --- the advisory fence (task-254) -------------------------------------------
+
+export type VariantFence = components['schemas']['VariantFence']
+
+/** Unblock a variant: a person may clear any fence (ADR-180 point 1). */
+export function useUnblock(campaignId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (variantId: number) =>
+      read(api.DELETE('/campaigns/variants/{variant_id}/fence', { params: { path: { variant_id: variantId } } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.composition(campaignId) }),
+  })
+}

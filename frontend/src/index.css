@@ -433,3 +433,9 @@ input[data-focus-visible] {
   border-radius: var(--brand-radius);
   background: #fff;
 }
+
+/* The advisory fence (task-254): someone else's is the one worth noticing. */
+.fence--other {
+  border-left: 3px solid var(--brand-accent);
+  padding-left: calc(var(--brand-space) * 1.5);
+}

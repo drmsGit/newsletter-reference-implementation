@@ -18,6 +18,7 @@ import Choice from '../components/Choice'
 import { AutosaveField, SaveState, fieldError } from '../components/EditorFields'
 import ScreenState from '../components/ScreenState'
 import CatalogueModule from './CatalogueModule'
+import Fence from './Fence'
 import PreviewBar from './Preview'
 
 /**
@@ -93,6 +94,7 @@ function Editor({
       <p className="muted">
         {variant.channel} · {variant.status}
       </p>
+      <Fence campaignId={campaignId} variantId={variant.id} fence={composed.fence} />
       <PreviewBar variantId={variant.id} variantName={variant.name} stamp={stamp} byName={byName} />
       {composed.has_envelope && (
         <Envelope campaignId={campaignId} composed={composed} manifests={manifests} reload={reload} />
