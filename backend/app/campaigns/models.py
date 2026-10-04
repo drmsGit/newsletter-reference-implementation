@@ -460,3 +460,19 @@ class CampaignComposition(BaseModel):
 
     campaign: Campaign
     variants: list[ComposedVariant]
+
+
+class SlotAttach(BaseModel):
+    """Fill a catalogue module from a new decision slot (task-264). The
+    strategy's declared settings start at their defaults and are edited on
+    the slot afterwards."""
+
+    decision_strategy: str = "top_score"
+
+
+class SlotAttached(BaseModel):
+    """The module, now bound to the new slot, and the slot. The module's
+    `updated_at` is the version its next write states."""
+
+    module: ModuleInstance
+    slot: DecisionSlot

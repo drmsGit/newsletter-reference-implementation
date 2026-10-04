@@ -21,6 +21,8 @@ from app.campaigns.models import (
     DecisionSlotListed,
     DecisionSlotStats,
     SlotCandidates,
+    SlotAttach,
+    SlotAttached,
     CampaignComposition,
     SubjectSuggestionResult,
     CampaignCreate,
@@ -42,6 +44,7 @@ from app.campaigns.service import (
     ChannelUnavailable,
     ModuleDataInvalid,
     StaleWrite,
+    attach_new_slot,
     create_campaign,
     create_variant_for_campaign,
     list_campaigns,
@@ -292,6 +295,47 @@ def delete_variant_module(
         detail={"overrides_removed": removed},
     )
     return {"status": "deleted", "module_id": module_id}
+
+
+@router.post(
+    "/modules/{module_id}/decision-slot",
+    response_model=SlotAttached,
+    summary="Fill a catalogue module from a new decision slot",
+    description=(
+        "Creates a slot on the module's variant and binds the module to it, in one "
+        "write (Variant Editor interview 1.3: a slot is configured on its module). "
+        "If-Match takes the module's updated_at. Only a catalogue module takes a slot."
+    ),
+)
+def attach_module_slot(
+    module_id: int,
+    payload: SlotAttach,
+    request: Request,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+    if_match: str | None = IF_MATCH,
+):
+    try:
+        result = attach_new_slot(
+            db, module_id, payload.decision_strategy,
+            brand_id=brand_id, expected_updated_at=_expected(if_match),
+        )
+    except StaleWrite as error:
+        raise _stale(error)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    if result is None:
+        raise HTTPException(status_code=404, detail="Module not found")
+    module, slot = result
+    audit.record_from_request(
+        request, db, audit.DECISION_SLOT_CREATED, subject_type="decision_slot",
+        subject_id=slot.id, detail=slot_audit_detail(slot),
+    )
+    audit.record_from_request(
+        request, db, audit.MODULE_UPDATED, subject_type="module", subject_id=module.id,
+        detail=module_audit_detail(module),
+    )
+    return {"module": module, "slot": to_decision_slot(slot)}
 
 
 @router.post("/modules/{module_id}/move", response_model=ModuleInstance)

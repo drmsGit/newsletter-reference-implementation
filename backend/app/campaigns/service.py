@@ -954,6 +954,57 @@ def create_decision_slot_for_variant(
     return to_decision_slot(slot)
 
 
+def attach_new_slot(
+    db: Session,
+    module_id: int,
+    decision_strategy: str = "top_score",
+    *,
+    brand_id: int,
+    expected_updated_at: datetime | None = None,
+):
+    """Fill a catalogue module from a new decision slot, in one transaction
+    (task-264). Returns `(module, slot)`, or None when the module is not in
+    this brand.
+
+    Variant Editor interview 1.3: a slot is configured on its module, in
+    place. Creating the slot and binding the module were two writes, and a
+    failure between them left a slot nothing used. The module's version is
+    checked first (ADR-180 point 2). Only a catalogue module takes a slot: a
+    static module's fields are typed in, and nothing would read a pick. Any
+    override on the module stays in its table but stops applying, because
+    a slot is never overridden (ADR-186 point 5).
+    """
+    module = get_module(db, module_id, brand_id=brand_id)
+    if module is None:
+        return None
+    refuse_stale(db, module, expected_updated_at, "module")
+    variant = db.get(VariantDB, module.variant_id)
+    manifest = get_manifest(variant.channel, module.module_type)
+    if manifest is None or not manifest.cms:
+        raise ValueError(
+            f"'{module.module_type}' takes its fields from the module itself, so a "
+            "decision slot would have nothing to fill. Only a catalogue module takes one."
+        )
+    candidate_filter, strategy_config = _normalize_for_strategy(decision_strategy, None, None)
+    slot = DecisionSlotDB(
+        variant_id=module.variant_id,
+        name=f"{manifest.label} (position {module.position})",
+        decision_type="content_recommendation",
+        decision_strategy=decision_strategy,
+        candidate_filter=candidate_filter,
+        strategy_config=strategy_config,
+        max_results=1,
+    )
+    db.add(slot)
+    db.flush()
+    module.content_record_id = None
+    module.decision_slot_id = slot.id
+    db.commit()
+    db.refresh(module)
+    db.refresh(slot)
+    return to_module_instance(module), slot
+
+
 def to_decision_resolution(record: DecisionResolutionDB) -> DecisionResolution:
     return DecisionResolution(
         id=record.id,

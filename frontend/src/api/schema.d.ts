@@ -600,6 +600,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/campaigns/modules/{module_id}/decision-slot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fill a catalogue module from a new decision slot
+         * @description Creates a slot on the module's variant and binds the module to it, in one write (Variant Editor interview 1.3: a slot is configured on its module). If-Match takes the module's updated_at. Only a catalogue module takes a slot.
+         */
+        post: operations["attach_module_slot_campaigns_modules__module_id__decision_slot_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/campaigns/modules/{module_id}/move": {
         parameters: {
             query?: never;
@@ -5288,6 +5308,28 @@ export interface components {
             };
         };
         /**
+         * SlotAttach
+         * @description Fill a catalogue module from a new decision slot (task-264). The
+         *     strategy's declared settings start at their defaults and are edited on
+         *     the slot afterwards.
+         */
+        SlotAttach: {
+            /**
+             * Decision Strategy
+             * @default top_score
+             */
+            decision_strategy: string;
+        };
+        /**
+         * SlotAttached
+         * @description The module, now bound to the new slot, and the slot. The module's
+         *     `updated_at` is the version its next write states.
+         */
+        SlotAttached: {
+            module: components["schemas"]["ModuleInstance"];
+            slot: components["schemas"]["DecisionSlot"];
+        };
+        /**
          * SlotCandidates
          * @description What a slot would choose between right now, without choosing (task-205).
          *
@@ -6930,6 +6972,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attach_module_slot_campaigns_modules__module_id__decision_slot_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
+            path: {
+                module_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SlotAttach"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlotAttached"];
                 };
             };
             /** @description Validation Error */
