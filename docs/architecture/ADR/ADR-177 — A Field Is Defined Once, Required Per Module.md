@@ -176,6 +176,72 @@ boolean and cannot express a mixture" gap. The button's URL stays the unsized
 `button_url`, following point 5: a button's label is sized text and its URL is
 not, so they are two concepts.
 
+## Addendum 2026-10-04 — A field's label is written once in its definition, not built from concept and size
+
+Prompted by task-271 and decided by the user on 2026-10-04, one question at a
+time. The problem was found live the same day while checking task-269's bind
+picker: the hero module's fit note read *"Lacks headline_hero for this
+module"*, and the variant editor labelled that module's fields
+`headline_hero`, `button_label_hero` and `button_url`. A manager saw storage
+keys where the form should name the field.
+
+**What point 3 promised and nothing built.** Point 3's descriptor table says
+`note` *"Replaces `label`"*, and the paragraph under it says *"The form label
+can be built from `concept` and `size`"*. Nothing ever built it. `GET /modules`
+returned `label: null` for every email field its manifest did not label
+inline, `headline_hero` among them, so the React variant editor and the bind
+picker's fit note fell back to the storage key. The paragraph's other premise
+has lapsed as well: `ModuleVariableOut` (`backend/app/modules/router.py`) now
+carries `label`, so a missing label reaches the client as a gap rather than
+being dropped.
+
+**Concept and size cannot name every field apart.** `image_url` and
+`image_alt` share the concept `image` and have no size; only `type` (`url`
+against `text`) separates them. The concepts `label`, `text` and `url`, used
+by the `cta` and `editorial` modules, are generic. The definitions are in
+`storage/fields.json`.
+
+**Labels already had a second source.** Some field labels lived inline in
+module manifests: `subject` and `preheader` in
+`storage/modules/email/header.json`, the `section_heading` entries in
+`img_left`, `img_right` and `single_stack`, and the fields of
+`storage/modules/push/notification.json`. That is a second source per field,
+the condition this record exists to end. The docstring on `_variable` in
+`backend/app/modules/registry.py` already claimed *"the definition wins"*, but
+the code read only the manifest's label.
+
+**The decision.**
+
+1. **Each field definition in `storage/fields.json` carries one `label`,
+   written once.** Point 3's line that the label is built from `concept` and
+   `size` is amended accordingly. `note` keeps its role as guidance for a
+   person or an AI. The descriptor gains `label` beside `note`; `note` does
+   not replace it.
+2. **A label names the size only where the size tells two fields of the same
+   concept apart**: "Hero headline" against "Headline", "Hero button text"
+   against "Button text". The content screen shows fields from several modules
+   side by side. Labels that existed inline are kept word for word: "Subject
+   line", "Preheader (inbox preview)", "Heading above this module",
+   "Notification title", "Notification text", "Image URL", "Opens this link".
+3. **A module manifest no longer declares a field label.** The registry reads
+   the label from the definition only and refuses a manifest whose field entry
+   still declares one, so there is one source. A module's own `label`, its
+   name in the module list, is not a field label and is unaffected.
+4. **The label reaches every client surface from that one source.**
+   `GET /modules` carries it to the variant editor and the picker's fit note.
+   `GET /content/fields` carries it to the content screen; its `ContentField`
+   model (`backend/app/content/models.py`) gains the attribute.
+
+So point 3's descriptor gains an attribute, and `note`'s row is read without
+*"Replaces `label`"*:
+
+| Attribute | Purpose |
+|---|---|
+| `label` | what a form shows for the field. Written once in the definition, never built from `concept` and `size`, never declared in a manifest |
+| `note` | guidance for a person **or an AI** on how the field should be used. Sits beside `label` rather than replacing it |
+
+The exact labels live in `storage/fields.json` and are not repeated here.
+
 ## Related ADRs
 
 ### Depends On

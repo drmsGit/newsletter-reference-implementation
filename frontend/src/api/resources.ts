@@ -651,6 +651,15 @@ export function useCreateVariant(campaignId: number) {
 export type ContentRecordDetail = components['schemas']['ContentRecordDetail']
 
 /** The unsent campaigns an edit to this record would reach (ADR-178 point 8). */
+/** Every field a content record can carry, each with its label (ADR-177 addendum 2026-10-04). */
+export function useContentFields() {
+  return useQuery({
+    queryKey: [...keys.content, 'fields'],
+    queryFn: () => read(api.GET('/content/fields')),
+    staleTime: Infinity,
+  })
+}
+
 /**
  * Every campaign whose modules use a record, sent ones included, each with
  * the variants that use it and their stage (task-267). The first page; the

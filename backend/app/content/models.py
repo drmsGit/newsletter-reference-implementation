@@ -12,6 +12,9 @@ class ContentField(BaseModel):
     """
 
     name: str
+    #: What a form calls it, written once in `storage/fields.json` (ADR-177
+    #: addendum 2026-10-04).
+    label: str | None = None
     concept: str | None = None
     size: str | None = None
     type: str = "text"

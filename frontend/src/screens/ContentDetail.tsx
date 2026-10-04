@@ -1,12 +1,16 @@
 import { Link, useParams } from 'react-router'
 
-import { useCampaignsUsing, useContentRecord } from '../api/resources'
+import { useCampaignsUsing, useContentFields, useContentRecord } from '../api/resources'
 import ScreenState from '../components/ScreenState'
 import { STAGE_LABEL } from './Monitoring'
 
 export default function ContentDetail() {
   const { id } = useParams()
   const record = useContentRecord(Number(id))
+  // Each field by its label, written once in storage/fields.json (task-271);
+  // a key with no definition is shown as itself rather than hidden.
+  const fields = useContentFields()
+  const labelOf = new Map((fields.data ?? []).map((f) => [f.name, f.label ?? f.name]))
 
   return (
     <>
@@ -37,7 +41,7 @@ export default function ContentDetail() {
             <dl className="facts">
               {Object.entries(record.data.content ?? {}).map(([field, value]) => (
                 <div key={field} style={{ display: 'contents' }}>
-                  <dt>{field}</dt>
+                  <dt title={field}>{labelOf.get(field) ?? field}</dt>
                   <dd>{typeof value === 'string' ? value : JSON.stringify(value)}</dd>
                 </div>
               ))}

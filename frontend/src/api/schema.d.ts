@@ -3358,6 +3358,8 @@ export interface components {
         ContentField: {
             /** Name */
             name: string;
+            /** Label */
+            label?: string | null;
             /** Concept */
             concept?: string | null;
             /** Size */

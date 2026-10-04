@@ -6,7 +6,6 @@
   "variables": [
     {
       "name": "section_heading",
-      "label": "Heading above this module",
       "required": false,
       "source": "module"
     },

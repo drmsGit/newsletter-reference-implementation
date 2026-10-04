@@ -8,13 +8,15 @@ import { jsonResponse, page, renderWithProviders, stubFetch } from '../test-util
 afterEach(() => vi.unstubAllGlobals())
 
 const RECORD = {
-  id: 42, title: 'Lisbon in spring', description: null, status: 'active', content: {},
+  id: 42, title: 'Lisbon in spring', description: null, status: 'active',
+  content: { headline_hero: 'Lisbon', legacy_key: 'kept' },
   updated_at: '2026-10-04T10:00:00Z', latest_version_number: 1, unpublished_changes: false,
 }
 
 function open(campaigns: object[], total = campaigns.length) {
   const fetchMock = stubFetch({
     'GET /content/42': () => jsonResponse(RECORD),
+    'GET /content/fields': () => jsonResponse([{ name: 'headline_hero', label: 'Hero headline', type: 'text' }]),
     'GET /content/42/campaigns': () => jsonResponse(page(campaigns, { total })),
   })
   renderWithProviders(
@@ -25,6 +27,15 @@ function open(campaigns: object[], total = campaigns.length) {
   )
   return fetchMock
 }
+
+describe('a record\'s fields (task-271)', () => {
+  it('are shown by their label, and a field with no definition by its key', async () => {
+    open([])
+    expect(await screen.findByText('Hero headline')).toBeInTheDocument()
+    expect(screen.queryByText('headline_hero')).not.toBeInTheDocument()
+    expect(screen.getByText('legacy_key')).toBeInTheDocument()
+  })
+})
 
 describe('where a record is used (task-267)', () => {
   it('links each campaign and each variant that uses it, and marks a sent one', async () => {

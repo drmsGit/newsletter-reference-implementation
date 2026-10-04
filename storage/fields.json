@@ -14,39 +14,47 @@
     "subsystem, so an image is a URL somebody typed. These become `asset` when",
     "one exists.",
     "",
-    "The six `note` values were `label` on the manifests and are carried",
-    "verbatim. Some are a label plus guidance — 'Preheader (inbox preview)' —",
-    "and splitting them is a judgement rather than a migration."
+    "`label` is what a form calls the field, written once here (ADR-177 addendum",
+    "2026-10-04, task-271): never built from concept and size, never declared in a",
+    "manifest. The size is named only where it tells two fields of one concept",
+    "apart ('Hero headline' / 'Headline'). `note` is guidance for a person or an AI;",
+    "the six notes that were old manifest labels became the labels."
   ],
   "fields": {
     "body_medium": {
+      "label": "Body text",
       "concept": "body",
       "channel": "email",
       "type": "richtext",
       "size": "medium"
     },
     "button_label": {
+      "label": "Button text",
       "concept": "button_label",
       "channel": "email",
       "type": "text"
     },
     "button_label_hero": {
+      "label": "Hero button text",
       "concept": "button_label",
       "channel": "email",
       "type": "text",
       "size": "hero"
     },
     "button_url": {
+      "label": "Button link",
       "concept": "button_url",
       "channel": "email",
       "type": "url"
     },
     "headline": {
+      "label": "Headline (unsized, legacy)",
       "concept": "headline",
       "channel": "email",
       "type": "text"
     },
     "headline_hero": {
+      "label": "Hero headline",
       "concept": "headline",
       "channel": "email",
       "type": "text",
@@ -54,58 +62,63 @@
       "note": "The h1. Largest type in the email and usually over a background image, so it must be SHORT — shorter than headline_medium."
     },
     "headline_medium": {
+      "label": "Headline",
       "concept": "headline",
       "channel": "email",
       "type": "text",
       "size": "medium"
     },
     "image_alt": {
+      "label": "Image description (alt text)",
       "concept": "image",
       "channel": "email",
       "type": "text"
     },
     "image_url": {
+      "label": "Image (URL)",
       "concept": "image",
       "channel": "email",
       "type": "url"
     },
     "label": {
+      "label": "Call-to-action text",
       "concept": "label",
       "channel": "email",
       "type": "text"
     },
     "preheader": {
+      "label": "Preheader (inbox preview)",
       "concept": "preheader",
       "channel": "email",
       "type": "text",
-      "envelope": true,
-      "note": "Preheader (inbox preview)"
+      "envelope": true
     },
     "push_body": {
+      "label": "Notification text",
       "concept": "push_body",
       "channel": "push",
-      "type": "text",
-      "note": "Notification text"
+      "type": "text"
     },
     "push_image_url": {
+      "label": "Image URL",
       "concept": "push_image",
       "channel": "push",
-      "type": "url",
-      "note": "Image URL"
+      "type": "url"
     },
     "push_link": {
+      "label": "Opens this link",
       "concept": "push_link",
       "channel": "push",
-      "type": "url",
-      "note": "Opens this link"
+      "type": "url"
     },
     "push_title": {
+      "label": "Notification title",
       "concept": "push_title",
       "channel": "push",
-      "type": "text",
-      "note": "Notification title"
+      "type": "text"
     },
     "section_heading": {
+      "label": "Heading above this module",
       "concept": "heading",
       "channel": "email",
       "type": "text",
@@ -113,18 +126,20 @@
       "note": "Optional. Shown above the module, and only when the module itself is shown."
     },
     "subject": {
+      "label": "Subject line",
       "concept": "subject",
       "channel": "email",
       "type": "text",
-      "envelope": true,
-      "note": "Subject line"
+      "envelope": true
     },
     "text": {
+      "label": "Text",
       "concept": "text",
       "channel": "email",
       "type": "text"
     },
     "url": {
+      "label": "Call-to-action link",
       "concept": "url",
       "channel": "email",
       "type": "url"

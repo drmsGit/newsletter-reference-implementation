@@ -59,10 +59,9 @@ class UndefinedFieldError(Exception):
 class ModuleVariable:
     name: str
     required: bool = True
-    #: What to call this field in an authoring form. Optional — falls back to
-    #: the field name, which is what email's hardcoded form shows today. It
-    #: exists so a channel added later gets a readable authoring surface from
-    #: its manifest alone, rather than needing a hand-written form.
+    #: What to call this field in an authoring form. From `storage/fields.json`
+    #: only, written once per field (ADR-177 addendum 2026-10-04, task-271):
+    #: never built from concept and size, never declared by a manifest.
     label: str | None = None
     #: Whether this field belongs on the delivery **envelope** rather than in
     #: the rendered body. A subject line is the case that forces it: it is a
@@ -142,12 +141,17 @@ def _source(declared: dict, json_path: Path) -> str:
 def _variable(declared: dict, json_path: Path) -> ModuleVariable:
     """One manifest entry plus its definition.
 
-    The manifest supplies `name` and `required`; everything else comes from
-    `fields.json`. An inline `label` is still read so a manifest that has not
-    been stripped yet keeps working, but the definition wins — two sources that
-    disagree is the condition ADR-177 exists to end.
+    The manifest supplies `name` and `required` (and `source`); everything else
+    comes from `fields.json`, the label included. A manifest that still labels
+    a field is refused rather than ignored: two sources that disagree is the
+    condition ADR-177 exists to end (addendum 2026-10-04).
     """
     name = declared["name"]
+    if "label" in declared:
+        raise ValueError(
+            f"{json_path} labels the field {name!r}; a field's label is written "
+            "once, in storage/fields.json (ADR-177 addendum 2026-10-04)."
+        )
     defs = field_definitions()
     if defs and name not in defs:
         raise UndefinedFieldError(
@@ -160,7 +164,7 @@ def _variable(declared: dict, json_path: Path) -> ModuleVariable:
     return ModuleVariable(
         name=name,
         required=declared.get("required", True),
-        label=declared.get("label"),
+        label=spec.get("label"),
         envelope=bool(spec.get("envelope", declared.get("envelope", False))),
         concept=spec.get("concept"),
         size=spec.get("size"),

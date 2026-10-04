@@ -7,23 +7,19 @@
   "variables": [
     {
       "name": "push_title",
-      "required": true,
-      "label": "Notification title"
+      "required": true
     },
     {
       "name": "push_body",
-      "required": true,
-      "label": "Notification text"
+      "required": true
     },
     {
       "name": "push_image_url",
-      "required": false,
-      "label": "Image URL"
+      "required": false
     },
     {
       "name": "push_link",
-      "required": false,
-      "label": "Opens this link"
+      "required": false
     }
   ]
 }

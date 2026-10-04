@@ -1107,7 +1107,10 @@ class TestTheContentFieldsRoute:
         assert fields["headline_medium"]["size"] == "medium"
         assert fields["headline_medium"]["channel"] == "email"
         assert fields["push_link"]["type"] == "url"
-        assert fields["push_title"]["note"] == "Notification title"
+        # The old manifest label, carried as a note until ADR-177's addendum of
+        # 2026-10-04 made it the field's label (task-271).
+        assert fields["push_title"]["label"] == "Notification title"
+        assert fields["push_title"]["note"] is None
 
     def test_required_is_absent_on_purpose(self, db):
         """It belongs to *(module, field)*.
