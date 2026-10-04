@@ -138,29 +138,51 @@ def _source(declared: dict, json_path: Path) -> str:
     return source
 
 
-#: What a field IS, so a manifest entry may not carry it: the definition in
-#: `storage/fields.json` is its one source (ADR-177 point 3). A manifest says
-#: which fields a module uses and whether each is required there.
-DEFINITION_ONLY = ("label", "envelope")
+#: The keys a field entry in a manifest may carry, and nothing else (task-273):
+#: which field, whether this module requires it (ADR-177 point 4), and where a
+#: catalogue module takes it from (ADR-179's 2026-10-04 addendum). Anything
+#: else is refused rather than ignored, because an ignored key fails quietly
+#: and the wrong way: `"requried": false` leaves the field required.
+FIELD_ENTRY_KEYS = frozenset({"name", "required", "source"})
+
+#: What a field IS: written once in `storage/fields.json`, never in a manifest
+#: (ADR-177 point 3; its 2026-10-04 addendum for `label`, task-272 for
+#: `envelope`). Named apart from a typo only so the refusal can say where the
+#: key belongs.
+DEFINITION_ATTRIBUTES = frozenset({"label", "envelope", "concept", "size", "type", "note", "channel"})
+
+#: The keys a module manifest may carry (task-273, the user's call to include
+#: the top level). `"cms "` misspelt would otherwise turn a catalogue module
+#: into a static one without a word.
+MANIFEST_KEYS = frozenset({"label", "channel", "description", "cms", "has_template", "variables"})
+
+
+def _refuse_unknown(keys, allowed: frozenset, where: str, json_path: Path) -> None:
+    unknown = sorted(set(keys) - allowed)
+    if not unknown:
+        return
+    reasons = [
+        f"{key!r} (what the field is: it belongs in storage/fields.json)"
+        if key in DEFINITION_ATTRIBUTES and where != "the module" else f"{key!r} (unknown — a typo?)"
+        for key in unknown
+    ]
+    raise ValueError(
+        f"{json_path} declares {', '.join(reasons)} on {where}; allowed there: "
+        f"{', '.join(sorted(allowed))}."
+    )
 
 
 def _variable(declared: dict, json_path: Path) -> ModuleVariable:
     """One manifest entry plus its definition.
 
-    The manifest supplies `name` and `required` (and `source`); everything else
-    comes from `fields.json`, the label and `envelope` included. A manifest that
-    still declares either is refused rather than ignored or used as a fallback:
-    two sources that disagree is the condition ADR-177 exists to end (point 3;
-    addendum 2026-10-04 for the label, task-272 for `envelope`).
+    The manifest supplies `name`, `required` and `source`; everything else
+    comes from `fields.json`. Any other key on the entry is refused rather than
+    ignored or used as a fallback (task-273): a definition attribute repeated
+    here is a second source, the condition ADR-177 exists to end, and anything
+    else is a typo that would otherwise fall back to a default unseen.
     """
     name = declared["name"]
-    owned = [key for key in DEFINITION_ONLY if key in declared]
-    if owned:
-        raise ValueError(
-            f"{json_path} declares {', '.join(owned)} on the field {name!r}; that "
-            "is what the field IS, written once in storage/fields.json (ADR-177 "
-            "point 3; addendum 2026-10-04)."
-        )
+    _refuse_unknown(declared, FIELD_ENTRY_KEYS, f"the field {name!r}", json_path)
     defs = field_definitions()
     if defs and name not in defs:
         raise UndefinedFieldError(
@@ -195,6 +217,7 @@ def _load_manifest(json_path: Path, channel: str) -> ModuleManifest:
             f"misfiled manifest shows up as a module offered to a renderer "
             f"that cannot take it."
         )
+    _refuse_unknown(data, MANIFEST_KEYS, "the module", json_path)
 
     return ModuleManifest(
         name=json_path.stem,

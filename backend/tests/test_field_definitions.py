@@ -72,32 +72,68 @@ def test_catalogue_fields_side_by_side_never_share_a_label():
     assert by_name["image_url"] != by_name["image_alt"]
 
 
-@pytest.mark.parametrize("key, value", [("label", "My own word for it"), ("envelope", True)])
-def test_a_manifest_that_declares_what_a_field_is_is_not_offered(key, value):
-    """One source: a manifest repeating the definition is refused, not quietly
-    ignored or used as a fallback — the module is skipped like any manifest the
-    registry cannot read, and the rest stay offered."""
+def _offered(manifest: dict) -> bool:
+    """Plant a manifest, ask the registry for email's modules, clean up."""
     prefix = f"deftest{uuid.uuid4().hex[:6]}"
     planted = registry.MODULES_DIR / "email" / f"{prefix}.json"
-    planted.write_text(json.dumps({
-        "label": "Repeats its field's definition", "channel": "email", "cms": False, "has_template": False,
-        "variables": [{"name": "text", key: value}],
-    }))
+    planted.write_text(json.dumps(manifest))
     try:
         registry._registry_mtime = None
         names = [m.name for m in registry.list_manifests("email")]
-        assert prefix not in names
-        assert "hero" in names
+        assert "hero" in names, "one refused manifest must not take the rest down"
+        return prefix in names
     finally:
         planted.unlink(missing_ok=True)
         registry._registry_mtime = None
 
 
-def test_no_shipped_manifest_repeats_a_definition():
-    for path in Path(registry.MODULES_DIR).glob("*/*.json"):
-        for entry in json.loads(path.read_text()).get("variables", []):
-            repeated = [k for k in registry.DEFINITION_ONLY if k in entry]
-            assert not repeated, f"{path.name} declares {repeated} on {entry['name']!r}"
+def _module(**overrides):
+    return {"label": "Planted", "channel": "email", "cms": False, "has_template": False,
+            "variables": [{"name": "text"}], **overrides}
+
+
+def test_a_well_formed_planted_manifest_is_offered():
+    """The control: without it, every refusal below could pass because the
+    planted module is never offered at all."""
+    assert _offered(_module(variables=[{"name": "text", "required": False, "source": "content"}]))
+
+
+@pytest.mark.parametrize("key, value", [
+    # What the field IS (ADR-177 point 3): a second source, refused.
+    ("label", "My own word for it"), ("envelope", True), ("type", "url"), ("note", "x"),
+    # Typos of the three allowed keys, which would otherwise default unseen (task-273).
+    ("requried", False), ("sorce", "module"),
+])
+def test_a_field_entry_carries_only_name_required_and_source(key, value):
+    assert not _offered(_module(variables=[{"name": "text", key: value}]))
+
+
+def test_a_module_carries_only_its_own_keys():
+    """`"cms "` misspelt would otherwise make a catalogue module static."""
+    manifest = _module()
+    manifest["cms "] = manifest.pop("cms")
+    assert not _offered(manifest)
+
+
+def test_the_refusal_says_where_the_key_belongs():
+    with pytest.raises(ValueError) as definition:
+        registry._variable({"name": "text", "type": "url"}, Path("x.json"))
+    assert "storage/fields.json" in str(definition.value)
+    with pytest.raises(ValueError) as typo:
+        registry._variable({"name": "text", "requried": False}, Path("x.json"))
+    assert "typo" in str(typo.value)
+
+
+def test_every_shipped_manifest_uses_only_allowed_keys_and_loads():
+    paths = sorted(Path(registry.MODULES_DIR).glob("*/*.json"))
+    for path in paths:
+        data = json.loads(path.read_text())
+        assert set(data) <= registry.MANIFEST_KEYS, path.name
+        for entry in data.get("variables", []):
+            assert set(entry) <= registry.FIELD_ENTRY_KEYS, f"{path.name}: {entry}"
+    registry._registry_mtime = None
+    offered = {(m.channel, m.name) for channel in _channels() for m in registry.list_manifests(channel)}
+    assert offered == {(p.parent.name, p.stem) for p in paths}
 
 
 def test_the_envelope_still_comes_from_the_definitions():
