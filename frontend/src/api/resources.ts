@@ -7,6 +7,7 @@ import type { components } from './schema'
 
 export type Campaign = components['schemas']['Campaign']
 export type ContentRecord = components['schemas']['ContentRecord']
+export type ContentListItem = components['schemas']['ContentListItem']
 export type AudienceGroup = components['schemas']['AudienceGroup']
 export type PendingActionRow = components['schemas']['PendingActionRow']
 export type PendingActionDetail = components['schemas']['PendingActionDetail']
@@ -764,6 +765,45 @@ export function useCategories() {
   return useQuery({
     queryKey: ['content', 'categories'],
     queryFn: () => read(api.GET('/content/categories')),
+  })
+}
+
+export type CategoryRelation = components['schemas']['CategoryRelation']
+
+/** The parent -> child edges of the taxonomy, so a picker can show its hierarchy. */
+export function useCategoryRelations() {
+  return useQuery({
+    queryKey: ['content', 'category-relations'],
+    queryFn: () => read(api.GET('/content/category-relations')),
+  })
+}
+
+/** How many records the bind picker lists at once; narrowing finds the rest. */
+export const PICKER_SIZE = 20
+
+/**
+ * The bind picker's records (task-269): active ones, by title or description
+ * and optionally one category, which the server orders by score (ADR-175
+ * addendum 2026-10-04). The previous list stays up while the next one loads,
+ * so the rows do not blink away on every pause in typing.
+ */
+export function usePickerRecords(q: string, categoryId: number | null) {
+  return useQuery({
+    queryKey: [...keys.content, 'picker', q, categoryId],
+    queryFn: () =>
+      read(
+        api.GET('/content/', {
+          params: {
+            query: {
+              limit: PICKER_SIZE,
+              q: q || undefined,
+              status: 'active',
+              category_id: categoryId ?? undefined,
+            },
+          },
+        }),
+      ),
+    placeholderData: (previous) => previous,
   })
 }
 

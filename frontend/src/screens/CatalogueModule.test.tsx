@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router'
 
 import VariantEditor from './VariantEditor'
+import { ShortcutsProvider } from '../shortcuts/Shortcuts'
 import { jsonResponse, page, renderWithProviders, stubFetch } from '../test-utils'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -26,7 +27,19 @@ const MANIFESTS = [
  * does: the record's for catalogue edits (task-257), the module's for override
  * writes (task-256), each refusing a stale one with 409.
  */
-function server(options: { slot?: boolean; unbound?: boolean; unpublished?: boolean; override?: object } = {}) {
+/** The bind picker's rows (task-269): one fits, one lacks a field and was never published, one is used elsewhere. */
+const PICKABLE = [
+  { id: 42, title: 'Lisbon in spring', description: 'Three days by the river', status: 'active',
+    content: { headline_hero: 'Lisbon', button_label_hero: 'Go' }, latest_version_number: 1 },
+  { id: 43, title: 'Porto weekend', description: 'Port, tiles and the Douro', status: 'active',
+    content: { headline_hero: 'Porto', button_label_hero: '  ' }, latest_version_number: null },
+  { id: 44, title: 'Algarve coast', description: null, status: 'active',
+    content: { headline_hero: 'Algarve', button_label_hero: 'See it' }, latest_version_number: 2 },
+]
+
+function server(
+  options: { slot?: boolean; unbound?: boolean; unpublished?: boolean; override?: object; sibling?: boolean } = {},
+) {
   let clock = 1
   const state = {
     record: {
@@ -43,6 +56,9 @@ function server(options: { slot?: boolean; unbound?: boolean; unpublished?: bool
     } as Record<string, unknown>,
   }
   const writes: Request[] = []
+  const searches: URLSearchParams[] = []
+  // Another module in the variant, bound to Algarve, for "already in this variant" (VE 1.6).
+  const sibling = { ...state.module, id: 13, position: 2, content_record_id: 44, active_override: null }
   const stale = (request: Request, current: string) =>
     request.headers.get('If-Match') !== null && request.headers.get('If-Match') !== current
   const handlers = {
@@ -51,14 +67,22 @@ function server(options: { slot?: boolean; unbound?: boolean; unpublished?: bool
       variants: [{
         variant: { id: 3, name: 'Variant A', channel: 'email', status: 'draft', updated_at: T(1) },
         module_limit: null, can_add_module: true, has_envelope: false, accepted_module_types: ['hero'],
-        modules: [state.module], envelope_modules: [], decision_slots: [],
+        modules: options.sibling ? [state.module, sibling] : [state.module], envelope_modules: [], decision_slots: [],
       }],
     }),
     'GET /modules': () => jsonResponse(MANIFESTS),
     'GET /content/42': () => jsonResponse(state.record),
     'GET /content/42/unsent-campaigns': () =>
       jsonResponse({ count: 2, campaigns: [{ id: 1, name: 'Spring' }, { id: 9, name: 'Summer' }] }),
-    'GET /content/': () => jsonResponse(page([{ id: 42, title: 'Lisbon in spring', content: {}, status: 'active' }])),
+    'GET /content/43': () => jsonResponse({ ...state.record, ...PICKABLE[1], unpublished_changes: true }),
+    'GET /content/': (request: Request) => {
+      searches.push(new URL(request.url).searchParams)
+      return jsonResponse(page(PICKABLE, { total: 31, limit: 20 }))
+    },
+    'GET /content/categories': () =>
+      jsonResponse([{ id: 7, name: 'Coast', type: 'main' }, { id: 8, name: 'Beach', type: 'sub' }]),
+    'GET /content/category-relations': () =>
+      jsonResponse([{ id: 1, parent_category_id: 7, child_category_id: 8, relation_type: 'parent_child' }]),
     'PATCH /content/42': async (request: Request) => {
       writes.push(request.clone())
       if (stale(request, state.record.updated_at)) return jsonResponse({ detail: 'changed' }, 409)
@@ -90,17 +114,22 @@ function server(options: { slot?: boolean; unbound?: boolean; unpublished?: bool
       return jsonResponse({ id: 1, content_record_id: 42, version_number: 2 })
     },
   }
-  return { state, writes, handlers }
+  return { state, writes, searches, handlers }
 }
 
-function open(handlers: Record<string, (request: Request) => Response | Promise<Response>>) {
+function open(
+  handlers: Record<string, (request: Request) => Response | Promise<Response>>,
+  { shortcuts = false } = {},
+) {
   const fetchMock = stubFetch(handlers as never)
-  renderWithProviders(
+  const routes = (
     <Routes>
       <Route path="/campaigns/:id/variants/:variantId" element={<VariantEditor />} />
-    </Routes>,
-    { route: '/campaigns/1/variants/3' },
+    </Routes>
   )
+  renderWithProviders(shortcuts ? <ShortcutsProvider>{routes}</ShortcutsProvider> : routes, {
+    route: '/campaigns/1/variants/3',
+  })
   return fetchMock
 }
 
@@ -245,16 +274,107 @@ describe('overriding', () => {
   })
 })
 
-describe('binding', () => {
-  it('binds an unbound catalogue module to a record found by title', async () => {
-    const { handlers, writes } = server({ unbound: true })
+describe('binding (task-269: browse by topic, from the keyboard)', () => {
+  const option = (name: RegExp) => screen.findByRole('option', { name })
+
+  it('lists records before anything is typed, and binds one by clicking it', async () => {
+    const { handlers, writes, searches } = server({ unbound: true })
     open(handlers)
-    fireEvent.change(await screen.findByLabelText('Find a content record by title'), { target: { value: 'Lis' } })
-    fireEvent.click(await screen.findByRole('button', { name: 'Use “Lisbon in spring”' }))
+    fireEvent.click(await option(/Lisbon in spring/))
     await waitFor(() => expect(writes).toHaveLength(1))
     expect(writes[0].headers.get('If-Match')).toBe(T(1))
     expect((await writes[0].json()).content_record_id).toBe(42)
     expect(await screen.findByLabelText(/^Headline/)).toHaveValue('Lisbon')
+    // Active records only, never more than the picker shows.
+    expect(searches[0].get('status')).toBe('active')
+    expect(searches[0].get('limit')).toBe('20')
+  })
+
+  it('says how many there are when not all fit', async () => {
+    open(server({ unbound: true }).handlers)
+    expect(await screen.findByText('Showing 3 of 31. Type or choose a category to narrow them.')).toBeInTheDocument()
+  })
+
+  it('goes from the search into the list with ArrowDown and uses a record with Enter', async () => {
+    const { handlers, writes } = server({ unbound: true })
+    open(handlers)
+    await option(/Lisbon in spring/)
+    fireEvent.keyDown(screen.getByLabelText('Find a record by title or description'), { key: 'ArrowDown' })
+    const focused = document.activeElement as HTMLElement
+    expect(focused).toHaveAttribute('role', 'option')
+    expect(focused).toHaveTextContent('Lisbon in spring')
+    fireEvent.keyDown(focused, { key: 'Enter' })
+    fireEvent.keyUp(focused, { key: 'Enter' })
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect((await writes[0].json()).content_record_id).toBe(42)
+  })
+
+  it('searches title and description after a pause in typing, and narrows by one category', async () => {
+    const { handlers, searches } = server({ unbound: true })
+    open(handlers)
+    await option(/Lisbon in spring/)
+    fireEvent.change(screen.getByLabelText('Find a record by title or description'), { target: { value: ' tiles ' } })
+    await waitFor(() => expect(searches.at(-1)?.get('q')).toBe('tiles'))
+    fireEvent.click(screen.getByRole('button', { name: /Any category/ }))
+    fireEvent.click(await screen.findByRole('option', { name: 'Beach' }))
+    await waitFor(() => expect(searches.at(-1)?.get('category_id')).toBe('8'))
+    expect(searches.at(-1)?.get('q')).toBe('tiles')
+  })
+
+  it('notes what to know about a record without refusing it', async () => {
+    const { handlers, writes } = server({ unbound: true, sibling: true })
+    open(handlers)
+    const porto = await option(/Porto weekend/)
+    expect(porto).toHaveTextContent('Port, tiles and the Douro')
+    // A required field that is only whitespace is missing (ADR-177: required is the module's).
+    expect(porto).toHaveTextContent('Lacks Button for this module · Not published yet')
+    expect(await option(/Algarve coast/)).toHaveTextContent('Already in this variant')
+    expect(await option(/Lisbon in spring/)).not.toHaveTextContent(/Lacks|Already|Not published/)
+    fireEvent.click(porto)
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect((await writes[0].json()).content_record_id).toBe(43)
+  })
+
+  it('closes after a rebind from "Use another record", and on Esc', async () => {
+    const { handlers, writes } = server()
+    open(handlers)
+    fireEvent.click(await screen.findByRole('button', { name: 'Use another record' }))
+    // The module's own record is shown but cannot be chosen again.
+    expect(await option(/Lisbon in spring/)).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.keyDown(screen.getByLabelText('Find a record by title or description'), { key: 'Escape' })
+    expect(screen.queryByRole('listbox', { name: 'Records to use' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use another record' }))
+    fireEvent.click(await option(/Porto weekend/))
+    await waitFor(() => expect(writes).toHaveLength(1))
+    await waitFor(() => expect(screen.queryByRole('listbox', { name: 'Records to use' })).not.toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Use another record' })).toBeInTheDocument()
+  })
+
+  it('lists its keys in the shortcut overview, Esc only where it closes something', async () => {
+    open(server().handlers, { shortcuts: true })
+    fireEvent.click(await screen.findByRole('button', { name: 'Use another record' }))
+    await option(/Lisbon in spring/)
+    fireEvent.keyDown(document.body, { key: '?' })
+    const here = within(await screen.findByRole('dialog', { name: 'Keyboard shortcuts' })).getByRole('region', {
+      name: 'This screen',
+    })
+    expect(within(here).getByText('Use the highlighted record for this module')).toBeInTheDocument()
+    expect(within(here).getByText('From the record search, into the list of records')).toBeInTheDocument()
+    expect(within(here).getByText('Close the record picker')).toBeInTheDocument()
+  })
+
+  it('lets Esc in the category dropdown close only the dropdown', async () => {
+    open(server().handlers)
+    fireEvent.click(await screen.findByRole('button', { name: 'Use another record' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Any category/ }))
+    const beach = await screen.findByRole('option', { name: 'Beach' })
+    // Beach is Coast's child, so it sits indented beneath it; Coast does not.
+    expect(beach.style.paddingInlineStart).not.toBe('')
+    expect(screen.getByRole('option', { name: 'Coast' }).style.paddingInlineStart).toBe('')
+    fireEvent.keyDown(beach, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('option', { name: 'Beach' })).not.toBeInTheDocument())
+    expect(screen.getByRole('listbox', { name: 'Records to use' })).toBeInTheDocument()
   })
 })
 

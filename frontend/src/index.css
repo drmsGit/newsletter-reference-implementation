@@ -334,11 +334,51 @@ input[data-focus-visible] {
   margin: var(--brand-space) 0;
 }
 
+/* The bind picker (task-269): search and category side by side, then rows. */
+.bind__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--brand-space);
+  align-items: end;
+}
+
 .bind__results {
   list-style: none;
   padding: 0;
+  margin: var(--brand-space) 0 0;
   display: grid;
   gap: calc(var(--brand-space) / 2);
+  max-height: 24rem;
+  overflow-y: auto;
+}
+
+.bind__record {
+  display: grid;
+  padding: calc(var(--brand-space) / 2) var(--brand-space);
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.bind__record[data-focused],
+.bind__record[data-hovered] {
+  border-left-color: var(--brand-accent);
+}
+
+.bind__record[data-disabled] {
+  cursor: default;
+  opacity: 0.7;
+}
+
+/* One line of description: what the piece is about, not the piece. */
+.bind__description {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bind__notices {
+  font-size: 0.9em;
 }
 
 /* Slot settings on their module (task-264). */

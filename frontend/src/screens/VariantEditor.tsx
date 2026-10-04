@@ -121,6 +121,9 @@ function Editor({
               manifest={byName.get(selected.module_type)}
               channel={variant.channel}
               reload={reload}
+              otherRecordIds={modules.flatMap((m) =>
+                m.id !== selected.id && m.content_record_id != null ? [m.content_record_id] : [],
+              )}
             />
           ) : (
             <p id="fields-heading">Add a module to start.</p>
@@ -323,12 +326,14 @@ function ModuleFields({
   manifest,
   channel,
   reload,
+  otherRecordIds,
 }: {
   campaignId: number
   module: ComposedModule
   manifest: ModuleManifest | undefined
   channel: string
   reload: () => void
+  otherRecordIds: number[]
 }) {
   const save = useSaveModule(campaignId)
   const title = manifest?.label ?? module.module_type
@@ -352,6 +357,7 @@ function ModuleFields({
           manifest={manifest}
           channel={channel}
           reload={reload}
+          otherRecordIds={otherRecordIds}
         />
       </>
     )

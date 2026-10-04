@@ -1,10 +1,9 @@
-import { useState } from 'react'
-import { Button, Input, Label, Text, TextField } from 'react-aria-components'
+import { useEffect, useRef, useState } from 'react'
+import { Button, Input, Label, ListBox, ListBoxItem, Text, TextField } from 'react-aria-components'
 import { Link } from 'react-router'
 
 import {
   useBindModule,
-  useContentList,
   useContentReach,
   useContentRecord,
   usePublishRecord,
@@ -12,12 +11,16 @@ import {
   useSetOverride,
   useAttachSlot,
   useSaveModule,
+  usePickerRecords,
   type ComposedModule,
+  type ContentListItem,
   type ModuleManifest,
 } from '../api/resources'
+import CategoryChoice from '../components/CategoryChoice'
 import Choice from '../components/Choice'
 import { AutosaveField, SaveState, fieldError } from '../components/EditorFields'
 import ScreenState from '../components/ScreenState'
+import { useShortcut } from '../shortcuts/Shortcuts'
 import SlotSettings from './SlotSettings'
 
 /**
@@ -42,20 +45,29 @@ export default function CatalogueModule({
   manifest,
   channel,
   reload,
+  otherRecordIds,
 }: {
   campaignId: number
   module: ComposedModule
   manifest: ModuleManifest
   channel: string
   reload: () => void
+  /** Records the variant's other modules are bound to, for "already in this variant" (VE 1.6). */
+  otherRecordIds: number[]
 }) {
   if (module.decision_slot_id != null) {
     return (
-      <SlotBound campaignId={campaignId} module={module} manifest={manifest} slotId={module.decision_slot_id} />
+      <SlotBound
+        campaignId={campaignId}
+        module={module}
+        manifest={manifest}
+        slotId={module.decision_slot_id}
+        otherRecordIds={otherRecordIds}
+      />
     )
   }
   if (module.content_record_id == null) {
-    return <Unbound campaignId={campaignId} module={module} />
+    return <Unbound campaignId={campaignId} module={module} manifest={manifest} otherRecordIds={otherRecordIds} />
   }
   return (
     <CatalogueFields
@@ -65,6 +77,7 @@ export default function CatalogueModule({
       manifest={manifest}
       channel={channel}
       reload={reload}
+      otherRecordIds={otherRecordIds}
     />
   )
 }
@@ -76,6 +89,7 @@ function CatalogueFields({
   manifest,
   channel,
   reload,
+  otherRecordIds,
 }: {
   campaignId: number
   module: ComposedModule
@@ -83,6 +97,7 @@ function CatalogueFields({
   manifest: ModuleManifest
   channel: string
   reload: () => void
+  otherRecordIds: number[]
 }) {
   const record = useContentRecord(recordId)
   const saveField = useSaveCatalogueField(recordId, channel)
@@ -105,7 +120,17 @@ function CatalogueFields({
               {rebinding ? 'Keep this record' : 'Use another record'}
             </Button>
           </p>
-          {rebinding && <BindRecord campaignId={campaignId} module={module} />}
+          {rebinding && (
+            // Closes once the new record is in: this component stays mounted
+            // across the rebind (same module), so its state would keep it open.
+            <BindRecord
+              campaignId={campaignId}
+              module={module}
+              manifest={manifest}
+              otherRecordIds={otherRecordIds}
+              onClose={() => setRebinding(false)}
+            />
+          )}
           <PublishState recordId={recordId} detail={record.data} />
 
           <ModuleOwnFields campaignId={campaignId} module={module} manifest={manifest} />
@@ -251,38 +276,145 @@ function Reason({ current, onChange }: { current: string | null; onChange: (reas
   )
 }
 
-/** Bind a catalogue module to a record, found by title. */
-function BindRecord({ campaignId, module }: { campaignId: number; module: ComposedModule }) {
+/** `value`, once it has stopped changing for `ms` — so a search waits for a pause in typing. */
+function useDebounced<T>(value: T, ms: number): T {
+  const [settled, setSettled] = useState(value)
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(value), ms)
+    return () => clearTimeout(timer)
+  }, [value, ms])
+  return settled
+}
+
+/**
+ * Choose the record a catalogue module shows (task-269), as task-263 decided
+ * it (design pass, "Choosing a record for a module"; ADR-175 addendum
+ * 2026-10-04):
+ *
+ * - It lists records before anything is typed, so a manager with only a topic
+ *   in mind has something to choose from. Text matches title or description;
+ *   one category narrows to records assigned to it directly, best fit first.
+ * - Keyboard-first (VE): ArrowDown from the search goes into the list, arrows
+ *   move, Enter uses the record, Esc closes a picker that was opened.
+ * - A row says what to know before choosing, never refusing: required fields
+ *   the record lacks for this module (VE 2.8), already in this variant (VE
+ *   1.6), never published.
+ */
+function BindRecord({
+  campaignId,
+  module,
+  manifest,
+  otherRecordIds,
+  onClose,
+}: {
+  campaignId: number
+  module: ComposedModule
+  manifest: ModuleManifest
+  otherRecordIds: number[]
+  onClose?: () => void
+}) {
   const [q, setQ] = useState('')
-  const results = useContentList(0, q, 'active')
+  const [categoryId, setCategoryId] = useState<number | null>(null)
+  const records = usePickerRecords(useDebounced(q.trim(), 250), categoryId)
   const bind = useBindModule(campaignId)
+  const list = useRef<HTMLDivElement>(null)
+  useShortcut('↓', 'From the record search, into the list of records', null)
+  useShortcut('Enter', 'Use the highlighted record for this module', null)
+  // Content fields this module must have, as the module declares them (ADR-177).
+  const required = manifest.variables.filter((v) => v.required && !v.envelope && v.source !== 'module')
+  const items = records.data?.items ?? []
   return (
-    <div className="bind">
+    <div
+      className="bind"
+      onKeyDownCapture={(event) => {
+        // DOM containment, not React's tree: Esc in the category dropdown's
+        // popover (portalled out) closes that popover, not the picker.
+        if (event.key === 'Escape' && onClose && event.currentTarget.contains(event.target as Node)) {
+          event.stopPropagation()
+          onClose()
+        }
+      }}
+    >
+      {onClose && <CloseShortcut />}
       {module.content_record_id == null && (
         <p>Not bound to content yet. It is reported at send, never blocked.</p>
       )}
-      <TextField value={q} onChange={setQ}>
-        <Label>Find a content record by title</Label>
-        <Input />
-      </TextField>
-      {q.trim() && (
-        <ul className="bind__results">
-          {(results.data?.items ?? []).slice(0, 10).map((record) => (
-            <li key={record.id}>
-              <Button
-                isDisabled={bind.isPending || record.id === module.content_record_id}
-                onPress={() => bind.mutate({ id: module.id, contentRecordId: record.id })}
-              >
-                Use “{record.title}”
-              </Button>
-            </li>
-          ))}
-          {results.data && results.data.items.length === 0 && <li className="muted">No record matches.</li>}
-        </ul>
+      <div className="bind__filters">
+        <TextField
+          value={q}
+          onChange={setQ}
+          autoFocus={onClose != null}
+          onKeyDown={(event) => {
+            if (event.key !== 'ArrowDown' || items.length === 0) return event.continuePropagation()
+            list.current?.focus()
+          }}
+        >
+          <Label>Find a record by title or description</Label>
+          <Input />
+        </TextField>
+        <CategoryChoice selected={categoryId} onChange={setCategoryId} />
+      </div>
+      {records.data && items.length === 0 ? (
+        <p className="muted">No record matches.</p>
+      ) : (
+        <ListBox
+          ref={list}
+          aria-label="Records to use"
+          className="bind__results"
+          items={items}
+          disabledKeys={bind.isPending ? items.map((r) => r.id) : [module.content_record_id ?? -1]}
+          onAction={(key) =>
+            bind.mutate({ id: module.id, contentRecordId: Number(key) }, { onSuccess: () => onClose?.() })
+          }
+        >
+          {(record) => (
+            <ListBoxItem id={record.id} textValue={record.title} className="bind__record">
+              <span className="bind__title">{record.title}</span>
+              {record.id === module.content_record_id && <span className="muted"> · this module's record</span>}
+              {record.description && <span className="bind__description muted">{record.description}</span>}
+              <Notices record={record} required={required} inVariant={otherRecordIds.includes(record.id)} />
+            </ListBoxItem>
+          )}
+        </ListBox>
+      )}
+      {records.data && records.data.total > items.length && (
+        <p className="muted">
+          Showing {items.length} of {records.data.total}. Type or choose a category to narrow them.
+        </p>
       )}
       <SaveState mutation={bind} what="the module" />
     </div>
   )
+}
+
+/** Listed only where Esc does something: a picker that was opened can be closed. */
+function CloseShortcut() {
+  useShortcut('Esc', 'Close the record picker', null)
+  return null
+}
+
+/** What to know about a record before using it here. Each one informs; none blocks (VE 1.4). */
+function Notices({
+  record,
+  required,
+  inVariant,
+}: {
+  record: ContentListItem
+  required: ModuleManifest['variables']
+  inVariant: boolean
+}) {
+  const content = record.content as Record<string, unknown>
+  const missing = required.filter((v) => {
+    const value = content[v.name]
+    return value == null || (typeof value === 'string' && !value.trim())
+  })
+  const notes = [
+    missing.length > 0 && `Lacks ${missing.map((v) => v.label ?? v.name).join(', ')} for this module`,
+    inVariant && 'Already in this variant',
+    record.latest_version_number == null && 'Not published yet',
+  ].filter(Boolean)
+  if (notes.length === 0) return null
+  return <span className="bind__notices">{notes.join(' · ')}</span>
 }
 
 /**
@@ -411,11 +543,13 @@ function SlotBound({
   module,
   manifest,
   slotId,
+  otherRecordIds,
 }: {
   campaignId: number
   module: ComposedModule
   manifest: ModuleManifest
   slotId: number
+  otherRecordIds: number[]
 }) {
   const [rebinding, setRebinding] = useState(false)
   return (
@@ -428,17 +562,35 @@ function SlotBound({
       <Button onPress={() => setRebinding(!rebinding)}>
         {rebinding ? 'Keep the slot' : 'Use one content record instead'}
       </Button>
-      {rebinding && <BindRecord campaignId={campaignId} module={module} />}
+      {rebinding && (
+        <BindRecord
+          campaignId={campaignId}
+          module={module}
+          manifest={manifest}
+          otherRecordIds={otherRecordIds}
+          onClose={() => setRebinding(false)}
+        />
+      )}
     </>
   )
 }
 
 /** A catalogue module with no content yet: one record, or a slot that picks per recipient. */
-function Unbound({ campaignId, module }: { campaignId: number; module: ComposedModule }) {
+function Unbound({
+  campaignId,
+  module,
+  manifest,
+  otherRecordIds,
+}: {
+  campaignId: number
+  module: ComposedModule
+  manifest: ModuleManifest
+  otherRecordIds: number[]
+}) {
   const attach = useAttachSlot(campaignId)
   return (
     <>
-      <BindRecord campaignId={campaignId} module={module} />
+      <BindRecord campaignId={campaignId} module={module} manifest={manifest} otherRecordIds={otherRecordIds} />
       <p>
         Or fill it per recipient:{' '}
         <Button isDisabled={attach.isPending} onPress={() => attach.mutate({ id: module.id })}>

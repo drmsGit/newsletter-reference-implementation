@@ -63,7 +63,9 @@ function server(options: { unbound?: boolean } = {}) {
       jsonResponse({ slot_id: 5, candidate_count: 7, category_ids: [1], requires_recipient: true }),
     'GET /decision/strategies': () => jsonResponse(STRATEGIES),
     'GET /content/categories': () => jsonResponse([{ id: 1, name: 'Food', type: 'main' }, { id: 2, name: 'City', type: 'main' }]),
-    'GET /content/': () => jsonResponse(page([{ id: 42, title: 'Lisbon', content: {}, status: 'active' }])),
+    'GET /content/category-relations': () => jsonResponse([]),
+    'GET /content/': () =>
+      jsonResponse(page([{ id: 42, title: 'Lisbon', content: {}, status: 'active', latest_version_number: 1 }])),
     'PATCH /campaigns/decision-slots/5': async (request: Request) => {
       writes.push(request.clone())
       if (stale(request, state.slot.updated_at)) return jsonResponse({ detail: 'changed' }, 409)
@@ -141,8 +143,8 @@ describe('a slot on its module', () => {
     const { handlers, writes } = server()
     open(handlers)
     fireEvent.click(await screen.findByRole('button', { name: 'Use one content record instead' }))
-    fireEvent.change(screen.getByLabelText('Find a content record by title'), { target: { value: 'Lis' } })
-    fireEvent.click(await screen.findByRole('button', { name: 'Use “Lisbon”' }))
+    // The picker lists records on open (task-269), so no search is needed.
+    fireEvent.click(await screen.findByRole('option', { name: /Lisbon/ }))
     await waitFor(() => expect(writes).toHaveLength(1))
     const body = await writes[0].json()
     expect([body.content_record_id, body.decision_slot_id]).toEqual([42, null])
