@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.campaigns.db_models import ModuleInstanceDB, DecisionResolutionDB, VariantDB
 from app.content.db_models import ContentRecordDB, ContentVersionDB
-from app.modules.registry import ModuleManifest, get_manifest, get_template_html
+from app.modules.registry import ModuleManifest, envelope_module_type, get_manifest, get_template_html
 from app.overrides.service import get_active_content_override
 
 RenderMode = Literal["preview", "send"]
@@ -684,3 +684,78 @@ def resolve_content_for_module(
         return content, resolution
 
     return None, None
+
+
+def module_states(
+    db: Session, variant_id: int, recipient_id: int | None = None, *, brand_id: int
+) -> list[dict]:
+    """What each module of a variant is doing, for the composer's preview
+    (task-227). Read-only: nothing is resolved or written.
+
+    Per module, in order, the envelope left out (it is the variant's, shown
+    apart): its `kind` — `record`, `slot`, `typed` (a static module's own
+    fields), `unbound` (a catalogue module with no content yet) or `unknown`
+    (no manifest on this channel) — and, as they apply:
+
+    - `slot_state` (Variant Editor interview 4.4): `resolved`, `not_run`, or
+      `finds_nothing` — its rule matches no active content
+      (`slot_candidate_count`, task-205), so ADR-086 will hide it and the
+      email ships shorter. That outranks an older pick: the rule is what a
+      send will run.
+    - `generic_pick` (4.2): a recipient was named and has no pick of their
+      own, so the generic one is shown. Read from the resolution the renderer
+      itself uses (`resolve_content_for_module`), so the label and the render
+      cannot disagree.
+    - `unpublished_changes` (4.3): the record's live content, which a preview
+      shows, differs from the version a send would use (task-257).
+    - `missing_required`: required fields that would render empty, for the
+      modules whose content does not depend on the recipient (ADR-174 point 3).
+    """
+    from app.campaigns.db_models import VariantDB
+    from app.campaigns.service import slot_candidate_count
+    from app.content.service import get_content_record, publish_state
+
+    variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
+    envelope = envelope_module_type(variant.channel)
+    missing: dict[int, list[str]] = {}
+    for module_id, _type, field in missing_required_fields(db, variant_id, mode="preview"):
+        missing.setdefault(module_id, []).append(field)
+
+    states = []
+    for module in (
+        db.query(ModuleInstanceDB)
+        .filter(ModuleInstanceDB.variant_id == variant_id)
+        .order_by(ModuleInstanceDB.position)
+    ):
+        if module.module_type == envelope:
+            continue
+        manifest = get_manifest(variant.channel, module.module_type)
+        state = {
+            "module_id": module.id, "position": module.position, "module_type": module.module_type,
+            "slot_state": None, "generic_pick": False, "unpublished_changes": False,
+            "missing_required": sorted(missing.get(module.id, [])),
+        }
+        if manifest is None:
+            state["kind"] = "unknown"
+        elif module.decision_slot_id is not None:
+            state["kind"] = "slot"
+            _content, resolution = resolve_content_for_module(
+                db=db, module=module, recipient_id=recipient_id, mode="preview")
+            candidates = slot_candidate_count(db, module.decision_slot_id, brand_id=brand_id)
+            if candidates is not None and candidates["candidate_count"] == 0:
+                state["slot_state"] = "finds_nothing"
+            elif resolution is None:
+                state["slot_state"] = "not_run"
+            else:
+                state["slot_state"] = "resolved"
+                state["generic_pick"] = recipient_id is not None and resolution.recipient_id is None
+        elif module.content_record_id is not None:
+            state["kind"] = "record"
+            record = get_content_record(db, module.content_record_id, brand_id=brand_id)
+            state["unpublished_changes"] = record is not None and publish_state(db, record)[1]
+        elif manifest.cms:
+            state["kind"] = "unbound"
+        else:
+            state["kind"] = "typed"
+        states.append(state)
+    return states

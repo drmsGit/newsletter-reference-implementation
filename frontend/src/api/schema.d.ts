@@ -4184,6 +4184,41 @@ export interface components {
             override?: components["schemas"]["ContentOverride"] | null;
         };
         /**
+         * ModuleState
+         * @description What one module is doing in this render (task-227). See
+         *     `rendering.service.module_states` for what each field means.
+         */
+        ModuleState: {
+            /** Module Id */
+            module_id: number;
+            /** Position */
+            position: number;
+            /** Module Type */
+            module_type: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "record" | "slot" | "typed" | "unbound" | "unknown";
+            /** Slot State */
+            slot_state?: ("resolved" | "not_run" | "finds_nothing") | null;
+            /**
+             * Generic Pick
+             * @default false
+             */
+            generic_pick: boolean;
+            /**
+             * Unpublished Changes
+             * @default false
+             */
+            unpublished_changes: boolean;
+            /**
+             * Missing Required
+             * @default []
+             */
+            missing_required: string[];
+        };
+        /**
          * ModuleVariableOut
          * @description One field of a module, as an authoring form needs it (task-208).
          *
@@ -4970,6 +5005,11 @@ export interface components {
             fields?: {
                 [key: string]: unknown;
             } | null;
+            /**
+             * Modules
+             * @default []
+             */
+            modules: components["schemas"]["ModuleState"][];
         };
         /** SendCapUpdate */
         SendCapUpdate: {

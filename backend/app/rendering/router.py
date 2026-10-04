@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -10,7 +12,22 @@ from app.campaigns.db_models import VariantDB
 # itself — 994 frames deep, surfacing as a 500 rather than as the shadowing it
 # was. Found by re-probing after the fix rather than by the test suite, which
 # does not exercise this JSON route.
+from app.rendering.service import module_states
 from app.rendering.service import render_variant as render_channel_artifact
+
+
+class ModuleState(BaseModel):
+    """What one module is doing in this render (task-227). See
+    `rendering.service.module_states` for what each field means."""
+
+    module_id: int
+    position: int
+    module_type: str
+    kind: Literal["record", "slot", "typed", "unbound", "unknown"]
+    slot_state: Literal["resolved", "not_run", "finds_nothing"] | None = None
+    generic_pick: bool = False
+    unpublished_changes: bool = False
+    missing_required: list[str] = []
 
 
 class RenderedVariant(BaseModel):
@@ -26,6 +43,9 @@ class RenderedVariant(BaseModel):
     artifact_body: str = ""
     #: The structured payload, for a channel that has one.
     fields: dict | None = None
+    #: Each module's state, for the composer's preview (task-227): an HTML
+    #: comment in the artifact is not something a client should parse.
+    modules: list[ModuleState] = []
 
 
 router = APIRouter(prefix="/rendering", tags=["rendering"])
@@ -42,10 +62,15 @@ def render_variant(
     # directly returned a 200 with a 252-character empty document for a push
     # variant — no error, because nothing failed; the email assembler simply
     # found no email manifest for a push module and rendered comments.
-    artifact = render_channel_artifact(
-        db=db, variant_id=variant_id, recipient_id=recipient_id,
-        brand_id=brand_id,
-    )
+    try:
+        artifact = render_channel_artifact(
+            db=db, variant_id=variant_id, recipient_id=recipient_id,
+            brand_id=brand_id,
+        )
+    except ValueError as error:
+        # A variant outside the brand, or none at all, is not found. It
+        # answered 500 until 2026-10-04 (task-227).
+        raise HTTPException(status_code=404, detail=str(error))
     variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
 
     return RenderedVariant(
@@ -54,4 +79,5 @@ def render_variant(
         role=artifact.role,
         artifact_body=artifact.body or "",
         fields=artifact.fields,
+        modules=module_states(db, variant_id, recipient_id, brand_id=brand_id),
     )
