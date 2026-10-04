@@ -31,28 +31,21 @@ from urllib.parse import urlsplit, urlunsplit
 
 import pytest
 
-#: The dev database, which this suite must never touch.
-DEV_DEFAULT = (
-    "postgresql://newsletter_user:newsletter_password@localhost:5432/newsletter"
-)
+from tests.checkout_database import DEV_DEFAULT, database_name as _database_name, recorded_checkout
 
 
 def _test_database_url() -> str:
-    """Where the suite runs. `TEST_DATABASE_URL` wins; otherwise `<dev>_test`.
+    """Where the suite runs. `TEST_DATABASE_URL` wins; otherwise a database of
+    this checkout's own beside the dev one (task-259, `checkout_database`).
 
     Derived from the dev URL rather than hardcoded so that a developer who
     moved their Postgres — a different port, a different password — gets a test
-    database beside it without configuring anything twice.
+    database beside it without configuring anything twice. Per checkout, so two
+    worktrees running the suite at once cannot rebuild each other's schema.
     """
-    explicit = os.environ.get("TEST_DATABASE_URL")
-    if explicit:
-        return explicit
-    parts = urlsplit(os.environ.get("DATABASE_URL") or DEV_DEFAULT)
-    return urlunsplit(parts._replace(path=parts.path.rstrip("/") + "_test"))
+    from tests.checkout_database import test_database_url
 
-
-def _database_name(url: str) -> str:
-    return urlsplit(url).path.lstrip("/")
+    return test_database_url()
 
 
 def _refuse_the_dev_database(url: str) -> None:
@@ -97,6 +90,10 @@ def _ensure_database_exists(url: str) -> None:
                 # environment, not from a request.
                 cursor.execute(f'CREATE DATABASE "{name}"')
                 print(f"\n[conftest] created the test database {name!r}")
+            # Which checkout this database belongs to, recorded on every run so
+            # one created before task-259 gets it too. The cleanup script reads
+            # it: a database whose checkout is gone is a leftover.
+            cursor.execute(f'COMMENT ON DATABASE "{name}" IS %s', (recorded_checkout(),))
     finally:
         connection.close()
 
@@ -142,6 +139,10 @@ def _start_from_an_empty_schema(url: str) -> None:
 
 
 # --- and this must happen before anything imports app.database --------------
+#: The dev database URL as it was before the redirect below. Afterwards
+#: `DATABASE_URL` names the test database, so anything deriving "the test
+#: database beside dev" at test time must start from this (task-259).
+DEV_DATABASE_URL = os.environ.get("DATABASE_URL") or DEV_DEFAULT
 TEST_DATABASE_URL = _test_database_url()
 _refuse_the_dev_database(TEST_DATABASE_URL)
 _ensure_database_exists(TEST_DATABASE_URL)
@@ -196,7 +197,7 @@ def _build_known_state() -> None:
     from app.auth import service as auth
     from app.database import SessionLocal
 
-    assert str(engine.url).endswith("_test") or os.environ.get("TEST_DATABASE_URL"), (
+    assert engine.url.database == _database_name(TEST_DATABASE_URL), (
         f"the engine bound to {engine.url!r}, which is not the test database — "
         "something imported app.database before this conftest ran"
     )

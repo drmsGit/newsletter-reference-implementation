@@ -259,8 +259,10 @@ class TestStartupActuallyRefuses:
         import sys
         from pathlib import Path
 
+        from tests.conftest import TEST_DATABASE_URL
+
         url = os.environ["DATABASE_URL"]
-        assert url.rsplit("/", 1)[-1].endswith("_test") or os.environ.get("TEST_DATABASE_URL"), (
+        assert url == TEST_DATABASE_URL, (
             f"refusing to run a startup probe against {url!r}: not the test database"
         )
 
