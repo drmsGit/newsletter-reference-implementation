@@ -340,3 +340,30 @@ input[data-focus-visible] {
   display: grid;
   gap: calc(var(--brand-space) / 2);
 }
+
+/* Slot settings on their module (task-264). */
+.slot-settings,
+.categories {
+  display: grid;
+  gap: var(--brand-space);
+  margin: var(--brand-space) 0;
+}
+
+.categories .react-aria-Checkbox {
+  display: flex;
+  gap: var(--brand-space);
+  align-items: center;
+}
+
+.categories .react-aria-Checkbox::before {
+  content: "";
+  width: 1em;
+  height: 1em;
+  border: 1px solid var(--brand-line);
+  border-radius: 2px;
+}
+
+.categories .react-aria-Checkbox[data-selected]::before {
+  background: var(--brand-accent);
+  border-color: var(--brand-accent);
+}

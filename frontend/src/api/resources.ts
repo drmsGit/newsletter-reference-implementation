@@ -743,3 +743,75 @@ export function useBindModule(campaignId: number) {
       ),
   )
 }
+
+// --- slice 7: decision slots on their modules (task-264) ---------------------
+
+export type StrategyMeta = components['schemas']['StrategyMeta']
+export type Category = components['schemas']['Category']
+type SlotStats = components['schemas']['DecisionSlotStats']
+
+/** The registered decision strategies, each with the settings it declares. */
+export function useStrategies() {
+  return useQuery({
+    queryKey: ['decision', 'strategies'],
+    queryFn: () => read(api.GET('/decision/strategies')),
+    staleTime: Infinity,
+  })
+}
+
+/** The category taxonomy, shared across brands (it has no brand column). */
+export function useCategories() {
+  return useQuery({
+    queryKey: ['content', 'categories'],
+    queryFn: () => read(api.GET('/content/categories')),
+  })
+}
+
+/** Fill a catalogue module from a new slot, in one write with the module's version. */
+export function useAttachSlot(campaignId: number) {
+  return useComposerWrite(
+    campaignId,
+    'module',
+    (composition, id) => cachedOf(composition, 'module', id),
+    ({ id, strategy }: { id: number; strategy?: string }, module) =>
+      read(
+        api.POST('/campaigns/modules/{module_id}/decision-slot', {
+          params: { path: { module_id: id }, header: { 'If-Match': module?.updated_at } },
+          body: { decision_strategy: strategy ?? 'top_score' },
+        }),
+      ),
+  )
+}
+
+/**
+ * Change some of a slot's settings: PATCH leaves a section it is not sent
+ * as stored (inventory B16). The slot's version is read from the cached slot
+ * read when the save is sent, and slot saves run one after another, as the
+ * composer's other writes do.
+ */
+export function useSaveSlot(campaignId: number, slotId: number) {
+  const queryClient = useQueryClient()
+  const statsKey = [...keys.decisionSlot(slotId), 'stats']
+  return useMutation({
+    scope: { id: 'composer-slot' },
+    mutationFn: (changes: {
+      decision_strategy?: string
+      candidate_filter?: Record<string, unknown>
+      strategy_config?: Record<string, unknown>
+    }) =>
+      read(
+        api.PATCH('/campaigns/decision-slots/{slot_id}', {
+          params: {
+            path: { slot_id: slotId },
+            header: { 'If-Match': queryClient.getQueryData<SlotStats>(statsKey)?.slot.updated_at },
+          },
+          body: changes,
+        }),
+      ),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.decisionSlot(slotId) }),
+        queryClient.invalidateQueries({ queryKey: keys.composition(campaignId) }),
+      ]),
+  })
+}

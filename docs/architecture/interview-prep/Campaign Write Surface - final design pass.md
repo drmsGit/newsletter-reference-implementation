@@ -170,7 +170,10 @@ plus creating a campaign and a blank variant. **Slice 6 is built too**
 and publish state. **Its default was then reversed by the user** after trying it:
 [[ADR-186 — In the Composer an Override Is the Default and a Catalogue Edit Is Explicit]]
 supersedes ADR-178, so typing overrides and the catalogue changes through an
-explicit per-field act (task-260). Next is slice 7, slots on modules.
+explicit per-field act (task-260). **Slice 7 is built** (task-264, 2026-10-04): a
+slot is set up on its module, in place. The write surface is complete; what
+remains is the preview overlay, the advisory lock (task-254), a keyboard
+shortcuts overlay (VE 1.5) and a slot heading (task-223).
 
 1. **Close defects 1–4** (task-248, task-249, task-250, task-251). These are backend fixes with tests. Defect 1 first:
    it is the only one that crosses a brand.

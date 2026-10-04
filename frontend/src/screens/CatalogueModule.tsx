@@ -10,12 +10,14 @@ import {
   usePublishRecord,
   useSaveCatalogueField,
   useSetOverride,
+  useAttachSlot,
   type ComposedModule,
   type ModuleManifest,
 } from '../api/resources'
 import Choice from '../components/Choice'
 import { AutosaveField, SaveState, fieldError } from '../components/EditorFields'
 import ScreenState from '../components/ScreenState'
+import SlotSettings from './SlotSettings'
 
 /**
  * A catalogue-bound module in the variant editor (task-258, slice 6), as
@@ -47,17 +49,10 @@ export default function CatalogueModule({
   reload: () => void
 }) {
   if (module.decision_slot_id != null) {
-    return (
-      <p>
-        Its fields come from{' '}
-        <Link to={`/decision-slots/${module.decision_slot_id}`}>decision slot #{module.decision_slot_id}</Link>,
-        picked per recipient. A slot is never overridden: one pinned value would replace every
-        personal pick.
-      </p>
-    )
+    return <SlotBound campaignId={campaignId} module={module} slotId={module.decision_slot_id} />
   }
   if (module.content_record_id == null) {
-    return <BindRecord campaignId={campaignId} module={module} />
+    return <Unbound campaignId={campaignId} module={module} />
   }
   return (
     <CatalogueFields
@@ -398,5 +393,42 @@ function CatalogueField({
       )}
       {changeInCatalogue}
     </div>
+  )
+}
+
+/**
+ * A module filled by a decision slot: its settings in place (slice 7), and
+ * the way back to one fixed record. Never overridable (ADR-186 point 5).
+ */
+function SlotBound({ campaignId, module, slotId }: { campaignId: number; module: ComposedModule; slotId: number }) {
+  const [rebinding, setRebinding] = useState(false)
+  return (
+    <>
+      <SlotSettings campaignId={campaignId} slotId={slotId} />
+      <p className="muted">
+        A slot is never overridden: one pinned value would replace every personal pick.
+      </p>
+      <Button onPress={() => setRebinding(!rebinding)}>
+        {rebinding ? 'Keep the slot' : 'Use one content record instead'}
+      </Button>
+      {rebinding && <BindRecord campaignId={campaignId} module={module} />}
+    </>
+  )
+}
+
+/** A catalogue module with no content yet: one record, or a slot that picks per recipient. */
+function Unbound({ campaignId, module }: { campaignId: number; module: ComposedModule }) {
+  const attach = useAttachSlot(campaignId)
+  return (
+    <>
+      <BindRecord campaignId={campaignId} module={module} />
+      <p>
+        Or fill it per recipient:{' '}
+        <Button isDisabled={attach.isPending} onPress={() => attach.mutate({ id: module.id })}>
+          Personalise with a decision slot
+        </Button>
+      </p>
+      <SaveState mutation={attach} what="the module" />
+    </>
   )
 }

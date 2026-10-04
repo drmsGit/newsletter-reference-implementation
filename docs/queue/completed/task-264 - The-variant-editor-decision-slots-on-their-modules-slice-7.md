@@ -1,11 +1,11 @@
 ---
 id: TASK-264
 title: 'The variant editor, decision slots on their modules (slice 7)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-04 07:15'
-updated_date: '2026-10-04 07:18'
+updated_date: '2026-10-04 07:21'
 labels:
   - frontend
   - backend
@@ -26,10 +26,10 @@ Slice 7 of [[Campaign Write Surface - final design pass]], started 2026-10-04. V
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A catalogue module can be filled from a new decision slot in one atomic write that states the module version
-- [ ] #2 The slot's strategy, categories and strategy settings are edited in place on the module and saved with the slot's version
-- [ ] #3 The editor shows how many records the slot would choose between, without resolving it
-- [ ] #4 A slot-bound module can go back to a content record
+- [x] #1 A catalogue module can be filled from a new decision slot in one atomic write that states the module version
+- [x] #2 The slot's strategy, categories and strategy settings are edited in place on the module and saved with the slot's version
+- [x] #3 The editor shows how many records the slot would choose between, without resolving it
+- [x] #4 A slot-bound module can go back to a content record
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -45,4 +45,12 @@ Slice 7 of [[Campaign Write Surface - final design pass]], started 2026-10-04. V
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-04. Backend half: attach_new_slot in backend/app/campaigns/service.py and POST /campaigns/modules/{module_id}/decision-slot (If-Match on the module; creates the slot with the strategy's defaults, binds the module, clears its record, one transaction; audited decision_slot.created and module.updated; refuses a static module or an unknown strategy with nothing left behind). Tests backend/tests/test_attach_slot.py (6); mutants: no version check, static allowed, record kept, no brand scope, slot creation unaudited: each caught. Full suite 1188 passed, rc 0.
+
+2026-10-04. Client half: hooks useStrategies, useCategories, useAttachSlot (module queue, module If-Match), useSaveSlot (PATCH with only the changed section, slot If-Match read from the cached slot read at send time, own queue; invalidates the slot reads and the composition). screens/SlotSettings.tsx: strategy choice, category checkboxes (none = every category), the strategy's declared number settings saved on blur (non-numbers refused in place), the candidate count from task-205, a link to the slot screen; max_results not offered (task-109). CatalogueModule: a slot-bound module shows SlotSettings and 'Use one content record instead'; an unbound one offers the record search or 'Personalise with a decision slot'. Tests SlotSettings.test.tsx (6) against a stub that checks the slot version; mutants: strategy change resending everything, a non-number saved, no slot token, attach without token, no candidate count, no way back to a record: each caught. 104 client tests, tsc clean. Browser on the dev backend (Variant 1A, Image Left, slot #1): settings render with 85 candidates; ticking Wildlife saved category 14 and the count became 89; unticking restored the original filter exactly; both saves moved the slot version, no conflict. The backend had been stopped by the app overnight and was restarted; my pane signed in again with the dev account.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Decision slots are now set up on their modules: a catalogue module can be filled from a new slot in one atomic write, the slot's strategy, categories and settings are edited in place with its version, the editor shows what the slot would choose between, and a slot-bound module can go back to one record. Verified by 12 tests (backend and client), eleven mutants, and a live round trip on slot #1.
+<!-- SECTION:FINAL_SUMMARY:END -->
