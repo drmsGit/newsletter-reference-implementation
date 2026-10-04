@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router'
 
 import { SearchBox } from '../components/RecipientSearch'
-import { GoToShortcuts } from '../shell/Nav'
+import Nav, { GoToShortcuts } from '../shell/Nav'
 import { renderWithProviders } from '../test-utils'
 import { ShortcutsProvider } from './Shortcuts'
 
@@ -77,5 +77,44 @@ describe('keyboard shortcuts (task-266)', () => {
     press('?')
     const overview = await screen.findByRole('dialog', { name: 'Keyboard shortcuts' })
     expect(within(overview).queryByText('Find a campaign')).not.toBeInTheDocument()
+  })
+})
+
+describe('hints on the elements while Alt or Ctrl is held (2026-10-04)', () => {
+  function withNav() {
+    return renderWithProviders(
+      <ShortcutsProvider>
+        <GoToShortcuts />
+        <Nav />
+        <Routes>
+          <Route path="/campaigns" element={<SearchBox label="Find a campaign" />} />
+        </Routes>
+      </ShortcutsProvider>,
+      { route: '/campaigns' },
+    )
+  }
+
+  const hints = () => [...document.querySelectorAll('.shortcut-hint')].map((h) => h.textContent)
+
+  it('shows each element its keys while Alt is held, and hides them on release', () => {
+    withNav()
+    expect(hints()).toEqual([])
+    fireEvent.keyDown(window, { key: 'Alt' })
+    expect(hints()).toEqual(expect.arrayContaining(['gc', 'gm', '/']))
+    // Badges are for eyes: the field keeps its name for a screen reader.
+    expect(screen.getByRole('textbox', { name: 'Find a campaign' })).toBeInTheDocument()
+    fireEvent.keyUp(window, { key: 'Alt' })
+    expect(hints()).toEqual([])
+  })
+
+  it('Ctrl shows them too, and any other key or leaving the window hides them', () => {
+    withNav()
+    fireEvent.keyDown(window, { key: 'Control' })
+    expect(hints().length).toBeGreaterThan(0)
+    fireEvent.keyDown(window, { key: 'c', ctrlKey: true })
+    expect(hints()).toEqual([])
+    fireEvent.keyDown(window, { key: 'Control' })
+    fireEvent.blur(window)
+    expect(hints()).toEqual([])
   })
 })

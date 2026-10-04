@@ -34,6 +34,15 @@ type Registry = {
 
 const ShortcutsContext = createContext<Registry | null>(null)
 
+/**
+ * Whether the hints are showing: while Alt or Ctrl is held on its own, every
+ * element with a shortcut shows its keys on itself (asked for 2026-10-04).
+ */
+const HintsContext = createContext(false)
+
+// The key that shows the hints: Alt (Option on a Mac) or Ctrl, held alone.
+const HINT_KEYS = new Set(['Alt', 'Control'])
+
 const SEQUENCE_TIMEOUT_MS = 1000
 
 function isTyping(target: EventTarget | null): boolean {
@@ -49,6 +58,7 @@ function isTyping(target: EventTarget | null): boolean {
 export function ShortcutsProvider({ children }: { children: ReactNode }) {
   const [entries, setEntries] = useState<Registration[]>([])
   const [open, setOpen] = useState(false)
+  const [hints, setHints] = useState(false)
   const entriesRef = useRef<Registration[]>([])
   entriesRef.current = entries
   const pending = useRef<{ key: string; at: number } | null>(null)
@@ -90,14 +100,35 @@ export function ShortcutsProvider({ children }: { children: ReactNode }) {
       }
       pending.current = null
     }
+    // Held alone it shows the hints; any other key, letting go, or leaving the
+    // window hides them, so they never linger after a Ctrl+C.
+    function onHintDown(event: KeyboardEvent) {
+      setHints(HINT_KEYS.has(event.key))
+    }
+    function onHintUp(event: KeyboardEvent) {
+      if (HINT_KEYS.has(event.key)) setHints(false)
+    }
+    function hide() {
+      setHints(false)
+    }
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    window.addEventListener('keydown', onHintDown)
+    window.addEventListener('keyup', onHintUp)
+    window.addEventListener('blur', hide)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keydown', onHintDown)
+      window.removeEventListener('keyup', onHintUp)
+      window.removeEventListener('blur', hide)
+    }
   }, [])
 
   return (
     <ShortcutsContext.Provider value={registry}>
+    <HintsContext.Provider value={hints}>
       {children}
       <ShortcutsOverlay open={open} onOpenChange={setOpen} entries={entries} />
+    </HintsContext.Provider>
     </ShortcutsContext.Provider>
   )
 }
@@ -173,5 +204,22 @@ function ShortcutsOverlay({
         </Dialog>
       </Modal>
     </ModalOverlay>
+  )
+}
+
+/**
+ * The keys of a shortcut, shown on the element it belongs to while Alt or
+ * Ctrl is held (2026-10-04). Hidden from screen readers: the overview is
+ * where they learn the keys, and a badge read out on every link is noise.
+ */
+export function ShortcutHint({ keys }: { keys: string }) {
+  const visible = useContext(HintsContext)
+  if (!visible) return null
+  return (
+    <span className="shortcut-hint" aria-hidden="true">
+      {keys.split(' ').map((k, i) => (
+        <kbd key={i}>{k}</kbd>
+      ))}
+    </span>
   )
 }

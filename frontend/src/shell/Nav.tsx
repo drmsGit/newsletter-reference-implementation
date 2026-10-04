@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router'
 
-import { useShortcut } from '../shortcuts/Shortcuts'
+import { ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
 
 /**
  * The screens in the first cut, in the order `docs/react-screen-inventory.md`
@@ -51,7 +51,10 @@ export default function Nav() {
               reader currently is. A plain link would look identical and say
               nothing.
             */}
-            <NavLink to={screen.to}>{screen.label}</NavLink>
+            <NavLink to={screen.to}>
+              {screen.label}
+              <ShortcutHint keys={`g ${screen.go}`} />
+            </NavLink>
           </li>
         ))}
       </ul>

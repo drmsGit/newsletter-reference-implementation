@@ -20,7 +20,7 @@ import ScreenState from '../components/ScreenState'
 import CatalogueModule from './CatalogueModule'
 import Fence from './Fence'
 import PreviewBar from './Preview'
-import { useShortcut } from '../shortcuts/Shortcuts'
+import { ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
 
 /**
  * One variant, edited (task-255, slice 5 of the campaign write surface).
@@ -228,14 +228,14 @@ function Stack({
                 isDisabled={index === 0}
                 onPress={() => move.mutate({ id: module.id, direction: 'up' })}
               >
-                ↑
+                ↑ <ShortcutHint keys="Alt+↑" />
               </Button>
               <Button
                 aria-label={`Move ${label} down`}
                 isDisabled={index === modules.length - 1}
                 onPress={() => move.mutate({ id: module.id, direction: 'down' })}
               >
-                ↓
+                ↓ <ShortcutHint keys="Alt+↓" />
               </Button>
               {confirming === module.id ? (
                 <span role="group" aria-label={`Remove ${label}?`}>

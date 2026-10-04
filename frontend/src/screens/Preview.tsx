@@ -8,7 +8,7 @@ import {
   type ModuleState,
 } from '../api/resources'
 import ScreenState from '../components/ScreenState'
-import { useShortcut } from '../shortcuts/Shortcuts'
+import { ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
 
 /**
  * The variant editor's preview (task-265): a collapsed bar that says what the
@@ -50,7 +50,9 @@ export default function PreviewBar({
             ? 'Rendering…'
             : findings.text}
       </span>
-      <Button onPress={() => setOpen(true)}>Open preview</Button>
+      <Button onPress={() => setOpen(true)}>
+        Open preview <ShortcutHint keys="p" />
+      </Button>
       <ModalOverlay isOpen={open} onOpenChange={setOpen} isDismissable className="preview-overlay">
         <Modal className="preview-modal">
           <Dialog aria-label={`Preview of ${variantName}`}>

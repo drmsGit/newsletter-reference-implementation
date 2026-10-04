@@ -469,3 +469,18 @@ kbd {
   border-bottom-width: 2px;
   border-radius: var(--brand-radius);
 }
+
+/* Shortcut keys shown on their elements while Alt or Ctrl is held (2026-10-04). */
+.shortcut-hint {
+  margin-left: calc(var(--brand-space) / 2);
+  display: inline-flex;
+  gap: 2px;
+  vertical-align: middle;
+}
+
+.shortcut-hint kbd {
+  background: var(--brand-fg);
+  color: var(--brand-bg);
+  border-color: var(--brand-fg);
+  font-size: 0.75em;
+}

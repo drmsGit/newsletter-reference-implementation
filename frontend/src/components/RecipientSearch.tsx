@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { Button, Input, Label, TextField } from 'react-aria-components'
 import { useSearchParams } from 'react-router'
 
-import { useShortcut } from '../shortcuts/Shortcuts'
+import { ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
 
 /** The current search, from the URL (`?q=`), so it survives a reload and a link. */
 export function useSearch(): string {
@@ -54,7 +54,9 @@ export function SearchBox({ label }: { label: string }) {
       }}
     >
       <TextField value={value} onChange={setValue}>
-        <Label>{label}</Label>
+        <Label>
+          {label} <ShortcutHint keys="/" />
+        </Label>
         <Input ref={input} />
       </TextField>
       <Button type="submit">Search</Button>
