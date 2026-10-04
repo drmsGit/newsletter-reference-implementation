@@ -1,3 +1,4 @@
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -9,7 +10,7 @@ from app.content.db_models import (
     ContentCategoryAssignmentDB,
     ContentVersionDB,
 )
-from app.content.models import ContentRecord, Category, CategoryRelation, ContentVersion
+from app.content.models import ContentListItem, ContentRecord, Category, CategoryRelation, ContentVersion
 from app.overrides.db_models import ContentOverrideDB
 
 
@@ -326,19 +327,59 @@ def set_content_status(
 
 def page_content_records(
     db: Session, params, *, brand_id: int, q: str | None = None, status: str | None = None,
+    category_id: int | None = None,
 ):
-    """One ADR-185 page of the brand's content records, newest first, narrowed
-    by title (part, any case) and status — the same filters for rows and total."""
+    """One ADR-185 page of the brand's content records, narrowed by title or
+    description (part, any case), status and category — the same filters for
+    rows and total.
+
+    A category means a direct assignment, the meaning a decision slot's
+    `candidate_query` gives it: no expansion to child categories (ADR-175
+    addendum 2026-10-04, point 4). With one, rows come by the record's score in
+    it, highest first, then newest (point 5); without, newest first."""
     from app.pagination import page_of_query
 
-    query = db.query(ContentRecordDB).filter(ContentRecordDB.brand_id == brand_id)
+    # The latest published version per record, in one grouped subquery for the
+    # whole page rather than a query per row (task-268).
+    latest = (
+        db.query(
+            ContentVersionDB.content_record_id.label("content_id"),
+            func.max(ContentVersionDB.version_number).label("number"),
+        )
+        .group_by(ContentVersionDB.content_record_id)
+        .subquery()
+    )
+    query = (
+        db.query(ContentRecordDB, latest.c.number)
+        .outerjoin(latest, latest.c.content_id == ContentRecordDB.id)
+        .filter(ContentRecordDB.brand_id == brand_id)
+    )
     if (q or "").strip():
-        query = query.filter(ContentRecordDB.title.icontains(q.strip(), autoescape=True))
+        term = q.strip()
+        query = query.filter(or_(
+            ContentRecordDB.title.icontains(term, autoescape=True),
+            ContentRecordDB.description.icontains(term, autoescape=True),
+        ))
     if status:
         query = query.filter(ContentRecordDB.status == status)
-    # The table has no timestamps; ids rise with creation, so newest first is
-    # id descending, which is its own tie-breaker (ADR-185 point 4).
-    return page_of_query(query, params, ContentRecordDB.id.desc(), convert=to_content_record)
+    # Ids rise with creation (the table records no creation time), so newest
+    # first is id descending, which is also the tie-breaker (ADR-185 point 4).
+    order = [ContentRecordDB.id.desc()]
+    if category_id is not None:
+        # One row per record: (content, category) is unique. The vocabulary is
+        # global and the brand filter above keeps the rows the brand's own
+        # (ADR-150 addendum 2026-09-15).
+        query = query.join(
+            ContentCategoryAssignmentDB,
+            ContentCategoryAssignmentDB.content_id == ContentRecordDB.id,
+        ).filter(ContentCategoryAssignmentDB.category_id == category_id)
+        order.insert(0, ContentCategoryAssignmentDB.score.desc())
+
+    def convert(row) -> ContentListItem:
+        record, number = row
+        return ContentListItem(**to_content_record(record).model_dump(), latest_version_number=number)
+
+    return page_of_query(query, params, *order, convert=convert)
 
 
 def list_content_records(db: Session, *, brand_id: int) -> list[ContentRecord]:

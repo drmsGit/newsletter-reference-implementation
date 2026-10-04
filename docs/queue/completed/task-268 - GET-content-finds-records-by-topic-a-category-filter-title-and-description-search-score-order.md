@@ -3,9 +3,11 @@ id: TASK-268
 title: >-
   GET /content/ finds records by topic: a category filter, title-and-description
   search, score order
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-10-04 10:20'
+updated_date: '2026-10-04 10:27'
 labels:
   - backend
 dependencies: []
@@ -36,9 +38,37 @@ Decided in the task-263 design session (2026-10-04, user, one question at a time
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 GET /content/ accepts a category filter that returns only the brand's records directly assigned to that category, with total counted under the same filter
-- [ ] #2 q matches part of the title or the description, any case, wildcards escaped
-- [ ] #3 With a category, rows are ordered by assignment score descending, then id descending; without one, id descending as today
-- [ ] #4 A list row carries enough to show "not published yet" without a query per row
-- [ ] #5 Tests cover brand isolation of the category filter, the order, and that a child category's records are not included
+- [x] #1 GET /content/ accepts a category filter that returns only the brand's records directly assigned to that category, with total counted under the same filter
+- [x] #2 q matches part of the title or the description, any case, wildcards escaped
+- [x] #3 With a category, rows are ordered by assignment score descending, then id descending; without one, id descending as today
+- [x] #4 A list row carries enough to show "not published yet" without a query per row
+- [x] #5 Tests cover brand isolation of the category filter, the order, and that a child category's records are not included
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. ContentListItem(ContentRecord) in backend/app/content/models.py adds latest_version_number (None = never published, so a send would refuse it). This is the picker's "not published yet". "Differs from the latest version" is deliberately left out: binding such a record is fine.
+2. In page_content_records, q matches title OR description. category_id joins content_category_assignments: direct only, inside the brand, ordered by score desc then id desc. Latest version comes from one grouped subquery outer-joined into the page query, not N+1.
+3. The router gains a category_id query param, an updated q description, and response_model Page[ContentListItem].
+4. Reword the "no timestamps" comment.
+5. Tests in test_list_filters.py cover: description match; category filter (rows plus total, brand isolation, child not included, order); latest_version_number. Mutation-check each.
+6. Regenerate frontend schema.d.ts, then run the client typecheck and tests, and check:contract.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Built 2026-10-04.
+- "Not published yet" = latest_version_number is null on a new ContentListItem row, meaning no version exists and a send refuses the record. It comes from one grouped max(version_number) subquery outer-joined into the page query, not a query per row. "Live differs from latest" was left to the detail route deliberately: binding such a record is fine.
+- category_id joins content_category_assignments inside the brand filter. Order with a category: score desc, then id desc.
+- The Content screen search now also matches descriptions; its label "Find content by title" stays until task-270 relabels it. useContentList takes no category yet; that is task-269/270.
+- 6 new tests in backend/tests/test_list_filters.py (TestContentByTopic). Mutation-checked against 9 mutants, each caught: category filter dropped, score asc, no score order, id-asc tie-break, brand filter dropped, child included, title-only q, q ignored with a category, version dropped.
+- Full backend suite: 1217 passed. Client: schema.d.ts regenerated from the live server, tsc -b clean, vitest 125 passed.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+GET /content/ finds by topic: a category_id filter (direct assignment, brand-scoped, rows and total alike), q over title and description, score-then-newest order with a category, and latest_version_number on each row for the "not published yet" notice without N+1. Verified by 6 new tests mutation-checked against 9 mutants, the full backend suite (1217 passed), and the client typecheck and tests on regenerated types.
+<!-- SECTION:FINAL_SUMMARY:END -->

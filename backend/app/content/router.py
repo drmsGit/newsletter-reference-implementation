@@ -16,6 +16,7 @@ from app.pagination import Page, PageParams, page_of_list, page_params
 from app.database import get_db
 from app.content.models import (
     ContentField,
+    ContentListItem,
     ContentRecord,
     ContentRecordDetail,
     ContentReach,
@@ -66,18 +67,26 @@ from app.content.service import (
 router = APIRouter(prefix="/content", tags=["content"])
 
 
-@router.get("/", response_model=Page[ContentRecord])
+@router.get("/", response_model=Page[ContentListItem])
 def get_content_records(
-    q: str | None = Query(None, description="Find by title (part, any case)."),
+    q: str | None = Query(None, description="Find by title or description (part, any case)."),
     status: Literal["active", "inactive"] | None = Query(None, description="Only records in this status."),
+    category_id: int | None = Query(
+        None,
+        description="Only records assigned to this category directly (not its children), "
+        "ordered by their score in it, highest first.",
+    ),
     params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
-    """One ADR-185 page of the brand's content records, newest first."""
+    """One ADR-185 page of the brand's content records, newest first unless a
+    category orders them (ADR-175 addendum 2026-10-04)."""
     from app.content.service import page_content_records
 
-    return page_content_records(db, params, brand_id=brand_id, q=q, status=status)
+    return page_content_records(
+        db, params, brand_id=brand_id, q=q, status=status, category_id=category_id,
+    )
 
 
 # These fixed-path routes (/categories, /category-relations) must be

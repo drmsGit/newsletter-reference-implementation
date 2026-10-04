@@ -30,6 +30,19 @@ class ContentRecord(BaseModel):
     updated_at: datetime | None = None
 
 
+class ContentListItem(ContentRecord):
+    """One row of `GET /content/`, with what the bind picker's "not published
+    yet" notice needs (task-268, task-263 decision 6).
+
+    `None` means no version was ever published, so a send would refuse the
+    record (`UnpublishedContentError`). Whether the live content differs from
+    the latest version is the detail's `unpublished_changes`, not a list
+    concern: binding such a record is fine, a send uses the published version.
+    """
+
+    latest_version_number: int | None = None
+
+
 class ContentRecordDetail(ContentRecord):
     """One record, with whether a send would use what it says now (task-257).
 

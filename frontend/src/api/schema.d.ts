@@ -105,7 +105,8 @@ export interface paths {
         };
         /**
          * Get Content Records
-         * @description One ADR-185 page of the brand's content records, newest first.
+         * @description One ADR-185 page of the brand's content records, newest first unless a
+         *     category orders them (ADR-175 addendum 2026-10-04).
          */
         get: operations["get_content_records_content__get"];
         put?: never;
@@ -3332,6 +3333,37 @@ export interface components {
              */
             envelope: boolean;
         };
+        /**
+         * ContentListItem
+         * @description One row of `GET /content/`, with what the bind picker's "not published
+         *     yet" notice needs (task-268, task-263 decision 6).
+         *
+         *     `None` means no version was ever published, so a send would refuse the
+         *     record (`UnpublishedContentError`). Whether the live content differs from
+         *     the latest version is the detail's `unpublished_changes`, not a list
+         *     concern: binding such a record is fine, a send uses the published version.
+         */
+        ContentListItem: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /** Content */
+            content: {
+                [key: string]: unknown;
+            };
+            /**
+             * Status
+             * @default active
+             */
+            status: string;
+            /** Updated At */
+            updated_at?: string | null;
+            /** Latest Version Number */
+            latest_version_number?: number | null;
+        };
         /** ContentOverride */
         ContentOverride: {
             /** Id */
@@ -4399,10 +4431,10 @@ export interface components {
             /** Offset */
             offset: number;
         };
-        /** Page[ContentOverride] */
-        Page_ContentOverride_: {
+        /** Page[ContentListItem] */
+        Page_ContentListItem_: {
             /** Items */
-            items: components["schemas"]["ContentOverride"][];
+            items: components["schemas"]["ContentListItem"][];
             /** Total */
             total: number;
             /** Limit */
@@ -4410,10 +4442,10 @@ export interface components {
             /** Offset */
             offset: number;
         };
-        /** Page[ContentRecord] */
-        Page_ContentRecord_: {
+        /** Page[ContentOverride] */
+        Page_ContentOverride_: {
             /** Items */
-            items: components["schemas"]["ContentRecord"][];
+            items: components["schemas"]["ContentOverride"][];
             /** Total */
             total: number;
             /** Limit */
@@ -5955,10 +5987,12 @@ export interface operations {
     get_content_records_content__get: {
         parameters: {
             query?: {
-                /** @description Find by title (part, any case). */
+                /** @description Find by title or description (part, any case). */
                 q?: string | null;
                 /** @description Only records in this status. */
                 status?: ("active" | "inactive") | null;
+                /** @description Only records assigned to this category directly (not its children), ordered by their score in it, highest first. */
+                category_id?: number | null;
                 /** @description Rows per page (1-200). */
                 limit?: number;
                 /** @description Rows to skip. */
@@ -5976,7 +6010,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_ContentRecord_"];
+                    "application/json": components["schemas"]["Page_ContentListItem_"];
                 };
             };
             /** @description Validation Error */
