@@ -1095,9 +1095,10 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
         artifact, picks = render_frame(
             db, snapshot.render_context, recipient_id=execution.recipient_id,
         )
-        # Subject lives on the variant until ADR-162 point 1 moves it into
-        # a header module, so the renderer put it in the envelope. The send
-        # instance's name is the fallback it always was.
+        # The envelope comes from the snapshot's frame: the envelope module's
+        # subject as it was approved (ADR-162 point 1, ADR-183). A variant
+        # with no envelope module has no subject, so the send instance's name
+        # stays the fallback it always was.
         if artifact.body is not None and not artifact.envelope.get("subject"):
             artifact.envelope["subject"] = subject
 

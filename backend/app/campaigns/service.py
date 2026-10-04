@@ -309,9 +309,11 @@ def create_variant_for_campaign(
     its content-readiness and its renderer at once, so changing channel means
     creating a new variant. `update_variant` therefore does not touch it.
 
-    `subject` and `preheader` are email-shaped and stay on the row for now —
-    ADR-162 point 1 moves them into a `header` module and is not built. A push
-    variant leaves them NULL.
+    `subject` and `preheader` are fields of an email, not columns of the
+    variant: `set_envelope_fields` below writes them into the variant's
+    envelope module (ADR-162 point 1; migration 0011 moved them there and 0012
+    dropped the columns). Push declares no envelope fields, so a push variant
+    has none.
     """
     # The parent is resolved within the brand before anything is written, so a
     # variant cannot be hung off another brand's campaign (ADR-172 point 5).
@@ -339,10 +341,9 @@ def create_variant_for_campaign(
     db.commit()
     db.refresh(variant)
 
-    # Into the module that declares them, not onto the row (ADR-162 point 1).
-    # The columns still exist and are deliberately no longer written: two
-    # places holding the same field is the failure mode that point rejects,
-    # and the read path stopped preferring the columns before this did.
+    # Into the module that declares them, not onto the row (ADR-162 point 1):
+    # the variant has no such columns since migration 0012, and two places
+    # holding the same field is the failure mode that point rejects.
     set_envelope_fields(
         db, variant.id, {"subject": subject, "preheader": preheader},
         brand_id=brand_id,

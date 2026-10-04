@@ -33,9 +33,9 @@ class EmailRenderer(ChannelRenderer):
             collect_resolutions=True,
         )
         # From the modules' manifests (ADR-162 point 1), not from variant
-        # columns — `envelope_fields_for_variant` still falls back to those
-        # while they exist, so this line did not have to change when the
-        # header module arrived and will not change when they are dropped.
+        # columns: the variant has had none since migration 0012, and this
+        # line did not have to change when the header module arrived or when
+        # the columns were dropped.
         from app.rendering.service import envelope_fields_for_variant
 
         envelope = envelope_fields_for_variant(db, variant_id, self.channel)

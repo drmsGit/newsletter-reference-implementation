@@ -75,11 +75,11 @@
                 </div>
                 <div id="envelope-fields">
                 {# Subject and preheader are fields of an EMAIL, not of a
-                   variant — ADR-162 point 1 moves them into a `header` module
-                   and is not built yet, so they are still columns and are
-                   hidden rather than absent for other channels. The server
-                   drops them for a non-email variant regardless, since a
-                   hand-crafted POST never sees this markup. #}
+                   variant — they are written into the variant's envelope
+                   (header) module, ADR-162 point 1, not into columns. Hidden
+                   rather than absent for other channels; the server drops them
+                   for a non-email variant regardless, since a hand-crafted
+                   POST never sees this markup. #}
                 <div class="mb-3">
                     <label class="form-label">Subject line <span class="text-muted">(recipient-facing)</span></label>
                     <input type="text" name="subject" class="form-control" maxlength="255" placeholder="e.g. Your summer city escape awaits">

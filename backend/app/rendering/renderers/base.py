@@ -49,10 +49,12 @@ class RenderedArtifact:
     #: concern every other channel has to ignore, which is the
     #: optional-methods shape that point explicitly rejects.
     #:
-    #: Subject and preheader are still read off the variant — ADR-162 point 1
-    #: moves them into a `header` module and is not built. When it is, they
-    #: arrive as module fields and this dict is filled from them instead,
-    #: without the interface changing.
+    #: Filled from the fields the variant's modules declare as envelope
+    #: (`envelope_fields_for_variant`, ADR-162 point 1) — for email, the
+    #: header module's subject and preheader. At send time it comes from the
+    #: snapshot's frame instead (`rendering/frame.py`), so what was approved
+    #: is what is sent (ADR-183). The variant has had no such columns since
+    #: migration 0012.
     envelope: dict = field(default_factory=dict)
     #: Per-module resolutions actually used, for the render context.
     resolutions_by_module_id: dict[int, DecisionResolutionDB] = field(default_factory=dict)
