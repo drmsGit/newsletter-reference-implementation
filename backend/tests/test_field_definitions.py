@@ -1,14 +1,18 @@
-"""A field's label is written once, in its definition (task-271).
+"""What a field IS is written once, in its definition (task-271, task-272).
 
 ADR-177 point 3 said a form label "can be built from concept and size";
 nothing built it, so the React editor and the bind picker showed storage keys
 (`headline_hero`). Concept and size cannot tell `image_url` from `image_alt`
 anyway. The addendum of 2026-10-04: one `label` per field in
 `storage/fields.json`, never declared by a manifest, reaching every surface
-from there.
+from there. `envelope` followed (task-272): ADR-177 point 3 already called it
+a property of the field, yet the header manifest repeated it and the registry
+fell back to the manifest's copy.
 """
 import json
 import uuid
+
+import pytest
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -68,15 +72,16 @@ def test_catalogue_fields_side_by_side_never_share_a_label():
     assert by_name["image_url"] != by_name["image_alt"]
 
 
-def test_a_manifest_that_labels_a_field_is_not_offered():
-    """One source: a label in a manifest is refused, not quietly ignored or
-    preferred — the module is skipped like any manifest the registry cannot
-    read, and the rest stay offered."""
-    prefix = f"labeltest{uuid.uuid4().hex[:6]}"
+@pytest.mark.parametrize("key, value", [("label", "My own word for it"), ("envelope", True)])
+def test_a_manifest_that_declares_what_a_field_is_is_not_offered(key, value):
+    """One source: a manifest repeating the definition is refused, not quietly
+    ignored or used as a fallback — the module is skipped like any manifest the
+    registry cannot read, and the rest stay offered."""
+    prefix = f"deftest{uuid.uuid4().hex[:6]}"
     planted = registry.MODULES_DIR / "email" / f"{prefix}.json"
     planted.write_text(json.dumps({
-        "label": "Labels its own field", "channel": "email", "cms": False, "has_template": False,
-        "variables": [{"name": "text", "label": "My own word for it"}],
+        "label": "Repeats its field's definition", "channel": "email", "cms": False, "has_template": False,
+        "variables": [{"name": "text", key: value}],
     }))
     try:
         registry._registry_mtime = None
@@ -86,3 +91,19 @@ def test_a_manifest_that_labels_a_field_is_not_offered():
     finally:
         planted.unlink(missing_ok=True)
         registry._registry_mtime = None
+
+
+def test_no_shipped_manifest_repeats_a_definition():
+    for path in Path(registry.MODULES_DIR).glob("*/*.json"):
+        for entry in json.loads(path.read_text()).get("variables", []):
+            repeated = [k for k in registry.DEFINITION_ONLY if k in entry]
+            assert not repeated, f"{path.name} declares {repeated} on {entry['name']!r}"
+
+
+def test_the_envelope_still_comes_from_the_definitions():
+    """The header manifest no longer says so; the definitions do, and the
+    envelope lookup still finds header for email and nothing for push."""
+    header = {v.name: v.envelope for v in registry.get_manifest("email", "header").variables}
+    assert header == {"subject": True, "preheader": True}
+    assert registry.envelope_module_type("email") == "header"
+    assert registry.envelope_module_type("push") is None

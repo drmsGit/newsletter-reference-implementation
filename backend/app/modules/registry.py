@@ -138,19 +138,28 @@ def _source(declared: dict, json_path: Path) -> str:
     return source
 
 
+#: What a field IS, so a manifest entry may not carry it: the definition in
+#: `storage/fields.json` is its one source (ADR-177 point 3). A manifest says
+#: which fields a module uses and whether each is required there.
+DEFINITION_ONLY = ("label", "envelope")
+
+
 def _variable(declared: dict, json_path: Path) -> ModuleVariable:
     """One manifest entry plus its definition.
 
     The manifest supplies `name` and `required` (and `source`); everything else
-    comes from `fields.json`, the label included. A manifest that still labels
-    a field is refused rather than ignored: two sources that disagree is the
-    condition ADR-177 exists to end (addendum 2026-10-04).
+    comes from `fields.json`, the label and `envelope` included. A manifest that
+    still declares either is refused rather than ignored or used as a fallback:
+    two sources that disagree is the condition ADR-177 exists to end (point 3;
+    addendum 2026-10-04 for the label, task-272 for `envelope`).
     """
     name = declared["name"]
-    if "label" in declared:
+    owned = [key for key in DEFINITION_ONLY if key in declared]
+    if owned:
         raise ValueError(
-            f"{json_path} labels the field {name!r}; a field's label is written "
-            "once, in storage/fields.json (ADR-177 addendum 2026-10-04)."
+            f"{json_path} declares {', '.join(owned)} on the field {name!r}; that "
+            "is what the field IS, written once in storage/fields.json (ADR-177 "
+            "point 3; addendum 2026-10-04)."
         )
     defs = field_definitions()
     if defs and name not in defs:
@@ -165,7 +174,7 @@ def _variable(declared: dict, json_path: Path) -> ModuleVariable:
         name=name,
         required=declared.get("required", True),
         label=spec.get("label"),
-        envelope=bool(spec.get("envelope", declared.get("envelope", False))),
+        envelope=bool(spec.get("envelope", False)),
         concept=spec.get("concept"),
         size=spec.get("size"),
         type=spec.get("type", "text"),
