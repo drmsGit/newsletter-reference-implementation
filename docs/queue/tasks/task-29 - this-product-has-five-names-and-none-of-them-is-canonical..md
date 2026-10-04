@@ -4,7 +4,7 @@ title: this product has five names and none of them is canonical.
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:56'
-updated_date: '2026-10-01 21:02'
+updated_date: '2026-10-04 17:49'
 labels:
   - docs
 dependencies: []
@@ -25,4 +25,6 @@ ordinal: 102900
 Migrated 2026-09-27 from `docs/backlog.md` line 94, section "Bugs", position 29 in that section (top = do next). The description is the original entry, verbatim.
 
 2026-10-01: a candidate name exists and is waiting on legal clearance (trademark / IP) before it is adopted. Held until that check is done; the name itself is deliberately not recorded here until it is cleared.
+
+2026-10-04: checked with the user; the candidate name is still not cleared. Still held; task-30 taken instead.
 <!-- SECTION:NOTES:END -->

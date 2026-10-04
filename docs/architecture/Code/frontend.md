@@ -5,12 +5,21 @@ topic:
   - architecture
   - frontend
 created: 2026-07-27
-modified: 2026-07-27
+modified: 2026-10-04
 ---
 
 # frontend
 
 > Part of [[MOC - System Overview]].
+
+> [!note] Which frontend this is
+> **The server-rendered Jinja UI in `backend/app/frontend/`** — the older of the
+> two manager UIs. It still owns `/`, which is why the React client is served
+> under `/manager`; `frontend/vite.config.ts` records that the base path becomes
+> `/` once `backend/app/frontend/router.py` is deleted. The React client
+> ([[ADR-170 — The Manager Client Is a Plain React SPA, Not Next.js]]) lives in
+> the top-level `frontend/` directory and is documented in [[manager-client]].
+> The two share a name and nothing else (task-30, 2026-10-04).
 
 ## Purpose
 

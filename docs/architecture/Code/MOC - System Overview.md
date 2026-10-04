@@ -94,7 +94,8 @@ graph LR
 ```
 
 *Cross-cutting, not shown as flow nodes:* [[settings]] (app config, e.g. the send
-cap) and [[frontend]] (the Jinja UI that drives all of the above).
+cap), [[manager-client]] (the React SPA a manager uses) and [[frontend]] (the
+older Jinja UI it is replacing).
 
 ---
 
@@ -135,7 +136,8 @@ Each links to its module page. One line = what it owns. Full detail is on the pa
 
 ### Cross-cutting
 - [[settings]] — app configuration (e.g. `max_send_recipients`), editable in the UI.
-- [[frontend]] — the Jinja/Bootstrap admin UI. **57 routes in one file** — documented as a [[frontend#Route index|route index table]], not per-route pages.
+- [[manager-client]] — the React SPA in the top-level `frontend/` directory ([[ADR-170 — The Manager Client Is a Plain React SPA, Not Next.js]]): one screen per area, typed against the JSON API from the OpenAPI schema.
+- [[frontend]] — the older Jinja/Bootstrap admin UI in `backend/app/frontend/`. **57 routes in one file** — documented as a [[frontend#Route index|route index table]], not per-route pages. Not the React client, despite the name.
 - [[auth]] — who is calling, and may they do this here: brands, users × roles × brands, passwordless sessions, machine principals, and the one route→permission policy table. Every other module is ignorant that users exist.
 - [[audit]] — the append-only accountability log. Deliberately separate from the domain history the product needs to function.
 - [[ai]] — the AI capability layer: discovered tasks, manager-owned prompts, vendor adapters, and the token ledger that gates spend. Proposes; never applies.

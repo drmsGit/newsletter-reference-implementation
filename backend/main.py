@@ -191,8 +191,10 @@ Endpoints are grouped by module, following the data flow: **sources** (content,
 recipients) → **compose** (campaigns, modules) → **personalize** (decision,
 overrides) → **audience** → **render** (rendering, snapshots) → **deliver**
 (delivery, provider) → **learn** (insight). The **frontend** section at the end is
-the server-rendered HTML admin UI (post/redirect/get), not a JSON API — it is
-documented as a route index in `docs/architecture/Code/frontend.md`.
+the older server-rendered Jinja admin UI (post/redirect/get), not a JSON API — it
+is documented as a route index in `docs/architecture/Code/frontend.md`. The React
+manager client (the top-level `frontend/` directory) is a consumer of the JSON
+API above, documented in `docs/architecture/Code/manager-client.md`.
 """.strip()
 
 # Ordered by architecture layer; `frontend` (the /ui HTML routes) is deliberately
@@ -210,7 +212,7 @@ TAGS_METADATA = [
     {"name": "delivery", "description": "Plan and fire sends: send instances + per-recipient delivery executions, through a swappable provider."},
     {"name": "provider", "description": "Inbound feedback boundary: normalize + correlate provider webhooks (opens/clicks/bounces) to deliveries."},
     {"name": "insight", "description": "The learning loop: engagement → per-category signal contributions (decay-on-read)."},
-    {"name": "frontend", "description": "Server-rendered HTML admin UI (post/redirect/get) — **not a JSON API**. Documented as a route index in `docs/architecture/Code/frontend.md`."},
+    {"name": "frontend", "description": "The older server-rendered Jinja admin UI (post/redirect/get) — **not a JSON API**, and not the React manager client (that one consumes the JSON API above; see `docs/architecture/Code/manager-client.md`). Route index in `docs/architecture/Code/frontend.md`."},
 ]
 
 # --- API documentation exposure (ADR-184, tasks 31 and 232) -----------------
