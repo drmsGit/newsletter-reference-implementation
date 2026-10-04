@@ -142,3 +142,17 @@ The agent definition names `<repo>/.claude/agent-memory/bug-fixer/` (this file).
 The harness preamble names `<repo>/backend/.claude/agent-memory/bug-fixer/` and
 auto-loads *that* MEMORY.md. Canonical content lives here; the backend one
 carries a pointer. Read both.
+
+## 2026-10-04 — every checkout has its own test database now (task-259); added by the main session
+
+The 2026-09-27 note above says the suite uses `<dev url>_test`. Since task-259 it
+is **per checkout**: `<dev>_test_<folder>_<path hash>` (`backend/tests/checkout_database.py`),
+created on the first run, so your worktree's suite and any other checkout's
+suite cannot rebuild each other's schema. Don't set `TEST_DATABASE_URL`.
+
+- Run with `INITIAL_ADMIN_EMAIL=admin@example.invalid` (see your definition,
+  step 6). A worktree has no `.env`, and without it no admin is seeded: 1
+  failure (`test_seed_pending_actions`) and skips that look almost green.
+- Your test database outlives your worktree. `scripts/drop_stale_test_databases.py`
+  lists it once the worktree is gone; dropping is the human's (`--drop`), never yours.
+- The suite baselines above are history; take a fresh baseline every run.

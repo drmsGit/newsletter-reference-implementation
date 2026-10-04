@@ -120,40 +120,51 @@ behind it is the human's. Say what the decision is and hand it back.
 
    ```
    cd <worktree>/backend && \
+     INITIAL_ADMIN_EMAIL=admin@example.invalid \
      /Users/diedeslembrouck/Projects/newsletter-reference-implementation/backend/venv/bin/python \
      -m pytest tests/ -q
    ```
 
-   That runs the main venv's packages against *your* `app/`. Verified: 157
-   pass this way with no `.env` present. Do not create a venv in the worktree
-   and do not `pip install` anything.
+   That runs the main venv's packages against *your* `app/`. Do not create a
+   venv in the worktree and do not `pip install` anything.
+
+   **`INITIAL_ADMIN_EMAIL` is not optional.** In the main checkout it comes from
+   `.env`; without it no admin is seeded, and the suite fails
+   `test_seed_pending_actions` and *skips* the tests that need an admin to act
+   as ("no active admin in this database to act as") — a run that looks almost
+   green while not testing them. The address is a made-up test value; never
+   read `.env` to find the real one. Any skip in your run is something to
+   explain in the report, not to accept.
 7. Report. Leave the worktree dirty.
 
-## The database is shared, and your worktree does not isolate it
+## The test database is your worktree's own; the dev database is not yours
 
-You run in a git worktree, so the files you touch are isolated from the main
-checkout. **The database is not.** The suite runs against the shared dev
-Postgres — there is no isolated test DB, which is a known open design item —
-and several tests create and delete real rows.
+You run in a git worktree, and since task-259 (2026-10-04) the suite does too:
+`backend/tests/checkout_database.py` names a test database per checkout
+(`<dev>_test_<folder>_<path hash>`), creates it on your first run, and the
+conftest rebuilds its schema from **your** models at every load. So another
+agent's suite or a human using the app cannot interfere with your run, and
+your run cannot touch the dev database — `_refuse_the_dev_database` stops the
+suite before anything is dropped. Do not set `TEST_DATABASE_URL`; the default
+is what isolates you.
 
-So: **do not run while another agent is running, or while a human is using the
-app.** That is a scheduling rule you cannot enforce and must not assume. If you
-see unexplained row counts or a test failing on data you did not create, stop
-and report rather than "fixing" the data.
+Establish your **baseline before editing anything** — run the suite first,
+write the result down, and compare your final run against *that*, not against
+a figure someone told you. A failure that is already in the baseline is not
+your change and not something to work around: report it and say which commit
+you are on. Never rebase, never migrate, never reseed.
 
-**Your worktree can be older than the database.** It is cut from a commit, but
-the shared dev database has whatever migrations have been applied to it — so if
-a migration landed after your branch point, your code and that database
-disagree, and you will see failures like `UndefinedColumn: column "email" of
-relation "recipients" does not exist` in tests you never touched. That is not
-your change and not something to work around. Establish your **baseline before
-editing anything** — run the suite first, write the number down, and compare
-your final run against *that*, not against a figure someone told you. Report
-the discrepancy and say which commit you are on. Never rebase, never migrate,
-never reseed.
+Your test database outlives the worktree. When the human deletes the worktree,
+`scripts/drop_stale_test_databases.py` lists it as stale, and dropping it is
+theirs: **never run that script with `--drop`.** Name your test database in the
+report; from `<worktree>/backend`, with the same interpreter as above:
 
-Never truncate, reseed, or reset the database. `scripts/reset_all_data.sql` and
-`scripts/seed_demo_data.py` destroy the dev data; running one to make a test
+```
+<main venv python> -c "from tests.checkout_database import test_database_url; print(test_database_url())"
+```
+
+Never truncate, reseed, or reset the **dev** database. `scripts/reset_all_data.sql`
+and `scripts/seed_demo_data.py` destroy the dev data; running one to make a test
 pass is a catastrophe dressed as a cleanup.
 
 ## Report shape
@@ -178,7 +189,7 @@ Then, in order:
 - **Suite result** — the count, and any failure with its name.
 - **What you deliberately did not touch** — anything you noticed and left
   alone. This is the most useful line in the report for whoever reads it next.
-- **Worktree path and branch.**
+- **Worktree path and branch, and the name of its test database.**
 
 Do not pad with praise. Do not summarise what the module does. Do not propose a
 follow-up refactor — this project's rule is that open forks are noted as
