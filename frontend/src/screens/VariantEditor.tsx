@@ -379,7 +379,10 @@ function ModuleFields({
 }
 
 function bindingOf(module: ComposedModule): string {
-  if (module.content_record_id != null) return `record #${module.content_record_id}`
-  if (module.decision_slot_id != null) return `slot #${module.decision_slot_id}`
+  // Names, not ids (2026-10-04); the id only when no name came back.
+  if (module.content_record_id != null)
+    return `“${module.content_record_title ?? `record #${module.content_record_id}`}”`
+  if (module.decision_slot_id != null)
+    return `slot “${module.decision_slot_name ?? `#${module.decision_slot_id}`}”`
   return 'typed in'
 }

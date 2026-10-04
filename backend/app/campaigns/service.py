@@ -1281,6 +1281,16 @@ def campaign_composition(db: Session, campaign_id: int, *, brand_id: int) -> dic
         return None
     slot_stats = {row["id"]: row for row in list_decision_slots_with_stats(db, brand_id=brand_id)
                   if row["campaign_id"] == campaign_id}
+    # Names, not ids: "Record #65" tells a manager nothing (2026-10-04). One
+    # query for every record the campaign's modules are bound to, kept within
+    # the brand, so a binding that somehow crossed it names nothing.
+    record_titles = dict(
+        db.query(ContentRecordDB.id, ContentRecordDB.title)
+        .join(ModuleInstanceDB, ModuleInstanceDB.content_record_id == ContentRecordDB.id)
+        .join(VariantDB, VariantDB.id == ModuleInstanceDB.variant_id)
+        .filter(VariantDB.campaign_id == campaign_id, ContentRecordDB.brand_id == brand_id)
+        .all()
+    )
     variants = []
     for variant in (db.query(VariantDB).filter(VariantDB.campaign_id == campaign_id)
                     .order_by(VariantDB.id.asc()).all()):
@@ -1293,6 +1303,8 @@ def campaign_composition(db: Session, campaign_id: int, *, brand_id: int) -> dic
             row = {
                 "id": m.id, "position": m.position, "module_type": m.module_type,
                 "content_record_id": m.content_record_id, "decision_slot_id": m.decision_slot_id,
+                "content_record_title": record_titles.get(m.content_record_id),
+                "decision_slot_name": (slot_stats.get(m.decision_slot_id) or {}).get("name"),
                 "module_data": m.module_data or {},
                 "known": manifest is not None, "updated_at": m.updated_at,
                 "overrideable": overrideable,

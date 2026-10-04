@@ -114,7 +114,9 @@ function VariantSection({
        */
       render: (m) =>
         m.content_record_id != null ? (
-          <Link to={`/content/${m.content_record_id}`}>Record #{m.content_record_id}</Link>
+          <Link to={`/content/${m.content_record_id}`}>
+            {m.content_record_title ?? `Record #${m.content_record_id}`}
+          </Link>
         ) : m.decision_slot_id != null ? (
           <Link to={`/decision-slots/${m.decision_slot_id}`}>
             Slot: {slotNames.get(m.decision_slot_id) ?? `#${m.decision_slot_id}`}

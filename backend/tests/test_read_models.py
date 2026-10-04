@@ -195,6 +195,17 @@ class TestB11CampaignComposition:
         assert by_id[composed["content"]]["active_override"]["field_overrides"] == {"headline_medium": "X"}
         assert by_id[composed["slotted"]]["overrideable"] is False, "a slot is never overridden"
 
+    def test_modules_name_their_record_and_slot_not_just_their_ids(self, db, composed):
+        """"Record #65" tells a manager nothing (2026-10-04)."""
+        from app.content.db_models import ContentRecordDB
+        from app.campaigns.db_models import ModuleInstanceDB as M
+
+        [variant] = self._get(composed["campaign"].id).json()["variants"]
+        by_id = {m["id"]: m for m in variant["modules"]}
+        record_id = db.get(M, composed["content"]).content_record_id
+        assert by_id[composed["content"]]["content_record_title"] == db.get(ContentRecordDB, record_id).title
+        assert by_id[composed["slotted"]]["decision_slot_name"] == "slot"
+
     def test_the_envelope_is_reported_apart(self, composed):
         [variant] = self._get(composed["campaign"].id).json()["variants"]
         assert [m["id"] for m in variant["envelope_modules"]] == [composed["header"]]

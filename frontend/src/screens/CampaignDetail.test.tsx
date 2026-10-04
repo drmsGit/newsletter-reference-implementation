@@ -42,7 +42,7 @@ const COMPOSITION = {
       ],
       modules: [
         module(10, 1, {
-          content_record_id: 42, overrideable: true,
+          content_record_id: 42, content_record_title: 'Lisbon in spring', overrideable: true,
           active_override: { id: 1, field_overrides: { headline_medium: 'Short' }, overridden_by: 'sam', reason: null },
         }),
         module(11, 2, { decision_slot_id: 5 }),
@@ -93,7 +93,8 @@ describe('a campaign in detail', () => {
     renderDetail()
 
     expect(await screen.findByText('Spring is here')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Record #42' })).toHaveAttribute('href', '/content/42')
+    // The record's title, not its id (2026-10-04).
+    expect(screen.getByRole('link', { name: 'Lisbon in spring' })).toHaveAttribute('href', '/content/42')
     expect(screen.getByRole('link', { name: 'Slot: Top pick' })).toHaveAttribute('href', '/decision-slots/5')
     expect(screen.getByRole('link', { name: 'Top pick' })).toHaveAttribute('href', '/decision-slots/5')
     expect(screen.getByText('Typed in the module')).toBeInTheDocument()

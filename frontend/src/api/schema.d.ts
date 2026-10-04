@@ -3036,6 +3036,10 @@ export interface components {
             content_record_id?: number | null;
             /** Decision Slot Id */
             decision_slot_id?: number | null;
+            /** Content Record Title */
+            content_record_title?: string | null;
+            /** Decision Slot Name */
+            decision_slot_name?: string | null;
             /** Module Data */
             module_data: {
                 [key: string]: unknown;

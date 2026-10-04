@@ -432,6 +432,9 @@ class ComposedModule(BaseModel):
     module_type: str
     content_record_id: int | None = None
     decision_slot_id: int | None = None
+    # What a manager reads instead of the ids (2026-10-04).
+    content_record_title: str | None = None
+    decision_slot_name: str | None = None
     module_data: dict
     # False when no manifest exists for this type on this channel.
     known: bool

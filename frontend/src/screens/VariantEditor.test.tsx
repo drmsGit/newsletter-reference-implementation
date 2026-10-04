@@ -49,7 +49,7 @@ function server(overrides: { canAdd?: boolean } = {}) {
       { id: 11, position: 1, module_type: 'cta', content_record_id: null, decision_slot_id: null,
         module_data: { label: 'Go', url: 'https://example.invalid' }, known: true, overrideable: false,
         active_override: null, updated_at: T(1) },
-      { id: 12, position: 2, module_type: 'hero', content_record_id: 42, decision_slot_id: null,
+      { id: 12, position: 2, module_type: 'hero', content_record_id: 42, content_record_title: 'Lisbon', decision_slot_id: null,
         module_data: {}, known: true, overrideable: true, active_override: null, updated_at: T(1) },
     ],
   }
@@ -113,7 +113,7 @@ describe('the variant editor', () => {
     expect(await screen.findByLabelText(/^Subject/)).toHaveValue('Spring')
     const stack = screen.getByRole('list')
     expect(within(stack).getByRole('button', { name: /^Call to action ·/ })).toBeInTheDocument()
-    expect(within(stack).getByRole('button', { name: /Hero · record #42/ })).toBeInTheDocument()
+    expect(within(stack).getByRole("button", { name: /Hero · “Lisbon”/ })).toBeInTheDocument()
     expect(screen.getByLabelText(/^Button label/)).toHaveValue('Go')
   })
 
