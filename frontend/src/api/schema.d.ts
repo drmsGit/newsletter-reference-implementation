@@ -467,6 +467,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/content/{content_id}/campaigns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The campaigns whose modules use this record, sent ones included
+         * @description Campaigns in the brand with a module bound to the record, each with the variants that use it and their stage; a sent variant's stage is "sent". A decision slot that may pick the record at send time is not listed.
+         */
+        get: operations["get_campaigns_using_content__content_id__campaigns_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/content/{content_id}/unsent-campaigns": {
         parameters: {
             query?: never;
@@ -2825,6 +2845,17 @@ export interface components {
              */
             overrides_not_carried: number;
         };
+        /** CampaignVariantUse */
+        CampaignVariantUse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Channel */
+            channel: string;
+            /** Stage */
+            stage: string;
+        };
         /** CampaignWithVariants */
         CampaignWithVariants: {
             /** Id */
@@ -3250,6 +3281,19 @@ export interface components {
             type: string;
             /** Score */
             score?: number | null;
+        };
+        /**
+         * ContentCampaign
+         * @description A campaign with a module bound to the record, and the variants of it
+         *     that use the record (task-267).
+         */
+        ContentCampaign: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Variants */
+            variants: components["schemas"]["CampaignVariantUse"][];
         };
         /** ContentCategoryAssignment */
         ContentCategoryAssignment: {
@@ -4424,6 +4468,17 @@ export interface components {
         Page_ConsentSyncLog_: {
             /** Items */
             items: components["schemas"]["ConsentSyncLog"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[ContentCampaign] */
+        Page_ContentCampaign_: {
+            /** Items */
+            items: components["schemas"]["ContentCampaign"][];
             /** Total */
             total: number;
             /** Limit */
@@ -6758,6 +6813,42 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_campaigns_using_content__content_id__campaigns_get: {
+        parameters: {
+            query?: {
+                /** @description Rows per page (1-200). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                content_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ContentCampaign_"];
+                };
             };
             /** @description Validation Error */
             422: {

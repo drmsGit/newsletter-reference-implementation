@@ -25,6 +25,7 @@ from app.content.models import (
     ContentDuplicateTarget,
     ContentAssignment,
     ContentUsage,
+    ContentCampaign,
     Category,
     CategoryCreate,
     CategoryRelation,
@@ -586,6 +587,31 @@ def delete_category_relation_route(relation_id: int, db: Session = Depends(get_d
 
     if not delete_category_relation(db, relation_id):
         raise HTTPException(status_code=404, detail="Category relation not found")
+
+
+@router.get(
+    "/{content_id}/campaigns",
+    response_model=Page[ContentCampaign],
+    summary="The campaigns whose modules use this record, sent ones included",
+    description=(
+        "Campaigns in the brand with a module bound to the record, each with the "
+        "variants that use it and their stage; a sent variant's stage is \"sent\". "
+        "A decision slot that may pick the record at send time is not listed."
+    ),
+)
+def get_campaigns_using(
+    content_id: int,
+    params: PageParams = Depends(page_params),
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    from app.campaigns.monitoring import campaigns_using
+
+    if get_content_record(db, content_id, brand_id=brand_id) is None:
+        raise HTTPException(status_code=404, detail="Content record not found")
+    # Grows with use, so paged (ADR-185); built in Python from monitoring's
+    # read model, like the monitoring list itself.
+    return page_of_list(campaigns_using(db, content_id, brand_id=brand_id), params)
 
 
 @router.get(

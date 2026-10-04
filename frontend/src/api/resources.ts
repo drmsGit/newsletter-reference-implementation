@@ -651,6 +651,23 @@ export function useCreateVariant(campaignId: number) {
 export type ContentRecordDetail = components['schemas']['ContentRecordDetail']
 
 /** The unsent campaigns an edit to this record would reach (ADR-178 point 8). */
+/**
+ * Every campaign whose modules use a record, sent ones included, each with
+ * the variants that use it and their stage (task-267). The first page; the
+ * screen says when there are more.
+ */
+export function useCampaignsUsing(recordId: number) {
+  return useQuery({
+    queryKey: [...keys.contentRecord(recordId), 'campaigns'],
+    queryFn: () =>
+      read(
+        api.GET('/content/{content_id}/campaigns', {
+          params: { path: { content_id: recordId }, query: { limit: PAGE_SIZE } },
+        }),
+      ),
+  })
+}
+
 export function useContentReach(recordId: number | null | undefined) {
   return useQuery({
     queryKey: [...keys.contentRecord(recordId ?? 0), 'unsent-campaigns'],

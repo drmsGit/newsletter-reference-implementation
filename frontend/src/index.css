@@ -377,6 +377,15 @@ input[data-focus-visible] {
   white-space: nowrap;
 }
 
+.used-in {
+  padding-left: 1.25em;
+}
+
+/* A sent variant is immune to catalogue edits; say so at a glance (task-267). */
+.used-in__sent {
+  font-weight: 600;
+}
+
 .bind__notices {
   font-size: 0.9em;
 }

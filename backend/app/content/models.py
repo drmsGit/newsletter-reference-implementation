@@ -197,6 +197,23 @@ class UnsentCampaign(BaseModel):
     name: str
 
 
+class CampaignVariantUse(BaseModel):
+    id: int
+    name: str
+    channel: str
+    #: The monitoring screen's stage (task-216); "sent" marks a sent variant.
+    stage: str
+
+
+class ContentCampaign(BaseModel):
+    """A campaign with a module bound to the record, and the variants of it
+    that use the record (task-267)."""
+
+    id: int
+    name: str
+    variants: list[CampaignVariantUse]
+
+
 class ContentReach(BaseModel):
     """Which unsent campaigns use a record (task-224, ADR-178 point 8): the
     count the composer shows beside a catalogue field, and the list behind it.

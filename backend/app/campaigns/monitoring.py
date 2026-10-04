@@ -143,16 +143,15 @@ def campaign_monitoring(db: Session, *, brand_id: int) -> list[dict]:
     return rows
 
 
-def unsent_campaigns_using(db: Session, content_record_id: int, *, brand_id: int) -> list[dict]:
-    """The brand's campaigns a catalogue edit to this record can still reach
-    (task-224, ADR-178 point 8): campaigns with a module bound to it, kept when
-    any variant that uses it has not been sent.
+def campaigns_using(db: Session, content_record_id: int, *, brand_id: int) -> list[dict]:
+    """The brand's campaigns with a module bound to this record, each with
+    only the variants that use it (task-267: the content screen's "used in").
 
-    "Sent" is this module's own definition — a variant whose stage is "sent" —
-    so the composer's count and the monitoring screen never disagree. A sent
-    variant is snapshotted and immune; counting it would overstate the reach.
-    Only bound modules count: a slot that might pick the record at send time
-    is not "using" it. Id and name only — no owners on the composer.
+    A variant carries its stage, so a sent one reads as sent by this module's
+    own definition (task-216) and the content screen, the composer's count and
+    the monitoring screen never disagree. Only bound modules count: a slot that
+    might pick the record at send time is not "using" it. Monitoring's order —
+    in flight first, then newest.
     """
     using = {
         variant_id
@@ -162,8 +161,26 @@ def unsent_campaigns_using(db: Session, content_record_id: int, *, brand_id: int
     }
     if not using:
         return []
+    rows = []
+    for row in campaign_monitoring(db, brand_id=brand_id):
+        variants = [
+            {key: v[key] for key in ("id", "name", "channel", "stage")}
+            for v in row["variants"] if v["id"] in using
+        ]
+        if variants:
+            rows.append({"id": row["id"], "name": row["name"], "variants": variants})
+    return rows
+
+
+def unsent_campaigns_using(db: Session, content_record_id: int, *, brand_id: int) -> list[dict]:
+    """The brand's campaigns a catalogue edit to this record can still reach
+    (task-224, ADR-178 point 8): those `campaigns_using` lists with a variant
+    using it that has not been sent. A sent variant is snapshotted and immune;
+    counting it would overstate the reach. Id and name only — no owners on the
+    composer.
+    """
     return [
         {"id": row["id"], "name": row["name"]}
-        for row in campaign_monitoring(db, brand_id=brand_id)
-        if any(v["id"] in using and v["stage"] != "sent" for v in row["variants"])
+        for row in campaigns_using(db, content_record_id, brand_id=brand_id)
+        if any(v["stage"] != "sent" for v in row["variants"])
     ]

@@ -1,4 +1,5 @@
-"""How many unsent campaigns a catalogue edit reaches (task-224, ADR-178 point 8).
+"""How many unsent campaigns a catalogue edit reaches (task-224, ADR-178 point 8),
+and every campaign that uses a record, sent ones marked (task-267).
 
 The composer shows this passively beside a catalogue field: a count of
 *unsent* campaigns using the record, the list on demand, no owner names. A
@@ -28,16 +29,19 @@ def world(db, default_brand, foreign_brand):
     db.add(record); db.flush()
     made = {"campaigns": [], "snapshots": [], "sends": []}
 
-    def campaign(name, *, brand=default_brand, uses=True, sent=False, variants=1):
+    def campaign(name, *, brand=default_brand, uses=True, sent=False, variants=1, sent_only=None):
+        """`sent_only`: indexes of the variants that are sent, when not all are."""
         c = CampaignDB(brand_id=brand.id, name=f"{name}-{uuid.uuid4().hex[:4]}")
         db.add(c); db.flush()
         made["campaigns"].append(c.id)
-        for _ in range(variants):
-            v = VariantDB(campaign_id=c.id, channel="email", name="v", status="draft")
+        for index in range(variants):
+            v = VariantDB(campaign_id=c.id, channel="email", name=f"v{index}", status="draft")
             db.add(v); db.flush()
+            # `uses` may name the variants that use the record; True means all.
+            used = uses is True or (isinstance(uses, set) and index in uses)
             db.add(ModuleInstanceDB(variant_id=v.id, module_type="img_left", position=1,
-                                    content_record_id=record.id if uses else None))
-            if sent:
+                                    content_record_id=record.id if used else None))
+            if sent if sent_only is None else index in sent_only:
                 s = SnapshotDB(variant_id=v.id)
                 db.add(s); db.flush()
                 made["snapshots"].append(s.id)
@@ -89,3 +93,55 @@ def test_another_brands_record_is_not_found(world, foreign_brand, foreign_api):
     record, _ = world
     with foreign_api([VIEW]) as headers:
         assert client.get(f"/content/{record.id}/unsent-campaigns", headers=headers).status_code == 404
+
+
+def _used_in(record_id, **params):
+    with machine([VIEW]) as headers:
+        return client.get(f"/content/{record_id}/campaigns", headers=headers, params=params)
+
+
+def test_used_in_lists_sent_campaigns_too_with_each_variants_stage(world):
+    record, campaign = world
+    composing = campaign("composing")
+    sent = campaign("sent", sent=True)
+    campaign("other", uses=False)
+    response = _used_in(record.id)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    rows = {row["id"]: row for row in body["items"]}
+    assert set(rows) == {composing.id, sent.id}
+    assert body["total"] == 2
+    assert [v["stage"] for v in rows[sent.id]["variants"]] == ["sent"]
+    assert [v["stage"] for v in rows[composing.id]["variants"]] == ["composing"]
+    assert rows[sent.id]["name"] == sent.name
+
+
+def test_used_in_names_only_the_variants_that_use_the_record(world):
+    record, campaign = world
+    mixed = campaign("mixed", variants=3, uses={0, 2}, sent_only={2})
+    [row] = [r for r in _used_in(record.id).json()["items"] if r["id"] == mixed.id]
+    assert [(v["name"], v["stage"], v["channel"]) for v in row["variants"]] == [
+        ("v0", "composing", "email"), ("v2", "sent", "email"),
+    ]
+
+
+def test_used_in_is_paged(world):
+    record, campaign = world
+    for n in range(3):
+        campaign(f"paged{n}")
+    body = _used_in(record.id, limit=2).json()
+    assert (len(body["items"]), body["total"], body["limit"]) == (2, 3, 2)
+
+
+def test_used_in_another_brands_record_is_not_found(world, foreign_brand, foreign_api):
+    record, _ = world
+    with foreign_api([VIEW]) as headers:
+        assert client.get(f"/content/{record.id}/campaigns", headers=headers).status_code == 404
+
+
+def test_a_campaign_partly_sent_still_counts_as_reachable(world):
+    """The refactor onto campaigns_using keeps the reach rule: a campaign
+    counts while any variant using the record is unsent."""
+    record, campaign = world
+    mixed = campaign("mixed", variants=2, sent_only={0})
+    assert [c["id"] for c in _reach(record.id).json()["campaigns"]] == [mixed.id]

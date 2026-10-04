@@ -13,7 +13,8 @@ const STATE_LABEL: Record<string, string> = {
   sent: 'Sent',
 }
 
-const STAGE_LABEL: Record<string, string> = {
+/** A variant's stage in words; the content screen's "used in" reads it too (task-267). */
+export const STAGE_LABEL: Record<string, string> = {
   sending: 'sending',
   scheduled: 'scheduled',
   planned: 'send planned',
