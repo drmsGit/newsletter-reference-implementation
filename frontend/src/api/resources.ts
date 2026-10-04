@@ -815,3 +815,36 @@ export function useSaveSlot(campaignId: number, slotId: number) {
       ]),
   })
 }
+
+// --- the preview overlay (task-265) ------------------------------------------
+
+export type RenderedVariant = components['schemas']['RenderedVariant']
+export type ModuleState = components['schemas']['ModuleState']
+
+/**
+ * The variant rendered as it is saved now, with each module's state
+ * (task-227). `stamp` is the composition's update time, so every save —
+ * which re-reads the composition — re-renders too: the preview never needs
+ * a render button (Variant Editor interview 2.1).
+ */
+export function useRenderedVariant(variantId: number, recipientId: number | null, stamp: number) {
+  return useQuery({
+    queryKey: ['render', variantId, recipientId, stamp],
+    queryFn: () =>
+      read(
+        api.GET('/rendering/variants/{variant_id}', {
+          params: { path: { variant_id: variantId }, query: { recipient_id: recipientId ?? undefined } },
+        }),
+      ),
+    placeholderData: (previous) => previous,
+  })
+}
+
+/** Recipients found by identifier or address, for naming one in a preview. */
+export function useRecipientSearch(q: string) {
+  return useQuery({
+    queryKey: ['recipients', 'search', q],
+    queryFn: () => read(api.GET('/recipients/', { params: { query: { q, limit: 10 } } })),
+    enabled: q.trim().length > 0,
+  })
+}

@@ -4201,7 +4201,7 @@ export interface components {
              */
             kind: "record" | "slot" | "typed" | "unbound" | "unknown";
             /** Slot State */
-            slot_state?: ("resolved" | "not_run" | "finds_nothing") | null;
+            slot_state?: ("resolved" | "not_run" | "per_recipient" | "finds_nothing") | null;
             /**
              * Generic Pick
              * @default false

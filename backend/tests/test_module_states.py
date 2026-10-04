@@ -129,3 +129,16 @@ def test_another_brands_variant_is_not_found(world, foreign_api):
     with foreign_api([VIEW]) as headers:
         response = client.get(f"/rendering/variants/{world['variant'].id}", headers=headers)
     assert response.status_code == 404, response.text
+
+
+def test_a_slot_that_picked_only_per_recipient_is_not_called_unrun(db, world):
+    """A per-recipient strategy writes picks for named people and none for
+    "anyone", so a generic preview finds nothing to show. "Not run" would be
+    false — it ran (found live on the dev data, 2026-10-04)."""
+    unrun = world["modules"][4]
+    db.add(DecisionResolutionDB(decision_slot_id=unrun.decision_slot_id, recipient_id=world["recipient"].id,
+                                content_record_id=world["modules"][1].content_record_id, reason="r", score=1))
+    db.commit()
+    assert _states(world["variant"].id)[4]["slot_state"] == "per_recipient"
+    named = _states(world["variant"].id, recipient_id=world["recipient"].id)[4]
+    assert (named["slot_state"], named["generic_pick"]) == ("resolved", False)

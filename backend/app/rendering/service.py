@@ -697,7 +697,9 @@ def module_states(
     fields), `unbound` (a catalogue module with no content yet) or `unknown`
     (no manifest on this channel) — and, as they apply:
 
-    - `slot_state` (Variant Editor interview 4.4): `resolved`, `not_run`, or
+    - `slot_state` (Variant Editor interview 4.4): `resolved`, `not_run`,
+      `per_recipient` (no generic pick, but picks for named people: name one to
+      see theirs), or
       `finds_nothing` — its rule matches no active content
       (`slot_candidate_count`, task-205), so ADR-086 will hide it and the
       email ships shorter. That outranks an older pick: the rule is what a
@@ -745,7 +747,14 @@ def module_states(
             if candidates is not None and candidates["candidate_count"] == 0:
                 state["slot_state"] = "finds_nothing"
             elif resolution is None:
-                state["slot_state"] = "not_run"
+                # No generic pick, but picks for named people: a per-recipient
+                # strategy that has run. "Not run" would be false; it needs a
+                # recipient named to show anything (found live, 2026-10-04).
+                personal = recipient_id is None and db.query(DecisionResolutionDB.id).filter(
+                    DecisionResolutionDB.decision_slot_id == module.decision_slot_id,
+                    DecisionResolutionDB.recipient_id.isnot(None),
+                ).first() is not None
+                state["slot_state"] = "per_recipient" if personal else "not_run"
             else:
                 state["slot_state"] = "resolved"
                 state["generic_pick"] = recipient_id is not None and resolution.recipient_id is None

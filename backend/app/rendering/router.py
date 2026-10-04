@@ -24,7 +24,7 @@ class ModuleState(BaseModel):
     position: int
     module_type: str
     kind: Literal["record", "slot", "typed", "unbound", "unknown"]
-    slot_state: Literal["resolved", "not_run", "finds_nothing"] | None = None
+    slot_state: Literal["resolved", "not_run", "per_recipient", "finds_nothing"] | None = None
     generic_pick: bool = False
     unpublished_changes: bool = False
     missing_required: list[str] = []

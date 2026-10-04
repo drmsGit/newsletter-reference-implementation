@@ -367,3 +367,69 @@ input[data-focus-visible] {
   background: var(--brand-accent);
   border-color: var(--brand-accent);
 }
+
+/*
+ * The preview (task-265): a collapsed bar on the editor, and an overlay with
+ * the render. Only "finds nothing" is marked (Variant Editor interview 4.4).
+ */
+.preview-bar {
+  display: flex;
+  gap: var(--brand-space);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--brand-space) calc(var(--brand-space) * 1.5);
+  border: 1px solid var(--brand-line);
+  border-radius: var(--brand-radius);
+  margin-bottom: calc(var(--brand-space) * 2);
+}
+
+.preview-bar__findings--marked,
+.module-state--marked {
+  color: var(--brand-danger);
+}
+
+.preview-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 40%);
+  display: grid;
+  place-items: center;
+  z-index: 10;
+}
+
+.preview-modal {
+  background: var(--brand-bg);
+  border-radius: var(--brand-radius);
+  width: min(70rem, 95vw);
+  max-height: 92vh;
+  overflow: auto;
+  padding: calc(var(--brand-space) * 2);
+}
+
+.preview-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.preview-body {
+  display: grid;
+  grid-template-columns: minmax(16rem, 1fr) 2fr;
+  gap: calc(var(--brand-space) * 2);
+  align-items: start;
+}
+
+.module-states {
+  margin: 0;
+  padding-left: 1.2em;
+  display: grid;
+  gap: var(--brand-space);
+}
+
+.preview-frame {
+  width: 100%;
+  height: 70vh;
+  border: 1px solid var(--brand-line);
+  border-radius: var(--brand-radius);
+  background: #fff;
+}

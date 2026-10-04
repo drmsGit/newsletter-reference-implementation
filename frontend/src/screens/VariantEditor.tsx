@@ -18,6 +18,7 @@ import Choice from '../components/Choice'
 import { AutosaveField, SaveState, fieldError } from '../components/EditorFields'
 import ScreenState from '../components/ScreenState'
 import CatalogueModule from './CatalogueModule'
+import PreviewBar from './Preview'
 
 /**
  * One variant, edited (task-255, slice 5 of the campaign write surface).
@@ -58,6 +59,7 @@ export default function VariantEditor() {
                 composed={composed}
                 manifests={manifests.data}
                 reload={() => composition.refetch()}
+                stamp={composition.dataUpdatedAt}
               />
             )}
           </ScreenState>
@@ -72,11 +74,13 @@ function Editor({
   composed,
   manifests,
   reload,
+  stamp,
 }: {
   campaignId: number
   composed: ComposedVariant
   manifests: ModuleManifest[]
   reload: () => void
+  stamp: number
 }) {
   const { variant, modules } = composed
   const [selectedId, setSelectedId] = useState<number | undefined>(modules[0]?.id)
@@ -89,6 +93,7 @@ function Editor({
       <p className="muted">
         {variant.channel} · {variant.status}
       </p>
+      <PreviewBar variantId={variant.id} variantName={variant.name} stamp={stamp} byName={byName} />
       {composed.has_envelope && (
         <Envelope campaignId={campaignId} composed={composed} manifests={manifests} reload={reload} />
       )}
