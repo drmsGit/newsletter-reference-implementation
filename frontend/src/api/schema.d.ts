@@ -4272,6 +4272,11 @@ export interface components {
             note?: string | null;
             /** Concept */
             concept?: string | null;
+            /**
+             * Source
+             * @default content
+             */
+            source: string;
         };
         /**
          * MonitoredCampaign

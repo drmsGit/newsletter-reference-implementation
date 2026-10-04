@@ -15,6 +15,8 @@ const MANIFESTS = [
     variables: [
       { name: 'headline_hero', required: true, label: 'Headline', envelope: false, type: 'text' },
       { name: 'button_label_hero', required: true, label: 'Button', envelope: false, type: 'text' },
+      { name: 'section_heading', required: false, label: 'Heading above this module', envelope: false,
+        type: 'text', source: 'module' },
     ],
   },
 ]
@@ -36,7 +38,7 @@ function server(options: { slot?: boolean; unbound?: boolean; unpublished?: bool
       id: 12, position: 1, module_type: 'hero',
       content_record_id: options.slot || options.unbound ? null : 42,
       decision_slot_id: options.slot ? 5 : null,
-      module_data: {}, known: true, overrideable: !options.slot && !options.unbound,
+      module_data: { section_heading: 'Picked for you' }, known: true, overrideable: !options.slot && !options.unbound,
       active_override: options.override ?? null, updated_at: T(1),
     } as Record<string, unknown>,
   }
@@ -253,5 +255,26 @@ describe('binding', () => {
     expect(writes[0].headers.get('If-Match')).toBe(T(1))
     expect((await writes[0].json()).content_record_id).toBe(42)
     expect(await screen.findByLabelText(/^Headline/)).toHaveValue('Lisbon')
+  })
+})
+
+describe('a field typed in the module (task-223)', () => {
+  it('is edited on the module with its version, never as a catalogue edit or an override', async () => {
+    const { handlers, writes } = server()
+    open(handlers)
+    const heading = await screen.findByLabelText(/^Heading above this module/)
+    expect(heading).toHaveValue('Picked for you')
+    expect(screen.queryByRole('button', { name: /Change Heading above this module in catalogue/ })).not.toBeInTheDocument()
+    fireEvent.change(heading, { target: { value: 'You might like' } })
+    fireEvent.blur(heading)
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect(new URL(writes[0].url).pathname).toBe('/campaigns/modules/12')
+    expect(writes[0].headers.get('If-Match')).toBe(T(1))
+    expect((await writes[0].json()).module_data).toEqual({ section_heading: 'You might like' })
+  })
+
+  it('is offered on a slot-filled module too, where it hides with the slot', async () => {
+    open(server({ slot: true }).handlers)
+    expect(await screen.findByLabelText(/^Heading above this module/)).toHaveValue('Picked for you')
   })
 })

@@ -11,6 +11,7 @@ import {
   useSaveCatalogueField,
   useSetOverride,
   useAttachSlot,
+  useSaveModule,
   type ComposedModule,
   type ModuleManifest,
 } from '../api/resources'
@@ -49,7 +50,9 @@ export default function CatalogueModule({
   reload: () => void
 }) {
   if (module.decision_slot_id != null) {
-    return <SlotBound campaignId={campaignId} module={module} slotId={module.decision_slot_id} />
+    return (
+      <SlotBound campaignId={campaignId} module={module} manifest={manifest} slotId={module.decision_slot_id} />
+    )
   }
   if (module.content_record_id == null) {
     return <Unbound campaignId={campaignId} module={module} />
@@ -85,7 +88,9 @@ function CatalogueFields({
   const saveField = useSaveCatalogueField(recordId, channel)
   const setOverride = useSetOverride(campaignId)
   const overrides = (module.active_override?.field_overrides ?? {}) as Record<string, unknown>
-  const fields = manifest.variables.filter((v) => !v.envelope)
+  // Content fields only: a field typed in the module is the module's own,
+  // edited below and never overridden (ADR-179's 2026-10-04 addendum).
+  const fields = manifest.variables.filter((v) => !v.envelope && v.source !== 'module')
   const [confirmReset, setConfirmReset] = useState(false)
   const [rebinding, setRebinding] = useState(false)
 
@@ -103,6 +108,7 @@ function CatalogueFields({
           {rebinding && <BindRecord campaignId={campaignId} module={module} />}
           <PublishState recordId={recordId} detail={record.data} />
 
+          <ModuleOwnFields campaignId={campaignId} module={module} manifest={manifest} />
           {fields.map((field) => (
             <CatalogueField
               key={field.name}
@@ -400,10 +406,21 @@ function CatalogueField({
  * A module filled by a decision slot: its settings in place (slice 7), and
  * the way back to one fixed record. Never overridable (ADR-186 point 5).
  */
-function SlotBound({ campaignId, module, slotId }: { campaignId: number; module: ComposedModule; slotId: number }) {
+function SlotBound({
+  campaignId,
+  module,
+  manifest,
+  slotId,
+}: {
+  campaignId: number
+  module: ComposedModule
+  manifest: ModuleManifest
+  slotId: number
+}) {
   const [rebinding, setRebinding] = useState(false)
   return (
     <>
+      <ModuleOwnFields campaignId={campaignId} module={module} manifest={manifest} />
       <SlotSettings campaignId={campaignId} slotId={slotId} />
       <p className="muted">
         A slot is never overridden: one pinned value would replace every personal pick.
@@ -430,5 +447,40 @@ function Unbound({ campaignId, module }: { campaignId: number; module: ComposedM
       </p>
       <SaveState mutation={attach} what="the module" />
     </>
+  )
+}
+
+/**
+ * The fields a catalogue module types itself (ADR-179's 2026-10-04
+ * addendum) — today the optional heading above it. Saved to the module, with
+ * its version, and shown only when the module is: a slot that finds nothing
+ * hides its heading too (ADR-086).
+ */
+function ModuleOwnFields({
+  campaignId,
+  module,
+  manifest,
+}: {
+  campaignId: number
+  module: ComposedModule
+  manifest: ModuleManifest
+}) {
+  const save = useSaveModule(campaignId)
+  const own = manifest.variables.filter((v) => v.source === 'module')
+  if (own.length === 0) return null
+  const data = module.module_data as Record<string, unknown>
+  return (
+    <div className="module-own-fields">
+      {own.map((field) => (
+        <AutosaveField
+          key={field.name}
+          field={field}
+          value={typeof data[field.name] === 'string' ? (data[field.name] as string) : ''}
+          onSave={(value) => save.mutate({ id: module.id, changes: { [field.name]: value.trim() ? value : null } })}
+          error={fieldError(save.error, field.name)}
+        />
+      ))}
+      <SaveState mutation={save} what="the module" />
+    </div>
   )
 }

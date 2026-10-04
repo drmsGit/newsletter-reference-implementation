@@ -110,7 +110,7 @@
       "channel": "email",
       "type": "text",
       "size": "small",
-      "note": "Optional heading above the module, shown only when the module is (ADR-179 addendum 2026-10-04)"
+      "note": "Optional. Shown above the module, and only when the module itself is shown."
     },
     "subject": {
       "concept": "subject",
