@@ -228,6 +228,78 @@ detect a conflict.
   for this campaign", "Legal or compliance". They are stored as text in the
   existing reason column; task-225 may turn them into codes.
 
+## Choosing a record for a module
+
+**Decided with the user, 2026-10-04 (task-263), one question at a time. Not
+built: task-268 (server), task-269 (picker), task-270 (Content list).**
+
+After trying slice 6, the user said a manager with "only a general topic in
+mind" has nothing to pick from. BindRecord (`frontend/src/screens/CatalogueModule.tsx`)
+matches part of a title and shows nothing until something is typed. The API
+and category rules are recorded in the ADR-175 addendum of 2026-10-04
+([[ADR-175 — Facets Are the Manager's Own Taxonomy, Not the Engine's]]). This
+section holds the decisions about the screen.
+
+1. **A manager with a topic browses in the picker, not through a slot.** A slot
+   filtered to one category already means "let the engine pick from this
+   topic", and stays as it is.
+2. **Topic is category for now, read-only.** The picker never offers to create
+   or assign a category. Facets join as a second filter when task-207 is built.
+3. **Text matches title and description**, in the picker and on the Content
+   list alike.
+4. **"In Nature" means directly assigned to Nature,** as for a slot. The
+   dropdown shows children indented beneath their parents.
+5. **Order:** with a category, score highest first, then newest. With text
+   only, newest first.
+6. **Each row shows** the title, a one-line description and notices. The
+   notices inform and never block:
+   - the record lacks a field this module requires (VE 2.8);
+   - it is already in this variant (VE 1.6);
+   - it is not published yet.
+
+   The score and the record's other categories are not shown.
+7. **Interaction:**
+   - The picker opens already listing records, newest first.
+   - A text field sits beside a one-category dropdown, and the two combine.
+   - Results update live after a short typing pause.
+   - Arrow keys move through results, Enter binds and Esc closes. These keys
+     appear in the shortcut overview.
+8. **The Content list gets the same category filter**, built alongside
+   task-267's content-screen work (task-270).
+
+**Deferred, not rejected:**
+- body-text and full-text search;
+- including child categories, which would be decided for slots and picker
+  together;
+- a shortcut from the picker to a slot.
+
+**Where it lands:**
+- **Server, task-268:** `GET /content/` gains a category filter, the wider `q`
+  and the score order. It reuses the brand-scoped `page_content_records`
+  (`backend/app/content/service.py`). Its row has to carry what "not published
+  yet" needs without a query per row.
+- **Client, task-269:** BindRecord is rewritten as a keyboard-navigable list.
+  The hierarchy is built from `GET /content/categories` and
+  `/content/category-relations`, and must survive the multi-parent graph and
+  the seeded Beach↔Family cycle.
+
+**Not touched:**
+- decision slots;
+- `candidate_query`;
+- category assignment;
+- the list screens' search-on-Enter.
+
+**What could break:**
+- Widening `q` changes the Content list's search results as well, which is
+  intended.
+- A category filter that joins assignments without the brand filter would leak
+  another brand's records, the same class of fault as defect 1.
+
+> Note, 2026-10-04: the "Record-bound fields" row in *Where each part lands*
+> describes ADR-178's catalogue-first default. Since ADR-186 superseded it,
+> typing overrides and the catalogue changes only through an explicit act.
+> The row is left as it was decided; read ADR-186 for current behaviour.
+
 ## What could break
 
 - **Fixing defect 1 can refuse existing rows.** A seeded or hand-made module

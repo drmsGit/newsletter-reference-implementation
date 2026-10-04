@@ -121,6 +121,26 @@ The product must not assume a record count — a reference architecture is copie
 
 **The filtering requirement in point 7 is unchanged by this addendum.** Every facet filter, every readiness filter and every search from points 1 and 5 is still a query parameter the API must accept. ADR-185 leaves filtering route-specific and undecided, with one rule that binds it now: a filter applies identically to `items` and `total`. The filters themselves are still owed, and work on them starts on 2026-10-03.
 
+## Addendum 2026-10-04 — Until facets exist, the bind picker browses by category, read-only
+
+The variant editor's bind picker, `BindRecord` (`frontend/src/screens/CatalogueModule.tsx:254-286`), finds a record only by title. It calls `GET /content/?q=`, which `page_content_records` (`backend/app/content/service.py:327-341`) narrows by a part-word, any-case match on `title` and orders newest first. A manager who has a topic in mind but no title has nothing to pick from. The user raised this on 2026-10-03 after trying slice 6 (task-258), and it was logged as task-263. Point 5 above expected facets to serve this picker, but none is built: the facet model is task-207, logged at P3 and parked. The user settled the question in a design interview on 2026-10-04, and this section records the answers.
+
+**1. A manager with only a topic browses and chooses in the picker. A decision slot is not the answer to this case.** "Let the engine pick from this topic" is already covered by a decision slot whose candidate filter names one category, and that slot is unchanged by this addendum. The missing case is the one where the manager still makes the choice and only needs something to choose from.
+
+**2. Until facets are built, categories are the picker's browse axis, and the picker only reads them.** It never offers to create a category or to assign one to a record. The Context above records why categories exist: to build each recipient's affinity profile. [[ADR-179 — What Enters the Catalogue, and What a Machine May Take From It]] says the same. Reading that vocabulary to narrow a list adds nothing to the engine's inputs. Writing to it from a findability surface would. So any pressure to make content easier to find still goes to facets, not into the affinity vocabulary, and point 6's direction holds. When task-207 lands, facets join the picker as a second filter beside categories, and a campaign's own facets may narrow the picker in advance, as point 5 intends.
+
+**3. `GET /content/` gains a category filter, and its free-text `q` widens from title to title plus description.** The match stays part-word and any case. It widens wherever content is searched, which means both the picker and the Content list (`frontend/src/screens/Content.tsx`), because both read this route. So `q` keeps one meaning across the client. This delivers part of the list filtering that point 7 and the 2026-10-03 addendum say is owed. Under [[ADR-185 — Lists That Grow With Data Are Paged in One Envelope]]'s rule, the filter applies identically to `items` and `total`. Searching body text, and full-text search, are deferred.
+
+**4. "In category X" means assigned to X directly, which is the meaning `candidate_query` already gives it.** A decision slot's candidates (`backend/app/decision/strategies/base.py:176-214`) match a category through the record's own assignment, with no expansion to child categories, and the picker uses the same meaning. Any future expansion is decided for slots and the picker together, never for one of them alone, so "in this topic" cannot come to mean two different sets of records on two screens.
+
+**5. Ordering.** With a category chosen, rows are ordered by the record's score in that category, highest first, then newest first (id descending). With text only, rows are ordered newest first, as today. The category order's tie-break deliberately differs from `top_score`'s, which is id ascending (`backend/app/decision/strategies/top_score.py:50-52`), so the picker's top row does not claim to be the record a slot would pick.
+
+**This is not a supersession.** The Decision above stands unchanged. This section records how the picker behaves until facets exist, and how the content list's filtering begins to meet point 7. It does not make categories a findability taxonomy: the picker reads them as a browse axis for the interim and writes nothing to them.
+
+**The category vocabulary and its brand scope are unchanged.** Categories stay global, and their assignments stay per brand through `content_records.brand_id`, per [[ADR-150 — Tenancy and Access Model]]'s addendum of 2026-09-15. The picker therefore narrows only within the working brand's records. The category list stays an unpaged array under ADR-185 point 1, and the record list stays paged.
+
+The interface, meaning what a row shows and how the keyboard moves through the list, belongs to the design pass rather than to this record: [[Campaign Write Surface - final design pass]], section "Choosing a record for a module".
+
 ## Related ADRs
 
 ### Depends On
@@ -129,3 +149,7 @@ The product must not assume a record count — a reference architecture is copie
 - [[ADR-084 — Decision Slots May Resolve One or Multiple Content Records]]
 - [[ADR-150 — Tenancy and Access Model]]
 - [[ADR-172 — The Working Brand Is Resolved Once and Carried Into Every Query]]
+
+### Referenced By
+- [[ADR-179 — What Enters the Catalogue, and What a Machine May Take From It]]
+- [[ADR-185 — Lists That Grow With Data Are Paged in One Envelope]]

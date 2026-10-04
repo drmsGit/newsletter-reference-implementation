@@ -495,6 +495,18 @@ and the authentication question the React manager client was blocked on.
 
 **Status:** built and checked live (task-260, task-261, task-262). 98 client tests.
 
+
+### 2026-10-04 — A manager with a topic browses for content; categories serve until facets exist
+
+**Context:** the bind picker in the variant editor matched only part of a title, so a manager with a topic but no title had nothing to pick from (task-263, raised 2026-10-03). The answers come from a design interview held one question at a time.
+
+1. **The picker is the answer, not a decision slot.** A slot on one category already means "let the engine pick from this topic". The picker is for a manager who still chooses.
+2. **Categories are the topic axis until facets are built, and the picker only reads them.** It never creates or assigns one, so wanting things findable never bends the affinity vocabulary. Facets (task-207) join later as a second filter. This is recorded as an addendum to [[ADR-175 — Facets Are the Manager's Own Taxonomy, Not the Engine's]], not a supersession.
+3. **Search matches title and description, on the picker and the Content list alike.** A category means direct assignment only, as for a slot. Results are ordered by score, then newest.
+4. **The picker opens already listing records, is driven from the keyboard, and shows notices that never block.** The notices cover poor fit, a record already in the variant, and a record not yet published. Details are in the final design pass, section "Choosing a record for a module".
+
+**Status:** decided, not built. task-268 (server), task-269 (picker) and task-270 (Content list, alongside task-267).
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*

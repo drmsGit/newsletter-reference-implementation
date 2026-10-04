@@ -4,7 +4,7 @@ title: 'The facet model, including a facet-value mapping on duplicate_campaign'
 status: To Do
 assignee: []
 created_date: '2026-09-27 14:20'
-updated_date: '2026-10-01 20:54'
+updated_date: '2026-10-04 10:22'
 labels:
   - backend
 dependencies: []
@@ -33,4 +33,6 @@ Related: task-49 (gap C2, the settings surface).
 
 <!-- SECTION:NOTES:BEGIN -->
 Logged 2026-09-27 from the "What Cluster N produced" sections of the two design interviews, each gap re-verified against the code that day. The plan was reviewed and approved by the session that ran the interviews. Parked: not yet ranked by anyone.
+
+2026-10-04 (task-263): the bind picker browses by category until facets exist. When this task lands, facets join the picker and the Content list as a second filter (ADR-175 addendum 2026-10-04). Its Settings-router dependency (task-49 gap C2) may be stale: backend/app/settings/router.py now exists. Verify before relying on it.
 <!-- SECTION:NOTES:END -->
