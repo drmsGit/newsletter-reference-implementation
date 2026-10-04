@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Button, Input, Label, TextField } from 'react-aria-components'
 import { useSearchParams } from 'react-router'
+
+import { useShortcut } from '../shortcuts/Shortcuts'
 
 /** The current search, from the URL (`?q=`), so it survives a reload and a link. */
 export function useSearch(): string {
@@ -30,6 +32,9 @@ export default function RecipientSearch() {
 export function SearchBox({ label }: { label: string }) {
   const [params, setParams] = useSearchParams()
   const [value, setValue] = useState(params.get('q') ?? '')
+  const input = useRef<HTMLInputElement>(null)
+  // / jumps to the search on any list that has one (task-266).
+  useShortcut('/', label, () => input.current?.focus())
 
   function run(q: string) {
     const next = new URLSearchParams(params)
@@ -50,7 +55,7 @@ export function SearchBox({ label }: { label: string }) {
     >
       <TextField value={value} onChange={setValue}>
         <Label>{label}</Label>
-        <Input />
+        <Input ref={input} />
       </TextField>
       <Button type="submit">Search</Button>
       {params.get('q') && (

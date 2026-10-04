@@ -8,6 +8,7 @@ import {
   type ModuleState,
 } from '../api/resources'
 import ScreenState from '../components/ScreenState'
+import { useShortcut } from '../shortcuts/Shortcuts'
 
 /**
  * The variant editor's preview (task-265): a collapsed bar that says what the
@@ -35,6 +36,7 @@ export default function PreviewBar({
   byName: Map<string, ModuleManifest>
 }) {
   const [open, setOpen] = useState(false)
+  useShortcut('p', 'Open the preview', () => setOpen(true))
   const [recipient, setRecipient] = useState<{ id: number; label: string } | null>(null)
   const render = useRenderedVariant(variantId, recipient?.id ?? null, stamp)
   const findings = summarise(render.data?.modules ?? [])

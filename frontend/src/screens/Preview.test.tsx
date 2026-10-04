@@ -147,3 +147,27 @@ describe('the preview overlay', () => {
     expect(within(dialog).queryByTitle(/Rendered email/)).not.toBeInTheDocument()
   })
 })
+
+describe('the editor shortcuts (task-266)', () => {
+  it('p opens the preview, and the overview lists the editor keys', async () => {
+    const { ShortcutsProvider } = await import('../shortcuts/Shortcuts')
+    stubFetch(handlers().handlers as never)
+    renderWithProviders(
+      <ShortcutsProvider>
+        <Routes>
+          <Route path="/campaigns/:id/variants/:variantId" element={<VariantEditor />} />
+        </Routes>
+      </ShortcutsProvider>,
+      { route: '/campaigns/1/variants/3' },
+    )
+    await screen.findByText(/finds nothing/)
+    fireEvent.keyDown(document.body, { key: 'p' })
+    const preview = await screen.findByRole('dialog', { name: 'Preview of Variant A' })
+    fireEvent.keyDown(preview, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    fireEvent.keyDown(document.body, { key: '?' })
+    const overview = await screen.findByRole('dialog', { name: 'Keyboard shortcuts' })
+    expect(within(overview).getByText('Open the preview')).toBeInTheDocument()
+    expect(within(overview).getByText('Move the selected module up')).toBeInTheDocument()
+  })
+})

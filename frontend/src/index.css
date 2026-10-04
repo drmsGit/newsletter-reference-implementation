@@ -439,3 +439,33 @@ input[data-focus-visible] {
   border-left: 3px solid var(--brand-accent);
   padding-left: calc(var(--brand-space) * 1.5);
 }
+
+/* The keyboard shortcuts overview (task-266). */
+.shortcuts-modal {
+  background: var(--brand-bg);
+  border-radius: var(--brand-radius);
+  width: min(32rem, 95vw);
+  max-height: 85vh;
+  overflow: auto;
+  padding: calc(var(--brand-space) * 2);
+}
+
+.shortcuts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--brand-space) calc(var(--brand-space) * 2);
+  margin: 0;
+}
+
+.shortcuts dd {
+  margin: 0;
+}
+
+kbd {
+  font-family: var(--brand-font);
+  font-size: 0.85em;
+  padding: 1px 6px;
+  border: 1px solid var(--brand-line);
+  border-bottom-width: 2px;
+  border-radius: var(--brand-radius);
+}

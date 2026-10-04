@@ -5,7 +5,8 @@ import { Navigate, Outlet, useNavigate } from 'react-router'
 import { useSession, useSignOut } from '../api/session'
 import { PRODUCT_NAME } from '../branding'
 import BrandSwitcher from './BrandSwitcher'
-import Nav from './Nav'
+import Nav, { GoToShortcuts } from './Nav'
+import { ShortcutsProvider } from '../shortcuts/Shortcuts'
 
 /**
  * The frame every signed-in screen sits inside.
@@ -38,6 +39,8 @@ export default function Shell() {
   if (!session.data) return <Navigate to="/sign-in" replace />
 
   return (
+    <ShortcutsProvider>
+    <GoToShortcuts />
     <div className="shell">
       <header className="shell__bar">
         <span className="shell__brand">{PRODUCT_NAME}</span>
@@ -61,5 +64,6 @@ export default function Shell() {
         <Outlet />
       </main>
     </div>
+    </ShortcutsProvider>
   )
 }

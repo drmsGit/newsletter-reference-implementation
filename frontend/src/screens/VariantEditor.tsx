@@ -20,6 +20,7 @@ import ScreenState from '../components/ScreenState'
 import CatalogueModule from './CatalogueModule'
 import Fence from './Fence'
 import PreviewBar from './Preview'
+import { useShortcut } from '../shortcuts/Shortcuts'
 
 /**
  * One variant, edited (task-255, slice 5 of the campaign write surface).
@@ -184,6 +185,10 @@ function Stack({
   onSelect: (id: number) => void
 }) {
   const move = useMoveModule(campaignId)
+  // Handled on the selected module itself (onKeyDown below); listed so the
+  // overview shows them (task-266).
+  useShortcut('Alt+↑', 'Move the selected module up', null)
+  useShortcut('Alt+↓', 'Move the selected module down', null)
   const remove = useDeleteModule(campaignId)
   const [confirming, setConfirming] = useState<number | null>(null)
 
