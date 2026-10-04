@@ -109,13 +109,13 @@ Restricting candidates to the sending brand, to a named list of brands, or to no
 - A company that genuinely needs brand separation *and* wants one system is told no. Some will consider that a missing feature; it is a deliberate refusal to make a compliance judgement on their behalf.
 - Sharing signals across brands is defensible only while brands are presentation. A company using brands as a proxy for separate legal entities is in case 3 and should not be on one installation.
 - Introducing users and roles requires an actor on every audited action, which is a change to code written when no actor existed.
-- Brand scoping is now a **schema change across several modules** rather than a dormant column on the access grants. Content, campaigns, audiences and sends each gain a column, a migration and a filter in queries already written, and the reach goes further than the four: `ConsentEventDB` has no brand column either, which is the same gap this record's Notes already flag as "brand carried on the grant" in the unwritten consent purpose-split. That is work bought now, before the first pilot, instead of work avoided until someone asks.
+- Brand scoping is now a **schema change across several modules** rather than a dormant column on the access grants. Content, campaigns, audiences and sends each gain a column, a migration and a filter in queries already written, and the reach goes further than the four: `ConsentEventDB` has no brand column either, which is the same gap this record's Notes already flag as "brand carried on the grant" in the unwritten consent purpose-split. (**Superseded by the 2026-10-04 status addendum below** for this claim only — `consent_events.brand_id` is NOT NULL now — and left as written because it records the cost as it was booked when this consequence was written.) That is work bought now, before the first pilot, instead of work avoided until someone asks.
 - It is adopted on the strength of **one pilot customer's needs** — a real customer with around ten brands, but one data point. If that customer proves unrepresentative, we will have paid a cross-module migration for a scope most adopters leave at its default. Accepted because the retrofit is the expensive direction and this is the cheap one, but the evidence should be visible rather than buried.
 
 ## Notes
 
 - **Open, deliberately not decided here:** the **consent purpose-split** (marketing opt-in versus transactional basis as distinct permissions on the same person, with brand carried on the grant) is recorded in the Decision Log as a proposed amendment to [[ADR-122 — Minimal Consent Model Required]]. It is not folded into this ADR because it changes an existing accepted decision rather than adding a new concern, and that amendment has not been written.
-- Known implementation cost of that amendment, corrected 2026-09-14 — the point has inverted, because the *mechanism* shipped first. `RecipientDB.consent_status` is no longer a column: [[ADR-163 — Per-Channel Consent and Addressability]] replaced it on 2026-09-12 with append-only `ConsentEventDB` rows keyed `(recipient, channel, purpose)`, where `purpose` is already a real column defaulting to `"marketing"` (`backend/app/recipients/db_models.py`). Two things are still genuinely open. First, the amendment recorded above has not been written as such — [[ADR-122 — Minimal Consent Model Required]] carries a dated addendum (2026-09-12) widening consent to the `(channel, purpose)` grid, and that addendum itself still describes this purpose-split as a *proposed* amendment. Second, **brand on the grant is unbuilt**: `ConsentEventDB` has no brand column — one of the columns point 2 now requires. (Corrected 2026-09-15: this bullet previously added that `role_assignments.brand_id` was the only brand foreign key in the database. It no longer is; see the implementation status below. The consent gap itself is unchanged.)
+- Known implementation cost of that amendment, corrected 2026-09-14 — the point has inverted, because the *mechanism* shipped first. `RecipientDB.consent_status` is no longer a column: [[ADR-163 — Per-Channel Consent and Addressability]] replaced it on 2026-09-12 with append-only `ConsentEventDB` rows keyed `(recipient, channel, purpose)`, where `purpose` is already a real column defaulting to `"marketing"` (`backend/app/recipients/db_models.py`). Two things are still genuinely open. First, the amendment recorded above has not been written as such — [[ADR-122 — Minimal Consent Model Required]] carries a dated addendum (2026-09-12) widening consent to the `(channel, purpose)` grid, and that addendum itself still describes this purpose-split as a *proposed* amendment. Second, **brand on the grant is unbuilt**: `ConsentEventDB` has no brand column — one of the columns point 2 now requires. (**Superseded by the 2026-10-04 status addendum below** for this claim only — `consent_events.brand_id` is NOT NULL now — and left as written because the 2026-09-15 addenda refer back to it.) (Corrected 2026-09-15: this bullet previously added that `role_assignments.brand_id` was the only brand foreign key in the database. It no longer is; see the implementation status below. The consent gap itself is unchanged.)
 - Interacts with [[ADR-081 — AI Ranks Within Governed Candidate Sets]] and [[ADR-083 — Personalization Happens Inside Variants Through Decision Slots]]: the brand candidate filter composes with the governed candidate set rather than replacing it.
 - **Implementation status, 2026-09-14:** Points 5 and 6 are built as rows rather than code — `RoleDB`, `RolePermissionDB` and `RoleAssignmentDB` exist with the three seeded roles, and a grant is one `(user × role × brand)` row (`backend/app/auth/db_models.py`). Brand scoping was **modelled but not enforceable as the code stood**, verified 2026-09-14 — at that point `role_assignments.brand_id` was the only brand foreign key in the database, and no campaign, content record, audience or send belonged to a brand. **Superseded by the 2026-09-15 status below**, which is the current picture; this paragraph is left as written because the addendum's reasoning refers back to the state it describes. `has_permission(db, user, permission, brand_id=None)` in `backend/app/auth/service.py` already accepts a brand and narrows the grants it reads to it — **no caller ever passes one**: both call sites in `backend/app/auth/dependencies.py`, `require_permission` and `enforce_policy`, omit the argument. Points 2, 8, 9 and 10 therefore have no implementation, and the work point 2 creates is three things: brand columns on the resource tables (content, campaigns, audiences, sends, and in due course the consent grants), a way for a request to say which brand it is acting in, and passing that brand into the filter that already exists. How each of those is done is not decided here. The sixteen-key vocabulary in point 5 is a specification, not a state: `backend/app/auth/permissions.py` still holds the original nine, and `policy.py`'s `WRITE_POLICY` still maps only `/ui/…` prefixes, so the twelve JSON routers are included in `backend/main.py` with no guard at all. The rule that a permission key names a code path is already broken by one of the nine — `credentials.manage` appears only in `permissions.py` and its tests, and no guard names it — before any of the seven new keys are added.
 
@@ -130,6 +130,8 @@ Restricting candidates to the sending brand, to a named list of brands, or to no
   of which existed in the first cut, which left the scope enforced and
   unadministrable. List views filter by the working brand and a decision slot
   resolves only the sending brand's content (point 8).
+
+  **Superseded by the 2026-10-04 status addendum below** — the paragraph that follows is left as written because the 2026-09-15 addendum beneath it argues from the state it describes.
 
   **Still unbuilt, and it is the half that matters:** `require_permission` and
   `enforce_policy` still call `has_permission` with no brand, so every
@@ -160,9 +162,11 @@ Prompted by the question of whether an admin is an admin *globally*, with only m
 
 **Several roles on one brand stay legal, and the access list must show the union.** Forbidding it was considered and rejected — it is useful with customised roles, which can be combined. `backend/app/auth/dependencies.py` already documents that a user holding several roles gets the **union** of their permissions, and that stays true. What changes is that the union must be **visible**: `backend/app/templates/users.html` renders one line per grant, so "Manager on Default" and "Admin on Default" sit as two lines and leave a reader to combine them in their head. The display obligation is recorded here; the design of that display is not decided here. This is unchanged from point 6 rather than an amendment to it — point 6 says a user may be Manager on one brand and Viewer on another, and never promised one role per brand.
 
+**Superseded by the 2026-10-04 status addendum below** — the paragraph that follows is left as written because the classification above was argued against the state it records.
+
 **What is not built, which is the whole of the enforcement.** Verified 2026-09-15: `require_permission` and `enforce_policy` in `backend/app/auth/dependencies.py` both call `has_permission(db, user, permission)` with **no brand**, and they are the only two callers in the codebase. The other side exists — `has_permission` and `permissions_for` in `backend/app/auth/service.py` take `brand_id` and narrow the grants when given one, and `resolve_session_brand` already resolves the working brand from the session — so both halves are present and nothing joins them. **Today every permission behaves platform-level**, and a Viewer on brand B who is Admin on brand A currently passes an Admin check while working in brand B. The split above is therefore a specification for work, not a state, exactly as point 5's sixteen keys are ([[ADR-166 — Inbound Machine Callers Are Authenticated Principals]]): `backend/app/auth/permissions.py` still holds the original nine, so seven of the sixteen keys classified here have no code path to be scoped yet.
 
-One correction the above depends on, since the Notes above it now read older than they look: the 2026-09-14 statement that `role_assignments.brand_id` is the only brand foreign key in the database no longer holds. `content_records`, `campaigns`, `audience_groups`, `send_instances` and `sessions` each carry one as of 2026-09-15, which is what makes "the rows it guards carry a `brand_id`" a test that can be applied rather than a prediction. `consent_events` still carries none, so the brand-on-the-grant gap those Notes flag is unchanged.
+One correction the above depends on, since the Notes above it now read older than they look: the 2026-09-14 statement that `role_assignments.brand_id` is the only brand foreign key in the database no longer holds. `content_records`, `campaigns`, `audience_groups`, `send_instances` and `sessions` each carry one as of 2026-09-15, which is what makes "the rows it guards carry a `brand_id`" a test that can be applied rather than a prediction. `consent_events` still carries none, so the brand-on-the-grant gap those Notes flag is unchanged. (**Superseded by the 2026-10-04 status addendum below** for this last sentence only — `consent_events.brand_id` is NOT NULL now — and left as written for the same reason as the paragraph above.)
 
 ## Addendum 2026-09-15 — the category vocabulary is global; which content is in a category is already per-brand
 
@@ -486,6 +490,104 @@ unchanged.
 **Nothing in this record's Decision changes.** Point 5's sixteen keys and the 2026-09-15
 classification are untouched; this addendum says who may make settings writes and which
 combination two specific writes require.
+
+## Addendum 2026-10-04 — implementation status: brand enforcement is built
+
+Prompted by task-44. **This is a status record, not a decision.** Three passages above
+still described brand enforcement as unbuilt, and they are the passages someone
+checking whether the brand boundary is real would read first. Each fact below was
+verified against the code on 2026-10-04.
+
+**Brand-scoped permissions are checked against the working brand.** `_permitted` in
+`backend/app/auth/dependencies.py`, which both `require_permission` and
+`enforce_policy` call, checks a platform-level permission with `brand_id=ALL_BRANDS`
+(the union of every grant the user holds, asked for by name) and a brand-scoped one
+against `request.state.current_brand`. **A brand-scoped permission with no working
+brand is refused, never checked without one**, because checking it against the union
+would let a grant on brand A act in brand B. `enforce_api_policy` in the same file
+makes the same split on the JSON plane, and raises `BrandNotDeclared` rather than a
+permission refusal when no working brand resolves. Built in commit `cb8b5b1`
+(2026-09-15, "check brand-scoped permissions against the working brand"). The
+`BRAND_SCOPED` set in `backend/app/auth/permissions.py` matches the 2026-09-15
+classification as this record's 2026-09-20 addendum amended it.
+
+**Consent carries a brand.** `ConsentEventDB` in `backend/app/recipients/db_models.py`
+carries a NOT NULL `brand_id` with no default, and the latest-row-wins cell is
+`(recipient, brand, channel, purpose)`. It was decided in
+[[ADR-163 — Per-Channel Consent and Addressability]]'s addendum of 2026-09-15 and
+committed the next day as `619194b` (2026-09-16, "scope consent to the sending brand").
+That is why the earlier addenda date the column 2026-09-15 and the code dates it
+2026-09-16. This record's 2026-09-20 addendum moved `recipients.consent` to brand-scoped
+because of it. The brand-on-the-grant gap is closed. This addendum does not check
+whether the consent purpose-split amendment to
+[[ADR-122 — Minimal Consent Model Required]], named in the first Notes bullet, has been
+written, and says nothing about it.
+
+**The JSON routers are guarded.** Commit `ee01e8a` (2026-09-18, "the JSON API stops
+being an open control plane"). Each JSON router is included in `backend/main.py` with
+`enforce_api_csrf` and `enforce_api_policy` as dependencies, and `WRITE_POLICY` in
+`backend/app/auth/policy.py` no longer maps only `/ui/…` prefixes. It now maps the JSON
+prefixes beside them, among them `/content/`, `/campaigns/`, `/delivery/`,
+`/snapshots/`, `/recipients/`, `/insight/`, `/provider/events`, `/overrides/`,
+`/api/audience-groups`, `/approvals`, `/integrations` and `/settings`. A write route
+with no entry still resolves to `UNMAPPED` and is refused, so the fail-closed
+consequence point 5 predicted holds. Two entries are deliberate exemptions named as
+sentinels rather than permissions: `/provider/webhooks/` (`PROVIDER_SIGNED`, because a
+provider signs its own callbacks) and `/auth/session` (`PUBLIC_AUTH`, the door a
+session comes through). One later change matters to a reader of that commit. At
+`ee01e8a` the plane accepted machine credentials only, and the session-cookie principal
+the React client uses arrived afterwards under
+[[ADR-168 — The Manager SPA Authenticates With Its Session Cookie]].
+
+**Detail-by-id reads are brand-scoped.**
+[[ADR-172 — The Working Brand Is Resolved Once and Carried Into Every Query]]
+(accepted, dated 2026-09-19) separated context from authorisation. Every request
+resolves a working brand, brand-owned service queries take it, and an out-of-brand row
+answers exactly as an absent one does. Another brand's campaign no longer opens by URL.
+Two tests pin this:
+
+- `test_another_brand_s_campaign_answers_instead_of_crashing` in
+  `backend/tests/test_brand_scoping.py` opens a default-brand campaign at
+  `/ui/campaigns/{id}` while working in another brand. It expects a redirect to the
+  campaigns list with a message, not the page and not an error.
+- `test_a_record_in_another_brand_answers_as_absent` in
+  `backend/tests/test_brand_boundary.py` expects `GET /content/{id}` from a foreign
+  brand to answer 404, the same answer as an id that never existed.
+
+The list-side counterpart is `test_content_is_invisible_from_another_brand` in
+`backend/tests/test_brand_scoping.py`, which asserts at the service query.
+
+**The vocabulary point 5 specifies is in code.** `backend/app/auth/permissions.py` no
+longer holds only the original nine. It defines every key point 5 lists, including the
+split and new ones: `audiences.pin`, `sends.plan`, `recipients.manage`,
+`recipients.consent`, `insight.write`, `overrides.manage` and `integrations.manage`.
+Each of those added keys names a route in `WRITE_POLICY`, so each is real in the sense
+point 5 requires. The 2026-09-14 status paragraph made one further observation, and it
+still holds, so it is stated here so nobody takes it as fixed: `credentials.manage`
+appears in `backend/app` only in `permissions.py`, so it still names no guard.
+
+**What this supersedes.** These passages above described this work as unbuilt, and this
+addendum supersedes them:
+
+- in `## Consequences` → `### Negative`, the claim in the "Brand scoping is now a
+  schema change across several modules" bullet that `ConsentEventDB` has no brand
+  column. The rest of that bullet is not superseded;
+- in `## Notes`, the claim in the "Known implementation cost" bullet that brand on the
+  grant is unbuilt. The rest of that bullet, about the purpose-split amendment, is not
+  superseded;
+- in `## Notes`, the "Still unbuilt, and it is the half that matters" paragraph of the
+  2026-09-15 implementation status;
+- in the 2026-09-15 permission-scope addendum, the "What is not built, which is the
+  whole of the enforcement" paragraph, and the sentence in the correction after it that
+  `consent_events` still carries no brand.
+
+Each now opens with, or carries, a one-line marker pointing here. Otherwise each is left
+as written for the same reason as the 2026-09-14 status paragraph: later text in this
+record, including its own 2026-09-15 addenda, refers back to the state they describe.
+
+**Nothing in this record's Decision changes.** Status, the sixteen keys and the
+classification of permissions are untouched; this addendum records that what they
+specified has been built.
 
 ## Related ADRs
 

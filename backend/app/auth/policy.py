@@ -332,14 +332,12 @@ BRAND_OWNED: dict[str, str] = {
         "(ADR-150's 2026-10-02 addendum)."
     ),
     "/recipients": (
-        "partial, and the unresolved one. Recipients carry no brand (ADR-150 "
-        "point 9), so most of this router is genuinely platform-level. But "
-        "`POST /{external_id}/consent` writes `consent_events.brand_id` and "
-        "takes that brand FROM THE REQUEST BODY, while `recipients.consent` is "
-        "platform-level and so is checked against no brand at all. That is the "
-        "shape ADR-166 point 8 refuses. Logged in `docs/backlog.md`; the fix "
-        "is a decision about whether consent capture is a brand-scoped act, "
-        "not an edit."
+        "partial — recipients carry no brand (ADR-150 point 9), so most of "
+        "this router is genuinely platform-level. `POST /{external_id}/consent` "
+        "writes `consent_events.brand_id`, and `recipients.consent` is "
+        "brand-scoped since ADR-150's 2026-09-20 addendum: it is checked "
+        "against the working brand, and a body `brand_id` that differs from it "
+        "is refused rather than chosen (`recipients/router.py`)."
     ),
     "/provider": (
         "no — provider configuration and signed callbacks. A webhook arrives "
