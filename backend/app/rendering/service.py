@@ -322,7 +322,14 @@ def resolve_module_variables(
     field_overrides = (override.field_overrides if override else None) or {}
     variables: dict = {}
 
+    module_data = module.module_data or {}
     for var in manifest.variables:
+        # A field typed in the module itself (ADR-179's 2026-10-04 addendum):
+        # read from module_data, never overridden. Reached only once content
+        # resolved, so it hides with its module (ADR-086).
+        if var.source == "module":
+            variables[var.name] = module_data.get(var.name) or ""
+            continue
         # Convention: template variable name = CMS field name exactly. A
         # field-level override wins over the resolved content value (ADR-041).
         if var.name in field_overrides:

@@ -556,14 +556,16 @@ class TestCardinalityIsDeclaredNotCodedIn:
         variant = create_variant_for_campaign(
             db, campaign_id=campaign.id, name=_name("push"), channel="push", brand_id=campaign.brand_id)
         first = create_module_for_variant(
+            # No module_data: a catalogue module's fields come from content
+            # (ADR-179's 2026-10-04 addendum); this test is about how many.
             db, variant_id=variant.id, module_type="notification",
-            module_data={"push_title": "Snow is here"}, brand_id=brand_of_variant(db, variant.id))
+            brand_id=brand_of_variant(db, variant.id))
         assert first is not None
 
         with pytest.raises(ValueError, match="already does"):
             create_module_for_variant(
                 db, variant_id=variant.id, module_type="notification",
-                module_data={"push_title": "And again"}, brand_id=brand_of_variant(db, variant.id))
+                brand_id=brand_of_variant(db, variant.id))
         assert db.query(ModuleInstanceDB).filter(
             ModuleInstanceDB.variant_id == variant.id
         ).count() == 1
@@ -662,7 +664,7 @@ class TestAModuleMustBelongToItsVariantsChannel:
 
             create_module_for_variant(
                 db, variant_id=variant.id, module_type="notification",
-                module_data={"push_title": "Full now"}, brand_id=brand_of_variant(db, variant.id))
+                brand_id=brand_of_variant(db, variant.id))
 
             page = client.get(f"/ui/campaigns/{campaign.id}")
             assert "already does" in page.text, (

@@ -5,6 +5,11 @@
   "cms": true,
   "variables": [
     {
+      "name": "section_heading",
+      "required": false,
+      "source": "module"
+    },
+    {
       "name": "image_url",
       "required": false
     },

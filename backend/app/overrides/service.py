@@ -77,7 +77,9 @@ def _validate_field_overrides(manifest, module: ModuleInstanceDB, field_override
     manifest — the same manifest-bound discipline the decision-slot config uses,
     so a typo'd field name is rejected up front instead of silently doing
     nothing at render time."""
-    allowed = {v.name for v in manifest.variables}
+    # A field typed in the module is the module's own and edited directly; an
+    # override is for catalogue values (ADR-179's 2026-10-04 addendum).
+    allowed = {v.name for v in manifest.variables if v.source == "content"}
     unknown = set(field_overrides) - allowed
     if unknown:
         raise ValueError(

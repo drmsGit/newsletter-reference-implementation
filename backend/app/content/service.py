@@ -137,7 +137,9 @@ def content_field_groups() -> dict[str, tuple[str, ...]]:
             if not manifest.cms:
                 continue
             for var in manifest.variables:
-                if var.channel:
+                # A field typed in the module is no catalogue field (ADR-179's
+                # 2026-10-04 addendum): a record never carries it.
+                if var.channel and var.source == "content":
                     groups.setdefault(var.channel, set()).add(var.name)
     return {channel: tuple(sorted(names)) for channel, names in groups.items()}
 
@@ -212,7 +214,7 @@ def catalogue_fields() -> list[dict]:
     for channel_dir in sorted(p for p in Path(MODULES_DIR).iterdir() if p.is_dir()):
         for manifest in list_manifests(channel_dir.name):
             if manifest.cms:
-                in_catalogue.update(v.name for v in manifest.variables)
+                in_catalogue.update(v.name for v in manifest.variables if v.source == "content")
 
     defined = field_definitions()
     return [

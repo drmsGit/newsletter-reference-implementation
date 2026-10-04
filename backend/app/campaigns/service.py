@@ -636,7 +636,13 @@ def _refuse_module_data(channel_key: str, module_type: str, module_data: dict | 
     if not module_data:
         return
     manifest = get_manifest(channel_key, module_type)
-    declared = {variable.name for variable in manifest.variables} if manifest else set()
+    # A catalogue module keeps only the fields it types itself; its content
+    # fields come from the record or the slot, never from module_data (ADR-179's
+    # 2026-10-04 addendum). A static module's fields are all its own.
+    declared = {
+        variable.name for variable in manifest.variables
+        if not manifest.cms or variable.source == "module"
+    } if manifest else set()
     errors = []
     for field, value in module_data.items():
         if field not in declared:

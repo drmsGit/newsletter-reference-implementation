@@ -105,6 +105,13 @@
       "type": "text",
       "note": "Notification title"
     },
+    "section_heading": {
+      "concept": "heading",
+      "channel": "email",
+      "type": "text",
+      "size": "small",
+      "note": "Optional heading above the module, shown only when the module is (ADR-179 addendum 2026-10-04)"
+    },
     "subject": {
       "concept": "subject",
       "channel": "email",

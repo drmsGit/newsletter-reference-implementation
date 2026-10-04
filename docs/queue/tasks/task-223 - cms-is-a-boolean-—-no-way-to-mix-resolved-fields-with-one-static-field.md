@@ -1,16 +1,17 @@
 ---
 id: TASK-223
 title: cms is a boolean — no way to mix resolved fields with one static field
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-27 14:20'
-updated_date: '2026-10-01 20:54'
+updated_date: '2026-10-04 09:06'
 labels:
   - backend
 dependencies: []
 priority: p3
 type: feature
-ordinal: 208800
+ordinal: 200064
 ---
 
 ## Description
@@ -27,8 +28,22 @@ Source: [[Variant Editor - design interview]] → What Cluster 2 produced, gap 1
 Related: task-108 (the section-heading module, which this is not), task-133 (whether hero / CTA draw from the catalogue).
 <!-- SECTION:DESCRIPTION:END -->
 
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Decided 2026-10-04 (user): per-field source. ADR-179 addendum via adr-author.
+1. registry: ModuleVariable.source ('content' default, 'module' = typed in the module), declared per (module, field) in the manifest; ModuleVariableOut exposes it.
+2. fields.json: section_heading (email, heading, text). img_left, img_right, single_stack declare it optional with source module; their templates render it only when filled; brand.css styles it.
+3. rendering: resolve_module_variables fills module-sourced fields from module_data, only when content resolved (a hidden slot hides its heading, ADR-086).
+4. overrides refuse module-sourced fields; module_data on a catalogue module accepts only module-sourced fields; content_field_groups and catalogue_fields leave them out.
+5. Client: the module's own fields (the heading) edited in place on catalogue and slot modules, saved to module_data with the module's version.
+6. Tests, mutants, live check.
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Logged 2026-09-27 from the "What Cluster N produced" sections of the two design interviews, each gap re-verified against the code that day. The plan was reviewed and approved by the session that ran the interviews. Parked: not yet ranked by anyone.
+
+2026-10-04. Backend: ModuleVariable.source (registry, exposed on ModuleVariableOut); section_heading in storage/fields.json and, optional with source module, in img_left / img_right / single_stack, rendered above the module only when filled (brand.css styles it); resolve_module_variables fills module-sourced fields from module_data (only reached when content resolved, so a hidden slot hides its heading); overrides refuse them; a catalogue module's module_data accepts only them; content_field_groups and catalogue_fields leave them out (the pinned field-groups test still passes unchanged). Tests backend/tests/test_module_sourced_fields.py (5); mutants: renderer ignoring the field, field overridable, catalogue module storing content fields, field counted as catalogue: each caught. Tightening found two push tests storing push_title in a catalogue module's module_data, which the push renderer never reads; the dead data was removed. Dev database: no catalogue module holds content keys in module_data. Full suite 1210 passed, rc 0. ADR-179 addendum by adr-author, diff verified 18 added, 0 changed.
 <!-- SECTION:NOTES:END -->

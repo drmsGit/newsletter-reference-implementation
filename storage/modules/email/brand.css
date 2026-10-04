@@ -77,3 +77,12 @@
   text-align: center;
   padding: 24px 16px;
 }
+
+/* An optional heading typed above a module (ADR-179 addendum 2026-10-04). */
+.module-section-heading {
+  margin: 24px 0 8px;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b6b6b;
+}

@@ -98,6 +98,24 @@ A record can be active, push-ready and *not* machine-selectable — a piece that
 - **Also not settled: whether an integration may assert machine-ready.** [[ADR-174 — Channel Readiness Is Asserted, Not Computed]] point 4 gives channel readiness a machine path through the approval inbox's held actions, so the machinery exists and the question is live. A machine marking its own output machine-selectable without that hold would be self-certification of the kind [[ADR-082 — AI May Recommend but Not Publish]] refuses. Point 2 says the flag is manager-set and no machine path exists today; which shape it takes if one is wanted is left to the record that decides it.
 - **`docs/playbook-strategy.md` carries the 2026-09-27 decision-log entry behind this record**, under *Variant Editor Design Interview (ADR-177) — interview closed*, whose point 3 names *"a record for catalogue binding plus the machine-ready axis"* among the three ADRs still owed. This is that record. The entry's heading names only ADR-177 because these records had not been written when it was logged; nothing here departs from the entry.
 
+## Addendum 2026-10-04 — a field may be typed in the module, beside the content
+
+Prompted by building task-223, which asked *"How should a catalogue module carry one hand-typed field (the optional heading) beside its content fields?"* The user's answer, *"Per-field source"*, closes the gap the fourth Note logged: `cms` is a boolean, point 1 made it decide whether *all* of a module's fields come from the catalogue or from `module_data`, and a boolean cannot express a mixture.
+
+**Why a mixture is needed.** [[Variant Editor - design interview]] question 2.6 (2026-09-26) asked for an optional heading over a slot-bound module — *"this might be of interest"* — that must not render when the slot finds nothing. A separate heading module cannot do that: it would float above nothing for exactly the recipients [[ADR-086 — Decision Slots Fail Gracefully]] protects. The heading belongs to the slot-bound module.
+
+**The decision.**
+
+- **`cms` still says whether a module is catalogue-bound. Per field, `source` defaults to the content; `source: "module"` marks a field typed in the module itself.** Its value is stored in `module_data`, which the `CHECK` on `module_instances` already allows beside a content record or a slot. The module's other fields still come from the content record or the slot's pick.
+- **`source` is declared per *(module, field)* in the manifest, like `required`** ([[ADR-177 — A Field Is Defined Once, Required Per Module]] point 4), and not in `fields.json`: where a value comes from is a property of the module that uses the field, not of the field.
+- **A module-sourced field renders only when its module renders.** A slot that finds nothing hides the module, heading included ([[ADR-086 — Decision Slots Fail Gracefully]]).
+- **A module-sourced field is never overridden.** It is the module's own and is edited directly; overrides stay for catalogue values ([[ADR-186 — In the Composer an Override Is the Default and a Catalogue Edit Is Explicit]], which superseded ADR-178).
+- **First use: an optional `section_heading`** on email's catalogue modules that sit in the body — `img_left`, `img_right`, `single_stack` — defined once in `fields.json` per ADR-177.
+
+One option was rejected: a built-in optional heading on slot-bound modules only, rendered by the email renderer. It was the smallest change, but it was a special case that only email and only slots would get.
+
+Point 1 is unchanged. A hand-typed heading carries no topic, so keeping it out of the catalogue applies point 1's test. It does not make an exception to it.
+
 ## Related ADRs
 
 ### Depends On

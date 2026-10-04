@@ -86,6 +86,13 @@ class ModuleVariable:
     #: ADR-177's 2026-09-28 addendum. `content_field_groups()` is the consumer
     #: that makes this load-bearing rather than descriptive.
     channel: str | None = None
+    #: Where a catalogue module takes this field from (ADR-179's 2026-10-04
+    #: addendum, task-223): `content` — the record or the slot's pick — or
+    #: `module`, typed in the module itself and kept in `module_data`. Declared
+    #: per (module, field) in the manifest, like `required`, because where a
+    #: value comes from is a property of the module that uses the field. A
+    #: static module's fields are all the module's own whatever this says.
+    source: str = "content"
 
 
 @dataclass
@@ -122,6 +129,16 @@ def field_definitions() -> dict[str, dict]:
     return json.loads(FIELDS_PATH.read_text()).get("fields", {})
 
 
+def _source(declared: dict, json_path: Path) -> str:
+    source = declared.get("source", "content")
+    if source not in ("content", "module"):
+        raise ValueError(
+            f"{json_path} declares source {source!r} for {declared['name']!r}; "
+            "a field comes from the content or is typed in the module."
+        )
+    return source
+
+
 def _variable(declared: dict, json_path: Path) -> ModuleVariable:
     """One manifest entry plus its definition.
 
@@ -150,6 +167,7 @@ def _variable(declared: dict, json_path: Path) -> ModuleVariable:
         type=spec.get("type", "text"),
         note=spec.get("note"),
         channel=spec.get("channel"),
+        source=_source(declared, json_path),
     )
 
 

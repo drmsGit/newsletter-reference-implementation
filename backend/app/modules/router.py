@@ -25,6 +25,9 @@ class ModuleVariableOut(BaseModel):
     size: str | None = None
     note: str | None = None
     concept: str | None = None
+    #: `content` (the record or the slot's pick) or `module` (typed in the
+    #: module itself): ADR-179's 2026-10-04 addendum, task-223.
+    source: str = "content"
 
 
 class ModuleManifestOut(BaseModel):
@@ -46,7 +49,7 @@ def _to_out(manifest: ModuleManifest) -> ModuleManifestOut:
         variables=[
             ModuleVariableOut(
                 name=v.name, required=v.required, label=v.label, envelope=v.envelope,
-                type=v.type, size=v.size, note=v.note, concept=v.concept,
+                type=v.type, size=v.size, note=v.note, concept=v.concept, source=v.source,
             )
             for v in manifest.variables
         ],
