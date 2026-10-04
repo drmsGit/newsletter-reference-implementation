@@ -4,6 +4,7 @@ topic:
   - testing
   - development
 created: 2026-09-19
+modified: 2026-10-04
 ---
 
 # The test database, and the rule it exists to enforce
@@ -18,13 +19,23 @@ written down rather than left in a commit message.
 
 ## What happens when you run `pytest`
 
-`backend/tests/conftest.py` redirects the suite to a second Postgres database —
-`newsletter_test` by default, beside your development one on the same instance —
-creating it on first use. Then, once per run, it drops and rebuilds the schema
-from the models and seeds a known dataset.
+`backend/tests/conftest.py` redirects the suite to a second Postgres database
+beside your development one on the same instance — one per checkout since
+task-259 (2026-10-04): `newsletter_test_<folder>_<path hash>`, named by
+`backend/tests/checkout_database.py` — creating it on first use. Then, once per
+run, it drops and rebuilds the schema from the models and seeds a known dataset.
+
+Per checkout because the rebuild is destructive: when every worktree shared one
+`newsletter_test`, two suites running at once rebuilt the schema under each
+other (reproduced as a Postgres deadlock). Each run records its checkout's path
+as the database's comment, so `scripts/drop_stale_test_databases.py` (run from
+`backend/`) can list the databases of deleted worktrees; it drops them only
+with `--drop`, and never one somebody named by hand.
 
 Nothing to configure. `TEST_DATABASE_URL` overrides the destination if you want
-it elsewhere.
+it elsewhere. A fresh worktree has no `.env`, so set
+`INITIAL_ADMIN_EMAIL=admin@example.invalid` there, or no admin is seeded and the
+tests that need one skip.
 
 ## Four decisions worth keeping
 
