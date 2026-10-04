@@ -82,13 +82,20 @@ export function useCampaigns(offset = 0, q = '') {
   })
 }
 
-export function useContentList(offset = 0, q = '', status?: 'active' | 'inactive') {
+export function useContentList(
+  offset = 0,
+  q = '',
+  status?: 'active' | 'inactive',
+  categoryId: number | null = null,
+) {
   return useQuery({
-    queryKey: [...keys.content, 'page', offset, q, status],
+    queryKey: [...keys.content, 'page', offset, q, status, categoryId],
     queryFn: () =>
       read(
         api.GET('/content/', {
-          params: { query: { limit: PAGE_SIZE, offset, q: q || undefined, status } },
+          params: {
+            query: { limit: PAGE_SIZE, offset, q: q || undefined, status, category_id: categoryId ?? undefined },
+          },
         }),
       ),
   })

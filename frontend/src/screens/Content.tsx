@@ -1,6 +1,7 @@
 import { useNavigate, useSearchParams } from 'react-router'
 
 import { useContentList, type ContentRecord } from '../api/resources'
+import CategoryChoice from '../components/CategoryChoice'
 import DataTable, { type DataColumn } from '../components/DataTable'
 import Choice from '../components/Choice'
 import Pager, { useOffset } from '../components/Pager'
@@ -21,14 +22,27 @@ export default function Content() {
   const [params, setParams] = useSearchParams()
   // Content's own status vocabulary (`CONTENT_STATUSES`); the server refuses others.
   const status = (params.get('status') ?? '') as '' | 'active' | 'inactive'
-  const content = useContentList(useOffset(), useSearch(), status || undefined)
+  // One category, assigned directly; the server then orders by fit (ADR-175
+  // addendum 2026-10-04, task-270). The same choice the bind picker offers.
+  const category = Number(params.get('category')) || null
+  const search = useSearch()
+  const content = useContentList(useOffset(), search, status || undefined, category)
+  const filtered = Boolean(search || status || category)
   const navigate = useNavigate()
+
+  function setFilter(key: string, value: string | null) {
+    const next = new URLSearchParams(params)
+    if (value === null) next.delete(key)
+    else next.set(key, value)
+    next.delete('offset')
+    setParams(next)
+  }
 
   return (
     <>
       <h1>Content</h1>
       <div className="filters">
-        <SearchBox label="Find content by title" />
+        <SearchBox label="Find content by title or description" />
         <Choice
           label="Status"
           options={[
@@ -37,21 +51,17 @@ export default function Content() {
             { id: 'inactive', name: 'Inactive' },
           ]}
           selected={status || 'any'}
-          onChange={(v) => {
-            const next = new URLSearchParams(params)
-            if (v === 'any') next.delete('status')
-            else next.set('status', v)
-            next.delete('offset')
-            setParams(next)
-          }}
+          onChange={(v) => setFilter('status', v === 'any' ? null : v)}
         />
+        <CategoryChoice selected={category} onChange={(id) => setFilter('category', id == null ? null : String(id))} />
       </div>
       <ScreenState query={content}>
         <DataTable
           label="Content records"
           columns={columns}
           items={content.data?.items ?? []}
-          emptyMessage="No content in this brand yet."
+          // With a filter set, an empty page says nothing about the brand.
+          emptyMessage={filtered ? 'No content matches these filters.' : 'No content in this brand yet.'}
           onRowAction={(r) => navigate(`/content/${r.id}`)}
         />
         <Pager page={content.data} />

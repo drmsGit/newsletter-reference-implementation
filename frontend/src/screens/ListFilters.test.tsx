@@ -30,7 +30,7 @@ describe.each([
   ['content', '/content', '/content/', <Content />, /Find content/],
 ] as const)('searching %s', (_name, route, api, element, label) => {
   it('sends the words to the server and starts from the first page', async () => {
-    const fetchMock = stubFetch({ [`GET ${api}`]: () => jsonResponse(page([])) })
+    const fetchMock = stubFetch({ [`GET ${api}`]: () => jsonResponse(page([])), ...CATEGORY_ROUTES })
     renderWithProviders(
       <Routes>
         <Route path={route} element={element} />
@@ -44,9 +44,59 @@ describe.each([
   })
 })
 
+const CATEGORY_ROUTES = {
+  'GET /content/categories': () =>
+    jsonResponse([{ id: 7, name: 'Coast', type: 'main' }, { id: 8, name: 'Beach', type: 'sub' }]),
+  'GET /content/category-relations': () =>
+    jsonResponse([{ id: 1, parent_category_id: 7, child_category_id: 8, relation_type: 'parent_child' }]),
+}
+
+describe('filtering content by category (task-270)', () => {
+  function contentAt(route: string) {
+    const fetchMock = stubFetch({ 'GET /content/': () => jsonResponse(page([])), ...CATEGORY_ROUTES })
+    renderWithProviders(
+      <Routes>
+        <Route path="/content" element={<Content />} />
+      </Routes>,
+      { route },
+    )
+    return fetchMock
+  }
+
+  it('sends the category held in the URL', async () => {
+    const fetchMock = contentAt('/content?category=8')
+    await waitFor(() => expect(lastQuery(fetchMock, '/content/').get('category_id')).toBe('8'))
+    expect(await screen.findByRole('button', { name: /Beach/ })).toBeInTheDocument()
+    // Search reaches the description too since task-268, and says so.
+    expect(screen.getByLabelText('Find content by title or description')).toBeInTheDocument()
+  })
+
+  it('sends a chosen category and starts from the first page', async () => {
+    const fetchMock = contentAt('/content?offset=50')
+    await waitFor(() => expect(lastQuery(fetchMock, '/content/').get('offset')).toBe('50'))
+    fireEvent.click(screen.getByRole('button', { name: /Any category/ }))
+    fireEvent.click(await screen.findByRole('option', { name: 'Beach' }))
+    await waitFor(() => expect(lastQuery(fetchMock, '/content/').get('category_id')).toBe('8'))
+    expect(lastQuery(fetchMock, '/content/').get('offset')).toBe('0')
+  })
+
+  it('says no record matches, not that the brand has none, when a filter empties the list', async () => {
+    contentAt('/content?category=8')
+    expect(await screen.findByText('No content matches these filters.')).toBeInTheDocument()
+    expect(screen.queryByText('No content in this brand yet.')).not.toBeInTheDocument()
+  })
+
+  it('drops the category for "Any category"', async () => {
+    const fetchMock = contentAt('/content?category=8')
+    fireEvent.click(await screen.findByRole('button', { name: /Beach/ }))
+    fireEvent.click(await screen.findByRole('option', { name: 'Any category' }))
+    await waitFor(() => expect(lastQuery(fetchMock, '/content/').has('category_id')).toBe(false))
+  })
+})
+
 describe('filtering content by status', () => {
   it('sends the chosen status, from the URL', async () => {
-    const fetchMock = stubFetch({ 'GET /content/': () => jsonResponse(page([])) })
+    const fetchMock = stubFetch({ 'GET /content/': () => jsonResponse(page([])), ...CATEGORY_ROUTES })
     renderWithProviders(
       <Routes>
         <Route path="/content" element={<Content />} />
