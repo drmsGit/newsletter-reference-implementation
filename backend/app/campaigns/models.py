@@ -442,8 +442,20 @@ class ComposedModule(BaseModel):
     updated_at: datetime
 
 
+class VariantFence(BaseModel):
+    """Who last edited a variant, and whether that still holds machines off
+    (ADR-180 and its 2026-10-04 addendum, task-254). Lapsed or not, it is
+    "last edited by X at HH:MM"; `active` says whether it is a fence."""
+
+    by: str | None = None
+    by_type: str | None = None
+    at: datetime
+    active: bool
+
+
 class ComposedVariant(BaseModel):
     variant: Variant
+    fence: VariantFence | None = None
     # None: the channel sets no limit.
     module_limit: int | None = None
     can_add_module: bool

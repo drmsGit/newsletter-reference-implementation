@@ -57,6 +57,8 @@ VARIANT_DUPLICATED = "variant.duplicated"
 CAMPAIGN_CREATED = "campaign.created"
 VARIANT_CREATED = "variant.created"
 VARIANT_UPDATED = "variant.updated"
+# task-254: a person (any fence) or a machine (its own) cleared a fence.
+VARIANT_UNFENCED = "variant.unfenced"
 MODULE_CREATED = "module.created"
 MODULE_UPDATED = "module.updated"
 MODULE_DELETED = "module.deleted"

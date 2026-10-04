@@ -67,6 +67,15 @@ class VariantDB(Base):
         onupdate=func.now(),
         nullable=False,
     )
+    # The advisory fence (ADR-180, task-254, migration 0030): who last edited
+    # this variant and when. Set by every composer write, lapsing 30 minutes
+    # after it (`campaigns.fence`). Written without moving `updated_at`, which
+    # is the variant's own version token (task-110) and must not change when
+    # one of its modules does.
+    fenced_by_type = Column(String(20), nullable=True)
+    fenced_by_id = Column(Integer, nullable=True)
+    fenced_by_label = Column(String(255), nullable=True)
+    fenced_at = Column(DateTime(timezone=True), nullable=True)
 
 
 class ModuleInstanceDB(Base):

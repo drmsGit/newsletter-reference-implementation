@@ -19,9 +19,13 @@ from app.campaigns.db_models import CampaignDB, DecisionSlotDB, ModuleInstanceDB
 from app.content.db_models import ContentRecordDB
 from app.overrides.db_models import ContentOverrideDB
 from main import app
-from tests.machine import machine
+from tests.machine import editor, machine
 
 client = TestClient(app, raise_server_exceptions=False)
+
+# One editing machine per test: several writes as different machines would
+# meet each other's fence (task-254).
+pytestmark = pytest.mark.usefixtures("one_editor")
 
 
 @pytest.fixture
@@ -57,7 +61,7 @@ def world(db, default_brand):
 
 
 def _put(module_id, fields, token=None, reason=None):
-    with machine([OVERRIDES_MANAGE, CAMPAIGNS_MANAGE, VIEW]) as headers:
+    with editor([OVERRIDES_MANAGE, CAMPAIGNS_MANAGE, VIEW]) as headers:
         if token is not None:
             headers = {**headers, "If-Match": token}
         return client.put(f"/overrides/modules/{module_id}",
@@ -71,7 +75,7 @@ def _rows(db, module_id):
 
 
 def _token(campaign_id, module_id):
-    with machine([VIEW]) as headers:
+    with editor([VIEW]) as headers:
         composed = client.get(f"/campaigns/{campaign_id}/composition", headers=headers).json()
     return next(m for m in composed["variants"][0]["modules"] if m["id"] == module_id)["updated_at"]
 

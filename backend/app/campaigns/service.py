@@ -1268,6 +1268,7 @@ def campaign_composition(db: Session, campaign_id: int, *, brand_id: int) -> dic
     from app.channels.registry import max_modules_for
     from app.modules.registry import envelope_module_type, get_manifest, list_manifests
     from app.overrides.service import get_active_content_override, is_overrideable
+    from app.campaigns.fence import view as fence_view
 
     campaign = get_campaign(db, campaign_id, brand_id=brand_id)
     if campaign is None:
@@ -1299,7 +1300,7 @@ def campaign_composition(db: Session, campaign_id: int, *, brand_id: int) -> dic
             (envelope_modules if is_envelope else modules).append(row)
         limit = max_modules_for(variant.channel)
         variants.append({
-            "variant": to_variant(variant, db),
+            "variant": to_variant(variant, db), "fence": fence_view(variant),
             "module_limit": limit,
             "can_add_module": limit is None or len(modules) < limit,
             "has_envelope": envelope_module_type(variant.channel) is not None,

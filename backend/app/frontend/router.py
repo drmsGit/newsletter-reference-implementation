@@ -24,7 +24,7 @@ from app.channels.registry import DEFAULT_CHANNEL, get_channel, max_modules_for
 from app.delivery.providers.factory import providers_for_channel
 from app.settings.service import available_channels
 from app.audit import service as audit
-from app.campaigns import duplication
+from app.campaigns import duplication, fence
 from app.recipients.consent import consent_grid, consent_history, resolve_emails
 from app.recipients.service import to_recipient, to_recipients
 
@@ -1386,6 +1386,7 @@ def variant_create(
         request, db, audit.VARIANT_CREATED, subject_type="variant", subject_id=created.id,
         detail={"campaign_id": campaign_id, "name": created.name, "channel": created.channel},
     )
+    fence.touch(db, request, variant_id=created.id)
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
@@ -1413,6 +1414,7 @@ def variant_edit(
             detail={"name": updated.name, "subject": updated.subject,
                     "preheader": updated.preheader},
         )
+        fence.touch(db, request, variant_id=updated.id)
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
@@ -1547,6 +1549,7 @@ def variant_apply_subject(
                 detail={"name": updated.name, "subject": updated.subject,
                         "preheader": updated.preheader, "applied_suggestion": True},
             )
+            fence.touch(db, request, variant_id=updated.id)
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
@@ -1592,6 +1595,7 @@ def module_create(
         request, db, audit.MODULE_CREATED, subject_type="module", subject_id=created.id,
         detail=module_audit_detail(created),
     )
+    fence.touch(db, request, variant_id=created.variant_id)
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
@@ -1636,17 +1640,21 @@ def module_edit(
             request, db, audit.MODULE_UPDATED, subject_type="module", subject_id=module_id,
             detail=module_audit_detail(updated),
         )
+        fence.touch(db, request, variant_id=updated.variant_id)
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
 @router.post("/ui/campaigns/{campaign_id}/variants/{variant_id}/modules/{module_id}/delete")
 def module_delete(request: Request, campaign_id: int, variant_id: int, module_id: int, db: Session = Depends(get_db)):
+    # Read before the delete: the module is gone afterwards.
+    deleted_from = fence.variant_of(db, module_id=module_id)
     removed = delete_module(db, module_id, brand_id=working_brand_id(request, db))
     if removed is not None:
         audit.record_from_request(
             request, db, audit.MODULE_DELETED, subject_type="module", subject_id=module_id,
             detail={"overrides_removed": removed},
         )
+        fence.touch(db, request, variant_id=deleted_from)
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
@@ -1671,6 +1679,7 @@ def module_move(
             request, db, audit.MODULE_MOVED, subject_type="module", subject_id=module_id,
             detail={"direction": direction, "position": moved.position},
         )
+        fence.touch(db, request, variant_id=moved.variant_id)
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
@@ -1702,6 +1711,7 @@ def decision_slot_create(
         request, db, audit.DECISION_SLOT_CREATED, subject_type="decision_slot",
         subject_id=created.id, detail=slot_audit_detail(created),
     )
+    fence.touch(db, request, variant_id=created.variant_id)
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
@@ -1747,6 +1757,7 @@ def content_override_create(
         request, db, audit.OVERRIDE_CREATED, subject_type="override", subject_id=created.id,
         detail=override_audit_detail(created),
     )
+    fence.touch(db, request, module_id=created.module_instance_id)
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
@@ -1765,6 +1776,7 @@ def content_override_reset(
             request, db, audit.OVERRIDE_RESET, subject_type="override", subject_id=override_id,
             detail=override_audit_detail(override),
         )
+        fence.touch(db, request, override_id=override_id)
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
 
 
@@ -1894,6 +1906,7 @@ def decision_slot_edit(
             request, db, audit.DECISION_SLOT_UPDATED, subject_type="decision_slot",
             subject_id=slot_id, detail=slot_audit_detail(updated),
         )
+        fence.touch(db, request, slot_id=slot_id)
     return RedirectResponse(url=f"/ui/decisions/slots/{slot_id}", status_code=303)
 
 

@@ -353,6 +353,15 @@ def foreign_brand(temp_brand):
 
 
 @pytest.fixture
+def one_editor():
+    """One editing machine for the whole test (see `tests.machine.editor`)."""
+    from tests.machine import editor_session
+
+    with editor_session() as headers:
+        yield headers
+
+
+@pytest.fixture
 def foreign_api(foreign_brand):
     """`machine()` headers for a credential granted on the non-default brand.
 

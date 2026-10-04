@@ -18,9 +18,13 @@ from fastapi.testclient import TestClient
 from app.auth.permissions import CAMPAIGNS_MANAGE, VIEW
 from app.campaigns.db_models import CampaignDB, DecisionSlotDB, ModuleInstanceDB, VariantDB
 from main import app
-from tests.machine import machine
+from tests.machine import editor, machine
 
 client = TestClient(app, raise_server_exceptions=False)
+
+# One editing machine per test: several writes as different machines would
+# meet each other's fence (task-254).
+pytestmark = pytest.mark.usefixtures("one_editor")
 
 
 @pytest.fixture
@@ -44,7 +48,7 @@ def world(db, default_brand):
 
 
 def _send(method, url, token=None, **kw):
-    with machine([CAMPAIGNS_MANAGE, VIEW]) as headers:
+    with editor([CAMPAIGNS_MANAGE, VIEW]) as headers:
         if token is not None:
             headers = {**headers, "If-Match": token}
         return getattr(client, method)(url, headers=headers, **kw)

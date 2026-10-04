@@ -16,9 +16,13 @@ from app.auth.permissions import CAMPAIGNS_MANAGE, VIEW
 from app.campaigns.db_models import CampaignDB, DecisionSlotDB, ModuleInstanceDB, VariantDB
 from app.content.db_models import ContentRecordDB
 from main import app
-from tests.machine import machine
+from tests.machine import editor, machine
 
 client = TestClient(app, raise_server_exceptions=False)
+
+# One editing machine per test: several writes as different machines would
+# meet each other's fence (task-254).
+pytestmark = pytest.mark.usefixtures("one_editor")
 
 
 @pytest.fixture
@@ -46,14 +50,14 @@ def world(db, default_brand):
 
 
 def _attach(module_id, token=None, **body):
-    with machine([CAMPAIGNS_MANAGE, VIEW]) as headers:
+    with editor([CAMPAIGNS_MANAGE, VIEW]) as headers:
         if token is not None:
             headers = {**headers, "If-Match": token}
         return client.post(f"/campaigns/modules/{module_id}/decision-slot", json=body, headers=headers)
 
 
 def _token(campaign_id, module_id):
-    with machine([VIEW]) as headers:
+    with editor([VIEW]) as headers:
         composed = client.get(f"/campaigns/{campaign_id}/composition", headers=headers).json()
     return next(m for m in composed["variants"][0]["modules"] if m["id"] == module_id)["updated_at"]
 
@@ -76,7 +80,7 @@ def test_a_catalogue_module_gets_a_new_slot_and_is_bound_to_it(db, world):
 def test_a_stale_module_version_is_refused_and_no_slot_is_left_behind(db, world):
     m = world["catalogue"]
     token = _token(world["campaign"].id, m.id)
-    with machine([CAMPAIGNS_MANAGE]) as headers:
+    with editor([CAMPAIGNS_MANAGE]) as headers:
         client.put(f"/campaigns/modules/{m.id}", json={"module_type": "img_left"}, headers=headers)
     assert _attach(m.id, token).status_code == 409
     assert db.query(DecisionSlotDB).filter(DecisionSlotDB.variant_id == world["variant"].id).count() == 0

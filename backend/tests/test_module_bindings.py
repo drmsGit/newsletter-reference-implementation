@@ -21,9 +21,13 @@ from app.auth.permissions import CAMPAIGNS_MANAGE
 from app.campaigns.db_models import CampaignDB, DecisionSlotDB, ModuleInstanceDB, VariantDB
 from app.content.db_models import ContentRecordDB
 from main import app
-from tests.machine import machine
+from tests.machine import editor, machine
 
 client = TestClient(app, raise_server_exceptions=False)
+
+# One editing machine per test: several writes as different machines would
+# meet each other's fence (task-254).
+pytestmark = pytest.mark.usefixtures("one_editor")
 
 
 @pytest.fixture
@@ -62,7 +66,7 @@ def _bindings(db, variant):
 
 
 def _create(variant, **binding):
-    with machine([CAMPAIGNS_MANAGE]) as headers:
+    with editor([CAMPAIGNS_MANAGE]) as headers:
         return client.post(f"/campaigns/variants/{variant.id}/modules",
                            json={"module_type": "img_left", **binding}, headers=headers)
 
@@ -97,7 +101,7 @@ class TestJsonUpdate:
         return response.json()["id"]
 
     def _put(self, module_id, **binding):
-        with machine([CAMPAIGNS_MANAGE]) as headers:
+        with editor([CAMPAIGNS_MANAGE]) as headers:
             return client.put(f"/campaigns/modules/{module_id}",
                               json={"module_type": "img_left", **binding}, headers=headers)
 

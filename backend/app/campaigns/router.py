@@ -6,7 +6,7 @@ from app.auth.permissions import CAMPAIGNS_MANAGE
 from app.auth.dependencies import auth_is_enforced, request_principal, working_brand
 from app.pagination import Page, PageParams, page_of_list, page_params
 from app.database import get_db
-from app.campaigns import duplication
+from app.campaigns import duplication, fence
 from app.campaigns.db_models import CampaignDB
 from app.campaigns.models import (
     Campaign,
@@ -23,6 +23,7 @@ from app.campaigns.models import (
     SlotCandidates,
     SlotAttach,
     SlotAttached,
+    VariantFence,
     CampaignComposition,
     SubjectSuggestionResult,
     CampaignCreate,
@@ -229,6 +230,7 @@ def create_campaign_variant(
         request, db, audit.VARIANT_CREATED, subject_type="variant", subject_id=created.id,
         detail={"campaign_id": campaign_id, "name": created.name, "channel": created.channel},
     )
+    fence.touch(db, request, variant_id=created.id)
     return created
 
 
@@ -253,6 +255,7 @@ def create_variant_module(
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
+    fence.guard(db, request, variant_id=variant_id)
     try:
         created = create_module_for_variant(
             db=db,
@@ -271,6 +274,7 @@ def create_variant_module(
         request, db, audit.MODULE_CREATED, subject_type="module", subject_id=created.id,
         detail=module_audit_detail(created),
     )
+    fence.touch(db, request, variant_id=variant_id)
     return created
 
 
@@ -282,6 +286,8 @@ def delete_variant_module(
     brand_id: int = Depends(working_brand),
     if_match: str | None = IF_MATCH,
 ):
+    fenced_variant = fence.variant_of(db, module_id=module_id)
+    fence.guard(db, request, variant_id=fenced_variant)
     try:
         removed = delete_module(
             db, module_id, brand_id=brand_id, expected_updated_at=_expected(if_match)
@@ -294,6 +300,7 @@ def delete_variant_module(
         request, db, audit.MODULE_DELETED, subject_type="module", subject_id=module_id,
         detail={"overrides_removed": removed},
     )
+    fence.touch(db, request, variant_id=fenced_variant)
     return {"status": "deleted", "module_id": module_id}
 
 
@@ -315,6 +322,7 @@ def attach_module_slot(
     brand_id: int = Depends(working_brand),
     if_match: str | None = IF_MATCH,
 ):
+    fence.guard(db, request, module_id=module_id)
     try:
         result = attach_new_slot(
             db, module_id, payload.decision_strategy,
@@ -335,6 +343,7 @@ def attach_module_slot(
         request, db, audit.MODULE_UPDATED, subject_type="module", subject_id=module.id,
         detail=module_audit_detail(module),
     )
+    fence.touch(db, request, module_id=module_id)
     return {"module": module, "slot": to_decision_slot(slot)}
 
 
@@ -348,6 +357,7 @@ def move_variant_module(
     if_match: str | None = IF_MATCH,
 ):
     """Move a module one step 'up' or 'down' within its variant."""
+    fence.guard(db, request, module_id=module_id)
     try:
         result = move_module(
             db, module_id, direction, brand_id=brand_id, expected_updated_at=_expected(if_match)
@@ -362,6 +372,7 @@ def move_variant_module(
         request, db, audit.MODULE_MOVED, subject_type="module", subject_id=module_id,
         detail={"direction": direction, "position": result.position},
     )
+    fence.touch(db, request, module_id=module_id)
     return result
 
 
@@ -443,6 +454,7 @@ def create_variant_decision_slot(
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
+    fence.guard(db, request, variant_id=variant_id)
     try:
         created = create_decision_slot_for_variant(
             db=db,
@@ -461,6 +473,7 @@ def create_variant_decision_slot(
         request, db, audit.DECISION_SLOT_CREATED, subject_type="decision_slot",
         subject_id=created.id, detail=slot_audit_detail(created),
     )
+    fence.touch(db, request, variant_id=variant_id)
     return created
 
 
@@ -504,6 +517,37 @@ def create_decision_slot_resolution(
 # The UI has had all three since the Jinja build; this closes the half of
 # ADR-002 that had quietly drifted.
 
+@router.delete(
+    "/variants/{variant_id}/fence",
+    response_model=VariantFence | None,
+    summary="Unblock a variant",
+    description=(
+        "Clears the advisory fence (ADR-180). A person may clear any fence; a "
+        "machine only one it holds, and is refused with 423 otherwise. The next "
+        "edit sets a new fence."
+    ),
+)
+def unblock_variant(
+    variant_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    from app.campaigns.service import get_variant
+
+    variant = get_variant(db, variant_id, brand_id=brand_id)
+    if variant is None:
+        raise HTTPException(status_code=404, detail="Variant not found")
+    was = fence.view(variant)
+    fence.clear(db, request, variant)
+    if was is not None:
+        audit.record_from_request(
+            request, db, audit.VARIANT_UNFENCED, subject_type="variant", subject_id=variant_id,
+            detail={"was": was["by"], "active": was["active"]},
+        )
+    return None
+
+
 @router.put("/variants/{variant_id}", response_model=Variant)
 def update_variant_record(
     variant_id: int,
@@ -521,6 +565,7 @@ def update_variant_record(
     envelope simply has nowhere to put them and they are ignored rather than
     refused.
     """
+    fence.guard(db, request, variant_id=variant_id)
     try:
         updated = update_variant(
             db,
@@ -539,6 +584,7 @@ def update_variant_record(
         request, db, audit.VARIANT_UPDATED, subject_type="variant", subject_id=variant_id,
         detail={"name": updated.name, "subject": updated.subject, "preheader": updated.preheader},
     )
+    fence.touch(db, request, variant_id=variant_id)
     return updated
 
 
@@ -562,6 +608,7 @@ def update_module_record(
     which is where that rule belongs, since rendering silently prefers the
     content record and ignores the slot.
     """
+    fence.guard(db, request, module_id=module_id)
     try:
         updated = update_module(
             db,
@@ -585,6 +632,7 @@ def update_module_record(
         request, db, audit.MODULE_UPDATED, subject_type="module", subject_id=module_id,
         detail=module_audit_detail(updated),
     )
+    fence.touch(db, request, module_id=module_id)
     return updated
 
 
@@ -613,6 +661,7 @@ def update_decision_slot_record(
     graceful degradation (ADR-086), which is the right answer for a strategy
     that found no candidates and the wrong one for a typo.
     """
+    fence.guard(db, request, slot_id=slot_id)
     from app.decision.strategies.registry import get_strategy
 
     try:
@@ -651,6 +700,7 @@ def update_decision_slot_record(
         request, db, audit.DECISION_SLOT_UPDATED, subject_type="decision_slot",
         subject_id=slot_id, detail=slot_audit_detail(updated),
     )
+    fence.touch(db, request, slot_id=slot_id)
     return to_decision_slot(updated)
 
 
@@ -678,6 +728,7 @@ def patch_decision_slot_record(
     A JSON client has no such hidden state, which is precisely why the rule had
     to become explicit rather than remain a property of one form.
     """
+    fence.guard(db, request, slot_id=slot_id)
     from app.decision.strategies.registry import get_strategy
 
     existing = get_decision_slot(db, slot_id, brand_id=brand_id)
@@ -731,6 +782,7 @@ def patch_decision_slot_record(
         request, db, audit.DECISION_SLOT_UPDATED, subject_type="decision_slot",
         subject_id=slot_id, detail=slot_audit_detail(updated),
     )
+    fence.touch(db, request, slot_id=slot_id)
     return to_decision_slot(updated)
 
 

@@ -14,9 +14,13 @@ from fastapi.testclient import TestClient
 from app.auth.permissions import CAMPAIGNS_MANAGE
 from app.campaigns.db_models import CampaignDB, ModuleInstanceDB, VariantDB
 from main import app
-from tests.machine import machine
+from tests.machine import editor, machine
 
 client = TestClient(app, raise_server_exceptions=False)
+
+# One editing machine per test: several writes as different machines would
+# meet each other's fence (task-254).
+pytestmark = pytest.mark.usefixtures("one_editor")
 
 
 @pytest.fixture
@@ -34,7 +38,7 @@ def campaign(db, default_brand):
 
 
 def _create(campaign, **fields):
-    with machine([CAMPAIGNS_MANAGE]) as headers:
+    with editor([CAMPAIGNS_MANAGE]) as headers:
         response = client.post(f"/campaigns/{campaign.id}/variants",
                                json={"name": "B", "channel": "email", **fields}, headers=headers)
     assert response.status_code == 200, response.text
@@ -62,7 +66,7 @@ def test_whitespace_is_trimmed_and_blank_is_empty_on_create(db, campaign):
 
 def test_whitespace_only_on_update_clears_the_envelope(db, campaign):
     created = _create(campaign, subject="Spring", preheader="Peek")
-    with machine([CAMPAIGNS_MANAGE]) as headers:
+    with editor([CAMPAIGNS_MANAGE]) as headers:
         response = client.put(f"/campaigns/variants/{created['id']}",
                               json={"name": "B", "subject": " ", "preheader": "\t"}, headers=headers)
     assert response.status_code == 200, response.text

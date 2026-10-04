@@ -91,6 +91,24 @@ Two things follow from point 3 and are written down so they are confirmed rather
 - **This is not a supersession and no ADR's status changes.** The repository has had exactly one supersession ever, [[ADR-165 — Core Scope Is Channel-Neutral Content Orchestration]] over ADR-001 on 2026-09-12, and this is deliberately not a second.
 - **`docs/playbook-strategy.md` carries the 2026-09-27 decision-log entry behind this record**, under *Variant Editor Design Interview (ADR-177) — interview closed*, which names *"the machine-versus-human lock policy"* as the first of three ADRs the interview still owed. Nothing here departs from it; the entry's title predates this record and ADR-178.
 
+## Addendum 2026-10-04 — a fence is set by editing and lapses after 30 minutes
+
+Prompted by building task-254, which asked *"How should a variant's fence be set, and when does it end?"* The user's answer, *"Set by editing, lapses"*, settles what Consequences → Negative left open: whether a fence expires, and after how long.
+
+**The decision.** Any edit to the variant — subject or preheader, modules, overrides, slots — sets *"blocked by X, last updated HH:MM"*. The fence **lapses after 30 minutes without edits**, and anyone may unblock it sooner. A forgotten fence therefore never stops a machine for long, which answers the holiday problem point 3 reintroduced on the machine side.
+
+Two options were rejected. A fence that **never lapses** means an abandoned fence stops automation until someone notices — the very failure this record's Negative names. An **explicit *"I'm working on this"* button** means nothing is fenced unless someone remembers to press it.
+
+**Build decisions taken with it — mechanism, recorded as such:**
+
+- **The fence lives on the variant row, as who and when:** actor type, actor id and a text label, plus the time of the last edit. The label is the readable name, the same value `content_overrides.overridden_by` carries via `auth.service.actor_label` — a user's email, `integration:<name>` for a machine. This resolves the first Note's open tension about display names the way task-243 settled override authors: the text label is the readable copy, and `audit_events` keeps the id-based record ([[ADR-153 — Audit and Accountability]]).
+- **"Last updated by X at HH:MM" is the fence itself**, refreshed by every composer write, not a read of `audit_events`. task-254's original acceptance criterion — *read from `audit_events`* — is met by the fence instead. The Context's "first real consumer of `audit_events`" and the Negative bullet on a UI string depending on the accountability log therefore describe the reasoning at the time, not the build.
+- **Every composer write on both planes refreshes the fence to its actor.** Editing never waits on a fence for a person; point 1 stays advisory.
+- **A machine is refused with HTTP 423 Locked** when its composer write targets a variant whose fence is active and held by another actor. 409 already means a stale version (point 2), so the two refusals stay distinct. It is enforced server-side by actor type, as point 4 requires.
+- **Unblock follows point 3.** A person may clear any fence; a machine may clear only a fence it holds. Unblocking is audited.
+
+What a blocked agent does next is still open, as the Negative says. The lapse bounds how long it waits; it does not choose between retry, defer and escalation.
+
 ## Related ADRs
 
 ### Depends On

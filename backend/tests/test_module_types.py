@@ -18,9 +18,13 @@ from fastapi.testclient import TestClient
 from app.auth.permissions import CAMPAIGNS_MANAGE
 from app.campaigns.db_models import CampaignDB, ModuleInstanceDB, VariantDB
 from main import app
-from tests.machine import machine
+from tests.machine import editor, machine
 
 client = TestClient(app, raise_server_exceptions=False)
+
+# One editing machine per test: several writes as different machines would
+# meet each other's fence (task-254).
+pytestmark = pytest.mark.usefixtures("one_editor")
 
 
 @pytest.fixture
@@ -44,13 +48,13 @@ def _types(db, variant):
 
 
 def _create(variant, module_type):
-    with machine([CAMPAIGNS_MANAGE]) as headers:
+    with editor([CAMPAIGNS_MANAGE]) as headers:
         return client.post(f"/campaigns/variants/{variant.id}/modules",
                            json={"module_type": module_type}, headers=headers)
 
 
 def _put(module_id, module_type):
-    with machine([CAMPAIGNS_MANAGE]) as headers:
+    with editor([CAMPAIGNS_MANAGE]) as headers:
         return client.put(f"/campaigns/modules/{module_id}",
                           json={"module_type": module_type}, headers=headers)
 

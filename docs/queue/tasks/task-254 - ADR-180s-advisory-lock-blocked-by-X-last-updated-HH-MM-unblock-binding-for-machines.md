@@ -3,9 +3,11 @@ id: TASK-254
 title: >-
   ADR-180's advisory lock: "blocked by X, last updated HH:MM, unblock", binding
   for machines
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-03 18:01'
+updated_date: '2026-10-04 08:49'
 labels:
   - backend
   - frontend
@@ -35,3 +37,22 @@ Split from task-110 on 2026-10-03 (user): task-110 built the layer underneath, o
 - [ ] #3 "Last updated by X at HH:MM" for a variant is read from audit_events
 - [ ] #4 The variant editor shows the fence and the unblock control
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Decided 2026-10-04 (user): any composer edit sets the fence; it lapses after 30 minutes without edits; anyone may unblock sooner. Recorded as an ADR-180 addendum (adr-author).
+1. Migration 0030: variants.fenced_by_type, fenced_by_id, fenced_by_label, fenced_at (all nullable). Applied before any model edit.
+2. backend/app/campaigns/fence.py: FENCE_LAPSE (30 min), is_active, view, guard (refuses a machine whose write would cross another actor's active fence: HTTP 423), touch (sets the fence to the actor after a write), clear (a person any, a machine only its own; audited variant.unfenced).
+3. Composer routes on both planes: guard first on the JSON plane (machines only use it), touch after every successful write, next to its audit entry.
+4. DELETE /campaigns/variants/{variant_id}/fence; ComposedVariant.fence for the editor.
+5. AC 3 deviation, recorded in the addendum: 'last updated by X at HH:MM' is the fence itself (refreshed by every write, label text as for override authors), not an audit_events read.
+6. Client: the editor shows the fence (someone else's, active) with Unblock, or 'last edited by' when lapsed.
+7. Tests, mutants, live check.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-04. Backend: migration 0030 (applied to dev, and by hand to the test database because the conftest fix 2bb8b8b is only on the parallel session's branch); backend/app/campaigns/fence.py (FENCE_LAPSE 30 min, guard, touch, clear, view); guard before and touch after every composer write on the JSON plane (campaigns and overrides routers), touch after every successful write on the Jinja plane (bound to the written object, never the URL id); DELETE /campaigns/variants/{id}/fence (audited variant.unfenced); ComposedVariant.fence. The fence write leaves variants.updated_at alone (Core UPDATE writing it back), so a module edit does not move the variant's version token. guard answers only for the working brand's variants, so a 423 never reveals another brand's variant. Two bugs found by the review and the tests before commit: the wiring script put the overrides reset route's calls into set_fields (unusual signature), and the Jinja actor is request.state.current_user, a plain dict, not the principal (fenced as 'unauthenticated' until fixed). Tests backend/tests/test_fence.py (10); mutants: guard never refuses, no lapse, fence moves the version, machine clears any, guard not brand-scoped, override write unguarded: each caught. 21 older tests made successive writes as different machines and met the fence (correctly); they now use one editing machine per test (tests.machine.editor, one_editor fixture). Full suite 1205 passed, rc 0.
+<!-- SECTION:NOTES:END -->

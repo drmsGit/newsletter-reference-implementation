@@ -12,6 +12,7 @@ from app.audit import service as audit
 # The version-token helpers the composer routes use (task-110), so an
 # override write states and checks a module's version the same way.
 from app.campaigns.router import IF_MATCH, _expected
+from app.campaigns import fence
 from app.campaigns.service import StaleWrite
 from app.overrides.service import (
     override_audit_detail,
@@ -33,6 +34,7 @@ def create(
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
+    fence.guard(db, request, module_id=data.module_instance_id)
     try:
         created = create_content_override(
             db, data, brand_id=brand_id, author=actor_label(request_principal(request)))
@@ -42,6 +44,7 @@ def create(
         request, db, audit.OVERRIDE_CREATED, subject_type="override", subject_id=created.id,
         detail=override_audit_detail(created),
     )
+    fence.touch(db, request, module_id=data.module_instance_id)
     return created
 
 
@@ -78,6 +81,7 @@ def reset(override_id: int, request: Request, db: Session = Depends(get_db),
     """Reset-to-original: deactivate the override, reverting the module to
     system-governed content. Keeps the row as history; who reset it is the
     audit entry's actor (task-252)."""
+    fence.guard(db, request, override_id=override_id)
     override = reset_content_override(db, override_id, brand_id=brand_id)
     if override is None:
         raise HTTPException(status_code=404, detail="Content override not found")
@@ -85,6 +89,7 @@ def reset(override_id: int, request: Request, db: Session = Depends(get_db),
         request, db, audit.OVERRIDE_RESET, subject_type="override", subject_id=override_id,
         detail=override_audit_detail(override),
     )
+    fence.touch(db, request, override_id=override_id)
     return override
 
 
@@ -124,6 +129,7 @@ def set_fields(
     brand_id: int = Depends(working_brand),
     if_match: str | None = IF_MATCH,
 ):
+    fence.guard(db, request, module_id=module_id)
     try:
         result = set_override_fields(
             db, module_id, data.field_overrides, data.reason,
@@ -142,4 +148,5 @@ def set_fields(
             request, db, _SET_ACTIONS[happened], subject_type="override", subject_id=row.id,
             detail=override_audit_detail(row),
         )
+    fence.touch(db, request, module_id=module_id)
     return {"module_id": module.id, "module_updated_at": module.updated_at, "override": live}

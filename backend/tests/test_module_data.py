@@ -17,9 +17,13 @@ from app.auth import service as auth
 from app.auth.permissions import CAMPAIGNS_MANAGE
 from app.campaigns.db_models import CampaignDB, ModuleInstanceDB, VariantDB
 from main import app
-from tests.machine import machine
+from tests.machine import editor, machine
 
 client = TestClient(app, raise_server_exceptions=False)
+
+# One editing machine per test: several writes as different machines would
+# meet each other's fence (task-254).
+pytestmark = pytest.mark.usefixtures("one_editor")
 
 
 @pytest.fixture
@@ -37,7 +41,7 @@ def variant(db, default_brand):
 
 
 def _create(variant, module_data):
-    with machine([CAMPAIGNS_MANAGE]) as headers:
+    with editor([CAMPAIGNS_MANAGE]) as headers:
         return client.post(f"/campaigns/variants/{variant.id}/modules",
                            json={"module_type": "cta", "module_data": module_data}, headers=headers)
 
@@ -78,7 +82,7 @@ class TestCreate:
 def test_an_update_is_checked_too(db, variant):
     created = _create(variant, {"label": "Go"})
     assert created.status_code == 200, created.text
-    with machine([CAMPAIGNS_MANAGE]) as headers:
+    with editor([CAMPAIGNS_MANAGE]) as headers:
         response = client.put(f"/campaigns/modules/{created.json()['id']}",
                               json={"module_type": "cta", "module_data": {"colour": "red"}}, headers=headers)
     assert response.status_code == 422, response.text

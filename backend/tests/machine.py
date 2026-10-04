@@ -61,3 +61,37 @@ def machine(permissions, brand_id: int | None = None):
             ).delete()
             db.commit()
         db.close()
+
+
+# --- one editing machine per test (task-254) ---------------------------------
+#
+# A composer write fences its variant to whoever made it, and a machine's
+# write across another actor's active fence is refused with 423 (ADR-180's
+# 2026-10-04 addendum). Each `machine()` is a new integration — a different
+# actor — so a test making several writes as "the editor" must make them all
+# as one machine, or the second write meets the first one's fence. A test of
+# the fence itself uses `machine()` on purpose to get two actors.
+
+EDITOR_PERMISSIONS = ["campaigns.manage", "overrides.manage", "content.manage", "view"]
+_editor_headers: dict | None = None
+
+
+@contextmanager
+def editor_session():
+    global _editor_headers
+    with machine(EDITOR_PERMISSIONS) as headers:
+        _editor_headers = headers
+        try:
+            yield headers
+        finally:
+            _editor_headers = None
+
+
+def editor(_permissions=None):
+    """The test's one editing machine, as `with editor([...]) as headers:` —
+    the permissions argument is accepted and ignored, so a call written for
+    `machine()` reads the same. Needs the `one_editor` fixture."""
+    from contextlib import nullcontext
+
+    assert _editor_headers is not None, "this test needs the one_editor fixture"
+    return nullcontext(_editor_headers)
