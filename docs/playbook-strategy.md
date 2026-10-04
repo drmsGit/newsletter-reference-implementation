@@ -507,6 +507,19 @@ and the authentication question the React manager client was blocked on.
 
 **Status:** decided, not built. task-268 (server), task-269 (picker) and task-270 (Content list, alongside task-267).
 
+
+### 2026-10-04 — The content screen becomes where a record is written
+
+**Context:** the user asked whether the edit part of "content" had been skipped. It had never been filed: the React content screens only showed records (task-274). The answers come from an interview held one question at a time.
+
+1. **The record page autosaves each field on blur with its version check**, like the variant editor. On this screen changing the catalogue is the point, and nothing reaches a send until it is published.
+2. **It says how far an edit reaches in one passive line** (unsent campaigns, and that sends use the published version), with no confirmation. **Publish works as in the composer**, and a read-only version list sits below.
+3. **Category scores are 1 to 10, enforced for every caller, and can be changed in place.** The screen says categories build the interest profile, with facets to follow for findability. This is recorded as an addendum to [[ADR-080 — Human-governed Taxonomy Before AI Selection]], not a supersession.
+4. **Creating a record asks only for a title and description.** Status and duplicate are in scope now; delete waits for task-117; per-channel readiness is its own task.
+5. **Defects in the content API are filed as bugs ahead of the build**, as D3 did for the composer: unaudited writes, field order, and the versions 404.
+
+**Status:** decided, not built. Details in [[Content Write Surface - final design pass]]; bugs task-275 to task-277, build task-278 to task-281, readiness task-282.
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*

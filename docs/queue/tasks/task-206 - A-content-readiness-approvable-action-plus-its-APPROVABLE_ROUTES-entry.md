@@ -4,10 +4,11 @@ title: 'A content-readiness approvable action, plus its APPROVABLE_ROUTES entry'
 status: To Do
 assignee: []
 created_date: '2026-09-27 14:20'
-updated_date: '2026-10-01 20:54'
+updated_date: '2026-10-04 18:25'
 labels:
   - backend
-dependencies: []
+dependencies:
+  - TASK-282
 priority: p2
 type: feature
 ordinal: 200430
@@ -29,4 +30,6 @@ Related: [[ADR-174 — Channel Readiness Is Asserted, Not Computed]].
 
 <!-- SECTION:NOTES:BEGIN -->
 Logged 2026-09-27 from the "What Cluster N produced" sections of the two design interviews, each gap re-verified against the code that day. The plan was reviewed and approved by the session that ran the interviews. Parked: not yet ranked by anyone.
+
+2026-10-04: depends on task-282, the readiness state itself (split out of the task-274 design session).
 <!-- SECTION:NOTES:END -->

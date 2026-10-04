@@ -3,9 +3,11 @@ id: TASK-274
 title: >-
   The content screen cannot create or edit a record: design the content write
   surface
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-10-04 18:07'
+updated_date: '2026-10-04 18:26'
 labels:
   - frontend
   - backend
@@ -60,6 +62,33 @@ Record architectural answers through the adr-author agent; screen decisions go i
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A design session settles the content write surface (save model, reach, publish, fields by channel, categories and scores, create, delete and duplicate), recorded in an ADR or addendum where architectural and in a final design pass otherwise
-- [ ] #2 Build tasks are proposed from it, none started
+- [x] #1 A design session settles the content write surface (save model, reach, publish, fields by channel, categories and scores, create, delete and duplicate), recorded in an ADR or addendum where architectural and in a final design pass otherwise
+- [x] #2 Build tasks are proposed from it, none started
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Design session held 2026-10-04 with the user, eight questions one at a time plus the defect handling:
+1. autosave on blur with If-Match;
+2. a passive reach line, no confirmation;
+3. the D5 notice and Publish, plus a read-only version list (restore deferred);
+4. scores 1-10 enforced for every caller, out-of-range rows reported not changed;
+5. categories edited in place (new score route), with the note, and no creating categories;
+6. create asks for title and description, then the page;
+7. status and duplicate now, delete waits for task-117;
+8. readiness split out.
+Defects become bugs ahead of the build.
+Recorded in:
+- the ADR-080 addendum 2026-10-04 (adr-author; additions only);
+- [[Content Write Surface - final design pass]] (new);
+- the playbook decision log 2026-10-04.
+Corrections to this task's own text: the delete block that force cannot lift is ContentRecordHasHistoryError, not the soft one; and PATCH cannot set status.
+Filed: bugs task-275 (audit), task-276 (field order) and task-277 (versions 404); build task-278 (scores and route), task-279 (record page), task-280 (categories) and task-281 (create); readiness task-282, which task-206 now depends on. None started.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Designed the React content write surface with the user: autosave with version checks, a passive reach line, D5-style publish with a read-only version list, 1-10 scores enforced for every caller and edited in place, title-only create, status and duplicate now, delete deferred to task-117, readiness split out. Recorded in an ADR-080 addendum, a new final design pass and the playbook. Three bugs, four build tasks and a readiness task filed, none started.
+<!-- SECTION:FINAL_SUMMARY:END -->
