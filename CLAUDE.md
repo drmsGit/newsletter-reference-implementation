@@ -57,8 +57,9 @@ commercial product. Learnings feed the separate Condor use case.
   Title Case under `## Status`.
 - Status is one of: Proposed | Accepted | Superseded by ADR-NNN | Deprecated
 - Never edit an Accepted ADR's Decision. Supersede it with a new ADR instead.
-  One supersession exists: ADR-165 supersedes ADR-001 (2026-09-12). It is still
-  rare enough to be worth saying out loud when you propose another.
+  Supersessions so far: ADR-165 supersedes ADR-001 (2026-09-12), ADR-186
+  supersedes ADR-178 (2026-10-04). Still rare enough to be worth saying out
+  loud when you propose another.
 - To amend an Accepted ADR without superseding it, append a dated addendum
   section (the ADR-101 pattern), never a rewrite of Decision.
 - Never renumber. Numbers are permanent identifiers.
