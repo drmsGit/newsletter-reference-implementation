@@ -767,15 +767,25 @@ class TestSlotCandidateCount:
     @pytest.fixture
     def setup(self, db, home, foreign_brand):
         from app.campaigns.db_models import DecisionResolutionDB, DecisionSlotDB
-        from app.content.db_models import CategoryDB, ContentCategoryAssignmentDB, ContentRecordDB
+        from app.content.db_models import (
+            CategoryDB, ContentCategoryAssignmentDB, ContentChannelReadinessDB, ContentRecordDB, ContentVersionDB,
+        )
 
         variant = _variant(db, home)
         one, two = CategoryDB(name=f"cc-{uuid.uuid4().hex[:6]}"), CategoryDB(name=f"cc-{uuid.uuid4().hex[:6]}")
-        a = ContentRecordDB(title="A", content={}, status="active", brand_id=home.id)
-        b = ContentRecordDB(title="B", content={}, status="active", brand_id=home.id)
-        retired = ContentRecordDB(title="R", content={}, status="archived", brand_id=home.id)
-        elsewhere = ContentRecordDB(title="F", content={}, status="active", brand_id=foreign_brand.id)
+        # All four machine ready, published and marked ready for email, so a
+        # slot may take any of them (task-284): what keeps the archived and the
+        # foreign record out is the status and the brand filter.
+        a = ContentRecordDB(title="A", content={}, status="active", brand_id=home.id, machine_ready=True)
+        b = ContentRecordDB(title="B", content={}, status="active", brand_id=home.id, machine_ready=True)
+        retired = ContentRecordDB(title="R", content={}, status="archived", brand_id=home.id, machine_ready=True)
+        elsewhere = ContentRecordDB(title="F", content={}, status="active", brand_id=foreign_brand.id,
+                                    machine_ready=True)
         db.add_all([one, two, a, b, retired, elsewhere]); db.flush()
+        records = [a.id, b.id, retired.id, elsewhere.id]
+        for rid in records:
+            db.add_all([ContentVersionDB(content_record_id=rid, version_number=1, content={}),
+                        ContentChannelReadinessDB(content_id=rid, channel="email", marked_by="test")])
         assignments = [
             ContentCategoryAssignmentDB(content_id=a.id, category_id=one.id, score=9),
             ContentCategoryAssignmentDB(content_id=a.id, category_id=two.id, score=1),
@@ -803,6 +813,10 @@ class TestSlotCandidateCount:
         db.query(DecisionSlotDB).filter(DecisionSlotDB.id.in_(made)).delete(synchronize_session=False)
         db.query(ContentCategoryAssignmentDB).filter(
             ContentCategoryAssignmentDB.id.in_([x.id for x in assignments])).delete(synchronize_session=False)
+        db.query(ContentChannelReadinessDB).filter(ContentChannelReadinessDB.content_id.in_(records)).delete(
+            synchronize_session=False)
+        db.query(ContentVersionDB).filter(ContentVersionDB.content_record_id.in_(records)).delete(
+            synchronize_session=False)
         db.query(ContentRecordDB).filter(ContentRecordDB.id == elsewhere.id).delete()
         db.query(CategoryDB).filter(CategoryDB.id.in_([one.id, two.id])).delete(synchronize_session=False)
         db.commit()

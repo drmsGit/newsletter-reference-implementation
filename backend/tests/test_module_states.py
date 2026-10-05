@@ -17,7 +17,7 @@ from app.campaigns.db_models import (
     CampaignDB, DecisionResolutionDB, DecisionSlotDB, ModuleInstanceDB, VariantDB,
 )
 from app.content.db_models import (
-    CategoryDB, ContentCategoryAssignmentDB, ContentRecordDB, ContentVersionDB,
+    CategoryDB, ContentCategoryAssignmentDB, ContentChannelReadinessDB, ContentRecordDB, ContentVersionDB,
 )
 from app.recipients.db_models import RecipientDB
 from main import app
@@ -34,7 +34,9 @@ def world(db, default_brand):
     variant = VariantDB(campaign_id=campaign.id, channel="email", name="v", status="draft")
     category = CategoryDB(name=f"ms-{uuid.uuid4().hex[:6]}")
     empty_category = CategoryDB(name=f"ms-empty-{uuid.uuid4().hex[:6]}")
-    published = ContentRecordDB(title="pub", content={"headline_medium": "Same"}, status="active", brand_id=b)
+    # The slots' candidate: one a slot may take (task-284).
+    published = ContentRecordDB(title="pub", content={"headline_medium": "Same"}, status="active", brand_id=b,
+                                machine_ready=True)
     drafted = ContentRecordDB(title="draft", content={"headline_medium": "Edited"}, status="active", brand_id=b)
     recipient = RecipientDB(external_id=f"ms-{uuid.uuid4().hex[:8]}")
     db.add_all([variant, category, empty_category, published, drafted, recipient]); db.flush()
@@ -42,6 +44,7 @@ def world(db, default_brand):
         ContentVersionDB(content_record_id=published.id, version_number=1, content={"headline_medium": "Same"}),
         ContentVersionDB(content_record_id=drafted.id, version_number=1, content={"headline_medium": "Old"}),
         ContentCategoryAssignmentDB(content_id=published.id, category_id=category.id, score=5),
+        ContentChannelReadinessDB(content_id=published.id, channel="email", marked_by="test"),
     ])
     slot = lambda name, cats: DecisionSlotDB(  # noqa: E731
         variant_id=variant.id, name=name, decision_type="content_recommendation",
@@ -75,6 +78,7 @@ def world(db, default_brand):
     db.query(VariantDB).filter(VariantDB.id == variant.id).delete()
     db.query(CampaignDB).filter(CampaignDB.id == campaign.id).delete()
     db.query(ContentCategoryAssignmentDB).filter(ContentCategoryAssignmentDB.category_id == category.id).delete()
+    db.query(ContentChannelReadinessDB).filter(ContentChannelReadinessDB.content_id == published.id).delete()
     db.query(ContentVersionDB).filter(ContentVersionDB.content_record_id.in_([published.id, drafted.id])).delete(
         synchronize_session=False)
     db.query(ContentRecordDB).filter(ContentRecordDB.id.in_([published.id, drafted.id])).delete(

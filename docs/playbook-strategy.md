@@ -533,7 +533,7 @@ and the authentication question the React manager client was blocked on.
 
 Recorded as addenda to [[ADR-174 — Channel Readiness Is Asserted, Not Computed]] and [[ADR-179 — What Enters the Catalogue, and What a Machine May Take From It]], not supersessions, and in [[Channel Readiness - final design pass]].
 
-**Status:** decided, not built. Build tasks task-283 to task-287. task-206 now depends on task-283 and task-210. Still open, for the user before task-284: whether a record marked ready but missing fields is skipped by slots.
+**Status:** decided, not built. Build tasks task-283 to task-287. task-206 now depends on task-283 and task-210. The question left open was settled the same day, before task-284 was built: **a slot also skips a record whose latest published version cannot fill the slot's module.** Nothing else checks a slot's pick, because the send check skips slot modules. Recorded as a further addendum to ADR-174.
 
 ## 6. Roadmap
 

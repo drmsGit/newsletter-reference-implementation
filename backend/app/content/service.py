@@ -781,6 +781,14 @@ def _channel_or_refuse(channel: str):
     return manifest
 
 
+def fields_a_record_must_fill(manifest) -> list[str]:
+    """The fields a content record must fill for `manifest`'s module to render:
+    required, sourced from content, not envelope. One definition for the
+    readiness warning and slot candidacy (`decision.strategies.base.candidate_query`),
+    so the two never disagree about what "required" means."""
+    return [v.name for v in manifest.variables if v.required and v.source == "content" and not v.envelope]
+
+
 def readiness_warning(content: dict | None, channel: str) -> str | None:
     """Why a mark for `channel` is doubtful, or None (ADR-174 addendum point 4).
 
@@ -800,8 +808,7 @@ def readiness_warning(content: dict | None, channel: str) -> str | None:
         return value is not None and not (isinstance(value, str) and not value.strip())
 
     modules = sorted((m for m in list_manifests(channel) if m.cms), key=lambda m: m.name)
-    needs = [(m, [v.name for v in m.variables if v.required and v.source == "content" and not v.envelope])
-             for m in modules]
+    needs = [(m, fields_a_record_must_fill(m)) for m in modules]
     if not needs or any(all(filled(name) for name in required) for _, required in needs):
         return None
     _channel_or_refuse(channel)

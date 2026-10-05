@@ -28,6 +28,7 @@ from app.content.db_models import (
     ContentRecordDB,
     ContentVersionDB,
     ContentCategoryAssignmentDB,
+    ContentChannelReadinessDB,
 )
 from app.recipients.db_models import (
     AddressabilityDB,
@@ -149,14 +150,17 @@ def seed(extended: bool = False):
                 "button_url": f"https://example.com/stories/{i}",
                 "image_url": f"/static/img/demo-{i}.jpg",
             }
+            # Slot content: a slot picks only what is machine ready and marked
+            # ready for its channel (task-284).
             rec = ContentRecordDB(title=title, description=body["body_medium"], content=body,
-                                  status="active", brand_id=BRAND_ID)
+                                  status="active", brand_id=BRAND_ID, machine_ready=True)
             db.add(rec)
             contents.append((rec, primary))
         db.commit()
 
         for rec, primary in contents:
             db.add(ContentVersionDB(content_record_id=rec.id, version_number=1, content=rec.content, created_by="demo"))
+            db.add(ContentChannelReadinessDB(content_id=rec.id, channel="email", marked_by="demo"))
             # 1–3 categories: the primary + up to 2 others (co-occurrence -> edges)
             cats = {primary}
             for _ in range(random.randint(0, 2)):
@@ -539,10 +543,11 @@ def _seed_extras(db, recipients, cat, slots) -> None:
         body = {"headline_medium": f"Brand B: {name} #{i}",
                 "body_medium": f"Brand B's take on {name.lower()}.", "button_label": "Read more"}
         rec = ContentRecordDB(title=f"Brand B {name} #{i}", content=body, status="active",
-                              brand_id=brand_b.id)
+                              brand_id=brand_b.id, machine_ready=True)
         db.add(rec); db.flush()
         db.add(ContentVersionDB(content_record_id=rec.id, version_number=1, content=body,
                                 created_by="demo"))
+        db.add(ContentChannelReadinessDB(content_id=rec.id, channel="email", marked_by="demo"))
         db.add(ContentCategoryAssignmentDB(content_id=rec.id, category_id=cat[name].id, score=8))
         b_records.append(rec)
     campaign_b = CampaignDB(name="Brand B newsletter", status="draft", brand_id=brand_b.id)

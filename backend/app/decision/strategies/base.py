@@ -178,6 +178,16 @@ def candidate_query(db, slot, *, brand_id: int):
     for the brand's active content, narrowed to the slot's `category_ids` when
     it names any (empty = all).
 
+    **And only what a machine may take and the slot can render** (task-284):
+    - machine ready, and marked ready for the slot's channel (ADR-179 addendum
+      2026-10-05 point 3);
+    - its latest published version fills every field the slot's module needs
+      (ADR-174's task-284 addendum). That version is what a pick renders, so a
+      record never published is no candidate. Nothing else checks a slot's
+      pick: the send-time check skips slot modules (`rendering.frame.
+      missing_required_in_frame`), so without this a reader gets the module
+      with its headline blank. The mark and its warning are untouched.
+
     One row per record **and category assignment**, so a record in two
     categories appears twice — count `distinct(ContentRecordDB.id)` for how
     many records that is. Strategies add their own ordering or recipient
@@ -188,7 +198,33 @@ def candidate_query(db, slot, *, brand_id: int):
     argument because each strategy also scopes its version lookup with it and
     the two must agree.
     """
-    from app.content.db_models import ContentCategoryAssignmentDB, ContentRecordDB
+    from sqlalchemy import exists, func
+
+    from app.campaigns.db_models import ModuleInstanceDB, VariantDB
+    from app.content.db_models import (
+        ContentCategoryAssignmentDB, ContentChannelReadinessDB, ContentRecordDB, ContentVersionDB,
+    )
+    from app.content.service import fields_a_record_must_fill
+    from app.modules.registry import get_manifest
+
+    channel = db.query(VariantDB.channel).filter(VariantDB.id == slot.variant_id).scalar()
+    module_types = {t for (t,) in db.query(ModuleInstanceDB.module_type)
+                    .filter(ModuleInstanceDB.decision_slot_id == slot.id)}
+    needed = sorted({name for t in module_types if (m := get_manifest(channel, t))
+                     for name in fields_a_record_must_fill(m)})
+    latest = (
+        db.query(func.max(ContentVersionDB.version_number))
+        .filter(ContentVersionDB.content_record_id == ContentRecordDB.id)
+        .correlate(ContentRecordDB).scalar_subquery()
+    )
+    published_and_complete = exists().where(
+        ContentVersionDB.content_record_id == ContentRecordDB.id,
+        ContentVersionDB.version_number == latest,
+        # Filled = holds something besides whitespace, as the readiness
+        # warning and the send check read it; a JSON null or a missing key
+        # gives NULL here, which is not filled either.
+        *(ContentVersionDB.content[name].as_string().op("~")(r"\S") for name in needed),
+    )
 
     query = (
         db.query(
@@ -207,6 +243,10 @@ def candidate_query(db, slot, *, brand_id: int):
         # whose campaign chain is broken never gets here: `sending_brand_id`
         # raises rather than handing this filter None (task-18).
         .filter(ContentRecordDB.brand_id == brand_id)
+        .filter(ContentRecordDB.machine_ready.is_(True))
+        .filter(exists().where(ContentChannelReadinessDB.content_id == ContentRecordDB.id,
+                               ContentChannelReadinessDB.channel == channel))
+        .filter(published_and_complete)
     )
     category_ids = (slot.candidate_filter or {}).get("category_ids", [])
     if category_ids:

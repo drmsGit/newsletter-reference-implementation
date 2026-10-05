@@ -197,6 +197,60 @@ rather than held.
 
 Nothing above changes this record's Decision section.
 
+## Addendum 2026-10-05 — A slot passes over a record that cannot fill its module
+
+Prompted by task-284. The user decided this on 2026-10-05, choosing the first
+of three options. It settles the Notes item left open above, *whether a
+marked-but-incomplete record should be excluded from slot candidacy*: it is,
+for the module the slot is bound to.
+
+**1. A record is a slot candidate only if it can fill the slot's module.** The
+earlier addendum's point 2 and
+[[ADR-179 — What Enters the Catalogue, and What a Machine May Take From It]]'s
+addendum of 2026-10-05 require machine ready and a mark for the channel of the
+slot's variant. On top of those, every required field of the slot's module must
+be non-empty. "Required" is the set the readiness warning uses: manifest
+variables marked `required`, sourced from content, not envelope fields
+(`readiness_warning`, `backend/app/content/service.py:784`). A slot with no
+bound module adds no field condition; if several modules are bound to one slot,
+which no constraint forbids, all their required fields count.
+
+**2. It is judged on what would be sent: the record's latest published
+version.** A slot's pick renders that frozen version (`_pick_for_slot`,
+`backend/app/rendering/frame.py:148`), and the strategies pin the latest one,
+so checking the live draft would check something that is not sent. A record
+that has never been published has nothing to send and is not a candidate.
+
+**3. It lives in `candidate_query`** (`backend/app/decision/strategies/base.py:176`),
+so every strategy and the read-only candidate count (`slot_candidate_count`,
+`backend/app/campaigns/service.py:1235`) draw on the same set, and through the
+count so does [[ADR-086 — Decision Slots Fail Gracefully]]'s hiding of an empty
+slot in the editor's module states.
+
+**4. Point 2 is unchanged.** The mark survives an emptied field and the warning
+still shows. The record stays marked; it is not picked until it is complete.
+
+**Why this is not the second place the Notes warned about.** There is no first
+place for a slot. Point 3's send check (built, earlier addendum point 6) skips
+slot-bound modules on purpose: a slot resolves per recipient, and refusing a
+whole send for one person's pick would be absurd
+(`backend/app/rendering/service.py:496-501`; `missing_required_in_frame` in
+`backend/app/rendering/frame.py`). So the Notes' "a record that the send will
+then refuse" does not hold for slots; without this condition, a recipient would
+receive the module with a required field blank. The per-recipient "nothing
+meaningful" skip (task-228, unbuilt) would not catch it either, because it
+skips only a recipient whose slots all came up empty. Widening task-228 to skip
+a recipient whose pick lacks a required field remains possible later as a
+second safety net; it was not decided now.
+
+**What it costs.** A record completed in its draft but not republished stays
+excluded, and the record page's warning, computed on the draft, may then say
+nothing while the slot passes the record over; the slot's candidate count is
+where that shows. The candidate query also gains one condition per required
+field and a latest-version lookup.
+
+Nothing above changes this record's Decision section.
+
 ## Related ADRs
 
 ### Depends On

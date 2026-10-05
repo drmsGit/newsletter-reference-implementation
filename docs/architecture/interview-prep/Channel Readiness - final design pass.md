@@ -67,13 +67,23 @@ to ADR-174 and ADR-179.
 8. **An integration may remove a channel mark directly;** adding one stays held
    (task-206). Until task-206 is built, an integration's attempt to mark is
    refused, so nothing goes through unheld.
+9. **A slot also skips a record that cannot fill the slot's module** (decided
+   2026-10-05 before task-284, the user's choice of three options). Every
+   required field of the module the slot is bound to must be filled in the
+   record's **latest published version**, which is what a pick renders, so a
+   record never published is no candidate. The check sits in `candidate_query`
+   beside the two marks. The mark and its warning are untouched. Nothing else
+   checks a slot's pick: the send check skips slot modules, and task-228 only
+   skips a recipient whose slots all came up empty. Widening task-228 was not
+   chosen now. Recorded in ADR-174's addendum "A slot passes over a record
+   that cannot fill its module".
 
 ## Where each part lands
 
 | Part | Server | Client | Task |
 |---|---|---|---|
 | State, migration, routes | readiness table; `machine_ready` column; migration with the backfills; mark/unmark and machine-ready routes; detail fields with warnings; `ready_for` on `GET /content/` | — | task-283 |
-| Slots | `candidate_query` requires both conditions; the count agrees; seed marks | — | task-284 |
+| Slots | `candidate_query` requires both marks and a published version that fills the slot's module (decision 9); the count agrees; seed marks | — | task-284 |
 | Record page | — | a Ready switch per channel section (who/when, warning); a Machine ready switch by the status | task-285 |
 | Picker and Content list | (task-283's filter) | picker opens on ready records, with a switch for the rest; a "Ready for" filter on the list | task-286 |
 | Jinja | read-only display; stale text, test and ADR-161-rider comments removed | — | task-287 |
