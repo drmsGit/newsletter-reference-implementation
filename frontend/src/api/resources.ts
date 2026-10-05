@@ -740,6 +740,21 @@ export function useSaveContentRecord(recordId: number) {
   })
 }
 
+/**
+ * Create a content record with a title and an optional description only
+ * (task-281, Content Write Surface decision 6): nothing else is required at
+ * catalogue level (ADR-177 point 4), and the fields are filled on the
+ * record's page, where they autosave.
+ */
+export function useCreateContent() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ title, description }: { title: string; description: string }) =>
+      read(api.POST('/content/', { body: { title, description: description || null, content: {} } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [...keys.content, 'page'] }),
+  })
+}
+
 /** A record's categories with their scores (task-280), ordered by name. */
 export function useContentAssignments(recordId: number) {
   return useQuery({

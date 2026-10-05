@@ -7,6 +7,7 @@ import Choice from '../components/Choice'
 import Pager, { useOffset } from '../components/Pager'
 import { SearchBox, useSearch } from '../components/RecipientSearch'
 import ScreenState from '../components/ScreenState'
+import ContentCreate from './ContentCreate'
 
 const columns: DataColumn<ContentRecord>[] = [
   { key: 'title', header: 'Title', isRowHeader: true, render: (r) => r.title },
@@ -41,6 +42,7 @@ export default function Content() {
   return (
     <>
       <h1>Content</h1>
+      <ContentCreate />
       <div className="filters">
         <SearchBox label="Find content by title or description" />
         <Choice

@@ -497,6 +497,13 @@ input[data-focus-visible] {
   z-index: 10;
 }
 
+.create-modal {
+  background: var(--brand-bg);
+  border-radius: var(--brand-radius);
+  width: min(32rem, 95vw);
+  padding: calc(var(--brand-space) * 2);
+}
+
 .preview-modal {
   background: var(--brand-bg);
   border-radius: var(--brand-radius);
