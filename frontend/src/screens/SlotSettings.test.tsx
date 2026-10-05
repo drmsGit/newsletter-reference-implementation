@@ -65,7 +65,7 @@ function server(options: { unbound?: boolean } = {}) {
     'GET /content/categories': () => jsonResponse([{ id: 1, name: 'Food', type: 'main' }, { id: 2, name: 'City', type: 'main' }]),
     'GET /content/category-relations': () => jsonResponse([]),
     'GET /content/': () =>
-      jsonResponse(page([{ id: 42, title: 'Lisbon', content: {}, status: 'active', latest_version_number: 1 }])),
+      jsonResponse(page([{ id: 42, title: 'Lisbon', content: {}, status: 'active', latest_version_number: 1, ready_for: ['email'] }])),
     'PATCH /campaigns/decision-slots/5': async (request: Request) => {
       writes.push(request.clone())
       if (stale(request, state.slot.updated_at)) return jsonResponse({ detail: 'changed' }, 409)

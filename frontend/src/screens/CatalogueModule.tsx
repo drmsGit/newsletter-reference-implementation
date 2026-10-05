@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button, Input, Label, ListBox, ListBoxItem, Text, TextField } from 'react-aria-components'
+import { Button, Input, Label, ListBox, ListBoxItem, Switch, Text, TextField } from 'react-aria-components'
 import { Link } from 'react-router'
 
 import {
@@ -61,13 +61,22 @@ export default function CatalogueModule({
         campaignId={campaignId}
         module={module}
         manifest={manifest}
+        channel={channel}
         slotId={module.decision_slot_id}
         otherRecordIds={otherRecordIds}
       />
     )
   }
   if (module.content_record_id == null) {
-    return <Unbound campaignId={campaignId} module={module} manifest={manifest} otherRecordIds={otherRecordIds} />
+    return (
+      <Unbound
+        campaignId={campaignId}
+        module={module}
+        manifest={manifest}
+        channel={channel}
+        otherRecordIds={otherRecordIds}
+      />
+    )
   }
   return (
     <CatalogueFields
@@ -127,6 +136,7 @@ function CatalogueFields({
               campaignId={campaignId}
               module={module}
               manifest={manifest}
+              channel={channel}
               otherRecordIds={otherRecordIds}
               onClose={() => setRebinding(false)}
             />
@@ -281,18 +291,23 @@ function BindRecord({
   campaignId,
   module,
   manifest,
+  channel,
   otherRecordIds,
   onClose,
 }: {
   campaignId: number
   module: ComposedModule
   manifest: ModuleManifest
+  /** The variant's channel: the picker opens on records ready for it (task-286, MW Q11). */
+  channel: string
   otherRecordIds: number[]
   onClose?: () => void
 }) {
   const [q, setQ] = useState('')
   const [categoryId, setCategoryId] = useState<number | null>(null)
-  const records = usePickerRecords(useDebounced(q.trim(), 250), categoryId)
+  const [showUnready, setShowUnready] = useState(false)
+  const channelTitle = channel.charAt(0).toUpperCase() + channel.slice(1)
+  const records = usePickerRecords(useDebounced(q.trim(), 250), categoryId, showUnready ? null : channel)
   const bind = useBindModule(campaignId)
   const list = useRef<HTMLDivElement>(null)
   useShortcut('↓', 'From the record search, into the list of records', null)
@@ -330,6 +345,10 @@ function BindRecord({
           <Input />
         </TextField>
         <CategoryChoice selected={categoryId} onChange={setCategoryId} />
+        <Switch isSelected={showUnready} onChange={setShowUnready}>
+          <span className="switch__indicator" aria-hidden="true" />
+          Show records not ready for {channelTitle}
+        </Switch>
       </div>
       {records.data && items.length === 0 ? (
         <p className="muted">No record matches.</p>
@@ -349,7 +368,12 @@ function BindRecord({
               <span className="bind__title">{record.title}</span>
               {record.id === module.content_record_id && <span className="muted"> · this module's record</span>}
               {record.description && <span className="bind__description muted">{record.description}</span>}
-              <Notices record={record} required={required} inVariant={otherRecordIds.includes(record.id)} />
+              <Notices
+                record={record}
+                required={required}
+                inVariant={otherRecordIds.includes(record.id)}
+                notReadyFor={record.ready_for.includes(channel) ? null : channelTitle}
+              />
             </ListBoxItem>
           )}
         </ListBox>
@@ -375,10 +399,13 @@ function Notices({
   record,
   required,
   inVariant,
+  notReadyFor,
 }: {
   record: ContentListItem
   required: ModuleManifest['variables']
   inVariant: boolean
+  /** The channel this record is not marked ready for, when it is not (ADR-174). */
+  notReadyFor: string | null
 }) {
   const content = record.content as Record<string, unknown>
   const missing = required.filter((v) => {
@@ -386,6 +413,7 @@ function Notices({
     return value == null || (typeof value === 'string' && !value.trim())
   })
   const notes = [
+    notReadyFor && `Not ready for ${notReadyFor}`,
     missing.length > 0 && `Lacks ${missing.map((v) => v.label ?? v.name).join(', ')} for this module`,
     inVariant && 'Already in this variant',
     record.latest_version_number == null && 'Not published yet',
@@ -519,12 +547,14 @@ function SlotBound({
   campaignId,
   module,
   manifest,
+  channel,
   slotId,
   otherRecordIds,
 }: {
   campaignId: number
   module: ComposedModule
   manifest: ModuleManifest
+  channel: string
   slotId: number
   otherRecordIds: number[]
 }) {
@@ -544,6 +574,7 @@ function SlotBound({
           campaignId={campaignId}
           module={module}
           manifest={manifest}
+          channel={channel}
           otherRecordIds={otherRecordIds}
           onClose={() => setRebinding(false)}
         />
@@ -557,17 +588,25 @@ function Unbound({
   campaignId,
   module,
   manifest,
+  channel,
   otherRecordIds,
 }: {
   campaignId: number
   module: ComposedModule
   manifest: ModuleManifest
+  channel: string
   otherRecordIds: number[]
 }) {
   const attach = useAttachSlot(campaignId)
   return (
     <>
-      <BindRecord campaignId={campaignId} module={module} manifest={manifest} otherRecordIds={otherRecordIds} />
+      <BindRecord
+        campaignId={campaignId}
+        module={module}
+        manifest={manifest}
+        channel={channel}
+        otherRecordIds={otherRecordIds}
+      />
       <p>
         Or fill it per recipient:{' '}
         <Button isDisabled={attach.isPending} onPress={() => attach.mutate({ id: module.id })}>

@@ -27,18 +27,25 @@ const MANIFESTS = [
  * does: the record's for catalogue edits (task-257), the module's for override
  * writes (task-256), each refusing a stale one with 409.
  */
-/** The bind picker's rows (task-269): one fits, one lacks a field and was never published, one is used elsewhere. */
+/**
+ * The bind picker's rows (task-269): one fits, one lacks a field and was never
+ * published, one is used elsewhere. Porto is the one not marked ready for
+ * email (task-286).
+ */
 const PICKABLE = [
   { id: 42, title: 'Lisbon in spring', description: 'Three days by the river', status: 'active',
-    content: { headline_hero: 'Lisbon', button_label_hero: 'Go' }, latest_version_number: 1 },
+    content: { headline_hero: 'Lisbon', button_label_hero: 'Go' }, latest_version_number: 1, ready_for: ['email'] },
   { id: 43, title: 'Porto weekend', description: 'Port, tiles and the Douro', status: 'active',
-    content: { headline_hero: 'Porto', button_label_hero: '  ' }, latest_version_number: null },
+    content: { headline_hero: 'Porto', button_label_hero: '  ' }, latest_version_number: null, ready_for: [] as string[] },
   { id: 44, title: 'Algarve coast', description: null, status: 'active',
-    content: { headline_hero: 'Algarve', button_label_hero: 'See it' }, latest_version_number: 2 },
+    content: { headline_hero: 'Algarve', button_label_hero: 'See it' }, latest_version_number: 2,
+    ready_for: ['email', 'push'] },
 ]
 
 function server(
-  options: { slot?: boolean; unbound?: boolean; unpublished?: boolean; override?: object; sibling?: boolean } = {},
+  options: {
+    slot?: boolean; unbound?: boolean; unpublished?: boolean; override?: object; sibling?: boolean; channel?: string
+  } = {},
 ) {
   let clock = 1
   const state = {
@@ -65,7 +72,7 @@ function server(
     'GET /campaigns/1/composition': () => jsonResponse({
       campaign: { id: 1, name: 'Spring' },
       variants: [{
-        variant: { id: 3, name: 'Variant A', channel: 'email', status: 'draft', updated_at: T(1) },
+        variant: { id: 3, name: 'Variant A', channel: options.channel ?? 'email', status: 'draft', updated_at: T(1) },
         module_limit: null, can_add_module: true, has_envelope: false, accepted_module_types: ['hero'],
         modules: options.sibling ? [state.module, sibling] : [state.module], envelope_modules: [], decision_slots: [],
       }],
@@ -76,8 +83,11 @@ function server(
       jsonResponse({ count: 2, campaigns: [{ id: 1, name: 'Spring' }, { id: 9, name: 'Summer' }] }),
     'GET /content/43': () => jsonResponse({ ...state.record, ...PICKABLE[1], unpublished_changes: true }),
     'GET /content/': (request: Request) => {
-      searches.push(new URL(request.url).searchParams)
-      return jsonResponse(page(PICKABLE, { total: 31, limit: 20 }))
+      const params = new URL(request.url).searchParams
+      searches.push(params)
+      const channel = params.get('ready_for')
+      return jsonResponse(page(channel ? PICKABLE.filter((r) => r.ready_for.includes(channel)) : PICKABLE,
+        { total: 31, limit: 20 }))
     },
     'GET /content/categories': () =>
       jsonResponse([{ id: 7, name: 'Coast', type: 'main' }, { id: 8, name: 'Beach', type: 'sub' }]),
@@ -303,7 +313,8 @@ describe('binding (task-269: browse by topic, from the keyboard)', () => {
 
   it('says how many there are when not all fit', async () => {
     open(server({ unbound: true }).handlers)
-    expect(await screen.findByText('Showing 3 of 31. Type or choose a category to narrow them.')).toBeInTheDocument()
+    // The two records ready for email, of the 31 the server counts.
+    expect(await screen.findByText('Showing 2 of 31. Type or choose a category to narrow them.')).toBeInTheDocument()
   })
 
   it('goes from the search into the list with ArrowDown and uses a record with Enter', async () => {
@@ -335,6 +346,7 @@ describe('binding (task-269: browse by topic, from the keyboard)', () => {
   it('notes what to know about a record without refusing it', async () => {
     const { handlers, writes } = server({ unbound: true, sibling: true })
     open(handlers)
+    fireEvent.click(await screen.findByRole('switch', { name: 'Show records not ready for Email' }))
     const porto = await option(/Porto weekend/)
     expect(porto).toHaveTextContent('Port, tiles and the Douro')
     // A required field that is only whitespace is missing (ADR-177: required is the module's).
@@ -356,6 +368,7 @@ describe('binding (task-269: browse by topic, from the keyboard)', () => {
     expect(screen.queryByRole('listbox', { name: 'Records to use' })).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Use another record' }))
+    fireEvent.click(await screen.findByRole('switch', { name: 'Show records not ready for Email' }))
     fireEvent.click(await option(/Porto weekend/))
     await waitFor(() => expect(writes).toHaveLength(1))
     await waitFor(() => expect(screen.queryByRole('listbox', { name: 'Records to use' })).not.toBeInTheDocument())
@@ -386,6 +399,52 @@ describe('binding (task-269: browse by topic, from the keyboard)', () => {
     fireEvent.keyDown(beach, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('option', { name: 'Beach' })).not.toBeInTheDocument())
     expect(screen.getByRole('listbox', { name: 'Records to use' })).toBeInTheDocument()
+  })
+})
+
+describe('the picker and readiness (task-286)', () => {
+  const option = (name: RegExp) => screen.findByRole('option', { name })
+
+  it('opens on records ready for the variant\'s channel, and shows the rest, marked, when asked', async () => {
+    const { handlers, writes, searches } = server({ unbound: true })
+    open(handlers)
+    await option(/Lisbon in spring/)
+    expect(searches.at(-1)?.get('ready_for')).toBe('email')
+    expect(screen.queryByRole('option', { name: /Porto weekend/ })).not.toBeInTheDocument()
+
+    const widen = screen.getByRole('switch', { name: 'Show records not ready for Email' })
+    expect(widen).not.toBeChecked()
+    fireEvent.click(widen)
+    const porto = await option(/Porto weekend/)
+    expect(searches.at(-1)?.has('ready_for')).toBe(false)
+    // Marked rather than absent (MW Q11), and a note informs, never blocks.
+    expect(porto).toHaveTextContent('Not ready for Email')
+    expect(await option(/Lisbon in spring/)).not.toHaveTextContent('Not ready')
+    fireEvent.click(porto)
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect((await writes[0].json()).content_record_id).toBe(43)
+  })
+
+  it('reads the channel from the variant: a push variant opens on records ready for push', async () => {
+    const { handlers, searches } = server({ unbound: true, channel: 'push' })
+    open(handlers)
+    await option(/Algarve coast/)
+    expect(searches.at(-1)?.get('ready_for')).toBe('push')
+    expect(screen.queryByRole('option', { name: /Lisbon in spring/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('switch', { name: 'Show records not ready for Push' }))
+    expect(await option(/Lisbon in spring/)).toHaveTextContent('Not ready for Push')
+    expect(await option(/Algarve coast/)).not.toHaveTextContent('Not ready')
+  })
+
+  it('keeps the text it was narrowed by when widened', async () => {
+    const { handlers, searches } = server({ unbound: true })
+    open(handlers)
+    await option(/Lisbon in spring/)
+    fireEvent.change(screen.getByLabelText('Find a record by title or description'), { target: { value: 'tiles' } })
+    await waitFor(() => expect(searches.at(-1)?.get('q')).toBe('tiles'))
+    fireEvent.click(screen.getByRole('switch', { name: 'Show records not ready for Email' }))
+    await waitFor(() => expect(searches.at(-1)?.has('ready_for')).toBe(false))
+    expect(searches.at(-1)?.get('q')).toBe('tiles')
   })
 })
 

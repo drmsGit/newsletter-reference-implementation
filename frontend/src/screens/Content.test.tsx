@@ -12,6 +12,7 @@ function open({ refuse }: { refuse?: number } = {}, { shortcuts = false } = {}) 
   const writes: Request[] = []
   stubFetch({
     'GET /content/': () => jsonResponse(page([])),
+    'GET /content/fields': () => jsonResponse([]),
     'GET /content/categories': () => jsonResponse([]),
     'GET /content/category-relations': () => jsonResponse([]),
     'POST /content/': (request: Request) => {

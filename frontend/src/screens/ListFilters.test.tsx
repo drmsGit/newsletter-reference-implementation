@@ -45,6 +45,12 @@ describe.each([
 })
 
 const CATEGORY_ROUTES = {
+  // The channels the "Ready for" filter offers come from the field definitions (task-286).
+  'GET /content/fields': () => jsonResponse([
+    { name: 'headline_hero', label: 'Hero headline', type: 'text', channel: 'email' },
+    { name: 'push_title', label: 'Notification title', type: 'text', channel: 'push' },
+    { name: 'image_url', label: 'Image', type: 'url', channel: null },
+  ]),
   'GET /content/categories': () =>
     jsonResponse([{ id: 7, name: 'Coast', type: 'main' }, { id: 8, name: 'Beach', type: 'sub' }]),
   'GET /content/category-relations': () =>
@@ -104,5 +110,38 @@ describe('filtering content by status', () => {
       { route: '/content?status=inactive' },
     )
     await waitFor(() => expect(lastQuery(fetchMock, '/content/').get('status')).toBe('inactive'))
+  })
+})
+
+describe('filtering content by readiness (task-286)', () => {
+  function contentAt(route: string) {
+    const fetchMock = stubFetch({ 'GET /content/': () => jsonResponse(page([])), ...CATEGORY_ROUTES })
+    renderWithProviders(
+      <Routes>
+        <Route path="/content" element={<Content />} />
+      </Routes>,
+      { route },
+    )
+    return fetchMock
+  }
+
+  it('sends the channel held in the URL', async () => {
+    const fetchMock = contentAt('/content?ready=push')
+    await waitFor(() => expect(lastQuery(fetchMock, '/content/').get('ready_for')).toBe('push'))
+    expect(await screen.findByRole('button', { name: /Push/ })).toBeInTheDocument()
+  })
+
+  it('offers each channel the fields name, sends a chosen one from the first page, and drops it for Any', async () => {
+    const fetchMock = contentAt('/content?offset=50')
+    await waitFor(() => expect(lastQuery(fetchMock, '/content/').get('offset')).toBe('50'))
+    fireEvent.click(await screen.findByRole('button', { name: /Ready for any channel/ }))
+    const options = await screen.findAllByRole('option')
+    expect(options.map((o) => o.textContent)).toEqual(['Ready for any channel', 'Email', 'Push'])
+    fireEvent.click(screen.getByRole('option', { name: 'Email' }))
+    await waitFor(() => expect(lastQuery(fetchMock, '/content/').get('ready_for')).toBe('email'))
+    expect(lastQuery(fetchMock, '/content/').get('offset')).toBe('0')
+    fireEvent.click(await screen.findByRole('button', { name: /Email/ }))
+    fireEvent.click(await screen.findByRole('option', { name: 'Ready for any channel' }))
+    await waitFor(() => expect(lastQuery(fetchMock, '/content/').has('ready_for')).toBe(false))
   })
 })

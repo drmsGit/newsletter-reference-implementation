@@ -1,6 +1,6 @@
 import { useNavigate, useSearchParams } from 'react-router'
 
-import { useContentList, type ContentRecord } from '../api/resources'
+import { useContentFields, useContentList, type ContentRecord } from '../api/resources'
 import CategoryChoice from '../components/CategoryChoice'
 import DataTable, { type DataColumn } from '../components/DataTable'
 import Choice from '../components/Choice'
@@ -26,9 +26,13 @@ export default function Content() {
   // One category, assigned directly; the server then orders by fit (ADR-175
   // addendum 2026-10-04, task-270). The same choice the bind picker offers.
   const category = Number(params.get('category')) || null
+  // Marked ready for one channel (ADR-174, task-286). The channels offered are
+  // the ones the field definitions name, as the record page's sections are.
+  const ready = params.get('ready')
+  const channels = [...new Set((useContentFields().data ?? []).flatMap((f) => (f.channel ? [f.channel] : [])))]
   const search = useSearch()
-  const content = useContentList(useOffset(), search, status || undefined, category)
-  const filtered = Boolean(search || status || category)
+  const content = useContentList(useOffset(), search, status || undefined, category, ready)
+  const filtered = Boolean(search || status || category || ready)
   const navigate = useNavigate()
 
   function setFilter(key: string, value: string | null) {
@@ -56,6 +60,15 @@ export default function Content() {
           onChange={(v) => setFilter('status', v === 'any' ? null : v)}
         />
         <CategoryChoice selected={category} onChange={(id) => setFilter('category', id == null ? null : String(id))} />
+        <Choice
+          label="Ready for"
+          options={[
+            { id: 'any', name: 'Ready for any channel' },
+            ...channels.map((c) => ({ id: c, name: c.charAt(0).toUpperCase() + c.slice(1) })),
+          ]}
+          selected={ready && channels.includes(ready) ? ready : 'any'}
+          onChange={(v) => setFilter('ready', v === 'any' ? null : v)}
+        />
       </div>
       <ScreenState query={content}>
         <DataTable

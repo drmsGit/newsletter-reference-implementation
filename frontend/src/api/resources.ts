@@ -87,14 +87,18 @@ export function useContentList(
   q = '',
   status?: 'active' | 'inactive',
   categoryId: number | null = null,
+  readyFor: string | null = null,
 ) {
   return useQuery({
-    queryKey: [...keys.content, 'page', offset, q, status, categoryId],
+    queryKey: [...keys.content, 'page', offset, q, status, categoryId, readyFor],
     queryFn: () =>
       read(
         api.GET('/content/', {
           params: {
-            query: { limit: PAGE_SIZE, offset, q: q || undefined, status, category_id: categoryId ?? undefined },
+            query: {
+              limit: PAGE_SIZE, offset, q: q || undefined, status, category_id: categoryId ?? undefined,
+              ready_for: readyFor ?? undefined,
+            },
           },
         }),
       ),
@@ -1005,11 +1009,12 @@ export const PICKER_SIZE = 20
  * The bind picker's records (task-269): active ones, by title or description
  * and optionally one category, which the server orders by score (ADR-175
  * addendum 2026-10-04). The previous list stays up while the next one loads,
- * so the rows do not blink away on every pause in typing.
+ * so the rows do not blink away on every pause in typing. `readyFor` narrows
+ * to records marked ready for that channel (task-286); null lists them all.
  */
-export function usePickerRecords(q: string, categoryId: number | null) {
+export function usePickerRecords(q: string, categoryId: number | null, readyFor: string | null = null) {
   return useQuery({
-    queryKey: [...keys.content, 'picker', q, categoryId],
+    queryKey: [...keys.content, 'picker', q, categoryId, readyFor],
     queryFn: () =>
       read(
         api.GET('/content/', {
@@ -1019,6 +1024,7 @@ export function usePickerRecords(q: string, categoryId: number | null) {
               q: q || undefined,
               status: 'active',
               category_id: categoryId ?? undefined,
+              ready_for: readyFor ?? undefined,
             },
           },
         }),
