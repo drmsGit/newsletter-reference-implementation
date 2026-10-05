@@ -4,17 +4,21 @@ import { Link, useNavigate, useParams } from 'react-router'
 
 import {
   useCampaignsUsing,
+  useContentAssignments,
   useContentFields,
   useContentReach,
   useContentRecord,
   useContentVersions,
   useDuplicateContent,
   useDuplicateTargets,
+  useEditAssignments,
   useSaveContentRecord,
   useSetContentStatus,
   type ContentRecordDetail,
 } from '../api/resources'
+import CategoryChoice from '../components/CategoryChoice'
 import Choice from '../components/Choice'
+import { HttpError } from '../api/session'
 import { AutosaveField, SaveState, fieldError } from '../components/EditorFields'
 import PublishState from '../components/PublishState'
 import ScreenState from '../components/ScreenState'
@@ -34,8 +38,8 @@ type ContentField = NonNullable<ReturnType<typeof useContentFields>['data']>[num
  * - The composer's publish notice, and a read-only list of versions (3).
  * - Channels as labelled sections down the page, each field in the modules'
  *   declared order (MW Q2, task-276).
- * - Status and duplicate now; delete waits for task-117 (7). Categories are
- *   task-280.
+ * - Status and duplicate now; delete waits for task-117 (7).
+ * - Categories with their 1-10 scores, changed in place (5, task-280).
  */
 export default function ContentDetail() {
   const { id } = useParams()
@@ -151,6 +155,7 @@ function RecordPage({
       )}
       <SaveState mutation={save} reload={reload} what="the record" />
 
+      <Categories recordId={record.id} />
       <Versions recordId={record.id} fields={fields} />
       <UsedIn recordId={record.id} />
     </>
@@ -231,6 +236,90 @@ function StatusAndDuplicate({ record }: { record: ContentRecordDetail }) {
         </div>
       )}
     </div>
+  )
+}
+
+const SCORES = Array.from({ length: 10 }, (_, index) => ({ id: String(index + 1), name: String(index + 1) }))
+
+/**
+ * A record's categories (decision 5, ADR-080's 2026-10-04 addendum): each
+ * score a 1-10 choice changed in place — never remove-and-re-add, which would
+ * take the record out of the category for a moment — removed per row, and
+ * added from the hierarchy the picker uses. Categories are only assigned
+ * here, never created: they build each recipient's interest profile, and a
+ * label made for finding content belongs to facets (ADR-175).
+ */
+function Categories({ recordId }: { recordId: number }) {
+  const assignments = useContentAssignments(recordId)
+  const edit = useEditAssignments(recordId)
+  const [adding, setAdding] = useState<number | null>(null)
+  const [score, setScore] = useState('10')
+  const assigned = new Set((assignments.data ?? []).map((a) => a.category_id))
+
+  return (
+    <section aria-labelledby="categories-heading">
+      <h2 id="categories-heading">Categories</h2>
+      <p className="muted">
+        Categories build each recipient&apos;s interest profile. For finding content, facets will follow.
+      </p>
+      <ScreenState query={assignments}>
+        {assignments.data && assignments.data.length === 0 ? (
+          <p className="muted">No categories yet.</p>
+        ) : (
+          <ul className="assignments">
+            {assignments.data?.map((assignment) => (
+              <li key={assignment.assignment_id} className="assignment">
+                <span className="assignment__name">{assignment.name}</span>
+                <Choice
+                  label={`Score for ${assignment.name}`}
+                  options={SCORES}
+                  selected={String(assignment.score ?? 10)}
+                  onChange={(next) =>
+                    edit.mutate({ kind: 'score', assignmentId: assignment.assignment_id, score: Number(next) })
+                  }
+                />
+                <Button
+                  aria-label={`Remove ${assignment.name}`}
+                  isDisabled={edit.isPending}
+                  onPress={() => edit.mutate({ kind: 'remove', assignmentId: assignment.assignment_id })}
+                >
+                  Remove
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </ScreenState>
+      <div className="assignment-add">
+        <CategoryChoice
+          label="Add a category"
+          noneLabel="Choose a category"
+          selected={adding}
+          onChange={setAdding}
+          exclude={assigned}
+        />
+        <Choice label="Score" options={SCORES} selected={score} onChange={setScore} />
+        <Button
+          isDisabled={adding == null || edit.isPending}
+          onPress={() =>
+            adding != null &&
+            edit.mutate(
+              { kind: 'assign', categoryId: adding, score: Number(score) },
+              { onSuccess: () => setAdding(null) },
+            )
+          }
+        >
+          Add
+        </Button>
+      </div>
+      <p className="muted">1 = barely in the category, 10 = squarely in it.</p>
+      {edit.isError && (
+        // The server's own words, not SaveState's: a 409 here is "already
+        // assigned" (somebody added it meanwhile), not a stale version, and a
+        // refused score arrives as a field error SaveState would not show.
+        <p role="alert">Not saved: {edit.error instanceof HttpError ? edit.error.detail : 'the change failed.'}</p>
+      )}
+    </section>
   )
 }
 

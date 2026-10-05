@@ -20,8 +20,14 @@ const FIELDS = [
  * A server that keeps the record and checks its version the way the real one
  * does (task-257): a PATCH stating a stale `If-Match` is refused with 409.
  */
-function server(options: { campaigns?: object[]; total?: number; versions?: object[]; reach?: number } = {}) {
+function server(options: {
+  campaigns?: object[]; total?: number; versions?: object[]; reach?: number; assignRefused?: number
+} = {}) {
   let clock = 1
+  const categories = [
+    { id: 7, name: 'Coast', type: 'main' }, { id: 8, name: 'Beach', type: 'sub' }, { id: 9, name: 'City', type: 'main' },
+  ]
+  const assignments = [{ assignment_id: 5, category_id: 7, name: 'Coast', type: 'main', score: 7 }]
   const state = {
     record: {
       id: 42, title: 'Lisbon in spring', description: null as string | null, status: 'active',
@@ -71,6 +77,29 @@ function server(options: { campaigns?: object[]; total?: number; versions?: obje
     'GET /content/77/unsent-campaigns': () => jsonResponse({ count: 0, campaigns: [] }),
     'GET /content/77/versions': () => jsonResponse([]),
     'GET /content/77/duplicate-targets': () => jsonResponse([]),
+    'GET /content/77/assignments': () => jsonResponse([]),
+    'GET /content/categories': () => jsonResponse(categories),
+    'GET /content/category-relations': () =>
+      jsonResponse([{ id: 1, parent_category_id: 7, child_category_id: 8, relation_type: 'parent_child' }]),
+    'GET /content/42/assignments': () => jsonResponse(assignments),
+    'POST /content/42/categories': async (request: Request) => {
+      writes.push(request.clone())
+      if (options.assignRefused) return jsonResponse({ detail: 'Category already assigned to this content record' }, options.assignRefused)
+      const body = await request.json()
+      const category = categories.find((c) => c.id === body.category_id)!
+      assignments.push({ assignment_id: 6, category_id: category.id, name: category.name, type: category.type, score: body.score })
+      return jsonResponse({ id: 6, content_id: 42, category_id: category.id, score: body.score })
+    },
+    'PATCH /content/42/assignments/5': async (request: Request) => {
+      writes.push(request.clone())
+      assignments[0].score = (await request.json()).score
+      return jsonResponse({ id: 5, content_id: 42, category_id: 7, score: assignments[0].score })
+    },
+    'DELETE /content/42/assignments/5': (request: Request) => {
+      writes.push(request.clone())
+      assignments.splice(0, 1)
+      return new Response(null, { status: 204 })
+    },
   }
   return { state, writes, handlers }
 }
@@ -193,6 +222,66 @@ describe('writing a record (task-279)', () => {
     await waitFor(() => expect(writes).toHaveLength(1))
     expect(await writes[0].json()).toEqual({ target_brand_id: 2 })
     expect(await screen.findByText(/Copied to Beta\. The copy has no published version/)).toBeInTheDocument()
+  })
+})
+
+describe('a record\'s categories (task-280)', () => {
+  const section = () => screen.findByRole('region', { name: 'Categories' })
+
+  it('says what categories are for, and offers no way to create one', async () => {
+    open(server().handlers)
+    const categories = await section()
+    expect(within(categories).getByText(/build each recipient's interest profile/)).toBeInTheDocument()
+    expect(within(categories).queryByRole('button', { name: /new|create/i })).not.toBeInTheDocument()
+    expect(within(categories).queryByRole('textbox')).not.toBeInTheDocument()
+  })
+
+  it('changes a score in place', async () => {
+    const { handlers, writes } = server()
+    open(handlers)
+    const categories = await section()
+    fireEvent.click(await within(categories).findByRole('button', { name: /Score for Coast/ }))
+    fireEvent.click(await screen.findByRole('option', { name: '3' }))
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect(writes[0].method).toBe('PATCH')
+    expect(new URL(writes[0].url).pathname).toBe('/content/42/assignments/5')
+    expect(await writes[0].json()).toEqual({ score: 3 })
+  })
+
+  it('removes a category', async () => {
+    const { handlers, writes } = server()
+    open(handlers)
+    fireEvent.click(await within(await section()).findByRole('button', { name: 'Remove Coast' }))
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect(writes[0].method).toBe('DELETE')
+    expect(await within(await section()).findByText('No categories yet.')).toBeInTheDocument()
+  })
+
+  it('adds one from the hierarchy, not offering those already assigned', async () => {
+    const { handlers, writes } = server()
+    open(handlers)
+    const categories = await section()
+    fireEvent.click(await within(categories).findByRole('button', { name: /Choose a category/ }))
+    expect(screen.queryByRole('option', { name: 'Coast' })).not.toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('option', { name: 'Beach' }))
+    fireEvent.click(within(categories).getByRole('button', { name: /\bScore$/ }))
+    fireEvent.click(await screen.findByRole('option', { name: '4' }))
+    fireEvent.click(within(categories).getByRole('button', { name: 'Add' }))
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect(await writes[0].json()).toEqual({ category_id: 8, score: 4 })
+    expect(await within(categories).findByText('Beach')).toBeInTheDocument()
+  })
+
+  it('shows a refusal in the server\'s words, not as a stale version', async () => {
+    open(server({ assignRefused: 409 }).handlers)
+    const categories = await section()
+    fireEvent.click(await within(categories).findByRole('button', { name: /Choose a category/ }))
+    fireEvent.click(await screen.findByRole('option', { name: 'City' }))
+    fireEvent.click(within(categories).getByRole('button', { name: 'Add' }))
+    expect(await within(categories).findByRole('alert')).toHaveTextContent(
+      'Not saved: Category already assigned to this content record',
+    )
+    expect(within(categories).queryByRole('button', { name: /Load their version/ })).not.toBeInTheDocument()
   })
 })
 

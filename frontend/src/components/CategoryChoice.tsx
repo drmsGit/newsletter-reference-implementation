@@ -45,18 +45,28 @@ export function categoryTree(categories: Category[], relations: CategoryRelation
 export default function CategoryChoice({
   selected,
   onChange,
+  label = 'Category',
+  noneLabel = 'Any category',
+  exclude,
 }: {
   selected: number | null
   onChange: (id: number | null) => void
+  label?: string
+  /** What choosing nothing is called: "Any category" for a filter. */
+  noneLabel?: string
+  /** Categories not to offer, e.g. those a record already has (task-280). */
+  exclude?: ReadonlySet<number>
 }) {
   const categories = useCategories()
   const relations = useCategoryRelations()
-  const tree = categoryTree(categories.data ?? [], relations.data ?? [])
+  const tree = categoryTree(categories.data ?? [], relations.data ?? []).filter(
+    ({ category }) => !exclude?.has(category.id),
+  )
   return (
     <Choice
-      label="Category"
+      label={label}
       options={[
-        { id: 'any', name: 'Any category' },
+        { id: 'any', name: noneLabel },
         ...tree.map(({ category, depth }) => ({ id: String(category.id), name: category.name, indent: depth })),
       ]}
       selected={selected == null ? 'any' : String(selected)}

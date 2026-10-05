@@ -740,6 +740,55 @@ export function useSaveContentRecord(recordId: number) {
   })
 }
 
+/** A record's categories with their scores (task-280), ordered by name. */
+export function useContentAssignments(recordId: number) {
+  return useQuery({
+    queryKey: [...keys.contentRecord(recordId), 'assignments'],
+    queryFn: () =>
+      read(api.GET('/content/{content_id}/assignments', { params: { path: { content_id: recordId } } })),
+  })
+}
+
+/**
+ * Assign, re-score or remove a record's category (task-280; ADR-080's
+ * 2026-10-04 addendum: 1-10, changed in place). Each re-reads the record's
+ * assignments, and the content lists, whose category filter they change.
+ */
+export function useEditAssignments(recordId: number) {
+  const queryClient = useQueryClient()
+  const refresh = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: [...keys.contentRecord(recordId), 'assignments'] }),
+      queryClient.invalidateQueries({ queryKey: [...keys.content, 'page'] }),
+      queryClient.invalidateQueries({ queryKey: [...keys.content, 'picker'] }),
+    ])
+  const path = { content_id: recordId }
+  return useMutation({
+    scope: { id: `assignments-${recordId}` },
+    mutationFn: (
+      change:
+        | { kind: 'assign'; categoryId: number; score: number }
+        | { kind: 'score'; assignmentId: number; score: number }
+        | { kind: 'remove'; assignmentId: number },
+    ) => {
+      if (change.kind === 'assign')
+        return read(api.POST('/content/{content_id}/categories', {
+          params: { path }, body: { category_id: change.categoryId, score: change.score },
+        }))
+      if (change.kind === 'score')
+        return read(api.PATCH('/content/{content_id}/assignments/{assignment_id}', {
+          params: { path: { ...path, assignment_id: change.assignmentId } }, body: { score: change.score },
+        }))
+      return read(api.DELETE('/content/{content_id}/assignments/{assignment_id}', {
+        params: { path: { ...path, assignment_id: change.assignmentId } },
+      }))
+    },
+    // Re-read after a refusal too: a 409 means somebody assigned it meanwhile,
+    // and the list should show what is there now.
+    onSettled: refresh,
+  })
+}
+
 /** A record's published versions, newest first (ADR-128): what each send used. */
 export function useContentVersions(recordId: number) {
   return useQuery({

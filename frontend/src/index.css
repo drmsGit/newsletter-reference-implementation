@@ -403,6 +403,26 @@ input[data-focus-visible] {
   display: inline;
 }
 
+.assignments {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: calc(var(--brand-space) / 2);
+}
+
+.assignment,
+.assignment-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--brand-space);
+  align-items: end;
+}
+
+.assignment__name {
+  min-width: 10rem;
+  align-self: center;
+}
+
 .versions {
   list-style: none;
   padding: 0;
