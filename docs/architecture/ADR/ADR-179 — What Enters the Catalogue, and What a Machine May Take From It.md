@@ -116,6 +116,20 @@ One option was rejected: a built-in optional heading on slot-bound modules only,
 
 Point 1 is unchanged. A hand-typed heading carries no topic, so keeping it out of the catalogue applies point 1's test. It does not make an exception to it.
 
+## Addendum 2026-10-05 — Machine ready: its starting value, and only people set it
+
+Prompted by task-282, which found that machine ready (point 2) had been decided and never built. The user decided the points below on 2026-10-05 in the task-282 design interview, one question at a time. They settle the two questions the Notes left open: the flag's default and backfill, and whether an integration may set it. Where each part lands in the code is in [[Channel Readiness - final design pass]].
+
+**1. Starting value.** A new record starts **not** machine ready: it fails closed, as point 2 says. Existing records start machine ready, set by the migration, because slots pick them today; turning them all off would silently empty every slot. The demo seed marks its slot content machine ready.
+
+**2. Only a person may turn it on or off.** An integration's attempt is refused, not held. The flag is the human gate on what machines may pick, so a machine setting it, even through the approval inbox, would be the machine approving its own access. This is the same "people only" shape as the second addendum of 2026-10-02 to [[ADR-150 — Tenancy and Access Model]], which refuses a machine credential on every settings write. Turning it off is people only too, so that one rule covers the flag.
+
+This is where machine ready parts from channel readiness. An integration may remove a channel readiness mark directly and may ask, through the approval inbox, to add one ([[ADR-174 — Channel Readiness Is Asserted, Not Computed]]'s addendum of 2026-10-05, point 5). It has neither path for machine ready.
+
+**3. The decision engine reads it,** together with channel readiness. A record is a slot candidate only if it is machine ready and marked ready for the slot's channel ([[ADR-174 — Channel Readiness Is Asserted, Not Computed]]'s addendum of 2026-10-05, point 2). Both strategies and the read-only candidate count now draw on one shared `candidate_query` (`backend/app/decision/strategies/base.py:176`), which today filters on `status == "active"` and the sending brand only (`base.py:203-209`); the line numbers in the fifth Negative are from before that query was shared.
+
+Nothing above changes this record's Decision section.
+
 ## Related ADRs
 
 ### Depends On

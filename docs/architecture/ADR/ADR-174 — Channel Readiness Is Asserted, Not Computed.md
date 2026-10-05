@@ -123,6 +123,80 @@ which is the same reasoning point 4 already runs on.
 
 Nothing above changes this record's Decision section.
 
+## Addendum 2026-10-05 — How readiness is stored, who reads it, and when it warns
+
+Prompted by task-282, which found that channel readiness and machine ready had
+been decided and never built. The user decided the points below on 2026-10-05
+in the task-282 design interview, one question at a time. Where each part
+lands in the code is in [[Channel Readiness - final design pass]].
+
+**1. Storage: one row per (content record, channel) that is marked ready.**
+The row holds who marked it and when. Unmarking deletes the row, and the audit
+log keeps the history. A new channel therefore costs no migration, which
+settles the choice the first Negative left open between a column set that
+grows with every channel and a child table. Readiness is still a property of
+the content record, as point 1 says; it is stored beside the record rather
+than as columns on it, so the first Positive's "column to filter on" is a row.
+
+**2. Decision slots read it.** A record is a slot candidate only if it is
+machine ready ([[ADR-179 — What Enters the Catalogue, and What a Machine May Take From It]]
+point 2) **and** marked ready for the slot's channel, which is the channel of
+the slot's variant. The migration that adds readiness marks today's active
+records ready for **email**: that is the channel they were written for and the
+one slots pick for today, so no slot goes empty. Push readiness is never
+assumed by a migration; a person marks it.
+
+**3. The bind picker and the Content list read it in the same build.**
+`GET /content/` gains a "ready for <channel>" filter and says, for each row,
+which channels the record is ready for. The bind picker opens on records ready
+for the variant's channel, with a visible switch to also show records that are
+not, each marked *"Not ready for <channel>"*
+([[Manager Workflow - design interview]] Q11). The Content list gets a
+"Ready for" filter (Manager Workflow Q5).
+
+**4. When point 2's warning shows.** `required` belongs to a module, not to a
+field ([[ADR-177 — A Field Is Defined Once, Required Per Module]] point 4), and
+a channel can have more than one module. A mark therefore warns when the record
+cannot fill **any** of that channel's modules, that is, when it lacks a
+required field for every module of the channel. The warning says what each
+kind of module needs. Push has one module, so its warning reads *"Marked ready
+for Push, but Notification text is empty"*. For email it reads *"no email
+module can use it: Hero banner needs Hero headline; image modules need
+Headline"*. A gap for one specific module is the bind-time fit note's job
+([[Variant Editor - design interview]] question 2.8), and point 3's send check
+still blocks. Point 2 itself is unchanged: the warning informs and the mark
+stays.
+
+**5. An integration may remove a mark directly, and the removal is audited.**
+Removing is the safe direction: the record stops being picked or offered for
+that channel. Adding a mark stays held in the approval inbox, as point 4
+decided. Until task-206 builds that hold, an integration's attempt to add a
+mark is refused, so nothing is let through unheld.
+
+**6. Point 3's send check is built.** Point 3 says the check "does not exist
+today"; it now does. `send_send_instance` refuses a send whose snapshot frame
+would send a required field empty, before the status transition
+(`backend/app/delivery/service.py:872-887`, through `missing_required_in_frame`
+at `backend/app/rendering/frame.py:251`). The send approval's review screen
+shows the same finding and disables approval
+(`backend/app/approvals/actions/send_fire.py:133-158`). The check covers modules
+bound to a record and static modules. A slot-bound module resolves per
+recipient and is outside it by design (`backend/app/rendering/frame.py:257-258`,
+`backend/app/rendering/service.py:496-501`); the code names that case a
+per-recipient skip rather than a block. So the second Negative, that this
+decision's safety rests on an unbuilt check, no longer holds for bound modules.
+
+**7. The Jinja content screen shows the marks read-only.** Marking happens in
+the React client.
+
+**The question the 2026-09-27 addendum left open is settled elsewhere.**
+Whether an integration may set machine ready is answered in
+[[ADR-179 — What Enters the Catalogue, and What a Machine May Take From It]]'s
+addendum of 2026-10-05: only a person, and a machine's attempt is refused
+rather than held.
+
+Nothing above changes this record's Decision section.
+
 ## Related ADRs
 
 ### Depends On

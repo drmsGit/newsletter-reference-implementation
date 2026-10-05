@@ -520,6 +520,21 @@ and the authentication question the React manager client was blocked on.
 
 **Status:** decided, not built. Details in [[Content Write Surface - final design pass]]; bugs task-275 to task-277, build task-278 to task-281, readiness task-282.
 
+
+### 2026-10-05 — Channel readiness and machine ready are decided
+
+**Context:** a record's per-channel readiness and its "machine ready" flag were decided long ago (Manager Workflow Q3, ADR-174, ADR-179) and never built. This session settled what those records left open, through an interview held one question at a time (task-282).
+
+1. **Readiness is one row per record and channel, holding who marked it and when.** Unmarking deletes the row and the audit log keeps the history, so a new channel needs no migration.
+2. **Machine ready starts off for new records and on for existing ones.** Only a person may change it; an integration is refused.
+3. **Decision slots pick only records that are machine ready and marked ready for their channel.** The migration marks today's active records ready for email, so no slot empties; push is only ever marked by a person.
+4. **The picker and the Content list read readiness from the first build.** The warning fires when a record can fill no module of the channel.
+5. **The Jinja screen shows readiness read-only.** An integration may unmark directly; its mark is held (task-206), and refused until that exists.
+
+Recorded as addenda to [[ADR-174 — Channel Readiness Is Asserted, Not Computed]] and [[ADR-179 — What Enters the Catalogue, and What a Machine May Take From It]], not supersessions, and in [[Channel Readiness - final design pass]].
+
+**Status:** decided, not built. Build tasks task-283 to task-287. task-206 now depends on task-283 and task-210. Still open, for the user before task-284: whether a record marked ready but missing fields is skipped by slots.
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*
