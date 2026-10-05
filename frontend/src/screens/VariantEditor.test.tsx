@@ -9,7 +9,7 @@ afterEach(() => vi.unstubAllGlobals())
 
 const MANIFESTS = [
   {
-    name: 'header', channel: 'email', label: 'Header', description: '', cms: false,
+    name: 'header', channel: 'email', label: 'Header', description: '', cms: false, carries_envelope: true,
     variables: [
       { name: 'subject', required: true, label: 'Subject', envelope: true, type: 'text' },
       { name: 'preheader', required: false, label: 'Preheader', envelope: true, type: 'text' },
@@ -148,6 +148,23 @@ describe('the variant editor', () => {
       expect(state.modules[0].module_data).toEqual({ label: 'Go now', url: 'https://example.invalid/new' }),
     )
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('takes the envelope fields from the module the server says carries it (task-221)', async () => {
+    // A second module declaring an envelope field must not reach the envelope
+    // area: the client asks which module carries it instead of scanning.
+    const { handlers } = server()
+    open({
+      ...handlers,
+      'GET /modules': () => jsonResponse([
+        ...MANIFESTS,
+        { name: 'stray', channel: 'email', label: 'Stray', description: '', cms: false, carries_envelope: false,
+          variables: [{ name: 'stray_subject', required: false, label: 'Stray subject', envelope: true, type: 'text' }] },
+      ]),
+    })
+    const envelope = await screen.findByRole('region', { name: 'Envelope' })
+    expect(within(envelope).getByLabelText(/^Subject/)).toBeInTheDocument()
+    expect(within(envelope).queryByLabelText('Stray subject')).not.toBeInTheDocument()
   })
 
   it('shows a stale save in place and loads the other version on request', async () => {

@@ -191,3 +191,20 @@ class TestMergingDeclaredOrders:
 
         merged = merge_declared_orders([["a", "b"], ["b", "c"], ["a", "c"]])
         assert sorted(merged) == ["a", "b", "c"] and len(merged) == 3
+
+
+# --- which module carries a channel's envelope (task-221) ---------------------
+
+def test_the_module_list_says_which_module_carries_the_envelope():
+    """ADR-177 point 8: the lookup stays a scan on the server and is exposed,
+    so no client re-derives it by scanning every module's fields."""
+    email = {m["name"]: m["carries_envelope"] for m in _get("/modules", channel="email")}
+    assert [name for name, carries in email.items() if carries] == [registry.envelope_module_type("email")]
+    assert email["header"] is True and email["hero"] is False
+    push = _get("/modules", channel="push")
+    assert push and not any(m["carries_envelope"] for m in push), "push has no envelope"
+
+
+def test_one_module_says_so_too():
+    assert _get("/modules/header", channel="email")["carries_envelope"] is True
+    assert _get("/modules/hero", channel="email")["carries_envelope"] is False

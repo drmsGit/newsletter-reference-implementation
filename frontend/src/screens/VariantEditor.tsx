@@ -160,7 +160,13 @@ function Envelope({
 }) {
   const save = useSaveVariant(campaignId)
   const { variant } = composed
-  const fields = manifests.flatMap((m) => m.variables).filter((v) => v.envelope)
+  // The fields of the module the server says carries the envelope (task-221),
+  // not every module's envelope-flagged fields: scanning for those here would
+  // be a second copy of `envelope_module_type`, in another language (ADR-177
+  // point 8). A variant has this before its first subject is saved, when it
+  // has no envelope row yet.
+  const carrier = manifests.find((m) => m.carries_envelope)
+  const fields = (carrier?.variables ?? []).filter((v) => v.envelope)
   const values: Record<string, string | null | undefined> = {
     subject: variant.subject,
     preheader: variant.preheader,

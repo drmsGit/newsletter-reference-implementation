@@ -4281,6 +4281,11 @@ export interface components {
             description: string;
             /** Cms */
             cms: boolean;
+            /**
+             * Carries Envelope
+             * @default false
+             */
+            carries_envelope: boolean;
             /** Variables */
             variables: components["schemas"]["ModuleVariableOut"][];
         };

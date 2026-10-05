@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.modules.registry import ModuleManifest, list_manifests, get_manifest
+from app.modules.registry import ModuleManifest, envelope_module_type, list_manifests, get_manifest
 
 
 router = APIRouter(prefix="/modules", tags=["modules"])
@@ -36,6 +36,11 @@ class ModuleManifestOut(BaseModel):
     label: str
     description: str
     cms: bool
+    #: Whether this is the module that carries the channel's envelope — the
+    #: subject and preheader for email (ADR-162 point 1). The server's answer
+    #: (`envelope_module_type`), exposed so a client never re-derives it by
+    #: scanning every module's fields (ADR-177 point 8; task-221). Push has none.
+    carries_envelope: bool = False
     variables: list[ModuleVariableOut]
 
 
@@ -46,6 +51,7 @@ def _to_out(manifest: ModuleManifest) -> ModuleManifestOut:
         label=manifest.label,
         description=manifest.description,
         cms=manifest.cms,
+        carries_envelope=envelope_module_type(manifest.channel) == manifest.name,
         variables=[
             ModuleVariableOut(
                 name=v.name, required=v.required, label=v.label, envelope=v.envelope,
