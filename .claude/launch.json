@@ -2,7 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "newsletter-api",
+      "name": "api",
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",
@@ -12,7 +12,7 @@
       "autoPort": false
     },
     {
-      "name": "newsletter-client",
+      "name": "client",
       "runtimeExecutable": "bash",
       "runtimeArgs": [
         "-c",

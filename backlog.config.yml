@@ -1,4 +1,4 @@
-project_name: "Newsletter Architecture"
+project_name: "Tarrow"
 default_status: "To Do"
 statuses: ["To Do", "In Progress", "Blocked", "Done"]
 labels: ["needs-adr", "backend", "frontend", "docs"]

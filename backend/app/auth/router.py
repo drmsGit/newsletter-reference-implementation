@@ -15,6 +15,8 @@ from urllib.parse import quote
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
+
+from app import product
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -40,6 +42,7 @@ from app.settings.service import set_config
 
 router = APIRouter(tags=["frontend"])
 templates = Jinja2Templates(directory="app/templates")
+product.register(templates)
 
 # Shown whatever happens, so the page cannot be read as "this address exists".
 NEUTRAL_NOTICE = "If that address has an account, a sign-in code is on its way."

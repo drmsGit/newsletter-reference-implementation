@@ -1,9 +1,15 @@
-# Newsletter Architecture
+# Tarrow
 
 Open-source newsletter architecture MVP. Teachable and tailorable, not a fixed
 commercial product. Learnings feed the separate Condor use case.
 
 ## Where things live
+- **The product's name: `product.json`** (repo root) — the one source of truth.
+  Provisional (Tarrow, not legally cleared). Code reads it; never write the name
+  into code. Prose, file names and YAML carry it literally; rename with
+  `backend/scripts/rename_product.py` (`--dry-run` first). Dated records keep
+  the names they were written with. See
+  `docs/business/decisions/naming-brand-tarrow.md`.
 - ADRs: `docs/architecture/ADR/` — numbering is sparse and permanent. **No
   count or highest number is recorded here on purpose**: every figure this
   line has carried went stale within days. Run `ls` and read the directory.

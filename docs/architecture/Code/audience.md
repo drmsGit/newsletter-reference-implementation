@@ -10,7 +10,7 @@ modified: 2026-07-27
 
 # audience
 
-> Part of [[MOC - System Overview]]. Architecture rationale: [[MOC - Newsletter Architecture]] (audience/segmentation).
+> Part of [[MOC - System Overview]]. Architecture rationale: [[MOC - Tarrow]] (audience/segmentation).
 
 ## Purpose
 

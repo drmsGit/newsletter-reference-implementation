@@ -95,6 +95,7 @@ def _load_local_env() -> None:
 _load_local_env()
 
 from app.database import Base, engine, SessionLocal
+from app.product import PRODUCT_NAME, register as register_product_name
 from app.content.db_models import ContentRecordDB, CategoryDB, ContentCategoryAssignmentDB, ContentVersionDB
 from app.content.router import router as content_router
 from app.content.service import create_demo_content_if_empty
@@ -178,8 +179,8 @@ from app.frontend.router import router as frontend_router
 # routes, so it can't drift. The prose below just frames it and orders/labels
 # the tag sections by architecture layer; the module & flow pages carry the
 # "how modules connect" tier, and docstrings carry function internals.
-API_DESCRIPTION = """
-Endpoint reference for the **Newsletter Blueprint** backend — a vendor-neutral
+API_DESCRIPTION = f"""
+Endpoint reference for the **{PRODUCT_NAME}** backend — a vendor-neutral
 reference architecture for email marketing systems.
 
 **This page documents HTTP routes only.** For how the ~14 modules connect, the
@@ -236,7 +237,7 @@ if API_DOCS not in API_DOCS_MODES:
 SWAGGER_UI_PARAMETERS = {"withCredentials": True, "persistAuthorization": True}
 
 app = FastAPI(
-    title="Newsletter Reference Architecture API",
+    title=f"{PRODUCT_NAME} API",
     version="0.1.0",
     description=API_DESCRIPTION,
     openapi_tags=TAGS_METADATA,
@@ -296,6 +297,7 @@ app.openapi = _openapi_with_security
 
 
 templates = Jinja2Templates(directory="app/templates")
+register_product_name(templates)
 
 # ADR-181. Asked BEFORE create_all, because afterwards every database has
 # tables: an empty one is being built from the models and is at head by

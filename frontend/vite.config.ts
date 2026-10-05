@@ -3,6 +3,14 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 /**
+ * What the product is called: `product.json` at the repository root, the one
+ * place the name is decided (task-29). It is provisional, so nothing in the
+ * client spells it out — `branding.ts` reads `__PRODUCT_NAME__`, and the page
+ * title in `index.html` is `%PRODUCT_NAME%`, both filled from here.
+ */
+import PRODUCT from '../product.json'
+
+/**
  * The backend in development. ADR-168 point 3 makes same-origin a deployment
  * requirement rather than a preference: it is what keeps the session cookie at
  * `samesite="lax"` and keeps CORSMiddleware out of the backend entirely.
@@ -69,7 +77,11 @@ const BASE = '/manager/'
 
 export default defineConfig({
   base: BASE,
-  plugins: [react()],
+  define: { __PRODUCT_NAME__: JSON.stringify(PRODUCT.name) },
+  plugins: [
+    react(),
+    { name: 'product-name', transformIndexHtml: (html) => html.replaceAll('%PRODUCT_NAME%', PRODUCT.name) },
+  ],
   test: {
     // A browser-like DOM in Node. React Testing Library renders into it, so
     // a component test exercises the real render path rather than a mock.

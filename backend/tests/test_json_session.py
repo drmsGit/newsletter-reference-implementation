@@ -346,7 +346,7 @@ class TestAStaleCookieDoesNotLockYouOut:
     """**The deadlock, found by a user who simply could not sign in.**
 
     `enforce_api_csrf` skipped only when there was no cookie *string*. A browser
-    holding a revoked or expired `nra_session` — from a signed-out tab, an idle
+    holding a revoked or expired session cookie — from a signed-out tab, an idle
     timeout, or the Jinja UI — still sent one, so CSRF was enforced against a
     session that no longer existed.
 

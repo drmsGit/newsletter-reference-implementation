@@ -26,6 +26,7 @@ from enum import Enum
 
 from sqlalchemy.orm import Session
 
+from app.product import PRODUCT_SLUG
 from app.auth.db_models import (
     BrandDB, IntegrationDB, IntegrationGrantDB, LoginCodeDB,
     LoginCodeRequestDB, RoleAssignmentDB, RoleDB, RolePermissionDB, SessionDB,
@@ -50,7 +51,10 @@ CODE_REQUESTS_PER_CLIENT = 20
 CODE_REQUEST_CLIENT_WINDOW_MINUTES = 60
 SESSION_ABSOLUTE_HOURS = 12
 SESSION_IDLE_MINUTES = 60
-SESSION_COOKIE = "nra_session"
+# Named after the product slug (task-29), so it follows product.json. Not a
+# bare "session": browsers share cookies per host, not per port, and on
+# localhost a bare name would meet every other dev app's cookie.
+SESSION_COOKIE = f"{PRODUCT_SLUG}_session"
 
 DEFAULT_BRAND_KEY = "default"
 

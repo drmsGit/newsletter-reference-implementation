@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, Query, Request, Form
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
+
+from app import product
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from urllib.parse import quote
@@ -146,6 +148,7 @@ def switch_brand(
 
 
 templates = Jinja2Templates(directory="app/templates")
+product.register(templates)
 
 
 @router.get("/")

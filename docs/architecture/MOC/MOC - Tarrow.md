@@ -6,13 +6,13 @@ created: 2026-05-30
 modified: 2026-06-05
 ---
 
-# MOC - Newsletter Architecture
+# MOC - Tarrow
 
-	# MOC - Newsletter Architecture
+	# MOC - Tarrow
 
 ## Architecture Principles
 
-- [[Newsletter Architecture Design Principles]]
+- [[Tarrow Design Principles]]
 
 ## Foundation
 
@@ -85,4 +85,4 @@ graph LR
 
 ## Principles
 
-- [[Newsletter Architecture Design Principles]]
+- [[Tarrow Design Principles]]

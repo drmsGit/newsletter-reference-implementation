@@ -12,7 +12,7 @@ modified: 2026-06-06
 
 ## Purpose
 
-The Newsletter Reference Architecture is not defined solely by its components, APIs, or implementation details.
+Tarrow is not defined solely by its components, APIs, or implementation details.
 
 The architecture is guided by a set of principles that influence every design decision across content management, composition, personalization, delivery, automation, analytics, privacy, and AI.
 

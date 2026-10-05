@@ -1,6 +1,6 @@
 # Project Context
 
-This is the Newsletter Blueprint — a vendor-neutral reference architecture for email marketing systems.
+This is Tarrow — a vendor-neutral reference architecture for email marketing systems.
 
 ## ADR Location
 All architecture decisions are in `docs/architecture/ADR/`.

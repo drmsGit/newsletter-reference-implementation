@@ -444,7 +444,7 @@ def enforce_api_policy(request: Request, db: Session = Depends(get_db)):
     """One guard over the JSON API, for **two kinds of principal** (ADR-168).
 
     A machine credential first — `Authorization: Bearer <key_id>.<secret>` —
-    and failing that the `nra_session` cookie, resolved through
+    and failing that the session cookie (`SESSION_COOKIE`), resolved through
     `user_for_token`. The principal that comes out is the `UserDB |
     IntegrationDB` union `permissions_for` already dispatches on, so adding a
     second way to say *who* changes the credential reader and nothing below it.
@@ -662,7 +662,7 @@ async def enforce_api_csrf(request: Request, db: Session = Depends(get_db)) -> N
 
     **"No live session" and not "no cookie string", and the difference was a
     lockout.** This asked only whether a cookie was present until 2026-09-20.
-    A browser holding a revoked or expired `nra_session` — from a signed-out
+    A browser holding a revoked or expired session cookie — from a signed-out
     tab, an idle timeout, or the Jinja UI — still sent one, so CSRF was
     enforced against a session that no longer existed. The SPA could not
     satisfy it: `GET /auth/session` answered 401, so it had no token, and the

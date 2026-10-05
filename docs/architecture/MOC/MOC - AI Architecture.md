@@ -27,7 +27,7 @@ ADR-081's *"AI ranks within governed candidate sets"* is fully satisfied by a le
 
 ## Related MOCs
 
-- [[MOC - Newsletter Architecture]]
+- [[MOC - Tarrow]]
 - [[MOC - Decision Architecture]]
 - [[MOC - Automation Architecture]]
 - [[MOC - Security Architecture]]

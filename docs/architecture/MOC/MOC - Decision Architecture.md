@@ -22,4 +22,4 @@ modified: 2026-06-05
 
 ## Related MOCs
 
-- [[MOC - Newsletter Architecture]]
+- [[MOC - Tarrow]]

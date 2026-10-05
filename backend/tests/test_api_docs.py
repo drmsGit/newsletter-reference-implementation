@@ -12,6 +12,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from app.auth import service as auth
 from main import app
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -29,6 +30,7 @@ def _in_mode(mode: str, script: str) -> subprocess.CompletedProcess:
 _PROBE = """
 import json
 from fastapi.testclient import TestClient
+from app.auth import service as auth
 from main import app
 from tests.machine import machine
 from app.auth.permissions import VIEW
@@ -57,7 +59,7 @@ class TestThePublicDefault:
         schema = client.get("/openapi.json").json()
         assert set(schema["components"]["securitySchemes"]) == {
             "SessionCookie", "CsrfToken", "MachineKey", "Brand"}
-        assert schema["components"]["securitySchemes"]["SessionCookie"]["name"] == "nra_session"
+        assert schema["components"]["securitySchemes"]["SessionCookie"]["name"] == auth.SESSION_COOKIE
         assert {"MachineKey": [], "Brand": []} in schema["security"]
 
     def test_sign_in_and_webhooks_need_no_credential(self):

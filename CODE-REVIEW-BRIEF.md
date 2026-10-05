@@ -1,4 +1,4 @@
-# Code review brief — Newsletter Blueprint backend
+# Code review brief — Tarrow backend
 
 **Prepared 2026-09-19.** Read this before reviewing. It is short, and it will
 save you from reporting a dozen deliberate decisions as defects.
