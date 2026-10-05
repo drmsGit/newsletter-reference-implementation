@@ -796,13 +796,13 @@ export interface paths {
         get?: never;
         /**
          * Update Variant Record
-         * @description Rename a variant and set its envelope copy.
+         * @description Rename a variant and, when `envelope` is sent, replace its envelope copy.
          *
-         *     `subject` and `preheader` are **not columns** — ADR-162 point 1 made them
-         *     fields of a `header` module and migration 0012 dropped them. `update_variant`
-         *     writes them through `set_envelope_fields`, so a channel that declares no
-         *     envelope simply has nowhere to put them and they are ignored rather than
-         *     refused.
+         *     The envelope fields (email's subject and preheader) are **not columns** —
+         *     ADR-162 point 1 made them fields of a `header` module and migration 0012
+         *     dropped them. `update_variant` writes them through `set_envelope_fields`, so
+         *     a field the channel does not declare has nowhere to go and is ignored
+         *     rather than refused.
          */
         put: operations["update_variant_record_campaigns_variants__variant_id__put"];
         post?: never;
@@ -5913,10 +5913,13 @@ export interface components {
             channel: string;
             /** Name */
             name: string;
-            /** Subject */
-            subject?: string | null;
-            /** Preheader */
-            preheader?: string | null;
+            /**
+             * Envelope
+             * @default {}
+             */
+            envelope: {
+                [key: string]: string;
+            };
             /**
              * Status
              * @default draft
@@ -5945,10 +5948,10 @@ export interface components {
              * @default Variant A
              */
             name: string;
-            /** Subject */
-            subject?: string | null;
-            /** Preheader */
-            preheader?: string | null;
+            /** Envelope */
+            envelope?: {
+                [key: string]: string | null;
+            } | null;
             /**
              * Status
              * @default draft
@@ -6025,10 +6028,10 @@ export interface components {
         VariantUpdate: {
             /** Name */
             name: string;
-            /** Subject */
-            subject?: string | null;
-            /** Preheader */
-            preheader?: string | null;
+            /** Envelope */
+            envelope?: {
+                [key: string]: string | null;
+            } | null;
         };
     };
     responses: never;

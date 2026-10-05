@@ -537,18 +537,15 @@ export function useSaveVariant(campaignId: number) {
     'variant',
     (composition, id) => cachedOf(composition, 'variant', id),
     (
-      { id, changes }: { id: number; changes: { name?: string; subject?: string | null; preheader?: string | null } },
+      // `envelope` replaces the stored one when sent and is left alone when
+      // not (task-48), so a rename cannot clear the subject.
+      { id, changes }: { id: number; changes: { name?: string; envelope?: Record<string, string | null> } },
       variant,
     ) =>
       read(
         api.PUT('/campaigns/variants/{variant_id}', {
           params: { path: { variant_id: id }, header: { 'If-Match': variant?.updated_at } },
-          body: {
-            name: variant?.name ?? '',
-            subject: variant?.subject ?? null,
-            preheader: variant?.preheader ?? null,
-            ...changes,
-          },
+          body: { name: variant?.name ?? '', ...changes },
         }),
       ),
   )

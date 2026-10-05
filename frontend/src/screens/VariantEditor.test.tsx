@@ -43,7 +43,8 @@ const T = (n: number) => `2026-10-03T10:00:0${n}.000000Z`
 function server(overrides: { canAdd?: boolean } = {}) {
   let clock = 1
   const state = {
-    variant: { id: 3, campaign_id: 1, channel: 'email', name: 'Variant A', subject: 'Spring', preheader: 'Peek',
+    variant: { id: 3, campaign_id: 1, channel: 'email', name: 'Variant A',
+      envelope: { subject: 'Spring', preheader: 'Peek' } as Record<string, string>,
       status: 'draft', created_at: T(0), updated_at: T(1) },
     modules: [
       { id: 11, position: 1, module_type: 'cta', content_record_id: null, decision_slot_id: null,
@@ -79,7 +80,11 @@ function server(overrides: { canAdd?: boolean } = {}) {
     'PUT /campaigns/variants/3': async (request: Request) => {
       puts.push(request.clone())
       if (stale(request, state.variant.updated_at)) return jsonResponse({ detail: 'changed' }, 409)
-      Object.assign(state.variant, await request.json(), { updated_at: T(++clock) })
+      const body = await request.json()
+      // As the server does: a sent envelope replaces the stored one, blanks dropped (task-48).
+      const envelope = body.envelope === undefined ? state.variant.envelope
+        : Object.fromEntries(Object.entries(body.envelope as Record<string, string | null>).filter(([, v]) => v))
+      Object.assign(state.variant, { name: body.name, envelope, updated_at: T(++clock) })
       return jsonResponse(state.variant)
     },
   }
@@ -200,7 +205,7 @@ describe('the variant editor', () => {
     const { handlers, state } = server()
     open(handlers)
     await screen.findByLabelText(/^Subject/)
-    Object.assign(state.variant, { preheader: 'Theirs', updated_at: T(9) })
+    Object.assign(state.variant, { envelope: { ...state.variant.envelope, preheader: 'Theirs' }, updated_at: T(9) })
     await edit('Subject', 'Mine')
     expect(await screen.findByRole('alert')).toHaveTextContent(/changed the variant after you loaded it/)
     fireEvent.click(screen.getByRole('button', { name: 'Load their version' }))
@@ -219,13 +224,28 @@ describe('the variant editor', () => {
     expect(await within(field).findByRole('alert')).toHaveTextContent('must be text')
   })
 
-  it('saves the envelope through the variant, sending all three of its fields', async () => {
+  it('saves the envelope through the variant, sending the whole envelope', async () => {
     const { handlers, puts } = server()
     open(handlers)
     await edit('Subject', 'Summer')
     await waitFor(() => expect(puts).toHaveLength(1))
     expect(puts[0].headers.get('If-Match')).toBe(T(1))
-    expect(await puts[0].json()).toEqual({ name: 'Variant A', subject: 'Summer', preheader: 'Peek' })
+    expect(await puts[0].json()).toEqual({ name: 'Variant A', envelope: { subject: 'Summer', preheader: 'Peek' } })
+  })
+
+  it('shows whatever envelope fields the channel declares, by their names (task-48)', async () => {
+    const { handlers, state } = server()
+    state.variant.envelope = { sender_name: 'Ana from Travel' }
+    open({
+      ...handlers,
+      'GET /modules': () => jsonResponse([
+        ...MANIFESTS.filter((m) => m.name !== 'header'),
+        { name: 'header', channel: 'email', label: 'Header', description: '', cms: false, carries_envelope: true,
+          variables: [{ name: 'sender_name', required: false, label: 'Sender name', envelope: true, type: 'text' }] },
+      ]),
+    })
+    const envelope = await screen.findByRole('region', { name: 'Envelope' })
+    expect(await within(envelope).findByLabelText(/^Sender name/)).toHaveValue('Ana from Travel')
   })
 
 })

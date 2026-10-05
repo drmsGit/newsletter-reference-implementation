@@ -14,8 +14,12 @@ class Variant(BaseModel):
     # it anywhere and `VariantUpdate` deliberately does not carry it.
     channel: str
     name: str
-    subject: str | None = None
-    preheader: str | None = None
+    # The envelope copy: the fields the channel's manifest declares as
+    # envelope (ADR-162 point 1), by name — `{"subject", "preheader"}` for
+    # email, `{}` for push, which has none. A map rather than `subject` and
+    # `preheader` (task-48): those are email's field names, and every variant
+    # of every channel answered with them.
+    envelope: dict[str, str] = {}
     status: str = "draft"
     created_at: datetime
     updated_at: datetime
@@ -24,8 +28,8 @@ class Variant(BaseModel):
 class VariantCreate(BaseModel):
     channel: str = "email"
     name: str = "Variant A"
-    subject: str | None = None
-    preheader: str | None = None
+    # Fields the channel does not declare are ignored, as `set_envelope_fields` does.
+    envelope: dict[str, str | None] | None = None
     # `campaigns.service.VARIANT_STATUSES` (task-203). The read model `Variant`
     # keeps `str`, since rows written before the rule may hold other values.
     status: Literal["draft", "ready"] = "draft"
@@ -33,8 +37,9 @@ class VariantCreate(BaseModel):
 
 class VariantUpdate(BaseModel):
     name: str
-    subject: str | None = None
-    preheader: str | None = None
+    # Replaces the whole envelope when sent; left out, the envelope is untouched.
+    # A blank field clears it.
+    envelope: dict[str, str | None] | None = None
 
 
 class Campaign(BaseModel):

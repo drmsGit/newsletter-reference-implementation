@@ -116,7 +116,7 @@ def variant_created(w, plane, call, db):
 def variant_updated(w, plane, call):
     vid = w["variant"].id
     if plane == "json":
-        call("put", f"/campaigns/variants/{vid}", json={"name": "renamed", "subject": "S"})
+        call("put", f"/campaigns/variants/{vid}", json={"name": "renamed", "envelope": {"subject": "S"}})
     else:
         call("post", f"{_ui(w)}/edit", data={"name": "renamed", "subject": "S"})
     return audit.VARIANT_UPDATED, vid

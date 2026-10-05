@@ -1377,8 +1377,9 @@ def variant_create(
             campaign_id=campaign_id,
             name=name,
             channel=channel,
-            subject=subject.strip() or None,
-            preheader=preheader.strip() or None,
+            # The form's fields are email's envelope; a channel without them
+            # ignores them (`set_envelope_fields`).
+            envelope={"subject": subject, "preheader": preheader},
             brand_id=working_brand_id(request, db),
         )
     except ChannelUnavailable as error:
@@ -1408,15 +1409,13 @@ def variant_edit(
         db,
         variant_id=variant_id,
         name=name,
-        subject=subject.strip() or None,
-        preheader=preheader.strip() or None,
+        envelope={"subject": subject, "preheader": preheader},
         brand_id=working_brand_id(request, db),
     )
     if updated is not None:
         audit.record_from_request(
             request, db, audit.VARIANT_UPDATED, subject_type="variant", subject_id=variant_id,
-            detail={"name": updated.name, "subject": updated.subject,
-                    "preheader": updated.preheader},
+            detail={"name": updated.name, "envelope": updated.envelope},
         )
         fence.touch(db, request, variant_id=updated.id)
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)
@@ -1541,8 +1540,7 @@ def variant_apply_subject(
             db,
             variant_id=variant_id,
             name=variant.name,
-            subject=subject.strip() or None,
-            preheader=preheader.strip() or None,
+            envelope={"subject": subject, "preheader": preheader},
             brand_id=working_brand_id(request, db),
         )
         if updated is not None:
@@ -1550,8 +1548,7 @@ def variant_apply_subject(
             # any other; `applied_suggestion` says where the copy came from.
             audit.record_from_request(
                 request, db, audit.VARIANT_UPDATED, subject_type="variant", subject_id=variant_id,
-                detail={"name": updated.name, "subject": updated.subject,
-                        "preheader": updated.preheader, "applied_suggestion": True},
+                detail={"name": updated.name, "envelope": updated.envelope, "applied_suggestion": True},
             )
             fence.touch(db, request, variant_id=updated.id)
     return RedirectResponse(url=f"/ui/campaigns/{campaign_id}", status_code=303)

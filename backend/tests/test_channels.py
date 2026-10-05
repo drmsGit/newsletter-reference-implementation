@@ -2263,7 +2263,7 @@ class TestEnvelopeFieldsLiveInAModule:
 
         variant = create_variant_for_campaign(
             db, campaign_id=campaign.id, name=_name("v"), channel="email",
-            subject="Snow report", preheader="Two metres at Arosa", brand_id=campaign.brand_id)
+            envelope={"subject": "Snow report", "preheader": "Two metres at Arosa"}, brand_id=campaign.brand_id)
 
         module = db.query(ModuleInstanceDB).filter(
             ModuleInstanceDB.variant_id == variant.id,
@@ -2279,7 +2279,7 @@ class TestEnvelopeFieldsLiveInAModule:
         empty module asserting that somebody wrote one."""
         variant = create_variant_for_campaign(
             db, campaign_id=campaign.id, name=_name("p"), channel="push",
-            subject="ignored", preheader="ignored", brand_id=campaign.brand_id)
+            envelope={"subject": "ignored", "preheader": "ignored"}, brand_id=campaign.brand_id)
         assert db.query(ModuleInstanceDB).filter(
             ModuleInstanceDB.variant_id == variant.id).count() == 0
 
@@ -2288,7 +2288,7 @@ class TestEnvelopeFieldsLiveInAModule:
 
         variant = create_variant_for_campaign(
             db, campaign_id=campaign.id, name=_name("v"), channel="email",
-            subject="Snow report", preheader="Two metres", brand_id=campaign.brand_id)
+            envelope={"subject": "Snow report", "preheader": "Two metres"}, brand_id=campaign.brand_id)
         artifact = render_variant(db, variant.id, mode="preview")
         assert artifact.envelope["subject"] == "Snow report", (
             "the subject did not reach the envelope, so the send path would "
@@ -2304,7 +2304,7 @@ class TestEnvelopeFieldsLiveInAModule:
 
         variant = create_variant_for_campaign(
             db, campaign_id=campaign.id, name=_name("v"), channel="email",
-            subject="S", preheader="Two metres at Arosa", brand_id=campaign.brand_id)
+            envelope={"subject": "S", "preheader": "Two metres at Arosa"}, brand_id=campaign.brand_id)
         body = render_variant(db, variant.id, mode="preview").body
         assert body.count('class="preheader"') == 1, (
             f"the preheader span appears {body.count(chr(34) + 'preheader' + chr(34))} "
@@ -2319,9 +2319,9 @@ class TestEnvelopeFieldsLiveInAModule:
 
         variant = create_variant_for_campaign(
             db, campaign_id=campaign.id, name=_name("v"), channel="email",
-            subject="Temporary", preheader="", brand_id=campaign.brand_id)
+            envelope={"subject": "Temporary", "preheader": ""}, brand_id=campaign.brand_id)
         update_variant(
-            db, variant.id, name="still here", subject="", preheader="",
+            db, variant.id, name="still here", envelope={"subject": "", "preheader": ""},
             brand_id=brand_of_variant(db, variant.id),
         )
         assert db.query(ModuleInstanceDB).filter(

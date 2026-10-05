@@ -79,9 +79,10 @@ class TestEditingAVariant:
     def test_envelope_copy_goes_to_the_module_not_a_column(self, db, variant, api):
         """`subject` and `preheader` stopped being columns in migration 0012.
 
-        The payload still names them because they are what a caller means; the
-        service writes them through `set_envelope_fields`, into the `header`
-        module ADR-162 point 1 put them in.
+        The payload carries them in `envelope`, by the names the channel's
+        manifest declares (task-48); the service writes them through
+        `set_envelope_fields`, into the `header` module ADR-162 point 1 put
+        them in.
         """
         from app.rendering.service import envelope_fields_for_variant
 
@@ -89,8 +90,7 @@ class TestEditingAVariant:
             f"/campaigns/variants/{variant.id}",
             json={
                 "name": variant.name,
-                "subject": "Written over JSON",
-                "preheader": "And its preheader",
+                "envelope": {"subject": "Written over JSON", "preheader": "And its preheader"},
             },
             headers=api,
         )

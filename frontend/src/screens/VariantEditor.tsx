@@ -167,13 +167,12 @@ function Envelope({
   // has no envelope row yet.
   const carrier = manifests.find((m) => m.carries_envelope)
   const fields = (carrier?.variables ?? []).filter((v) => v.envelope)
-  const values: Record<string, string | null | undefined> = {
-    subject: variant.subject,
-    preheader: variant.preheader,
-  }
 
+  // The whole envelope goes with each save, since a sent envelope replaces the
+  // stored one; the values are read and written by the manifest's field names,
+  // so no channel's field names are spelt out here (task-48).
   function saveField(name: string, value: string) {
-    save.mutate({ id: variant.id, changes: { [name]: value.trim() || null } })
+    save.mutate({ id: variant.id, changes: { envelope: { ...variant.envelope, [name]: value.trim() || null } } })
   }
 
   return (
@@ -182,7 +181,7 @@ function Envelope({
         <AutosaveField
           key={field.name}
           field={field}
-          value={values[field.name] ?? ''}
+          value={variant.envelope[field.name] ?? ''}
           onSave={(value) => saveField(field.name, value)}
           error={fieldError(save.error, field.name)}
         />

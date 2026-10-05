@@ -158,8 +158,7 @@ def to_variant(record: VariantDB, db: Session) -> Variant:
         campaign_id=record.campaign_id,
         channel=record.channel,
         name=record.name,
-        subject=envelope.get("subject"),
-        preheader=envelope.get("preheader"),
+        envelope=envelope,
         status=record.status,
         created_at=record.created_at,
         updated_at=record.updated_at,
@@ -298,8 +297,7 @@ def create_variant_for_campaign(
     campaign_id: int,
     name: str,
     channel: str,
-    subject: str | None = None,
-    preheader: str | None = None,
+    envelope: dict | None = None,
     status: str = "draft",
     *,
     brand_id: int,
@@ -309,11 +307,11 @@ def create_variant_for_campaign(
     its content-readiness and its renderer at once, so changing channel means
     creating a new variant. `update_variant` therefore does not touch it.
 
-    `subject` and `preheader` are fields of an email, not columns of the
-    variant: `set_envelope_fields` below writes them into the variant's
-    envelope module (ADR-162 point 1; migration 0011 moved them there and 0012
-    dropped the columns). Push declares no envelope fields, so a push variant
-    has none.
+    `envelope` holds the channel's envelope fields by name — email's subject
+    and preheader — which are not columns of the variant: `set_envelope_fields`
+    below writes them into the variant's envelope module (ADR-162 point 1;
+    migration 0011 moved them there and 0012 dropped the columns). Push
+    declares no envelope fields, so a push variant has none.
     """
     # The parent is resolved within the brand before anything is written, so a
     # variant cannot be hung off another brand's campaign (ADR-172 point 5).
@@ -344,10 +342,7 @@ def create_variant_for_campaign(
     # Into the module that declares them, not onto the row (ADR-162 point 1):
     # the variant has no such columns since migration 0012, and two places
     # holding the same field is the failure mode that point rejects.
-    set_envelope_fields(
-        db, variant.id, {"subject": subject, "preheader": preheader},
-        brand_id=brand_id,
-    )
+    set_envelope_fields(db, variant.id, envelope or {}, brand_id=brand_id)
     return to_variant(variant, db)
 
 
@@ -385,26 +380,25 @@ def update_variant(
     db: Session,
     variant_id: int,
     name: str,
-    subject: str | None = None,
-    preheader: str | None = None,
+    envelope: dict | None = None,
     *,
     brand_id: int,
     expected_updated_at: datetime | None = None,
 ) -> Variant | None:
+    """Rename the variant and, when `envelope` is given, replace its envelope
+    copy. `None` leaves the envelope as it is: renaming is not clearing."""
     variant = get_variant(db, variant_id, brand_id=brand_id)
     if variant is None:
         return None
     refuse_stale(db, variant, expected_updated_at, "variant")
     variant.name = name
-    # Moved by hand: subject and preheader live in the header module, so an
-    # edit to them alone leaves this row clean and `onupdate` never fires —
-    # two editors changing the subject would never conflict (task-110).
+    # Moved by hand: the envelope lives in the header module, so an edit to it
+    # alone leaves this row clean and `onupdate` never fires — two editors
+    # changing the subject would never conflict (task-110).
     variant.updated_at = func.now()
     db.commit()
-    set_envelope_fields(
-        db, variant.id, {"subject": subject, "preheader": preheader},
-        brand_id=brand_id,
-    )
+    if envelope is not None:
+        set_envelope_fields(db, variant.id, envelope, brand_id=brand_id)
     db.refresh(variant)
     return to_variant(variant, db)
 

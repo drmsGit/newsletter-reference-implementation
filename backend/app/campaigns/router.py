@@ -215,8 +215,7 @@ def create_campaign_variant(
             campaign_id=campaign_id,
             name=payload.name,
             channel=payload.channel,
-            subject=payload.subject,
-            preheader=payload.preheader,
+            envelope=payload.envelope,
             status=payload.status,
             brand_id=brand_id,
         )
@@ -557,13 +556,13 @@ def update_variant_record(
     brand_id: int = Depends(working_brand),
     if_match: str | None = IF_MATCH,
 ):
-    """Rename a variant and set its envelope copy.
+    """Rename a variant and, when `envelope` is sent, replace its envelope copy.
 
-    `subject` and `preheader` are **not columns** — ADR-162 point 1 made them
-    fields of a `header` module and migration 0012 dropped them. `update_variant`
-    writes them through `set_envelope_fields`, so a channel that declares no
-    envelope simply has nowhere to put them and they are ignored rather than
-    refused.
+    The envelope fields (email's subject and preheader) are **not columns** —
+    ADR-162 point 1 made them fields of a `header` module and migration 0012
+    dropped them. `update_variant` writes them through `set_envelope_fields`, so
+    a field the channel does not declare has nowhere to go and is ignored
+    rather than refused.
     """
     fence.guard(db, request, variant_id=variant_id)
     try:
@@ -571,8 +570,7 @@ def update_variant_record(
             db,
             variant_id=variant_id,
             name=payload.name,
-            subject=payload.subject,
-            preheader=payload.preheader,
+            envelope=payload.envelope,
             brand_id=brand_id,
             expected_updated_at=_expected(if_match),
         )
@@ -582,7 +580,7 @@ def update_variant_record(
         raise HTTPException(status_code=404, detail="Variant not found")
     audit.record_from_request(
         request, db, audit.VARIANT_UPDATED, subject_type="variant", subject_id=variant_id,
-        detail={"name": updated.name, "subject": updated.subject, "preheader": updated.preheader},
+        detail={"name": updated.name, "envelope": updated.envelope},
     )
     fence.touch(db, request, variant_id=variant_id)
     return updated
