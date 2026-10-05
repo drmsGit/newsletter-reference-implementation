@@ -434,6 +434,11 @@ def get_content_versions(
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
+    # 404 like every other content route (task-277, ADR-172 point 6). The list
+    # was already brand-scoped, but it answered `[]` for a record that is not
+    # the brand's or not there, which reads the same as "no versions yet".
+    if get_content_record(db, content_record_id, brand_id=brand_id) is None:
+        raise HTTPException(status_code=404, detail="Content record not found")
     return list_versions_for_content(
         db=db,
         content_record_id=content_record_id,

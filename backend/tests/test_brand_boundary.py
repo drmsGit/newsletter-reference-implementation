@@ -190,6 +190,20 @@ class TestContentIsAddressableOnlyWithinItsBrand:
         finally:
             self._remove(record_id)
 
+    def test_a_records_versions_answer_as_absent_from_another_brand(self, foreign_api):
+        """The version list too (task-277): it answered `200 []`, so "no
+        versions yet" and "not yours, or not there" read the same."""
+        record_id = self._default_brand_record()
+        try:
+            with foreign_api([VIEW]) as headers:
+                assert client.get(f"/content/{record_id}/versions", headers=headers).status_code == 404
+                assert client.get("/content/999999999/versions", headers=headers).status_code == 404
+            with machine([VIEW]) as headers:
+                own = client.get(f"/content/{record_id}/versions", headers=headers)
+                assert (own.status_code, own.json()) == (200, []), "a record of one's own with no versions"
+        finally:
+            self._remove(record_id)
+
     def test_a_list_carries_only_the_declared_brands_records(self, foreign_api):
         record_id = self._default_brand_record()
         try:
