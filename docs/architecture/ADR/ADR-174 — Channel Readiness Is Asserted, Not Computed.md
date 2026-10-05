@@ -251,6 +251,30 @@ field and a latest-version lookup.
 
 Nothing above changes this record's Decision section.
 
+## Addendum 2026-10-05 — A hidden field is not a missing one
+
+Prompted by task-218 and recorded in full in
+[[ADR-187 — A Manager Hides Fields Per Module, and Required Means Required When Shown]].
+A manager may hide a field in one module in a variant, and a required field
+may be hideable. In a module where a required field is hidden, the checks in
+this record that read "required" skip it:
+
+- **Point 3's send check** (`missing_required_in_frame`,
+  `missing_required_fields`) does not refuse a send because a hidden field is
+  empty. The frame records which fields were hidden, so the check reads that
+  list from what is sent.
+- **Slot candidacy** (the addendum above, "A slot passes over a record that
+  cannot fill its module", point 1): a record need not fill a field the slot's
+  module hides.
+
+Shown, nothing changes: an empty required field still blocks the send and
+still excludes the record from the slot. The readiness warning (first
+2026-10-05 addendum, point 4) is unaffected, because it judges a record
+against a channel's module types, not against a module in a variant, and so
+has no hidden list to read.
+
+Nothing above changes this record's Decision section.
+
 ## Related ADRs
 
 ### Depends On

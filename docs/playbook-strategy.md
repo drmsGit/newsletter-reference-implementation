@@ -535,6 +535,33 @@ Recorded as addenda to [[ADR-174 — Channel Readiness Is Asserted, Not Computed
 
 **Status:** decided, not built. Build tasks task-283 to task-287. task-206 now depends on task-283 and task-210. The question left open was settled the same day, before task-284 was built: **a slot also skips a record whose latest published version cannot fill the slot's module.** Nothing else checks a slot's pick, because the send check skips slot modules. Recorded as a further addendum to ADR-174.
 
+### 2026-10-05 — Tarrow is the working name, held in one place
+
+**Context:** the product carried five names and none was canonical (task-29). The candidate, Tarrow, is not legally cleared and may change again before anything goes public, so a rename must be quick. Decided with the user one question at a time.
+
+1. **One source of truth, `product.json` at the repository root:** "Tarrow" for display, "tarrow" as the slug. Everything that runs reads it — the API title, the Jinja nav, the React client, the session cookie.
+2. **What cannot read a value carries the name literally** — prose, file names, YAML — and `backend/scripts/rename_product.py` rewrites it in one command; a test keeps retired names out of living files. Dated records keep the names they were written with.
+3. **Kept for later:** the dev database names (task-288), and the GitHub repository and local folder until the name is cleared, when Tarrow gets its own GitHub account.
+
+Recorded in `docs/business/decisions/naming-brand-tarrow.md` (dated entry; still a draft, not adopted).
+
+**Status:** built (task-29).
+
+
+### 2026-10-05 — A manager hides fields within a module
+
+**Context:** the user's brief for the editor asked for hiding elements ("no button, no headline") so one module type gives many layouts. It was never designed, and its queue entry (task-218) had turned it into hiding a whole module. Decided with the user one question at a time.
+
+1. **Each field is an element**, and the module's manifest marks which may be hidden (`hideable`). No element groups.
+2. **The choice lives on the module in the variant**, as a toggle per hideable field; it survives re-binding the record and copies with the variant. Human only for now: no integration or decision engine hides anything.
+3. **A hidden field reaches the template as empty**, removed before the MJML compile; every hideable field must sit inside an `{% if %}` that mentions it, checked when the modules load.
+4. **"Required" means "required when shown"**: the send check, slot candidacy and the picker's note skip a hidden field. Hiding keeps the value.
+5. **Starting set:** image, headline, body and button label in Image Left, Image Right and Single Stack; headline and button label in the Hero Banner.
+
+Recorded in [[ADR-187 — A Manager Hides Fields Per Module, and Required Means Required When Shown]] and [[Element Hiding - final design pass]].
+
+**Status:** decided, not built. Build tasks task-289 to task-291.
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*

@@ -242,6 +242,28 @@ So point 3's descriptor gains an attribute, and `note`'s row is read without
 
 The exact labels live in `storage/fields.json` and are not repeated here.
 
+## Addendum 2026-10-05 — Required per module, when shown
+
+Prompted by task-218 and decided by the user on 2026-10-05, one question at a
+time; recorded in full in
+[[ADR-187 — A Manager Hides Fields Per Module, and Required Means Required When Shown]].
+
+**Point 4 is narrowed, not reversed.** `required` stays a property of
+*(module, field)*, never of the field. It now also has a condition: a manager
+may hide a field in one module in a variant, and in that module a hidden field
+is not required. "Required per module" reads **"required per module, when
+shown"**. Shown, nothing changes.
+
+**The manifest gains a second per-(module, field) attribute beside
+`required`.** `"hideable": true` (default false) declares that a manager may
+hide the field in this module. It belongs in the manifest for the same reason
+point 4 put `required` there: whether a field may be left out is a property of
+the module that uses it, not of the field. It does not enter `fields.json`.
+A field may be both required and hideable, which is what makes "no headline"
+possible.
+
+Nothing above changes this record's Decision section.
+
 ## Related ADRs
 
 ### Depends On
