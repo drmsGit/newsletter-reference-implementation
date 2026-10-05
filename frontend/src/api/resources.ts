@@ -833,6 +833,48 @@ export function useSetContentStatus(recordId: number) {
   })
 }
 
+/**
+ * Mark or unmark a record ready for a channel (ADR-174, task-285). A mark is
+ * its own row and moves no version, but who marked it, when, and the server's
+ * warning come with the record, so the record is re-read — after a refusal
+ * too, so the switch shows what is stored. In the record's write queue, so a
+ * mark lands after a field save in flight and its warning reads that save.
+ */
+export function useMarkReady(recordId: number, channel: string) {
+  const queryClient = useQueryClient()
+  const path = { content_id: recordId, channel }
+  return useMutation({
+    scope: { id: 'composer-content' },
+    mutationFn: (ready: boolean) =>
+      ready
+        ? read(api.PUT('/content/{content_id}/readiness/{channel}', { params: { path } }))
+        : read(api.DELETE('/content/{content_id}/readiness/{channel}', { params: { path } })),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.contentRecord(recordId) }),
+        queryClient.invalidateQueries({ queryKey: [...keys.content, 'page'] }),
+        queryClient.invalidateQueries({ queryKey: [...keys.content, 'picker'] }),
+      ]),
+  })
+}
+
+/**
+ * Turn machine ready on or off (ADR-179 point 2; people only). A column on the
+ * record, so it moves the version as status does, and the record is re-read
+ * for the next field save to state the new one.
+ */
+export function useSetMachineReady(recordId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    scope: { id: 'composer-content' },
+    mutationFn: (machineReady: boolean) =>
+      read(api.PUT('/content/{content_id}/machine-ready', {
+        params: { path: { content_id: recordId } }, body: { machine_ready: machineReady },
+      })),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.contentRecord(recordId) }),
+  })
+}
+
 /** The brands this person may copy the record into (task-50). */
 export function useDuplicateTargets(recordId: number) {
   return useQuery({

@@ -22,6 +22,7 @@ const FIELDS = [
  */
 function server(options: {
   campaigns?: object[]; total?: number; versions?: object[]; reach?: number; assignRefused?: number
+  readinessRefused?: number; machineRefused?: number; hold?: boolean
 } = {}) {
   let clock = 1
   const categories = [
@@ -34,11 +35,53 @@ function server(options: {
       // Stored in an order that is neither declared nor alphabetical.
       content: { legacy_key: 'kept', button_url: 'https://x.test', headline_hero: 'Lisbon' } as Record<string, unknown>,
       updated_at: T(1), latest_version_number: 1 as number | null, unpublished_changes: false,
+      machine_ready: true,
+      readiness: [{ channel: 'email', marked_by: 'ana@example.invalid', marked_at: T(0), warning: null }] as {
+        channel: string; marked_by: string; marked_at: string; warning: string | null
+      }[],
     },
+    reads: 0,
   }
   const writes: Request[] = []
+  // A test that must see a change while it is still being saved holds the
+  // answers to readiness and machine-ready writes until it lets them go.
+  let release = () => {}
+  const held = () => options.hold ? new Promise<void>((resolve) => { release = resolve }) : Promise.resolve()
+  // Marks live in their own table on the real server: marking moves no
+  // version, and the warning is the server's, read back with the record.
+  const mark = (channel: string) => async (request: Request) => {
+    writes.push(request.clone())
+    await held()
+    if (options.readinessRefused) return jsonResponse({ detail: 'No channel here' }, options.readinessRefused)
+    const row = {
+      channel, marked_by: 'manager@example.invalid', marked_at: T(30),
+      warning: state.record.content.push_title ? null : 'Marked ready for Push, but Notification title is empty',
+    }
+    state.record.readiness = [...state.record.readiness.filter((r) => r.channel !== channel), row]
+    return jsonResponse(row)
+  }
+  const unmark = (channel: string) => (request: Request) => {
+    writes.push(request.clone())
+    state.record.readiness = state.record.readiness.filter((r) => r.channel !== channel)
+    return new Response(null, { status: 204 })
+  }
   const handlers = {
-    'GET /content/42': () => jsonResponse(state.record),
+    'GET /content/42': () => {
+      state.reads++
+      return jsonResponse(state.record)
+    },
+    'PUT /content/42/readiness/push': mark('push'),
+    'PUT /content/42/readiness/email': mark('email'),
+    'DELETE /content/42/readiness/push': unmark('push'),
+    'DELETE /content/42/readiness/email': unmark('email'),
+    'PUT /content/42/machine-ready': async (request: Request) => {
+      writes.push(request.clone())
+      await held()
+      if (options.machineRefused) return jsonResponse({ detail: 'People only' }, options.machineRefused)
+      // A column on the record, so the version moves — as on the real server.
+      Object.assign(state.record, { machine_ready: (await request.json()).machine_ready, updated_at: T(++clock) })
+      return jsonResponse({ machine_ready: state.record.machine_ready })
+    },
     'GET /content/fields': () => jsonResponse(FIELDS),
     'GET /content/42/campaigns': () =>
       jsonResponse(page(options.campaigns ?? [], { total: options.total ?? (options.campaigns ?? []).length })),
@@ -101,7 +144,7 @@ function server(options: {
       return new Response(null, { status: 204 })
     },
   }
-  return { state, writes, handlers }
+  return { state, writes, handlers, release: () => release() }
 }
 
 function open(handlers: Record<string, (request: Request) => Response | Promise<Response>>) {
@@ -159,7 +202,8 @@ describe('writing a record (task-279)', () => {
     open(handlers)
     const email = (await screen.findByRole('heading', { name: 'Email' })).closest('details') as HTMLElement
     expect(email).toHaveAttribute('open')
-    const labels = [...email.querySelectorAll('label')].map((l) => l.textContent)
+    // The fields' labels; the Ready switch is a label too (task-285).
+    const labels = [...email.querySelectorAll('label:not(.react-aria-Switch)')].map((l) => l.textContent)
     expect(labels).toEqual(['Hero headline', 'Button link'])
     expect(screen.getByRole('heading', { name: 'Push' })).toBeInTheDocument()
     const other = screen.getByRole('region', { name: 'Other stored values' })
@@ -309,5 +353,109 @@ describe('where a record is used (task-267)', () => {
     open(server({ campaigns: [{ id: 1, name: 'Spring', variants: [{ id: 3, name: 'A', channel: 'email', stage: 'sent' }] }],
       total: 51 }).handlers)
     expect(await screen.findByText('Showing 1 of 51 campaigns.')).toBeInTheDocument()
+  })
+})
+
+describe('readiness per channel and machine ready (task-285)', () => {
+  const channel = async (name: string) =>
+    (await screen.findByRole('heading', { name })).closest('details') as HTMLElement
+
+  it('gives each channel section a Ready switch saying who marked it and when', async () => {
+    open(server().handlers)
+    const email = await channel('Email')
+    expect(within(email).getByRole('switch', { name: 'Ready for Email' })).toBeChecked()
+    expect(within(email).getByText(/Marked ready by ana@example\.invalid/)).toBeInTheDocument()
+    const push = await channel('Push')
+    expect(within(push).getByRole('switch', { name: 'Ready for Push' })).not.toBeChecked()
+    expect(within(push).queryByText(/Marked ready by/)).not.toBeInTheDocument()
+  })
+
+  it('marks a channel, re-reads the record and shows the server\'s warning, which does not block', async () => {
+    const { handlers, writes, state } = server()
+    open(handlers)
+    const push = await channel('Push')
+    const before = state.reads
+    fireEvent.click(within(push).getByRole('switch', { name: 'Ready for Push' }))
+    expect(await within(push).findByText('Marked ready for Push, but Notification title is empty')).toBeInTheDocument()
+    expect(within(push).getByRole('switch', { name: 'Ready for Push' })).toBeChecked()
+    expect(within(push).getByText(/Marked ready by manager@example\.invalid/)).toBeInTheDocument()
+    expect(state.reads).toBeGreaterThan(before)
+    expect(writes.map((w) => `${w.method} ${new URL(w.url).pathname}`)).toEqual(['PUT /content/42/readiness/push'])
+    // A warning informs; the field is still there to fill (ADR-174 point 2).
+    expect(within(push).getByLabelText('Notification title')).toBeEnabled()
+  })
+
+  it('unmarks a channel', async () => {
+    const { handlers, writes } = server()
+    open(handlers)
+    const email = await channel('Email')
+    fireEvent.click(within(email).getByRole('switch', { name: 'Ready for Email' }))
+    await waitFor(() => expect(within(email).getByRole('switch', { name: 'Ready for Email' })).not.toBeChecked())
+    expect(within(email).queryByText(/Marked ready by/)).not.toBeInTheDocument()
+    expect(writes.map((w) => `${w.method} ${new URL(w.url).pathname}`)).toEqual(['DELETE /content/42/readiness/email'])
+  })
+
+  it('shows a refused mark in place, in that channel\'s section', async () => {
+    open(server({ readinessRefused: 404 }).handlers)
+    const push = await channel('Push')
+    fireEvent.click(within(push).getByRole('switch', { name: 'Ready for Push' }))
+    expect(await within(push).findByRole('alert')).toHaveTextContent('Not saved: No channel here')
+    expect(within(push).getByRole('switch', { name: 'Ready for Push' })).not.toBeChecked()
+  })
+
+  it('has a Machine ready switch by the status, saying what it means', async () => {
+    open(server().handlers)
+    const machine = await screen.findByRole('switch', { name: 'Machine ready' })
+    expect(machine).toBeChecked()
+    expect(machine.closest('.record-actions')).toBeInTheDocument()
+    expect(screen.getByText(/may a decision slot pick this without a person choosing it/i)).toBeInTheDocument()
+  })
+
+  it('turns machine ready off, and the next field save states the version that change produced', async () => {
+    const { handlers, writes } = server()
+    open(handlers)
+    fireEvent.click(await screen.findByRole('switch', { name: 'Machine ready' }))
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'Machine ready' })).not.toBeChecked())
+    expect(await writes[0].json()).toEqual({ machine_ready: false })
+    await edit('Hero headline', 'After')
+    await waitFor(() => expect(writes).toHaveLength(2))
+    expect(writes[1].headers.get('If-Match')).toBe(T(2))
+  })
+
+  it('turns machine ready on for a record that is not', async () => {
+    const { handlers, writes, state } = server()
+    state.record.machine_ready = false
+    open(handlers)
+    const machine = await screen.findByRole('switch', { name: 'Machine ready' })
+    expect(machine).not.toBeChecked()
+    fireEvent.click(machine)
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'Machine ready' })).toBeChecked())
+    expect(await writes[0].json()).toEqual({ machine_ready: true })
+  })
+
+  it('keeps a switch focused while its change is saved, so the keyboard does not lose its place', async () => {
+    const { handlers, release } = server({ hold: true })
+    open(handlers)
+    const push = await channel('Push')
+    const ready = within(push).getByRole('switch', { name: 'Ready for Push' })
+    const machine = screen.getByRole('switch', { name: 'Machine ready' })
+    for (const toggle of [ready, machine]) {
+      toggle.focus()
+      fireEvent.click(toggle)
+      // Saving: the switch takes no second change, but stays enabled — a
+      // disabled input drops focus to the page.
+      await waitFor(() => expect(toggle.closest('label')).toHaveAttribute('data-readonly'))
+      expect(toggle).toBeEnabled()
+      expect(toggle).toHaveFocus()
+      release()
+      await waitFor(() => expect(toggle.closest('label')).not.toHaveAttribute('data-readonly'))
+    }
+  })
+
+  it('shows a refused machine-ready change in place and leaves the switch as it was', async () => {
+    open(server({ machineRefused: 403 }).handlers)
+    fireEvent.click(await screen.findByRole('switch', { name: 'Machine ready' }))
+    expect(await screen.findByText('You do not have permission to change machine ready.')).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: 'Machine ready' })).toBeChecked()
   })
 })

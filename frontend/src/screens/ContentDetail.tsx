@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button } from 'react-aria-components'
+import { Button, Switch } from 'react-aria-components'
 import { Link, useNavigate, useParams } from 'react-router'
 
 import {
@@ -12,8 +12,10 @@ import {
   useDuplicateContent,
   useDuplicateTargets,
   useEditAssignments,
+  useMarkReady,
   useSaveContentRecord,
   useSetContentStatus,
+  useSetMachineReady,
   type ContentRecordDetail,
 } from '../api/resources'
 import CategoryChoice from '../components/CategoryChoice'
@@ -40,6 +42,8 @@ type ContentField = NonNullable<ReturnType<typeof useContentFields>['data']>[num
  *   declared order (MW Q2, task-276).
  * - Status and duplicate now; delete waits for task-117 (7).
  * - Categories with their 1-10 scores, changed in place (5, task-280).
+ * - A Ready switch per channel and a Machine ready switch by the status
+ *   (task-285, the Channel Readiness final design pass).
  */
 export default function ContentDetail() {
   const { id } = useParams()
@@ -123,7 +127,7 @@ function RecordPage({
           <summary>
             <h2>{channel.charAt(0).toUpperCase() + channel.slice(1)}</h2>
           </summary>
-          {/* The per-channel readiness mark goes here (task-282). */}
+          {channel !== 'other' && <ReadyFor record={record} channel={channel} />}
           {fields
             .filter((f) => (f.channel ?? 'other') === channel)
             .map((field) => (
@@ -202,6 +206,7 @@ function StatusAndDuplicate({ record }: { record: ContentRecordDetail }) {
         <span className="muted"> Inactive records are not offered by the picker or chosen by a slot.</span>
       )}
       <SaveState mutation={status} what="the record" />
+      <MachineReady record={record} />
       {options.length > 0 && chosen && (
         <div className="record-duplicate">
           <Choice
@@ -235,6 +240,50 @@ function StatusAndDuplicate({ record }: { record: ContentRecordDetail }) {
           <SaveState mutation={duplicate} what="the copy" />
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * A person's assertion that the record may go out on this channel (ADR-174).
+ * The warning is the server's — it fires when the record can fill no module of
+ * the channel — and it informs, never blocks (point 2). The switch shows what
+ * is stored: it moves once the record has been re-read, not before. Read-only
+ * while a change is saved, never disabled: a disabled input drops keyboard
+ * focus to the page.
+ */
+function ReadyFor({ record, channel }: { record: ContentRecordDetail; channel: string }) {
+  const mark = useMarkReady(record.id, channel)
+  const stored = record.readiness.find((r) => r.channel === channel)
+  const title = channel.charAt(0).toUpperCase() + channel.slice(1)
+  return (
+    <div className="readiness">
+      <Switch isSelected={!!stored} isReadOnly={mark.isPending} onChange={(ready) => mark.mutate(ready)}>
+        <span className="switch__indicator" aria-hidden="true" />
+        Ready for {title}
+      </Switch>
+      {stored && (
+        <p className="muted">
+          Marked ready by {stored.marked_by ?? 'unknown'} · {new Date(stored.marked_at).toLocaleString()}
+        </p>
+      )}
+      {stored?.warning && <p className="readiness__warning">{stored.warning}</p>}
+      <SaveState mutation={mark} what={`readiness for ${title}`} />
+    </div>
+  )
+}
+
+/** ADR-179 point 2: the human gate on what a machine may pick. People only. */
+function MachineReady({ record }: { record: ContentRecordDetail }) {
+  const set = useSetMachineReady(record.id)
+  return (
+    <div className="readiness">
+      <Switch isSelected={record.machine_ready} isReadOnly={set.isPending} onChange={(on) => set.mutate(on)}>
+        <span className="switch__indicator" aria-hidden="true" />
+        Machine ready
+      </Switch>
+      <span className="muted"> May a decision slot pick this without a person choosing it.</span>
+      <SaveState mutation={set} what="machine ready" />
     </div>
   )
 }
