@@ -148,11 +148,14 @@ def content_field_groups() -> dict[str, tuple[str, ...]]:
 
 #: Groups where an EMPTY value means "remove the key", not "store an empty one".
 #:
-#: ADR-161 point 7's rider makes catalogue readiness exactly "push fields not
-#: empty", so a stored `""` would leave every record looking push-ready — the
-#: difference between "not prepared for push" and "prepared with nothing in
-#: it". Email carries no such predicate, so an empty string there is merely an
-#: empty string and is stored as written.
+#: An absent push field means nothing was written for push; a stored `""`
+#: would say somebody wrote push copy and left it blank — the difference
+#: between "not prepared for push" and "prepared with nothing in it". The
+#: Jinja record page reads exactly that ("Nothing written for this channel
+#: yet" is key presence). It once also guarded readiness, when ADR-161 point
+#: 7's rider defined that as "push fields not empty"; readiness is a person's
+#: mark since ADR-174, so that reason is gone and this one stands. Email
+#: carries no such distinction, so an empty string there is stored as written.
 #:
 #: This asymmetry is deliberate and was preserved rather than tidied when the
 #: rule moved out of the router: unifying on "always remove" would be simpler
@@ -169,9 +172,8 @@ def without_empty_presence_fields(content: dict | None) -> dict:
     whole — `create_content` and `update_content_record`, which `POST /content/`
     and `PUT /content/{id}` reach with the client's dict verbatim. Until
     2026-10-02 the rule was enforced only by the Jinja form's own loop, so a
-    JSON client posting `"push_title": ""` made the record look push-ready
-    (ADR-161 point 7's rider) and the Jinja UI's deletion would have taken the
-    only enforcement with it.
+    JSON client posting `"push_title": ""` stored blank push copy, and the
+    Jinja UI's deletion would have taken the only enforcement with it.
 
     Values are stripped when kept, as the merge does. Keys in no group are
     untouched; the input is not mutated.

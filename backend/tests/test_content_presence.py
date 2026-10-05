@@ -1,8 +1,9 @@
 """An empty push field is absent, not blank — on every write path (task-50, B18).
 
-ADR-161 point 7's rider makes catalogue readiness exactly "push fields not
-empty". A stored `""` would make a record look prepared for a channel nobody
-prepared it for. The Jinja form and `PATCH` already honoured that; `POST
+An absent push field means nothing was written for push; a stored `""`
+would make a record look prepared for a channel nobody prepared it for
+(`PRESENCE_SIGNIFICANT_GROUPS`). Readiness itself is a person's mark since
+ADR-174, not field presence. The Jinja form and `PATCH` already honoured that; `POST
 /content/` and `PUT /content/{id}` stored the client's dict verbatim, so the
 SPA — the client that replaces the Jinja UI — would have broken it.
 """

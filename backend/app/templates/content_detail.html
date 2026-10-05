@@ -46,6 +46,32 @@
     </div>
 </div>
 
+{# Readiness, read-only (task-287, ADR-174's 2026-10-05 addendum point 7): a
+   person's mark per channel, never derived from filled fields (point 1). The
+   warning is the server's and only informs (point 2). Marked in the React
+   client, so no form here. #}
+<section id="readiness" class="card mb-4" aria-labelledby="readiness-heading">
+    <div class="card-body">
+        <h2 id="readiness-heading" class="h6">Readiness</h2>
+        <ul class="list-unstyled mb-2">
+            {% for row in readiness %}
+            <li class="mb-1">
+                <strong>{{ row.title }}:</strong>
+                {% if row.mark %}
+                ready <span class="text-muted">— Marked ready by {{ row.mark.marked_by or "unknown" }}, {{ row.mark.marked_at.strftime("%Y-%m-%d %H:%M") }}</span>
+                {% if row.mark.warning %}<div class="small text-warning-emphasis">{{ row.mark.warning }}</div>{% endif %}
+                {% else %}
+                <span class="text-muted">Not marked ready</span>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        <p class="mb-1">Machine ready: {{ "yes" if record.machine_ready else "no" }}
+            <span class="text-muted small">— may a decision slot pick this without a person choosing it</span></p>
+        <p class="small text-muted mb-0">Readiness is marked in the manager client.</p>
+    </div>
+</section>
+
 {% if error %}
 <div class="alert alert-danger" role="alert">
     {{ error }}
@@ -125,21 +151,6 @@
                     </tr>
                     {% endfor %}
                 </table>
-                {# **No readiness verdict here, deliberately.** An earlier
-                   version showed "push-ready" / "not push-ready", and it was
-                   wrong twice over. Whether a record may be used is gated by
-                   the manager activating it and freezing a version — a badge
-                   claiming readiness beside a draft asserts a status nobody
-                   granted. And per-record readiness is not even well defined:
-                   `required` belongs to a MODULE's manifest variable, not to
-                   the record, so a record with no headline cannot fill
-                   `single_stack` and fills `cta` perfectly well. "Ready" has
-                   no meaning until a module is named.
-
-                   ADR-161 point 7's rider does define catalogue readiness as
-                   "channel fields not empty" — but that is a candidate filter
-                   for decision slots, which is not built. It belongs on the
-                   slot, where a module is in scope, not on the record. #}
                 {% if not section.fields | map(attribute="name")
                        | select("in", record.content | list) | list %}
                 <p class="small text-muted mb-0 mt-2">

@@ -686,15 +686,10 @@ def _channel_authoring_sections(db: Session) -> list[dict]:
     60-character headline at render time is the rendering-time transformation
     point 1 rejects: a notification is not a shortened email.
 
-    **This returns fields, never a readiness verdict, and that is deliberate.**
-    Whether a record may be used at all is gated by the manager activating it
-    and freezing a version — a "ready" badge beside a draft asserts a status
-    nobody granted. And `required` belongs to a *module's* manifest variable,
-    not to the record: a record with no headline cannot fill `single_stack`
-    and fills `cta` perfectly well, so readiness is meaningless until a module
-    is named. ADR-161 point 7's catalogue-readiness rider is a candidate filter
-    for decision slots, where a module IS in scope. It is not a record badge,
-    and an earlier version of this page made it one.
+    **This returns fields; readiness is not derived from them.** A record is
+    ready for a channel when a person marks it so (ADR-174 point 1), and the
+    detail page shows those marks (`_readiness_rows`). Filling every push field
+    marks nothing.
 
     Email is deliberately absent: its fields are the form's hand-written
     section, with labels and placeholders a manifest does not carry. That
@@ -2085,8 +2080,24 @@ def content_detail(
                 enforced=getattr(request.state, "auth_enforced", True),
             ),
             "channel_sections": _channel_authoring_sections(db),
+            "readiness": _readiness_rows(db, record),
         },
     )
+
+
+def _readiness_rows(db: Session, record: ContentRecordDB) -> list[dict]:
+    """Per channel, whether a person marked the record ready, with who, when
+    and the server's warning (ADR-174; task-287). Read-only: marking happens in
+    the React client (ADR-174's 2026-10-05 addendum point 7). Every channel this
+    deployment may select, plus any marked channel since switched off — a mark
+    is shown wherever it exists."""
+    from app.content.service import readiness_of
+
+    marks = {row["channel"]: row for row in readiness_of(db, record)}
+    names = [c.name for c in available_channels(db)]
+    names += sorted(set(marks) - set(names))
+    # Named as the React record page heads its channel sections ("Push").
+    return [{"title": name.capitalize(), "mark": marks.get(name)} for name in names]
 
 
 @router.post("/ui/content/{content_record_id}/set-status")
@@ -2170,11 +2181,10 @@ def content_create(
         "image_url": image_url,
         "image_alt": image_alt,
     }
-    # Only stored when actually written. An empty push_title is the difference
-    # between "not prepared for push" and "prepared with nothing in it", and
-    # ADR-161 point 7's rider makes catalogue readiness exactly "push fields
-    # not empty" — so writing empty strings would make every record look
-    # push-ready.
+    # Only stored when actually written. An absent push_title means nothing
+    # was written for push; a stored "" would say somebody wrote push copy and
+    # left it blank (`PRESENCE_SIGNIFICANT_GROUPS`). Readiness is a person's
+    # mark (ADR-174), not this.
     for name, value in (
         ("push_title", push_title), ("push_body", push_body),
         ("push_image_url", push_image_url), ("push_link", push_link),

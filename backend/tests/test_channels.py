@@ -968,10 +968,8 @@ class TestPushContentIsAuthoredNotDerived:
             self._cleanup(db, user)
 
     def test_an_empty_push_title_is_absent_rather_than_blank(self, db, monkeypatch):
-        """ADR-161 point 7's rider makes catalogue readiness "push fields not
-        empty". Storing "" would make every record in the catalogue look
-        push-ready, and a decision slot filtering on it would select copy that
-        says nothing."""
+        """Absent means nothing was written for push; a stored "" would say
+        push copy was written blank (`PRESENCE_SIGNIFICANT_GROUPS`)."""
         monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
         from app.content.db_models import ContentRecordDB
 
@@ -1163,15 +1161,14 @@ class TestTheContentOverviewShowsEveryChannelsCopy:
                 "a shortened email, and presenting one as the other is exactly "
                 "what ADR-160 point 3 refuses"
             )
-            # A neutral statement of fact, NOT a readiness verdict. An earlier
-            # version said "not push-ready", which asserts a status the manager
-            # alone grants by activating the record and freezing a version —
-            # and which is undefined per-record anyway, since `required` lives
-            # on a module's manifest variable rather than on the record.
+            # A neutral statement of fact, NOT a readiness verdict. Readiness
+            # is a person's mark, shown in its own block (ADR-174 point 1,
+            # task-287); the channel's fields say what is written, never
+            # whether the record is ready.
             assert "Nothing written for this channel yet" in page.text
             assert "ready" not in read_pane.lower(), (
-                "a readiness verdict came back — usability is gated by "
-                "activation and a frozen version, not by which fields are full"
+                "the push fields pane spoke of readiness — readiness is a "
+                "person's mark, not which fields are full"
             )
         finally:
             self._cleanup(db, user, [record.id])
@@ -1198,24 +1195,16 @@ class TestTheContentOverviewShowsEveryChannelsCopy:
             self._cleanup(db, user, [record.id])
 
 
-class TestNoReadinessVerdictIsClaimed:
-    """Corrected 2026-09-17 after the user pushed back on a "ready" badge.
+class TestReadinessIsShownAsMarked:
+    """The Jinja record page shows readiness read-only (task-287, ADR-174's
+    2026-10-05 addendum point 7): per channel, whether a person marked it ready,
+    who and when, and the server's warning; and machine ready. Marking happens
+    in the React client, so there is no form for it here.
 
-    Three reasons it had to go, and the third is the one that kills the concept
-    rather than the wording:
-
-      1. **Inconsistent** — push carried a badge and email did not.
-      2. **It asserts a status nobody granted.** Whether a record may be used
-         is gated by the manager activating it and freezing a version. "Ready"
-         beside an inactive draft is simply false.
-      3. **Per-record readiness is undefined.** `required` belongs to a
-         MODULE's manifest variable. A record with no `headline_medium` cannot
-         fill `single_stack` and fills `cta` perfectly well — so the question
-         has no answer until a module is named.
-
-    ADR-161 point 7's catalogue-readiness rider is not contradicted by this: it
-    describes a candidate filter for decision slots, where a module is in
-    scope. It was turned into a record badge here, which is a different claim.
+    It replaces a 2026-09-17 test that pinned "no readiness verdict at all",
+    written when readiness was derived from filled fields. ADR-174 point 1 made
+    it a person's assertion, so the old test's real point survives as the
+    first case: filled fields still make nothing "ready".
     """
 
     def _admin(self, db):
@@ -1235,9 +1224,11 @@ class TestNoReadinessVerdictIsClaimed:
         return client, token, user
 
     def _cleanup(self, db, user, record_ids=()):
-        from app.content.db_models import ContentRecordDB
+        from app.content.db_models import ContentChannelReadinessDB, ContentRecordDB
 
         if record_ids:
+            db.query(ContentChannelReadinessDB).filter(
+                ContentChannelReadinessDB.content_id.in_(record_ids)).delete(synchronize_session=False)
             db.query(ContentRecordDB).filter(
                 ContentRecordDB.id.in_(record_ids)).delete(synchronize_session=False)
         db.query(SessionDB).filter(SessionDB.user_id == user.id).delete()
@@ -1247,55 +1238,79 @@ class TestNoReadinessVerdictIsClaimed:
         db.query(UserDB).filter(UserDB.id == user.id).delete()
         db.commit()
 
-    def test_a_fully_filled_record_is_not_called_ready(self, db, monkeypatch):
-        """The case that prompted the correction: every push field written, on
-        a record the manager has not published a version of."""
+    def _section(self, page):
+        """The readiness block, so an assertion cannot pass on text elsewhere."""
+        text = page.text
+        start = text.index('id="readiness"')
+        return text[start:text.index("</section>", start)]
+
+    def test_filled_fields_make_nothing_ready(self, db, monkeypatch):
+        """Every push field written, nothing marked: not ready (ADR-174 point 1)."""
         monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
-        from app.content.db_models import ContentVersionDB
         from app.content.service import create_content
 
         client, token, user = self._admin(db)
         record = create_content(
             db, title=_name("complete"), brand_id=auth.ensure_default_brand(db).id,
-            content={"headline_medium": "Full", "body_medium": "Everything filled.",
-                     "push_title": "Full", "push_body": "Everything filled.",
-                     "push_image_url": "https://x.example/i.jpg",
-                     "push_link": "https://x.example"})
+            content={"headline_medium": "Full", "push_title": "Full", "push_body": "Everything filled."})
         try:
-            assert db.query(ContentVersionDB).filter(
-                ContentVersionDB.content_record_id == record.id).count() == 0, (
-                "fixture assumption: this record has no frozen version, so any "
-                "claim that it is usable is false"
-            )
-            page = client.get(f"/ui/content/{record.id}")
-            assert page.status_code == 200
-            assert ">ready<" not in page.text, (
-                "a record with no frozen version was labelled ready — usability "
-                "is granted by activating and publishing, not by filling fields"
-            )
-            assert "-ready" not in page.text
+            block = self._section(client.get(f"/ui/content/{record.id}"))
+            assert "Push" in block and "Email" in block
+            assert block.count("Not marked ready") == 2
+            assert "Marked ready by" not in block
+            assert "Machine ready: no" in block, "a new record starts not machine ready"
         finally:
             self._cleanup(db, user, [record.id])
 
-    def test_a_partially_filled_record_is_not_called_unready_either(
-        self, db, monkeypatch
-    ):
-        """The user's layout point: half the email fields is perfectly workable
-        for a module that does not declare the rest, so calling the record
-        unready would be wrong in the other direction."""
+    def test_a_mark_shows_who_when_and_the_servers_warning(self, db, monkeypatch):
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        from app.content.service import create_content, mark_ready, set_machine_ready
+
+        client, token, user = self._admin(db)
+        brand = auth.ensure_default_brand(db).id
+        record = create_content(db, title=_name("marked"), brand_id=brand,
+                                content={"headline_medium": "Only email copy"})
+        try:
+            mark_ready(db, record.id, "push", marked_by="ana@example.invalid", brand_id=brand)
+            set_machine_ready(db, record.id, True, brand_id=brand)
+            block = self._section(client.get(f"/ui/content/{record.id}"))
+            assert "Marked ready by ana@example.invalid" in block
+            assert "Marked ready for Push, but Notification title and Notification text are empty" in block
+            assert block.count("Not marked ready") == 1, "email is not marked"
+            assert "Machine ready: yes" in block
+        finally:
+            self._cleanup(db, user, [record.id])
+
+    def test_a_mark_on_a_channel_switched_off_since_is_still_shown(self, db, monkeypatch):
+        """A mark is shown wherever it exists; hiding it would hide a fact."""
+        monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
+        from app.content.service import create_content, mark_ready
+
+        client, token, user = self._admin(db)
+        brand = auth.ensure_default_brand(db).id
+        record = create_content(db, title=_name("offchannel"), brand_id=brand, content={})
+        mark_ready(db, record.id, "push", marked_by="ana@example.invalid", brand_id=brand)
+        set_channel_available(db, "push", False)
+        try:
+            block = self._section(client.get(f"/ui/content/{record.id}"))
+            assert "Push" in block and "Marked ready by ana@example.invalid" in block
+        finally:
+            set_channel_available(db, "push", True)
+            self._cleanup(db, user, [record.id])
+
+    def test_nothing_on_the_page_changes_readiness(self, db, monkeypatch):
         monkeypatch.setenv("SYSTEM_MAIL_PROVIDER", "mock")
         from app.content.service import create_content
 
         client, token, user = self._admin(db)
-        record = create_content(
-            db, title=_name("partial"), brand_id=auth.ensure_default_brand(db).id,
-            content={"headline_medium": "Half", "push_title": "Half"})
+        record = create_content(db, title=_name("readonly"), brand_id=auth.ensure_default_brand(db).id,
+                                content={})
         try:
             page = client.get(f"/ui/content/{record.id}")
-            assert "-ready" not in page.text, (
-                "a record missing one optional field was declared unready, but "
-                "which fields matter is the module's business, not the record's"
-            )
+            block = self._section(page)
+            assert "<form" not in block and "<input" not in block and "<button" not in block
+            assert "manager client" in block, "it says where readiness is marked"
+            assert "No readiness verdict" not in page.text
         finally:
             self._cleanup(db, user, [record.id])
 
@@ -2616,9 +2631,8 @@ class TestTheMergeRuleIsReachableFromBothPlanes:
         )
 
         assert "push_title" not in merged, (
-            "an empty push field must be removed, not stored as '' — ADR-161 "
-            "point 7 makes readiness 'push fields not empty', so a blank string "
-            "leaves the record looking push-ready"
+            "an empty push field must be removed, not stored as '' — a blank "
+            "string says push copy was written when none was"
         )
 
     def test_an_empty_email_field_is_stored_rather_than_removed(self):
