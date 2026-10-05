@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, JSON, func, UniqueConstraint
+from sqlalchemy import CheckConstraint, Column, Integer, String, ForeignKey, DateTime, JSON, func, UniqueConstraint
 
 from app.database import Base
 
@@ -54,6 +54,10 @@ class ContentCategoryAssignmentDB(Base):
             "content_id", "category_id",
             name="uq_content_category_assignments_content_category",
         ),
+        # A whole number from 1 (barely in the category) to 10 (squarely), for
+        # every caller — ADR-080's 2026-10-04 addendum, held by the database so
+        # no code path can store another (task-278, migration 0031).
+        CheckConstraint("score BETWEEN 1 AND 10", name="ck_content_category_assignments_score_range"),
     )
 
     id = Column(Integer, primary_key=True, index=True)

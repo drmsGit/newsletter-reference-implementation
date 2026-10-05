@@ -427,7 +427,11 @@ export interface paths {
         delete: operations["delete_content_assignment_content__content_id__assignments__assignment_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Change one assignment's score in place
+         * @description 1 to 10 (ADR-080's 2026-10-04 addendum). Through the record, within the working brand: another record's or another brand's assignment is not found. In place, so the record never drops out of the category mid-change.
+         */
+        patch: operations["change_assignment_score_content__content_id__assignments__assignment_id__patch"];
         trace?: never;
     };
     "/content/{content_id}/usage": {
@@ -3317,6 +3321,15 @@ export interface components {
              * Score
              * @default 10
              */
+            score: number;
+        };
+        /**
+         * ContentCategoryAssignmentScore
+         * @description Change an assignment's score in place (task-278), so the record never
+         *     drops out of the category the way remove-and-re-add made it.
+         */
+        ContentCategoryAssignmentScore: {
+            /** Score */
             score: number;
         };
         /** ContentCreate */
@@ -6755,6 +6768,42 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_assignment_score_content__content_id__assignments__assignment_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                content_id: number;
+                assignment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContentCategoryAssignmentScore"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentCategoryAssignment"];
+                };
             };
             /** @description Validation Error */
             422: {

@@ -780,8 +780,10 @@ class TestSlotCandidateCount:
             ContentCategoryAssignmentDB(content_id=a.id, category_id=one.id, score=9),
             ContentCategoryAssignmentDB(content_id=a.id, category_id=two.id, score=1),
             ContentCategoryAssignmentDB(content_id=b.id, category_id=two.id, score=5),
-            ContentCategoryAssignmentDB(content_id=retired.id, category_id=one.id, score=99),
-            ContentCategoryAssignmentDB(content_id=elsewhere.id, category_id=one.id, score=99),
+            # The highest score there is (1-10 since task-278), so either would
+            # win the slot if the status or brand filter ever let it through.
+            ContentCategoryAssignmentDB(content_id=retired.id, category_id=one.id, score=10),
+            ContentCategoryAssignmentDB(content_id=elsewhere.id, category_id=one.id, score=10),
         ]
         db.add_all(assignments); db.flush()
 

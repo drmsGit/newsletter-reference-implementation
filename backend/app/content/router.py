@@ -32,6 +32,7 @@ from app.content.models import (
     CategoryRelationCreate,
     ContentCategoryAssignment,
     ContentCategoryAssignmentCreate,
+    ContentCategoryAssignmentScore,
     ContentVersion,
     ContentVersionCreate,
     ContentStatusUpdate,
@@ -583,6 +584,37 @@ def get_content_assignments(
     if rows is None:
         raise HTTPException(status_code=404, detail="Content record not found")
     return rows
+
+
+@router.patch(
+    "/{content_id}/assignments/{assignment_id}",
+    response_model=ContentCategoryAssignment,
+    summary="Change one assignment's score in place",
+    description=(
+        "1 to 10 (ADR-080's 2026-10-04 addendum). Through the record, within the "
+        "working brand: another record's or another brand's assignment is not found. "
+        "In place, so the record never drops out of the category mid-change."
+    ),
+)
+def change_assignment_score(
+    content_id: int, assignment_id: int, payload: ContentCategoryAssignmentScore, request: Request,
+    db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.content.service import set_assignment_score
+
+    changed = set_assignment_score(db, content_id, assignment_id, payload.score, brand_id=brand_id)
+    if changed is None:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    before, after = changed
+    if before["score"] != after["score"]:
+        _record_content_write(request, db, audit.CONTENT_CATEGORY_SCORE_CHANGED, content_id, {
+            "category_id": after["category_id"], "category": after["category"],
+            "from": before["score"], "to": after["score"],
+        })
+    return ContentCategoryAssignment(
+        id=assignment_id, content_id=content_id,
+        category_id=after["category_id"], score=after["score"],
+    )
 
 
 @router.delete(

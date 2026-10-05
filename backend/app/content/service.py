@@ -747,6 +747,43 @@ def delete_category_assignment(
     return removed
 
 
+def check_score(score) -> None:
+    """Refuse a category score outside 1-10 (ADR-080's 2026-10-04 addendum).
+    Zero is refused with the rest: "no relevance" is no assignment at all."""
+    from app.content.models import SCORE_MAX, SCORE_MIN
+
+    if not isinstance(score, int) or isinstance(score, bool) or not SCORE_MIN <= score <= SCORE_MAX:
+        raise ValueError(
+            f"A category score is a whole number from {SCORE_MIN} to {SCORE_MAX}, not {score!r}"
+        )
+
+
+def set_assignment_score(
+    db: Session, content_id: int, assignment_id: int, score: int, *, brand_id: int,
+) -> tuple[dict, dict] | None:
+    """Change one assignment's score in place (task-278), selected through the
+    record within the brand, as `delete_category_assignment` is. Returns the
+    assignment before and after, for the audit entry, or None if not found."""
+    check_score(score)
+    assignment = (
+        db.query(ContentCategoryAssignmentDB)
+        .join(ContentRecordDB, ContentRecordDB.id == ContentCategoryAssignmentDB.content_id)
+        .filter(
+            ContentCategoryAssignmentDB.id == assignment_id,
+            ContentCategoryAssignmentDB.content_id == content_id,
+            ContentRecordDB.brand_id == brand_id,
+        )
+        .first()
+    )
+    if assignment is None:
+        return None
+    before = assignment_summary(db, assignment)
+    assignment.score = score
+    db.commit()
+    db.refresh(assignment)
+    return before, assignment_summary(db, assignment)
+
+
 def assignment_summary(db: Session, assignment: ContentCategoryAssignmentDB) -> dict:
     """An assignment as the audit log records it: which category, by name as
     well as id (a renamed or deleted category must still read), and the score."""
@@ -802,12 +839,11 @@ def assign_category_to_content(
     against nothing here; `content_id` is the brand-owned half and is resolved
     through the scoped getter.
     """
-    # A score of exactly zero is degenerate/meaningless — "no relevance"
-    # should mean no assignment row at all, not a stored zero. (The 0-10
-    # range itself is a POC-only convention, not enforced here — that's
-    # future config-layer work, Insight Q2.)
-    if score == 0:
-        raise ValueError("Category assignment score must not be zero — omit the assignment instead")
+    # 1 to 10, refused not clamped (ADR-080's 2026-10-04 addendum, task-278).
+    # **Checked here, before the insert, not left to the database's CHECK:**
+    # the IntegrityError handler below answers "already assigned", so a bad
+    # score reaching the insert would be reported as a duplicate.
+    check_score(score)
 
     if get_content_record(db, content_id, brand_id=brand_id) is None:
         return None

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Any
 
@@ -111,9 +111,22 @@ class ContentCategoryAssignment(BaseModel):
     score: int = 10
 
 
+#: A category score: 1 (barely in the category) to 10 (squarely) — ADR-080's
+#: 2026-10-04 addendum. Stated on the request models so the API refuses with a
+#: field error (422) a form can show, before the database's own CHECK would.
+SCORE_MIN, SCORE_MAX = 1, 10
+
+
 class ContentCategoryAssignmentCreate(BaseModel):
     category_id: int
-    score: int = 10
+    score: int = Field(10, ge=SCORE_MIN, le=SCORE_MAX)
+
+
+class ContentCategoryAssignmentScore(BaseModel):
+    """Change an assignment's score in place (task-278), so the record never
+    drops out of the category the way remove-and-re-add made it."""
+
+    score: int = Field(ge=SCORE_MIN, le=SCORE_MAX)
 
 
 class ContentVersion(BaseModel):

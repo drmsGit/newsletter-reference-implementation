@@ -12,6 +12,9 @@ Behaviour:
   - Matches categories BY NAME against categories already in the database.
     An unknown category name is reported and skipped, never auto-created —
     the category set is a governed taxonomy (ADR-080), not a side effect of import.
+  - A score is a whole number from 1 to 10 (`Beach:7`); a bare name means 10.
+    Anything else (`Beach:15`, `Beach:abc`) skips that one assignment and is
+    listed at the end, never clamped or guessed (task-278).
 """
 
 import csv
@@ -59,9 +62,19 @@ def read_rows(path: Path) -> tuple[list[dict], list[str]]:
     return list(reader), list(reader.fieldnames or [])
 
 
-def parse_categories(raw: str) -> list[tuple[str, int]]:
-    """'Hiking:10|Nature:7' -> [('Hiking', 10), ('Nature', 7)]. Score defaults to 10."""
+def parse_categories(raw: str) -> tuple[list[tuple[str, int]], list[str]]:
+    """'Hiking:10|Nature:7' -> ([('Hiking', 10), ('Nature', 7)], []).
+
+    A bare name means 10, the documented default. A score that is not a whole
+    number from 1 to 10 — '15', 'abc', '0' — is **refused, not clamped or
+    guessed** (ADR-080's 2026-10-04 addendum; decided with the user 2026-10-05):
+    that one assignment is left out and returned in the second list, so the
+    rest of the row still imports and the import says what it skipped.
+    """
+    from app.content.models import SCORE_MAX, SCORE_MIN
+
     out: list[tuple[str, int]] = []
+    refused: list[str] = []
     for part in (p.strip() for p in raw.split("|")):
         if not part:
             continue
@@ -69,12 +82,19 @@ def parse_categories(raw: str) -> list[tuple[str, int]]:
         name = name.strip()
         if not name:
             continue
-        try:
-            out.append((name, int(score) if score.strip() else 10))
-        except ValueError:
-            print(f"    ! bad score in '{part}' — using 10")
+        if not score.strip():
             out.append((name, 10))
-    return out
+            continue
+        try:
+            value = int(score.strip())
+        except ValueError:
+            refused.append(part)
+            continue
+        if SCORE_MIN <= value <= SCORE_MAX:
+            out.append((name, value))
+        else:
+            refused.append(part)
+    return out, refused
 
 
 def main() -> int:
@@ -110,6 +130,7 @@ def main() -> int:
 
         added = skipped = 0
         unknown_categories: set[str] = set()
+        refused_scores: list[str] = []
 
         for line_no, row in enumerate(rows, start=2):
             title = (row.get("title") or "").strip()
@@ -143,7 +164,9 @@ def main() -> int:
             db.flush()  # assign record.id without committing
 
             assigned = []
-            for name, score in parse_categories(row.get("categories") or ""):
+            parsed, refused = parse_categories(row.get("categories") or "")
+            refused_scores += [f"line {line_no} '{title[:40]}': {part}" for part in refused]
+            for name, score in parsed:
                 category = categories.get(name.lower())
                 if category is None:
                     unknown_categories.add(name)
@@ -152,7 +175,9 @@ def main() -> int:
                     ContentCategoryAssignmentDB(
                         content_id=record.id,
                         category_id=category.id,
-                        score=max(0, min(10, score)),
+                        # Already 1-10: parse_categories refuses anything else
+                        # rather than clamping it (task-278).
+                        score=score,
                     )
                 )
                 assigned.append(f"{category.name}:{score}")
@@ -160,6 +185,11 @@ def main() -> int:
             existing_titles.add(title.lower())
             added += 1
             print(f"  + {title[:60]}  [{', '.join(assigned) or 'no categories'}]")
+
+        if refused_scores:
+            print("\n  ! scores outside 1-10 or not a number (that assignment skipped, nothing guessed):")
+            for entry in refused_scores:
+                print(f"    {entry}")
 
         if unknown_categories:
             print(
