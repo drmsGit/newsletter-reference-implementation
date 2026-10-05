@@ -377,6 +377,37 @@ input[data-focus-visible] {
   white-space: nowrap;
 }
 
+/* The record page (task-279): channels as sections down the page (MW Q2). */
+.record-actions,
+.record-notices {
+  margin: var(--brand-space) 0;
+}
+
+.record-duplicate {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--brand-space);
+  align-items: end;
+  margin-top: var(--brand-space);
+}
+
+.record-channel {
+  margin: calc(var(--brand-space) * 2) 0;
+}
+
+.record-channel > summary {
+  cursor: pointer;
+}
+
+.record-channel > summary > h2 {
+  display: inline;
+}
+
+.versions {
+  list-style: none;
+  padding: 0;
+}
+
 .used-in {
   padding-left: 1.25em;
 }

@@ -6,7 +6,6 @@ import {
   useBindModule,
   useContentReach,
   useContentRecord,
-  usePublishRecord,
   useSaveCatalogueField,
   useSetOverride,
   useAttachSlot,
@@ -17,6 +16,7 @@ import {
   type ModuleManifest,
 } from '../api/resources'
 import CategoryChoice from '../components/CategoryChoice'
+import PublishState from '../components/PublishState'
 import Choice from '../components/Choice'
 import { AutosaveField, SaveState, fieldError } from '../components/EditorFields'
 import ScreenState from '../components/ScreenState'
@@ -204,29 +204,6 @@ function Reach({ recordId }: { recordId: number }) {
         </ul>
       )}
     </div>
-  )
-}
-
-/** Design pass D5: a send uses the published version, so say when that lags. */
-function PublishState({
-  recordId,
-  detail,
-}: {
-  recordId: number
-  detail: { latest_version_number?: number | null; unpublished_changes: boolean }
-}) {
-  const publish = usePublishRecord(recordId)
-  if (!detail.unpublished_changes) return null
-  return (
-    <p className="publish-state" role="status">
-      {detail.latest_version_number == null
-        ? 'Not published yet, so it cannot be sent until it is.'
-        : `Changed since version ${detail.latest_version_number} was published — sends still use version ${detail.latest_version_number}.`}{' '}
-      <Button isDisabled={publish.isPending} onPress={() => publish.mutate()}>
-        {publish.isPending ? 'Publishing…' : 'Publish'}
-      </Button>
-      <SaveState mutation={publish} what="the record" />
-    </p>
   )
 }
 

@@ -1,21 +1,48 @@
-import { Link, useParams } from 'react-router'
+import { useState } from 'react'
+import { Button } from 'react-aria-components'
+import { Link, useNavigate, useParams } from 'react-router'
 
-import { useCampaignsUsing, useContentFields, useContentRecord } from '../api/resources'
+import {
+  useCampaignsUsing,
+  useContentFields,
+  useContentReach,
+  useContentRecord,
+  useContentVersions,
+  useDuplicateContent,
+  useDuplicateTargets,
+  useSaveContentRecord,
+  useSetContentStatus,
+  type ContentRecordDetail,
+} from '../api/resources'
+import Choice from '../components/Choice'
+import { AutosaveField, SaveState, fieldError } from '../components/EditorFields'
+import PublishState from '../components/PublishState'
 import ScreenState from '../components/ScreenState'
 import { STAGE_LABEL } from './Monitoring'
 
+type ContentField = NonNullable<ReturnType<typeof useContentFields>['data']>[number]
+
+/**
+ * A content record's page, where the record is written (task-279) — the
+ * primary authoring surface (Manager Workflow Q4), as the Content Write
+ * Surface final design pass decided it:
+ *
+ * - Every field saves on blur with the record's version (decision 1, the
+ *   editor's D1): changing the catalogue is this page's purpose, and nothing
+ *   reaches a send until it is published.
+ * - One passive line says how far an edit reaches; no confirmations (2).
+ * - The composer's publish notice, and a read-only list of versions (3).
+ * - Channels as labelled sections down the page, each field in the modules'
+ *   declared order (MW Q2, task-276).
+ * - Status and duplicate now; delete waits for task-117 (7). Categories are
+ *   task-280.
+ */
 export default function ContentDetail() {
   const { id } = useParams()
-  const record = useContentRecord(Number(id))
-  // Each field by its label, written once in storage/fields.json (task-271);
-  // a key with no definition is shown as itself rather than hidden.
+  const recordId = Number(id)
+  const record = useContentRecord(recordId)
   const fields = useContentFields()
-  const labelOf = new Map((fields.data ?? []).map((f) => [f.name, f.label ?? f.name]))
-  // In the modules' declared order, as `/content/fields` lists them (task-276);
-  // a key with no definition after them, so nothing a record carries is hidden.
-  const position = new Map((fields.data ?? []).map((f, index) => [f.name, index]))
-  const byDeclaredOrder = ([a]: [string, unknown], [b]: [string, unknown]) =>
-    (position.get(a) ?? Infinity) - (position.get(b) ?? Infinity) || a.localeCompare(b)
+  const [generation, setGeneration] = useState(0)
 
   return (
     <>
@@ -24,39 +51,227 @@ export default function ContentDetail() {
       </p>
       <ScreenState query={record}>
         {record.data && (
-          <>
-            <h1>{record.data.title}</h1>
-            {record.data.description && <p>{record.data.description}</p>}
-
-            <dl className="facts">
-              <dt>Status</dt>
-              <dd>{record.data.status ?? '—'}</dd>
-            </dl>
-
-            <h2>Fields</h2>
-            {/*
-              **`content` is an open object and is rendered generically.**
-
-              The API types it as a dictionary, not a fixed shape, because what
-              a content record carries depends on its type -- and ADR-165 made
-              the core channel-neutral, so a client that hard-coded "headline"
-              and "body_medium" would be an email-shaped client again. Whatever
-              the server sends is what is shown.
-            */}
-            <dl className="facts">
-              {Object.entries(record.data.content ?? {}).sort(byDeclaredOrder).map(([field, value]) => (
-                <div key={field} style={{ display: 'contents' }}>
-                  <dt title={field}>{labelOf.get(field) ?? field}</dt>
-                  <dd>{typeof value === 'string' ? value : JSON.stringify(value)}</dd>
-                </div>
-              ))}
-            </dl>
-
-            <UsedIn recordId={record.data.id} />
-          </>
+          <RecordPage
+            // "Load their version" remounts the page, so every field starts
+            // from what is stored. A field keeps its draft while its stored
+            // value is unchanged, and after a refused save the value often is
+            // unchanged (somebody else edited another field): the refused text
+            // would stay on screen looking saved.
+            key={generation}
+            record={record.data}
+            fields={fields.data ?? []}
+            reload={() => {
+              setGeneration((n) => n + 1)
+              record.refetch()
+            }}
+          />
         )}
       </ScreenState>
     </>
+  )
+}
+
+function RecordPage({
+  record,
+  fields,
+  reload,
+}: {
+  record: ContentRecordDetail
+  fields: ContentField[]
+  reload: () => void
+}) {
+  const save = useSaveContentRecord(record.id)
+  const content = (record.content ?? {}) as Record<string, unknown>
+  const channels = [...new Set(fields.map((f) => f.channel ?? 'other'))]
+  const defined = new Set(fields.map((f) => f.name))
+  // Keys no definition names: shown, never hidden, but not editable here —
+  // PATCH writes by channel group, and these are in none.
+  const undefinedKeys = Object.keys(content).filter((key) => !defined.has(key)).sort()
+
+  return (
+    <>
+      <h1>{record.title}</h1>
+      <StatusAndDuplicate record={record} />
+
+      <div className="record-notices">
+        <PublishState recordId={record.id} detail={record} />
+        <ReachLine recordId={record.id} />
+      </div>
+
+      <section aria-labelledby="record-details-heading">
+        <h2 id="record-details-heading">Details</h2>
+        <AutosaveField
+          field={{ name: 'title', label: 'Title', type: 'text', required: true }}
+          value={record.title}
+          onSave={(title) => title.trim() && save.mutate({ title })}
+          error={fieldError(save.error, 'title')}
+        />
+        <AutosaveField
+          field={{ name: 'description', label: 'Description', type: 'text' }}
+          value={record.description ?? ''}
+          onSave={(description) => save.mutate({ description })}
+          error={fieldError(save.error, 'description')}
+        />
+      </section>
+
+      {channels.map((channel) => (
+        <details key={channel} open className="record-channel">
+          <summary>
+            <h2>{channel.charAt(0).toUpperCase() + channel.slice(1)}</h2>
+          </summary>
+          {/* The per-channel readiness mark goes here (task-282). */}
+          {fields
+            .filter((f) => (f.channel ?? 'other') === channel)
+            .map((field) => (
+              <AutosaveField
+                key={field.name}
+                field={field}
+                value={typeof content[field.name] === 'string' ? (content[field.name] as string) : ''}
+                // Only this channel's fields may be cleared by this save (B19).
+                onSave={(value) => save.mutate({ content: { [field.name]: value }, groups: [channel] })}
+                error={fieldError(save.error, field.name)}
+              />
+            ))}
+        </details>
+      ))}
+
+      {undefinedKeys.length > 0 && (
+        <section aria-labelledby="record-other-heading">
+          <h2 id="record-other-heading">Other stored values</h2>
+          <p className="muted">No field definition names these, so they are shown but not edited here.</p>
+          <dl className="facts">
+            {undefinedKeys.map((key) => (
+              <div key={key} style={{ display: 'contents' }}>
+                <dt>{key}</dt>
+                <dd>{typeof content[key] === 'string' ? (content[key] as string) : JSON.stringify(content[key])}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      )}
+      <SaveState mutation={save} reload={reload} what="the record" />
+
+      <Versions recordId={record.id} fields={fields} />
+      <UsedIn recordId={record.id} />
+    </>
+  )
+}
+
+/** Decision 2: how far an edit reaches, said once, passively — no prompt per field. */
+function ReachLine({ recordId }: { recordId: number }) {
+  const reach = useContentReach(recordId)
+  if (!reach.data) return null
+  const { count } = reach.data
+  return (
+    <p className="muted reach-line">
+      {count === 0
+        ? 'No unsent campaign uses this record. '
+        : `Edits here change this record for ${count} unsent campaign${count === 1 ? '' : 's'}. `}
+      Sends use the published version. <a href="#used-in-heading">Where it is used</a>
+    </p>
+  )
+}
+
+/** Status (the safe way to retire a record) and duplicating into a brand (decision 7). */
+function StatusAndDuplicate({ record }: { record: ContentRecordDetail }) {
+  const status = useSetContentStatus(record.id)
+  const targets = useDuplicateTargets(record.id)
+  const duplicate = useDuplicateContent(record.id)
+  const navigate = useNavigate()
+  const [target, setTarget] = useState<string | null>(null)
+  const [copiedTo, setCopiedTo] = useState<string | null>(null)
+  const active = record.status === 'active'
+  const options = targets.data ?? []
+  const chosen = target ?? (options[0] ? String(options[0].id) : null)
+
+  return (
+    <div className="record-actions">
+      <span className="muted">{active ? 'Active' : 'Inactive'}</span>{' '}
+      <Button
+        isDisabled={status.isPending}
+        onPress={() => status.mutate(active ? 'inactive' : 'active')}
+      >
+        {active ? 'Deactivate' : 'Reactivate'}
+      </Button>
+      {!active && (
+        <span className="muted"> Inactive records are not offered by the picker or chosen by a slot.</span>
+      )}
+      <SaveState mutation={status} what="the record" />
+      {options.length > 0 && chosen && (
+        <div className="record-duplicate">
+          <Choice
+            label="Duplicate into"
+            options={options.map((b) => ({ id: String(b.id), name: b.name }))}
+            selected={chosen}
+            onChange={setTarget}
+          />
+          <Button
+            isDisabled={duplicate.isPending}
+            onPress={() => {
+              const brand = options.find((b) => String(b.id) === chosen)
+              duplicate.mutate(Number(chosen), {
+                onSuccess: (copy) => {
+                  // A copy in this brand opens; one in another brand cannot be
+                  // opened from here, so it is said where it went.
+                  if (brand && !brand.crossing) navigate(`/content/${copy.id}`)
+                  else setCopiedTo(brand?.name ?? 'the other brand')
+                },
+              })
+            }}
+          >
+            Duplicate
+          </Button>
+          {copiedTo && (
+            <p role="status">
+              Copied to {copiedTo}. The copy has no published version, so it cannot be sent until it is
+              published there.
+            </p>
+          )}
+          <SaveState mutation={duplicate} what="the copy" />
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Decision 3: what each published version said — read only; no restore or compare. */
+function Versions({ recordId, fields }: { recordId: number; fields: ContentField[] }) {
+  const versions = useContentVersions(recordId)
+  const labelOf = new Map(fields.map((f) => [f.name, f.label ?? f.name]))
+  return (
+    <section aria-labelledby="versions-heading">
+      <h2 id="versions-heading">Published versions</h2>
+      <ScreenState query={versions}>
+        {versions.data && versions.data.length === 0 ? (
+          <p className="muted">Nothing published yet.</p>
+        ) : (
+          <ul className="versions">
+            {versions.data?.map((version) => (
+              <li key={version.id}>
+                <details>
+                  <summary>
+                    Version {version.version_number}
+                    <span className="muted">
+                      {' '}
+                      · {version.created_by ?? 'unknown'} ·{' '}
+                      {version.created_at ? new Date(version.created_at).toLocaleString() : '—'}
+                    </span>
+                  </summary>
+                  <dl className="facts">
+                    {Object.entries((version.content ?? {}) as Record<string, unknown>).map(([key, value]) => (
+                      <div key={key} style={{ display: 'contents' }}>
+                        <dt>{labelOf.get(key) ?? key}</dt>
+                        <dd>{typeof value === 'string' ? value : JSON.stringify(value)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </details>
+              </li>
+            ))}
+          </ul>
+        )}
+      </ScreenState>
+    </section>
   )
 }
 

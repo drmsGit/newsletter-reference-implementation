@@ -712,6 +712,87 @@ export function useSaveCatalogueField(recordId: number, channel: string) {
   })
 }
 
+/**
+ * Save part of a record from the record page (task-279): title, description,
+ * or one channel's fields. `groups` names the channel whose fields this save
+ * may clear, so another channel's copy is never touched (B19). The version is
+ * read from the cache when the save is sent and stated in If-Match, and the
+ * save joins the composer's catalogue saves in one queue — a save from either
+ * page waits for the other, so neither states a version the other just moved.
+ */
+export function useSaveContentRecord(recordId: number) {
+  const queryClient = useQueryClient()
+  const key = keys.contentRecord(recordId)
+  return useMutation({
+    scope: { id: 'composer-content' },
+    mutationFn: (body: { title?: string; description?: string; content?: Record<string, unknown>; groups?: string[] }) =>
+      read(
+        api.PATCH('/content/{content_id}', {
+          params: {
+            path: { content_id: recordId },
+            header: { 'If-Match': queryClient.getQueryData<ContentRecordDetail>(key)?.updated_at },
+          },
+          body: { content: {}, groups: [], ...body },
+        }),
+      ),
+    // Awaited before the next queued save runs, so it reads the new version.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: key }),
+  })
+}
+
+/** A record's published versions, newest first (ADR-128): what each send used. */
+export function useContentVersions(recordId: number) {
+  return useQuery({
+    queryKey: [...keys.contentRecord(recordId), 'versions'],
+    queryFn: () =>
+      read(api.GET('/content/{content_record_id}/versions', { params: { path: { content_record_id: recordId } } })),
+  })
+}
+
+/**
+ * Activate or deactivate. The route takes no version token but moves the
+ * record's `updated_at`, so the record is re-read afterwards — otherwise the
+ * next field save would state the old version and be refused as somebody
+ * else's change (task-279).
+ */
+export function useSetContentStatus(recordId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    scope: { id: 'composer-content' },
+    mutationFn: (status: 'active' | 'inactive') =>
+      read(api.PUT('/content/{content_id}/status', { params: { path: { content_id: recordId } }, body: { status } })),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.contentRecord(recordId) }),
+        queryClient.invalidateQueries({ queryKey: [...keys.content, 'page'] }),
+      ]),
+  })
+}
+
+/** The brands this person may copy the record into (task-50). */
+export function useDuplicateTargets(recordId: number) {
+  return useQuery({
+    queryKey: [...keys.contentRecord(recordId), 'duplicate-targets'],
+    queryFn: () =>
+      read(api.GET('/content/{content_id}/duplicate-targets', { params: { path: { content_id: recordId } } })),
+  })
+}
+
+/** Copy the record into a brand. The copy has no published version. */
+export function useDuplicateContent(recordId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (targetBrandId: number) =>
+      read(
+        api.POST('/content/{content_id}/duplicate', {
+          params: { path: { content_id: recordId } },
+          body: { target_brand_id: targetBrandId },
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [...keys.content, 'page'] }),
+  })
+}
+
 /** Publish the record's current content, which is what sends then use (D5). */
 export function usePublishRecord(recordId: number) {
   const queryClient = useQueryClient()

@@ -22,7 +22,8 @@ export function AutosaveField({
   onLeave,
   error,
 }: {
-  field: ModuleVariable
+  // A module's field, or a record's (`ContentField`): what a form needs of either.
+  field: Pick<ModuleVariable, 'name' | 'label' | 'type' | 'note'> & { required?: boolean }
   value: string
   onSave: (value: string) => void
   onLeave?: (draft: string, next: Element | null) => boolean
