@@ -45,6 +45,12 @@ export default function VariantEditor() {
   const composition = useComposition(campaignId)
   const composed = composition.data?.variants.find((v) => v.variant.id === variantId)
   const manifests = useModuleManifests(composed?.variant.channel)
+  // Bumped by "Load their version": the fields remount and start from what is
+  // stored. A field keeps its draft while its stored value is unchanged, and
+  // after a refused save it often is (somebody else edited another field), so
+  // the refused text would otherwise stay on screen looking saved (the bug
+  // task-279 found on the record page, reproduced here 2026-10-05).
+  const [generation, setGeneration] = useState(0)
 
   return (
     <>
@@ -60,7 +66,11 @@ export default function VariantEditor() {
                 campaignId={campaignId}
                 composed={composed}
                 manifests={manifests.data}
-                reload={() => composition.refetch()}
+                reload={() => {
+                  setGeneration((n) => n + 1)
+                  composition.refetch()
+                }}
+                generation={generation}
                 stamp={composition.dataUpdatedAt}
               />
             )}
@@ -76,12 +86,14 @@ function Editor({
   composed,
   manifests,
   reload,
+  generation,
   stamp,
 }: {
   campaignId: number
   composed: ComposedVariant
   manifests: ModuleManifest[]
   reload: () => void
+  generation: number
   stamp: number
 }) {
   const { variant, modules } = composed
@@ -98,7 +110,7 @@ function Editor({
       <Fence campaignId={campaignId} variantId={variant.id} fence={composed.fence} />
       <PreviewBar variantId={variant.id} variantName={variant.name} stamp={stamp} byName={byName} />
       {composed.has_envelope && (
-        <Envelope campaignId={campaignId} composed={composed} manifests={manifests} reload={reload} />
+        <Envelope key={generation} campaignId={campaignId} composed={composed} manifests={manifests} reload={reload} />
       )}
       <div className="editor">
         <section className="editor__stack" aria-labelledby="stack-heading">
@@ -115,7 +127,7 @@ function Editor({
         <section className="editor__fields" aria-labelledby="fields-heading">
           {selected ? (
             <ModuleFields
-              key={selected.id}
+              key={`${selected.id}-${generation}`}
               campaignId={campaignId}
               module={selected}
               manifest={byName.get(selected.module_type)}

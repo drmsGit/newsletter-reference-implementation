@@ -163,6 +163,33 @@ describe('the variant editor', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  it('drops the refused text even when their change was to another field', async () => {
+    // The case the record page got wrong (task-279): this field's stored value
+    // did not change, so a field that resets only when its value changes kept
+    // the refused text on screen, looking saved.
+    const { handlers, state } = server()
+    open(handlers)
+    const before = (await screen.findByLabelText(/^Button label/) as HTMLInputElement).value
+    Object.assign(state.modules[0], {
+      module_data: { ...state.modules[0].module_data, url: 'https://theirs.test' }, updated_at: T(9),
+    })
+    await edit('Button label', 'Mine')
+    expect(await screen.findByRole('alert')).toHaveTextContent(/changed the module after you loaded it/)
+    fireEvent.click(screen.getByRole('button', { name: 'Load their version' }))
+    await waitFor(() => expect(screen.getByLabelText(/^Button label/)).toHaveValue(before))
+  })
+
+  it('drops a refused subject when their change was to the preheader', async () => {
+    const { handlers, state } = server()
+    open(handlers)
+    await screen.findByLabelText(/^Subject/)
+    Object.assign(state.variant, { preheader: 'Theirs', updated_at: T(9) })
+    await edit('Subject', 'Mine')
+    expect(await screen.findByRole('alert')).toHaveTextContent(/changed the variant after you loaded it/)
+    fireEvent.click(screen.getByRole('button', { name: 'Load their version' }))
+    await waitFor(() => expect(screen.getByLabelText(/^Subject/)).toHaveValue('Spring'))
+  })
+
   it('shows a refused field on that field', async () => {
     const { handlers } = server()
     open({

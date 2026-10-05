@@ -154,6 +154,17 @@ describe('a catalogue field (ADR-186: override by default)', () => {
       .toBeInTheDocument()
   })
 
+  it('drops a refused override when somebody else changed the module meanwhile', async () => {
+    const { handlers, state } = server()
+    open(handlers)
+    await screen.findByLabelText(/^Headline/)
+    state.module.updated_at = T(9) // somebody else saved the module; the headline did not change
+    await edit(/^Headline/, 'Mine')
+    expect(await screen.findByRole('alert')).toHaveTextContent(/changed the module after you loaded it/)
+    fireEvent.click(screen.getByRole('button', { name: 'Load their version' }))
+    await waitFor(() => expect(screen.getByLabelText(/^Headline/)).toHaveValue('Lisbon'))
+  })
+
   it('writes nothing when the value is left as the catalogue has it', async () => {
     const { handlers, writes } = server()
     open(handlers)
