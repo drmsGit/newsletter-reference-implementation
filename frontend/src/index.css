@@ -101,6 +101,11 @@ input[data-focus-visible] {
   border-radius: var(--brand-radius);
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
   min-width: var(--trigger-width);
+  /* React Aria caps the popover's height to the room on screen (an inline
+     max-height); without this a long list drew past the box, over its own
+     trigger, so the click that opened it landed on an option and closed it
+     at once (2026-10-05, the record page's category list). */
+  overflow: auto;
 }
 
 .react-aria-ListBox {
