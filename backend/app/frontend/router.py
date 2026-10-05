@@ -1154,9 +1154,15 @@ def content_category_delete(
     assignment_id: int,
     db: Session = Depends(get_db),
 ):
-    delete_category_assignment(
+    removed = delete_category_assignment(
         db, content_record_id, assignment_id, brand_id=working_brand_id(request, db),
     )
+    if removed is not None:
+        # task-275: both planes record who removed a category, at what score.
+        audit.record_from_request(
+            request, db, audit.CONTENT_CATEGORY_UNASSIGNED, subject_type="content",
+            subject_id=content_record_id, detail=removed,
+        )
     return RedirectResponse(url=f"/ui/content/{content_record_id}", status_code=303)
 
 
@@ -2090,15 +2096,21 @@ def content_set_status(
     status: str = Form(...),
     db: Session = Depends(get_db),
 ):
+    brand_id = working_brand_id(request, db)
+    existing = get_content_record(db, content_record_id, brand_id=brand_id)
+    previous = existing.status if existing is not None else None
     try:
-        set_content_status(
-            db, content_record_id, status,
-            brand_id=working_brand_id(request, db),
-        )
+        record = set_content_status(db, content_record_id, status, brand_id=brand_id)
     except ValueError as error:
         return RedirectResponse(
             url=f"/ui/content/{content_record_id}?error={quote(str(error))}",
             status_code=303,
+        )
+    if record is not None and previous != record.status:
+        audit.record_from_request(
+            request, db, audit.CONTENT_STATUS_CHANGED, subject_type="content",
+            subject_id=content_record_id,
+            detail={"title": record.title, "from": previous, "to": record.status},
         )
     return RedirectResponse(url=f"/ui/content/{content_record_id}", status_code=303)
 
@@ -2111,7 +2123,7 @@ def content_delete(
     db: Session = Depends(get_db),
 ):
     try:
-        delete_content_record(
+        deleted = delete_content_record(
             db, content_record_id, force=force,
             brand_id=working_brand_id(request, db),
         )
@@ -2124,6 +2136,11 @@ def content_delete(
         return RedirectResponse(
             url=f"/ui/content/{content_record_id}?error={quote(str(error))}&confirm_delete=true",
             status_code=303,
+        )
+    if deleted:
+        audit.record_from_request(
+            request, db, audit.CONTENT_DELETED, subject_type="content",
+            subject_id=content_record_id, detail={**deleted, "forced": force},
         )
     return RedirectResponse(url="/ui/content", status_code=303)
 
@@ -2171,6 +2188,10 @@ def content_create(
         brand_id=working_brand_id(request, db),
         description=description or None,
         content=content,
+    )
+    audit.record_from_request(
+        request, db, audit.CONTENT_CREATED, subject_type="content", subject_id=record.id,
+        detail={"title": record.title, "fields": sorted(record.content or {})},
     )
     return RedirectResponse(url=f"/ui/content/{record.id}", status_code=303)
 
@@ -2291,10 +2312,11 @@ def content_edit(
     #
     # The email group is always offered because this form always renders it;
     # push only when `channel_sections_present` says it was on screen.
-    from app.content.service import merge_content_fields
+    from app.content.service import edit_snapshot, edited_fields, merge_content_fields
 
     brand_id = working_brand_id(request, db)
     existing = get_content_record(db, content_record_id, brand_id=brand_id)
+    before = edit_snapshot(existing) if existing else {}
     content = merge_content_fields(
         existing.content if existing else None,
         {
@@ -2323,7 +2345,9 @@ def content_edit(
     if record is not None:
         audit.record_from_request(
             request, db, audit.CONTENT_UPDATED, subject_type="content", subject_id=record.id,
-            detail={"title": record.title, "fields": sorted(content)},
+            # The fields this edit changed (task-275), not every key on the
+            # record — the form posts all of them, touched or not.
+            detail={"title": record.title, "fields": edited_fields(before, record)},
         )
     return RedirectResponse(url=f"/ui/content/{content_record_id}", status_code=303)
 
@@ -2359,7 +2383,7 @@ def content_assign_category(
     db: Session = Depends(get_db),
 ):
     try:
-        assign_category_to_content(
+        assignment = assign_category_to_content(
             db, content_id=content_record_id, category_id=category_id, score=score,
             brand_id=working_brand_id(request, db),
         )
@@ -2367,6 +2391,13 @@ def content_assign_category(
         return RedirectResponse(
             url=f"/ui/content/{content_record_id}?error={quote(str(error))}",
             status_code=303,
+        )
+    if assignment is not None:
+        from app.content.service import assignment_summary
+
+        audit.record_from_request(
+            request, db, audit.CONTENT_CATEGORY_ASSIGNED, subject_type="content",
+            subject_id=content_record_id, detail=assignment_summary(db, assignment),
         )
     return RedirectResponse(url=f"/ui/content/{content_record_id}", status_code=303)
 

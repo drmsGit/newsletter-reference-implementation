@@ -688,9 +688,10 @@ def delete_category_relation(db: Session, relation_id: int) -> bool:
 
 def delete_category_assignment(
     db: Session, content_id: int, assignment_id: int, *, brand_id: int,
-) -> bool:
+) -> dict | None:
     """Remove one category from one content record — selected through the
-    record, within the brand (task-241, ADR-172 points 4-6).
+    record, within the brand (task-241, ADR-172 points 4-6). Returns what was
+    removed, score included, for the audit entry (task-275), or None.
 
     It took only the assignment id until 2026-10-02, so anyone with
     `content.manage` in any brand could delete any brand's assignment by
@@ -708,10 +709,51 @@ def delete_category_assignment(
         .first()
     )
     if assignment is None:
-        return False
+        return None
+    removed = assignment_summary(db, assignment)
     db.delete(assignment)
     db.commit()
-    return True
+    return removed
+
+
+def assignment_summary(db: Session, assignment: ContentCategoryAssignmentDB) -> dict:
+    """An assignment as the audit log records it: which category, by name as
+    well as id (a renamed or deleted category must still read), and the score."""
+    category = db.get(CategoryDB, assignment.category_id)
+    return {
+        "category_id": assignment.category_id,
+        "category": category.name if category else None,
+        "score": assignment.score,
+    }
+
+
+def edited_fields(before: dict, record) -> list[str]:
+    """Which fields an edit actually changed: `title`, `description` and the
+    content keys whose value differs, added or removed (task-275).
+
+    The audit entry used to list either every key sent (the API, so an
+    unchanged field read as edited) or every key on the record (the Jinja form,
+    which lists fields nobody touched). `before` is a snapshot taken before the
+    write — `title`, `description` and a copy of `content` — because the ORM
+    object the caller loaded is the same one the update mutates.
+
+    **An empty value and an absent one are the same here.** The Jinja form posts
+    every email field, empty ones as `""`, and the merge stores `""` where there
+    was no key — nobody edited those fields. (Push never stores an empty value at
+    all: `without_empty_presence_fields`.)"""
+    def same(a, b) -> bool:
+        return (a if a not in ("", None) else None) == (b if b not in ("", None) else None)
+
+    changed = [name for name in ("title", "description")
+               if not same(before.get(name), getattr(record, name))]
+    old, new = before.get("content") or {}, record.content or {}
+    changed += sorted(key for key in set(old) | set(new) if not same(old.get(key), new.get(key)))
+    return changed
+
+
+def edit_snapshot(record) -> dict:
+    """The `before` that `edited_fields` compares against."""
+    return {"title": record.title, "description": record.description, "content": dict(record.content or {})}
 
 
 def assign_category_to_content(
@@ -889,8 +931,13 @@ def get_latest_version_for_content(
 
 def delete_content_record(
     db: Session, content_id: int, force: bool = False, *, brand_id: int
-) -> bool:
-    """
+) -> dict | None:
+    """What was deleted, for the audit entry (task-275), or None if the record
+    is not found. A forced delete names what it took with it — the assignment
+    and version counts, and which modules lost their record — the way a module
+    delete names the overrides it erased (campaign write surface pass, D2).
+
+
     Deleting a content record that still has relations must not silently
     cascade. Decision-resolution / override history is a hard block (never
     force-deletable — that data stays put, per the data-lifecycle Needs-ADR
@@ -950,6 +997,18 @@ def delete_content_record(
             },
         )
 
+    unbound = [
+        module_id for (module_id,) in db.query(ModuleInstanceDB.id)
+        .filter(ModuleInstanceDB.content_record_id == content_id)
+        .order_by(ModuleInstanceDB.id)
+    ]
+    summary = {
+        "title": record.title,
+        "category_assignments": assignment_count,
+        "versions": version_count,
+        "modules_unbound": unbound,
+    }
+
     db.query(ContentCategoryAssignmentDB).filter(
         ContentCategoryAssignmentDB.content_id == content_id
     ).delete()
@@ -962,7 +1021,7 @@ def delete_content_record(
 
     db.delete(record)
     db.commit()
-    return True
+    return summary
 
 
 def delete_category(db: Session, category_id: int, force: bool = False) -> bool:

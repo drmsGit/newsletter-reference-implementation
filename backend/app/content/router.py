@@ -155,12 +155,22 @@ def get_content_record_by_id(
             "latest_version_number": latest, "unpublished_changes": unpublished}
 
 
-def _record_edit(request, db, record, fields) -> None:
+def _record_edit(request, db, record, before: dict) -> None:
     """The audit entry for a catalogue edit (task-257, ADR-153 point 4): which
-    record, and which content keys the caller wrote."""
+    record, and which fields the edit changed — not every key sent (task-275,
+    `content.service.edited_fields`)."""
+    from app.content.service import edited_fields
+
     audit.record_from_request(
         request, db, audit.CONTENT_UPDATED, subject_type="content", subject_id=record.id,
-        detail={"title": record.title, "fields": sorted(fields)},
+        detail={"title": record.title, "fields": edited_fields(before, record)},
+    )
+
+
+def _record_content_write(request, db, action: str, content_id: int, detail: dict) -> None:
+    """Every other content write, audited the same way on both planes (task-275)."""
+    audit.record_from_request(
+        request, db, action, subject_type="content", subject_id=content_id, detail=detail,
     )
 
 
@@ -184,6 +194,12 @@ def update_content_record_by_id(
     authoritative for and merges accordingly, which is the rule
     `content.service.merge_content_fields` holds for both planes.
     """
+    from app.content.service import edit_snapshot
+
+    existing = get_content_record(db, content_id, brand_id=brand_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Content record not found")
+    before = edit_snapshot(existing)
     try:
         record = update_content_record(
             db, content_id, payload.title, payload.content, payload.description,
@@ -193,7 +209,7 @@ def update_content_record_by_id(
         raise HTTPException(status_code=409, detail=str(error))
     if record is None:
         raise HTTPException(status_code=404, detail="Content record not found")
-    _record_edit(request, db, record, payload.content)
+    _record_edit(request, db, record, before)
     return record
 
 
@@ -219,9 +235,12 @@ def patch_content_record(
     without destroying the copy for whichever channel its screen was not
     showing.
     """
+    from app.content.service import edit_snapshot
+
     existing = get_content_record(db, content_id, brand_id=brand_id)
     if existing is None:
         raise HTTPException(status_code=404, detail="Content record not found")
+    before = edit_snapshot(existing)
     try:
         merged = merge_content_fields(
             existing.content, payload.content, groups=payload.groups,
@@ -244,7 +263,7 @@ def patch_content_record(
         raise HTTPException(status_code=409, detail=str(error))
     if record is None:
         raise HTTPException(status_code=404, detail="Content record not found")
-    _record_edit(request, db, record, payload.content)
+    _record_edit(request, db, record, before)
     return record
 
 
@@ -252,22 +271,29 @@ def patch_content_record(
 def set_content_record_status(
     content_id: int,
     payload: ContentStatusUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
     """Activate/deactivate a content record — the safe alternative to deleting."""
+    existing = get_content_record(db, content_id, brand_id=brand_id)
+    previous = existing.status if existing is not None else None
     try:
         record = set_content_status(db, content_id, payload.status, brand_id=brand_id)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
     if record is None:
         raise HTTPException(status_code=404, detail="Content record not found")
+    if previous != record.status:
+        _record_content_write(request, db, audit.CONTENT_STATUS_CHANGED, content_id,
+                              {"title": record.title, "from": previous, "to": record.status})
     return record
 
 
 @router.delete("/{content_id}")
 def delete_content_record_by_id(
     content_id: int,
+    request: Request,
     force: bool = False,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
@@ -280,6 +306,7 @@ def delete_content_record_by_id(
         raise HTTPException(status_code=409, detail={"message": str(error), "counts": error.counts})
     if not deleted:
         raise HTTPException(status_code=404, detail="Content record not found")
+    _record_content_write(request, db, audit.CONTENT_DELETED, content_id, {**deleted, "forced": force})
     return {"status": "deleted"}
 
 
@@ -294,6 +321,7 @@ def get_content_categories(
 @router.post("/", response_model=ContentRecord)
 def create_content_record(
     payload: ContentCreate,
+    request: Request,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
@@ -309,13 +337,16 @@ def create_content_record(
     # true when launch gate 3 closed, and it was the half of task-39 most
     # likely to mislead — a reader told the routers are unguarded has a reason
     # to leave a brand bug alone.
-    return create_content(
+    record = create_content(
         db=db,
         title=payload.title,
         content=payload.content,
         brand_id=brand_id,
         description=payload.description,
     )
+    _record_content_write(request, db, audit.CONTENT_CREATED, record.id,
+                          {"title": record.title, "fields": sorted(record.content or {})})
+    return record
 
 @router.post("/categories", response_model=Category)
 def create_category_record(
@@ -333,6 +364,7 @@ def create_category_record(
 def assign_category(
     content_id: int,
     payload: ContentCategoryAssignmentCreate,
+    request: Request,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
@@ -359,6 +391,10 @@ def assign_category(
             status_code=status.HTTP_409_CONFLICT,
             detail="Category already assigned to this content record",
         )
+    from app.content.service import assignment_summary
+
+    _record_content_write(request, db, audit.CONTENT_CATEGORY_ASSIGNED, content_id,
+                          assignment_summary(db, assignment))
 
     return ContentCategoryAssignment(
         id=assignment.id,
@@ -551,13 +587,15 @@ def get_content_assignments(
     description="Through the record, within the working brand (task-241): another record's or another brand's assignment is not found.",
 )
 def delete_content_assignment(
-    content_id: int, assignment_id: int,
+    content_id: int, assignment_id: int, request: Request,
     db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
 ):
     from app.content.service import delete_category_assignment
 
-    if not delete_category_assignment(db, content_id, assignment_id, brand_id=brand_id):
+    removed = delete_category_assignment(db, content_id, assignment_id, brand_id=brand_id)
+    if removed is None:
         raise HTTPException(status_code=404, detail="Assignment not found")
+    _record_content_write(request, db, audit.CONTENT_CATEGORY_UNASSIGNED, content_id, removed)
 
 
 @router.get(

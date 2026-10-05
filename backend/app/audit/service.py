@@ -73,6 +73,14 @@ OVERRIDE_CHANGED = "override.changed"
 # publishing a version (which is what a send then uses).
 CONTENT_UPDATED = "content.updated"
 CONTENT_PUBLISHED = "content.published"
+# task-275: the rest of the content writes, both planes (ADR-153 point 4).
+# Category assignments feed slot ranking and every interest profile (ADR-080),
+# so who set or removed one, at what score, is history worth keeping.
+CONTENT_CREATED = "content.created"
+CONTENT_STATUS_CHANGED = "content.status_changed"
+CONTENT_DELETED = "content.deleted"
+CONTENT_CATEGORY_ASSIGNED = "content.category_assigned"
+CONTENT_CATEGORY_UNASSIGNED = "content.category_unassigned"
 # task-245: every settings write, both planes, and the access-control switch.
 SETTINGS_CHANGED = "settings.changed"
 # ADR-166's administration surface (task-50). Logged lines were the only trace

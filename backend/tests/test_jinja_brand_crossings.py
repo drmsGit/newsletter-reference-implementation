@@ -146,9 +146,11 @@ def test_an_assignment_is_deleted_only_through_its_own_record_in_the_brand(db, d
     db.add(assignment); db.commit()
     ids = (assignment.id, category.id, record.id)
     try:
-        assert delete_category_assignment(db, record.id, ids[0], brand_id=default_brand.id) is False
-        assert delete_category_assignment(db, record.id + 1, ids[0], brand_id=foreign_brand.id) is False
-        assert delete_category_assignment(db, record.id, ids[0], brand_id=foreign_brand.id) is True
+        # None for "not found"; the removed assignment otherwise (task-275, for its audit entry).
+        assert delete_category_assignment(db, record.id, ids[0], brand_id=default_brand.id) is None
+        assert delete_category_assignment(db, record.id + 1, ids[0], brand_id=foreign_brand.id) is None
+        removed = delete_category_assignment(db, record.id, ids[0], brand_id=foreign_brand.id)
+        assert removed == {"category_id": ids[1], "category": category.name, "score": 5}
     finally:
         db.rollback()
         db.query(ContentCategoryAssignmentDB).filter(
