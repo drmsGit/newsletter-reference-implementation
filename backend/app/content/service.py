@@ -206,22 +206,53 @@ def catalogue_fields() -> list[dict]:
     ([[ADR-177]]) — one module demands `body_medium` and another never mentions
     it — so the catalogue has no single truth to report and the composer asks
     `GET /modules` instead.
+
+    **In the modules' declared order, not by name** (task-276; the Manager
+    Workflow interview, Q2: "fields appear in the manifest's declared order").
+    Several modules declare their own order, so they are merged with
+    `merge_declared_orders`, which keeps every module's order where they agree.
     """
     from pathlib import Path
 
     from app.modules.registry import MODULES_DIR, field_definitions, list_manifests
 
-    in_catalogue: set[str] = set()
+    sequences: list[list[str]] = []
     for channel_dir in sorted(p for p in Path(MODULES_DIR).iterdir() if p.is_dir()):
-        for manifest in list_manifests(channel_dir.name):
+        for manifest in sorted(list_manifests(channel_dir.name), key=lambda m: m.name):
             if manifest.cms:
-                in_catalogue.update(v.name for v in manifest.variables if v.source == "content")
+                sequences.append([v.name for v in manifest.variables if v.source == "content"])
 
     defined = field_definitions()
-    return [
-        {"name": name, **defined.get(name, {})}
-        for name in sorted(in_catalogue)
-    ]
+    return [{"name": name, **defined.get(name, {})} for name in merge_declared_orders(sequences)]
+
+
+def merge_declared_orders(sequences: list[list[str]]) -> list[str]:
+    """One order for fields that several modules each declare in their own
+    order, keeping every module's order where they agree (decided with the user
+    2026-10-05, task-276).
+
+    The modules are taken in the order given — by channel, then module name.
+    Each field the first time it is seen goes right after the field before it
+    in its own module; if that one is not placed yet, before the next field of
+    its module that is; failing both, at the end. So a field every module puts
+    last ("Button link") stays last, and where two modules disagree the one
+    taken first wins.
+    """
+    merged: list[str] = []
+    for sequence in sequences:
+        for index, name in enumerate(sequence):
+            if name in merged:
+                continue
+            previous = sequence[index - 1] if index else None
+            if previous in merged:
+                merged.insert(merged.index(previous) + 1, name)
+                continue
+            following = next((later for later in sequence[index + 1:] if later in merged), None)
+            if following is not None:
+                merged.insert(merged.index(following), name)
+            else:
+                merged.append(name)
+    return merged
 
 
 def merge_content_fields(

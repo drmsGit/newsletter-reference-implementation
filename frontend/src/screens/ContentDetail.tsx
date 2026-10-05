@@ -11,6 +11,11 @@ export default function ContentDetail() {
   // a key with no definition is shown as itself rather than hidden.
   const fields = useContentFields()
   const labelOf = new Map((fields.data ?? []).map((f) => [f.name, f.label ?? f.name]))
+  // In the modules' declared order, as `/content/fields` lists them (task-276);
+  // a key with no definition after them, so nothing a record carries is hidden.
+  const position = new Map((fields.data ?? []).map((f, index) => [f.name, index]))
+  const byDeclaredOrder = ([a]: [string, unknown], [b]: [string, unknown]) =>
+    (position.get(a) ?? Infinity) - (position.get(b) ?? Infinity) || a.localeCompare(b)
 
   return (
     <>
@@ -39,7 +44,7 @@ export default function ContentDetail() {
               the server sends is what is shown.
             */}
             <dl className="facts">
-              {Object.entries(record.data.content ?? {}).map(([field, value]) => (
+              {Object.entries(record.data.content ?? {}).sort(byDeclaredOrder).map(([field, value]) => (
                 <div key={field} style={{ display: 'contents' }}>
                   <dt title={field}>{labelOf.get(field) ?? field}</dt>
                   <dd>{typeof value === 'string' ? value : JSON.stringify(value)}</dd>

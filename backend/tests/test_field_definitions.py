@@ -143,3 +143,51 @@ def test_the_envelope_still_comes_from_the_definitions():
     assert header == {"subject": True, "preheader": True}
     assert registry.envelope_module_type("email") == "header"
     assert registry.envelope_module_type("push") is None
+
+
+# --- the order a record's fields are listed in (task-276) ---------------------
+
+def test_content_fields_come_in_the_modules_declared_order():
+    """Decided 2026-10-05: merged so every module's own order holds. The
+    Manager Workflow interview (Q2) asked for the manifest's declared order;
+    the route returned them sorted by name."""
+    names = [f["name"] for f in _get("/content/fields")]
+    assert names == [
+        "headline_hero", "button_label_hero",
+        "image_url", "image_alt", "headline_medium", "body_medium", "button_label",
+        "button_url",
+        "push_title", "push_body", "push_image_url", "push_link",
+    ]
+
+
+def test_every_listed_field_is_in_a_channel_group():
+    """A field `/content/fields` lists but no channel group holds could never
+    be written by PATCH, which merges by group."""
+    from app.content.service import content_field_groups
+
+    grouped = {name for names in content_field_groups().values() for name in names}
+    missing = [f["name"] for f in _get("/content/fields") if f["name"] not in grouped]
+    assert not missing, f"listed but in no channel group: {missing}"
+
+
+class TestMergingDeclaredOrders:
+    def test_a_field_every_module_puts_last_stays_last(self):
+        from app.content.service import merge_declared_orders
+
+        assert merge_declared_orders([["a", "b", "z"], ["x", "y", "z"]]) == ["a", "b", "x", "y", "z"]
+
+    def test_a_new_field_goes_after_its_predecessor_in_its_own_module(self):
+        from app.content.service import merge_declared_orders
+
+        assert merge_declared_orders([["a", "c"], ["a", "b", "c"]]) == ["a", "b", "c"]
+
+    def test_where_modules_disagree_the_first_one_wins(self):
+        from app.content.service import merge_declared_orders
+
+        assert merge_declared_orders([["a", "b"], ["b", "a"]]) == ["a", "b"]
+
+    def test_each_field_appears_once(self):
+        from app.content.service import merge_declared_orders
+
+        merged = merge_declared_orders([["a", "b"], ["b", "c"], ["a", "c"]])
+        assert sorted(merged) == ["a", "b", "c"] and len(merged) == 3

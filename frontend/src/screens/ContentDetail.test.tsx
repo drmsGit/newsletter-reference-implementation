@@ -9,14 +9,19 @@ afterEach(() => vi.unstubAllGlobals())
 
 const RECORD = {
   id: 42, title: 'Lisbon in spring', description: null, status: 'active',
-  content: { headline_hero: 'Lisbon', legacy_key: 'kept' },
+  // Stored in an order that is neither declared nor alphabetical.
+  content: { legacy_key: 'kept', button_url: 'https://x.test', headline_hero: 'Lisbon' },
   updated_at: '2026-10-04T10:00:00Z', latest_version_number: 1, unpublished_changes: false,
 }
 
 function open(campaigns: object[], total = campaigns.length) {
   const fetchMock = stubFetch({
     'GET /content/42': () => jsonResponse(RECORD),
-    'GET /content/fields': () => jsonResponse([{ name: 'headline_hero', label: 'Hero headline', type: 'text' }]),
+    'GET /content/fields': () =>
+      jsonResponse([
+        { name: 'headline_hero', label: 'Hero headline', type: 'text' },
+        { name: 'button_url', label: 'Button link', type: 'url' },
+      ]),
     'GET /content/42/campaigns': () => jsonResponse(page(campaigns, { total })),
   })
   renderWithProviders(
@@ -34,6 +39,13 @@ describe('a record\'s fields (task-271)', () => {
     expect(await screen.findByText('Hero headline')).toBeInTheDocument()
     expect(screen.queryByText('headline_hero')).not.toBeInTheDocument()
     expect(screen.getByText('legacy_key')).toBeInTheDocument()
+  })
+
+  it('are listed in the declared order, with undefined keys last (task-276)', async () => {
+    open([])
+    await screen.findByText('Hero headline')
+    const terms = [...document.querySelectorAll('dl.facts dt')].map((dt) => dt.textContent)
+    expect(terms.slice(-3)).toEqual(['Hero headline', 'Button link', 'legacy_key'])
   })
 })
 
