@@ -33,6 +33,8 @@ from app.content.models import (
     ContentCategoryAssignment,
     ContentCategoryAssignmentCreate,
     ContentCategoryAssignmentScore,
+    ChannelReadiness,
+    MachineReady,
     ContentVersion,
     ContentVersionCreate,
     ContentStatusUpdate,
@@ -78,16 +80,20 @@ def get_content_records(
         description="Only records assigned to this category directly (not its children), "
         "ordered by their score in it, highest first.",
     ),
+    ready_for: str | None = Query(
+        None, description="Only records a person marked ready for this channel (ADR-174)."),
     params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
     """One ADR-185 page of the brand's content records, newest first unless a
-    category orders them (ADR-175 addendum 2026-10-04)."""
+    category orders them (ADR-175 addendum 2026-10-04). Each row says which
+    channels it is ready for (task-283)."""
     from app.content.service import page_content_records
 
     return page_content_records(
         db, params, brand_id=brand_id, q=q, status=status, category_id=category_id,
+        ready_for=ready_for,
     )
 
 
@@ -151,9 +157,12 @@ def get_content_record_by_id(
     record = get_content_record(db, content_id, brand_id=brand_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Content record not found")
+    from app.content.service import readiness_of
+
     latest, unpublished = publish_state(db, record)
     return {**to_content_record(record).model_dump(),
-            "latest_version_number": latest, "unpublished_changes": unpublished}
+            "latest_version_number": latest, "unpublished_changes": unpublished,
+            "machine_ready": bool(record.machine_ready), "readiness": readiness_of(db, record)}
 
 
 def _record_edit(request, db, record, before: dict) -> None:
@@ -584,6 +593,104 @@ def get_content_assignments(
     if rows is None:
         raise HTTPException(status_code=404, detail="Content record not found")
     return rows
+
+
+def _is_integration(request: Request) -> bool:
+    from app.auth.db_models import IntegrationDB
+
+    return isinstance(request_principal(request), IntegrationDB)
+
+
+@router.put(
+    "/{content_id}/readiness/{channel}",
+    response_model=ChannelReadiness,
+    summary="Mark the record ready for a channel",
+    description=(
+        "A person's mark takes effect at once (ADR-174 point 4). An integration's mark "
+        "is to be held for a person in the approval inbox (task-206); until that exists "
+        "it is refused, so nothing goes through unheld. Marking again keeps the first "
+        "mark's who and when."
+    ),
+)
+def mark_record_ready(
+    content_id: int, channel: str, request: Request,
+    db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.content.service import mark_ready, readiness_warning
+
+    if _is_integration(request):
+        raise HTTPException(
+            status_code=403,
+            detail="An integration's readiness mark must be approved by a person, "
+                   "and that approval path is not built yet (task-206).",
+        )
+    try:
+        marked = mark_ready(db, content_id, channel, marked_by=actor_label(request_principal(request)),
+                            brand_id=brand_id)
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error))
+    if marked is None:
+        raise HTTPException(status_code=404, detail="Content record not found")
+    row, created = marked
+    if created:
+        _record_content_write(request, db, audit.CONTENT_READY_MARKED, content_id, {"channel": channel})
+    record = get_content_record(db, content_id, brand_id=brand_id)
+    return ChannelReadiness(channel=row.channel, marked_by=row.marked_by, marked_at=row.marked_at,
+                            warning=readiness_warning(record.content, channel))
+
+
+@router.delete(
+    "/{content_id}/readiness/{channel}",
+    status_code=204,
+    summary="Remove the record's mark for a channel",
+    description=(
+        "The safe direction, so a person or an integration may remove a mark directly "
+        "(ADR-174 addendum 2026-10-05, point 5). Removing a mark that is not there is "
+        "not an error."
+    ),
+)
+def unmark_record_ready(
+    content_id: int, channel: str, request: Request,
+    db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.content.service import unmark_ready
+
+    if get_content_record(db, content_id, brand_id=brand_id) is None:
+        raise HTTPException(status_code=404, detail="Content record not found")
+    try:
+        was = unmark_ready(db, content_id, channel, brand_id=brand_id)
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error))
+    if was is not None:
+        _record_content_write(request, db, audit.CONTENT_READY_UNMARKED, content_id, was)
+
+
+@router.put(
+    "/{content_id}/machine-ready",
+    response_model=MachineReady,
+    summary="Turn machine ready on or off",
+    description=(
+        "May a machine pick this record without a person deciding? People only: an "
+        "integration is refused, because the flag is the human gate on what machines "
+        "may pick (ADR-179 addendum 2026-10-05)."
+    ),
+)
+def set_record_machine_ready(
+    content_id: int, payload: MachineReady, request: Request,
+    db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.content.service import set_machine_ready
+
+    if _is_integration(request):
+        raise HTTPException(status_code=403, detail="Only a person may change machine ready.")
+    changed = set_machine_ready(db, content_id, payload.machine_ready, brand_id=brand_id)
+    if changed is None:
+        raise HTTPException(status_code=404, detail="Content record not found")
+    record, previous = changed
+    if previous != record.machine_ready:
+        _record_content_write(request, db, audit.CONTENT_MACHINE_READY_CHANGED, content_id,
+                              {"title": record.title, "from": previous, "to": record.machine_ready})
+    return MachineReady(machine_ready=record.machine_ready)
 
 
 @router.patch(

@@ -106,7 +106,8 @@ export interface paths {
         /**
          * Get Content Records
          * @description One ADR-185 page of the brand's content records, newest first unless a
-         *     category orders them (ADR-175 addendum 2026-10-04).
+         *     category orders them (ADR-175 addendum 2026-10-04). Each row says which
+         *     channels it is ready for (task-283).
          */
         get: operations["get_content_records_content__get"];
         put?: never;
@@ -403,6 +404,50 @@ export interface paths {
         /** The record's categories, with assignment id and score */
         get: operations["get_content_assignments_content__content_id__assignments_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/content/{content_id}/readiness/{channel}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Mark the record ready for a channel
+         * @description A person's mark takes effect at once (ADR-174 point 4). An integration's mark is to be held for a person in the approval inbox (task-206); until that exists it is refused, so nothing goes through unheld. Marking again keeps the first mark's who and when.
+         */
+        put: operations["mark_record_ready_content__content_id__readiness__channel__put"];
+        post?: never;
+        /**
+         * Remove the record's mark for a channel
+         * @description The safe direction, so a person or an integration may remove a mark directly (ADR-174 addendum 2026-10-05, point 5). Removing a mark that is not there is not an error.
+         */
+        delete: operations["unmark_record_ready_content__content_id__readiness__channel__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/content/{content_id}/machine-ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Turn machine ready on or off
+         * @description May a machine pick this record without a person deciding? People only: an integration is refused, because the flag is the human gate on what machines may pick (ADR-179 addendum 2026-10-05).
+         */
+        put: operations["set_record_machine_ready_content__content_id__machine_ready_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -3053,6 +3098,25 @@ export interface components {
              */
             relation_type: string;
         };
+        /**
+         * ChannelReadiness
+         * @description A record marked ready for one channel (ADR-174; task-283): who and when,
+         *     and the warning when the record can fill no module of that channel — said
+         *     by the server, so no client works it out (ADR-177).
+         */
+        ChannelReadiness: {
+            /** Channel */
+            channel: string;
+            /** Marked By */
+            marked_by?: string | null;
+            /**
+             * Marked At
+             * Format: date-time
+             */
+            marked_at: string;
+            /** Warning */
+            warning?: string | null;
+        };
         /** ChannelSetting */
         ChannelSetting: {
             /** Name */
@@ -3422,6 +3486,11 @@ export interface components {
             updated_at?: string | null;
             /** Latest Version Number */
             latest_version_number?: number | null;
+            /**
+             * Ready For
+             * @default []
+             */
+            ready_for: string[];
         };
         /** ContentOverride */
         ContentOverride: {
@@ -3572,6 +3641,16 @@ export interface components {
             latest_version_number?: number | null;
             /** Unpublished Changes */
             unpublished_changes: boolean;
+            /**
+             * Machine Ready
+             * @default false
+             */
+            machine_ready: boolean;
+            /**
+             * Readiness
+             * @default []
+             */
+            readiness: components["schemas"]["ChannelReadiness"][];
         };
         /** ContentResolutionUse */
         ContentResolutionUse: {
@@ -4201,6 +4280,11 @@ export interface components {
             credential: components["schemas"]["CredentialOut"];
             /** Secret Key */
             secret_key: string;
+        };
+        /** MachineReady */
+        MachineReady: {
+            /** Machine Ready */
+            machine_ready: boolean;
         };
         /** ModelChoice */
         ModelChoice: {
@@ -6068,6 +6152,8 @@ export interface operations {
                 status?: ("active" | "inactive") | null;
                 /** @description Only records assigned to this category directly (not its children), ordered by their score in it, highest first. */
                 category_id?: number | null;
+                /** @description Only records a person marked ready for this channel (ADR-174). */
+                ready_for?: string | null;
                 /** @description Rows per page (1-200). */
                 limit?: number;
                 /** @description Rows to skip. */
@@ -6742,6 +6828,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContentAssignment"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_record_ready_content__content_id__readiness__channel__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                content_id: number;
+                channel: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelReadiness"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unmark_record_ready_content__content_id__readiness__channel__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                content_id: number;
+                channel: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_record_machine_ready_content__content_id__machine_ready_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                content_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MachineReady"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MachineReady"];
                 };
             };
             /** @description Validation Error */

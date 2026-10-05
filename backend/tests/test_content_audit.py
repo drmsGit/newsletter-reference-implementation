@@ -188,7 +188,7 @@ def test_a_forced_delete_names_what_it_took_with_it(db, world, person):
                                             AuditEventDB.subject_id == w["record_id"]).all()
     assert entry.detail == {
         "title": f"{TAG} record", "category_assignments": 1, "versions": 1,
-        "modules_unbound": [w["module_id"]], "forced": True,
+        "modules_unbound": [w["module_id"]], "readiness_marks": 0, "forced": True,
     }
 
 

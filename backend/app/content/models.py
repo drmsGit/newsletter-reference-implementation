@@ -33,6 +33,21 @@ class ContentRecord(BaseModel):
     updated_at: datetime | None = None
 
 
+class ChannelReadiness(BaseModel):
+    """A record marked ready for one channel (ADR-174; task-283): who and when,
+    and the warning when the record can fill no module of that channel — said
+    by the server, so no client works it out (ADR-177)."""
+
+    channel: str
+    marked_by: str | None = None
+    marked_at: datetime
+    warning: str | None = None
+
+
+class MachineReady(BaseModel):
+    machine_ready: bool
+
+
 class ContentListItem(ContentRecord):
     """One row of `GET /content/`, with what the bind picker's "not published
     yet" notice needs (task-268, task-263 decision 6).
@@ -44,6 +59,8 @@ class ContentListItem(ContentRecord):
     """
 
     latest_version_number: int | None = None
+    #: The channels this record is marked ready for (task-283).
+    ready_for: list[str] = []
 
 
 class ContentRecordDetail(ContentRecord):
@@ -59,6 +76,10 @@ class ContentRecordDetail(ContentRecord):
     # True when the live content differs from the latest version, or when
     # nothing has been published yet.
     unpublished_changes: bool
+    #: ADR-179 point 2: may a machine pick this without a person deciding?
+    machine_ready: bool = False
+    #: The channels a person marked it ready for, each with its warning (ADR-174).
+    readiness: list[ChannelReadiness] = []
 
 
 class ContentCreate(BaseModel):

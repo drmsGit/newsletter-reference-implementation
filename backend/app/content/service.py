@@ -8,6 +8,7 @@ from app.content.db_models import (
     CategoryDB,
     CategoryRelationDB,
     ContentCategoryAssignmentDB,
+    ContentChannelReadinessDB,
     ContentVersionDB,
 )
 from app.content.models import ContentListItem, ContentRecord, Category, CategoryRelation, ContentVersion
@@ -358,11 +359,11 @@ def set_content_status(
 
 def page_content_records(
     db: Session, params, *, brand_id: int, q: str | None = None, status: str | None = None,
-    category_id: int | None = None,
+    category_id: int | None = None, ready_for: str | None = None,
 ):
     """One ADR-185 page of the brand's content records, narrowed by title or
-    description (part, any case), status and category — the same filters for
-    rows and total.
+    description (part, any case), status, category and the channel a record is
+    marked ready for (task-283) — the same filters for rows and total.
 
     A category means a direct assignment, the meaning a decision slot's
     `candidate_query` gives it: no expansion to child categories (ADR-175
@@ -393,6 +394,13 @@ def page_content_records(
         ))
     if status:
         query = query.filter(ContentRecordDB.status == status)
+    if ready_for:
+        query = query.filter(
+            db.query(ContentChannelReadinessDB.id)
+            .filter(ContentChannelReadinessDB.content_id == ContentRecordDB.id,
+                    ContentChannelReadinessDB.channel == ready_for)
+            .exists()
+        )
     # Ids rise with creation (the table records no creation time), so newest
     # first is id descending, which is also the tie-breaker (ADR-185 point 4).
     order = [ContentRecordDB.id.desc()]
@@ -406,11 +414,25 @@ def page_content_records(
         ).filter(ContentCategoryAssignmentDB.category_id == category_id)
         order.insert(0, ContentCategoryAssignmentDB.score.desc())
 
-    def convert(row) -> ContentListItem:
-        record, number = row
-        return ContentListItem(**to_content_record(record).model_dump(), latest_version_number=number)
+    def convert_all(rows) -> list[ContentListItem]:
+        # Which channels each record on the page is ready for, in one query
+        # for the page rather than one per row.
+        ready: dict[int, list[str]] = {}
+        ids = [record.id for record, _ in rows]
+        if ids:
+            for content_id, channel in (
+                db.query(ContentChannelReadinessDB.content_id, ContentChannelReadinessDB.channel)
+                .filter(ContentChannelReadinessDB.content_id.in_(ids))
+                .order_by(ContentChannelReadinessDB.channel)
+            ):
+                ready.setdefault(content_id, []).append(channel)
+        return [
+            ContentListItem(**to_content_record(record).model_dump(), latest_version_number=number,
+                            ready_for=ready.get(record.id, []))
+            for record, number in rows
+        ]
 
-    return page_of_query(query, params, *order, convert=convert)
+    return page_of_query(query, params, *order, convert_all=convert_all)
 
 
 def list_content_records(db: Session, *, brand_id: int) -> list[ContentRecord]:
@@ -745,6 +767,138 @@ def delete_category_assignment(
     db.delete(assignment)
     db.commit()
     return removed
+
+
+# --- readiness per channel, and machine ready (task-283) -----------------------
+# ADR-174 and ADR-179, their addenda of 2026-10-05.
+
+def _channel_or_refuse(channel: str):
+    from app.channels.registry import get_channel
+
+    manifest = get_channel(channel)
+    if manifest is None:
+        raise LookupError(f"No channel '{channel}'")
+    return manifest
+
+
+def readiness_warning(content: dict | None, channel: str) -> str | None:
+    """Why a mark for `channel` is doubtful, or None (ADR-174 addendum point 4).
+
+    It warns when the record can fill **no** module of the channel — every
+    catalogue module of it lacks a field it requires — and says what each kind
+    of module needs. `required` belongs to a module (ADR-177 point 4), so a gap
+    for one specific module is the picker's fit note's job, not this. A
+    channel with no catalogue module never warns.
+    """
+    from app.modules.registry import field_definitions, list_manifests
+
+    content = content or {}
+    labels = {name: spec.get("label") or name for name, spec in field_definitions().items()}
+
+    def filled(name: str) -> bool:
+        value = content.get(name)
+        return value is not None and not (isinstance(value, str) and not value.strip())
+
+    modules = sorted((m for m in list_manifests(channel) if m.cms), key=lambda m: m.name)
+    needs = [(m, [v.name for v in m.variables if v.required and v.source == "content" and not v.envelope])
+             for m in modules]
+    if not needs or any(all(filled(name) for name in required) for _, required in needs):
+        return None
+    _channel_or_refuse(channel)
+    # Named as the record page heads its channel sections ("Push", "Email"),
+    # not by the channel manifest's longer label ("Push notification").
+    title = channel.capitalize()
+    if len(needs) == 1:
+        missing = [labels[name] for name in needs[0][1] if not filled(name)]
+        return f"Marked ready for {title}, but {_and(missing)} {'is' if len(missing) == 1 else 'are'} empty"
+    by_requirement: dict[tuple[str, ...], list[str]] = {}
+    for module, required in needs:
+        by_requirement.setdefault(tuple(n for n in required if not filled(n)), []).append(module.label)
+    parts = [
+        f"{_and(names)} {'needs' if len(names) == 1 else 'need'} {_and([labels[n] for n in missing])}"
+        for missing, names in by_requirement.items()
+    ]
+    return f"Marked ready for {title}, but no {title} module can use it: {'; '.join(parts)}"
+
+
+def _and(items: list[str]) -> str:
+    return items[0] if len(items) == 1 else f"{', '.join(items[:-1])} and {items[-1]}"
+
+
+def readiness_of(db: Session, record: ContentRecordDB) -> list[dict]:
+    """The channels `record` is marked ready for, each with who, when and its warning."""
+    rows = (
+        db.query(ContentChannelReadinessDB)
+        .filter(ContentChannelReadinessDB.content_id == record.id)
+        .order_by(ContentChannelReadinessDB.channel)
+        .all()
+    )
+    return [
+        {"channel": row.channel, "marked_by": row.marked_by, "marked_at": row.marked_at,
+         "warning": readiness_warning(record.content, row.channel)}
+        for row in rows
+    ]
+
+
+def mark_ready(db: Session, content_id: int, channel: str, *, marked_by: str, brand_id: int):
+    """Mark a record ready for a channel (ADR-174 point 1). Marking again keeps
+    the first mark's who and when. Returns (row, created), or None if the
+    record is not the brand's. An unknown channel raises LookupError."""
+    _channel_or_refuse(channel)
+    if get_content_record(db, content_id, brand_id=brand_id) is None:
+        return None
+    existing = (
+        db.query(ContentChannelReadinessDB)
+        .filter(ContentChannelReadinessDB.content_id == content_id,
+                ContentChannelReadinessDB.channel == channel)
+        .first()
+    )
+    if existing is not None:
+        return existing, False
+    row = ContentChannelReadinessDB(content_id=content_id, channel=channel, marked_by=marked_by)
+    db.add(row)
+    try:
+        db.commit()
+    except IntegrityError:
+        # A concurrent mark won the race; the unique constraint caught it.
+        db.rollback()
+        return mark_ready(db, content_id, channel, marked_by=marked_by, brand_id=brand_id)
+    db.refresh(row)
+    return row, True
+
+
+def unmark_ready(db: Session, content_id: int, channel: str, *, brand_id: int) -> dict | None:
+    """Remove a channel mark. Returns the mark as it was (for the audit entry),
+    or None if there was none or the record is not the brand's."""
+    _channel_or_refuse(channel)
+    if get_content_record(db, content_id, brand_id=brand_id) is None:
+        return None
+    row = (
+        db.query(ContentChannelReadinessDB)
+        .filter(ContentChannelReadinessDB.content_id == content_id,
+                ContentChannelReadinessDB.channel == channel)
+        .first()
+    )
+    if row is None:
+        return None
+    was = {"channel": row.channel, "marked_by": row.marked_by,
+           "marked_at": row.marked_at.isoformat() if row.marked_at else None}
+    db.delete(row)
+    db.commit()
+    return was
+
+
+def set_machine_ready(db: Session, content_id: int, value: bool, *, brand_id: int):
+    """Turn machine ready on or off (ADR-179 point 2). Returns (record, previous)
+    or None. Who may call this is the route's question: people only."""
+    record = get_content_record(db, content_id, brand_id=brand_id)
+    if record is None:
+        return None
+    previous = bool(record.machine_ready)
+    record.machine_ready = value
+    db.commit()
+    db.refresh(record)
+    return record, previous
 
 
 def check_score(score) -> None:
@@ -1085,6 +1239,13 @@ def delete_content_record(
     db.query(ModuleInstanceDB).filter(
         ModuleInstanceDB.content_record_id == content_id
     ).update({ModuleInstanceDB.content_record_id: None})
+    # A readiness mark is a claim about this record, not a relation anyone
+    # would re-parent, so it goes with the record without asking (task-283).
+    summary["readiness_marks"] = (
+        db.query(ContentChannelReadinessDB)
+        .filter(ContentChannelReadinessDB.content_id == content_id)
+        .delete()
+    )
 
     db.delete(record)
     db.commit()

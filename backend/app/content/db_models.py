@@ -1,4 +1,4 @@
-from sqlalchemy import CheckConstraint, Column, Integer, String, ForeignKey, DateTime, JSON, func, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, Column, Integer, String, ForeignKey, DateTime, Index, JSON, false, func, UniqueConstraint
 
 from app.database import Base
 
@@ -24,6 +24,30 @@ class ContentRecordDB(Base):
         onupdate=func.now(),
         nullable=False,
     )
+    #: May a machine pick this without a person deciding? ADR-179 point 2 and
+    #: its 2026-10-05 addendum: set by a person only, false for a new record
+    #: (fail closed). Migration 0032 set every record existing then to true.
+    machine_ready = Column(Boolean, nullable=False, default=False, server_default=false())
+
+
+class ContentChannelReadinessDB(Base):
+    """A record marked ready for one channel by a person (ADR-174, its
+    2026-10-05 addendum; task-283). The row existing IS the mark; unmarking
+    deletes it and the audit log keeps the history, so a new channel costs no
+    migration. No brand column: the record carries it (ADR-172 point 5)."""
+
+    __tablename__ = "content_channel_readiness"
+    __table_args__ = (
+        UniqueConstraint("content_id", "channel", name="uq_content_channel_readiness_content_channel"),
+        Index("ix_content_channel_readiness_channel", "channel"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    content_id = Column(Integer, ForeignKey("content_records.id"), nullable=False)
+    channel = Column(String(50), nullable=False)
+    #: `actor_label` of whoever marked it — never from a request body.
+    marked_by = Column(String(255), nullable=True)
+    marked_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class CategoryDB(Base):

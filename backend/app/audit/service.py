@@ -83,6 +83,11 @@ CONTENT_CATEGORY_ASSIGNED = "content.category_assigned"
 CONTENT_CATEGORY_UNASSIGNED = "content.category_unassigned"
 # task-278: a score changed in place (ADR-080's 2026-10-04 addendum).
 CONTENT_CATEGORY_SCORE_CHANGED = "content.category_score_changed"
+# task-283: readiness per channel and machine ready (ADR-174, ADR-179 addenda
+# of 2026-10-05). The rows hold only the current mark; this log is the history.
+CONTENT_READY_MARKED = "content.ready_marked"
+CONTENT_READY_UNMARKED = "content.ready_unmarked"
+CONTENT_MACHINE_READY_CHANGED = "content.machine_ready_changed"
 # task-245: every settings write, both planes, and the access-control switch.
 SETTINGS_CHANGED = "settings.changed"
 # ADR-166's administration surface (task-50). Logged lines were the only trace
