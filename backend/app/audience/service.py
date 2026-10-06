@@ -261,6 +261,7 @@ def find_by_criteria(
     preference_category_id: int | None = None,
     min_preference_score: float | None = None,
     exclude_ids: set[int] | None = None,
+    not_agreed: bool = False,
 ) -> list[RecipientDB]:
     # Consent gate: audiences are resolved only from consenting recipients.
     # Filtering here — at audience-resolution time, before any decisioning or
@@ -285,7 +286,25 @@ def find_by_criteria(
     # as `resolve_audience`'s own channel default (ADR-176 addendum
     # 2026-09-27), one layer further in, which is why `channel` is required
     # here too rather than defaulted for convenience.
-    q = db.query(RecipientDB).filter(is_consenting_filter(brand_id, channel, purpose=MARKETING))
+    #
+    # `not_agreed=True` turns the gate around, **for a count and nothing else**
+    # (task-213, the user 2026-10-06): the people the same criteria match who
+    # have NOT agreed to this channel, among those this brand has any consent
+    # record with — a recipient is not a brand's, so without that condition
+    # the count would include another brand's contacts. Only
+    # `audience_arithmetic` asks, and it keeps the length, never the rows.
+    if not_agreed:
+        from sqlalchemy import exists
+
+        from app.recipients.consent import CONSENTING_STATUS, consenting_status_expr
+        from app.recipients.db_models import ConsentEventDB
+
+        q = db.query(RecipientDB).filter(
+            func.coalesce(consenting_status_expr(brand_id, channel, purpose=MARKETING), "") != CONSENTING_STATUS,
+            exists().where(ConsentEventDB.recipient_id == RecipientDB.id, ConsentEventDB.brand_id == brand_id),
+        )
+    else:
+        q = db.query(RecipientDB).filter(is_consenting_filter(brand_id, channel, purpose=MARKETING))
 
     if language:
         q = q.filter(RecipientDB.language == language)
@@ -370,7 +389,7 @@ def bulk_add_members(
 # ---------------------------------------------------------------------------
 
 def _recipients_for_criteria(
-    db: Session, criteria: dict, brand_id: int, channel: str
+    db: Session, criteria: dict, brand_id: int, channel: str, *, not_agreed: bool = False,
 ) -> list[RecipientDB]:
     """Resolve one block's criteria to consenting recipients. Thin adapter over
     find_by_criteria so blocks and the older bulk-add path share one definition
@@ -389,6 +408,7 @@ def _recipients_for_criteria(
         status=criteria.get("status") or None,
         preference_category_id=int(cat) if cat not in (None, "") else None,
         min_preference_score=criteria.get("min_score"),
+        not_agreed=not_agreed,
     )
 
 
@@ -571,7 +591,8 @@ def preview_group(
             "count": count_for_criteria(db, criteria, group.brand_id, channel),
         })
 
-    resolved = resolve_audience(db, group.id, channel=channel)
+    # One computation for the audience and how it was arrived at (task-213).
+    resolved, arithmetic = _resolve(db, group.id, channel, with_arithmetic=True)
     gate = run_exclusion_stack(db, {r.id for r in resolved}, group.brand_id, channel=channel, purpose=MARKETING)
     reachable = [r for r in resolved if r.id in gate.eligible]
     from app.recipients import search
@@ -584,6 +605,7 @@ def preview_group(
     return {
         "channel": channel,
         "blocks": blocks,
+        "arithmetic": arithmetic,
         "resolved_count": len(resolved),
         "reachable_count": len(reachable),
         "unreachable_count": len(resolved) - len(reachable),
@@ -651,6 +673,38 @@ def resolve_audience(
     resolved to nobody and the planner reported "0 consenting recipients".
     The send path passes the variant's channel; a screen previewing a group
     with no variant in hand asks, because there is no channel-less count."""
+    return _resolve(db, group_id, channel)[0]
+
+
+def audience_arithmetic(db: Session, group_id: int, channel: str) -> dict | None:
+    """How the audience on `channel` was arrived at (task-213; Manager Workflow
+    interview Q4.3): the working, not just the total. The terms add up —
+
+        matched_rules − not_agreed + added_by_hand − removed_by_exclusion
+        − dropped_by_consent = total
+
+    - `matched_rules`: people the include blocks match, among those this brand
+      has a consent record with;
+    - `not_agreed`: of them, those not agreed to this channel — **counted,
+      never listed** (the user, 2026-10-06);
+    - `added_by_hand`: pins the rules did not already include;
+    - `removed_by_exclusion`: removed by an exclude block, and
+      `removed_hand_added` how many of those were hand-added — an add an
+      exclusion overrode (ADR-176 point 1), which a bare count would hide;
+    - `dropped_by_consent`: hand-added people not agreed to this channel;
+    - `total`: the audience `resolve_audience` returns, as of now — a send
+      resolves it again when it goes out.
+
+    Per channel, always (ADR-176 point 5). None when the group does not exist.
+    Computed by the same `_resolve` as the audience itself, so the number and
+    the people cannot disagree.
+    """
+    return _resolve(db, group_id, channel, with_arithmetic=True)[1]
+
+
+def _resolve(db: Session, group_id: int, channel: str, *, with_arithmetic: bool = False):
+    """`(audience, arithmetic or None)` — the one computation behind
+    `resolve_audience` and `audience_arithmetic`."""
     # The brand comes from the GROUP, never from the caller's working context.
     # A group belongs to exactly one brand (ADR-150 point 2), so resolving it
     # gates on that brand's consent — and a manager who switched brand between
@@ -658,7 +712,7 @@ def resolve_audience(
     # Same reasoning as `brand_for_snapshot` on the delivery side.
     group = group_regardless_of_brand(db, group_id)
     if group is None:
-        return []
+        return [], None
     brand_id = group.brand_id
 
     # The group's brand, not the caller's — so the blocks read here are the
@@ -667,23 +721,25 @@ def resolve_audience(
 
     include_ids: set[int] = set()
     exclude_ids: set[int] = set()
+    not_agreed_ids: set[int] = set()
     for block in blocks:
         ids = {r.id for r in _recipients_for_criteria(db, block.criteria, brand_id, channel)}
         if block.kind == "exclude":
             exclude_ids |= ids
         else:
             include_ids |= ids
+            if with_arithmetic:
+                # Counted only: the rows go no further than `len` below.
+                not_agreed_ids |= {r.id for r in _recipients_for_criteria(
+                    db, block.criteria, brand_id, channel, not_agreed=True)}
 
     # Pins join the rule-driven set and the excludes subtract from both
     # (ADR-176 point 1). The parenthesisation IS the decision — moving the
     # union outside the subtraction restores the 2026-07-26 rule that a pin
     # always survives, which is the failure that sends mail to somebody a
     # manager excluded on purpose.
-    final_ids = (
-        include_ids | get_member_recipient_ids(db, group_id, brand_id=brand_id)
-    ) - exclude_ids
-    if not final_ids:
-        return []
+    pins = get_member_recipient_ids(db, group_id, brand_id=brand_id)
+    final_ids = (include_ids | pins) - exclude_ids
 
     records = (
         db.query(RecipientDB)
@@ -694,8 +750,18 @@ def resolve_audience(
         )
         .order_by(RecipientDB.id.asc())
         .all()
-    )
-    return records
+    ) if final_ids else []
+    if not with_arithmetic:
+        return records, None
+    return records, {
+        "matched_rules": len(include_ids | not_agreed_ids),
+        "not_agreed": len(not_agreed_ids),
+        "added_by_hand": len(pins - include_ids),
+        "removed_by_exclusion": len((include_ids | pins) & exclude_ids),
+        "removed_hand_added": len(pins & exclude_ids),
+        "dropped_by_consent": len(final_ids) - len(records),
+        "total": len(records),
+    }
 
 
 # ---------------------------------------------------------------------------

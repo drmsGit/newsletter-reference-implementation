@@ -37,6 +37,41 @@ export default function AudienceDetail() {
   )
 }
 
+type Arithmetic = NonNullable<ReturnType<typeof useAudiencePreview>['data']>['arithmetic']
+
+/**
+ * How the audience on one channel is arrived at (task-213; Manager Workflow
+ * interview Q4.3): the working, not just the total, so a manager can see where
+ * people went — a hand-add an exclusion overrode included (ADR-176 point 1).
+ * The server's terms add up to the total; "not agreed" is a count only.
+ */
+function Working({ arithmetic: a, channel }: { arithmetic: Arithmetic; channel: string }) {
+  const rows: [string, string, string?][] = [
+    ['Match the rules', String(a.matched_rules)],
+    [`Not agreed to ${channel}`, `−${a.not_agreed}`],
+    ['Added by hand', `+${a.added_by_hand}`],
+    ['Removed by exclusion segments', `−${a.removed_by_exclusion}`,
+      a.removed_hand_added > 0 ? ` (${a.removed_hand_added} of them added by hand)` : undefined],
+    [`Added by hand, not agreed to ${channel}`, `−${a.dropped_by_consent}`],
+    ['In the audience', String(a.total)],
+  ]
+  return (
+    <table className="working" aria-label={`How the audience on ${channel} is arrived at`}>
+      <tbody>
+        {rows.map(([label, value, note]) => (
+          <tr key={label}>
+            <th scope="row">
+              {label}
+              {note && <span className="muted">{note}</span>}
+            </th>
+            <td>{value}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
 /**
  * Who a send to this group would reach, on one channel (2026-10-03).
  *
@@ -77,9 +112,9 @@ function Reach({ groupId }: { groupId: number }) {
       <ScreenState query={preview}>
         {preview.data && (
           <>
+            <Working arithmetic={preview.data.arithmetic} channel={channel} />
+            <p className="muted">As of now: a send works this out again when it goes out.</p>
             <dl className="facts">
-              <dt>Matched by the rules</dt>
-              <dd>{preview.data.resolved_count}</dd>
               <dt>Reachable on {channel}</dt>
               <dd>{preview.data.reachable_count}</dd>
               {Object.entries(preview.data.dropped_by_stage).map(([stage, count]) => (

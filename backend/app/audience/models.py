@@ -105,6 +105,23 @@ class PreviewRecipient(BaseModel):
     address: str | None = None
 
 
+class AudienceArithmetic(BaseModel):
+    """How the audience on one channel was arrived at (task-213; Manager
+    Workflow interview Q4.3). The terms add up: `matched_rules − not_agreed +
+    added_by_hand − removed_by_exclusion − dropped_by_consent = total`.
+    `not_agreed` is a count only, among people this brand has a consent record
+    with; `removed_hand_added` is the part of `removed_by_exclusion` a manager
+    had added by hand. As of now: a send resolves the audience again."""
+
+    matched_rules: int
+    not_agreed: int
+    added_by_hand: int
+    removed_by_exclusion: int
+    removed_hand_added: int
+    dropped_by_consent: int
+    total: int
+
+
 class AudiencePreview(BaseModel):
     """What sending to a group on one channel would reach (task-50, B27).
 
@@ -116,6 +133,7 @@ class AudiencePreview(BaseModel):
     group_id: int
     channel: str
     blocks: list[PreviewBlock]
+    arithmetic: AudienceArithmetic
     resolved_count: int
     reachable_count: int
     unreachable_count: int

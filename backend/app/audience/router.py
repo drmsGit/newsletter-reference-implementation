@@ -123,6 +123,7 @@ def preview_group(
         group_id=group.id,
         channel=preview["channel"],
         blocks=[PreviewBlock(**b) for b in preview["blocks"]],
+        arithmetic=preview["arithmetic"],
         resolved_count=preview["resolved_count"],
         reachable_count=preview["reachable_count"],
         unreachable_count=preview["unreachable_count"],

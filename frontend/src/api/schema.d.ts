@@ -2577,6 +2577,31 @@ export interface components {
              */
             mode: "auto_apply" | "require_approval";
         };
+        /**
+         * AudienceArithmetic
+         * @description How the audience on one channel was arrived at (task-213; Manager
+         *     Workflow interview Q4.3). The terms add up: `matched_rules − not_agreed +
+         *     added_by_hand − removed_by_exclusion − dropped_by_consent = total`.
+         *     `not_agreed` is a count only, among people this brand has a consent record
+         *     with; `removed_hand_added` is the part of `removed_by_exclusion` a manager
+         *     had added by hand. As of now: a send resolves the audience again.
+         */
+        AudienceArithmetic: {
+            /** Matched Rules */
+            matched_rules: number;
+            /** Not Agreed */
+            not_agreed: number;
+            /** Added By Hand */
+            added_by_hand: number;
+            /** Removed By Exclusion */
+            removed_by_exclusion: number;
+            /** Removed Hand Added */
+            removed_hand_added: number;
+            /** Dropped By Consent */
+            dropped_by_consent: number;
+            /** Total */
+            total: number;
+        };
         /** AudienceGroup */
         AudienceGroup: {
             /** Id */
@@ -2669,6 +2694,7 @@ export interface components {
             channel: string;
             /** Blocks */
             blocks: components["schemas"]["PreviewBlock"][];
+            arithmetic: components["schemas"]["AudienceArithmetic"];
             /** Resolved Count */
             resolved_count: number;
             /** Reachable Count */
