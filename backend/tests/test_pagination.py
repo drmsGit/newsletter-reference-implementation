@@ -35,6 +35,7 @@ PAGED = {
     "/recipients/consent/sync-log",
     "/recipients/consent/drift",
     "/content/{content_id}/campaigns",
+    "/recipients/{recipient_id}/audience-groups",
 }
 
 #: Lists fixed by code or configuration, or bounded by one parent record

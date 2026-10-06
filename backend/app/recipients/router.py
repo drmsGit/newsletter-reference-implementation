@@ -8,6 +8,7 @@ from app.auth.dependencies import working_brand
 from app.pagination import Page, PageParams, page_of_list, page_params
 from app.database import get_db
 from app.recipients.models import (
+    RecipientAudienceGroup,
     RecipientActivity,
     ConsentDriftItem,
     ConsentSyncLog,
@@ -270,3 +271,32 @@ def get_recipient_activity(
     if activity is None:
         raise HTTPException(status_code=404, detail=f"Recipient {recipient_id} not found")
     return activity
+
+
+@router.get(
+    "/{recipient_id}/audience-groups",
+    response_model=Page[RecipientAudienceGroup],
+    summary="Which of the working brand's audience groups one person is in, and why",
+    description=(
+        "Worked out on request for this person on `channel`, as of now; nothing is stored "
+        "(task-214, ADR-093). Lists the groups a rule matches or a hand-add touches, each with "
+        "`member` and its reasons, paged like the group list (ADR-185). `channel` is required: "
+        "there is no channel-less answer (ADR-176 point 5). 404 when the recipient does not exist."
+    ),
+)
+def get_recipient_audience_groups(
+    recipient_id: int,
+    channel: str = Query(...),
+    params: PageParams = Depends(page_params),
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    from app.audience.service import audience_memberships
+    from app.channels.registry import is_registered
+    from app.recipients.db_models import RecipientDB
+
+    if not is_registered(channel):
+        raise HTTPException(status_code=422, detail=f"{channel!r} is not a registered channel.")
+    if db.get(RecipientDB, recipient_id) is None:
+        raise HTTPException(status_code=404, detail=f"Recipient {recipient_id} not found")
+    return page_of_list(audience_memberships(db, recipient_id, brand_id=brand_id, channel=channel), params)

@@ -262,6 +262,7 @@ def find_by_criteria(
     min_preference_score: float | None = None,
     exclude_ids: set[int] | None = None,
     not_agreed: bool = False,
+    only_ids: set[int] | None = None,
 ) -> list[RecipientDB]:
     # Consent gate: audiences are resolved only from consenting recipients.
     # Filtering here — at audience-resolution time, before any decisioning or
@@ -312,6 +313,10 @@ def find_by_criteria(
         q = q.filter(RecipientDB.status == status)
     if exclude_ids:
         q = q.filter(RecipientDB.id.notin_(exclude_ids))
+    if only_ids is not None:
+        # One person checked against a rule (task-214), the same definition of
+        # the rule as every audience, without resolving the whole segment.
+        q = q.filter(RecipientDB.id.in_(only_ids))
 
     # Ordered by id since the address is no longer a column (ADR-163 point 2).
     # This also makes deduplication deterministic: two recipients sharing an
@@ -390,6 +395,7 @@ def bulk_add_members(
 
 def _recipients_for_criteria(
     db: Session, criteria: dict, brand_id: int, channel: str, *, not_agreed: bool = False,
+    only_ids: set[int] | None = None,
 ) -> list[RecipientDB]:
     """Resolve one block's criteria to consenting recipients. Thin adapter over
     find_by_criteria so blocks and the older bulk-add path share one definition
@@ -409,6 +415,7 @@ def _recipients_for_criteria(
         preference_category_id=int(cat) if cat not in (None, "") else None,
         min_preference_score=criteria.get("min_score"),
         not_agreed=not_agreed,
+        only_ids=only_ids,
     )
 
 
@@ -700,6 +707,65 @@ def audience_arithmetic(db: Session, group_id: int, channel: str) -> dict | None
     the people cannot disagree.
     """
     return _resolve(db, group_id, channel, with_arithmetic=True)[1]
+
+
+def audience_memberships(db: Session, recipient_id: int, *, brand_id: int, channel: str) -> list[dict]:
+    """Which of this brand's audience groups one person is in on `channel`,
+    and why (task-214; Manager Workflow interview Q4.5, "why did Anna get
+    this").
+
+    Worked out on request, for this one person, as of now — the user's
+    decision, 2026-10-06. Rule-based membership is never stored (only
+    hand-adds are rows), and storing it would make derived audience data
+    authoritative ([[ADR-093]]); so each group's rules are checked against
+    this person alone, with the same definitions `_resolve` uses. `member`
+    is exactly whether a send resolving the group now would include them.
+
+    Lists only the groups that touch the person — a rule matches (whether or
+    not they agreed to the channel) or they were added by hand — in name
+    order. Each carries its reasons, in this order: the include rules that
+    match (`rule`), `pinned`, the exclude rules that remove them
+    (`excluded`), and `not_agreed` when they have not agreed to the channel.
+    Per channel, always (ADR-176 point 5).
+    """
+    only = {recipient_id}
+    agreed = db.query(RecipientDB.id).filter(
+        RecipientDB.id == recipient_id, is_consenting_filter(brand_id, channel, purpose=MARKETING),
+    ).first() is not None
+    rows = []
+    for group in (db.query(AudienceGroupDB).filter(AudienceGroupDB.brand_id == brand_id)
+                  .order_by(AudienceGroupDB.name.asc(), AudienceGroupDB.id.asc())):
+        blocks = list_blocks(db, group.id, brand_id=brand_id)
+        reasons, matched_agreed, excluded = [], False, False
+        for block in blocks:
+            if block.kind == "exclude":
+                continue
+            hit = bool(_recipients_for_criteria(db, block.criteria, brand_id, channel, only_ids=only))
+            if not hit:
+                hit = bool(_recipients_for_criteria(
+                    db, block.criteria, brand_id, channel, not_agreed=True, only_ids=only))
+            else:
+                matched_agreed = True
+            if hit:
+                reasons.append({"kind": "rule", "label": block.label or f"Rule {block.id}"})
+        pinned = recipient_id in get_member_recipient_ids(db, group.id, brand_id=brand_id)
+        if not reasons and not pinned:
+            continue
+        if pinned:
+            reasons.append({"kind": "pinned", "label": None})
+        for block in blocks:
+            if block.kind == "exclude" and _recipients_for_criteria(db, block.criteria, brand_id, channel, only_ids=only):
+                excluded = True
+                reasons.append({"kind": "excluded", "label": block.label or f"Rule {block.id}"})
+        if not agreed:
+            reasons.append({"kind": "not_agreed", "label": channel})
+        rows.append({
+            "group_id": group.id, "group_name": group.name,
+            # ADR-176 point 1's order, for one person: (rules ∪ pins) − exclusions, then consent.
+            "member": (matched_agreed or pinned) and not excluded and agreed,
+            "reasons": reasons,
+        })
+    return rows
 
 
 def _resolve(db: Session, group_id: int, channel: str, *, with_arithmetic: bool = False):

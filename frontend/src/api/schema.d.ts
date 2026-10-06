@@ -1638,6 +1638,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/recipients/{recipient_id}/audience-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which of the working brand's audience groups one person is in, and why
+         * @description Worked out on request for this person on `channel`, as of now; nothing is stored (task-214, ADR-093). Lists the groups a rule matches or a hand-add touches, each with `member` and its reasons, paged like the group list (ADR-185). `channel` is required: there is no channel-less answer (ADR-176 point 5). 404 when the recipient does not exist.
+         */
+        get: operations["get_recipient_audience_groups_recipients__recipient_id__audience_groups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/provider/events": {
         parameters: {
             query?: never;
@@ -4345,6 +4365,18 @@ export interface components {
             /** Machine Ready */
             machine_ready: boolean;
         };
+        /**
+         * MembershipReason
+         * @description Why one person is in or out of a group (task-214): `rule` (an include
+         *     rule that matches, `label` its name), `pinned` (added by hand), `excluded`
+         *     (an exclude rule that removes them) or `not_agreed` (`label` the channel).
+         */
+        MembershipReason: {
+            /** Kind */
+            kind: string;
+            /** Label */
+            label?: string | null;
+        };
         /** ModelChoice */
         ModelChoice: {
             /** Model */
@@ -4758,6 +4790,17 @@ export interface components {
             /** Offset */
             offset: number;
         };
+        /** Page[RecipientAudienceGroup] */
+        Page_RecipientAudienceGroup_: {
+            /** Items */
+            items: components["schemas"]["RecipientAudienceGroup"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
         /** Page[Recipient] */
         Page_Recipient_: {
             /** Items */
@@ -5133,6 +5176,22 @@ export interface components {
             is_primary: boolean;
             /** Verified At */
             verified_at?: string | null;
+        };
+        /**
+         * RecipientAudienceGroup
+         * @description One audience group as it stands for one person on one channel, as of
+         *     now (task-214). `member` is exactly whether a send resolving the group now
+         *     would include them.
+         */
+        RecipientAudienceGroup: {
+            /** Group Id */
+            group_id: number;
+            /** Group Name */
+            group_name: string;
+            /** Member */
+            member: boolean;
+            /** Reasons */
+            reasons: components["schemas"]["MembershipReason"][];
         };
         /** RecipientConsentEvent */
         RecipientConsentEvent: {
@@ -9237,6 +9296,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RecipientActivity"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_recipient_audience_groups_recipients__recipient_id__audience_groups_get: {
+        parameters: {
+            query: {
+                channel: string;
+                /** @description Rows per page (1-200). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                recipient_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_RecipientAudienceGroup_"];
                 };
             };
             /** @description Validation Error */

@@ -227,3 +227,23 @@ class RecipientActivity(BaseModel):
     deliveries: list[RecipientDelivery]
     consent_grid: list[dict]
     consent_history: list[RecipientConsentEvent]
+
+
+class MembershipReason(BaseModel):
+    """Why one person is in or out of a group (task-214): `rule` (an include
+    rule that matches, `label` its name), `pinned` (added by hand), `excluded`
+    (an exclude rule that removes them) or `not_agreed` (`label` the channel)."""
+
+    kind: str
+    label: str | None = None
+
+
+class RecipientAudienceGroup(BaseModel):
+    """One audience group as it stands for one person on one channel, as of
+    now (task-214). `member` is exactly whether a send resolving the group now
+    would include them."""
+
+    group_id: int
+    group_name: str
+    member: bool
+    reasons: list[MembershipReason]
