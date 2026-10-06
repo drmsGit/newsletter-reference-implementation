@@ -4,11 +4,13 @@ title: Engagement in the audience editor
 status: To Do
 assignee: []
 created_date: '2026-10-06 19:59'
+updated_date: '2026-10-06 21:21'
 labels:
   - frontend
 dependencies:
   - TASK-296
   - TASK-297
+  - TASK-300
 type: feature
 ordinal: 200391
 ---

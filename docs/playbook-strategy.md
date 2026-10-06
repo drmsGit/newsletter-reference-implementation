@@ -577,6 +577,18 @@ Recorded in ADR-188 and [[Audience Write Surface - final design pass]].
 
 **Status:** decided, not built. Build tasks task-295 to task-298.
 
+### 2026-10-06 — A rule can name several categories, each with its own score
+
+**Context:** using the new editor (task-297), the user could not write "language de, active, Nature ≥ 5 or Wellness ≥ 5" as one rule: category interest took a single category, and a second rule with only Wellness let in every language. The decision already said a field takes several values; the build had not applied it to categories.
+
+1. **Several categories in one rule**, any one of them enough, each with its own minimum score (above 0, 1.0 filled in).
+2. **Not the pattern:** leaving out the complement ("leave out en, fr, nl") instead of saying "de" — it silently lets in people with no language and any new one.
+3. **Recorded as the next step, not built:** an "Everyone must also" section applying conditions to every "Who's in" rule, for an "or" across different fields. Taken when real cases need it; engagement (task-298) is the likely source.
+
+Recorded in the 2026-10-06 addendum to [[ADR-188 — Audience Rules Are Flat, and May Read Engagement History]].
+
+**Status:** decided, not built. Build task task-300, before task-298.
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*

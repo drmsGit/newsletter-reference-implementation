@@ -126,6 +126,43 @@ The words "blocklist" and "suppression" do not appear, so nobody is led to keep 
 - **Not a supersession, and no record's Decision changes.** ADR-176 point 3 gains wording from point 6 but keeps its statement that the schema cannot express the distinction. A short dated addendum on ADR-176 is proposed in the report that came with this record. It is not applied here.
 - **The decision log carries it.** `docs/playbook-strategy.md` §5 has the entry "2026-10-06 — The audience editor is decided". That entry's points 2 and 3 summarise this record's rule language, point 1 carries the "Who's in" and "Leave out" sections, and point 6 is the task-294 boundary. This record does not depart from it.
 
+## Addendum 2026-10-06 — Category interest takes several categories, each with its own score
+
+**What prompted it.** The user used the new React audience editor (task-297) on the day this record was accepted. They built a rule: language de, status active, category Nature ≥ 5. They then wanted to add Wellness ≥ 5, and could not, because category interest took one category per rule. A second rule with only Wellness would also bring in every other language and status. So "de and active and (Nature or Wellness)" had to be written as two rules, each repeating "de, active".
+
+That contradicts point 1: "a field takes one or more values". The first build kept category interest single-valued in two places:
+
+- the server's criteria check, `normalise_criteria` in `backend/app/audience/service.py` (task-295);
+- the editor's rule form, `frontend/src/screens/AudienceRules.tsx` (task-297).
+
+This section applies point 1 to category interest. It is not a new rule. The user decided it in chat on 2026-10-06.
+
+**1. A category-interest field takes one or more categories.** They combine with OR inside the field, as point 1 says. A person matches when they clear the threshold in any one of the listed categories.
+
+**2. Each category has its own minimum score.** "Nature ≥ 5 or Wellness ≥ 3" is one field. Point 3 holds per category: every listed category carries a score, the score must be above `0`, and the editor fills in `1.0`.
+
+**3. The shared condition stays in the rule.** The user's example is one rule: language de, status active, category interest Nature ≥ 5 or Wellness ≥ 5.
+
+**Settled in the final design pass.** These follow from points 1 to 3 above. They were not asked of the user separately.
+
+- **Stored shape.** A rule's criteria store category interest as a list: `categories: [{category_id, min_score}, …]`. Stored rules are always the list. A migration rewrites the existing rules.
+- **The old single pair is still accepted as input.** A `category_id` with a `min_score` is normalised to a one-entry list. This keeps the Jinja form and existing integrations working. It is the same courtesy the group's version token gives them: a caller that sends none is still accepted ([[Audience Write Surface - final design pass]]).
+- **Suggested rules keep one category each.** "Recalculate from campaign" (`recalculate_suggested_blocks`) applies only the difference per category. It keeps matching a suggested rule by its single category, so suggestions are never merged into one rule. Recalculation stays manual, as [[Manager Workflow - design interview]] Cluster 4, question 7 decided.
+
+**Recorded, not built: an "Everyone must also" section.** A third section beside "Who's in" and "Leave out" would hold conditions that apply to every "Who's in" rule. That gives "X and (Y or Z)" across different fields without nested groups. The example: German speakers who are Nature fans, or who clicked the last issue.
+
+- Point 1 says nested groups wait until a real case needs them. This section is the planned next step when such cross-field ORs appear in real use.
+- Engagement in the editor (task-298) is the most likely source of them.
+- Taking that step would change point 1, so it needs its own decision when the time comes: a further addendum or a superseding record.
+
+**Consequences.**
+
+- **Fewer cases need the repeated condition.** Point 1's Negative, "a genuinely nested condition needs two or more rules", now covers only ORs across different fields. An OR across categories is one field, as an OR across languages already was.
+- **Every reader of a stored category changes with the migration.** Code that reads `category_id` or `min_score` from stored criteria must read the list instead. That includes resolution, the criteria preview and the suggested-rule matching above.
+- **A complement is not the pattern for the shared condition.** "Leave out en, fr, nl" in place of "language de" silently lets in people with no language and any language that appears later. It also makes the rule read as the opposite of what it means.
+
+Nothing here changes the Decision section above.
+
 ## Related ADRs
 
 ### Depends On
