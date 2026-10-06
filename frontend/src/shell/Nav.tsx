@@ -15,6 +15,7 @@ export const SCREENS = [
   { to: '/monitoring', label: 'Monitoring', go: 'm' },
   { to: '/content', label: 'Content', go: 't' },
   { to: '/audiences', label: 'Audiences', go: 'u' },
+  { to: '/recipients', label: 'Recipients', go: 'r' },
   { to: '/deliveries', label: 'Deliveries', go: 'd' },
   // Supporting, read-mostly screens after the core loop.
   { to: '/decision-slots', label: 'Decision slots', go: 's' },

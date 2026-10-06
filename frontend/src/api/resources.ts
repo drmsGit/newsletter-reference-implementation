@@ -125,6 +125,33 @@ export function useAudienceGroups(offset = 0, q = '') {
   })
 }
 
+/** The recipient list, found by identifier or address on the server (task-292). */
+export function useRecipients(offset = 0, q = '') {
+  return useQuery({
+    queryKey: ['recipients', 'page', offset, q],
+    queryFn: () => read(api.GET('/recipients/', { params: { query: { limit: PAGE_SIZE, offset, q: q || undefined } } })),
+  })
+}
+
+/** One person as the recipient page shows them, from the working brand (task-50). */
+export function useRecipientActivity(id: number) {
+  return useQuery({
+    queryKey: ['recipients', id, 'activity'],
+    queryFn: () => read(api.GET('/recipients/{recipient_id}/activity', { params: { path: { recipient_id: id } } })),
+  })
+}
+
+/** Which groups the person is in on `channel`, and why, as of now (task-214). */
+export function useRecipientGroups(id: number, channel: string, offset = 0) {
+  return useQuery({
+    queryKey: ['recipients', id, 'audience-groups', channel, offset],
+    queryFn: () =>
+      read(api.GET('/recipients/{recipient_id}/audience-groups', {
+        params: { path: { recipient_id: id }, query: { channel, limit: PAGE_SIZE, offset } },
+      })),
+  })
+}
+
 export function useAudienceGroup(id: number) {
   return useQuery({
     queryKey: keys.audienceGroup(id),
