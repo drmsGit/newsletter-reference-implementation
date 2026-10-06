@@ -562,6 +562,21 @@ Recorded in [[ADR-187 — A Manager Hides Fields Per Module, and Required Means 
 
 **Status:** decided, not built. Build tasks task-289 to task-291.
 
+### 2026-10-06 — The audience editor is decided
+
+**Context:** the React client could show an audience but not create or edit one (task-293, raised by the user). Decided with the user one question at a time.
+
+1. **The group's page is the editor**: rules in "Who's in" and "Leave out", hand-added people below, the arithmetic beside them updating after each saved change, per channel.
+2. **Rules stay flat** ([[ADR-188 — Audience Rules Are Flat, and May Read Engagement History]]): a field takes several values; values OR, fields AND, rules OR, exclusions subtract — no nested groups. A category always carries a score, so "interested in Beach" never means everyone.
+3. **Engagement can be used in a rule**: received, opened or clicked, for a send, a campaign or any, in a fixed or relative period. "Opened" stays in — the company's call, and what reminders use. "Did not" is an exclusion.
+4. **People added by hand** carry an optional reason and who added them; a list can be pasted (identifiers or email addresses, a report first, nobody created, up to 5,000); no CSV wizard.
+5. **A group a send uses cannot be deleted**; every write states the group's version and is audited.
+6. **CRM attributes and sales or product data** are a separate architectural decision: task-294 (synced and stored, or pulled when needed).
+
+Recorded in ADR-188 and [[Audience Write Surface - final design pass]].
+
+**Status:** decided, not built. Build tasks task-295 to task-298.
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*

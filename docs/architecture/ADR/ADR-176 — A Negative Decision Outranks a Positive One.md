@@ -189,6 +189,26 @@ cleanup and it was right — a control that says *force* and can be overruled is
 how a manager learns the precedence from a send that reached fewer people than
 expected.
 
+## Addendum 2026-10-06 — point 3's distinction gets wording, still not a schema
+
+The audience editor now carries point 3's distinction in its wording
+([[ADR-188 — Audience Rules Are Flat, and May Read Engagement History]] point 6).
+The exclusion section is headed "Leave out" and says: "Leaves these people out
+even if a rule or a hand-add includes them. People who opted out are never sent
+to anyway: that's consent, not this list." The words "blocklist" and
+"suppression" do not appear, so the editor does not invite anyone to keep a
+legal opt-out list as an exclude block.
+
+This is wording, not a model. Both kinds are still `kind="exclude"`, and point
+3's statement that the schema cannot tell them apart stays true until the
+suppression data model is decided (task-231, task-135).
+
+ADR-188 point 5 also makes every "did not" condition an exclude block, so point
+1 applies to it: a hand-added person who matches a "did not" condition is left
+out. That is this record's principle applied, not an exception to it.
+
+Nothing here changes the Decision section above.
+
 ## Related ADRs
 
 ### Depends On

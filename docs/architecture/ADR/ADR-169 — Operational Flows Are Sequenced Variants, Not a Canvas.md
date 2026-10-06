@@ -124,6 +124,18 @@ When a cycle becomes *"people who did X get this, everyone else gets Y"* at real
 - **The design conversation rejected a canvas twice, for different reasons.** First because the legal obligations turned out not to be flows, and then — after the initial "one predicate, one send" framing was corrected as too narrow — because multi-step cycles turned out to be a sequence with locally-declared edges. The second correction came with the observation that a canvas is mostly aesthetics: it displays a graph the manager could author one email at a time, and it charges a whole UI surface for the display.
 - **Deliberately not decided here:** whether a followup's offset is relative to the anchor or to the preceding step's send. Anchor-relative is simpler and is what point 5 implies; step-relative survives a step being skipped by its own predicate. Worth settling in the final-design pass, with a worked welcome series in front of it.
 
+## Addendum 2026-10-06 — the audience vocabulary has no negated field
+
+[[ADR-188 — Audience Rules Are Flat, and May Read Engagement History]] fixed the
+vocabulary point 4 reuses. Engagement is received, opened or clicked, for a
+specific send, any send of a campaign or any send on the channel, in an
+absolute or relative window. "Did not" is never a negated field. Point 3's
+"if opened, then X; if not, then Y" fits this as an "opened" condition with an
+else branch. A standalone "did not open" reminder must be written either that
+way or as received minus opened. Which one is for the followup's final design
+pass. The frequency and decay-state predicates point 4 mentions are not in
+ADR-188.
+
 ## Related ADRs
 
 ### Depends On

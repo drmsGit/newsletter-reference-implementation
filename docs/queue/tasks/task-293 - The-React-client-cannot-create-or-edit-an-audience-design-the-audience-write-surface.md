@@ -3,9 +3,11 @@ id: TASK-293
 title: >-
   The React client cannot create or edit an audience: design the audience write
   surface
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-06 18:59'
+updated_date: '2026-10-06 19:04'
 labels:
   - frontend
   - backend

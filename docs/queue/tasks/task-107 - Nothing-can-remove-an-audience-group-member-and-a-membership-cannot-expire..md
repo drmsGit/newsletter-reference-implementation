@@ -4,7 +4,7 @@ title: 'Nothing can remove an audience group member, and a membership cannot exp
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
-updated_date: '2026-09-27 14:20'
+updated_date: '2026-10-06 20:00'
 labels:
   - backend
 dependencies: []
@@ -24,4 +24,6 @@ ordinal: 206000
 Migrated 2026-09-27 from `docs/backlog.md` line 364, section "Features", position 60 in that section (top = do next). The description is the original entry, verbatim.
 
 2026-09-27: related — task-217 (a membership records no reason; external automation must say why this recipient).
+
+2026-10-06, task-293 interview: removing a member exists (DELETE /api/audience-groups/{id}/members/{recipient_id}) and the React editor will offer it, audited (task-295, task-297) — the title's 'nothing can remove a member' is stale. Expiry was not chosen: groups are temporary by design (ADR-123), so a hand-add lives as long as its group; the expiry question stays open, if it is wanted at all.
 <!-- SECTION:NOTES:END -->
