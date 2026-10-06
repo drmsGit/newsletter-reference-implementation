@@ -12,6 +12,7 @@ push token). The address is personal data; the screens already show it beside
 each recipient, and it is what a manager actually knows.
 """
 from sqlalchemy import exists, or_
+from sqlalchemy.orm import aliased
 
 from app.recipients.consent import address_key_for
 from app.recipients.db_models import AddressabilityDB, RecipientDB
@@ -63,8 +64,12 @@ def clause_any_channel(q: str | None, recipient_id_column):
 # not a wildcard — "50%" finds "50%", not everything starting with "50".
 
 def _by_identifier(needle: str, recipient_id_column):
-    return exists().where(RecipientDB.id == recipient_id_column,
-                          RecipientDB.external_id.icontains(needle, autoescape=True))
+    # An alias, so the check is about the outer row even when the outer query
+    # is `recipients` itself (the recipients list): unaliased, the inner
+    # `recipients` stood alone and matched everyone once anybody matched.
+    person = aliased(RecipientDB)
+    return exists().where(person.id == recipient_id_column,
+                          person.external_id.icontains(needle, autoescape=True))
 
 
 def _by_address(needle: str, recipient_id_column, channels: list[str]):

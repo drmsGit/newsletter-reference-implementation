@@ -123,3 +123,28 @@ class TestSearchingASend:
             db.close()
         body = self._executions(send.id, q="nobody-is-called-this")
         assert (body["items"], body["total"]) == ([], 0)
+
+
+class TestSearchingAllRecipients:
+    """The recipients list and the pickers built on it (task-292, task-297).
+
+    The identifier check is an `EXISTS` over `recipients`, and here the outer
+    query is `recipients` too. Until 2026-10-06 the inner one did not refer
+    to the outer row, so it asked "does anybody's identifier match?" — and a
+    search for one person answered with everyone once somebody matched.
+    """
+
+    def test_by_identifier_finds_that_person_and_nobody_else(self):
+        from app.auth.permissions import RECIPIENTS_MANAGE
+
+        db = SessionLocal()
+        try:
+            one, other = db.query(RecipientDB).order_by(RecipientDB.id).limit(2).all()
+        finally:
+            db.close()
+        with machine([VIEW, RECIPIENTS_MANAGE]) as headers:
+            response = client.get("/recipients/", params={"q": one.external_id.upper(), "limit": 50},
+                                  headers=headers)
+        assert response.status_code == 200, response.text
+        found = {r["id"] for r in response.json()["items"]}
+        assert one.id in found and other.id not in found
