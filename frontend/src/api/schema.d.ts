@@ -4461,6 +4461,11 @@ export interface components {
              * @default content
              */
             source: string;
+            /**
+             * Hideable
+             * @default false
+             */
+            hideable: boolean;
         };
         /**
          * MonitoredCampaign

@@ -28,6 +28,8 @@ class ModuleVariableOut(BaseModel):
     #: `content` (the record or the slot's pick) or `module` (typed in the
     #: module itself): ADR-179's 2026-10-04 addendum, task-223.
     source: str = "content"
+    #: May a manager hide this field in this module (ADR-187 point 2)?
+    hideable: bool = False
 
 
 class ModuleManifestOut(BaseModel):
@@ -56,6 +58,7 @@ def _to_out(manifest: ModuleManifest) -> ModuleManifestOut:
             ModuleVariableOut(
                 name=v.name, required=v.required, label=v.label, envelope=v.envelope,
                 type=v.type, size=v.size, note=v.note, concept=v.concept, source=v.source,
+                hideable=v.hideable,
             )
             for v in manifest.variables
         ],

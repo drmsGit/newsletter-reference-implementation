@@ -11,7 +11,8 @@
     },
     {
       "name": "image_url",
-      "required": false
+      "required": false,
+      "hideable": true
     },
     {
       "name": "image_alt",
@@ -19,15 +20,18 @@
     },
     {
       "name": "headline_medium",
-      "required": true
+      "required": true,
+      "hideable": true
     },
     {
       "name": "body_medium",
-      "required": false
+      "required": false,
+      "hideable": true
     },
     {
       "name": "button_label",
-      "required": false
+      "required": false,
+      "hideable": true
     },
     {
       "name": "button_url",

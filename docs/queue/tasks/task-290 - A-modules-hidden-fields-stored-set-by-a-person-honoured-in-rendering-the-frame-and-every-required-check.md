@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-05 21:27'
+updated_date: '2026-10-06 10:45'
 labels:
   - backend
 dependencies:
@@ -39,3 +40,9 @@ Tests: each part above, including an integration refused, a stale version refuse
 - [ ] #3 The send check, module states and slot candidacy treat a hidden required field as not required
 - [ ] #4 Duplication copies the list; a type change prunes it; a re-bind keeps it
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-06, the user: hiding and showing are both people only — the route refuses an integration whichever way it would change the list.
+<!-- SECTION:NOTES:END -->

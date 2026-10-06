@@ -10,7 +10,7 @@
   {% endif %}
   <tr>
     <td class="module-content-cell">
-      <h2 class="module-headline">{{ headline_medium }}</h2>
+      {% if headline_medium %}<h2 class="module-headline">{{ headline_medium }}</h2>{% endif %}
       {% if body_medium %}<p class="module-body">{{ body_medium }}</p>{% endif %}
       {% if button_label and button_url %}
       <a href="{{ button_url }}" class="module-button">{{ button_label }}</a>

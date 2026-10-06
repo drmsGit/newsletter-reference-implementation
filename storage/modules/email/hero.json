@@ -1,16 +1,18 @@
 {
   "label": "Hero Banner",
   "channel": "email",
-  "description": "Full-width opening block: the h1 and an optional call to action. Carries no body copy \u2014 editorial belongs to the editorial module, which is hand-typed (ADR-179).",
+  "description": "Full-width opening block: the h1 and an optional call to action. Carries no body copy — editorial belongs to the editorial module, which is hand-typed (ADR-179).",
   "cms": true,
   "variables": [
     {
       "name": "headline_hero",
-      "required": true
+      "required": true,
+      "hideable": true
     },
     {
       "name": "button_label_hero",
-      "required": false
+      "required": false,
+      "hideable": true
     },
     {
       "name": "button_url",

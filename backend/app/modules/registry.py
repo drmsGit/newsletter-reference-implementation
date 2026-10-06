@@ -38,6 +38,17 @@ class MisfiledManifestError(Exception):
     """
 
 
+class UnguardedHideableFieldError(Exception):
+    """A field the manifest marks hideable can be printed while hidden.
+
+    ADR-187 point 5: a hidden field reaches the template as empty, so every use
+    of a hideable field must sit inside an `{% if %}` whose test has the field
+    as a conjunct. Otherwise "hideable" would be a convention a template could
+    quietly break. Not fatal, like `UndefinedFieldError`: it costs that one
+    module, which `_discover` skips with a warning naming the field and line.
+    """
+
+
 class UndefinedFieldError(Exception):
     """A manifest names a field that `storage/fields.json` does not define.
 
@@ -92,6 +103,12 @@ class ModuleVariable:
     #: value comes from is a property of the module that uses the field. A
     #: static module's fields are all the module's own whatever this says.
     source: str = "content"
+    #: May a manager hide this field in this module (ADR-187 point 2)? Declared
+    #: per (module, field) in the manifest, beside `required`, and only where
+    #: the template guards every use of it (`_check_hideable_guards`). It says
+    #: the field *may* be hidden; whether it is, is the module's choice in a
+    #: variant.
+    hideable: bool = False
 
 
 @dataclass
@@ -143,7 +160,7 @@ def _source(declared: dict, json_path: Path) -> str:
 #: catalogue module takes it from (ADR-179's 2026-10-04 addendum). Anything
 #: else is refused rather than ignored, because an ignored key fails quietly
 #: and the wrong way: `"requried": false` leaves the field required.
-FIELD_ENTRY_KEYS = frozenset({"name", "required", "source"})
+FIELD_ENTRY_KEYS = frozenset({"name", "required", "source", "hideable"})
 
 #: What a field IS: written once in `storage/fields.json`, never in a manifest
 #: (ADR-177 point 3; its 2026-10-04 addendum for `label`, task-272 for
@@ -203,7 +220,75 @@ def _variable(declared: dict, json_path: Path) -> ModuleVariable:
         note=spec.get("note"),
         channel=spec.get("channel"),
         source=_source(declared, json_path),
+        hideable=_hideable(declared, json_path),
     )
+
+
+def _hideable(declared: dict, json_path: Path) -> bool:
+    value = declared.get("hideable", False)
+    if not isinstance(value, bool):
+        raise ValueError(
+            f"{json_path} declares hideable {value!r} for {declared['name']!r}; "
+            "it is true or false."
+        )
+    return value
+
+
+def _conjuncts(test) -> set[str]:
+    """The field names an `{% if %}` test cannot be true without: the name
+    itself, or every name in an `and` chain. `or`, `not` and comparisons give
+    none, because each can be true with the field empty."""
+    from jinja2 import nodes
+
+    if isinstance(test, nodes.Name):
+        return {test.name}
+    if isinstance(test, nodes.And):
+        return _conjuncts(test.left) | _conjuncts(test.right)
+    return set()
+
+
+def _check_hideable_guards(manifest: "ModuleManifest", template_path: Path) -> None:
+    """Refuse a template that could print a hideable field while it is hidden
+    (ADR-187 point 5). Reads the template's structure with Jinja's parser, not
+    its text: a text search passes a field printed once inside its guard and
+    once outside it."""
+    hideable = {v.name for v in manifest.variables if v.hideable}
+    if not hideable:
+        return
+    if not manifest.has_template:
+        raise UnguardedHideableFieldError(
+            f"{manifest.channel}/{manifest.name} marks {', '.join(sorted(hideable))} hideable but has "
+            "no template: hiding a field is a layout choice, and this module has no layout."
+        )
+    from jinja2 import Environment, nodes
+
+    source = template_path.read_text()
+    unguarded: list[tuple[str, int]] = []
+
+    def walk(node, guarded: frozenset) -> None:
+        if isinstance(node, nodes.If):
+            # The test may read the field; what it guards is its body.
+            for child in node.body:
+                walk(child, guarded | _conjuncts(node.test))
+            for branch in node.elif_:
+                walk(branch, guarded)
+            for child in node.else_:
+                walk(child, guarded)
+            return
+        if isinstance(node, nodes.Name) and node.name in hideable and node.name not in guarded:
+            unguarded.append((node.name, node.lineno))
+        for child in node.iter_child_nodes():
+            walk(child, guarded)
+
+    walk(Environment().parse(source), frozenset())
+    if unguarded:
+        where = "; ".join(f"{name} on line {line}" for name, line in unguarded)
+        raise UnguardedHideableFieldError(
+            f"{manifest.channel}/{manifest.name}: a hideable field is printed outside an "
+            f"{{% if %}} that holds it ({where}) in {template_path.name}. Wrap each use in "
+            "{% if field %} or {% if field and … %} — a hidden field reaches the template "
+            "empty, and `or` would still print it (ADR-187 point 5)."
+        )
 
 
 def _load_manifest(json_path: Path, channel: str) -> ModuleManifest:
@@ -219,7 +304,7 @@ def _load_manifest(json_path: Path, channel: str) -> ModuleManifest:
         )
     _refuse_unknown(data, MANIFEST_KEYS, "the module", json_path)
 
-    return ModuleManifest(
+    manifest = ModuleManifest(
         name=json_path.stem,
         channel=channel,
         label=data["label"],
@@ -230,6 +315,10 @@ def _load_manifest(json_path: Path, channel: str) -> ModuleManifest:
             _variable(v, json_path) for v in data.get("variables", [])
         ],
     )
+    template = json_path.with_suffix(".html")
+    if not manifest.has_template or template.exists():
+        _check_hideable_guards(manifest, template)
+    return manifest
 
 
 def _discover() -> dict[tuple[str, str], ModuleManifest]:
