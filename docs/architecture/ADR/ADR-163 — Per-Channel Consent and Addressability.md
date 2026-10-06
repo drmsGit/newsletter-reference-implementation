@@ -8,7 +8,7 @@ topic:
   - privacy
   - data-model
 created: 2026-09-01
-modified: 2026-09-29
+modified: 2026-10-06
 source:
   - "Omni-Channel design interview (interview-prep, closed 2026-09-01), Cluster 4 / Q16–Q20"
 depends_on:
@@ -211,6 +211,20 @@ predicted this move in writing — *"the assertion must hold before and after;
 only its implementation site moves"* — and the assertion did survive
 unchanged. The prediction was right and nothing acted on it for seventeen days,
 which is the same failure mode as an accepted ADR nobody tracked.
+
+## Addendum 2026-10-06 — people who have not agreed may be counted, never listed
+
+Audience resolution keeps its consent gate. A rule block matches only people who agreed to the channel (`find_by_criteria` in `backend/app/audience/service.py`). The reason is the one that function's own comment gives: people who have not agreed stay out of the processing scope entirely, so no decisioning, no rendering and no AI spend runs over their data. This addendum records the one exception the user decided on 2026-10-06 (task-213), and how narrow it is.
+
+**The exception is a count.** A manager needs to see how an audience's number was arrived at: the arithmetic asked for in the Manager Workflow interview, Q4.3. To show it, each include block's criteria run once more with the gate reversed, counting the people who match but have not agreed to the channel. **The count is the only thing that leaves that query.** Those people are never listed, returned, sampled, decisioned or rendered. This is `find_by_criteria(..., not_agreed=True)`. Its only caller is `audience_arithmetic`, through `_resolve(with_arithmetic=True)`, which keeps the length and drops the rows. "Not agreed" means no event on this channel, pending, or opted out. That is the same fail-closed reading as the gate it reverses.
+
+**Only among people this brand has a consent record with**, on any channel and for any purpose. A recipient is not owned by a brand ([[ADR-150 — Tenancy and Access Model]]), so without that condition the count would include another brand's contacts. Brand isolation applies to numbers as well as to people.
+
+**Per channel**, like every audience number ([[ADR-176 — A Negative Decision Outranks a Positive One]] point 5).
+
+**The cost, stated because it is real.** Counting is itself a read of the records of people who have not agreed, and, where a rule uses a preference category, of their behavioural signals. It is accepted because nothing about any individual leaves the count, and the number is what shows a manager how much consent shrinks an audience.
+
+Nothing here changes the Decision section above.
 
 ## Related ADRs
 
