@@ -111,7 +111,62 @@ class CriteriaInvalid(ValueError):
 
 
 #: What a rule can say today (ADR-188 point 2). Related data waits for task-294.
-CRITERIA_FIELDS = frozenset({"language", "status", "category_id", "min_score"})
+CRITERIA_FIELDS = frozenset({"language", "status", "category_id", "min_score", "engagement"})
+
+#: What an engagement field can say happened (ADR-188 point 4), and the event
+#: each reads. "received" reads the delivery itself (sent, not bounced).
+ENGAGEMENT_EVENTS = {"received": None, "opened": "open", "clicked": "click"}
+ENGAGEMENT_KEYS = frozenset({"event", "send_instance_id", "campaign_id", "from", "to",
+                             "within_days", "more_than_days"})
+
+
+def _normalise_engagement(raw) -> tuple[dict, list[tuple[str, str]]]:
+    """An engagement field in its stored form, and what is wrong with it
+    (ADR-188 points 4-5). One mailing scope at most (a send or a campaign;
+    neither is any send on the channel) and one kind of time at most
+    (absolute from/to, or within / more than N days); no "did not" — that is
+    a leave-out rule."""
+    from datetime import date
+
+    if not isinstance(raw, dict):
+        return {}, [("engagement", "what happened, to which mailing, and when")]
+    errors = [(key, f"an engagement field cannot say '{key}'") for key in sorted(set(raw) - ENGAGEMENT_KEYS)]
+    out: dict = {}
+    if raw.get("event") not in ENGAGEMENT_EVENTS:
+        errors.append(("event", "received, opened or clicked"))
+    else:
+        out["event"] = raw["event"]
+    for key in ("send_instance_id", "campaign_id"):
+        if raw.get(key) not in (None, ""):
+            try:
+                out[key] = int(raw[key])
+            except (TypeError, ValueError):
+                errors.append((key, "an id"))
+    if "send_instance_id" in out and "campaign_id" in out:
+        errors.append(("campaign_id", "a send or a campaign, not both"))
+    for key in ("from", "to"):
+        if raw.get(key) not in (None, ""):
+            try:
+                out[key] = date.fromisoformat(str(raw[key])).isoformat()
+            except ValueError:
+                errors.append((key, "a date, YYYY-MM-DD"))
+    if "from" in out and "to" in out and out["to"] < out["from"]:
+        errors.append(("to", "the period ends before it starts"))
+    for key in ("within_days", "more_than_days"):
+        if raw.get(key) not in (None, ""):
+            try:
+                days = int(raw[key])
+            except (TypeError, ValueError):
+                days = 0
+            if days <= 0:
+                errors.append((key, "a number of days above 0"))
+            else:
+                out[key] = days
+    if "within_days" in out and "more_than_days" in out:
+        errors.append(("more_than_days", "within the last N days or more than N days ago, not both"))
+    if ("within_days" in out or "more_than_days" in out) and ("from" in out or "to" in out):
+        errors.append(("within_days", "a fixed period or a relative one, not both"))
+    return out, errors
 
 
 def _values(value) -> list[str]:
@@ -165,6 +220,12 @@ def normalise_criteria(criteria: dict | None) -> dict:
             out.update(category_id=category, min_score=score)
     elif score is not None:
         errors.append(("category_id", "a minimum score needs a category"))
+    if criteria.get("engagement") not in (None, {}):
+        engagement, problems = _normalise_engagement(criteria["engagement"])
+        errors += problems
+        out["engagement"] = engagement
+    elif "engagement" in criteria:
+        errors.append(("event", "received, opened or clicked"))
     if errors:
         raise CriteriaInvalid(errors)
     return out
@@ -496,6 +557,7 @@ def find_by_criteria(
     exclude_ids: set[int] | None = None,
     not_agreed: bool = False,
     only_ids: set[int] | None = None,
+    engagement: dict | None = None,
 ) -> list[RecipientDB]:
     # Consent gate: audiences are resolved only from consenting recipients.
     # Filtering here — at audience-resolution time, before any decisioning or
@@ -552,6 +614,8 @@ def find_by_criteria(
         # One person checked against a rule (task-214), the same definition of
         # the rule as every audience, without resolving the whole segment.
         q = q.filter(RecipientDB.id.in_(only_ids))
+    if engagement:
+        q = q.filter(RecipientDB.id.in_(_engaged(engagement, brand_id, channel)))
 
     # Ordered by id since the address is no longer a column (ADR-163 point 2).
     # This also makes deduplication deterministic: two recipients sharing an
@@ -586,6 +650,59 @@ def find_by_criteria(
     # "who can be reached", and the second is recorded per recipient with a
     # reason (point 8) instead of vanishing into a log line here.
     return records
+
+
+def _engaged(engagement: dict, brand_id: int, channel: str):
+    """The recipient ids an engagement field matches, as a subquery (task-296;
+    ADR-188 points 4-5). Only this brand's sends.
+
+    - **received**: a delivery handed to the provider (`sent`) and not
+      bounced (the user, 2026-10-06) — excluded and failed never count, and a
+      bounce event on the delivery removes the person; timed by `sent_at`;
+    - **opened / clicked**: an `open` / `click` event on a delivery; timed by
+      `occurred_at`;
+    - which mailing: one send, any send of a campaign (send → snapshot →
+      variant → campaign), or any send on the channel being resolved;
+    - when: from / to as whole days, within the last N days, or more than N
+      days ago — relative to now, so the audience is as of now.
+    """
+    from datetime import date, datetime, time, timedelta, timezone
+
+    from sqlalchemy import exists, select
+
+    from app.campaigns.db_models import VariantDB
+    from app.delivery.db_models import DeliveryExecutionDB as Ex, SendInstanceDB as Send
+    from app.insight.db_models import EngagementEventDB as Event
+    from app.snapshots.db_models import SnapshotDB
+
+    kind = ENGAGEMENT_EVENTS[engagement["event"]]
+    query = select(Ex.recipient_id).join(Send, Send.id == Ex.send_instance_id).where(Send.brand_id == brand_id)
+    if kind is None:
+        when = Ex.sent_at
+        query = query.where(Ex.status == "sent", ~exists().where(
+            Event.delivery_execution_id == Ex.id, Event.event_type == "bounce"))
+    else:
+        query = query.join(Event, Event.delivery_execution_id == Ex.id).where(Event.event_type == kind)
+        when = Event.occurred_at
+    if engagement.get("send_instance_id") is not None:
+        query = query.where(Send.id == engagement["send_instance_id"])
+    elif engagement.get("campaign_id") is not None:
+        query = (query.join(SnapshotDB, SnapshotDB.id == Send.snapshot_id)
+                 .join(VariantDB, VariantDB.id == SnapshotDB.variant_id)
+                 .where(VariantDB.campaign_id == engagement["campaign_id"]))
+    else:
+        query = query.where(Ex.channel == channel)
+    now = datetime.now(timezone.utc)
+    if "within_days" in engagement:
+        query = query.where(when >= now - timedelta(days=engagement["within_days"]))
+    if "more_than_days" in engagement:
+        query = query.where(when < now - timedelta(days=engagement["more_than_days"]))
+    if "from" in engagement:
+        query = query.where(when >= datetime.combine(date.fromisoformat(engagement["from"]), time.min, timezone.utc))
+    if "to" in engagement:
+        end = date.fromisoformat(engagement["to"]) + timedelta(days=1)
+        query = query.where(when < datetime.combine(end, time.min, timezone.utc))
+    return query
 
 
 def bulk_add_members(
@@ -653,6 +770,7 @@ def _recipients_for_criteria(
         min_preference_score=criteria.get("min_score"),
         not_agreed=not_agreed,
         only_ids=only_ids,
+        engagement=criteria.get("engagement"),
     )
 
 

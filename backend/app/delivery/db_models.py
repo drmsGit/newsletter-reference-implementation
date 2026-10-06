@@ -74,7 +74,10 @@ class DeliveryExecutionDB(Base):
     __tablename__ = "delivery_executions"
 
     id = Column(Integer, primary_key=True, index=True)
-    send_instance_id = Column(Integer, ForeignKey("send_instances.id"), nullable=False)
+    # Indexed 2026-10-06 (task-296, migration 0036): an audience rule about one
+    # send filters deliveries by it — measured 4.76 ms / 2,310 buffers -> 1.62 ms /
+    # 384 at 100,000 deliveries.
+    send_instance_id = Column(Integer, ForeignKey("send_instances.id"), nullable=False, index=True)
     recipient_id = Column(Integer, ForeignKey("recipients.id"), nullable=False)
     # "created" | "sent" | "failed" | "excluded".
     # "excluded" is not a failure: the recipient was deliberately not sent to,

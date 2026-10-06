@@ -1,10 +1,10 @@
 ---
 id: TASK-215
 title: Audience criteria cannot express delivery history
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 14:20'
-updated_date: '2026-10-06 20:00'
+updated_date: '2026-10-06 20:44'
 labels:
   - backend
 dependencies: []
@@ -30,3 +30,9 @@ Logged 2026-09-27 from the "What Cluster N produced" sections of the two design 
 
 2026-10-06: decided in the task-293 interview — ADR-188 points 4 and 5 (received, opened or clicked; a send, a campaign or any; absolute or relative time; 'did not' is an exclusion). Built by task-296; close this when that lands.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed by task-296 (2026-10-06): audience rules can read delivery and engagement history — received, opened, clicked; a send, a campaign or any send; a fixed or relative period — decided in the task-293 interview (ADR-188 points 4-5).
+<!-- SECTION:FINAL_SUMMARY:END -->
