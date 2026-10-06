@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-06 19:25'
+updated_date: '2026-10-06 20:11'
 labels:
   - backend
   - needs-adr
@@ -42,3 +43,9 @@ ordinal: 305350
 - [ ] #1 The way related data enters the platform is decided and recorded in an ADR
 - [ ] #2 Which related data audience rules may use, and how it is declared, is decided
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-06: overlaps task-120 ('Sales and transaction data from the CRM or DWH — probably a playbook chapter rather than an implementation'); read it in the same session.
+<!-- SECTION:NOTES:END -->

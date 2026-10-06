@@ -90,6 +90,10 @@ is the precedent.
 
 ## Decided in this pass (follow from the answers; not asked)
 
+- **"Received" means handed to the provider and not bounced** (the user,
+  2026-10-06): excluded and failed deliveries never count, a bounce removes
+  the person, and no confirmed "delivered" is required, since not every
+  provider reports it.
 - **A minimum score must be above 0.** "Never 0" (decision 2) covers a
   negative score too, which would match even more people (an unsubscribe
   contributes a negative signal, `backend/app/insight/signals.py`).

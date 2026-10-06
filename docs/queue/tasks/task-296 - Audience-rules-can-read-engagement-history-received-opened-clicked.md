@@ -4,6 +4,7 @@ title: 'Audience rules can read engagement history: received, opened, clicked'
 status: To Do
 assignee: []
 created_date: '2026-10-06 19:59'
+updated_date: '2026-10-06 20:11'
 labels:
   - backend
 dependencies:
@@ -30,3 +31,9 @@ Tests: each what/which/when, absolute and relative windows, brand isolation, exc
 - [ ] #2 'Did not' works as an exclusion rule; the arithmetic and per-person lookup follow
 - [ ] #3 Resolution with engagement rules is measured on dev data, indexed where needed
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-06, the user: 'received' means handed to the provider and not bounced — excluded and failed deliveries never count, a bounce removes the person, no confirmed 'delivered' required (not every provider reports it).
+<!-- SECTION:NOTES:END -->
