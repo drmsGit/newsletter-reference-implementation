@@ -14,8 +14,9 @@ const MANIFESTS = [
   {
     name: 'hero', channel: 'email', label: 'Hero', description: '', cms: true,
     variables: [
-      { name: 'headline_hero', required: true, label: 'Headline', envelope: false, type: 'text' },
-      { name: 'button_label_hero', required: true, label: 'Button', envelope: false, type: 'text' },
+      { name: 'headline_hero', required: true, label: 'Headline', envelope: false, type: 'text', hideable: true },
+      { name: 'button_label_hero', required: true, label: 'Button', envelope: false, type: 'text', hideable: true },
+      { name: 'button_url', required: false, label: 'Button link', envelope: false, type: 'url' },
       { name: 'section_heading', required: false, label: 'Heading above this module', envelope: false,
         type: 'text', source: 'module' },
     ],
@@ -45,6 +46,7 @@ const PICKABLE = [
 function server(
   options: {
     slot?: boolean; unbound?: boolean; unpublished?: boolean; override?: object; sibling?: boolean; channel?: string
+    hidden?: string[]; hideRefused?: number
   } = {},
 ) {
   let clock = 1
@@ -59,6 +61,7 @@ function server(
       content_record_id: options.slot || options.unbound ? null : 42,
       decision_slot_id: options.slot ? 5 : null,
       module_data: { section_heading: 'Picked for you' }, known: true, overrideable: !options.slot && !options.unbound,
+      hidden_fields: options.hidden ?? [],
       active_override: options.override ?? null, updated_at: T(1),
     } as Record<string, unknown>,
   }
@@ -112,6 +115,16 @@ function server(
         : null
       state.module.updated_at = T(++clock)
       return jsonResponse({ module_id: 12, module_updated_at: state.module.updated_at, override: state.module.active_override })
+    },
+    'PUT /campaigns/modules/12/hidden-fields': async (request: Request) => {
+      writes.push(request.clone())
+      if (stale(request, state.module.updated_at as string)) return jsonResponse({ detail: 'changed' }, 409)
+      if (options.hideRefused) {
+        return jsonResponse({ detail: [{ loc: ['body', 'hidden_fields', 'headline_hero'], msg: 'cannot be hidden here',
+          type: 'value_error' }] }, options.hideRefused)
+      }
+      Object.assign(state.module, { hidden_fields: (await request.json()).hidden_fields, updated_at: T(++clock) })
+      return jsonResponse({ ...state.module, variant_id: 3, created_at: T(0) })
     },
     'PUT /campaigns/modules/12': async (request: Request) => {
       writes.push(request.clone())
@@ -466,5 +479,79 @@ describe('a field typed in the module (task-223)', () => {
   it('is offered on a slot-filled module too, where it hides with the slot', async () => {
     open(server({ slot: true }).handlers)
     expect(await screen.findByLabelText(/^Heading above this module/)).toHaveValue('Picked for you')
+  })
+})
+
+describe('hiding a field in this module (task-291, ADR-187)', () => {
+  const sw = (name: string) => screen.findByRole('switch', { name })
+
+  it('offers Hide on each hideable field, and none on a field that is not', async () => {
+    open(server().handlers)
+    expect(await sw('Hide Headline in this module')).not.toBeChecked()
+    expect(await sw('Hide Button in this module')).not.toBeChecked()
+    expect(screen.queryByRole('switch', { name: /Hide Heading above this module/ })).not.toBeInTheDocument()
+    expect(await screen.findByLabelText(/^Button link/)).toBeInTheDocument()
+    expect(screen.queryByRole('switch', { name: /Hide Button link/ })).not.toBeInTheDocument()
+  })
+
+  it('hides with the module version, folds the field, and showing it brings the stored value back', async () => {
+    const { handlers, writes } = server()
+    open(handlers)
+    fireEvent.click(await sw('Hide Headline in this module'))
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect(new URL(writes[0].url).pathname).toBe('/campaigns/modules/12/hidden-fields')
+    expect(writes[0].headers.get('If-Match')).toBe(T(1))
+    expect(await writes[0].json()).toEqual({ hidden_fields: ['headline_hero'] })
+    // Folded: the label and why, no input, nothing to change in the catalogue.
+    const folded = (await screen.findByText('Hidden in this module')).closest('.field-hidden') as HTMLElement
+    expect(within(folded).getByText('Headline')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/^Headline/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Change Headline in catalogue' })).not.toBeInTheDocument()
+    expect(await sw('Hide Headline in this module')).toBeChecked()
+
+    fireEvent.click(await sw('Hide Headline in this module'))
+    await waitFor(() => expect(writes).toHaveLength(2))
+    expect(writes[1].headers.get('If-Match')).toBe(T(2))
+    expect(await writes[1].json()).toEqual({ hidden_fields: [] })
+    expect(await screen.findByLabelText(/^Headline/)).toHaveValue('Lisbon')
+  })
+
+  it('keeps the other hidden fields when one more is hidden', async () => {
+    const { handlers, writes } = server({ hidden: ['button_label_hero'] })
+    open(handlers)
+    fireEvent.click(await sw('Hide Headline in this module'))
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect(await writes[0].json()).toEqual({ hidden_fields: ['headline_hero', 'button_label_hero'] })
+  })
+
+  it('offers the switches on a slot-filled module, whose fields are not listed', async () => {
+    const { handlers, writes } = server({ slot: true })
+    open(handlers)
+    const group = await screen.findByRole('group', { name: 'Fields shown in this module' })
+    fireEvent.click(within(group).getByRole('switch', { name: 'Hide Button in this module' }))
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect(await writes[0].json()).toEqual({ hidden_fields: ['button_label_hero'] })
+  })
+
+  it('lets the picker skip a field the module hides when it says what a record lacks', async () => {
+    open(server({ unbound: true, hidden: ['button_label_hero'] }).handlers)
+    fireEvent.click(await screen.findByRole('switch', { name: 'Show records not ready for Email' }))
+    const porto = await screen.findByRole('option', { name: /Porto weekend/ })
+    expect(porto).not.toHaveTextContent('Lacks')
+  })
+
+  it('shows a refusal at the field', async () => {
+    open(server({ hideRefused: 422 }).handlers)
+    fireEvent.click(await sw('Hide Headline in this module'))
+    expect(await screen.findByText('cannot be hidden here')).toBeInTheDocument()
+  })
+
+  it('shows a stale version with Load their version', async () => {
+    const { handlers, state } = server()
+    open(handlers)
+    await sw('Hide Headline in this module')
+    state.module.updated_at = T(40)
+    fireEvent.click(await sw('Hide Headline in this module'))
+    expect(await screen.findByRole('button', { name: 'Load their version' })).toBeInTheDocument()
   })
 })

@@ -575,6 +575,26 @@ export function useSaveModule(campaignId: number) {
   )
 }
 
+/**
+ * Hide or show fields in a module (ADR-187, task-291): the whole list, as the
+ * server keeps it, with the module's version. A person's choice only; the
+ * server refuses an integration either way.
+ */
+export function useSetHiddenFields(campaignId: number) {
+  return useComposerWrite(
+    campaignId,
+    'module',
+    (composition, id) => cachedOf(composition, 'module', id),
+    ({ id, hidden }: { id: number; hidden: string[] }, module) =>
+      read(
+        api.PUT('/campaigns/modules/{module_id}/hidden-fields', {
+          params: { path: { module_id: id }, header: { 'If-Match': module?.updated_at } },
+          body: { hidden_fields: hidden },
+        }),
+      ),
+  )
+}
+
 export function useMoveModule(campaignId: number) {
   return useComposerWrite(
     campaignId,

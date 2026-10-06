@@ -10,6 +10,7 @@ import {
   useSetOverride,
   useAttachSlot,
   useSaveModule,
+  useSetHiddenFields,
   usePickerRecords,
   type ComposedModule,
   type ContentListItem,
@@ -64,6 +65,7 @@ export default function CatalogueModule({
         channel={channel}
         slotId={module.decision_slot_id}
         otherRecordIds={otherRecordIds}
+        reload={reload}
       />
     )
   }
@@ -75,6 +77,7 @@ export default function CatalogueModule({
         manifest={manifest}
         channel={channel}
         otherRecordIds={otherRecordIds}
+        reload={reload}
       />
     )
   }
@@ -117,6 +120,7 @@ function CatalogueFields({
   const fields = manifest.variables.filter((v) => !v.envelope && v.source !== 'module')
   const [confirmReset, setConfirmReset] = useState(false)
   const [rebinding, setRebinding] = useState(false)
+  const hide = useHide(campaignId, module, manifest)
 
   return (
     <ScreenState query={record}>
@@ -144,18 +148,25 @@ function CatalogueFields({
           <PublishState recordId={recordId} detail={record.data} />
 
           <ModuleOwnFields campaignId={campaignId} module={module} manifest={manifest} />
-          {fields.map((field) => (
-            <CatalogueField
-              key={field.name}
-              module={module}
-              field={field}
-              catalogue={record.data.content[field.name]}
-              overrides={overrides}
-              setOverride={setOverride}
-              saveField={saveField}
-              recordId={recordId}
-            />
-          ))}
+          {fields.map((field) =>
+            hide.hidden.has(field.name) ? (
+              <HiddenField key={field.name} field={field} hide={hide} />
+            ) : (
+              <div key={field.name} className="field-shown">
+                <CatalogueField
+                  module={module}
+                  field={field}
+                  catalogue={record.data.content[field.name]}
+                  overrides={overrides}
+                  setOverride={setOverride}
+                  saveField={saveField}
+                  recordId={recordId}
+                />
+                {field.hideable && <HideSwitch field={field} hide={hide} />}
+              </div>
+            ),
+          )}
+          <SaveState mutation={hide.set} reload={reload} what="the module" />
 
           {module.active_override && (
             <>
@@ -313,7 +324,11 @@ function BindRecord({
   useShortcut('↓', 'From the record search, into the list of records', null)
   useShortcut('Enter', 'Use the highlighted record for this module', null)
   // Content fields this module must have, as the module declares them (ADR-177).
-  const required = manifest.variables.filter((v) => v.required && !v.envelope && v.source !== 'module')
+  // Required when shown (ADR-187 point 6): a field this module hides is not lacking.
+  const hiddenHere = new Set(module.hidden_fields ?? [])
+  const required = manifest.variables.filter(
+    (v) => v.required && !v.envelope && v.source !== 'module' && !hiddenHere.has(v.name),
+  )
   const items = records.data?.items ?? []
   return (
     <div
@@ -550,6 +565,7 @@ function SlotBound({
   channel,
   slotId,
   otherRecordIds,
+  reload,
 }: {
   campaignId: number
   module: ComposedModule
@@ -557,11 +573,13 @@ function SlotBound({
   channel: string
   slotId: number
   otherRecordIds: number[]
+  reload: () => void
 }) {
   const [rebinding, setRebinding] = useState(false)
   return (
     <>
       <ModuleOwnFields campaignId={campaignId} module={module} manifest={manifest} />
+      <HiddenFieldsGroup campaignId={campaignId} module={module} manifest={manifest} reload={reload} />
       <SlotSettings campaignId={campaignId} slotId={slotId} />
       <p className="muted">
         A slot is never overridden: one pinned value would replace every personal pick.
@@ -590,16 +608,19 @@ function Unbound({
   manifest,
   channel,
   otherRecordIds,
+  reload,
 }: {
   campaignId: number
   module: ComposedModule
   manifest: ModuleManifest
   channel: string
   otherRecordIds: number[]
+  reload: () => void
 }) {
   const attach = useAttachSlot(campaignId)
   return (
     <>
+      <HiddenFieldsGroup campaignId={campaignId} module={module} manifest={manifest} reload={reload} />
       <BindRecord
         campaignId={campaignId}
         module={module}
@@ -649,6 +670,90 @@ function ModuleOwnFields({
         />
       ))}
       <SaveState mutation={save} what="the module" />
+    </div>
+  )
+}
+
+/**
+ * Hiding fields in this module (ADR-187, task-291): which are hidden, and a
+ * toggle that sends the whole list in the manifest's order. One mutation per
+ * module, so its refusals show in one place.
+ */
+function useHide(campaignId: number, module: ComposedModule, manifest: ModuleManifest) {
+  const set = useSetHiddenFields(campaignId)
+  const hidden = new Set(module.hidden_fields ?? [])
+  const order = manifest.variables.filter((v) => v.hideable).map((v) => v.name)
+  function toggle(name: string) {
+    const next = new Set(hidden)
+    if (next.has(name)) next.delete(name)
+    else next.add(name)
+    set.mutate({ id: module.id, hidden: order.filter((n) => next.has(n)) })
+  }
+  return { set, hidden, toggle }
+}
+
+type Hide = ReturnType<typeof useHide>
+
+/** The toggle on one hideable field. Read-only while saving, so it keeps focus. */
+function HideSwitch({ field, hide }: { field: ModuleManifest['variables'][number]; hide: Hide }) {
+  const label = field.label ?? field.name
+  const refused = fieldError(hide.set.error, field.name)
+  return (
+    <div className="hide-switch">
+      <Switch
+        isSelected={hide.hidden.has(field.name)}
+        isReadOnly={hide.set.isPending}
+        onChange={() => hide.toggle(field.name)}
+      >
+        <span className="switch__indicator" aria-hidden="true" />
+        Hide {label} in this module
+      </Switch>
+      {refused && <p role="alert" className="field-error">{refused}</p>}
+    </div>
+  )
+}
+
+/**
+ * A hidden field, folded: its label and why, no input — nobody edits copy
+ * that will not be seen. The value is kept where it is; showing the field
+ * again brings it back (ADR-187 point 7).
+ */
+function HiddenField({ field, hide }: { field: ModuleManifest['variables'][number]; hide: Hide }) {
+  return (
+    <div className="field-hidden">
+      <p>
+        <span>{field.label ?? field.name}</span> <span className="muted">Hidden in this module</span>
+      </p>
+      <HideSwitch field={field} hide={hide} />
+    </div>
+  )
+}
+
+/**
+ * The toggles where a module's fields are not listed: a slot-filled module
+ * (its values are each recipient's pick) and one not bound yet. The choice is
+ * the module's, whatever fills it (ADR-187 point 3).
+ */
+function HiddenFieldsGroup({
+  campaignId,
+  module,
+  manifest,
+  reload,
+}: {
+  campaignId: number
+  module: ComposedModule
+  manifest: ModuleManifest
+  reload: () => void
+}) {
+  const hide = useHide(campaignId, module, manifest)
+  const hideable = manifest.variables.filter((v) => v.hideable)
+  if (hideable.length === 0) return null
+  return (
+    <div role="group" aria-label="Fields shown in this module" className="hidden-fields">
+      {hideable.map((field) => (
+        <HideSwitch key={field.name} field={field} hide={hide} />
+      ))}
+      <SaveState mutation={hide.set} reload={reload} what="the module" />
     </div>
   )
 }
