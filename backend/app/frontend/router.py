@@ -26,6 +26,7 @@ from app.channels.registry import DEFAULT_CHANNEL, get_channel, max_modules_for
 from app.delivery.providers.factory import providers_for_channel
 from app.settings.service import available_channels
 from app.audit import service as audit
+from app.audience.router import record_write as record_audience_write, who as audience_who
 from app.campaigns import duplication, fence
 from app.recipients.consent import consent_grid, consent_history, resolve_emails
 from app.recipients.service import to_recipient, to_recipients
@@ -3128,6 +3129,8 @@ def audience_groups_create(
         )
     except ValueError as error:
         return RedirectResponse(f"/ui/audience-groups?error={quote(str(error))}", status_code=303)
+    record_audience_write(request, db, audit.AUDIENCE_GROUP_CREATED, group.id,
+                          {"name": group.name, "description": group.description})
     return RedirectResponse(f"/ui/audience-groups/{group.id}", status_code=303)
 
 
@@ -3234,15 +3237,28 @@ def audience_group_edit(
 ):
     desc = description.strip() or None
     try:
-        audience_service.update_group(db, group_id, name.strip(), desc, brand_id=working_brand_id(request, db))
+        updated = audience_service.update_group(db, group_id, name.strip(), desc,
+                                                brand_id=working_brand_id(request, db))
     except ValueError as error:
         return RedirectResponse(f"/ui/audience-groups/{group_id}?error={quote(str(error))}", status_code=303)
+    if updated is not None:
+        record_audience_write(request, db, audit.AUDIENCE_GROUP_UPDATED, group_id,
+                              {"name": updated.name, "description": updated.description})
     return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
 
 
 @router.post("/ui/audience-groups/{group_id}/delete")
 def audience_group_delete(request: Request, group_id: int, db: Session = Depends(get_db)):
-    audience_service.delete_group(db, group_id, brand_id=working_brand_id(request, db))
+    brand_id = working_brand_id(request, db)
+    group = audience_service.get_group(db, group_id, brand_id=brand_id)
+    name = group.name if group else None
+    try:
+        deleted = audience_service.delete_group(db, group_id, brand_id=brand_id)
+    except audience_service.GroupInUse as error:
+        # Was an unhandled database error until task-295.
+        return RedirectResponse(f"/ui/audience-groups/{group_id}?error={quote(str(error))}", status_code=303)
+    if deleted:
+        record_audience_write(request, db, audit.AUDIENCE_GROUP_DELETED, group_id, {"name": name})
     return RedirectResponse("/ui/audience-groups", status_code=303)
 
 
@@ -3253,13 +3269,18 @@ def audience_group_add_member(
     recipient_id: int = Form(...),
     db: Session = Depends(get_db),
 ):
-    audience_service.add_member(db, group_id, recipient_id, brand_id=working_brand_id(request, db))
+    result = audience_service.pin(db, group_id, recipient_id, brand_id=working_brand_id(request, db),
+                                  added_by=audience_who(request))
+    if result and result[1]:
+        record_audience_write(request, db, audit.AUDIENCE_MEMBER_ADDED, group_id,
+                              {"recipient_id": recipient_id, "reason": None})
     return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
 
 
 @router.post("/ui/audience-groups/{group_id}/members/{recipient_id}/remove")
 def audience_group_remove_member(request: Request, group_id: int, recipient_id: int, db: Session = Depends(get_db)):
-    audience_service.remove_member(db, group_id, recipient_id, brand_id=working_brand_id(request, db))
+    if audience_service.remove_member(db, group_id, recipient_id, brand_id=working_brand_id(request, db)):
+        record_audience_write(request, db, audit.AUDIENCE_MEMBER_REMOVED, group_id, {"recipient_id": recipient_id})
     return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
 
 
@@ -3318,6 +3339,9 @@ def audience_group_bulk_add(
     )
     if result is None:
         return RedirectResponse("/ui/audience-groups", status_code=303)
+    record_audience_write(request, db, audit.AUDIENCE_PEOPLE_PASTED, group_id,
+                          {"by": "criteria", "channel": DEFAULT_CHANNEL,
+                           "result": result if isinstance(result, dict) else None})
     return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
 
 
@@ -3349,7 +3373,7 @@ def audience_block_add(
     db: Session = Depends(get_db),
 ):
     try:
-        audience_service.add_block(
+        block = audience_service.add_block(
             db,
             group_id=group_id,
             kind=kind,
@@ -3358,6 +3382,9 @@ def audience_block_add(
             source="manual",
             brand_id=working_brand_id(request, db),
         )
+        record_audience_write(request, db, audit.AUDIENCE_RULE_ADDED, group_id,
+                              {"block_id": block.id, "kind": block.kind, "criteria": block.criteria,
+                               "label": block.label})
     except ValueError as error:
         return RedirectResponse(f"/ui/audience-groups/{group_id}?error={quote(str(error))}", status_code=303)
     return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
@@ -3377,7 +3404,7 @@ def audience_block_edit(
     db: Session = Depends(get_db),
 ):
     try:
-        audience_service.update_block(
+        updated = audience_service.update_block(
             db,
             block_id=block_id,
             kind=kind,
@@ -3385,6 +3412,10 @@ def audience_block_edit(
             label=label.strip() or None,
             brand_id=working_brand_id(request, db),
         )
+        if updated is not None:
+            record_audience_write(request, db, audit.AUDIENCE_RULE_CHANGED, group_id,
+                                  {"block_id": block_id, "kind": updated.kind, "criteria": updated.criteria,
+                                   "label": updated.label})
     except ValueError as error:
         return RedirectResponse(f"/ui/audience-groups/{group_id}?error={quote(str(error))}", status_code=303)
     return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
@@ -3392,7 +3423,12 @@ def audience_block_edit(
 
 @router.post("/ui/audience-groups/{group_id}/blocks/{block_id}/delete")
 def audience_block_delete(request: Request, group_id: int, block_id: int, db: Session = Depends(get_db)):
-    audience_service.delete_block(db, block_id, brand_id=working_brand_id(request, db))
+    brand_id = working_brand_id(request, db)
+    block = audience_service.get_block(db, block_id, brand_id=brand_id)
+    detail = ({"block_id": block_id, "kind": block.kind, "criteria": block.criteria, "label": block.label}
+              if block else None)
+    if audience_service.delete_block(db, block_id, brand_id=brand_id):
+        record_audience_write(request, db, audit.AUDIENCE_RULE_REMOVED, group_id, detail)
     return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
 
 
@@ -3411,6 +3447,8 @@ def campaign_suggest_audience(request: Request, campaign_id: int, db: Session = 
             db, campaign_id, campaign.name, brand_id=brand_id)
     except ValueError as error:
         return RedirectResponse(f"/ui/campaigns/{campaign_id}?error={quote(str(error))}", status_code=303)
+    record_audience_write(request, db, audit.AUDIENCE_GROUP_CREATED, group.id,
+                          {"name": group.name, "source_campaign_id": campaign_id})
     return RedirectResponse(f"/ui/audience-groups/{group.id}", status_code=303)
 
 
@@ -3424,6 +3462,8 @@ def audience_group_recalculate(request: Request, group_id: int, db: Session = De
             f"/ui/audience-groups/{group_id}?error={quote('This group is not linked to a campaign, so there is nothing to recalculate.')}",
             status_code=303,
         )
+    record_audience_write(request, db, audit.AUDIENCE_RULES_RECALCULATED, group_id,
+                          {"source_campaign_id": result.source_campaign_id})
     return RedirectResponse(f"/ui/audience-groups/{group_id}", status_code=303)
 
 

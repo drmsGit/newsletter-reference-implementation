@@ -1859,6 +1859,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/audience-groups/criteria-values": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The languages and statuses a rule can choose from
+         * @description Values among the people this brand has a consent record with — values, never people.
+         */
+        get: operations["get_criteria_values_api_audience_groups_criteria_values_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audience-groups/": {
         parameters: {
             query?: never;
@@ -1891,11 +1911,17 @@ export interface paths {
         get: operations["get_group_api_audience_groups__group_id__get"];
         put?: never;
         post?: never;
-        /** Delete Group */
+        /**
+         * Delete Group
+         * @description Delete a group no send uses; one a send uses is refused 409, naming the sends.
+         */
         delete: operations["delete_group_api_audience_groups__group_id__delete"];
         options?: never;
         head?: never;
-        /** Update Group */
+        /**
+         * Update Group
+         * @description Rename or re-describe. Only the fields sent change; `description: null` clears it.
+         */
         patch: operations["update_group_api_audience_groups__group_id__patch"];
         trace?: never;
     };
@@ -1947,6 +1973,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/audience-groups/{group_id}/members/paste-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * What pasting a list of people would do, before anything is added
+         * @description Identifiers or email addresses, any separator, up to 5,000 (task-295).
+         */
+        post: operations["paste_preview_api_audience_groups__group_id__members_paste_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/audience-groups/{group_id}/members/paste": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a pasted list of people by hand, with one reason
+         * @description Nobody is created: an entry that is not a recipient stays not found (ADR-120).
+         */
+        post: operations["paste_apply_api_audience_groups__group_id__members_paste_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/audience-groups/{group_id}/members/{recipient_id}": {
         parameters: {
             query?: never;
@@ -1956,7 +2022,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Add Member */
+        /**
+         * Add Member
+         * @description Add one person by hand, with an optional reason; who added them is recorded.
+         */
         post: operations["add_member_api_audience_groups__group_id__members__recipient_id__post"];
         /** Remove Member */
         delete: operations["remove_member_api_audience_groups__group_id__members__recipient_id__delete"];
@@ -2006,7 +2075,10 @@ export interface paths {
         delete: operations["remove_block_api_audience_groups__group_id__blocks__block_id__delete"];
         options?: never;
         head?: never;
-        /** Edit Block */
+        /**
+         * Edit Block
+         * @description Change a rule. Only the fields sent change; `label: null` clears the label.
+         */
         patch: operations["edit_block_api_audience_groups__group_id__blocks__block_id__patch"];
         trace?: never;
     };
@@ -2698,6 +2770,21 @@ export interface components {
              * Format: date-time
              */
             added_at: string;
+            /** Reason */
+            reason?: string | null;
+            /** Added By */
+            added_by?: string | null;
+        };
+        /**
+         * AudienceGroupUpdate
+         * @description Only what is sent changes (task-295): leaving out the description keeps
+         *     it, `null` clears it.
+         */
+        AudienceGroupUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
         };
         /**
          * AudiencePreview
@@ -3837,6 +3924,16 @@ export interface components {
             /** Sample */
             sample: components["schemas"]["PreviewRecipient"][];
         };
+        /**
+         * CriteriaValues
+         * @description What a rule's language and status can be chosen from (task-295).
+         */
+        CriteriaValues: {
+            /** Languages */
+            languages: string[];
+            /** Statuses */
+            statuses: string[];
+        };
         /** DecisionExecutionRequest */
         DecisionExecutionRequest: {
             /** Recipient Id */
@@ -4365,6 +4462,11 @@ export interface components {
             /** Machine Ready */
             machine_ready: boolean;
         };
+        /** MemberAdd */
+        MemberAdd: {
+            /** Reason */
+            reason?: string | null;
+        };
         /**
          * MembershipReason
          * @description Why one person is in or out of a group (task-214): `rule` (an include
@@ -4822,6 +4924,45 @@ export interface components {
             limit: number;
             /** Offset */
             offset: number;
+        };
+        /** PasteApplyRequest */
+        PasteApplyRequest: {
+            /** Text */
+            text: string;
+            /** Reason */
+            reason?: string | null;
+        };
+        /**
+         * PastePreview
+         * @description What pasting a list would do, before anything is added (task-295).
+         */
+        PastePreview: {
+            /** To Add */
+            to_add: number;
+            /** Already In */
+            already_in: number;
+            /** Not Found */
+            not_found: string[];
+            /** Not Agreed */
+            not_agreed: number;
+            /** Channel */
+            channel: string;
+        };
+        /** PastePreviewRequest */
+        PastePreviewRequest: {
+            /** Text */
+            text: string;
+            /** Channel */
+            channel: string;
+        };
+        /** PasteResult */
+        PasteResult: {
+            /** Added */
+            added: number;
+            /** Already In */
+            already_in: number;
+            /** Not Found */
+            not_found: number;
         };
         /**
          * PendingActionDetail
@@ -9702,6 +9843,26 @@ export interface operations {
             };
         };
     };
+    get_criteria_values_api_audience_groups_criteria_values_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CriteriaValues"];
+                };
+            };
+        };
+    };
     list_groups_api_audience_groups__get: {
         parameters: {
             query?: {
@@ -9806,7 +9967,10 @@ export interface operations {
     delete_group_api_audience_groups__group_id__delete: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
             path: {
                 group_id: number;
             };
@@ -9835,7 +9999,10 @@ export interface operations {
     update_group_api_audience_groups__group_id__patch: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
             path: {
                 group_id: number;
             };
@@ -9843,7 +10010,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AudienceGroupCreate"];
+                "application/json": components["schemas"]["AudienceGroupUpdate"];
             };
         };
         responses: {
@@ -9973,17 +10140,97 @@ export interface operations {
             };
         };
     };
-    add_member_api_audience_groups__group_id__members__recipient_id__post: {
+    paste_preview_api_audience_groups__group_id__members_paste_preview_post: {
         parameters: {
             query?: never;
             header?: never;
+            path: {
+                group_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PastePreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PastePreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    paste_apply_api_audience_groups__group_id__members_paste_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
+            path: {
+                group_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasteApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasteResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_member_api_audience_groups__group_id__members__recipient_id__post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
             path: {
                 group_id: number;
                 recipient_id: number;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["MemberAdd"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             201: {
@@ -10008,7 +10255,10 @@ export interface operations {
     remove_member_api_audience_groups__group_id__members__recipient_id__delete: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
             path: {
                 group_id: number;
                 recipient_id: number;
@@ -10069,7 +10319,10 @@ export interface operations {
     create_block_api_audience_groups__group_id__blocks_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
             path: {
                 group_id: number;
             };
@@ -10104,7 +10357,10 @@ export interface operations {
     remove_block_api_audience_groups__group_id__blocks__block_id__delete: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
             path: {
                 group_id: number;
                 block_id: number;
@@ -10134,7 +10390,10 @@ export interface operations {
     edit_block_api_audience_groups__group_id__blocks__block_id__patch: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
             path: {
                 group_id: number;
                 block_id: number;

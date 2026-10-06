@@ -45,6 +45,12 @@ class AudienceGroupMemberDB(Base):
     group_id = Column(Integer, ForeignKey("audience_groups.id"), nullable=False)
     recipient_id = Column(Integer, ForeignKey("recipients.id"), nullable=False)
     added_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    #: Why a manager added this person by hand, if they said (task-295,
+    #: closing task-217), and who did — the same readable label as an
+    #: override's `overridden_by`; audit_events keeps the id-based record.
+    #: Migration 0034.
+    reason = Column(Text, nullable=True)
+    added_by = Column(String(255), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("group_id", "recipient_id", name="uq_audience_group_members_group_recipient"),

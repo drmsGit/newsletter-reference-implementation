@@ -65,6 +65,18 @@ MODULE_DELETED = "module.deleted"
 MODULE_MOVED = "module.moved"
 # task-290, ADR-187: a person hid or showed fields in a module (from/to lists).
 MODULE_FIELDS_HIDDEN = "module.fields_hidden"
+# task-295: every audience write (ADR-153 point 4; the Audience Write Surface
+# final design pass, decision 10).
+AUDIENCE_GROUP_CREATED = "audience_group.created"
+AUDIENCE_GROUP_UPDATED = "audience_group.updated"
+AUDIENCE_GROUP_DELETED = "audience_group.deleted"
+AUDIENCE_RULE_ADDED = "audience_group.rule_added"
+AUDIENCE_RULE_CHANGED = "audience_group.rule_changed"
+AUDIENCE_RULE_REMOVED = "audience_group.rule_removed"
+AUDIENCE_RULES_RECALCULATED = "audience_group.rules_recalculated"
+AUDIENCE_MEMBER_ADDED = "audience_group.member_added"
+AUDIENCE_MEMBER_REMOVED = "audience_group.member_removed"
+AUDIENCE_PEOPLE_PASTED = "audience_group.people_pasted"
 DECISION_SLOT_CREATED = "decision_slot.created"
 DECISION_SLOT_UPDATED = "decision_slot.updated"
 OVERRIDE_CREATED = "override.created"

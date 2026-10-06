@@ -61,7 +61,7 @@ class TestRuleBlocks:
         response = client.post(
             f"/api/audience-groups/{group.id}/blocks",
             json={"kind": "include", "label": "Hikers",
-                  "criteria": {"category_ids": [1]}},
+                  "criteria": {"category_id": 1, "min_score": 1.0}},
             headers=api,
         )
 
@@ -79,7 +79,7 @@ class TestRuleBlocks:
         client.post(
             f"/api/audience-groups/{group.id}/blocks",
             json={"kind": "include", "source": "suggested",
-                  "criteria": {"category_ids": [1]}},
+                  "criteria": {"category_id": 1, "min_score": 1.0}},
             headers=api,
         )
 

@@ -36,11 +36,60 @@ class AudienceGroupCreate(BaseModel):
     description: str | None = None
 
 
+class AudienceGroupUpdate(BaseModel):
+    """Only what is sent changes (task-295): leaving out the description keeps
+    it, `null` clears it."""
+
+    name: str | None = None
+    description: str | None = None
+
+
 class AudienceGroupMember(BaseModel):
     id: int
     group_id: int
     recipient_id: int
     added_at: datetime
+    # Why they were added by hand, if anyone said, and by whom (task-295).
+    reason: str | None = None
+    added_by: str | None = None
+
+
+class MemberAdd(BaseModel):
+    reason: str | None = None
+
+
+class PastePreviewRequest(BaseModel):
+    text: str
+    #: There is no channel-less "not agreed" (ADR-176 point 5).
+    channel: str
+
+
+class PasteApplyRequest(BaseModel):
+    text: str
+    reason: str | None = None
+
+
+class PastePreview(BaseModel):
+    """What pasting a list would do, before anything is added (task-295)."""
+
+    to_add: int
+    already_in: int
+    not_found: list[str]
+    not_agreed: int
+    channel: str
+
+
+class PasteResult(BaseModel):
+    added: int
+    already_in: int
+    not_found: int
+
+
+class CriteriaValues(BaseModel):
+    """What a rule's language and status can be chosen from (task-295)."""
+
+    languages: list[str]
+    statuses: list[str]
 
 
 class AudienceRuleBlock(BaseModel):

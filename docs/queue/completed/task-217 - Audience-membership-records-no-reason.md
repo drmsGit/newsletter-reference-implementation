@@ -1,10 +1,10 @@
 ---
 id: TASK-217
 title: Audience membership records no reason
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 14:20'
-updated_date: '2026-10-06 20:00'
+updated_date: '2026-10-06 20:32'
 labels:
   - backend
 dependencies: []
@@ -32,3 +32,9 @@ Logged 2026-09-27 from the "What Cluster N produced" sections of the two design 
 
 2026-10-06: decided in the task-293 interview — a hand-add takes an optional reason and records who added it (Audience Write Surface final design pass, decision 5). Built by task-295; close this when that lands.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed by task-295 (2026-10-06): a hand-add records an optional reason and who added it (audience_group_members.reason, added_by; migration 0034), shown in the audit entry too. Decided in the task-293 interview.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -67,6 +67,200 @@ def group_regardless_of_brand(db: Session, group_id: int) -> AudienceGroupDB | N
     return db.query(AudienceGroupDB).filter(AudienceGroupDB.id == group_id).first()
 
 
+# --- writes: one version, validated rules (task-295) ------------------------
+
+#: "Not passed", for a partial update where None is a value (clear it).
+UNSET = object()
+
+
+def touch(group: AudienceGroupDB) -> None:
+    """Move the group's version: any write to it, its rules or its members
+    changes who the audience is, so it is one thing with one version (the
+    design pass, decision 10). By hand, because a rule or member write leaves
+    the group's own row clean and `onupdate` would not fire."""
+    group.updated_at = func.now()
+
+
+def check_version(db: Session, group: AudienceGroupDB, expected_updated_at) -> None:
+    """Refuse a write based on an out-of-date read (ADR-180 point 2), the
+    composer's rule: no token, no check."""
+    from app.campaigns.service import refuse_stale
+
+    refuse_stale(db, group, expected_updated_at, "audience")
+
+
+class GroupInUse(Exception):
+    """A group a send uses cannot be deleted (the design pass, decision 8).
+    Not a ValueError, so no route mistakes it for a bad request."""
+
+    def __init__(self, sends: list[str]):
+        self.sends = sends
+        named = ", ".join(sends[:5]) + (", …" if len(sends) > 5 else "")
+        super().__init__(
+            f"Used by {len(sends)} send{'' if len(sends) == 1 else 's'} ({named}). Sent mail must keep "
+            "its audience; remove it from planned sends first."
+        )
+
+
+class CriteriaInvalid(ValueError):
+    """A rule that does not say something meaningful, with each field's reason."""
+
+    def __init__(self, errors: list[tuple[str, str]]):
+        self.errors = errors
+        super().__init__("; ".join(f"{field}: {message}" for field, message in errors))
+
+
+#: What a rule can say today (ADR-188 point 2). Related data waits for task-294.
+CRITERIA_FIELDS = frozenset({"language", "status", "category_id", "min_score"})
+
+
+def _values(value) -> list[str]:
+    """A rule's multi-value field as a list: an older rule's single string is a
+    list of one, and blanks are nothing."""
+    if value in (None, ""):
+        return []
+    values = [value] if isinstance(value, str) else list(value)
+    return [v.strip() for v in values if isinstance(v, str) and v.strip()]
+
+
+def normalise_criteria(criteria: dict | None) -> dict:
+    """Check a rule and return it in its stored form (ADR-188 points 1-3).
+
+    Unknown fields are refused by name rather than stored, where they would
+    silently never match. Language and status are lists ("is one of").
+    **Interest in a category always carries a minimum score above 0** —
+    every recipient's signal is at least 0 unless they unsubscribed, so a
+    category without one matches nearly everyone. A score without a category
+    means nothing and is refused too. Raises `CriteriaInvalid`.
+    """
+    criteria = dict(criteria or {})
+    errors: list[tuple[str, str]] = [
+        (key, f"a rule cannot say '{key}'; it can say language, status and category interest")
+        for key in sorted(set(criteria) - CRITERIA_FIELDS)
+    ]
+    out: dict = {}
+    for key in ("language", "status"):
+        raw = criteria.get(key)
+        if raw not in (None, "") and not (isinstance(raw, str) or (
+                isinstance(raw, list) and all(isinstance(v, str) for v in raw))):
+            errors.append((key, "one or more values"))
+        elif values := _values(raw):
+            out[key] = values
+    category, score = criteria.get("category_id"), criteria.get("min_score")
+    try:
+        category = None if category in (None, "") else int(category)
+    except (TypeError, ValueError):
+        errors.append(("category_id", "a category"))
+        category = None
+    try:
+        score = None if score in (None, "") else float(score)
+    except (TypeError, ValueError):
+        errors.append(("min_score", "a number"))
+        score = None
+    if category is not None:
+        if score is None or score <= 0:
+            errors.append(("min_score", "interest in a category needs a minimum score above 0; "
+                                        "without one it matches nearly everyone"))
+        else:
+            out.update(category_id=category, min_score=score)
+    elif score is not None:
+        errors.append(("category_id", "a minimum score needs a category"))
+    if errors:
+        raise CriteriaInvalid(errors)
+    return out
+
+
+def criteria_values(db: Session, *, brand_id: int) -> dict:
+    """The languages and statuses a rule can choose from: the values among the
+    people this brand has a consent record with — values, never people."""
+    from sqlalchemy import exists
+
+    from app.recipients.db_models import ConsentEventDB
+
+    known = exists().where(ConsentEventDB.recipient_id == RecipientDB.id, ConsentEventDB.brand_id == brand_id)
+
+    def distinct(column):
+        return sorted(v for (v,) in db.query(column).filter(known, column.isnot(None)).distinct() if v)
+
+    return {"languages": distinct(RecipientDB.language), "statuses": distinct(RecipientDB.status)}
+
+
+#: The most a paste may hold; a bigger list belongs in the CRM as a segment
+#: (ADR-123; the design pass, decision 6).
+PASTE_LIMIT = 5000
+
+
+class PasteTooLong(ValueError):
+    pass
+
+
+def parse_paste(text: str) -> list[str]:
+    """The entries of a pasted list: separated by new lines, commas,
+    semicolons, tabs or spaces, so a spreadsheet column pastes as it is.
+    Repeats collapse; order is kept."""
+    import re
+
+    entries = list(dict.fromkeys(e for e in re.split(r"[\s,;]+", text or "") if e))
+    if len(entries) > PASTE_LIMIT:
+        raise PasteTooLong(f"{len(entries)} entries; a paste holds up to 5,000. A bigger list belongs in the CRM.")
+    return entries
+
+
+def _resolve_paste(db: Session, entries: list[str]) -> tuple[set[int], list[str]]:
+    """Recipient ids for the entries — a CRM identifier, or an email address
+    when the entry holds "@" — and the entries that matched nobody. Nobody is
+    created: the CRM owns people (ADR-120)."""
+    from app.recipients.db_models import AddressabilityDB
+
+    ids_by_external = dict(db.query(RecipientDB.external_id, RecipientDB.id)
+                           .filter(RecipientDB.external_id.in_([e for e in entries if "@" not in e])))
+    emails = {e.lower() for e in entries if "@" in e}
+    by_email: dict[str, set[int]] = {}
+    if emails:
+        email = func.lower(AddressabilityDB.value["email"].as_string())
+        for address, rid in db.query(email, AddressabilityDB.recipient_id).filter(
+                AddressabilityDB.channel == "email", email.in_(emails)):
+            by_email.setdefault(address, set()).add(rid)
+    found: set[int] = set()
+    missing: list[str] = []
+    for entry in entries:
+        hits = by_email.get(entry.lower(), set()) if "@" in entry else (
+            {ids_by_external[entry]} if entry in ids_by_external else set())
+        if hits:
+            found |= hits
+        else:
+            missing.append(entry)
+    return found, missing
+
+
+def paste_preview(db: Session, group: AudienceGroupDB, text: str, *, channel: str) -> dict:
+    """What pasting this list would do — added, already in, not found (listed),
+    not agreed to `channel` — before anything is added (decision 6)."""
+    found, missing = _resolve_paste(db, parse_paste(text))
+    members = get_member_recipient_ids(db, group.id, brand_id=group.brand_id)
+    to_add = found - members
+    agreed = {rid for (rid,) in db.query(RecipientDB.id).filter(
+        RecipientDB.id.in_(to_add), is_consenting_filter(group.brand_id, channel, purpose=MARKETING))} if to_add else set()
+    return {"to_add": len(to_add), "already_in": len(found & members), "not_found": missing,
+            "not_agreed": len(to_add - agreed), "channel": channel}
+
+
+def paste_apply(db: Session, group: AudienceGroupDB, text: str, *, reason: str | None,
+                added_by: str | None, expected_updated_at=None) -> dict:
+    """Add the pasted people by hand, with one reason for the paste. The list
+    is read again, so what is added is what is true now."""
+    check_version(db, group, expected_updated_at)
+    found, missing = _resolve_paste(db, parse_paste(text))
+    members = get_member_recipient_ids(db, group.id, brand_id=group.brand_id)
+    reason = (reason or "").strip() or None
+    for rid in sorted(found - members):
+        db.add(AudienceGroupMemberDB(group_id=group.id, recipient_id=rid, reason=reason, added_by=added_by))
+    if found - members:
+        touch(group)
+    db.commit()
+    return {"added": len(found - members), "already_in": len(found & members), "not_found": len(missing)}
+
+
 def get_group(db: Session, group_id: int, *, brand_id: int) -> AudienceGroupDB | None:
     """One group, selected within a brand (ADR-172 points 4-6).
 
@@ -117,14 +311,20 @@ def create_group(
 
 
 def update_group(
-    db: Session, group_id: int, name: str, description: str | None = None,
-    *, brand_id: int,
+    db: Session, group_id: int, name=UNSET, description=UNSET,
+    *, brand_id: int, expected_updated_at=None,
 ) -> AudienceGroupDB | None:
+    """Rename or re-describe a group. **Only what is passed changes** (the
+    design pass, task-295): a rename leaves the description alone, and
+    `description=None` clears it. States the group's version when given."""
     group = get_group(db, group_id, brand_id=brand_id)
     if not group:
         return None
-    group.name = name
-    group.description = description
+    check_version(db, group, expected_updated_at)
+    if name is not UNSET:
+        group.name = name
+    if description is not UNSET:
+        group.description = description
     try:
         db.commit()
     except IntegrityError:
@@ -134,10 +334,22 @@ def update_group(
     return group
 
 
-def delete_group(db: Session, group_id: int, *, brand_id: int) -> bool:
+def delete_group(db: Session, group_id: int, *, brand_id: int, expected_updated_at=None) -> bool:
+    """Delete a group nobody sends to (the design pass, decision 8). A group
+    a send uses — planned or sent — is refused with `GroupInUse`, naming the
+    sends: sent mail must keep the record of who it was for, and a planned send
+    would lose its audience. Today's alternative was the database refusing at
+    commit and an unhandled 500."""
+    from app.delivery.db_models import SendInstanceDB
+
     group = get_group(db, group_id, brand_id=brand_id)
     if not group:
         return False
+    check_version(db, group, expected_updated_at)
+    used_by = [name for (name,) in db.query(SendInstanceDB.name)
+               .filter(SendInstanceDB.audience_group_id == group_id).order_by(SendInstanceDB.id.asc())]
+    if used_by:
+        raise GroupInUse(used_by)
     # Clear both children first — members and rule blocks both FK to the group,
     # so either left behind blocks the delete.
     db.query(AudienceGroupMemberDB).filter(AudienceGroupMemberDB.group_id == group_id).delete()
@@ -180,12 +392,28 @@ def list_members(
 
 
 def add_member(
-    db: Session, group_id: int, recipient_id: int, *, brand_id: int
+    db: Session, group_id: int, recipient_id: int, *, brand_id: int,
+    reason: str | None = None, added_by: str | None = None, expected_updated_at=None,
 ) -> AudienceGroupMemberDB | None:
+    """Add one person by hand, with an optional reason and who added them
+    (task-295, closing task-217). Someone already in is returned as they are."""
+    result = pin(db, group_id, recipient_id, brand_id=brand_id, reason=reason, added_by=added_by,
+                 expected_updated_at=expected_updated_at)
+    return result[0] if result else None
+
+
+def pin(
+    db: Session, group_id: int, recipient_id: int, *, brand_id: int,
+    reason: str | None = None, added_by: str | None = None, expected_updated_at=None,
+) -> tuple[AudienceGroupMemberDB, bool] | None:
+    """`add_member`, saying whether the person was newly added — for the
+    audit entry, which records an addition, not a repeat."""
     # The group is resolved within the brand before a pin is written, so a
     # recipient cannot be pinned into another brand's list.
-    if get_group(db, group_id, brand_id=brand_id) is None:
+    group = get_group(db, group_id, brand_id=brand_id)
+    if group is None:
         return None
+    check_version(db, group, expected_updated_at)
 
     existing = (
         db.query(AudienceGroupMemberDB)
@@ -196,9 +424,11 @@ def add_member(
         .first()
     )
     if existing:
-        return existing
-    member = AudienceGroupMemberDB(group_id=group_id, recipient_id=recipient_id)
+        return existing, False
+    member = AudienceGroupMemberDB(group_id=group_id, recipient_id=recipient_id,
+                                   reason=(reason or "").strip() or None, added_by=added_by)
     db.add(member)
+    touch(group)
     try:
         db.commit()
     except IntegrityError:
@@ -213,16 +443,18 @@ def add_member(
                 AudienceGroupMemberDB.recipient_id == recipient_id,
             )
             .first()
-        )
+        ), False
     db.refresh(member)
-    return member
+    return member, True
 
 
 def remove_member(
-    db: Session, group_id: int, recipient_id: int, *, brand_id: int
+    db: Session, group_id: int, recipient_id: int, *, brand_id: int, expected_updated_at=None,
 ) -> bool:
-    if get_group(db, group_id, brand_id=brand_id) is None:
+    group = get_group(db, group_id, brand_id=brand_id)
+    if group is None:
         return False
+    check_version(db, group, expected_updated_at)
     member = (
         db.query(AudienceGroupMemberDB)
         .filter(
@@ -234,6 +466,7 @@ def remove_member(
     if not member:
         return False
     db.delete(member)
+    touch(group)
     db.commit()
     return True
 
@@ -307,10 +540,12 @@ def find_by_criteria(
     else:
         q = db.query(RecipientDB).filter(is_consenting_filter(brand_id, channel, purpose=MARKETING))
 
-    if language:
-        q = q.filter(RecipientDB.language == language)
-    if status:
-        q = q.filter(RecipientDB.status == status)
+    # "Is one of" (ADR-188 point 1): a rule may name several values. A single
+    # string is an older rule's form and means a list of one.
+    if languages := _values(language):
+        q = q.filter(RecipientDB.language.in_(languages))
+    if statuses := _values(status):
+        q = q.filter(RecipientDB.status.in_(statuses))
     if exclude_ids:
         q = q.filter(RecipientDB.id.notin_(exclude_ids))
     if only_ids is not None:
@@ -356,7 +591,8 @@ def find_by_criteria(
 def bulk_add_members(
     db: Session, group_id: int, recipient_ids: list[int], *, brand_id: int
 ) -> int:
-    if get_group(db, group_id, brand_id=brand_id) is None:
+    group = get_group(db, group_id, brand_id=brand_id)
+    if group is None:
         return 0
     existing = get_member_recipient_ids(db, group_id, brand_id=brand_id)
     added = 0
@@ -366,6 +602,7 @@ def bulk_add_members(
             added += 1
     if not added:
         return added
+    touch(group)
 
     try:
         db.commit()
@@ -463,11 +700,15 @@ def add_block(
     source: str = "manual",
     *,
     brand_id: int,
+    expected_updated_at=None,
 ) -> AudienceRuleBlockDB:
     if kind not in ("include", "exclude"):
         raise ValueError("kind must be 'include' or 'exclude'")
-    if get_group(db, group_id, brand_id=brand_id) is None:
+    group = get_group(db, group_id, brand_id=brand_id)
+    if group is None:
         raise ValueError(f"Audience group {group_id} not found")
+    check_version(db, group, expected_updated_at)
+    criteria = normalise_criteria(criteria)
     next_pos = (
         db.query(AudienceRuleBlockDB)
         .filter(AudienceRuleBlockDB.group_id == group_id)
@@ -482,6 +723,7 @@ def add_block(
         position=next_pos,
     )
     db.add(block)
+    touch(group)
     db.commit()
     db.refresh(block)
     return block
@@ -492,31 +734,39 @@ def update_block(
     block_id: int,
     kind: str | None = None,
     criteria: dict | None = None,
-    label: str | None = None,
+    label=UNSET,
     *,
     brand_id: int,
+    expected_updated_at=None,
 ) -> AudienceRuleBlockDB | None:
+    """Change a rule. `label=None` clears the label; leaving it out keeps it."""
     block = get_block(db, block_id, brand_id=brand_id)
     if not block:
         return None
+    group = db.get(AudienceGroupDB, block.group_id)
+    check_version(db, group, expected_updated_at)
     if kind is not None:
         if kind not in ("include", "exclude"):
             raise ValueError("kind must be 'include' or 'exclude'")
         block.kind = kind
     if criteria is not None:
-        block.criteria = criteria
-    if label is not None:
+        block.criteria = normalise_criteria(criteria)
+    if label is not UNSET:
         block.label = label
+    touch(group)
     db.commit()
     db.refresh(block)
     return block
 
 
-def delete_block(db: Session, block_id: int, *, brand_id: int) -> bool:
+def delete_block(db: Session, block_id: int, *, brand_id: int, expected_updated_at=None) -> bool:
     block = get_block(db, block_id, brand_id=brand_id)
     if not block:
         return False
+    group = db.get(AudienceGroupDB, block.group_id)
+    check_version(db, group, expected_updated_at)
     db.delete(block)
+    touch(group)
     db.commit()
     return True
 
@@ -1045,6 +1295,7 @@ def recalculate_suggested_blocks(
             db.delete(block)
             removed += 1
     if removed:
+        touch(group)
         db.commit()
 
     # Add suggested blocks for newly-covered categories.
