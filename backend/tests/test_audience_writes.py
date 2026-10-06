@@ -317,3 +317,21 @@ class TestTheJinjaForms:
         assert response.status_code == 303 and "Used%20by%201%20send" in response.headers["location"]
         db.expire_all()
         assert db.query(AudienceGroupDB).filter_by(id=g.id).first() is not None
+
+
+def test_the_members_list_names_each_person_and_who_an_exclusion_leaves_out(db, person, world):
+    """The editor's hand-added list (task-297): who, reason, who added them, and
+    the exclusion rules that leave a hand-added person out on the channel."""
+    client, csrf, user = person
+    g, anna, ben = world["group"], world["people"]["anna"], world["people"]["ben"]
+    client.post(f"{URL}/{g.id}/members/{anna.id}", json={"reason": "VIP"}, headers=csrf)
+    client.post(f"{URL}/{g.id}/members/{ben.id}", headers=csrf)
+    db.query(RecipientDB).filter_by(id=ben.id).update({"status": "paused"}); db.commit()
+    audience.add_block(db, g.id, kind="exclude", criteria={"status": ["paused"]}, label="Paused", brand_id=world["brand"])
+    body = client.get(f"{URL}/{g.id}/members", params={"channel": "email"}).json()
+    rows = {m["recipient_id"]: m for m in body["items"]}
+    assert (rows[anna.id]["external_id"], rows[anna.id]["reason"], rows[anna.id]["added_by"]) == (
+        anna.external_id, "VIP", user.email)
+    assert (rows[anna.id]["left_out_by"], rows[ben.id]["left_out_by"]) == ([], ["Paused"])
+    plain = client.get(f"{URL}/{g.id}/members").json()["items"]
+    assert all(m["left_out_by"] == [] for m in plain), "no channel, no exclusion verdict"

@@ -5,6 +5,7 @@ import DataTable, { type DataColumn } from '../components/DataTable'
 import Pager, { useOffset } from '../components/Pager'
 import { SearchBox, useSearch } from '../components/RecipientSearch'
 import ScreenState from '../components/ScreenState'
+import { NewAudience, SuggestFromCampaign } from './AudienceCreate'
 import { formatDate } from './Campaigns'
 
 const columns: DataColumn<AudienceGroup>[] = [
@@ -24,6 +25,9 @@ export default function Audiences() {
   return (
     <>
       <h1>Audiences</h1>
+      <p>
+        <NewAudience /> <SuggestFromCampaign />
+      </p>
       <SearchBox label="Find an audience by name" />
       <ScreenState query={groups}>
         <DataTable

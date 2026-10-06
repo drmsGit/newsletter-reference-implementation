@@ -3,9 +3,11 @@ id: TASK-297
 title: >-
   The React audience editor: rules, hand-added people, paste, delete — with the
   live arithmetic
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-06 19:59'
+updated_date: '2026-10-06 20:46'
 labels:
   - frontend
 dependencies:

@@ -247,9 +247,12 @@ def delete_group(
 @router.get("/{group_id}/members", response_model=Page[AudienceGroupMember])
 def list_members(
     group_id: int, params: PageParams = Depends(page_params),
+    channel: str | None = Query(None, description="Mark who an exclusion rule leaves out on this channel."),
     db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
 ):
-    return service.page_members(db, group_id, params, brand_id=brand_id)
+    if channel is not None and not is_registered(channel):
+        raise HTTPException(status_code=422, detail=f"{channel!r} is not a registered channel.")
+    return service.page_members(db, group_id, params, brand_id=brand_id, channel=channel)
 
 
 @router.post("/{group_id}/members/paste-preview", response_model=PastePreview,

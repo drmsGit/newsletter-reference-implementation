@@ -259,6 +259,180 @@ export function useAudiencePreview(id: number, channel: string, q = '') {
   })
 }
 
+// --- the audience editor (task-297) ------------------------------------------
+
+export type AudienceRuleBlock = components['schemas']['AudienceRuleBlock']
+export type AudienceGroupMember = components['schemas']['AudienceGroupMember']
+export type PastePreview = components['schemas']['PastePreview']
+
+/** A group's rules, in order. Under the group's key, so any write re-reads them. */
+export function useAudienceBlocks(id: number) {
+  return useQuery({
+    queryKey: [...keys.audienceGroup(id), 'blocks'],
+    queryFn: () => read(api.GET('/api/audience-groups/{group_id}/blocks', { params: { path: { group_id: id } } })),
+  })
+}
+
+/**
+ * The people added by hand, each named, with whom an exclusion leaves out on
+ * `channel` (ADR-176 point 1: an exclusion beats a hand-add).
+ */
+export function useAudienceMembers(id: number, channel: string, offset = 0) {
+  return useQuery({
+    queryKey: [...keys.audienceGroup(id), 'members', channel, offset],
+    queryFn: () =>
+      read(api.GET('/api/audience-groups/{group_id}/members', {
+        params: { path: { group_id: id }, query: { channel, limit: PAGE_SIZE, offset } },
+      })),
+  })
+}
+
+/** The languages and statuses the brand's recipients hold, for a rule to choose from. */
+export function useCriteriaValues() {
+  return useQuery({
+    queryKey: [...keys.audienceGroups, 'criteria-values'],
+    queryFn: () => read(api.GET('/api/audience-groups/criteria-values')),
+  })
+}
+
+export function useCreateAudience() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ name, description }: { name: string; description: string }) =>
+      read(api.POST('/api/audience-groups/', { body: { name, description: description || null } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [...keys.audienceGroups, 'page'] }),
+  })
+}
+
+/** A new group with one suggested rule per top category of a campaign's content (4.1). */
+export function useSuggestAudience() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (campaignId: number) =>
+      read(api.POST('/api/audience-groups/suggested', { body: { campaign_id: campaignId } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [...keys.audienceGroups, 'page'] }),
+  })
+}
+
+/**
+ * One write to a group, stating its version (design pass decision 10).
+ *
+ * **The group has one version for everything** — a rename, a rule, a hand-add
+ * all move its `updated_at` — so every write reads it from the cache when it
+ * is sent, and all of them run one after another in one queue, as the
+ * composer's do (task-110). A write's success waits for the group to be read
+ * again, so the next one states the version this one produced; the rules,
+ * people and arithmetic are re-read alongside without holding the queue.
+ */
+function useAudienceWrite<TArgs, TResult>(
+  id: number,
+  send: (args: TArgs, version: string | undefined) => Promise<TResult>,
+) {
+  const queryClient = useQueryClient()
+  const key = keys.audienceGroup(id)
+  return useMutation({
+    scope: { id: `audience-${id}` },
+    mutationFn: (args: TArgs) => send(args, queryClient.getQueryData<AudienceGroup>(key)?.updated_at),
+    onSuccess: async () => {
+      void queryClient.invalidateQueries({ queryKey: key, predicate: (q) => q.queryKey.length > key.length })
+      void queryClient.invalidateQueries({ queryKey: [...keys.audienceGroups, 'page'] })
+      await queryClient.invalidateQueries({ queryKey: key, exact: true })
+    },
+  })
+}
+
+const groupPath = (id: number, version: string | undefined) => ({
+  path: { group_id: id },
+  header: { 'If-Match': version },
+})
+
+/** Rename or re-describe: only what is sent changes. */
+export function useSaveAudience(id: number) {
+  return useAudienceWrite(id, (changes: { name?: string; description?: string | null }, version) =>
+    read(api.PATCH('/api/audience-groups/{group_id}', { params: groupPath(id, version), body: changes })))
+}
+
+export type RuleChanges = { kind?: string; criteria?: Record<string, unknown>; label?: string | null }
+
+export function useAddRule(id: number) {
+  return useAudienceWrite(id, (rule: RuleChanges & { kind: string }, version) =>
+    read(api.POST('/api/audience-groups/{group_id}/blocks', { params: groupPath(id, version), body: rule })))
+}
+
+export function useSaveRule(id: number) {
+  return useAudienceWrite(id, ({ blockId, ...changes }: RuleChanges & { blockId: number }, version) =>
+    read(api.PATCH('/api/audience-groups/{group_id}/blocks/{block_id}', {
+      params: { ...groupPath(id, version), path: { group_id: id, block_id: blockId } },
+      body: changes,
+    })))
+}
+
+export function useRemoveRule(id: number) {
+  return useAudienceWrite(id, (blockId: number, version) =>
+    read(api.DELETE('/api/audience-groups/{group_id}/blocks/{block_id}', {
+      params: { ...groupPath(id, version), path: { group_id: id, block_id: blockId } },
+    })))
+}
+
+/** Add one person by hand with an optional reason; who and when the server records. */
+export function useAddPerson(id: number) {
+  return useAudienceWrite(id, ({ recipientId, reason }: { recipientId: number; reason: string }, version) =>
+    read(api.POST('/api/audience-groups/{group_id}/members/{recipient_id}', {
+      params: { ...groupPath(id, version), path: { group_id: id, recipient_id: recipientId } },
+      body: { reason: reason || null },
+    })))
+}
+
+export function useRemovePerson(id: number) {
+  return useAudienceWrite(id, (recipientId: number, version) =>
+    read(api.DELETE('/api/audience-groups/{group_id}/members/{recipient_id}', {
+      params: { ...groupPath(id, version), path: { group_id: id, recipient_id: recipientId } },
+    })))
+}
+
+/** What a paste would do, before anything is added (decision 6). Writes nothing. */
+export function usePastePreview(id: number) {
+  return useMutation({
+    mutationFn: ({ text, channel }: { text: string; channel: string }) =>
+      read(api.POST('/api/audience-groups/{group_id}/members/paste-preview', {
+        params: { path: { group_id: id } }, body: { text, channel },
+      })),
+  })
+}
+
+export function usePastePeople(id: number) {
+  return useAudienceWrite(id, ({ text, reason }: { text: string; reason: string }, version) =>
+    read(api.POST('/api/audience-groups/{group_id}/members/paste', {
+      params: groupPath(id, version), body: { text, reason: reason || null },
+    })))
+}
+
+/** Re-derive the suggested rules from the source campaign; the manager's own stay (4.7). */
+export function useRecalculate(id: number) {
+  return useAudienceWrite(id, () =>
+    read(api.POST('/api/audience-groups/{group_id}/recalculate', { params: { path: { group_id: id } } })))
+}
+
+/**
+ * Delete a group no send uses. Not through the queue's re-read: a deleted
+ * group answers 404, so its cache is dropped instead of refreshed.
+ */
+export function useDeleteAudience(id: number) {
+  const queryClient = useQueryClient()
+  const key = keys.audienceGroup(id)
+  return useMutation({
+    scope: { id: `audience-${id}` },
+    mutationFn: () =>
+      read(api.DELETE('/api/audience-groups/{group_id}', {
+        params: groupPath(id, queryClient.getQueryData<AudienceGroup>(key)?.updated_at),
+      })),
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: key })
+      return queryClient.invalidateQueries({ queryKey: [...keys.audienceGroups, 'page'] })
+    },
+  })
+}
+
 /**
  * What one recipient got (ADR-183). Answers 409 for an execution that was not
  * sent, or was sent before delivery records existed -- the screen tells that

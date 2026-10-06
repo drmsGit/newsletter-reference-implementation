@@ -52,6 +52,10 @@ class AudienceGroupMember(BaseModel):
     # Why they were added by hand, if anyone said, and by whom (task-295).
     reason: str | None = None
     added_by: str | None = None
+    # Who they are, and — when the list was asked for a channel — the
+    # exclusion rules that leave them out on it (task-297).
+    external_id: str | None = None
+    left_out_by: list[str] = []
 
 
 class MemberAdd(BaseModel):

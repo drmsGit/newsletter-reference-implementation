@@ -420,8 +420,15 @@ def delete_group(db: Session, group_id: int, *, brand_id: int, expected_updated_
     return True
 
 
-def page_members(db: Session, group_id: int, params, *, brand_id: int):
-    """One ADR-185 page of a group's pinned members, most recently added first."""
+def page_members(db: Session, group_id: int, params, *, brand_id: int, channel: str | None = None):
+    """One ADR-185 page of a group's pinned members, most recently added first.
+
+    Each names the person (`external_id`) and, when a `channel` is given, the
+    exclusion rules that leave them out on it (`left_out_by`) — a hand-add an
+    exclusion overrides, which ADR-176 point 1 makes real and the editor marks
+    (task-297). Checked for this page's people only, with the rules' own
+    definitions (`find_by_criteria(only_ids=...)`). No channel, no verdict.
+    """
     from app.audience.models import AudienceGroupMember
     from app.pagination import page_of_query
 
@@ -430,8 +437,24 @@ def page_members(db: Session, group_id: int, params, *, brand_id: int):
         .join(AudienceGroupDB, AudienceGroupDB.id == AudienceGroupMemberDB.group_id)
         .filter(AudienceGroupMemberDB.group_id == group_id, AudienceGroupDB.brand_id == brand_id)
     )
-    return page_of_query(query, params, AudienceGroupMemberDB.added_at.desc(),
-                         AudienceGroupMemberDB.id.desc(), convert=lambda m: AudienceGroupMember.model_validate(m, from_attributes=True))
+    page = page_of_query(query, params, AudienceGroupMemberDB.added_at.desc(),
+                         AudienceGroupMemberDB.id.desc(),
+                         convert=lambda m: AudienceGroupMember.model_validate(m, from_attributes=True))
+    ids = {m.recipient_id for m in page.items}
+    if not ids:
+        return page
+    names = dict(db.query(RecipientDB.id, RecipientDB.external_id).filter(RecipientDB.id.in_(ids)))
+    left_out: dict[int, list[str]] = {}
+    if channel is not None:
+        for block in list_blocks(db, group_id, brand_id=brand_id):
+            if block.kind != "exclude":
+                continue
+            for r in _recipients_for_criteria(db, block.criteria, brand_id, channel, only_ids=ids):
+                left_out.setdefault(r.id, []).append(block.label or f"Rule {block.id}")
+    for member in page.items:
+        member.external_id = names.get(member.recipient_id)
+        member.left_out_by = left_out.get(member.recipient_id, [])
+    return page
 
 def list_members(
     db: Session, group_id: int, *, brand_id: int

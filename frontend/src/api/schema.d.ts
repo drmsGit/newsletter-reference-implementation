@@ -2774,6 +2774,13 @@ export interface components {
             reason?: string | null;
             /** Added By */
             added_by?: string | null;
+            /** External Id */
+            external_id?: string | null;
+            /**
+             * Left Out By
+             * @default []
+             */
+            left_out_by: string[];
         };
         /**
          * AudienceGroupUpdate
@@ -10072,6 +10079,8 @@ export interface operations {
     list_members_api_audience_groups__group_id__members_get: {
         parameters: {
             query?: {
+                /** @description Mark who an exclusion rule leaves out on this channel. */
+                channel?: string | null;
                 /** @description Rows per page (1-200). */
                 limit?: number;
                 /** @description Rows to skip. */

@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { Button, Dialog, Heading, Input, Label, Modal, ModalOverlay, TextField } from 'react-aria-components'
+import { Button, Dialog, Heading, Modal, ModalOverlay } from 'react-aria-components'
 
 import {
-  useRecipientSearch,
   useRenderedVariant,
   type ModuleManifest,
   type ModuleState,
 } from '../api/resources'
+import RecipientPicker from '../components/RecipientPicker'
 import ScreenState from '../components/ScreenState'
 import { ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
 
@@ -172,8 +172,6 @@ function RecipientChoice({
   recipient: { id: number; label: string } | null
   onChange: (recipient: { id: number; label: string } | null) => void
 }) {
-  const [q, setQ] = useState('')
-  const found = useRecipientSearch(q)
   if (recipient) {
     return (
       <p>
@@ -182,24 +180,5 @@ function RecipientChoice({
       </p>
     )
   }
-  return (
-    <div className="recipient-choice">
-      <TextField value={q} onChange={setQ}>
-        <Label>Preview for a recipient (optional)</Label>
-        <Input />
-      </TextField>
-      {q.trim() && found.data && (
-        <ul className="bind__results">
-          {found.data.items.map((r) => (
-            <li key={r.id}>
-              <Button onPress={() => onChange({ id: r.id, label: r.email || r.external_id })}>
-                {r.email || r.external_id}
-              </Button>
-            </li>
-          ))}
-          {found.data.items.length === 0 && <li className="muted">Nobody matches.</li>}
-        </ul>
-      )}
-    </div>
-  )
+  return <RecipientPicker label="Preview for a recipient (optional)" onChoose={({ id, label }) => onChange({ id, label })} />
 }

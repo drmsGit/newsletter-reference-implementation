@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router'
 
 import AudienceDetail from './AudienceDetail'
-import { jsonResponse, renderWithProviders, stubFetch } from '../test-utils'
+import { jsonResponse, page, renderWithProviders, stubFetch } from '../test-utils'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -18,6 +18,13 @@ function preview(sample: object[], extra: object = {}) {
     sample_matching: 1180, sample, ...extra }
 }
 
+/** The editor's own reads (task-297), empty: these tests are about the reach. */
+const EDITOR = {
+  'GET /api/audience-groups/3/blocks': () => jsonResponse([]),
+  'GET /api/audience-groups/3/members': () => jsonResponse(page([])),
+  'GET /api/audience-groups/criteria-values': () => jsonResponse({ languages: [], statuses: [] }),
+}
+
 const someone = (i: number) => ({ recipient_id: 900 + i, external_id: `r-${i}`, language: 'de',
   status: 'active', address: `r${i}@example.invalid` })
 
@@ -25,6 +32,7 @@ describe("an audience's reach", () => {
   it('counts the segment, shows twenty, and searches the server for someone', async () => {
     /** Decided 2026-10-03: a sample and a search, not a paged list. */
     const fetchMock = stubFetch({
+      ...EDITOR,
       'GET /api/audience-groups/3': () => jsonResponse(GROUP),
       'GET /settings': () => jsonResponse({ channels: [{ name: 'email', available: true }] }),
       'GET /api/audience-groups/3/preview': (request) => {
@@ -56,6 +64,7 @@ describe("an audience's reach", () => {
 
   it('shows how the number was arrived at, on the channel, as of now (task-213)', async () => {
     stubFetch({
+      ...EDITOR,
       'GET /api/audience-groups/3': () => jsonResponse(GROUP),
       'GET /settings': () => jsonResponse({ channels: [{ name: 'email', available: true }] }),
       'GET /api/audience-groups/3/preview': () => jsonResponse(preview([someone(1)])),
@@ -82,6 +91,7 @@ describe("an audience's reach", () => {
 
   it('leaves out the hand-added note when no hand-add was excluded', async () => {
     stubFetch({
+      ...EDITOR,
       'GET /api/audience-groups/3': () => jsonResponse(GROUP),
       'GET /settings': () => jsonResponse({ channels: [{ name: 'email', available: true }] }),
       'GET /api/audience-groups/3/preview': () => jsonResponse(preview([someone(1)], {

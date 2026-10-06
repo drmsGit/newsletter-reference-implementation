@@ -649,3 +649,29 @@ kbd {
 .react-aria-Switch[data-disabled] {
   opacity: 0.6;
 }
+
+/* The audience editor (task-297): the arithmetic beside the rules and people.
+   Layout polish is its own session; this is only the two columns. */
+.audience-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 2rem;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .audience-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.audience-editor .rule {
+  border: 1px solid var(--brand-line);
+  padding: 0.75rem;
+  margin-block: 0.75rem;
+}
+.badge {
+  display: inline-block;
+  font-size: 0.8em;
+  padding: 0 0.5em;
+  border: 1px solid currentColor;
+  border-radius: 1em;
+}
