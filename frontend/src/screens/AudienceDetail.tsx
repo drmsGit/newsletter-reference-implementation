@@ -121,7 +121,11 @@ function Details({ group, reload }: { group: AudienceGroup; reload: () => void }
           <Button isDisabled={recalculate.isPending} onPress={() => recalculate.mutate(undefined)}>
             Recalculate from campaign
           </Button>{' '}
-          <span className="muted">Replaces the suggested rules with fresh ones from the campaign. Your own rules stay.</span>
+          <span className="muted">
+            Brings the suggested rules up to date with the campaign&apos;s content: new topics are added, dropped
+            ones removed, the rest kept as you set them. Your own rules stay.
+          </span>
+          {recalculate.isSuccess && <span role="status"> The suggested rules match the campaign now.</span>}
           <SaveState mutation={recalculate} what="this audience" reload={reload} />
         </p>
       )}

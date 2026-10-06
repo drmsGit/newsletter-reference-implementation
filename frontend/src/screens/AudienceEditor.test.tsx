@@ -357,7 +357,8 @@ describe('the audience page is the editor (task-297)', () => {
     const s = server({ sourceCampaign: 77 })
     open(s)
     fireEvent.click(await screen.findByRole('button', { name: 'Recalculate from campaign' }))
-    await waitFor(() => expect(last(s).path).toBe('/api/audience-groups/3/recalculate'))
+    expect(await screen.findByText(/The suggested rules match the campaign now/)).toBeInTheDocument()
+    expect(last(s).path).toBe('/api/audience-groups/3/recalculate')
   })
 
   it('offers no recalculation without a source campaign', async () => {
