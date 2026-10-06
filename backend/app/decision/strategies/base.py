@@ -208,10 +208,12 @@ def candidate_query(db, slot, *, brand_id: int):
     from app.modules.registry import get_manifest
 
     channel = db.query(VariantDB.channel).filter(VariantDB.id == slot.variant_id).scalar()
-    module_types = {t for (t,) in db.query(ModuleInstanceDB.module_type)
-                    .filter(ModuleInstanceDB.decision_slot_id == slot.id)}
-    needed = sorted({name for t in module_types if (m := get_manifest(channel, t))
-                     for name in fields_a_record_must_fill(m)})
+    # Required when shown (ADR-187 point 6): a field the module hides need not
+    # be filled, so each bound module's hidden list is part of what it needs.
+    bound = db.query(ModuleInstanceDB.module_type, ModuleInstanceDB.hidden_fields).filter(
+        ModuleInstanceDB.decision_slot_id == slot.id)
+    needed = sorted({name for t, hidden in bound if (m := get_manifest(channel, t))
+                     for name in fields_a_record_must_fill(m, hidden)})
     latest = (
         db.query(func.max(ContentVersionDB.version_number))
         .filter(ContentVersionDB.content_record_id == ContentRecordDB.id)

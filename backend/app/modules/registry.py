@@ -403,6 +403,20 @@ def list_manifests(channel: str) -> list[ModuleManifest]:
     return [m for (c, _), m in _REGISTRY.items() if c == channel]
 
 
+def required_when_shown(manifest: ModuleManifest, hidden=()) -> list[str]:
+    """The fields this module requires, less those hidden in it: ADR-187
+    point 6, "required" means "required when shown". The one definition every
+    required check reads — the send check, the editor's module states, slot
+    candidacy — so they cannot drift apart."""
+    hidden = set(hidden or ())
+    return [v.name for v in manifest.variables if v.required and v.name not in hidden]
+
+
+def hideable_fields(manifest: ModuleManifest) -> list[str]:
+    """The fields a manager may hide in this module, in manifest order."""
+    return [v.name for v in manifest.variables if v.hideable]
+
+
 def get_template_html(channel: str, name: str) -> str | None:
     manifest = get_manifest(channel, name)
     if manifest is None or not manifest.has_template:

@@ -1,4 +1,4 @@
-from sqlalchemy import Index, CheckConstraint, Column, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, func, JSON
+from sqlalchemy import Index, CheckConstraint, Column, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, func, JSON, text
 
 from app.database import Base
 
@@ -88,6 +88,11 @@ class ModuleInstanceDB(Base):
     content_record_id = Column(Integer, ForeignKey("content_records.id"), nullable=True)
     module_data = Column(JSON, nullable=True)
     decision_slot_id = Column(Integer, ForeignKey("decision_slots.id"), nullable=True)
+    #: The fields a manager hid in this module (ADR-187, task-290): each one its
+    #: manifest marks hideable. A layout choice, so it sits on the module, not
+    #: the record or the override; it survives re-binding and copies with the
+    #: variant. Migration 0033.
+    hidden_fields = Column(JSON, nullable=False, default=list, server_default=text("'[]'"))
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime(timezone=True),

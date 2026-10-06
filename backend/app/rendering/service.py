@@ -10,7 +10,9 @@ from sqlalchemy.orm import Session
 
 from app.campaigns.db_models import ModuleInstanceDB, DecisionResolutionDB, VariantDB
 from app.content.db_models import ContentRecordDB, ContentVersionDB
-from app.modules.registry import ModuleManifest, envelope_module_type, get_manifest, get_template_html
+from app.modules.registry import (
+    ModuleManifest, envelope_module_type, get_manifest, get_template_html, required_when_shown,
+)
 from app.overrides.service import get_active_content_override
 
 RenderMode = Literal["preview", "send"]
@@ -414,9 +416,19 @@ def render_cms_module(
         )
 
     return (
-        module_html(channel, module.module_type, module.id, variables, content_id=content["id"]),
+        module_html(channel, module.module_type, module.id, without_hidden(variables, module.hidden_fields),
+                    content_id=content["id"]),
         decision_resolution,
     )
+
+
+def without_hidden(variables: dict, hidden) -> dict:
+    """`variables` less the fields the module hides (ADR-187 point 5): a hidden
+    field reaches the template as empty — before any MJML compile — and its
+    value stays where it is. Applied where values are handed to a template,
+    never where they are read for editing."""
+    hidden = set(hidden or ())
+    return {k: v for k, v in variables.items() if k not in hidden}
 
 
 def static_module_variables(
@@ -473,7 +485,7 @@ def render_static_module(
 ) -> str:
     return module_html(
         channel, module.module_type, module.id,
-        static_module_variables(db, module, manifest, mode=mode),
+        without_hidden(static_module_variables(db, module, manifest, mode=mode), module.hidden_fields),
     )
 
 
@@ -552,9 +564,10 @@ def missing_required_fields(
             # draft nobody has frozen yet.
             continue
 
-        for var in manifest.variables:
-            if var.required and not str(variables.get(var.name, "") or "").strip():
-                missing.append((module.id, module.module_type, var.name))
+        # Required when shown (ADR-187 point 6): a hidden field is not missing.
+        for name in required_when_shown(manifest, module.hidden_fields):
+            if not str(variables.get(name, "") or "").strip():
+                missing.append((module.id, module.module_type, name))
 
     return missing
 

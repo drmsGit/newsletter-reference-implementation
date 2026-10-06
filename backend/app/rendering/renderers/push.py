@@ -76,6 +76,12 @@ class PushRenderer(ChannelRenderer):
                     for var in manifest.variables
                 }
 
+            # A field the module hides is left out (ADR-187). Push marks none
+            # hideable today; this keeps the rule in every renderer, not only
+            # the one that needs it now.
+            from app.rendering.service import without_hidden
+            variables = without_hidden(variables, module.hidden_fields)
+
             # **Strip rather than emit** — task-222, interview Q2.5. A
             # `richtext` field carries `**bold**` and `[label](url)`, which an
             # operating system renders as the characters they are. Stripping is

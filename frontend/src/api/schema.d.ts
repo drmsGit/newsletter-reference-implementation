@@ -812,6 +812,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/campaigns/modules/{module_id}/hidden-fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Hide or show fields in a module
+         * @description The whole list of fields to hide in this module; `[]` shows them all. Each must be one the module's manifest marks hideable (ADR-187). A person's choice only: an integration is refused whichever way it would change the list. States the module's version in If-Match.
+         */
+        put: operations["set_module_hidden_fields_campaigns_modules__module_id__hidden_fields_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/campaigns/decision-slots/{slot_id}": {
         parameters: {
             query?: never;
@@ -3144,6 +3164,11 @@ export interface components {
             module_data: {
                 [key: string]: unknown;
             };
+            /**
+             * Hidden Fields
+             * @default []
+             */
+            hidden_fields: string[];
             /** Known */
             known: boolean;
             /** Overrideable */
@@ -4237,6 +4262,14 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /**
+         * HiddenFields
+         * @description The fields to hide in a module — the whole list; `[]` shows them all.
+         */
+        HiddenFields: {
+            /** Hidden Fields */
+            hidden_fields: string[];
+        };
         /** IntegrationCreate */
         IntegrationCreate: {
             /** Name */
@@ -4309,6 +4342,11 @@ export interface components {
             } | null;
             /** Decision Slot Id */
             decision_slot_id?: number | null;
+            /**
+             * Hidden Fields
+             * @default []
+             */
+            hidden_fields: string[];
             /**
              * Created At
              * Format: date-time
@@ -7744,6 +7782,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Variant"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_module_hidden_fields_campaigns_modules__module_id__hidden_fields_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
+            path: {
+                module_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HiddenFields"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleInstance"];
                 };
             };
             /** @description Validation Error */

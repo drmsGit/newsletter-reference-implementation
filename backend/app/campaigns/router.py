@@ -34,6 +34,7 @@ from app.campaigns.models import (
     ModuleInstance,
     ModuleInstanceCreate,
     ModuleInstanceUpdate,
+    HiddenFields,
     DecisionSlot,
     DecisionSlotCreate,
     DecisionResolution,
@@ -44,7 +45,9 @@ from app.campaigns.models import (
 from app.campaigns.service import (
     ChannelUnavailable,
     ModuleDataInvalid,
+    NotHideable,
     StaleWrite,
+    set_hidden_fields,
     attach_new_slot,
     create_campaign,
     create_variant_for_campaign,
@@ -631,6 +634,59 @@ def update_module_record(
         detail=module_audit_detail(updated),
     )
     fence.touch(db, request, module_id=module_id)
+    return updated
+
+
+@router.put(
+    "/modules/{module_id}/hidden-fields",
+    response_model=ModuleInstance,
+    summary="Hide or show fields in a module",
+    description=(
+        "The whole list of fields to hide in this module; `[]` shows them all. Each must be one "
+        "the module's manifest marks hideable (ADR-187). A person's choice only: an integration "
+        "is refused whichever way it would change the list. States the module's version in If-Match."
+    ),
+)
+def set_module_hidden_fields(
+    module_id: int,
+    payload: HiddenFields,
+    request: Request,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+    if_match: str | None = IF_MATCH,
+):
+    from app.auth.db_models import IntegrationDB
+    from app.campaigns.service import get_module
+
+    # Not found before refused: another brand's module answers 404 to anyone.
+    if get_module(db, module_id, brand_id=brand_id) is None:
+        raise HTTPException(status_code=404, detail="Module not found")
+    if isinstance(request_principal(request), IntegrationDB):
+        raise HTTPException(
+            status_code=403,
+            detail="Hiding or showing a module's fields is a person's choice (ADR-187); "
+                   "an integration may do neither.",
+        )
+    fence.guard(db, request, module_id=module_id)
+    try:
+        result = set_hidden_fields(db, module_id, payload.hidden_fields, brand_id=brand_id,
+                                   expected_updated_at=_expected(if_match))
+    except StaleWrite as error:
+        raise _stale(error)
+    except NotHideable as error:
+        raise HTTPException(status_code=422, detail=[
+            {"loc": ["body", "hidden_fields", name], "msg": str(error), "type": "value_error"}
+            for name in error.fields
+        ])
+    if result is None:
+        raise HTTPException(status_code=404, detail="Module not found")
+    updated, before = result
+    if updated.hidden_fields != before:
+        audit.record_from_request(
+            request, db, audit.MODULE_FIELDS_HIDDEN, subject_type="module", subject_id=module_id,
+            detail={**module_audit_detail(updated), "from": before, "to": updated.hidden_fields},
+        )
+        fence.touch(db, request, module_id=module_id)
     return updated
 
 

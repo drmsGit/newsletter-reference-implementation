@@ -28,7 +28,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.campaigns.db_models import DecisionResolutionDB, ModuleInstanceDB, VariantDB
-from app.modules.registry import MODULES_DIR, get_manifest
+from app.modules.registry import MODULES_DIR, get_manifest, required_when_shown
 from app.overrides.service import get_active_content_override
 from app.rendering.renderers.base import ROLE_HTML, ROLE_PAYLOAD, RenderedArtifact
 
@@ -87,7 +87,7 @@ def build_frame(db: Session, variant_id: int) -> dict:
     snapshot always has.
     """
     from app.rendering.service import (
-        envelope_fields_for_variant, resolve_module_variables, static_module_variables,
+        envelope_fields_for_variant, resolve_module_variables, static_module_variables, without_hidden,
     )
 
     variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
@@ -109,6 +109,11 @@ def build_frame(db: Session, variant_id: int) -> dict:
             "position": module.position,
         }
         manifest = get_manifest(channel, module.module_type)
+        if manifest is not None:
+            # What the manager hid (ADR-187): recorded, so the as-sent view
+            # stays true if the toggle changes later, and the frozen values are
+            # only the shown ones. A frame without the key hid nothing.
+            entry["hidden_fields"] = list(module.hidden_fields or [])
         if manifest is None:
             entry["kind"] = KIND_UNKNOWN
         elif module.decision_slot_id is not None:
@@ -128,7 +133,7 @@ def build_frame(db: Session, variant_id: int) -> dict:
             else:
                 entry.update(
                     kind=KIND_CONTENT if manifest.cms else KIND_STATIC,
-                    variables=variables,
+                    variables=without_hidden(variables, module.hidden_fields),
                     content_record_id=(content or {}).get("id"),
                     content_version_id=(content or {}).get("_version_id"),
                     override_id=override.id if override else None,
@@ -174,8 +179,10 @@ def _pick_for_slot(db: Session, entry: dict, channel: str, recipient_id: int | N
     if content is None:
         return None
     manifest = get_manifest(channel, entry["module_type"])
-    # No override: a decision slot is never overridden (ADR-178 point 5).
-    variables = {var.name: content.get(var.name, "") for var in manifest.variables}
+    # No override: a decision slot is never overridden (ADR-178 point 5). A
+    # field the module hides is left out of the pick, as of every render.
+    hidden = set(entry.get("hidden_fields") or ())
+    variables = {var.name: content.get(var.name, "") for var in manifest.variables if var.name not in hidden}
     return {
         "module_id": entry["module_id"],
         "decision_resolution_id": resolution.id,
@@ -216,6 +223,10 @@ def render_frame(
             if pick is not None:
                 made.append(pick)
                 variables, content_id = pick["variables"], pick["content_record_id"]
+        if variables is not None and entry.get("hidden_fields"):
+            # Already left out when frozen or picked; a recorded pick from
+            # before the list existed is held to it here too.
+            variables = {k: v for k, v in variables.items() if k not in set(entry["hidden_fields"])}
 
         if channel == "email":
             if kind == KIND_UNKNOWN:
@@ -262,9 +273,10 @@ def missing_required_in_frame(frame: dict) -> list[tuple[int, str, str]]:
         if entry["kind"] not in (KIND_CONTENT, KIND_STATIC):
             continue
         manifest = get_manifest(frame["channel"], entry["module_type"])
-        for var in manifest.variables:
-            if var.required and not str(entry["variables"].get(var.name, "") or "").strip():
-                missing.append((entry["module_id"], entry["module_type"], var.name))
+        # Required when shown (ADR-187 point 6), from the list the frame froze.
+        for name in required_when_shown(manifest, entry.get("hidden_fields")):
+            if not str(entry["variables"].get(name, "") or "").strip():
+                missing.append((entry["module_id"], entry["module_type"], name))
     return missing
 
 

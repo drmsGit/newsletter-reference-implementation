@@ -586,6 +586,8 @@ def _copy_variant_into(
             # is the binding to a specific record.
             decision_slot_id=slot_map.get(source_module.decision_slot_id),
             module_data=source_module.module_data,
+            # A layout choice, so it copies with the layout (ADR-187).
+            hidden_fields=list(source_module.hidden_fields or []),
         )
         db.add(module)
         db.flush()

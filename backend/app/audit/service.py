@@ -63,6 +63,8 @@ MODULE_CREATED = "module.created"
 MODULE_UPDATED = "module.updated"
 MODULE_DELETED = "module.deleted"
 MODULE_MOVED = "module.moved"
+# task-290, ADR-187: a person hid or showed fields in a module (from/to lists).
+MODULE_FIELDS_HIDDEN = "module.fields_hidden"
 DECISION_SLOT_CREATED = "decision_slot.created"
 DECISION_SLOT_UPDATED = "decision_slot.updated"
 OVERRIDE_CREATED = "override.created"

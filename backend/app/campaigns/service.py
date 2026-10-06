@@ -7,7 +7,7 @@ from app.campaigns.db_models import CampaignDB, VariantDB, ModuleInstanceDB, Dec
 from app.campaigns.models import Campaign, CampaignWithVariants, Variant, ModuleInstance, DecisionSlot, DecisionResolution
 from app.channels.registry import get_channel, max_modules_for
 from app.content.db_models import ContentRecordDB, ContentVersionDB
-from app.modules.registry import envelope_module_type, get_manifest
+from app.modules.registry import envelope_module_type, get_manifest, hideable_fields
 from app.recipients.db_models import RecipientDB
 
 
@@ -433,6 +433,7 @@ def to_module_instance(record: ModuleInstanceDB) -> ModuleInstance:
         content_record_id=record.content_record_id,
         module_data=record.module_data,
         decision_slot_id=record.decision_slot_id,
+        hidden_fields=list(record.hidden_fields or []),
         created_at=record.created_at,
         updated_at=record.updated_at,
     )
@@ -742,6 +743,12 @@ def update_module(
         db, module.variant_id, content_record_id, decision_slot_id, brand_id=brand_id
     )
 
+    if module_type != module.module_type:
+        # A hidden list is a layout choice for this module type: a new type
+        # keeps only what it still marks hideable (ADR-187). Re-binding the
+        # record keeps it whole.
+        hideable = set(hideable_fields(get_manifest(channel_key, module_type)))
+        module.hidden_fields = [f for f in (module.hidden_fields or []) if f in hideable]
     module.module_type = module_type
     module.content_record_id = content_record_id
     module.decision_slot_id = decision_slot_id
@@ -750,6 +757,51 @@ def update_module(
     db.commit()
     db.refresh(module)
     return to_module_instance(module)
+
+
+class NotHideable(Exception):
+    """A field the module's manifest does not mark hideable (ADR-187 point 2).
+    Carries the names, for a 422 the client can mark per field."""
+
+    def __init__(self, fields: list[str], module_type: str):
+        self.fields = fields
+        super().__init__(
+            f"{', '.join(fields)} cannot be hidden in a {module_type} module: its manifest "
+            f"does not mark {'it' if len(fields) == 1 else 'them'} hideable."
+        )
+
+
+def set_hidden_fields(
+    db: Session, module_id: int, fields: list[str], *, brand_id: int,
+    expected_updated_at: datetime | None = None,
+) -> tuple[ModuleInstance, list[str]] | None:
+    """Make a module's hidden fields exactly `fields` (ADR-187), returning the
+    module and the list it had, or None when the module is not in this brand.
+
+    Who may call this is the route's question: people only, in both
+    directions. Every name must be one the module's manifest marks hideable;
+    the list is kept in manifest order without repeats. The module's version
+    moves when the list changes (ADR-180 point 2), and a stale one is refused.
+    Hiding never touches a value: the record, the override and `module_data`
+    keep theirs.
+    """
+    module = get_module(db, module_id, brand_id=brand_id)
+    if module is None:
+        return None
+    refuse_stale(db, module, expected_updated_at, "module")
+    channel_key = db.get(VariantDB, module.variant_id).channel
+    manifest = get_manifest(channel_key, module.module_type)
+    hideable = hideable_fields(manifest) if manifest is not None else []
+    refused = [f for f in dict.fromkeys(fields) if f not in hideable]
+    if refused:
+        raise NotHideable(refused, module.module_type)
+    before = list(module.hidden_fields or [])
+    after = [f for f in hideable if f in set(fields)]
+    if after != before:
+        module.hidden_fields = after
+        db.commit()
+        db.refresh(module)
+    return to_module_instance(module), before
 
 
 def delete_module(
@@ -1301,6 +1353,7 @@ def campaign_composition(db: Session, campaign_id: int, *, brand_id: int) -> dic
                 "content_record_title": record_titles.get(m.content_record_id),
                 "decision_slot_name": (slot_stats.get(m.decision_slot_id) or {}).get("name"),
                 "module_data": m.module_data or {},
+                "hidden_fields": list(m.hidden_fields or []),
                 "known": manifest is not None, "updated_at": m.updated_at,
                 "overrideable": overrideable,
                 "active_override": (

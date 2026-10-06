@@ -783,12 +783,17 @@ def _channel_or_refuse(channel: str):
     return manifest
 
 
-def fields_a_record_must_fill(manifest) -> list[str]:
+def fields_a_record_must_fill(manifest, hidden=()) -> list[str]:
     """The fields a content record must fill for `manifest`'s module to render:
-    required, sourced from content, not envelope. One definition for the
-    readiness warning and slot candidacy (`decision.strategies.base.candidate_query`),
-    so the two never disagree about what "required" means."""
-    return [v.name for v in manifest.variables if v.required and v.source == "content" and not v.envelope]
+    required when shown (ADR-187 point 6, `required_when_shown`), sourced from
+    content, not envelope. One definition for the readiness warning and slot
+    candidacy (`decision.strategies.base.candidate_query`), so the two never
+    disagree about what "required" means. `hidden` is the module's hidden list;
+    the readiness warning has no module, so it passes none."""
+    from app.modules.registry import required_when_shown
+
+    required = set(required_when_shown(manifest, hidden))
+    return [v.name for v in manifest.variables if v.name in required and v.source == "content" and not v.envelope]
 
 
 def readiness_warning(content: dict | None, channel: str) -> str | None:

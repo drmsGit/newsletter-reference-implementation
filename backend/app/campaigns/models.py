@@ -96,8 +96,17 @@ class ModuleInstance(BaseModel):
     content_record_id: int | None = None
     module_data: dict[str, Any] | None = None
     decision_slot_id: int | None = None
+    # The fields a manager hid in this module (ADR-187); set only through
+    # `PUT /campaigns/modules/{id}/hidden-fields`.
+    hidden_fields: list[str] = []
     created_at: datetime
     updated_at: datetime
+
+
+class HiddenFields(BaseModel):
+    """The fields to hide in a module — the whole list; `[]` shows them all."""
+
+    hidden_fields: list[str]
 
 
 class ModuleInstanceCreate(BaseModel):
@@ -441,6 +450,8 @@ class ComposedModule(BaseModel):
     content_record_title: str | None = None
     decision_slot_name: str | None = None
     module_data: dict
+    # The fields a manager hid in this module (ADR-187).
+    hidden_fields: list[str] = []
     # False when no manifest exists for this type on this channel.
     known: bool
     # A manager may override its fields (content-bound, never a slot).
