@@ -1,11 +1,11 @@
 ---
 id: TASK-300
 title: 'Category interest takes several categories, each with its own score'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-06 21:20'
-updated_date: '2026-10-07 21:00'
+updated_date: '2026-10-07 21:06'
 labels:
   - backend
   - frontend
@@ -44,11 +44,11 @@ It comes before task-298 so the engagement field lands on the corrected rule sha
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A rule can hold several categories, each with its own minimum score above 0, matching anyone who clears any one of them
-- [ ] #2 Existing rules are migrated to the list form and the old single-category input is still accepted
-- [ ] #3 Suggested rules and Recalculate from campaign keep working per category
-- [ ] #4 The editor adds and removes categories within one rule, each with a score filled in at 1.0
-- [ ] #5 A saved rule shows as one line naming its conditions, and Edit opens the form for that rule only
+- [x] #1 A rule can hold several categories, each with its own minimum score above 0, matching anyone who clears any one of them
+- [x] #2 Existing rules are migrated to the list form and the old single-category input is still accepted
+- [x] #3 Suggested rules and Recalculate from campaign keep working per category
+- [x] #4 The editor adds and removes categories within one rule, each with a score filled in at 1.0
+- [x] #5 A saved rule shows as one line naming its conditions, and Edit opens the form for that rule only
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -78,4 +78,12 @@ Tests: backend tests/test_audience_categories.py (22); client AudienceEditor.tes
 Suites: backend 1459, client 218, build and contract clean.
 
 Found, not fixed (outside this task): the Jinja rule form compares a stored language or status LIST with a single value, so since task-295 editing a multi-language rule there loses its languages (backend/app/templates/audience_group_detail.html, the language and status selects). The Jinja page is frozen and being replaced; worth a task only if anyone still edits rules there.
+
+Live check 2026-10-07, scratch audience only (zz-scratch task-300, deleted afterwards): a Who's in rule with language de, Nature at least 5 and Wellness at least 3, built with Add a category, saved as the list form and shown as one line (Outdoors or spa, Language de, Nature 5 or Wellness 3); 18 matched, checked on the server as exactly Nature alone (14) or Wellness alone (13); Edit opened that rule only, Remove this category on Wellness and Save brought it back to one line, Nature only, 14. The user's own test DS group already showed its migrated two-category rule as one line; it was only viewed.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+A rule's category interest now names several categories, each with its own minimum score, and anyone clearing any one of them matches (ADR-188 addendum 2026-10-06). The old single pair is still accepted and converted; migration 0037 rewrote the 6 existing dev rules, audited; suggested rules stay one category each, and one the manager widened is left alone by recalculation. In the editor a saved rule reads as one line and Edit opens that rule's form, with category rows (Add a category, Remove this category, 1.0 filled in). Verified by 22 new backend tests and 22 editor tests (mutation-checked), both full suites, the contract check, and a live check on a scratch audience whose count matched the server's per-category union.
+<!-- SECTION:FINAL_SUMMARY:END -->
