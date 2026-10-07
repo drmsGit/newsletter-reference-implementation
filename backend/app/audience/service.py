@@ -111,7 +111,10 @@ class CriteriaInvalid(ValueError):
 
 
 #: What a rule can say today (ADR-188 point 2). Related data waits for task-294.
-CRITERIA_FIELDS = frozenset({"language", "status", "category_id", "min_score", "engagement"})
+#: `category_id` + `min_score` is the older single-category input, still
+#: accepted and stored as `categories` (ADR-188 addendum 2026-10-06).
+CRITERIA_FIELDS = frozenset({"language", "status", "categories", "category_id", "min_score", "engagement"})
+CATEGORY_KEYS = frozenset({"category_id", "min_score"})
 
 #: What an engagement field can say happened (ADR-188 point 4), and the event
 #: each reads. "received" reads the delivery itself (sent, not bounced).
@@ -178,12 +181,90 @@ def _values(value) -> list[str]:
     return [v.strip() for v in values if isinstance(v, str) and v.strip()]
 
 
+def _score_problem(score) -> tuple[float | None, str | None]:
+    try:
+        score = None if score in (None, "") else float(score)
+    except (TypeError, ValueError):
+        return None, "a number"
+    if score is None or score <= 0:
+        return None, ("interest in a category needs a minimum score above 0; "
+                      "without one it matches nearly everyone")
+    return score, None
+
+
+def _normalise_categories(criteria: dict) -> tuple[list[dict], list[tuple[str, str]]]:
+    """Category interest as a list, and what is wrong with it (ADR-188 point 3
+    and its 2026-10-06 addendum): one or more categories, each with its own
+    minimum score above 0, each named once. The older single pair is read as a
+    list of one, and its refusals keep their field names (`category_id`,
+    `min_score`), which the Jinja form and older callers know."""
+    errors: list[tuple[str, str]] = []
+    pair = any(criteria.get(k) not in (None, "") for k in CATEGORY_KEYS)
+    if criteria.get("categories") is not None and pair:
+        return [], [("category_id", "either a list of categories or one category_id, not both")]
+    if pair:
+        category = criteria.get("category_id")
+        if category in (None, ""):
+            return [], [("category_id", "a minimum score needs a category")]
+        try:
+            category = int(category)
+        except (TypeError, ValueError):
+            return [], [("category_id", "a category")]
+        score, problem = _score_problem(criteria.get("min_score"))
+        if problem:
+            return [], [("min_score", problem)]
+        return [{"category_id": category, "min_score": score}], []
+    raw = criteria.get("categories")
+    if raw is None:
+        return [], []
+    if not isinstance(raw, list):
+        return [], [("categories", "a list of categories, each with a minimum score")]
+    out, seen = [], set()
+    for i, entry in enumerate(raw):
+        where = f"categories.{i}"
+        if not isinstance(entry, dict):
+            errors.append((where, "a category with a minimum score"))
+            continue
+        errors += [(f"{where}.{key}", "not part of a category; it has a category_id and a min_score")
+                   for key in sorted(set(entry) - CATEGORY_KEYS)]
+        category = entry.get("category_id")
+        if isinstance(category, bool) or not isinstance(category, int):
+            errors.append((f"{where}.category_id", "a category"))
+            category = None
+        elif category in seen:
+            errors.append((f"{where}.category_id", "each category once; give it one score"))
+        score, problem = _score_problem(entry.get("min_score"))
+        if problem:
+            errors.append((f"{where}.min_score", problem))
+        if category is not None and score is not None and category not in seen:
+            seen.add(category)
+            out.append({"category_id": category, "min_score": score})
+    return out, errors
+
+
+def category_terms(criteria: dict | None) -> list[tuple[int, float]]:
+    """A stored rule's categories as `(category_id, min_score)` pairs, whichever
+    shape it holds: the list, or the older single pair (a rule written before
+    migration 0037, or criteria a caller assembled). An older pair without a
+    score keeps its old meaning, a threshold of 0."""
+    criteria = criteria or {}
+    if isinstance(criteria.get("categories"), list):
+        return [(int(c["category_id"]), float(c.get("min_score") or 0.0))
+                for c in criteria["categories"] if isinstance(c, dict) and c.get("category_id") is not None]
+    category = criteria.get("category_id")
+    if category in (None, ""):
+        return []
+    score = criteria.get("min_score")
+    return [(int(category), float(score) if score not in (None, "") else 0.0)]
+
+
 def normalise_criteria(criteria: dict | None) -> dict:
     """Check a rule and return it in its stored form (ADR-188 points 1-3).
 
     Unknown fields are refused by name rather than stored, where they would
-    silently never match. Language and status are lists ("is one of").
-    **Interest in a category always carries a minimum score above 0** —
+    silently never match. Language and status are lists ("is one of"), and so
+    is category interest, each category with its own score (the 2026-10-06
+    addendum). **Interest in a category always carries a minimum score above 0** —
     every recipient's signal is at least 0 unless they unsubscribed, so a
     category without one matches nearly everyone. A score without a category
     means nothing and is refused too. Raises `CriteriaInvalid`.
@@ -201,25 +282,10 @@ def normalise_criteria(criteria: dict | None) -> dict:
             errors.append((key, "one or more values"))
         elif values := _values(raw):
             out[key] = values
-    category, score = criteria.get("category_id"), criteria.get("min_score")
-    try:
-        category = None if category in (None, "") else int(category)
-    except (TypeError, ValueError):
-        errors.append(("category_id", "a category"))
-        category = None
-    try:
-        score = None if score in (None, "") else float(score)
-    except (TypeError, ValueError):
-        errors.append(("min_score", "a number"))
-        score = None
-    if category is not None:
-        if score is None or score <= 0:
-            errors.append(("min_score", "interest in a category needs a minimum score above 0; "
-                                        "without one it matches nearly everyone"))
-        else:
-            out.update(category_id=category, min_score=score)
-    elif score is not None:
-        errors.append(("category_id", "a minimum score needs a category"))
+    categories, problems = _normalise_categories(criteria)
+    errors += problems
+    if categories:
+        out["categories"] = categories
     if criteria.get("engagement") not in (None, {}):
         engagement, problems = _normalise_engagement(criteria["engagement"])
         errors += problems
@@ -577,6 +643,7 @@ def find_by_criteria(
     status: str | None = None,
     preference_category_id: int | None = None,
     min_preference_score: float | None = None,
+    categories: list[tuple[int, float]] | None = None,
     exclude_ids: set[int] | None = None,
     not_agreed: bool = False,
     only_ids: set[int] | None = None,
@@ -650,10 +717,17 @@ def find_by_criteria(
     # Preference criterion: keep recipients whose *operational signal* for the
     # category clears the threshold (ADR-132, decay-on-read). Computed rather
     # than SQL-joined against a stored score, since there is no stored score.
+    #
+    # Several categories are "is one of" (ADR-188 addendum 2026-10-06): a
+    # person stays when they clear the threshold in any one, each category
+    # with its own. `preference_category_id` is the older single form.
+    terms = list(categories or [])
     if preference_category_id is not None:
-        min_score = min_preference_score if min_preference_score is not None else 0.0
-        signals = operational_signals_for_category(db, preference_category_id)
-        records = [r for r in records if signals.get(r.id, 0.0) >= min_score]
+        terms.append((preference_category_id,
+                      min_preference_score if min_preference_score is not None else 0.0))
+    if terms:
+        thresholds = [(operational_signals_for_category(db, cid), score) for cid, score in terms]
+        records = [r for r in records if any(signals.get(r.id, 0.0) >= score for signals, score in thresholds)]
 
     # **No addressability filter and no deduplication here** (task-233,
     # 2026-09-29). Both moved to stage 1 of the ADR-163 point 7 exclusion
@@ -782,15 +856,13 @@ def _recipients_for_criteria(
     keyed `(recipient, brand, channel, purpose)`, so which people a criterion
     matches depends on it."""
     criteria = criteria or {}
-    cat = criteria.get("category_id")
     return find_by_criteria(
         db,
         brand_id,
         channel=channel,
         language=criteria.get("language") or None,
         status=criteria.get("status") or None,
-        preference_category_id=int(cat) if cat not in (None, "") else None,
-        min_preference_score=criteria.get("min_score"),
+        categories=category_terms(criteria),
         not_agreed=not_agreed,
         only_ids=only_ids,
         engagement=criteria.get("engagement"),
@@ -985,7 +1057,9 @@ def preview_group(
             "label": block.label,
             "source": block.source,
             "criteria": criteria,
-            "category_name": category_names.get(criteria.get("category_id")),
+            # Every category the rule names, in its order ("Nature or Wellness").
+            "category_name": " or ".join(category_names.get(cid, f"Category {cid}")
+                                         for cid, _ in category_terms(criteria)) or None,
             "count": count_for_criteria(db, criteria, group.brand_id, channel),
         })
 
@@ -1336,7 +1410,8 @@ def suggest_include_blocks_for_campaign(db: Session, campaign_id: int, max_categ
     channel in hand, which is one call and cannot be wrong by default."""
     suggestions = []
     for row in campaign_category_scores(db, campaign_id)[:max_categories]:
-        criteria = {"category_id": row["category_id"], "min_score": DEFAULT_SUGGESTION_MIN_SCORE}
+        # One category per suggested rule, so a recalculation stays per category.
+        criteria = {"categories": [{"category_id": row["category_id"], "min_score": DEFAULT_SUGGESTION_MIN_SCORE}]}
         suggestions.append({
             "label": f"Interested in {row['category_name']}",
             "criteria": criteria,
@@ -1404,6 +1479,13 @@ def create_suggested_group_for_campaign(
     return group
 
 
+def _suggested_category(criteria: dict | None) -> int | None:
+    """The one category a suggested rule is about, in either stored shape;
+    None for a rule naming none or several (it then matches no suggestion)."""
+    terms = category_terms(criteria)
+    return terms[0][0] if len(terms) == 1 else None
+
+
 def recalculate_suggested_blocks(
     db: Session, group_id: int, *, brand_id: int
 ) -> AudienceGroupDB | None:
@@ -1421,18 +1503,21 @@ def recalculate_suggested_blocks(
         return None
 
     desired = suggest_include_blocks_for_campaign(db, group.source_campaign_id)
-    desired_by_cat = {s["criteria"]["category_id"]: s for s in desired}
+    desired_by_cat = {_suggested_category(s["criteria"]): s for s in desired}
 
     existing_suggested = [
         b for b in list_blocks(db, group_id, brand_id=brand_id)
         if b.source == "suggested"
     ]
-    existing_cats = {(b.criteria or {}).get("category_id") for b in existing_suggested}
+    # A suggested rule the manager widened to several categories is theirs now
+    # (task-300): never removed here, and each of its categories counts as
+    # covered, so it is not suggested again beside it.
+    existing_cats = {cid for b in existing_suggested for cid, _ in category_terms(b.criteria)}
 
-    # Remove suggested blocks whose category dropped out of the campaign.
+    # Remove suggested blocks whose one category dropped out of the campaign.
     removed = 0
     for block in existing_suggested:
-        if (block.criteria or {}).get("category_id") not in desired_by_cat:
+        if len(category_terms(block.criteria)) <= 1 and _suggested_category(block.criteria) not in desired_by_cat:
             db.delete(block)
             removed += 1
     if removed:
@@ -1477,8 +1562,7 @@ def criteria_matches(
         db, group.brand_id, channel=channel,
         language=criteria.get("language") or None,
         status=criteria.get("status") or None,
-        preference_category_id=criteria.get("category_id"),
-        min_preference_score=criteria.get("min_score"),
+        categories=category_terms(criteria),
         exclude_ids=get_member_recipient_ids(db, group_id, brand_id=brand_id),
     )
 

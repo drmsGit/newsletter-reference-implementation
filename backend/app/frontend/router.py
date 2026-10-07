@@ -3181,19 +3181,24 @@ def audience_group_detail(group_id: int, request: Request, error: str | None = N
     preview = audience_service.preview_group(db, group, channel=DEFAULT_CHANNEL)
 
     # The one-line summary is presentation and stays here.
+    # A rule naming several categories (ADR-188 addendum 2026-10-06) is shown
+    # here but edited only in the manager client: this page's form holds one
+    # category, and saving it would drop the rest (`category_terms`).
+    names = {c.id: c.name for c in categories}
     blocks = []
     for b in preview["blocks"]:
         crit = b["criteria"]
+        terms = audience_service.category_terms(crit)
         parts = []
-        if crit.get("category_id"):
-            parts.append(f"interested in {b['category_name'] or 'category ' + str(crit['category_id'])}")
-        if crit.get("min_score") not in (None, ""):
-            parts.append(f"signal ≥ {crit['min_score']}")
-        if crit.get("language"):
-            parts.append(f"language {crit['language']}")
-        if crit.get("status"):
-            parts.append(f"status {crit['status']}")
-        blocks.append({**b, "summary": ", ".join(parts) if parts else "everyone (no criteria)"})
+        if terms:
+            parts.append("interested in " + " or ".join(
+                f"{names.get(cid, f'category {cid}')} ≥ {score}" for cid, score in terms))
+        for field in ("language", "status"):
+            if crit.get(field):
+                values = crit[field] if isinstance(crit[field], list) else [crit[field]]
+                parts.append(f"{field} {' or '.join(values)}")
+        blocks.append({**b, "category_terms": terms,
+                       "summary": ", ".join(parts) if parts else "everyone (no criteria)"})
 
     # Source campaign (if this group was seeded by "Suggest audience") — enables
     # the Recalculate button and a link back to the campaign.

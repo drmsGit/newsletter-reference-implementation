@@ -27,7 +27,7 @@ function server(options: { sourceCampaign?: number; inUse?: boolean } = {}) {
     blocks: [
       { id: 11, group_id: 3, kind: 'include', criteria: { language: ['de'] }, label: 'German speakers',
         source: 'manual', position: 0 },
-      { id: 12, group_id: 3, kind: 'include', criteria: { category_id: 7, min_score: 1 }, label: 'Interested in Coast',
+      { id: 12, group_id: 3, kind: 'include', criteria: { categories: [{ category_id: 7, min_score: 1 }] }, label: 'Interested in Coast',
         source: 'suggested', position: 1 },
     ] as Block[],
     members: [
@@ -81,16 +81,21 @@ function server(options: { sourceCampaign?: number; inUse?: boolean } = {}) {
       ? jsonResponse({ detail: 'Used by 1 send (Spring edition). Sent mail must keep its audience; remove it from planned sends first.' }, 409)
       : new Response(null, { status: 204 })),
     'POST /api/audience-groups/3/blocks': (r) => write(r, (b) => {
-      if (b.criteria && (b.criteria as { min_score?: number }).min_score === 0)
-        return jsonResponse({ detail: [{ loc: ['body', 'criteria', 'min_score'], msg: 'A minimum score must be above 0.' }] }, 422)
+      const categories = (b.criteria as { categories?: { min_score: number }[] } | undefined)?.categories ?? []
+      const refused = categories.findIndex((c) => c.min_score === 0)
+      if (refused >= 0)
+        return jsonResponse({ detail: [{ loc: ['body', 'criteria', `categories.${refused}.min_score`],
+          msg: 'A minimum score must be above 0.' }] }, 422)
       const block = { id: 13, group_id: 3, source: 'manual', position: 2, label: null, ...b } as Block
       state.blocks.push(block)
       return jsonResponse(block, 201)
     }),
-    'PATCH /api/audience-groups/3/blocks/11': (r) => write(r, (b) => {
-      Object.assign(state.blocks[0], b)
-      return jsonResponse(state.blocks[0])
-    }),
+    ...Object.fromEntries([11, 12].map((id) => [`PATCH /api/audience-groups/3/blocks/${id}`, (r: Request) =>
+      write(r, (b) => {
+        const block = state.blocks.find((x) => x.id === id)!
+        Object.assign(block, b)
+        return jsonResponse(block)
+      })])),
     'DELETE /api/audience-groups/3/blocks/12': (r) => write(r, () => {
       state.blocks = state.blocks.filter((b) => b.id !== 12)
       return new Response(null, { status: 204 })
@@ -146,7 +151,20 @@ function open(s: ReturnType<typeof server>, route = '/audiences/3') {
   )
 }
 
-const rule = async (name: string) => screen.findByRole('form', { name })
+/** A saved rule reads as one line; Edit opens its form (task-300). */
+const line = async (name: string) => screen.findByRole('group', { name })
+async function edit(name: string) {
+  fireEvent.click(within(await line(name)).getByRole('button', { name: 'Edit' }))
+  return screen.findByRole('form', { name })
+}
+/** Add a category row to an open rule form and choose it. */
+async function addCategory(form: HTMLElement, name: string) {
+  fireEvent.click(within(form).getByRole('button', { name: 'Add a category' }))
+  const row = within(form).getAllByRole('group', { name: /^Category \d/ }).at(-1)!
+  fireEvent.click(within(row).getByRole('button', { name: /Category/ }))
+  fireEvent.click(await screen.findByRole('option', { name }))
+  return row
+}
 const section = async (name: string) => screen.findByRole('region', { name })
 const last = (s: ReturnType<typeof server>) => s.writes.at(-1)!
 
@@ -207,21 +225,49 @@ describe('the audience page is the editor (task-297)', () => {
     expect(await screen.findByRole('heading', { name: 'Theirs' })).toBeInTheDocument()
   })
 
-  it("lists the rules under Who's in and Leave out, the suggested one badged", async () => {
+  it("lists the rules under Who's in and Leave out as one line each, the suggested one badged", async () => {
     open(server())
     const included = await section("Who's in")
-    expect(await within(included).findByRole('form', { name: 'German speakers' })).toBeInTheDocument()
-    const suggested = within(included).getByRole('form', { name: 'Interested in Coast' })
+    const german = await within(included).findByRole('group', { name: 'German speakers' })
+    expect(german).toHaveTextContent('Language de')
+    const suggested = within(included).getByRole('group', { name: 'Interested in Coast' })
+    expect(await within(suggested).findByText(/Coast ≥ 1/)).toBeInTheDocument()
     expect(within(suggested).getByText('Suggested')).toBeInTheDocument()
+    expect(screen.queryByRole('form')).not.toBeInTheDocument()
     const leftOut = await section('Leave out')
     expect(within(leftOut).getByText(/Leaves these people out even if a rule or a hand-add includes them/)).toBeInTheDocument()
     expect(within(leftOut).getByText(/include who received it and leave out who clicked/)).toBeInTheDocument()
   })
 
-  it('edits a rule in place and saves it with Save rule, and the arithmetic follows', async () => {
+  it('opens the form of the rule being edited only, and saving closes it again', async () => {
     const s = server()
     open(s)
-    const form = await rule('German speakers')
+    const form = await edit('German speakers')
+    expect(screen.getAllByRole('form')).toHaveLength(1)
+    expect(within(await line('Interested in Coast')).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+    fireEvent.click(await within(form).findByRole('checkbox', { name: 'fr' }))
+    fireEvent.click(within(form).getByRole('button', { name: 'Save rule' }))
+    await waitFor(() => expect(screen.queryByRole('form')).not.toBeInTheDocument())
+    expect(await line('German speakers')).toHaveTextContent('Language de or fr')
+  })
+
+  it('cancelling an edit puts the rule back as it was', async () => {
+    const s = server()
+    open(s)
+    const form = await edit('German speakers')
+    fireEvent.click(await within(form).findByRole('checkbox', { name: 'fr' }))
+    fireEvent.click(within(form).getByRole('button', { name: 'Cancel' }))
+    expect(await line('German speakers')).toHaveTextContent('Language de')
+    expect(await line('German speakers')).not.toHaveTextContent('fr')
+    const again = await edit('German speakers')
+    expect(await within(again).findByRole('checkbox', { name: 'fr' })).not.toBeChecked()
+    expect(s.writes).toHaveLength(0)
+  })
+
+  it('edits a rule and saves it with Save rule, and the arithmetic follows', async () => {
+    const s = server()
+    open(s)
+    const form = await edit('German speakers')
     expect(await within(form).findByRole('checkbox', { name: 'fr' })).not.toBeChecked()
     expect(within(form).getByRole('checkbox', { name: 'de' })).toBeChecked()
     await screen.findByRole('table', { name: /arrived at/ })
@@ -238,11 +284,62 @@ describe('the audience page is the editor (task-297)', () => {
     await waitFor(() => expect(s.previews()).toBeGreaterThan(before))
   })
 
+  it('names several categories in one rule, each with its own score, and removes one', async () => {
+    const s = server()
+    open(s)
+    const form = await edit('Interested in Coast')
+    fireEvent.click(within(form).getByRole('button', { name: 'Add a category' }))
+    const second = within(form).getAllByRole('group', { name: /^Category \d/ })[1]
+    fireEvent.click(within(second).getByRole('button', { name: /Category/ }))
+    expect(await screen.findByRole('option', { name: 'City' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Coast' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('option', { name: 'City' }))
+    const city = second
+    expect(within(city).getByLabelText('Minimum score')).toHaveValue('1.0')
+    fireEvent.change(within(city).getByLabelText('Minimum score'), { target: { value: '5' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Save rule' }))
+    await waitFor(() => expect(last(s)).toMatchObject({
+      method: 'PATCH', path: '/api/audience-groups/3/blocks/12',
+      body: { criteria: { categories: [{ category_id: 7, min_score: 1 }, { category_id: 9, min_score: 5 }] } },
+    }))
+    expect(await line('Interested in Coast')).toHaveTextContent('Coast ≥ 1 or City ≥ 5')
+
+    const again = await edit('Interested in Coast')
+    const [coast] = within(again).getAllByRole('group', { name: /^Category \d/ })
+    fireEvent.click(within(coast).getByRole('button', { name: 'Remove this category' }))
+    fireEvent.click(within(again).getByRole('button', { name: 'Save rule' }))
+    await waitFor(() => expect(last(s).body).toMatchObject({ criteria: { categories: [{ category_id: 9, min_score: 5 }] } }))
+  })
+
+  it("removing a rule's only category removes its category interest; an unchosen row is ignored", async () => {
+    const s = server()
+    open(s)
+    const form = await edit('Interested in Coast')
+    const [coast] = within(form).getAllByRole('group', { name: /^Category \d/ })
+    fireEvent.click(within(coast).getByRole('button', { name: 'Remove this category' }))
+    fireEvent.click(within(form).getByRole('button', { name: 'Add a category' }))
+    fireEvent.click(within(form).getByRole('checkbox', { name: 'de' }))
+    fireEvent.click(within(form).getByRole('button', { name: 'Save rule' }))
+    await waitFor(() => expect(last(s).body).toEqual({ criteria: { language: ['de'] }, label: 'Interested in Coast' }))
+  })
+
+  it('reads a rule still in the old single-category shape and saves it as a list', async () => {
+    const s = server()
+    s.state.blocks[1].criteria = { category_id: 7, min_score: 2 }
+    open(s)
+    expect(await within(await line('Interested in Coast')).findByText(/Coast ≥ 2/)).toBeInTheDocument()
+    const form = await edit('Interested in Coast')
+    fireEvent.change(within(form).getByLabelText('Rule name'), { target: { value: 'Coast fans' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Save rule' }))
+    await waitFor(() => expect(last(s).body).toEqual({
+      criteria: { categories: [{ category_id: 7, min_score: 2 }] }, label: 'Coast fans' }))
+  })
+
   it('keeps what the form does not edit, such as an engagement condition, when a rule is saved', async () => {
     const s = server()
     s.state.blocks[0].criteria = { language: ['de'], engagement: { event: 'clicked', send_instance_id: 5 } }
     open(s)
-    const form = await rule('German speakers')
+    const form = await edit('German speakers')
     fireEvent.click(await within(form).findByRole('checkbox', { name: 'fr' }))
     fireEvent.click(within(form).getByRole('button', { name: 'Save rule' }))
     await waitFor(() => expect(last(s).body).toEqual({
@@ -256,26 +353,25 @@ describe('the audience page is the editor (task-297)', () => {
     const leftOut = await section('Leave out')
     fireEvent.click(within(leftOut).getByRole('button', { name: 'Add a rule' }))
     const form = await within(leftOut).findByRole('form', { name: 'New rule' })
-    fireEvent.click(within(form).getByRole('button', { name: /Category interest/ }))
-    fireEvent.click(await screen.findByRole('option', { name: 'City' }))
-    expect(within(form).getByLabelText(/Minimum score/)).toHaveValue('1.0')
+    const city = await addCategory(form, 'City')
+    expect(within(city).getByLabelText('Minimum score')).toHaveValue('1.0')
     fireEvent.change(within(form).getByLabelText('Rule name'), { target: { value: 'City people' } })
     fireEvent.click(within(form).getByRole('button', { name: 'Save rule' }))
     await waitFor(() => expect(last(s)).toMatchObject({
       method: 'POST', ifMatch: T(1),
-      body: { kind: 'exclude', label: 'City people', criteria: { category_id: 9, min_score: 1 } },
+      body: { kind: 'exclude', label: 'City people', criteria: { categories: [{ category_id: 9, min_score: 1 }] } },
     }))
+    expect(await within(leftOut).findByRole('group', { name: 'City people' })).toBeInTheDocument()
   })
 
-  it('shows a refused score on the score field', async () => {
+  it('shows a refused score on the form', async () => {
     const s = server()
     open(s)
     const included = await section("Who's in")
     fireEvent.click(within(included).getByRole('button', { name: 'Add a rule' }))
     const form = await within(included).findByRole('form', { name: 'New rule' })
-    fireEvent.click(within(form).getByRole('button', { name: /Category interest/ }))
-    fireEvent.click(await screen.findByRole('option', { name: 'City' }))
-    fireEvent.change(within(form).getByLabelText(/Minimum score/), { target: { value: '0' } })
+    const city = await addCategory(form, 'City')
+    fireEvent.change(within(city).getByLabelText('Minimum score'), { target: { value: '0' } })
     fireEvent.click(within(form).getByRole('button', { name: 'Save rule' }))
     expect(await within(form).findByText('A minimum score must be above 0.')).toBeInTheDocument()
   })
@@ -283,9 +379,9 @@ describe('the audience page is the editor (task-297)', () => {
   it('removes a rule, stating the version', async () => {
     const s = server()
     open(s)
-    fireEvent.click(within(await rule('Interested in Coast')).getByRole('button', { name: 'Remove rule' }))
+    fireEvent.click(within(await line('Interested in Coast')).getByRole('button', { name: 'Remove rule' }))
     await waitFor(() => expect(last(s)).toMatchObject({ method: 'DELETE', path: '/api/audience-groups/3/blocks/12', ifMatch: T(1) }))
-    await waitFor(() => expect(screen.queryByRole('form', { name: 'Interested in Coast' })).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('group', { name: 'Interested in Coast' })).not.toBeInTheDocument())
   })
 
   it("lists the hand-added people with reason, who and when, marking whom an exclusion leaves out on the channel", async () => {

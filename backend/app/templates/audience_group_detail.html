@@ -20,14 +20,14 @@
             <select name="category_id" class="form-select form-select-sm">
                 <option value="">Any</option>
                 {% for cat in categories %}
-                <option value="{{ cat.id }}" {% if b and b.criteria.get('category_id') == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                <option value="{{ cat.id }}" {% if b and b.category_terms|length == 1 and b.category_terms[0][0] == cat.id %}selected{% endif %}>{{ cat.name }}</option>
                 {% endfor %}
             </select>
         </div>
         <div class="col-md-2">
             <label class="form-label small mb-0">Min signal</label>
             <input type="number" step="1" min="0" name="min_score" class="form-control form-control-sm"
-                   value="{{ b.criteria.get('min_score', '') if b else '' }}">
+                   value="{{ b.category_terms[0][1] if b and b.category_terms|length == 1 else '' }}">
         </div>
         <div class="col-md-2">
             <label class="form-label small mb-0 d-none d-md-block">&nbsp;</label>
@@ -155,7 +155,11 @@
                 </tr>
                 <tr class="collapse" id="edit-block-{{ b.id }}">
                     <td colspan="4" class="bg-light">
+                        {% if b.category_terms|length > 1 %}
+                        <p class="text-muted small mb-0">This rule names several categories, so it is edited in the manager client.</p>
+                        {% else %}
                         {{ block_form('/ui/audience-groups/' ~ group.id ~ '/blocks/' ~ b.id ~ '/edit', b, 'Save') }}
+                        {% endif %}
                     </td>
                 </tr>
             {% endfor %}

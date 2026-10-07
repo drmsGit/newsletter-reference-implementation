@@ -1,10 +1,11 @@
 ---
 id: TASK-300
 title: 'Category interest takes several categories, each with its own score'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-06 21:20'
-updated_date: '2026-10-07 20:43'
+updated_date: '2026-10-07 20:47'
 labels:
   - backend
   - frontend
@@ -49,6 +50,17 @@ It comes before task-298 so the engagement field lands on the corrected rule sha
 - [ ] #4 The editor adds and removes categories within one rule, each with a score filled in at 1.0
 - [ ] #5 A saved rule shows as one line naming its conditions, and Edit opens the form for that rule only
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Server tests first: several categories (OR, a score each), the legacy pair normalised, refusals (no score, 0, unknown key, the same category twice, both shapes at once), suggested rules as one-entry lists, recalculate per category, the preview naming all categories, the migration rewriting the legacy pair with an audit entry and being idempotent.
+2. service.py: normalise_criteria takes categories or the legacy pair; one reader (_category_terms) for both shapes; find_by_criteria matches any listed category; _recipients_for_criteria, criteria_matches, count, preview, suggest and recalculate read through it.
+3. Jinja: the summary reads the list; a rule with several categories shows read-only with a pointer to the manager client (no edit form that could drop them).
+4. migrate_0037 (.py, dry-run default, audited per rule), applied before the .py edits are live.
+5. Client tests first, then AudienceRules.tsx: category rows (CategoryChoice + score, Add a category, remove), a saved rule as one line with Edit opening its form.
+6. Mutation check, suites, contract, commit, live check on a scratch audience, finalize.
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
