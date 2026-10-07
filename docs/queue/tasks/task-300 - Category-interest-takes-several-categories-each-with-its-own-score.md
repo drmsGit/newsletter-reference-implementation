@@ -4,7 +4,7 @@ title: 'Category interest takes several categories, each with its own score'
 status: To Do
 assignee: []
 created_date: '2026-10-06 21:20'
-updated_date: '2026-10-06 21:21'
+updated_date: '2026-10-07 20:43'
 labels:
   - backend
   - frontend
@@ -34,6 +34,7 @@ It comes before task-298 so the engagement field lands on the corrected rule sha
 - The preview's per-rule category_name (service.py:988; PreviewBlock in models.py) becomes the names of all listed categories.
 - The Jinja rule form shows a one-category rule as today; a rule with more than one category is shown read-only there with a pointer to the manager client, so saving the old form cannot drop categories.
 - The editor: the category part of a rule form becomes a list of rows, each a CategoryChoice and its score, with "Add a category" and a remove per row; the score is filled in at 1.0 for each new row.
+- **A saved rule reads as one line** (the user, 2026-10-07, after seeing every rule open as a full form in task-297): e.g. "Language de · active · Nature at least 5 or Wellness at least 5", with the rule's name and the suggested badge, and an "Edit" that opens the form for that rule only; "Save rule" or "Cancel" closes it again. A new rule opens as a form. Spacing, borders and sizes stay with the layout session; this is how the editor behaves, not how it looks.
 
 **Deliberately not touched:** the engagement field (task-298), related data (task-294), the "Everyone must also" section, nested groups.
 
@@ -46,6 +47,7 @@ It comes before task-298 so the engagement field lands on the corrected rule sha
 - [ ] #2 Existing rules are migrated to the list form and the old single-category input is still accepted
 - [ ] #3 Suggested rules and Recalculate from campaign keep working per category
 - [ ] #4 The editor adds and removes categories within one rule, each with a score filled in at 1.0
+- [ ] #5 A saved rule shows as one line naming its conditions, and Edit opens the form for that rule only
 <!-- AC:END -->
 
 ## Implementation Notes
