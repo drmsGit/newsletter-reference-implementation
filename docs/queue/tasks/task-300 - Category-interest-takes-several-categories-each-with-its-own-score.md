@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-06 21:20'
-updated_date: '2026-10-07 20:47'
+updated_date: '2026-10-07 21:00'
 labels:
   - backend
   - frontend
@@ -66,4 +66,16 @@ It comes before task-298 so the engagement field lands on the corrected rule sha
 
 <!-- SECTION:NOTES:BEGIN -->
 To keep apart when building (found while writing the ADR-188 addendum): a rule's minimum score is the recipient's interest score (operational signal, ADR-132), a different scale from a record's category score, which ADR-080's 2026-10-04 addendum limits to whole numbers 1 to 10. The rule form's labels and hint must not suggest the 1-10 range.
+
+Built 2026-10-07, commit 0f009ae. Live check pending (the browser pane was signed out).
+
+Server: normalise_criteria takes categories as a list of category_id and min_score (each above 0, each category once, unknown keys refused, refusals named categories.N.field) or the older pair (refusals keep the names category_id and min_score), never both; category_terms reads either stored shape and every reader goes through it (find_by_criteria any-one-category, _recipients_for_criteria, criteria_matches, the preview's category_name joined with or, the Jinja summary). Suggestions write a one-entry list; recalculation compares per category and leaves a suggested rule the manager widened to several categories alone, counting its categories as covered (found by a surviving mutant: before, recalculation would have deleted such a rule). The Jinja page shows a multi-category rule read-only. Migration 0037 rewrote 6 dev rules, audited.
+
+Client: AudienceRules.tsx - a saved rule is one line (name, conditions, Suggested badge, Edit, Remove rule); Edit opens that rule's form; category rows (CategoryChoice excluding categories other rows hold, Minimum score with 1.0 filled in, Remove this category, Add a category); Cancel closes and the draft is read again on reopening; an old-shape rule is read and saved as a list.
+
+Tests: backend tests/test_audience_categories.py (22); client AudienceEditor.test.tsx now 22. Mutation check: server 18 mutants, client 14; survivors strengthened (the widened suggestion, an unchosen row, removing the only category). One equivalent mutant recorded: _suggested_category's len == 1 versus any non-empty list - suggestions always name one category and the removal path checks for one or none first.
+
+Suites: backend 1459, client 218, build and contract clean.
+
+Found, not fixed (outside this task): the Jinja rule form compares a stored language or status LIST with a single value, so since task-295 editing a multi-language rule there loses its languages (backend/app/templates/audience_group_detail.html, the language and status selects). The Jinja page is frozen and being replaced; worth a task only if anyone still edits rules there.
 <!-- SECTION:NOTES:END -->
