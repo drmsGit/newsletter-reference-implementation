@@ -14,6 +14,14 @@ import { HttpError } from '../api/session'
 import CategoryChoice from '../components/CategoryChoice'
 import { SaveState } from '../components/EditorFields'
 import ScreenState from '../components/ScreenState'
+import {
+  EngagementFields,
+  EngagementSummary,
+  NEW_ENGAGEMENT,
+  engagementDraftOf,
+  engagementOf,
+  type EngagementDraft,
+} from './AudienceEngagement'
 
 /**
  * A group's rules in two lists, "Who's in" and "Leave out" (Audience Write
@@ -86,7 +94,13 @@ function RuleSection({
 }
 
 type CategoryRow = { categoryId: number | null; minScore: string }
-type Draft = { languages: string[]; statuses: string[]; categories: CategoryRow[]; label: string }
+type Draft = {
+  languages: string[]
+  statuses: string[]
+  categories: CategoryRow[]
+  engagement: EngagementDraft | null
+  label: string
+}
 
 /**
  * A rule's categories as `(id, score)` pairs, in either stored shape: the list
@@ -111,6 +125,7 @@ function draftOf(block: AudienceRuleBlock | undefined): Draft {
     languages: list(c.language),
     statuses: list(c.status),
     categories: categoriesOf(c).map(({ id, score }) => ({ categoryId: id, minScore: String(score) })),
+    engagement: engagementDraftOf(c.engagement),
     label: block?.label ?? '',
   }
 }
@@ -122,6 +137,7 @@ function criteriaOf(draft: Draft, block: AudienceRuleBlock | undefined): Record<
     categories: _cs,
     category_id: _c,
     min_score: _m,
+    engagement: _e,
     ...kept
   } = (block?.criteria ?? {}) as Record<string, unknown>
   const criteria: Record<string, unknown> = { ...kept }
@@ -133,6 +149,7 @@ function criteriaOf(draft: Draft, block: AudienceRuleBlock | undefined): Record<
       category_id: row.categoryId,
       min_score: row.minScore.trim() === '' ? null : Number(row.minScore),
     }))
+  if (draft.engagement) criteria.engagement = engagementOf(draft.engagement)
   return criteria
 }
 
@@ -182,9 +199,14 @@ function RuleSummary({ criteria }: { criteria: Record<string, unknown> }) {
       categoriesOf(criteria)
         .map(({ id, score }) => `${names.get(id) ?? `Category ${id}`} ≥ ${score}`)
         .join(' or '),
-    criteria.engagement != null &&
-      `${(criteria.engagement as { event?: string }).event ?? 'engagement'} a mailing`,
   ].filter(Boolean)
+  if (criteria.engagement != null)
+    return (
+      <span className="muted">
+        {parts.map((part) => `${part} · `)}
+        <EngagementSummary engagement={criteria.engagement} />
+      </span>
+    )
   return <span className="muted">{parts.length ? parts.join(' · ') : 'Everyone (no conditions)'}</span>
 }
 
@@ -218,9 +240,6 @@ function RuleForm({
   useEffect(() => setDraft(JSON.parse(saved)), [saved])
   const write = block ? save : add
   const dirty = JSON.stringify(draft) !== saved
-  const engagement = (block?.criteria as Record<string, unknown> | null | undefined)?.engagement as
-    | { event?: string }
-    | undefined
 
   function submit(event: FormEvent) {
     event.preventDefault()
@@ -282,8 +301,15 @@ function RuleForm({
           Add a category
         </Button>
       </div>
-      {engagement && (
-        <p className="muted">Also reads what they did with a mailing ({engagement.event}); kept as it is.</p>
+      {draft.engagement ? (
+        <EngagementFields
+          draft={draft.engagement}
+          kind={kind}
+          onChange={(engagement) => setDraft({ ...draft, engagement })}
+          onRemove={() => setDraft({ ...draft, engagement: null })}
+        />
+      ) : (
+        <Button onPress={() => setDraft({ ...draft, engagement: NEW_ENGAGEMENT })}>Add engagement</Button>
       )}
       <TextField value={draft.label} onChange={(label) => setDraft({ ...draft, label })}>
         <Label>Rule name</Label>

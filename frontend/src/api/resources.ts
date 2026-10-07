@@ -207,6 +207,19 @@ export function useDeliveries(offset = 0) {
   })
 }
 
+/**
+ * The brand's sent sends, newest first, for an audience rule to name one
+ * (task-298). One page: the route has no search, so an older send is reached
+ * through its campaign instead.
+ */
+export function useSentSends() {
+  return useQuery({
+    queryKey: [...keys.deliveries, 'sent'],
+    queryFn: () =>
+      read(api.GET('/delivery/send-instances', { params: { query: { status: 'sent', limit: PAGE_SIZE, offset: 0 } } })),
+  })
+}
+
 export function useDelivery(id: number) {
   return useQuery({
     queryKey: keys.delivery(id),

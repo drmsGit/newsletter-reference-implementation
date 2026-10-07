@@ -81,6 +81,8 @@ function server(options: { sourceCampaign?: number; inUse?: boolean } = {}) {
       ? jsonResponse({ detail: 'Used by 1 send (Spring edition). Sent mail must keep its audience; remove it from planned sends first.' }, 409)
       : new Response(null, { status: 204 })),
     'POST /api/audience-groups/3/blocks': (r) => write(r, (b) => {
+      if ((b.criteria as { engagement?: { within_days?: number } } | undefined)?.engagement?.within_days === 0)
+        return jsonResponse({ detail: [{ loc: ['body', 'criteria', 'within_days'], msg: 'a number of days above 0' }] }, 422)
       const categories = (b.criteria as { categories?: { min_score: number }[] } | undefined)?.categories ?? []
       const refused = categories.findIndex((c) => c.min_score === 0)
       if (refused >= 0)
@@ -131,6 +133,11 @@ function server(options: { sourceCampaign?: number; inUse?: boolean } = {}) {
       return jsonResponse(state.group, 201)
     },
     'GET /campaigns/': () => jsonResponse(page([{ id: 77, name: 'Spring edition', status: 'draft', created_at: T(0) }])),
+    'GET /delivery/send-instances': (r) => {
+      asked.push({ path: 'sends', params: new URL(r.url).searchParams })
+      return jsonResponse(page([{ id: 11, snapshot_id: 1, name: 'Spring send', status: 'sent', created_at: T(0),
+        updated_at: T(0), campaign_id: 77, campaign_name: 'Spring edition' }]))
+    },
   }
   return {
     state, writes, asked, handlers,
@@ -461,5 +468,100 @@ describe('the audience page is the editor (task-297)', () => {
     open(server())
     await screen.findByRole('heading', { name: 'Spring travellers' })
     expect(screen.queryByRole('button', { name: 'Recalculate from campaign' })).not.toBeInTheDocument()
+  })
+})
+
+/** Choose an option of a labelled choice inside `scope`. */
+async function choose(scope: HTMLElement, label: RegExp, option: string) {
+  fireEvent.click(within(scope).getByRole('button', { name: label }))
+  fireEvent.click(await screen.findByRole('option', { name: option }))
+}
+
+async function newRule(sectionName: string) {
+  const area = await section(sectionName)
+  fireEvent.click(within(area).getByRole('button', { name: 'Add a rule' }))
+  return within(area).findByRole('form', { name: 'New rule' })
+}
+
+describe('engagement in a rule (task-298)', () => {
+  it('says who clicked one send in the last N days, with the did-not hint, and reads it back as one line', async () => {
+    const s = server()
+    open(s)
+    const form = await newRule("Who's in")
+    expect(within(form).queryByText(/include who received it and leave out who clicked/)).not.toBeInTheDocument()
+    fireEvent.click(within(form).getByRole('button', { name: 'Add engagement' }))
+    expect(within(form).getByText(/include who received it and leave out who clicked/)).toBeInTheDocument()
+    await choose(form, /What happened/, 'Clicked in it')
+    await choose(form, /Which mailing/, 'One send')
+    await choose(form, /Send$/, 'Spring send')
+    await choose(form, /When/, 'In the last … days')
+    fireEvent.change(within(form).getByLabelText('Days'), { target: { value: '30' } })
+    fireEvent.change(within(form).getByLabelText('Rule name'), { target: { value: 'Clickers' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Save rule' }))
+    await waitFor(() => expect(last(s)).toMatchObject({ method: 'POST', body: {
+      kind: 'include', label: 'Clickers', criteria: { engagement: { event: 'clicked', send_instance_id: 11, within_days: 30 } } } }))
+    expect(await within(await line('Clickers')).findByText(/Clicked in Spring send in the last 30 days/)).toBeInTheDocument()
+    expect(s.asked.find((a) => a.path === 'sends')?.params.get('status')).toBe('sent')
+  })
+
+  it('says who received any send of a campaign between two dates', async () => {
+    const s = server()
+    open(s)
+    const form = await newRule("Who's in")
+    fireEvent.click(within(form).getByRole('button', { name: 'Add engagement' }))
+    await choose(form, /What happened/, 'Received it')
+    await choose(form, /Which mailing/, 'Any send of a campaign')
+    await choose(form, /Campaign$/, 'Spring edition')
+    await choose(form, /When/, 'Between two dates')
+    fireEvent.change(within(form).getByLabelText('From'), { target: { value: '2026-09-01' } })
+    fireEvent.change(within(form).getByLabelText('To'), { target: { value: '2026-09-15' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Save rule' }))
+    await waitFor(() => expect(last(s).body).toMatchObject({ criteria: { engagement: {
+      event: 'received', campaign_id: 77, from: '2026-09-01', to: '2026-09-15' } } }))
+    expect(await screen.findByText(/Received a send of Spring edition between 2026-09-01 and 2026-09-15/)).toBeInTheDocument()
+  })
+
+  it('says who opened any send, any time, or more than N days ago', async () => {
+    const s = server()
+    open(s)
+    const form = await newRule('Leave out')
+    fireEvent.click(within(form).getByRole('button', { name: 'Add engagement' }))
+    expect(within(form).queryByText(/include who received it and leave out who clicked/)).not.toBeInTheDocument()
+    expect(within(form).getByText(/any send on the channel this audience is sent on/)).toBeInTheDocument()
+    await choose(form, /What happened/, 'Opened it')
+    fireEvent.click(within(form).getByRole('button', { name: 'Save rule' }))
+    await waitFor(() => expect(last(s).body).toEqual({ kind: 'exclude', label: null, criteria: { engagement: { event: 'opened' } } }))
+
+    const again = await newRule('Leave out')
+    fireEvent.click(within(again).getByRole('button', { name: 'Add engagement' }))
+    await choose(again, /When/, 'More than … days ago')
+    fireEvent.change(within(again).getByLabelText('Days'), { target: { value: '90' } })
+    fireEvent.click(within(again).getByRole('button', { name: 'Save rule' }))
+    await waitFor(() => expect(last(s).body).toMatchObject({ criteria: { engagement: { event: 'received', more_than_days: 90 } } }))
+  })
+
+  it('reads an engagement field back into the form, and removing it removes it', async () => {
+    const s = server()
+    s.state.blocks[0].criteria = { language: ['de'], engagement: { event: 'clicked', campaign_id: 77, more_than_days: 7 } }
+    open(s)
+    expect(await screen.findByText(/Clicked in a send of Spring edition more than 7 days ago/)).toBeInTheDocument()
+    const form = await edit('German speakers')
+    expect(within(form).getByRole('button', { name: /What happened/ })).toHaveTextContent('Clicked in it')
+    expect(within(form).getByRole('button', { name: /Which mailing/ })).toHaveTextContent('Any send of a campaign')
+    expect(within(form).getByLabelText('Days')).toHaveValue('7')
+    fireEvent.click(within(form).getByRole('button', { name: 'Remove engagement' }))
+    fireEvent.click(within(form).getByRole('button', { name: 'Save rule' }))
+    await waitFor(() => expect(last(s).body).toEqual({ criteria: { language: ['de'] }, label: 'German speakers' }))
+  })
+
+  it("shows the server's refusal of an engagement value", async () => {
+    const s = server()
+    open(s)
+    const form = await newRule("Who's in")
+    fireEvent.click(within(form).getByRole('button', { name: 'Add engagement' }))
+    await choose(form, /When/, 'In the last … days')
+    fireEvent.change(within(form).getByLabelText('Days'), { target: { value: '0' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Save rule' }))
+    expect(await within(form).findByText('a number of days above 0')).toBeInTheDocument()
   })
 })
