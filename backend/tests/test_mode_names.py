@@ -17,6 +17,10 @@ from pathlib import Path
 from scripts import rename_product
 
 ROOT = Path(__file__).resolve().parents[2]
+#: This file quotes the letters to test the pattern, so it is the one living
+#: file the scan skips. (Found by CI: the scan reads tracked files, and this
+#: one was not tracked yet when it first passed locally.)
+ITSELF = Path(__file__).resolve().relative_to(ROOT)
 
 #: "Mode A", "Mode-A", "Mode A/B/C", "Modes A and B", "Mode-A-vs-…" — not
 #: "Mode Boundary" or a lower-case "mode" in ordinary prose.
@@ -26,7 +30,7 @@ LETTERED = re.compile(r"\bModes?[ -][ABC](?![a-zA-Z])")
 def lettered_mode_hits(root: Path) -> list[str]:
     hits = []
     for path in rename_product.tracked(root):
-        if rename_product.is_dated(path) or path.suffix not in rename_product.TEXT:
+        if path == ITSELF or rename_product.is_dated(path) or path.suffix not in rename_product.TEXT:
             continue
         if not (root / path).is_file():
             continue
