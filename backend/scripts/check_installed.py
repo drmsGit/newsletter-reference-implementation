@@ -5,7 +5,9 @@ Compares what is installed with what is locked, and fails on any difference:
   - the backend venv against `backend/requirements.txt` + `requirements-dev.txt`
     (ADR-189's pip-tools locks), read through the venv's own pip;
   - `frontend/node_modules` against `frontend/package-lock.json`, read through
-    npm's record of what it installed, `node_modules/.package-lock.json`.
+    npm's record of what it installed, `node_modules/.package-lock.json`;
+  - `frontend/package.json` against the lock's root entry, so neither changes
+    without the other.
 
 A difference is a package installed but not locked, locked at another
 version, or locked and missing. An npm package the lock marks optional may be
@@ -42,7 +44,7 @@ class OptionalVersion(str):
 @dataclass(frozen=True)
 class Problem:
     ecosystem: str
-    kind: str  # "not locked", "other version", "missing"
+    kind: str  # "not locked", "other version", "missing", "not in package.json", "not in the lock", "other range"
     name: str
     installed: str | None = None
     locked: str | None = None
@@ -56,6 +58,12 @@ class Problem:
             return text
         if self.kind == "other version":
             return f"{self.ecosystem}: {self.name} is {self.installed} here but locked at {self.locked}"
+        if self.kind == "not in package.json":
+            return f"{self.ecosystem}: the lock asks for {self.name} {self.locked}, package.json does not"
+        if self.kind == "not in the lock":
+            return f"{self.ecosystem}: package.json asks for {self.name} {self.installed}, the lock does not"
+        if self.kind == "other range":
+            return f"{self.ecosystem}: package.json asks for {self.name} {self.installed}, the lock for {self.locked}"
         return f"{self.ecosystem}: {self.name} {self.locked} is locked but not installed"
 
 
@@ -98,6 +106,26 @@ def read_npm(frontend: Path) -> tuple[dict[str, str], dict[str, str]]:
     so a nested copy (`a/node_modules/b`) is told apart from the top-level one."""
     return (_npm_packages(frontend / "package-lock.json"),
             _npm_packages(frontend / "node_modules" / ".package-lock.json"))
+
+
+def package_json_against_lock(frontend: Path) -> list[Problem]:
+    """package.json against the lock's root entry, which records what
+    package.json asked for when the lock was written: a dependency in one and
+    not the other, or at another range, means one changed without the other."""
+    def wanted(entry: dict) -> dict[str, str]:
+        return {**entry.get("dependencies", {}), **entry.get("devDependencies", {})}
+
+    asked = wanted(json.loads((frontend / "package.json").read_text()))
+    recorded = wanted(json.loads((frontend / "package-lock.json").read_text()).get("packages", {}).get("", {}))
+    problems = []
+    for name in sorted(set(asked) | set(recorded)):
+        if name not in asked:
+            problems.append(Problem("npm", "not in package.json", name, locked=recorded[name]))
+        elif name not in recorded:
+            problems.append(Problem("npm", "not in the lock", name, installed=asked[name]))
+        elif asked[name] != recorded[name]:
+            problems.append(Problem("npm", "other range", name, installed=asked[name], locked=recorded[name]))
+    return problems
 
 
 def _distance(a: str, b: str) -> int:
@@ -150,6 +178,8 @@ def main(argv: list[str] | None = None) -> int:
     python = args.python or (str(venv_python) if venv_python.exists() else sys.executable)
     problems += compare("python", locked, installed_python(python))
 
+    if (args.frontend / "package.json").exists():
+        problems += package_json_against_lock(args.frontend)
     if (args.frontend / "node_modules").exists():
         problems += compare("npm", *read_npm(args.frontend))
     else:

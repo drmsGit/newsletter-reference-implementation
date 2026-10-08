@@ -98,6 +98,21 @@ class TestNpm:
         assert problem.name == "a/node_modules/b"
 
 
+def test_a_lock_that_disagrees_with_package_json_fails(tmp_path):
+    """The lock's root entry records what package.json asked for; a dependency
+    in one and not the other, or at another range, means one changed without
+    the other."""
+    root = tmp_path / "frontend"
+    root.mkdir()
+    (root / "package.json").write_text(json.dumps({
+        "dependencies": {"react": "^19.3.0"}, "devDependencies": {"vite": "^8.3.0"}}))
+    (root / "package-lock.json").write_text(json.dumps({"packages": {"": {
+        "dependencies": {"react": "^19.2.0", "left-pad": "^1.0.0"}, "devDependencies": {"vite": "^8.3.0"}}}}))
+    problems = check.package_json_against_lock(root)
+    assert sorted((p.kind, p.name) for p in problems) == [("not in package.json", "left-pad"), ("other range", "react")]
+    assert "left-pad" in problems[0].describe() or "left-pad" in problems[1].describe()
+
+
 def test_the_command_fails_on_a_problem_and_says_what_it_found(tmp_path, capsys, monkeypatch):
     (tmp_path / "requirements.txt").write_text(LOCK)
     (tmp_path / "requirements-dev.txt").write_text("")
