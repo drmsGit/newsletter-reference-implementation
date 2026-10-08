@@ -383,7 +383,7 @@ def move_variant_module(
     response_model=SubjectSuggestionResult,
     summary="Ask the model for subject/preheader options",
     description=(
-        "Runs ADR-141 §3's Mode A task. Nothing is written to the variant — AI "
+        "Runs ADR-141 §3's Assistive AI task. Nothing is written to the variant — AI "
         "output is a proposal until a person picks one. Refused without "
         "spending tokens when the channel has no subject line at all, or when "
         "there is no content to write one from."

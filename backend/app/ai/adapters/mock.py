@@ -4,7 +4,7 @@ This is not scaffolding to delete later. It is permanent infrastructure:
   - the test suite must not depend on a paid external service;
   - ADR-143 requires development to work without production credentials, and an
     API key is a production credential like any other;
-  - the whole Mode A flow (prompt → result → approval inbox → publish) can be
+  - the whole Assistive flow (prompt → result → approval inbox → publish) can be
     built and demonstrated before anyone funds an API account.
 
 What it cannot do is tell you whether a prompt is any *good*. Quality tuning

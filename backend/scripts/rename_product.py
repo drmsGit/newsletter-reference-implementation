@@ -45,6 +45,11 @@ DATED = (
     "docs/playbook-strategy.md",
     "docs/react-session-brief.md",
     "docs/business-interview-baseline.md",
+    # Added 2026-10-08 (task-97): an interview log, a dated summary and a
+    # dated sweep report — records of a date like the others.
+    "docs/business-interview.md",
+    "docs/weekly-summary.md",
+    "docs/architecture/code-slimmer-report.md",
     "HANDOFF.md",
     ".claude/agent-memory/",
     "product.json",

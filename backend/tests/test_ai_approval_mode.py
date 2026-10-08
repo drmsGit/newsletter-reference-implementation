@@ -1,4 +1,4 @@
-"""Mode A through the approval inbox — ADR-141 §4, playbook 2026-07-31.
+"""Assistive AI through the approval inbox — ADR-141 §4, playbook 2026-07-31.
 
 **Inline is the default and that is the decision**, not a convenience. ADR-140's
 Context rejects routing every AI action through an approval layer because it

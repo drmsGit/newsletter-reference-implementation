@@ -1429,7 +1429,7 @@ def variant_suggest_subject(
     variant_id: int,
     db: Session = Depends(get_db),
 ):
-    """Run the Mode A subject/preheader task (ADR-141 §3).
+    """Run the Assistive subject/preheader task (ADR-141 §3).
 
     Nothing is written to the variant here — AI output is a proposal until a
     human picks one. The run id travels in the query string so the suggestions

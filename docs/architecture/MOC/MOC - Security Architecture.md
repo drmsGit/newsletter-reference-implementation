@@ -31,7 +31,7 @@ Who may act, how they prove it, what the system remembers about it, and what hap
 - **Step-up authentication** for destructive actions (ADR-151)
 - **Retention periods** — company determination; the architecture supplies the prune mechanism (ADR-154)
 - **Breach response** (Art. 33/34) — the adopter's process; architecture owes detection and scoping
-- **Machine authentication** for inbound API callers — a separate concern and a Mode B prerequisite, tracked in `docs/backlog.md`
+- **Machine authentication** for inbound API callers — a separate concern and a prerequisite for Autonomous workflows, tracked in `docs/backlog.md`
 
 ## Related MOCs
 

@@ -24,7 +24,7 @@ run against `docs/business/` since these files were created — run the
 | The structure absorbs new channels cheaply (~80% already channel-neutral) | The omni-channel interview — deferred 2026-08-12 |
 | Per-recipient LLM selection stays the wrong tool as model prices fall | The Needs-ADR item on what "AI" means in the decision layer |
 | Personalization data shape works against a real CRM | An example CRM integration PoC (open sub-question G1) |
-| The automation layer is years out and safe to defer | ADR-142's worked examples once Mode B is built (open item I1) |
+| The automation layer is years out and safe to defer | ADR-142's worked examples once Autonomous workflows are built (open item I1) |
 
 ## Non-blocking
 

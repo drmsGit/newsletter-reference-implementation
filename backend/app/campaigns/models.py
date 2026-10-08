@@ -209,7 +209,7 @@ class DecisionResolutionCreate(BaseModel):
 
 
 class SubjectSuggestionResult(BaseModel):
-    """The outcome of an AI subject/preheader suggestion (ADR-141 §3 Mode A).
+    """The outcome of an AI subject/preheader suggestion (ADR-141 §3, Assistive AI).
 
     `outcome` reuses `app.ai.orchestration.Outcome` rather than restating the
     vocabulary, so the generated client cannot drift from the service that

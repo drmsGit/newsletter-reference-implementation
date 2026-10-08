@@ -41,7 +41,7 @@ launch, it is the launch.
 campaign → editable modules → suggested/edited audience → prepare send (audience,
 provider, freeze-or-rerun, scheduling, recipient cap) → real Resend delivery from a
 verified domain → signed inbound webhooks → per-category signals with decay-on-read.
-Phases 1–3C done; the AI layer is designed (ADR-140–144) with Mode A shipped against
+Phases 1–3C done; the AI layer is designed (ADR-140–144) with Assistive AI shipped against
 a real Claude adapter under a pre-call spend gate; security is designed (ADR-150–154)
 with the base built (passwordless sign-in, roles/permissions as rows, one router-level
 guard).

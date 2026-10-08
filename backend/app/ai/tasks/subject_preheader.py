@@ -1,6 +1,6 @@
 """Task: suggest subject / preheader options for a variant.
 
-The first Mode A action (ADR-141 §3). This file is the **dev-owned scaffold**
+The first Assistive action (ADR-141 §3). This file is the **dev-owned scaffold**
 only — it declares what the task reads, what shape it returns, and where the
 result lands. The prompt itself is *not* here: it lives in settings, owned and
 versioned by the manager (ADR-140 §4), because a developer cannot meaningfully

@@ -721,7 +721,7 @@ export interface paths {
         put?: never;
         /**
          * Ask the model for subject/preheader options
-         * @description Runs ADR-141 §3's Mode A task. Nothing is written to the variant — AI output is a proposal until a person picks one. Refused without spending tokens when the channel has no subject line at all, or when there is no content to write one from.
+         * @description Runs ADR-141 §3's Assistive AI task. Nothing is written to the variant — AI output is a proposal until a person picks one. Refused without spending tokens when the channel has no subject line at all, or when there is no content to write one from.
          */
         post: operations["suggest_subject_for_variant_record_campaigns_variants__variant_id__suggest_subject_post"];
         delete?: never;
@@ -6031,7 +6031,7 @@ export interface components {
         };
         /**
          * SubjectSuggestionResult
-         * @description The outcome of an AI subject/preheader suggestion (ADR-141 §3 Mode A).
+         * @description The outcome of an AI subject/preheader suggestion (ADR-141 §3, Assistive AI).
          *
          *     `outcome` reuses `app.ai.orchestration.Outcome` rather than restating the
          *     vocabulary, so the generated client cannot drift from the service that

@@ -67,7 +67,7 @@ publishing the repo at all, which Gate-8/9/4C already assume.
   §5 for frontend sequencing.
 - Phase 3D (AI-based audience selection) — roadmap explicitly says "unblocked
   but should NOT be started yet" pending the per-recipient-LLM cost finding.
-- Mode B (autonomous workflows), the Mode-A shared approval inbox, the second
+- Autonomous workflows, the Assistive shared approval inbox, the second
   EU-hosted model adapter (ADR-144 §1 commitment, not yet built).
 - The remainder of the 43-item Features list not named above: category
   picker, pagination envelope, bulk-remove-by-criteria, image upload/media
@@ -101,8 +101,8 @@ publishing the repo at all, which Gate-8/9/4C already assume.
   build are both out).
 - Suppression + opt-out reason data model.
 - General data lifecycle/retention policy.
-- 11-broken-wikilink ADR housekeeping session, and the Mode A/B/C ↔ Phase
-  4A/4B/4C renaming cleanup — real, but editorial, not launch-blocking.
+- 11-broken-wikilink ADR housekeeping session, and the AI modes' letter
+  names ↔ Phase 4A/4B/4C renaming cleanup (task-97) — real, but editorial, not launch-blocking.
 
 ## 3. Needs-ADR: what beta actually requires
 
@@ -156,7 +156,7 @@ on its face:
   confirms the existing call.
 
 The other 12 (system-email transport, concurrent-actors contention model,
-Mode-A-vs-decision-slot cardinality, bulk-send batching, provider contact
+Assistive-AI-vs-decision-slot cardinality, bulk-send batching, provider contact
 sync, shadow-variant validation, guaranteed placement, isolated test DB,
 hero/CTA catalogue membership, transactional sends, suppression/opt-out
 model, data lifecycle) have no dependency on any of the seven open gates and
@@ -268,7 +268,7 @@ proven end-to-end path, not full parity with the Jinja UI:
    + variant builder (modules, decision slots) → audience (manual +
    suggested/edited) → prepare-send (audience, provider, freeze/re-run,
    schedule, cap) → a read-only delivery-status/signals view. Settings,
-   full content-versioning UI, and Mode-A's polish stay Jinja-only or thin
+   full content-versioning UI, and the Assistive AI's polish stay Jinja-only or thin
    for now.
 5. Minimal styling pass — usable, not the brand/theming build (still
    explicitly deferred to the final MVP package).

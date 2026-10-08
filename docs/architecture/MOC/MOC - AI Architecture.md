@@ -9,14 +9,14 @@ modified: 2026-08-02
 
 # MOC - AI Architecture
 
-The AI capability layer: what AI is allowed to do, in which of three modes, and under what data, model and cost governance. Designed as five ADRs in the 2026-07-31 AI-layer interview; Mode A is built.
+The AI capability layer: what AI is allowed to do, in which of three modes (Assistive, Autonomous, Development — lettered A, B and C in the ADRs; the key is ADR-140's 2026-10-08 addendum), and under what data, model and cost governance. Designed as five ADRs in the 2026-07-31 AI-layer interview; Assistive is built.
 
 ## ADRs
 
 - [[ADR-140 — AI Capability Layer]]
-- [[ADR-141 — In-App Assistive AI Actions]] — Mode A, in-app assistive actions
-- [[ADR-142 — Autonomous Workflows and the Automation Boundary]] — Mode B, orchestrated workflows
-- [[ADR-143 — AI-Assisted Development Boundary]] — Mode C, AI-assisted development
+- [[ADR-141 — In-App Assistive AI Actions]] — Assistive: in-app actions a person asks for
+- [[ADR-142 — Autonomous Workflows and the Automation Boundary]] — Autonomous: orchestrated workflows
+- [[ADR-143 — AI-Assisted Development Boundary]] — Development: AI-assisted development
 - [[ADR-144 — AI Data and Model Governance]] — model adapter, PII line, spend cap
 
 ## Note — "AI" means two different things in this architecture

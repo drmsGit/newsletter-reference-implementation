@@ -38,7 +38,7 @@ class AuditEventDB(Base):
 
     # ADR-153 point 3: the actor may be a system or an integration, not only a
     # person. Modelled that way from the start because retrofitting it when
-    # Mode B lands means revisiting every write path a second time. Today only
+    # Autonomous workflows land means revisiting every write path a second time. Today only
     # "user" is ever written; "integration" arrives with ADR-166.
     actor_type = Column(String(50), nullable=False)
     # Nullable for one case only: an action taken with access control switched
