@@ -141,6 +141,7 @@ class TestAnIntegrationsMarkIsHeld:
         with machine([CONTENT_MANAGE]) as headers:
             response = api.put(f"/content/{record}/readiness/push", headers=headers)
         assert response.status_code == 202, response.text
+        assert response.json()["detail"].startswith("Held for a person to approve: Mark content ready for a channel.")
         [row] = held()
         assert (row.status, row.subject_type, row.subject_id, row.subject_scope, row.expires_at) == (
             "pending", "content", record, "push", None)

@@ -650,11 +650,12 @@ def _approval_required(request: Request, exc: ApprovalRequired):
                 "pending_action_id": held.id,
                 "expires_at": held.expires_at.isoformat() if held.expires_at else None,
                 "review": f"/ui/approvals/{held.id}",
+                # Named by the action, not by sending: since task-206 a held
+                # request may be a readiness mark as well as a send.
                 "detail": (
-                    "This integration may not send without approval, so the "
-                    "send is held. A person with the right permission approves "
-                    "it in the app — there is deliberately no way to approve "
-                    "over the API."
+                    f"Held for a person to approve: {meta.label if meta else exc.action_key}. "
+                    "A person with the right permission approves it in the app — "
+                    "there is deliberately no way to approve over the API."
                 ),
             },
             status_code=202,
