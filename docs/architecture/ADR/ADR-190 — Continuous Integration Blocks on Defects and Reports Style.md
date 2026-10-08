@@ -113,6 +113,43 @@ mypy is not part of this record. task-105 already says why: a strict mypy over t
 - **Why the secret scan matters even with `.env` ignored.** ADR-152 point 1 makes the process environment the interface for every credential. A key pasted into code or a test fixture would bypass that. gitleaks catches the paste. `.gitignore` only covers the file.
 - **Not a supersession.** ADR-173 point 4 says "this record creates no CI", and that stays true of ADR-173. This record creates it. ADR-189 point 5's "once task-105 builds CI" is fulfilled, not changed.
 
+## Addendum 2026-10-08 — bandit's checks come from Ruff, and a few of them block
+
+**What prompted it.** The August review's CI gates (task-98) named bandit, a Python security linter. This record did not mention it. The user decided it in chat on 2026-10-08.
+
+**What was measured that day.** Ruff ships bandit's checks as its `S` rules. Over the backend they found 2854 findings.
+
+- 2777 were plain `assert` in tests (S101).
+- 43 were SQL-string warnings (S608), mostly in tests.
+- App code, tests excluded, had 25 findings. None was a real problem:
+  - `random` in the demo seed script, and in one decision strategy's deliberate exploration. Sign-in codes were not among them.
+  - `subprocess` in scripts.
+  - One Jinja environment without autoescaping, in `backend/app/modules/registry.py`. It only parses a template's syntax tree for the hideable-field guard check of [[ADR-187 — A Manager Hides Fields Per Module, and Required Means Required When Shown]]. It never renders. The rendering environment sets `autoescape=True` (`backend/app/rendering/service.py:32`).
+  - One `Markup` use in `render_rich_text`, which escapes everything first.
+
+**1. bandit is not added as a separate tool.** Ruff already carries its checks. A second tool brings more locked dependencies, under [[ADR-189 — Python Dependencies Are Locked With Hashes]], for checks we already have.
+
+**2. bandit is not run report-only either.** About 2850 findings, mostly noise, would be ignored. This record rejected report-only linting on the same argument when it set point 2: a check that never fails is easy to ignore.
+
+**3. A handful of Ruff's bandit rules join the blocking set.** Each is serious whenever it appears. None was present when added. They are listed in `backend/ruff.toml`:
+
+- S102 (`exec`) and S307 (`eval`);
+- S301 (`pickle`) and S506 (unsafe `yaml.load`);
+- S602 and S604 (`shell=True`), and S605 (`os.system` and other shell starts);
+- S324 (md5 or sha1 where a secure hash is expected);
+- S701 (Jinja without autoescaping).
+
+The one parse-only Jinja environment carries a `# noqa: S701`, with a comment saying why.
+
+**4. This widens point 2's blocking set, as a deliberate decision.** This record's Negative says the set only grows if someone decides to grow it. This is that decision.
+
+**Consequences.**
+
+- **Positive: the security checks that matter fail a build, with no new tool.**
+- **Negative: the rest of bandit's checks are not run at all.** That covers asserts, the SQL-string heuristics and `random`. A real case among them relies on review.
+
+Nothing here changes the Decision section above.
+
 ## Related ADRs
 
 ### Depends On

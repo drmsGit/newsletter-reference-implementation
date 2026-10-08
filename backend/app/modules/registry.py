@@ -280,7 +280,9 @@ def _check_hideable_guards(manifest: "ModuleManifest", template_path: Path) -> N
         for child in node.iter_child_nodes():
             walk(child, guarded)
 
-    walk(Environment().parse(source), frozenset())
+    # Parsed for its syntax tree only, never rendered, so autoescaping has nothing to
+    # protect here; the environment that renders sets it (app/rendering/service.py).
+    walk(Environment().parse(source), frozenset())  # noqa: S701
     if unguarded:
         where = "; ".join(f"{name} on line {line}" for name, line in unguarded)
         raise UnguardedHideableFieldError(

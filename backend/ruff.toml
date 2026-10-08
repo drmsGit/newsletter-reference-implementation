@@ -13,4 +13,16 @@ select = [
     "F823",  # local variable used before assignment
     "F841",  # local variable assigned and never used
     "F541",  # f-string without placeholders
+    # Security checks bandit would make, taken from Ruff rather than a second
+    # tool (ADR-190 addendum 2026-10-08): serious whenever they appear, none
+    # present when added.
+    "S102",  # exec
+    "S307",  # eval
+    "S301",  # pickle
+    "S506",  # unsafe yaml.load
+    "S602",  # subprocess with shell=True
+    "S604",  # any call with shell=True
+    "S605",  # os.system and other shell starts
+    "S324",  # md5 / sha1 used where a secure hash is expected
+    "S701",  # Jinja with autoescaping off
 ]

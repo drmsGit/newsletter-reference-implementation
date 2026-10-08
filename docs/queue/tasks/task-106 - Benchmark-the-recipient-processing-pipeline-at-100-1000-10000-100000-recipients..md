@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-10-08 20:51'
 labels:
   - backend
 dependencies: []
@@ -24,4 +25,6 @@ ordinal: 205900
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 362, section "Features", position 59 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-08, from task-98: the 2026-08-07 review also suggested three performance smoke tests on the per-recipient send path tracking query COUNT as well as duration ("runtime alone hides the per-recipient query/commit pattern"). Nothing in backend/tests measures query count on that path today (query counting exists only for the recipient list projection, tests/test_channels.py around line 1905, and session updates in tests/test_auth.py). They belong here, with this benchmark's per-stage query count, rather than in task-98; whether a small query-count assertion should then guard the send loop in CI is this task's call.
 <!-- SECTION:NOTES:END -->

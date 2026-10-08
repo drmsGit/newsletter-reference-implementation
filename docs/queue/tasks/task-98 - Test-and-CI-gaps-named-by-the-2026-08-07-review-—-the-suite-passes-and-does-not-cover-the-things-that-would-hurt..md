@@ -3,9 +3,11 @@ id: TASK-98
 title: >-
   Test and CI gaps named by the 2026-08-07 review — the suite passes and does
   not cover the things that would hurt.
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-27 13:57'
+updated_date: '2026-10-08 20:37'
 labels:
   - backend
 dependencies: []
