@@ -263,7 +263,18 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
 #: existed. Adding a route here is what grants it a queue.
 APPROVABLE_ROUTES: dict[str, str] = {
     "/delivery/send-instances/{send_instance_id}/send": "send.fire_send_instance",
+    "/content/{content_id}/readiness/{channel}": "content.mark_ready",
 }
+
+#: Routes on which **every** integration is held, whatever its flags (task-206).
+#: A send holds only an integration not flagged for unattended sending; a
+#: readiness mark holds every machine, because ADR-174 point 4 holds every
+#: machine assertion and there is no "may mark ready unattended". By method:
+#: removing a mark on the same path is direct (ADR-174 addendum 2026-10-05,
+#: point 5), so only the PUT is here.
+HELD_FOR_EVERY_INTEGRATION: frozenset[tuple[str, str]] = frozenset({
+    ("PUT", "/content/{content_id}/readiness/{channel}"),
+})
 
 
 #: **Which of the twelve JSON routers own brand-scoped rows** (ADR-172).

@@ -94,6 +94,12 @@ class PendingActionDB(Base):
     # nullable so that decision does not also need a migration.
     subject_type = Column(String(50), nullable=True)
     subject_id = Column(Integer, nullable=True)
+    # A part of the subject an action may declare (task-206; ADR-142 addendum
+    # 2026-10-08): the channel, for a readiness mark, so each channel of a
+    # record has its own open request. Empty — never NULL — for an action that
+    # declares none, because a unique index never sees two NULLs as equal and
+    # would drop the one-open-request rule for every such action (migration 0040).
+    subject_scope = Column(String(64), nullable=False, default="", server_default="")
 
     # Required by the service whenever the approving permission is brand-scoped.
     # Nullable in the schema only for the subject-less case: a brand-scoped
@@ -152,7 +158,7 @@ class PendingActionDB(Base):
         # exist; this is what every new one gets.
         Index(
             "ux_pending_actions_one_open_per_subject",
-            "action_key", "subject_type", "subject_id",
+            "action_key", "subject_type", "subject_id", "subject_scope",
             unique=True,
             # Both open states (ADR-142 addendum 2026-09-29): an executing
             # request still occupies its subject.

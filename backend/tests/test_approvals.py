@@ -170,6 +170,29 @@ class TestTheRegistry:
     def test_a_planted_action_is_discovered(self):
         assert ACTION_KEY in [a.key for a in action_registry.list_actions()]
 
+    def test_an_action_named_between_base_and_registry_is_discovered(self):
+        """The scan once reloaded `base` and `registry` with the actions, in
+        name order: `base` came back with a new declaration type, and a file
+        sorting after it but before `registry` was checked against the old one
+        and skipped without a word (found by task-206, `content_ready.py`)."""
+        package = Path(action_registry.__file__).parent
+        late = package / "c_apprtest_late.py"
+        late.write_text(
+            "from app.approvals.actions.base import ApprovableAction, ActionDescription, ActionResult\n"
+            "META = ApprovableAction(key='apprtest.late', label='Late', approve_permission='view',\n"
+            "                        default_ttl_seconds=60, requester_may_decide=True, subject_type='marker')\n"
+            "def describe(db, payload, *, brand_id=None): return ActionDescription(summary='late')\n"
+            "def execute(db, payload, *, choice=None, brand_id=None): return ActionResult(ok=True)\n"
+        )
+        try:
+            for _ in range(2):  # a second scan reloads what the first imported
+                action_registry._registry_mtime = None
+                keys = [a.key for a in action_registry.list_actions()]
+                assert "apprtest.late" in keys and ACTION_KEY in keys
+        finally:
+            late.unlink(missing_ok=True)
+            action_registry._registry_mtime = None
+
     def test_base_and_registry_are_not_actions(self):
         keys = [a.key for a in action_registry.list_actions()]
         assert "base" not in keys and "registry" not in keys

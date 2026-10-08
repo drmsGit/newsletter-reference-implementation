@@ -26,6 +26,12 @@ def _discover() -> dict[str, tuple[ApprovableAction, object]]:
     package_dir = Path(__file__).parent
 
     for _, module_name, _ in pkgutil.iter_modules([str(package_dir)]):
+        if module_name in ("base", "registry"):
+            # The contract and this scanner are not actions, and reloading them
+            # mid-scan made a new declaration type: an action file named after
+            # `base` but before `registry` was then checked against the old one
+            # and skipped without a word (found by task-206).
+            continue
         full_name = f"app.approvals.actions.{module_name}"
         try:
             if full_name in sys.modules:

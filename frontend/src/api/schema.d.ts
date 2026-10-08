@@ -421,7 +421,7 @@ export interface paths {
         get?: never;
         /**
          * Mark the record ready for a channel
-         * @description A person's mark takes effect at once (ADR-174 point 4). An integration's mark is to be held for a person in the approval inbox (task-206); until that exists it is refused, so nothing goes through unheld. Marking again keeps the first mark's who and when.
+         * @description A person's mark takes effect at once (ADR-174 point 4). An integration's mark is held for a person in the approval inbox: 202 with the held request, one per record and channel, no deadline; approving marks it in the approver's name (task-206). Marking again keeps the first mark's who and when.
          */
         put: operations["mark_record_ready_content__content_id__readiness__channel__put"];
         post?: never;

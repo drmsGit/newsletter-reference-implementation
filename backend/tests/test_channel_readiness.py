@@ -3,7 +3,7 @@
 ADR-174 and ADR-179, their addenda of 2026-10-05, decided with the user
 (task-282): a row per (record, channel) a person marked ready, with who and
 when; machine ready on the record, off for a new one; a person marks
-directly, an integration's mark is refused until task-206 can hold it, and an
+directly, an integration's mark is held for a person (task-206), and an
 integration may unmark; machine ready is people only. The warning fires when
 the record can fill no module of the channel. Migration 0032 sets existing
 records machine ready and marks active ones ready for email — once.
@@ -21,6 +21,7 @@ from app.audit.db_models import AuditEventDB
 from app.auth import service as auth
 from app.auth.permissions import CONTENT_MANAGE, VIEW
 from app.content.db_models import ContentChannelReadinessDB, ContentRecordDB
+from app.database import SessionLocal
 from main import app
 from tests.conftest import TEST_DATABASE_URL
 from tests.machine import machine
@@ -114,11 +115,98 @@ class TestAPersonMarks:
             assert api.delete(f"/content/{record}/readiness/email", headers=headers).status_code == 404
 
 
-class TestAnIntegration:
-    def test_its_mark_is_refused_until_it_can_be_held(self, db, record):
+@pytest.fixture
+def held(db, record):
+    """The held requests a test raises for `record`, and their audit rows, removed after."""
+    from app.approvals import service as approvals
+    from app.approvals.db_models import PendingActionDB
+
+    yield lambda: db.query(PendingActionDB).filter_by(action_key="content.mark_ready", subject_id=record).order_by(
+        PendingActionDB.id).all()
+    db.rollback()
+    ids = [i for (i,) in db.query(PendingActionDB.id).filter_by(action_key="content.mark_ready", subject_id=record)]
+    db.query(AuditEventDB).filter(AuditEventDB.subject_type == approvals.SUBJECT,
+                                  AuditEventDB.subject_id.in_(ids)).delete(synchronize_session=False)
+    db.query(PendingActionDB).filter(PendingActionDB.id.in_(ids)).delete(synchronize_session=False)
+    db.commit()
+
+
+class TestAnIntegrationsMarkIsHeld:
+    """ADR-174 point 4, built by task-206 (decided 2026-10-08, addenda to ADR-174
+    and ADR-142 of that date): a machine's mark is a held request a person
+    decides — one per record AND channel, with no deadline — and approving it
+    records the approver as the one who marked it."""
+
+    def test_it_is_held_not_applied(self, db, record, held):
         with machine([CONTENT_MANAGE]) as headers:
-            assert api.put(f"/content/{record}/readiness/push", headers=headers).status_code == 403
+            response = api.put(f"/content/{record}/readiness/push", headers=headers)
+        assert response.status_code == 202, response.text
+        [row] = held()
+        assert (row.status, row.subject_type, row.subject_id, row.subject_scope, row.expires_at) == (
+            "pending", "content", record, "push", None)
+        assert row.requested_by_type == audit.ACTOR_INTEGRATION
         assert db.query(ContentChannelReadinessDB).filter_by(content_id=record).count() == 0
+
+    def test_one_request_per_channel_and_a_retry_is_the_same_request(self, record, held):
+        with machine([CONTENT_MANAGE]) as headers:
+            email = api.put(f"/content/{record}/readiness/email", headers=headers)
+            first = api.put(f"/content/{record}/readiness/push", headers=headers).json()
+            again = api.put(f"/content/{record}/readiness/push", headers=headers).json()
+        assert email.status_code == 202, email.text
+        assert first == again, "a retry answers with its own channel's request, not the record's other one"
+        assert sorted(r.subject_scope for r in held()) == ["email", "push"]
+
+    def test_the_reviewer_sees_the_record_the_channel_and_the_warning(self, record, held, person):
+        client, csrf, _ = person
+        with machine([CONTENT_MANAGE]) as headers:
+            api.put(f"/content/{record}/readiness/push", headers=headers)
+        [row] = held()
+        detail = client.get(f"/approvals/{row.id}", headers=csrf).json()
+        rows = dict((r["label"], r["value"]) for r in detail["rows"])
+        assert (rows["Content"], rows["Channel"]) == (f"{TAG} record", "Push")
+        assert detail["warnings"] == ["Marked ready for Push, but Notification title and Notification text are empty"]
+        assert detail["blocked_reason"] is None, "the warning informs; it does not block"
+
+    def test_approving_marks_it_with_the_approver_as_marker(self, db, record, held, person):
+        client, csrf, email = person
+        with machine([CONTENT_MANAGE]) as headers:
+            api.put(f"/content/{record}/readiness/email", headers=headers)
+        [row] = held()
+        response = client.post(f"/approvals/{row.id}/approve", headers=csrf, json={})
+        assert response.status_code == 200 and response.json()["ok"], response.text
+        mark = db.query(ContentChannelReadinessDB).filter_by(content_id=record, channel="email").one()
+        assert mark.marked_by == email, "the person who approved asserted it"
+        [entry] = _entries(db, audit.CONTENT_READY_MARKED, record)
+        assert entry.actor_type == audit.ACTOR_USER
+        assert entry.detail["channel"] == "email" and entry.detail["pending_action_id"] == row.id
+
+    def test_rejecting_marks_nothing(self, db, record, held, person):
+        client, csrf, _ = person
+        with machine([CONTENT_MANAGE]) as headers:
+            api.put(f"/content/{record}/readiness/email", headers=headers)
+        [row] = held()
+        assert client.post(f"/approvals/{row.id}/reject", headers=csrf, json={"reason": "not yet"}).status_code == 200
+        assert db.query(ContentChannelReadinessDB).filter_by(content_id=record).count() == 0
+
+    def test_a_request_without_its_channel_is_refused_not_held_under_no_scope(self, record, held):
+        """An action that declares a scope and is given none would take the empty
+        slot every unscoped action uses; refused instead, like a missing subject."""
+        from app.approvals import service as approvals
+
+        with pytest.raises(approvals.SubjectRequired):
+            approvals.request_approval(
+                SessionLocal(), "content.mark_ready", payload={"content_id": record}, summary="x",
+                requested_by_type=audit.ACTOR_INTEGRATION, brand_id=1, subject_id=record)
+        assert held() == []
+
+    def test_another_brands_record_holds_nothing(self, record, held, foreign_api):
+        with foreign_api([CONTENT_MANAGE]) as headers:
+            response = api.put(f"/content/{record}/readiness/email", headers=headers)
+        assert response.status_code == 409 and "not found" in response.text
+        assert held() == []
+
+
+class TestAnIntegration:
 
     def test_it_may_unmark_directly_and_that_is_audited(self, db, record, person):
         client, csrf, _ = person

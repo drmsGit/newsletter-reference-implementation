@@ -602,6 +602,19 @@ Recorded in the 2026-10-08 addendum to [[ADR-086 — Decision Slots Fail Gracefu
 
 **Status:** built the same day (task-228).
 
+### 2026-10-08 — A machine's "ready for this channel" waits for a person
+
+**Context:** ADR-174 decided that an integration (an agency, an AI agent) may say a record is ready for a channel, and that a person decides it in the approval inbox; until this was built, such a mark was refused (task-206). Two details asked of the user, one at a time:
+
+1. **One open request per record and channel.** An agency marking a record ready for email and push holds two requests; the approval machinery gained a "scope" inside a request's subject for this.
+2. **The approver is recorded as the one who marked it.** The machine recommends, the person publishes (ADR-082); the integration that asked stays in the request's history and the audit log.
+
+Also: the hold has no deadline (built by task-210 the same day), the reviewer sees the record, the channel and the readiness warning, and an integration may still remove a mark directly.
+
+Recorded in the 2026-10-08 addenda to [[ADR-174 — Channel Readiness Is Asserted, Not Computed]] and [[ADR-142 — Autonomous Workflows and the Automation Boundary]].
+
+**Status:** built the same day (task-206).
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*

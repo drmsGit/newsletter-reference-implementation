@@ -15,6 +15,7 @@ append-only entry first-class, and a test asserts that deleting every row in
 the ADR-140 audit surface; it is not a second log" costs in practice.
 """
 
+import inspect
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -111,6 +112,7 @@ def request_approval(
     brand_id: int | None = None,
     subject_id: int | None = None,
     ttl_seconds: int | None = None,
+    subject_scope: str = "",
 ) -> PendingActionDB:
     """Hold an action. The caller then **finishes** — nothing waits here.
 
@@ -147,6 +149,15 @@ def request_approval(
             "could not be kept one of a kind. The subject is taken from the "
             f"path parameter named '{meta.subject_type}_id'."
         )
+    if meta.subject_scope_param and not subject_scope:
+        # The same refusal for the scope (task-206): an empty one is the slot
+        # every unscoped action uses, so a scoped request without its value
+        # would be held under the wrong key rather than refused.
+        raise SubjectRequired(
+            f"a request for '{action_key}' names no {meta.subject_scope_param}, so it "
+            "could not be kept one of a kind. The scope is taken from the path "
+            f"parameter named '{meta.subject_scope_param}'."
+        )
 
     ttl = ttl_seconds if ttl_seconds is not None else meta.default_ttl_seconds
     row = PendingActionDB(
@@ -157,6 +168,7 @@ def request_approval(
         requested_by_id=requested_by_id,
         subject_type=meta.subject_type,
         subject_id=subject_id,
+        subject_scope=subject_scope or "",
         brand_id=brand_id,
         status=PENDING,
         # No deadline when the action type declares none (task-210): every
@@ -235,6 +247,18 @@ def _current(db: Session, pending_id: int) -> PendingActionDB | None:
     return db.get(PendingActionDB, pending_id)
 
 
+def _approver_label(db: Session, approver_type: str, approver_id: int | None) -> str:
+    """The approver as a record stores an actor in text (`actor_label`): a
+    person's email, an integration's name."""
+    from app.auth.db_models import IntegrationDB, UserDB
+    from app.auth.service import actor_label
+
+    model = (UserDB if approver_type == audit.ACTOR_USER
+             else IntegrationDB if approver_type == audit.ACTOR_INTEGRATION else None)
+    principal = db.get(model, approver_id) if model is not None and approver_id is not None else None
+    return actor_label(principal)
+
+
 def approve(
     db: Session,
     pending_id: int,
@@ -307,8 +331,15 @@ def approve(
         # which is the column on this row. Passing the approver's working brand
         # instead would let where somebody happened to be standing decide what
         # a queued send was allowed to touch.
+        extra = {}
+        if "approver" in inspect.signature(module.execute).parameters:
+            # Only an action that asks is told who decided (task-206): the
+            # readiness mark records the approver as the one who marked it
+            # (ADR-174 addendum 2026-10-08). Asked, not imposed, so every
+            # action written before this keeps its signature.
+            extra["approver"] = _approver_label(db, approver_type, approver_id)
         result = module.execute(
-            db, row.payload or {}, choice=choice, brand_id=brand_id,
+            db, row.payload or {}, choice=choice, brand_id=brand_id, **extra,
         )
     except Exception as error:  # the action blew up
         db.rollback()

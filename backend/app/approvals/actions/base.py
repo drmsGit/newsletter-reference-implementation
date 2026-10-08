@@ -84,6 +84,13 @@ class ApprovableAction:
     #: None for an action with no record behind it (ADR-142 §10).
     subject_type: str | None = None
 
+    #: The path parameter that scopes the subject, or None (task-206; ADR-142
+    #: addendum 2026-10-08). One request is open per subject AND scope: a
+    #: readiness mark names the channel here, so a record's email and push
+    #: marks are two requests rather than one blocking the other. Omitting it
+    #: is safe — no scope is the one-request-per-subject rule as it was.
+    subject_scope_param: str | None = None
+
     description: str = ""
 
 

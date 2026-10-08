@@ -7,7 +7,7 @@ topic:
   - automation
   - governance
 created: 2026-07-31
-modified: 2026-10-02
+modified: 2026-10-08
 source:
   - "AI Layer design interview (interview-prep, 2026-07-27 – 31), Cluster 3"
 depends_on:
@@ -563,6 +563,54 @@ moved out to where the friction lives, rather than slowing every setting down.
 
 Nothing else changes: §4's inbox and its addenda, and §10's status as direction only,
 are untouched.
+
+## Addendum 2026-10-08 — one open request per subject and scope
+
+Prompted by task-206, the content-readiness hold of
+[[ADR-174 — Channel Readiness Is Asserted, Not Computed]], and decided by the user on
+2026-10-08. §4's *"the platform holds the pending action"* stands; what changes is how
+much of a subject one held request occupies.
+
+**The index was too coarse for readiness.** `ux_pending_actions_one_open_per_subject`
+is keyed on (action_key, subject_type, subject_id) over `pending` and `executing`, as
+the first two addenda of 2026-09-29 restate it. A readiness request's subject is a
+content record, so the index allowed one open readiness request per record across all
+channels. An agency asking for email and push on one record at once would have the
+second refused as already waiting.
+
+**1. An action may declare a scope inside its subject, and one request is open per
+subject and scope.** For readiness the scope is the channel, so each channel of a
+record has its own request. That matches ADR-174's one binary assertion per channel.
+
+**2. The held request gains a `subject_scope`.** It is empty for an action that
+declares no scope. The index becomes (action_key, subject_type, subject_id,
+subject_scope), over the same two open states.
+
+**3. The empty scope is an empty string, not null.** Postgres treats NULLs as distinct
+in a unique index, as the third addendum of 2026-09-29 found for subjects. Two null
+scopes would never collide, and every existing action would lose its one-open-request
+rule. With an empty string the rule holds for them unchanged.
+
+**4. The action names the path parameter that is its scope.** The handler
+`_approval_required` in `backend/main.py` lifts the subject id from a path parameter
+by the `<subject_type>_id` convention. The scope is lifted from a path parameter in
+the same way. For readiness it is `channel`, from
+`PUT /content/{content_id}/readiness/{channel}`.
+
+**5. A migration rewrites the index.** Existing rows get the empty scope.
+
+**6. Everything the 2026-09-29 addenda decided holds with the scope added.** An
+executing request still occupies its subject and scope. A subject must belong to the
+caller's brand before anything is held. The brand-filtered retry lookup, which answers
+a duplicate with the held request's id, matches the scope as well, so a retry for one
+channel is never answered with another channel's request.
+
+**What it costs.** Two requests for one record show as two inbox rows. The inbox's
+existing action-type filter answers that.
+
+Nothing else in §4 changes: the inbox, the audit trail shared with ADR-141, the
+notification-only rule for email and push, the state-based claim, the brand check and
+the named-subject rule of the 2026-09-29 addenda are untouched.
 
 ## Related ADRs
 

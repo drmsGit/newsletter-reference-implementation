@@ -7,7 +7,7 @@ topic:
   - content
   - approvals
 created: 2026-09-24
-modified: 2026-09-27
+modified: 2026-10-08
 source:
   - "Manager Workflow design interview (interview-prep), Cluster 2 / Q3, Q3b, Q6b — cluster closed 2026-09-21"
 depends_on:
@@ -272,6 +272,54 @@ still excludes the record from the slot. The readiness warning (first
 2026-10-05 addendum, point 4) is unaffected, because it judges a record
 against a channel's module types, not against a module in a variant, and so
 has no hidden list to read.
+
+Nothing above changes this record's Decision section.
+
+## Addendum 2026-10-08 — An integration's mark is held, and the approver is the one who marked it
+
+Prompted by task-206, the content-readiness hold. The user decided the points
+below on 2026-10-08. Where the readiness parts land in the code is in
+[[Channel Readiness - final design pass]].
+
+**1. Point 4 holds as decided.** A person's mark takes effect at once. An
+integration's `PUT /content/{content_id}/readiness/{channel}` is held in the
+approval inbox as the action `content.mark_ready`, and a person decides it.
+task-206 builds that hold. The first 2026-10-05 addendum's point 5 said that
+until then an integration's attempt to add a mark is refused; it is now held
+instead. Removing a mark stays direct for an integration, as that point
+decided.
+
+**2. When a person approves an integration's request, the mark records the
+approver as the one who marked it.** The assertion is the person's: the
+machine recommends and the person publishes
+([[ADR-082 — AI May Recommend but Not Publish]]). The integration that asked
+stays visible in the request's approval history and in the audit log:
+requested by the integration, approved by the person. Recording the
+integration as the marker would read on the record page as if a machine had
+marked the record ready itself.
+
+**3. The hold carries no deadline.** Whether the copy is good does not go
+stale. task-210 made an action without a deadline possible, under
+[[ADR-142 — Autonomous Workflows and the Automation Boundary]]'s addendum of
+2026-09-24.
+
+**4. The approver sees the record, the channel and the readiness warning on
+the review screen.** The warning is the one from the first 2026-10-05
+addendum's point 4: which modules the record cannot fill. It informs. It does
+not block approval, as point 2 says for a person's own mark.
+
+**5. The approval guard widens.** `enforce_api_policy` in
+`backend/app/auth/dependencies.py` raises `ApprovalRequired` only for
+`sends.execute`, and only for an integration not flagged for unattended
+sending. task-206 widens it to also hold every integration on the readiness
+route. There is no "may mark ready unattended" flag: point 4 holds every
+machine assertion.
+
+**6. Each channel of a record has its own request.** The open-request index
+allowed one readiness request per content record across all channels.
+[[ADR-142 — Autonomous Workflows and the Automation Boundary]]'s addendum of
+2026-10-08 lets an action declare a scope inside its subject; for this action
+the scope is the channel. That matches point 1's one assertion per channel.
 
 Nothing above changes this record's Decision section.
 

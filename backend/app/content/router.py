@@ -607,9 +607,9 @@ def _is_integration(request: Request) -> bool:
     summary="Mark the record ready for a channel",
     description=(
         "A person's mark takes effect at once (ADR-174 point 4). An integration's mark "
-        "is to be held for a person in the approval inbox (task-206); until that exists "
-        "it is refused, so nothing goes through unheld. Marking again keeps the first "
-        "mark's who and when."
+        "is held for a person in the approval inbox: 202 with the held request, one per "
+        "record and channel, no deadline; approving marks it in the approver's name "
+        "(task-206). Marking again keeps the first mark's who and when."
     ),
 )
 def mark_record_ready(
@@ -619,10 +619,12 @@ def mark_record_ready(
     from app.content.service import mark_ready, readiness_warning
 
     if _is_integration(request):
+        # Unreachable through the guard, which holds every integration's mark
+        # for a person (task-206, `HELD_FOR_EVERY_INTEGRATION`). Kept so that a
+        # mapping lost from the policy refuses rather than marks unheld.
         raise HTTPException(
             status_code=403,
-            detail="An integration's readiness mark must be approved by a person, "
-                   "and that approval path is not built yet (task-206).",
+            detail="An integration's readiness mark must be approved by a person.",
         )
     try:
         marked = mark_ready(db, content_id, channel, marked_by=actor_label(request_principal(request)),

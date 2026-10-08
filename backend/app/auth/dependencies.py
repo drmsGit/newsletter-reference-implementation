@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 from app.auth.db_models import UserDB
 from app.auth.permissions import SENDS_EXECUTE, is_brand_scoped
 from app.auth.policy import (
-    APPROVABLE_ROUTES, PROVIDER_SIGNED, UNMAPPED, required_permission,
+    APPROVABLE_ROUTES, HELD_FOR_EVERY_INTEGRATION, PROVIDER_SIGNED, UNMAPPED, required_permission,
 )
 from app.auth.integrations import authenticate, record_auth_failure
 from app.auth.service import (
@@ -621,14 +621,13 @@ def enforce_api_policy(request: Request, db: Session = Depends(get_db)):
     # authorised for this action on this brand, and has said which brand.
     # Only an integration can be held for approval — a person firing a send is
     # the approval. `may_send_unattended` does not exist on a user.
-    if (
-        credential
-        and permission == SENDS_EXECUTE
-        and not integration.may_send_unattended
+    if credential and (
+        (permission == SENDS_EXECUTE and not integration.may_send_unattended)
+        or (request.method, template) in HELD_FOR_EVERY_INTEGRATION
     ):
         logger.info(
-            "api: holding a send for integration %s — not flagged for "
-            "unattended sending", integration.id,
+            "api: holding %s %s for integration %s",
+            request.method, template, integration.id,
         )
         raise ApprovalRequired(
             action_key=APPROVABLE_ROUTES.get(template),

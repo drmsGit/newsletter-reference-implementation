@@ -557,6 +557,9 @@ def _approval_required(request: Request, exc: ApprovalRequired):
     # convention rather than inferred loosely, so an action whose subject is not
     # in its path says so by declaring none.
     subject_id = exc.payload.get(f"{meta.subject_type}_id") if meta else None
+    # The part of the subject the action declares, from the path too (task-206):
+    # a readiness mark's channel, so each channel of a record is its own request.
+    subject_scope = str(exc.payload.get(meta.subject_scope_param) or "") if meta and meta.subject_scope_param else ""
 
     db = SessionLocal()
     try:
@@ -606,6 +609,7 @@ def _approval_required(request: Request, exc: ApprovalRequired):
                 requested_by_id=exc.integration_id,
                 brand_id=exc.brand_id,
                 subject_id=subject_id,
+                subject_scope=subject_scope,
             )
         except approvals.SubjectRequired as refusal:
             # Fail closed, like the unmapped route above: a request that cannot
@@ -622,6 +626,7 @@ def _approval_required(request: Request, exc: ApprovalRequired):
                 PendingActionDB.action_key == exc.action_key,
                 PendingActionDB.subject_type == (meta.subject_type if meta else None),
                 PendingActionDB.subject_id == subject_id,
+                PendingActionDB.subject_scope == subject_scope,
                 PendingActionDB.status.in_(OPEN),
                 # Never answer one brand with another brand's request. Without
                 # this, brand B retrying its own send was handed brand A's
