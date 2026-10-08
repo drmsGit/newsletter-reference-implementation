@@ -615,6 +615,18 @@ Recorded in the 2026-10-08 addenda to [[ADR-174 — Channel Readiness Is Asserte
 
 **Status:** built the same day (task-206).
 
+### 2026-10-08 — Python dependencies are locked, with hashes
+
+**Context:** the backend installed nine unpinned names, so every install took whatever PyPI served that day, and a mistyped name (`httpx2`) once went in unnoticed — the shape AI-hallucinated package names exploit (task-235). First item of the pre-review list. Decided with the user one question at a time:
+
+1. **pip-tools writes the lock** — plain pip installs it, so an adopter needs no extra program.
+2. **Every install checks hashes**, locally as much as in CI and deployment; runtime and dev tools are separate locks.
+3. **A lock change is its own commit**, every new package gets a provenance check, upgrades go one package at a time, and CI will scan the lock once it exists (task-105).
+
+The first lock records the versions tested that day, not the newest. Recorded in [[ADR-189 — Python Dependencies Are Locked With Hashes]].
+
+**Status:** decided and built the same day (task-235).
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*

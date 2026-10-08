@@ -1,0 +1,19 @@
+# The backend's direct runtime dependencies, written by hand (ADR-189).
+# Never installed from directly: `pip-compile` turns this into
+# requirements.txt, with an exact version and hashes for every package,
+# transitive ones included. To change a dependency, edit this file and run
+#   venv/bin/pip-compile --generate-hashes --strip-extras requirements.in
+# then review the diff as ADR-189 point 5 says, in a commit of its own.
+fastapi
+uvicorn
+psycopg2-binary
+sqlalchemy
+jinja2
+# Imported by our own code (app/rendering/service.py), not only by Jinja.
+markupsafe
+# Imported by our own code (app/pagination.py and the models), not only by FastAPI.
+pydantic
+css-inline
+# Runtime, not only tests: the Claude adapter and the Resend provider use it.
+httpx
+python-multipart

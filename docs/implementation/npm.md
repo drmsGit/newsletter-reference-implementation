@@ -24,7 +24,7 @@ A package this project hands to somebody else should not require installing some
 
 Two people installing a month apart therefore get identical code.
 
-**This is stricter than the backend currently is.** `backend/requirements.txt` pins no versions at all, so two installs there can legitimately differ.
+**The backend has had the same property since 2026-10-08.** Until then `backend/requirements.txt` pinned no versions at all, so two installs could legitimately differ. It is now compiled by pip-tools from `backend/requirements.in`, with an exact version and hashes for every package, and every install checks them ([[ADR-189 — Python Dependencies Are Locked With Hashes]]).
 
 ### Installing runs code, so the record matters
 

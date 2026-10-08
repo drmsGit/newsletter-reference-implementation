@@ -3,10 +3,11 @@ id: TASK-235
 title: >-
   Python dependencies are unpinned and unhashed, so every fresh install takes
   whatever PyPI serves today
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-01 21:26'
-updated_date: '2026-10-08 19:11'
+updated_date: '2026-10-08 19:18'
 labels:
   - backend
   - needs-adr
