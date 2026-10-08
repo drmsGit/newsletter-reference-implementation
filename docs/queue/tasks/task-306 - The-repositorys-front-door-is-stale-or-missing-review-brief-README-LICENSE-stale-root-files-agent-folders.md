@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-08 22:27'
+updated_date: '2026-10-08 22:46'
 labels:
   - docs
 dependencies: []
@@ -64,3 +65,12 @@ Sequenced as batch R8 (pre-review hygiene) with task-237 and task-238. Not on th
 - [ ] #4 project_tree.txt and HANDOFF.md are each deleted, regenerated or moved as dated records, by decision
 - [ ] #5 .agents/, .codex/ and AGENTS.md are committed or ignored by decision; if committed, how AGENTS.md stays in step with CLAUDE.md is stated
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-08, from the code-slimmer sweep (note-only findings that a reader of the repository meets):
+- Stale live counts in the code map. docs/architecture/Code/MOC - System Overview.md:51 says "~14 modules, 70 files, 125 routes", and :140 and :163 say "57 routes in one file" for the Jinja router (83 route decorators on 2026-10-08). The module pages carry route counts too (content.md:41, campaigns.md:41). This breaks the no-live-counts rule. Reword without numbers, for example "the Jinja admin UI, frozen, in one file".
+- Two empty package folders a reviewer sees before any explanation: backend/app/automation/ and backend/app/privacy/ hold only .gitkeep. The MOC explains them, but a one-line README.md in each, naming its ADR (automation: ADR-142; privacy: ADR-154, and task-136 for the lifecycle decision), would answer the question where it arises.
+- tests/test_jinja_freeze.py says no ADR records the retirement of the Jinja UI. A reviewer will ask; the brief should say how and when Jinja goes, or that it is undecided.
+<!-- SECTION:NOTES:END -->
