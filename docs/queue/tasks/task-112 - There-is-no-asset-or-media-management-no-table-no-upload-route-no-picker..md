@@ -4,6 +4,7 @@ title: 'There is no asset or media management: no table, no upload route, no pic
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-10-08 19:05'
 labels:
   - backend
   - frontend
@@ -46,4 +47,10 @@ ordinal: 206500
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 374, section "Features", position 65 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-08, queue cleanup: task-91 merged into this task. Its original entry (user feedback 2026-07-12, while reviewing the content-schema redesign), kept here verbatim:
+
+Content image fields (image_url/image_alt in ContentRecordDB.content) require managers to hand-paste a raw URL - no upload or media-library picker. Carried over from a past Condor implementation; a marketer shouldn't need to copy/paste image URLs. Needs an "upload / select image" UI component (upload to storage, or pick from previously-uploaded images) wired into the content create/edit forms, replacing the plain URL text input. New feature, not a bug - low priority, no rush.
+
+It describes the same gap from the content form's side; this task's 2026-09-27 design covers it. The logo for a visible header (task-301) is the next consumer.
 <!-- SECTION:NOTES:END -->
