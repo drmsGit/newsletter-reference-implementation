@@ -29,3 +29,4 @@ storage/snapshots/*.html
 # Claude Code — local (uncommitted) agent memory
 .claude/agent-memory-local/
 .claude/.DS_Store
+backend/openapi.json

@@ -627,6 +627,18 @@ The first lock records the versions tested that day, not the newest. Recorded in
 
 **Status:** decided and built the same day (task-235).
 
+### 2026-10-08 — CI blocks on defects and reports style
+
+**Context:** no CI, no linter, no dependency or secret scanning (task-105), the first thing a reviewer looks for. Decided with the user one question at a time:
+
+1. **Linters block on a small set of rules that catch real defects** and report everything else without failing — Ruff (undefined names, a name defined twice, unused locals…) and ESLint (recommended rules, rules of hooks); jsx-a11y warns, for the accessibility session. Not ~800 style fixes.
+2. **Secrets:** the whole history scanned once locally (nothing found), then every push in CI.
+3. **Vulnerabilities:** every push and weekly; block only on what ships, report dev tooling; fix by upgrading the one package, or an ignore with a reason and a date.
+
+Its first runs found real problems: a model class defined twice that made two recipient routes answer 500, and published advisories in starlette and anyio — all fixed before CI went in. Recorded in [[ADR-190 — Continuous Integration Blocks on Defects and Reports Style]].
+
+**Status:** built the same day (task-105); the workflow's first run on GitHub is pending.
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*

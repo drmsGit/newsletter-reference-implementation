@@ -3,10 +3,11 @@ id: TASK-105
 title: >-
   There is no `.github/`, no linter, no type checking, no dependency or secret
   scanning.
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-27 13:57'
-updated_date: '2026-10-08 19:42'
+updated_date: '2026-10-08 19:47'
 labels:
   - backend
 dependencies: []
