@@ -662,6 +662,18 @@ Recorded in the 2026-10-08 addendum to [[ADR-153 — Audit and Accountability]].
 
 **Status:** built the same day (task-52).
 
+### 2026-10-08 — The AI modes are named by what they do
+
+**Context:** the AI layer's three modes were called Mode A / B / C, and the roadmap below has Phase 4A / 4B / 4C. They are unrelated, and on 2026-08-07 the subject-line feature (Mode A) being done was read as Phase 4A being done, which misdirected a planning session (task-97). Decided with the user one question at a time:
+
+1. **The modes are Assistive, Autonomous and Development** — what ADR-141, -142 and -143's titles already said.
+2. **Dated records keep the letters** — the ADRs, this log, the queue — by the same rule as the product rename (2026-10-05); ADR-140's addendum is the key for a reader who meets "Mode A" in one of them. Living files — code comments, the business docs, the maps of content — use the names.
+3. **A test keeps the letters out of living files**, since every ADR still uses them and they would come back with the first copied sentence.
+
+Recorded in the 2026-10-08 addendum to [[ADR-140 — AI Capability Layer]].
+
+**Status:** done the same day (task-97).
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*

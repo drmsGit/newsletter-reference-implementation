@@ -6,7 +6,7 @@ topic:
   - ai
   - governance
 created: 2026-07-31
-modified: 2026-07-31
+modified: 2026-10-08
 source:
   - "AI Layer design interview (interview-prep, 2026-07-27 – 31), Cluster 1"
 depends_on:
@@ -144,6 +144,84 @@ model behaving unexpectedly).
   (point 7). This ADR makes "off" a first-class configuration, not a fork.
 - **Status.** Decided in the design interview; implementation is phased (Mode A
   first — see ADR-141). Marked accepted as a design decision, not as shipped code.
+
+## Addendum 2026-10-08 — The three modes are named by what they do
+
+Prompted by task-97, and decided by the user in chat on 2026-10-08, one
+question at a time. Points 1–7 stand. This addendum changes what the three modes
+in Notes are called, not what they are or what they may do.
+
+**What was found.** The Notes above name the three modes by letter: **A**
+([[ADR-141 — In-App Assistive AI Actions]]), **B**
+([[ADR-142 — Autonomous Workflows and the Automation Boundary]]) and **C**
+([[ADR-143 — AI-Assisted Development Boundary]]). The roadmap in
+`docs/playbook-strategy.md` independently uses Phase 4A / 4B / 4C, where 4A is
+the playbook's chapter structure and voice. The two sets share nothing but the
+letters. On 2026-08-07 the user concluded that Phase 4A was finished because
+the subject-line feature, which is Mode A, was; that misread cost a planning
+session. A reader of the published material would meet both vocabularies too.
+On 2026-10-08 the mode letters appeared in 12 ADRs, in the Decision section of
+9 of them, and also in the playbook, queue tasks, business docs, two MOCs and
+backend code comments.
+
+**1. The modes are named by function.**
+
+- **Assistive** — was Mode A, [[ADR-141 — In-App Assistive AI Actions]]:
+  in-app actions a person asks for and accepts.
+- **Autonomous** — was Mode B,
+  [[ADR-142 — Autonomous Workflows and the Automation Boundary]]: workflows
+  that act without a person in the loop, inside the automation boundary.
+- **Development** — was Mode C, [[ADR-143 — AI-Assisted Development Boundary]]:
+  AI-assisted work on the codebase itself.
+
+The ADR titles already said this. The letters were the trap.
+
+**2. Dated records keep the letters, and this addendum is the key.** This is
+the user's rule of 2026-10-05 for the product rename
+(`docs/business/decisions/naming-brand-tarrow.md`, its 2026-10-05 entry; the
+`DATED` list in `backend/scripts/rename_product.py`): ADRs, interview prep,
+business decisions, the queue, the playbook and other records of a date keep
+the wording they were written with. An Accepted ADR's Decision is never edited
+either. A reader who meets "Mode A", "Mode B" or "Mode C" in an ADR or any
+other dated record looks it up here.
+
+**3. Living files use the function names, and a test keeps it so.** Code
+comments and docstrings, the living business docs in `docs/business/`
+(BRIEF, ASSUMPTIONS, BETA-SCOPE) and the MOCs say Assistive, Autonomous and
+Development. A test, `backend/tests/test_mode_names.py`, keeps the letters out
+of living files. It is built from the pieces of the product rename's
+living-file scan: the same tracked files (`rename_product.tracked`), the same
+`DATED` list (`rename_product.is_dated`), the same text suffixes and the same
+stripping of ADR links. So "living file" means the same thing for both
+renames. It does not call `rename_product.retired_name_hits` itself, because
+that function matches whole words and would miss a spelling like
+"Mode-A-vs-decision-slot". The test has its own pattern,
+`\bModes?[ -][ABC](?![a-zA-Z])`. It catches "Mode A", "Mode-A", "Mode A/B/C"
+and "Modes A and B", but not "Mode Boundary" or a lower-case "mode". Three more
+files are records of a date, so they join the `DATED` list and keep their
+letters: the interview log (`docs/business-interview.md`), the weekly summary
+(`docs/weekly-summary.md`) and the code-slimmer report
+(`docs/architecture/code-slimmer-report.md`).
+
+**Rejected.** Rewriting the letters in all ADRs, the playbook and open tasks
+was rejected: for a single rename it would break both the rule that an Accepted
+ADR's Decision is never edited and the 2026-10-05 rule that dated records keep
+their wording. Renaming the roadmap's Phase 4A / 4B / 4C instead was rejected
+too: the playbook is a dated record as well, and the mode letters would stay
+ambiguous.
+
+**Consequences.**
+
+- **Positive.** New material cannot collide with the roadmap's phase letters.
+  A reader has one place to translate the letters.
+- **Negative.** For as long as the ADRs exist, a reader meets two vocabularies
+  and needs this key. The guard test fails a living file that quotes "Mode A",
+  even when it is quoting an ADR on purpose: the file must be reworded, or it
+  is a dated record and belongs on the `DATED` list.
+
+Built the same day, under task-97: the three files joined `DATED`, living files
+were reworded, and the guard test runs in the suite. Nothing here changes the
+Decision section above.
 
 ## Related ADRs
 
