@@ -5462,6 +5462,15 @@ export interface components {
              */
             source: string;
         };
+        /** RecipientSignal */
+        RecipientSignal: {
+            /** Recipient Id */
+            recipient_id: number;
+            /** Category Id */
+            category_id: number;
+            /** Score */
+            score: number;
+        };
         /** ReconstructedModule */
         ReconstructedModule: {
             /** Module Id */
@@ -9393,7 +9402,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RecipientPreference"][];
+                    "application/json": components["schemas"]["RecipientSignal"][];
                 };
             };
             /** @description Validation Error */
@@ -9426,7 +9435,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RecipientPreference"];
+                    "application/json": components["schemas"]["RecipientSignal"];
                 };
             };
             /** @description Validation Error */
