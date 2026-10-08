@@ -27,7 +27,8 @@ class PendingActionRow(BaseModel):
     requested_by_type: str
     requested_by_id: int | None
     created_at: datetime
-    expires_at: datetime
+    # None for an action type that declares no deadline: it never expires (task-210).
+    expires_at: datetime | None = None
     decided_at: datetime | None
     # What is being decided, so a client can link to it (task-208), and who
     # decided it and why, for decision history. Exposed since 2026-10-03.

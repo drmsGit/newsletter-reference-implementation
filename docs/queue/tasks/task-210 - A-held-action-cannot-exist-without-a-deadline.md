@@ -1,10 +1,11 @@
 ---
 id: TASK-210
 title: A held action cannot exist without a deadline
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-27 14:20'
-updated_date: '2026-10-01 20:54'
+updated_date: '2026-10-08 18:29'
 labels:
   - backend
 dependencies: []

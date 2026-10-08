@@ -20,11 +20,20 @@ function requester(a: PendingActionRow) {
   return a.requested_by_name ? `${a.requested_by_name} (${a.requested_by_type})` : a.requested_by_type
 }
 
+/**
+ * A request's deadline. An action type may declare none (task-210; ADR-142
+ * §4's addendum): it never expires, which the screen says rather than leaving
+ * a blank that reads as unknown.
+ */
+export function deadline(iso: string | null | undefined): string {
+  return iso ? formatDate(iso) : 'No deadline'
+}
+
 const waitingColumns: DataColumn<PendingActionRow>[] = [
   { key: 'label', header: 'Request', isRowHeader: true, render: (a) => a.label },
   { key: 'summary', header: 'Summary', render: (a) => a.summary },
   { key: 'requested_by', header: 'Requested by', render: requester },
-  { key: 'expires', header: 'Expires', render: (a) => formatDate(a.expires_at) },
+  { key: 'expires', header: 'Expires', render: (a) => deadline(a.expires_at) },
 ]
 
 const historyColumns: DataColumn<PendingActionRow>[] = [

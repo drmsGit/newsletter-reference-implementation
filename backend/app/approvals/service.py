@@ -159,7 +159,9 @@ def request_approval(
         subject_id=subject_id,
         brand_id=brand_id,
         status=PENDING,
-        expires_at=now() + timedelta(seconds=ttl),
+        # No deadline when the action type declares none (task-210): every
+        # reader takes an empty expires_at as "never expires", not "expired".
+        expires_at=None if ttl is None else now() + timedelta(seconds=ttl),
     )
     db.add(row)
     try:
@@ -708,7 +710,8 @@ def pending_count(db: Session, brand_id: int | None) -> int:
     """
     query = db.query(func.count(PendingActionDB.id)).filter(
         PendingActionDB.status == PENDING,
-        PendingActionDB.expires_at > func.now(),
+        # A request with no deadline is pending for as long as nobody decides it.
+        or_(PendingActionDB.expires_at.is_(None), PendingActionDB.expires_at > func.now()),
     )
     if brand_id is not None:
         query = query.filter(PendingActionDB.brand_id == brand_id)

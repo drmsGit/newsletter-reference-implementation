@@ -5002,11 +5002,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
-            /**
-             * Expires At
-             * Format: date-time
-             */
-            expires_at: string;
+            /** Expires At */
+            expires_at?: string | null;
             /** Decided At */
             decided_at: string | null;
             /** Subject Type */
@@ -5073,11 +5070,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
-            /**
-             * Expires At
-             * Format: date-time
-             */
-            expires_at: string;
+            /** Expires At */
+            expires_at?: string | null;
             /** Decided At */
             decided_at: string | null;
             /** Subject Type */

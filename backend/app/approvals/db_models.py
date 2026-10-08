@@ -104,10 +104,12 @@ class PendingActionDB(Base):
 
     status = Column(String(20), nullable=False, default=PENDING, index=True)
 
-    # ADR-142 §4: "Pending actions expire." No default and no nullability — the
-    # registry always supplies one, so a module that forgets cannot create an
-    # immortal held send.
-    expires_at = Column(DateTime(timezone=True), nullable=False)
+    # ADR-142 §4: "Pending actions expire" — those whose type declares a
+    # deadline. Empty for an action type that declares none (§4's addendum of
+    # 2026-09-24; task-210, migration 0039), and read as "never expires"
+    # everywhere, never as "already expired". A module cannot get an empty one
+    # by forgetting: `default_ttl_seconds` has no default.
+    expires_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # ADR-140 §5's "approver-if-gated". All three stay NULL on an expired row:

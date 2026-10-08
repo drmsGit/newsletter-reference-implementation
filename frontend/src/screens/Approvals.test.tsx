@@ -37,6 +37,29 @@ describe('the approval inbox', () => {
   })
 })
 
+describe('a request whose action type has no deadline (task-210)', () => {
+  /** ADR-142 §4's addendum: it never expires, and the screens say so rather than showing a blank. */
+  it('says No deadline in the inbox and in the detail', async () => {
+    const ageless = { ...A_ROW, expires_at: null }
+    stubFetch({
+      'GET /approvals/': () => jsonResponse(page([ageless])),
+      'GET /approvals/7': () => jsonResponse({ ...ageless, payload: {}, rows: [], may_decide: true, blocked_reason: null,
+        describe_error: null, warnings: [], options: null }),
+    })
+    renderWithProviders(
+      <Routes>
+        <Route path="/approvals" element={<Approvals />} />
+        <Route path="/approvals/:id" element={<ApprovalDetail />} />
+      </Routes>,
+      { route: '/approvals' },
+    )
+    const row = (await screen.findByText('Apply a suggested subject')).closest('[role="row"]') as HTMLElement
+    expect(within(row).getByText('No deadline')).toBeInTheDocument()
+    fireEvent.click(within(row).getByText('Apply a suggested subject'))
+    expect(await screen.findByText('No deadline')).toBeInTheDocument()
+  })
+})
+
 describe('an approval in detail', () => {
   it('reads may_decide from the server rather than deciding for itself', async () => {
     /**

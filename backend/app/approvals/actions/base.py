@@ -53,9 +53,12 @@ class ApprovableAction:
     approve_permission: str
 
     #: ADR-142 §4: "Pending actions expire. A held 'send the morning campaign'
-    #: is worthless three days later." Every action supplies one, so the column
-    #: can be NOT NULL and a forgetful module cannot mint an immortal request.
-    default_ttl_seconds: int
+    #: is worthless three days later." The deadline belongs to the action type
+    #: and may be absent (§4's addendum of 2026-09-24): "is this copy good" does
+    #: not go stale. **`None` is a declaration, never an omission** — the field
+    #: stays required with no default, so a forgetful module still cannot mint
+    #: an immortal request; it has to say so (task-210).
+    default_ttl_seconds: int | None
 
     #: Whether the person who **requested** this may also decide it.
     #:

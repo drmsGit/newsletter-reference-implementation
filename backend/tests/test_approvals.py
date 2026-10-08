@@ -822,3 +822,96 @@ class TestEveryHeldRequestNamesItsSubject:
 
         assert refused, "the request never reached request_approval — this tests nothing"
         assert response.status_code == 403, response.text
+
+
+AGELESS_KEY = "apprtest.ageless"
+FORGETFUL_KEY = "apprtest.forgetful"
+
+
+@pytest.fixture
+def ageless_action(planted_action):
+    """An action type that declares no deadline (task-210; ADR-142 §4,
+    addendum 2026-09-24): "is this copy good" does not go stale."""
+    package = Path(action_registry.__file__).parent
+    path = package / f"{TAG}_ageless.py"
+    path.write_text(
+        "from app.approvals.actions.base import ApprovableAction, ActionDescription, ActionResult\n"
+        f"META = ApprovableAction(key='{AGELESS_KEY}', label='Never stale',\n"
+        "                        approve_permission='sends.execute',\n"
+        "                        default_ttl_seconds=None,\n"
+        "                        requester_may_decide=True,\n"
+        "                        subject_type='marker')\n"
+        "def describe(db, payload, *, brand_id=None):\n"
+        "    return ActionDescription(summary='never stale', rows=[])\n"
+        "def execute(db, payload, *, choice=None, brand_id=None):\n"
+        "    return ActionResult(ok=True)\n"
+    )
+    action_registry._registry_mtime = None
+    try:
+        yield
+    finally:
+        path.unlink(missing_ok=True)
+        action_registry._registry_mtime = None
+
+
+def _ageless(db):
+    return _remember(approvals.request_approval(
+        db, AGELESS_KEY, payload={}, summary="never stale", requested_by_type=ACTOR_USER,
+        requested_by_id=None, brand_id=1, subject_id=int(uuid.uuid4().int % 10**8)))
+
+
+class TestAnActionWithNoDeadline:
+    """A held action whose type declares no deadline never expires: every reader
+    takes an empty deadline as "never", not as "already" (ADR-142 addendum)."""
+
+    def test_it_is_held_with_no_deadline_and_reads_as_pending(self, db, ageless_action):
+        row = _ageless(db)
+        db.refresh(row)
+        assert row.expires_at is None
+        assert approvals.effective_status(row, at=approvals.now() + timedelta(days=3650)) == PENDING
+
+    def test_it_is_in_the_inbox_and_the_badge(self, db, ageless_action):
+        row = _ageless(db)
+        assert row.id in [r.id for r in approvals.list_for_brand(db, 1, PENDING)]
+        before = approvals.pending_count(db, 1)
+        other = _ageless(db)
+        assert approvals.pending_count(db, 1) == before + 1, "the badge counts it"
+        assert other.id in [r.id for r in approvals.list_for_brand(db, 1, PENDING)]
+
+    def test_the_sweep_never_retires_it(self, db, ageless_action):
+        row = _ageless(db)
+        assert row.id not in approvals.expire_due_pending_actions(db)
+        db.refresh(row)
+        assert row.status == PENDING
+
+    def test_it_can_be_approved_whenever_somebody_gets_to_it(self, db, ageless_action):
+        row = _ageless(db)
+        result = approvals.approve(db, row.id, approver_type=ACTOR_USER, approver_id=None)
+        assert result.ok, result.message
+
+    def test_the_route_says_it_has_none(self, db, ageless_action):
+        from app.approvals.router import _row  # what the inbox route answers with
+
+        assert _row(_ageless(db)).expires_at is None
+
+    def test_a_declaration_that_says_nothing_about_a_deadline_is_still_refused(self, ageless_action):
+        """No deadline is a declaration, never an omission: a forgetful module
+        must not mint an immortal request."""
+        package = Path(action_registry.__file__).parent
+        forgetful = package / f"{TAG}_forgetful.py"
+        forgetful.write_text(
+            "from app.approvals.actions.base import ApprovableAction\n"
+            f"META = ApprovableAction(key='{FORGETFUL_KEY}', label='Forgot',\n"
+            "                        approve_permission='view',\n"
+            "                        requester_may_decide=True)\n"
+            "def describe(db, payload, *, brand_id=None): pass\n"
+            "def execute(db, payload, *, choice=None, brand_id=None): pass\n"
+        )
+        try:
+            action_registry._registry_mtime = None
+            keys = [a.key for a in action_registry.list_actions()]
+            assert FORGETFUL_KEY not in keys
+            assert AGELESS_KEY in keys
+        finally:
+            forgetful.unlink(missing_ok=True)
+            action_registry._registry_mtime = None

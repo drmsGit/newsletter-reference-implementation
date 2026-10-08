@@ -12,6 +12,7 @@ import { Link, useParams } from 'react-router'
 import { useApproval, useDecide, type PendingActionDetail } from '../api/resources'
 import { HttpError } from '../api/session'
 import ScreenState from '../components/ScreenState'
+import { deadline } from './Approvals'
 import { formatDate } from './Campaigns'
 
 export default function ApprovalDetail() {
@@ -72,7 +73,7 @@ export default function ApprovalDetail() {
               <dt>Requested</dt>
               <dd>{formatDate(approval.data.created_at)}</dd>
               <dt>Expires</dt>
-              <dd>{formatDate(approval.data.expires_at)}</dd>
+              <dd>{deadline(approval.data.expires_at)}</dd>
               {approval.data.decided_at && (
                 <>
                   <dt>Decided</dt>
