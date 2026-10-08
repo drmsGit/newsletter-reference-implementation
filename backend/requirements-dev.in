@@ -6,3 +6,7 @@
 pytest
 # The lock tool itself, so its own version is locked too.
 pip-tools
+# CI (ADR-190): the linter, blocking on a small set of real-defect rules
+# (ruff.toml), and the vulnerability scan of the locks.
+ruff
+pip-audit
