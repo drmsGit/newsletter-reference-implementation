@@ -7,6 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-10-08 22:25'
 labels:
   - backend
 dependencies: []
@@ -24,4 +25,6 @@ ordinal: 204200
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 254, section "Features", position 42 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-08 queue cleanup (backlog-sequencer run 3, verified by hand): still true: bulk remove-by-criteria does not exist. The line citations have drifted: bulk_add_members is now at backend/app/audience/service.py:805 and find_by_criteria at :637. ADR-188 made audience rules flat and reversible (membership by criteria), which may make a separate bulk-remove less needed. Consider that before building it.
 <!-- SECTION:NOTES:END -->

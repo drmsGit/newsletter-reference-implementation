@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
-updated_date: '2026-09-27 14:20'
+updated_date: '2026-10-08 22:25'
 labels:
   - backend
 dependencies: []
@@ -58,4 +58,6 @@ ordinal: 205700
 Migrated 2026-09-27 from `docs/backlog.md` line 326, section "Features", position 57 in that section (top = do next). The description is the original entry, verbatim.
 
 2026-09-27: related — task-201 (required-field check before a send fires) and task-228 (post-render per-recipient 'nothing meaningful' skip, whose reason lands with the exclusion reasons).
+
+2026-10-08 queue cleanup (backlog-sequencer run 3, verified by hand): point (1), deduplication, is built: address deduplication is exclusion stage 1 in backend/app/delivery/exclusion.py:148-166, since 2026-09-29 (task-233). Point (3), suppression relayed from bounces, belongs to task-135. Point (2), double-send protection, and the rest still need checking against the send path. Also, the migration glued a second, finished entry onto the end of this description: the AI task registry, marked done 2026-09-18. It is not part of this task.
 <!-- SECTION:NOTES:END -->

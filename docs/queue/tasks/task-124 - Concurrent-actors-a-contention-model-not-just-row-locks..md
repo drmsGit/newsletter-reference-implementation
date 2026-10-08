@@ -4,7 +4,7 @@ title: 'Concurrent actors: a contention model, not just row locks.'
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
-updated_date: '2026-09-27 14:29'
+updated_date: '2026-10-08 22:25'
 labels:
   - needs-adr
   - backend
@@ -23,4 +23,6 @@ ordinal: 300800
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 447, section "Needs ADR", position 8 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-08 queue cleanup (backlog-sequencer run 3, verified by hand): parts of this are answered. (a) Human against human is decided by ADR-180 (A Lock Is Advisory for a Person and Binding for a Machine) and built with optimistic concurrency (task-110). (b) Human against machine is built as fences (task-254, backend/app/campaigns/fence.py). Still open: (c), the queue with a log, and the AI spend cap check-then-act race (backend/app/ai/service.py:89, tokens_used read before the gate).
 <!-- SECTION:NOTES:END -->

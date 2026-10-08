@@ -3,9 +3,10 @@ id: TASK-70
 title: >-
   Complete the inbound provider adapter layer (`providers/adapters/`, currently
   an empty mock file)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-10-08 22:21'
 labels:
   - backend
 dependencies: []
@@ -23,4 +24,19 @@ ordinal: 202300
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 216, section "Features", position 23 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-08 queue cleanup (backlog-sequencer run 3, verified by hand, closed by the user's decision): built in substance. The headline "currently an empty mock file" stopped being true when the Resend inbound adapter landed.
+- backend/app/providers/adapters/resend.py is the one worked example. It has a fail-closed signature check, RESEND_EVENT_TYPE_MAP normalizing provider event names to canonical types, and parse_webhook producing a NormalizedEvent. It follows this entry's own preferred design (b): a file to copy and adjust per provider, not a generic auto-fitting layer.
+- Bounce and complaint opt the recipient out on the mailing channel, purpose and brand: backend/app/providers/service.py:196-216 (ADR-106).
+- "Required before public launch" was settled by LAUNCH-GATES gates 5 and 6, both done (docs/business/LAUNCH-GATES.md:13-14).
+Not built, and where it lives now:
+- Relaying opt-outs back to the CRM is task-135 (suppression) and task-128.
+- A complaint as a content-quality signal is task-305, split out today.
+- The multi-provider research into the canonical event shape was optional in this entry and was not done. The adapter's docstring names the three things a second provider changes.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as built in substance: the inbound Resend adapter with event normalization and signature check, and bounce/complaint opt-out; gates 5 and 6 are done. The CRM relay lives in task-135/task-128, and the complaint-as-content-signal remainder was split into task-305.
+<!-- SECTION:FINAL_SUMMARY:END -->

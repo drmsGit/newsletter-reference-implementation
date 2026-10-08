@@ -7,6 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-10-08 22:25'
 labels:
   - backend
 dependencies: []
@@ -24,4 +25,6 @@ ordinal: 204300
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 256, section "Features", position 43 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-08 queue cleanup (backlog-sequencer run 3, verified by hand): the blocker named here is resolved. Phase 3B (the content-driven system-suggested audience, with recalculate) is marked done in the docs/playbook-strategy.md section 6 status table. The audience/segment override mechanism itself is still unbuilt.
 <!-- SECTION:NOTES:END -->

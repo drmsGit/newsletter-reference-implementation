@@ -1,9 +1,10 @@
 ---
 id: TASK-63
 title: The content-record form is half hand-written and half manifest-driven.
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-10-08 22:22'
 labels:
   - backend
   - frontend
@@ -26,4 +27,15 @@ ordinal: 201600
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 186, section "Features", position 16 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-08 queue cleanup (backlog-sequencer run 3, verified by hand, closed by the user's decision): superseded. The generalisation this entry deferred happened by another route.
+- ADR-177 (A Field Is Defined Once, Required Per Module) gives every field one descriptor, including its label, in storage/fields.json (task-219, which collapsed CONTENT_FIELD_GROUPS and the CSV importers' duplicate into it).
+- The React content form builds its fields from those descriptors via GET /content/fields (frontend/src/screens/ContentDetail.tsx:52, useContentFields), in the manifests' declared order (task-276).
+- The hand-written email block in content.html and content_detail.html, and PUSH_CONTENT_FIELDS in backend/app/frontend/router.py with its agreement test, survive only in the Jinja UI. The playbook decision log records that UI as frozen (docs/playbook-strategy.md:393). They go when the Jinja UI is retired, not as work of their own.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as superseded: ADR-177's field descriptors (storage/fields.json, task-219) drive the React content form through GET /content/fields (task-276). The hand-written duplication survives only in the frozen Jinja UI and goes with it.
+<!-- SECTION:FINAL_SUMMARY:END -->

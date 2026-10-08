@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-10-08 22:25'
 labels:
   - backend
 dependencies: []
@@ -23,4 +24,6 @@ ordinal: 202400
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 218, section "Features", position 24 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-08 queue cleanup (backlog-sequencer run 3, verified by hand): partly done. Realistic content exists as backend/scripts/seed_content_chatgpt.csv with its importer, backend/scripts/import_content_csv.py, and seed_content_prompt.md. The demo seed itself still writes placeholder bodies, at backend/scripts/seed_demo_data.py:146 ("An editorial piece about ... issue N"). Mode A in this dated entry is now called Assistive (ADR-140 addendum 2026-10-08).
 <!-- SECTION:NOTES:END -->

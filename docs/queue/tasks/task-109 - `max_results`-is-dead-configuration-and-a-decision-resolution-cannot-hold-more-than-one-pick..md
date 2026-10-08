@@ -6,11 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-10-08 22:25'
 labels:
   - backend
 dependencies: []
 type: feature
-ordinal: 206200
+ordinal: 202050
 ---
 
 ## Description
@@ -23,4 +24,6 @@ ordinal: 206200
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 368, section "Features", position 62 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-08 queue cleanup (backlog-sequencer run 3, verified by hand): still true. The cited duplication line has drifted: max_results is copied at backend/app/campaigns/duplication.py:541, and the DecisionSlotDetail screen still displays it (frontend/src/screens/DecisionSlotDetail.tsx:68). Moved ahead of the parked block today, with task-220 (which depends on it) right after.
 <!-- SECTION:NOTES:END -->

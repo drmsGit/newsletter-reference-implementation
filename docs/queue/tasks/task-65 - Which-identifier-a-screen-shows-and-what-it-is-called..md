@@ -4,11 +4,12 @@ title: 'Which identifier a screen shows, and what it is called.'
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-10-08 22:23'
 labels:
   - frontend
 dependencies: []
 type: feature
-ordinal: 201800
+ordinal: 206900
 ---
 
 ## Description
@@ -27,4 +28,10 @@ ordinal: 201800
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 198, section "Features", position 18 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-08 queue cleanup (backlog-sequencer run 3, verified by hand, kept by the user's decision as input to the React design session):
+- The code blocker is resolved: VariantDB.channel exists and is required (backend/app/campaigns/db_models.py:46), so ADR-160 point 4 is implemented.
+- The React client already labels a variant by its name plus its channel, never by the global id: frontend/src/screens/CampaignDetail.tsx:148-151, VariantEditor.tsx:106-108, and ContentDetail.tsx:439-441.
+- The Jinja examples in this entry (campaign_detail.html, the f"Content {id}" titles) no longer matter, because the Jinja UI is frozen (docs/playbook-strategy.md:393).
+- What remains undecided is one identifier convention across the React screens: when an id belongs in a title, and whether a per-campaign index beats an id. That is a question for the separate React visual-design session, which has no task of its own yet. The entry's reasoning (a variant is what gets planned and sent, ADR-160 point 7) still applies there.
 <!-- SECTION:NOTES:END -->

@@ -12,7 +12,7 @@ labels:
   - needs-adr
 dependencies: []
 type: decision
-ordinal: 305350
+ordinal: 300350
 ---
 
 ## Description
