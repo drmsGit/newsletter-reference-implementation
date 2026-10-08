@@ -19,6 +19,7 @@ import hashlib
 import hmac
 import logging
 import os
+import time
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -62,6 +63,14 @@ def _bounce_suppresses(data: dict) -> bool:
     return True
 
 
+#: How far a webhook's svix-timestamp may be from now, either way, and still be
+#: accepted (task-303): Svix's own guidance. A captured genuine event sent again
+#: later is refused here; deduplication by provider_event_id catches an exact
+#: replay of a stored event, but not one it never stored (quarantined) or no
+#: longer holds (pruned).
+WEBHOOK_TOLERANCE_SECONDS = 5 * 60
+
+
 def verify_signature(raw_body: bytes, headers: dict) -> bool:
     """Verify a Resend/Svix webhook signature. Fails CLOSED: with no secret
     configured there is nothing to verify against, so the event is rejected.
@@ -80,6 +89,15 @@ def verify_signature(raw_body: bytes, headers: dict) -> bool:
     svix_signature = lower.get("svix-signature")
     if not (svix_id and svix_timestamp and svix_signature):
         logger.warning("missing svix-* headers on webhook — rejecting")
+        return False
+    try:
+        age = abs(time.time() - int(svix_timestamp))
+    except ValueError:
+        logger.warning("webhook svix-timestamp is not a number — rejecting")
+        return False
+    if age > WEBHOOK_TOLERANCE_SECONDS:
+        logger.warning("webhook svix-timestamp is %ds from now, beyond %ds — rejecting as a possible replay",
+                       int(age), WEBHOOK_TOLERANCE_SECONDS)
         return False
 
     # Secret is "whsec_<base64>"; the HMAC key is the decoded base64 part.
