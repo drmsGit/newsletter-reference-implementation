@@ -14,7 +14,7 @@ from app.delivery.exclusion import (
 )
 from app.delivery.providers.factory import get_provider, providers_for_channel
 from app.recipients.consent import DEFAULT_CHANNEL, MARKETING, ConsentDenied
-from app.rendering.service import render_variant, render_variant_html
+from app.rendering.service import render_variant
 from app.snapshots.db_models import SnapshotDB
 
 logger = logging.getLogger(__name__)
@@ -743,6 +743,10 @@ def send_test_email(
     brand gap as well — the same shape B15 had, and for the same reason.
     """
     from app.rendering.renderers.base import RenderedArtifact
+    # Imported here, at call time, and not at the top of the file: the module
+    # attribute is read when the test send runs, so replacing the renderer
+    # (a test making it fail) reaches this call. Ruff's F811 once removed the
+    # local copy as redundant beside a top-level one; the top-level one went.
     from app.rendering.service import UnpublishedContentError, render_variant_html
 
     to = to.strip()

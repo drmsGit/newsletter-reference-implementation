@@ -111,7 +111,7 @@ def _purge(session):
 @pytest.fixture
 def scenario(db):
     """One recipient, one category, and contributions on two channels."""
-    brand = auth.ensure_default_brand(db)
+    auth.ensure_default_brand(db)  # the brand must exist; the test reads it by default
     category = create_category(db, name=f"{PREFIX}-{uuid.uuid4().hex[:8]}")
     recipient = RecipientDB(external_id=f"{PREFIX}-{uuid.uuid4().hex[:8]}", status="active")
     db.add(recipient); db.commit(); db.refresh(recipient)

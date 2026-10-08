@@ -15,7 +15,7 @@ from app.recipients.models import (
     ConsentSyncRequest,
     Recipient,
     RecipientCreate,
-    RecipientPreference,
+    RecipientSignal,
     RecipientPreferenceCreate,
 )
 from app.recipients.service import (
@@ -223,7 +223,7 @@ def get_recipient(
 
 @router.get(
     "/{recipient_id}/preferences",
-    response_model=list[RecipientPreference],
+    response_model=list[RecipientSignal],
 )
 def get_preferences(
     recipient_id: int,
@@ -237,7 +237,7 @@ def get_preferences(
 
 @router.post(
     "/preferences",
-    response_model=RecipientPreference,
+    response_model=RecipientSignal,
 )
 def create_preference(
     payload: RecipientPreferenceCreate,

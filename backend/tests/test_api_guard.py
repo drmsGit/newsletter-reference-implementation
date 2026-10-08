@@ -531,7 +531,6 @@ class TestFailuresAreCountedNotListed:
         caller who varies the key fan the table out row by row. It counts into
         the shared UNKNOWN_KEY bucket for this client and hour, which other
         tests in the same hour also add to, so this measures the delta."""
-        from app.auth import integrations as ints
 
         def bucket():
             return db.query(IntegrationAuthFailureDB).filter(
@@ -779,7 +778,6 @@ class TestAHeldSendIsQueuedNotRefused:
         a send that both happens and waits would be the worst of both."""
         from app.auth.db_models import IntegrationDB
         from app.auth.permissions import SENDS_EXECUTE, VIEW
-        from app.auth import integrations as ints
 
         before = [r.id for r in self._pending_rows(db)]
         try:

@@ -547,7 +547,7 @@ def _approval_required(request: Request, exc: ApprovalRequired):
 
     from app.approvals import service as approvals
     from app.approvals.actions.registry import get_action, get_action_module
-    from app.approvals.db_models import OPEN, PendingActionDB
+    from app.approvals.db_models import OPEN
     from app.audit.service import ACTOR_INTEGRATION
 
     meta = get_action(exc.action_key)

@@ -26,7 +26,7 @@ from app.campaigns import duplication
 from app.campaigns.db_models import CampaignDB, ModuleInstanceDB, VariantDB
 from app.campaigns.service import brand_of_variant, create_campaign
 from app.campaigns.service import (
-    create_campaign, create_module_for_variant, create_variant_for_campaign,
+    create_module_for_variant, create_variant_for_campaign,
 )
 from app.channels.registry import get_channel, list_channels, max_modules_for
 from app.modules.registry import get_manifest, list_manifests

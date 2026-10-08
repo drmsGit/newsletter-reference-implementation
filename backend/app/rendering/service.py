@@ -120,7 +120,6 @@ def render_variant_html(
     # This function stays EMAIL-shaped: it returns an HTML string, and ADR-162
     # point 3's role-tagged artifacts are not built. The channel is threaded
     # through so module lookup is correct, not because this can render a push.
-    from app.campaigns.db_models import VariantDB
 
     variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
     channel = variant.channel if variant is not None else "email"
@@ -264,7 +263,6 @@ def render_variant(
         if get_variant(db, variant_id, brand_id=brand_id) is None:
             raise ValueError(f"variant {variant_id} does not exist")
 
-    from app.campaigns.db_models import VariantDB
     from app.rendering.renderers.registry import get_renderer
 
     variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
@@ -524,7 +522,7 @@ def missing_required_fields(
     with the first, and the disagreement would be invisible until a send went
     out wrong.
     """
-    from app.campaigns.db_models import ModuleInstanceDB, VariantDB
+    from app.campaigns.db_models import ModuleInstanceDB
 
     variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
     if variant is None:
@@ -733,7 +731,6 @@ def module_states(
     - `missing_required`: required fields that would render empty, for the
       modules whose content does not depend on the recipient (ADR-174 point 3).
     """
-    from app.campaigns.db_models import VariantDB
     from app.campaigns.service import slot_candidate_count
     from app.content.service import get_content_record, publish_state
 

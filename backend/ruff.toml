@@ -1,0 +1,16 @@
+# Ruff in CI (ADR-190, task-105). Blocks on a small set of rules that catch
+# real defects; everything else is reported by a second, non-failing run
+# (`ruff check --select ... --exit-zero`, see .github/workflows/ci.yml).
+# Checks inform review: widening this list is a decision, not a cleanup.
+# Syntax errors are always reported and need no code here.
+extend-exclude = ["venv"]
+
+[lint]
+select = [
+    "F821",  # undefined name
+    "F811",  # a name defined twice, the second hiding the first
+    "F822",  # undefined name in __all__
+    "F823",  # local variable used before assignment
+    "F841",  # local variable assigned and never used
+    "F541",  # f-string without placeholders
+]

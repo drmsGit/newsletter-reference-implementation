@@ -157,9 +157,12 @@ class ConsentDriftItem(BaseModel):
     platform_source: str | None = None
 
 
-class RecipientPreference(BaseModel):
+class RecipientSignal(BaseModel):
     # A computed operational signal per category (ADR-132), not a stored row —
     # so no id/source/created_at. `score` is the decay-weighted signal.
+    # Named apart from `RecipientPreference` below (task-105): both were once
+    # called that, the second silently replaced this one, and the two
+    # /preferences routes that build this shape answered 500.
     recipient_id: int
     category_id: int
     score: float

@@ -28,7 +28,7 @@ from app.recipients.models import (
     ConsentSyncLog,
     Recipient,
     RecipientAddress,
-    RecipientPreference,
+    RecipientSignal,
 )
 
 # Re-exported for callers that imported it from here before consent moved into
@@ -592,7 +592,7 @@ def create_recipient_preference(
         source=source,
         base_weight=score,
     )
-    return RecipientPreference(
+    return RecipientSignal(
         recipient_id=recipient_id,
         category_id=category_id,
         score=get_operational_signal(db, recipient_id, category_id),
@@ -609,7 +609,7 @@ def list_preferences_for_recipient(
 
     signals = operational_signals_for_recipient(db, recipient_id)
     return [
-        RecipientPreference(recipient_id=recipient_id, category_id=category_id, score=score)
+        RecipientSignal(recipient_id=recipient_id, category_id=category_id, score=score)
         for category_id, score in sorted(signals.items(), key=lambda kv: kv[1], reverse=True)
     ]
 

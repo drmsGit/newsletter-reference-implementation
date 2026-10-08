@@ -158,7 +158,7 @@ class TestContentByTopic:
         assert body["total"] == 2
 
     def test_search_matches_the_description_too(self, topic):
-        body = _get("/content/", q=f"seaside")
+        body = _get("/content/", q="seaside")
         assert topic["described"] in [r["id"] for r in body["items"]]
 
     def test_a_row_says_whether_anything_was_ever_published(self, topic):

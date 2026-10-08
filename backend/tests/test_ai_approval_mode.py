@@ -75,9 +75,7 @@ def _restore_mode(db):
 
 
 def _api_client():
-    from fastapi.testclient import TestClient
 
-    from main import app
 
     return TestClient(app, raise_server_exceptions=False)
 
