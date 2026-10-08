@@ -4,6 +4,7 @@ title: A section-heading module.
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-10-08 18:26'
 labels:
   - backend
 dependencies: []
@@ -21,4 +22,6 @@ ordinal: 206100
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 366, section "Features", position 61 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-08, from the task-228 interview (ADR-086 addendum of that date): the floor skips a recipient when nothing but the envelope rendered, and there is no "decorative" marker on modules because no decorative module existed. A section heading is the first one: an email holding only the envelope module and a section heading must still count as "nothing to show", or it ships with nothing in it. So this task decides the manifest marker for structural modules (a key added to MANIFEST_KEYS in backend/app/modules/registry.py, read by what_rendered in backend/app/rendering/frame.py), together with the visible header and footer task filed the same day. On the user's question whether a module is a plain .html drop: no, a module needs its .json manifest beside the .html (an .html alone is skipped with a warning, registry.py _discover); with a minimal manifest (label, channel, cms false, no fields) it appears in the editor with no code change.
 <!-- SECTION:NOTES:END -->
