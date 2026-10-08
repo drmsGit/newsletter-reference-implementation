@@ -24,21 +24,21 @@ from tests.conftest import (
 
 class TestTheName:
     def test_two_checkouts_with_the_same_folder_name_get_different_databases(self):
-        a = checkout.test_database_name("newsletter", Path("/work/one/newsletter"))
-        b = checkout.test_database_name("newsletter", Path("/work/two/newsletter"))
+        a = checkout.test_database_name("app", Path("/work/one/newsletter"))
+        b = checkout.test_database_name("app", Path("/work/two/newsletter"))
         assert a != b
-        assert a == checkout.test_database_name("newsletter", Path("/work/one/newsletter")), "stable per checkout"
+        assert a == checkout.test_database_name("app", Path("/work/one/newsletter")), "stable per checkout"
 
     def test_it_reads_as_its_folder_and_stays_a_legal_identifier(self):
-        name = checkout.test_database_name("newsletter", Path("/w/Feature: Fix #12 (draft)"))
-        assert re.fullmatch(r"newsletter_test_feature_fix_12_draft_[0-9a-f]{6}", name), name
+        name = checkout.test_database_name("app", Path("/w/Feature: Fix #12 (draft)"))
+        assert re.fullmatch(r"app_test_feature_fix_12_draft_[0-9a-f]{6}", name), name
 
     def test_a_long_folder_is_shortened_and_the_hash_kept(self):
         root = Path("/w/" + "very-long-worktree-name-" * 6)
-        name = checkout.test_database_name("newsletter", root)
+        name = checkout.test_database_name("app", root)
         assert len(name) <= checkout.MAX_NAME
-        assert name.endswith("_" + checkout.test_database_name("newsletter", root)[-6:])
-        assert name != checkout.test_database_name("newsletter", Path("/x/" + "very-long-worktree-name-" * 6))
+        assert name.endswith("_" + checkout.test_database_name("app", root)[-6:])
+        assert name != checkout.test_database_name("app", Path("/x/" + "very-long-worktree-name-" * 6))
 
     def test_this_suite_runs_on_this_checkouts_database(self):
         explicit = checkout.os.environ.get("TEST_DATABASE_URL")

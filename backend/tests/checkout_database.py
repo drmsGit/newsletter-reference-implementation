@@ -25,7 +25,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 #: The dev database, which the suite must never touch.
 DEV_DEFAULT = (
-    "postgresql://newsletter_user:newsletter_password@localhost:5432/newsletter"
+    "postgresql://app_user:app_password@localhost:5432/app"
 )
 
 #: Postgres's identifier limit (NAMEDATALEN - 1).

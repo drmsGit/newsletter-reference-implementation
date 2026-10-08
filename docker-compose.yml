@@ -1,12 +1,13 @@
 services:
   postgres:
     image: postgres:16
-    container_name: newsletter_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: newsletter
-      POSTGRES_USER: newsletter_user
-      POSTGRES_PASSWORD: newsletter_password
+      # Name-free, so no product rename reaches it (task-288). No fixed container
+      # name: Compose names it per checkout, which keeps it unique on the machine.
+      POSTGRES_DB: app
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: app_password
     ports:
       - "5432:5432"
     volumes:

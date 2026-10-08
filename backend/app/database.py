@@ -8,7 +8,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 # database, so a local checkout runs with no configuration.
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql://newsletter_user:newsletter_password@localhost:5432/newsletter",
+    "postgresql://app_user:app_password@localhost:5432/app",
 )
 
 engine = create_engine(DATABASE_URL)

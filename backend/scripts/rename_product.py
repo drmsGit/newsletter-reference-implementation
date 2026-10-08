@@ -69,9 +69,6 @@ Not done by this script, deliberately:
   Moving the local folder: close every session, move it, rebuild backend/venv
   (its scripts hold the absolute path), copy Claude's project memory folder to
   the new path's key, reopen the Obsidian vault.
-- The dev database name, user, password and Docker container (`newsletter...`)
-  stay for now; the user wants them renamed at a later stage (docker-compose.yml,
-  .env.example and the user's own .env, and the database itself).
 - Signed-in browsers are signed out once: the session cookie is named after the slug.
 - Restart the preview servers, so the backend and Vite read product.json again."""
 
