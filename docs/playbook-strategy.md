@@ -674,6 +674,17 @@ Recorded in the 2026-10-08 addendum to [[ADR-140 — AI Capability Layer]].
 
 **Status:** done the same day (task-97).
 
+### 2026-10-08 — The dev database carries no name
+
+**Context:** the dev database, its user and its Docker container were still called `newsletter`, kept on 2026-10-05 as a listed exception to the product's one name, to be renamed later (task-288). Decided with the user one question at a time:
+
+1. **Name-free, not the product's slug:** database `app`, user `app_user` — where a name adds nothing, use none, so a second product rename never reaches it.
+2. **No fixed container name:** container names are unique across the whole machine, so Compose names it per checkout instead.
+
+Renamed in place after a full backup, data checked before and after; the user's `.env` needed no change. Recorded as a follow-up to `docs/business/decisions/naming-brand-tarrow.md`. The repository and its folder still carry the old name until the product name is legally cleared.
+
+**Status:** done the same day (task-288).
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*
