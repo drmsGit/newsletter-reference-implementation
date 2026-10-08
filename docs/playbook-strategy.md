@@ -650,6 +650,18 @@ Built as an explicit list of exact routes, so a new read route stays closed unti
 
 **Status:** built the same day (task-53).
 
+### 2026-10-08 — What an audit entry may say is checked where it is written
+
+**Context:** the audit log promised two things nothing enforced: that its action names are a known vocabulary, and that it holds internal ids, never a person's contact details. Nobody reads it back yet, so a typo or a leak would go unnoticed until the operator screen is built — and two entries were already copying a person's email address into the log (task-52). Decided with the user one question at a time:
+
+1. **One vocabulary, and an unknown action name is refused** when the entry is written, so a typo fails the first test that writes it.
+2. **An email address in an entry is refused**, so erasing a person never means rewriting the log. The two leaking entries now record who by id, or drop the label. **Authored copy is exempt** — a name, a title, a subject or preheader may mention an address ("Reply to hello@…") without failing the save it records; the exemption is a short named list, and everything else fails closed.
+3. **One person's history filtered by brand keeps their sign-ins and platform settings**, which belong to the person and to no brand.
+
+Recorded in the 2026-10-08 addendum to [[ADR-153 — Audit and Accountability]].
+
+**Status:** built the same day (task-52).
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*

@@ -7,7 +7,7 @@ topic:
   - governance
   - privacy
 created: 2026-08-02
-modified: 2026-10-01
+modified: 2026-10-08
 source:
   - "Security Chapter design interview, Part 2 (playbook-strategy.md Decision Log, 2026-08-02)"
 depends_on:
@@ -141,6 +141,86 @@ guard sets it.
 on an audited write rather than writing an actorless row. That is intended —
 loud beats silently wrong. The scripts-and-jobs gap of point 2 is named here,
 not closed.
+
+## Addendum 2026-10-08 — What an audit entry may say, enforced where it is written
+
+Prompted by task-52, from [[Interview Prep - Channels, Audit]] B-Q5, and
+decided by the user in chat on 2026-10-08, one question at a time. Points 1–6
+stand. B-Q5 found three things about `audit_events` that were stated but
+unproven, because nothing reads the table back. Two are now enforced where an
+entry is written. The third is settled before the first reader is built.
+
+**What was found on 2026-10-08.**
+
+- All 39 action names stored on dev were known constants. But nothing stopped
+  a typo, and the names lived in three places: `backend/app/audit/service.py`;
+  the approval lifecycle constants in `backend/app/approvals/service.py`; and
+  two plain strings in approval actions, `"send.fired"` and
+  `"ai.suggestion_applied"`.
+- Two kinds of entry put a person's email address into `detail`. That breaks
+  point 5, and [[ADR-154 — Erasure and Retention]] point 3.
+  `variant.unfenced` copied the fence holder's label. `content.ready_unmarked`
+  copied who had marked the record ready.
+- Sign-ins (`user.signed_in`) and settings changes (`settings.changed`) are
+  written with no brand, as point 2 intends.
+
+**1. One vocabulary, and an unknown action is refused at write time.** Every
+action name is a constant in `backend/app/audit/service.py`. The approval names
+and the two plain strings move there. `record` refuses a name outside the
+vocabulary. A typo is a programming error, so the suite fails on the first test
+that writes it. This fits the split `record` already keeps: it never raises for
+a database failure, and a bug in the calling code raises like any bug. A
+test-only scan was rejected, because a dynamically built name slips past it.
+
+**2. A `detail` holding an email-shaped value is refused at write time.** Point
+5 becomes a check, not only a policy.
+
+- The two leaking entries carry what identifies the actor internally instead,
+  or drop the label.
+- Phone numbers are not checked. They are too varied to detect reliably, and
+  nothing writes one.
+- A future legitimate company address, such as a sender address in a setting,
+  must be exempted deliberately, key by key. Without an exemption the check
+  fails closed.
+- **Authored copy is exempt.** This is the first key-by-key exemption, and it
+  is for copy, not for a company address. The user decided it on 2026-10-08,
+  while task-52 was being built. Variant and campaign names, content titles
+  and a variant's envelope (subject, preheader) are copied into audit details.
+  Copy can legitimately mention an address ("Reply to hello@brand.test"). As
+  first built, a save whose copy held an address would have failed with a 500.
+  The exemption is an explicit, named set of top-level detail keys in
+  `backend/app/audit/service.py`: `COPY_KEYS = {"name", "title", "envelope"}`.
+  Top level only: a `name` nested deeper is not copy by that fact alone, and is
+  still checked. Every other key still fails closed. Two other options were
+  offered and not chosen: logging only which envelope fields changed, which
+  keeps less evidence of what the subject said; and staying strict, so copy
+  could never contain an address.
+- Entries already stored keep what they say. The audit log is not rewritten.
+
+**3. A brand filter includes entries with no brand.** Filtering one actor's
+history by brand returns that brand's entries plus the brand-less ones:
+sign-ins and platform settings. They belong to the person, not to a brand. A
+plain `brand_id = X` would silently hide exactly the entries point 2 says have
+no other home. This is built as the one tested way to filter `events_by_actor`
+by brand, for the operator screen of point 1, which is not built yet. Showing
+brand-less entries only in an all-brands view was rejected.
+
+**Not decided here.** Retention, and the count of indexes on this write-mostly
+table. Both stay with the general data-lifecycle decision (task-136), as the
+interview said.
+
+**Consequences.**
+
+- **Positive.** A typo or a leaked address fails the first test that writes it.
+  The operator screen inherits a correct brand filter.
+- **Negative.** An audit write can now fail a request. On an untested path, a
+  bad name fails in use rather than writing a silent typo; that cost is
+  accepted. The email check is a pattern and catches email addresses only. A
+  company address needs an explicit exemption.
+  An address someone types into copy stays in the log; that cost is accepted.
+
+Built the same day, under task-52. Nothing here changes the Decision section
+above.
 
 ## Related ADRs
 
