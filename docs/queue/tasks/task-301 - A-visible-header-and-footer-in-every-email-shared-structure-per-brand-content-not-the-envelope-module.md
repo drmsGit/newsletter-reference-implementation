@@ -6,9 +6,8 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-08 18:26'
-updated_date: '2026-10-08 18:29'
+updated_date: '2026-10-08 19:11'
 labels:
-  - needs-adr
   - backend
 dependencies: []
 type: feature
