@@ -8,7 +8,7 @@ topic:
   - automation
   - governance
 created: 2026-09-13
-modified: 2026-10-02
+modified: 2026-10-08
 source:
   - "Machine authentication design interview (2026-09-13)"
 depends_on:
@@ -262,6 +262,108 @@ integration's keys. Someone who grants an integration a permission is trusting
 every existing key holder, including one issued earlier by a person who could not
 have been granted that permission themselves. Granting to an integration is
 therefore a decision about its key holders too.
+
+## Addendum 2026-10-08 — An integration reads what its permission writes
+
+Prompted by task-53. The user decided it in chat on 2026-10-08, one question at a
+time. **This does not touch the Decision.** Build-note 2 stands: `view` is still
+not implied for an integration.
+
+**The defect.** Every GET on the JSON plane resolves to `view`
+(`required_permission` in `backend/app/auth/policy.py`). Every role implies `view`
+(`IMPLIED` in `backend/app/auth/permissions.py`). An integration does not, by
+build-note 2. So an integration granted `recipients.manage` can write a recipient
+and gets a 403 reading it back. The only remedy was a platform-level `view` grant.
+That reopens the recipient-list exposure this record exists to close. A CRM
+connector that cannot read back what it wrote cannot reconcile.
+
+Question Q3 in [[Interview Prep - Auth, Permissions, Machine Principals]], resolved
+2026-09-19, already settled two things. The asymmetry stays. The fall-through to
+`view` is the defect. It did not settle the shape of the fix.
+[[ADR-168 — The Manager SPA Authenticates With Its Session Cookie]] put people on
+this plane too, so `view` carries two meanings there.
+
+**1. For an integration, a write permission also admits reads of its own area.**
+No new permission names. People are unchanged: every role still implies `view`.
+
+Separate read-only permissions per area (`recipients.read` and so on) were
+rejected. They would add about eight names to a permission screen that this
+record's `### Negative` already calls busy. They would serve a read-only
+integration that does not exist yet; reporting is task-58. They can be added later
+without undoing this.
+
+**2. The area's read covers only what the permission writes.** Data the platform
+derives about people, or sends to them, stays behind `view`. That means activity,
+audience memberships, signals, per-recipient executions, previews that list
+recipients, and reporting. This is data minimisation, in the sense of
+[[ADR-154 — Erasure and Retention]]: per-person behaviour is the richest personal
+data the platform holds (§2a, §4). A CRM connector needs to reconcile records. It
+does not need everyone's engagement history.
+
+**3. The shape is an explicit table of exact read routes, each admitted by one
+permission.** Not prefixes. A read route added later stays behind `view` until
+someone deliberately lists it, so nothing opens by accident. This is the same
+fail-closed stance as `UNMAPPED` in the write table. A brand-scoped permission is
+checked in the working brand for reads as for writes (point 8 above;
+[[ADR-172 — The Working Brand Is Resolved Once and Carried Into Every Query]]).
+
+The table is `MACHINE_READS` in `backend/app/auth/policy.py`. The guard in
+`backend/app/auth/dependencies.py` reads it. It is built under task-53, the same
+day. On 2026-10-08 it lists:
+
+- **`recipients.manage`:** `/recipients/`, `/recipients/{external_id}`
+- **`content.manage`:** `/content/`, `/content/{content_id}`,
+  `/content/{content_record_id}/versions`, `/content/categories`,
+  `/content/categories/{category_id}/children`,
+  `/content/categories/{category_id}/parents`, `/content/category-relations`,
+  `/content/fields`, `/content/{content_id}/assignments`,
+  `/content/{content_id}/categories`, `/content/{content_id}/duplicate-targets`
+- **`campaigns.manage`:** `/campaigns/`, `/campaigns/{campaign_id}/variants`,
+  `/campaigns/{campaign_id}/composition`,
+  `/campaigns/variants/{variant_id}/modules`,
+  `/campaigns/variants/{variant_id}/decision-slots`, `/campaigns/decision-slots`,
+  `/campaigns/{campaign_id}/duplicate-options`, `/decision/strategies`
+- **`audiences.manage`:** `/api/audience-groups/`,
+  `/api/audience-groups/{group_id}`, `/api/audience-groups/{group_id}/blocks`,
+  `/api/audience-groups/criteria-values`
+- **`audiences.pin`:** `/api/audience-groups/{group_id}/members`
+- **`sends.plan`:** `/delivery/send-instances`,
+  `/delivery/send-instances/{send_instance_id}`,
+  `/delivery/snapshots/{snapshot_id}/send-instances`,
+  `/snapshots/variants/{variant_id}`, `/snapshots/{snapshot_id}/html`
+- **`overrides.manage`:** `/overrides/`, `/overrides/{override_id}`
+
+Stays behind `view`:
+
+- a recipient's activity, audience groups and preferences;
+- consent drift and the sync log;
+- content usage, its campaigns and unsent campaigns;
+- campaign monitoring;
+- decision-slot resolutions, stats and candidates;
+- variant suggestions;
+- audience preview and criteria preview;
+- delivery executions, as-sent and trace;
+- all `/insight` reads, approvals, modules, rendering and provider quarantine.
+
+**`settings.manage` and `integrations.manage` are deliberately not listed.**
+Changing either is a person's act: every settings write in
+`backend/app/settings/router.py` requires a person, and the whole `/integrations`
+router refuses a machine (point 1 of the 2026-10-02 addendum). A machine holding
+either permission writes nothing, so by point 2 it reads nothing through the table.
+
+**Consequences.**
+
+- **Positive.** A CRM connector can reconcile what it wrote. No platform-wide
+  `view` grant is needed for it. A new read route is closed to integrations by
+  default.
+- **Negative.** The table must be kept up to date when read routes are added. A
+  forgotten entry shows up as a 403 for an integration. A read-only integration
+  still needs `view`, which is all-or-nothing, until read permissions exist. The
+  table, not the route, now says who may read, so an auditor must look in two
+  places.
+
+**Unchanged:** points 1 through 8, and build-note 2. Nothing here changes the
+Decision section above.
 
 ## Related ADRs
 
