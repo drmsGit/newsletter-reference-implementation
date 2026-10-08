@@ -3,10 +3,11 @@ id: TASK-236
 title: >-
   Nothing fails when an installed package is not in the lock, which is how
   httpx2 got in unnoticed
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-01 21:26'
-updated_date: '2026-10-08 19:11'
+updated_date: '2026-10-08 19:39'
 labels:
   - backend
 dependencies:
