@@ -3,11 +3,11 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from app.pagination import Page, PageParams, page_of_list, page_params
+from app.pagination import Page, PageParams, page_params
 from app.database import get_db
 from app.providers.adapters.resend import parse_webhook, verify_signature
 from app.providers.models import ProviderEventCreate, ProviderEventIngestResult, ProviderEventQuarantine
-from app.providers.service import ingest_provider_event, list_quarantined_events, process_provider_webhook_event
+from app.providers.service import ingest_provider_event, process_provider_webhook_event
 
 router = APIRouter(
     prefix="/provider",

@@ -117,11 +117,6 @@ def _permitted(request: Request, db: Session, user: UserDB, permission: str) -> 
     return has_permission(db, user, permission, brand_id=brand["id"])
 
 
-def current_user(request: Request, db: Session = Depends(get_db)) -> UserDB | None:
-    """Resolve the session cookie, or None. Never raises — for optional use."""
-    return user_for_token(db, request.cookies.get(SESSION_COOKIE))
-
-
 def require_permission(permission: str):
     """Dependency factory: this route needs this named permission.
 

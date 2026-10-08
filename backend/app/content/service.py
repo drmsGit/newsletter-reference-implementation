@@ -437,25 +437,6 @@ def page_content_records(
     return page_of_query(query, params, *order, convert_all=convert_all)
 
 
-def list_content_records(db: Session, *, brand_id: int) -> list[ContentRecord]:
-    """Content records for one brand (ADR-150 point 2, ADR-172 point 4).
-
-    **The brand was optional until 2026-09-19 and defaulted to every brand.**
-    A forgotten argument did not fail; it returned the whole platform. The
-    JSON routers forgot it at every call site, which is how `GET /content/`
-    came to serve every brand's records to anybody who could authenticate.
-
-    Callers that genuinely span brands — platform counts, migrations, seeds —
-    want `list_all_content_records`, which says so in its name.
-    """
-    return [
-        to_content_record(record)
-        for record in db.query(ContentRecordDB)
-        .filter(ContentRecordDB.brand_id == brand_id)
-        .all()
-    ]
-
-
 def list_all_content_records(db: Session) -> list[ContentRecord]:
     """Every content record, across every brand.
 

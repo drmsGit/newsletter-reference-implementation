@@ -101,7 +101,7 @@ Nothing structural stops these: the column is on the table, the filter is in the
 
 | Path | Leaks |
 |---|---|
-| `list_content_records` / `list_campaigns` / `list_groups` without `brand_id` | every brand's rows — **the default is `None`, which means "all"** |
+| `page_content_records` / `page_campaigns` / `list_groups` without `brand_id` | nothing since ADR-172 point 4: `brand_id` is keyword-only and required, so forgetting it is a `TypeError`. Spanning every brand needs a `list_all_*` function that says so in its name |
 | the five detail-by-id routes | another brand's row by URL (unscoped until 2026-09-15) |
 | the module content picker (`frontend/router.py:1082`) | binding brand-A content to a brand-B campaign — the defect ADR-013's addendum records |
 | decision candidate sets | brand A's content resolved into brand B's send |

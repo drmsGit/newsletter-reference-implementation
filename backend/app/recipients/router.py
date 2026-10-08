@@ -22,8 +22,6 @@ from app.recipients.service import (
     create_recipient,
     detect_consent_drift,
     get_recipient_by_external_id,
-    list_consent_sync_logs,
-    list_recipients,
     create_recipient_preference,
     list_preferences_for_recipient,
     sync_consent_from_crm,

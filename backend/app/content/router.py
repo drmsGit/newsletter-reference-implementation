@@ -43,7 +43,6 @@ from app.content.models import (
 from app.content.service import (
     catalogue_fields,
     merge_content_fields,
-    list_content_records,
     get_content_record,
     publish_state,
     to_content_record,

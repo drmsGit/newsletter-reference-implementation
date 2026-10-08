@@ -30,7 +30,7 @@ for personalization signals and audience targeting) and **content versioning**
 ## Public surface
 
 **Service functions** (`content/service.py`, selected):
-- `create_content` / `update_content_record` / `get_content_record` / `list_content_records`
+- `create_content` / `update_content_record` / `get_content_record` / `page_content_records`
 - `create_category` / `list_categories` / `delete_category`
 - `assign_category_to_content` / `list_categories_for_content` / `delete_category_assignment`
 - `create_category_relation` (cycle-guarded via `_would_create_cycle`) / `list_category_relations`

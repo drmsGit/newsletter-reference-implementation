@@ -8,11 +8,9 @@ from app.recipients.consent import (
     address_value,
     addresses_for_many,
     consent_grid_many,
-    latest_consent_event,
     latest_consent_status,
     latest_consent_statuses,
     record_consent,
-    resolve_email,
     resolve_emails,
 )
 from app.recipients.db_models import (
@@ -407,28 +405,6 @@ def page_consent_sync_logs(db: Session, params, recipient_id: int | None = None)
                              ok=r.ok, changes_applied=r.changes_applied, source=r.source,
                              note=r.note, synced_at=r.synced_at))
 
-def list_consent_sync_logs(
-    db: Session,
-    recipient_id: int | None = None,
-) -> list[ConsentSyncLog]:
-    q = db.query(ConsentSyncLogDB)
-    if recipient_id is not None:
-        q = q.filter(ConsentSyncLogDB.recipient_id == recipient_id)
-    rows = q.order_by(ConsentSyncLogDB.synced_at.desc(), ConsentSyncLogDB.id.desc()).all()
-    return [
-        ConsentSyncLog(
-            id=r.id,
-            recipient_id=r.recipient_id,
-            external_id=r.external_id,
-            ok=r.ok,
-            changes_applied=r.changes_applied,
-            source=r.source,
-            note=r.note,
-            synced_at=r.synced_at,
-        )
-        for r in rows
-    ]
-
 
 def detect_consent_drift(db: Session) -> list[ConsentDriftItem]:
     """Surface cells where the platform's consent disagrees with the CRM's last
@@ -526,24 +502,6 @@ def page_recipients(db: Session, params, *, brand_id: int, q: str | None = None)
         query = query.filter(condition)
     return page_of_query(query, params, RecipientDB.id.desc(),
                          convert_all=lambda rows: to_recipients(db, rows, brand_id))
-
-def list_recipients(db: Session, *, brand_id: int) -> list[Recipient]:
-    """Every recipient, with consent projected against one brand.
-
-    **The brand is required because consent is per-brand** (ADR-163's
-    2026-09-15 addendum), so a recipient's consent status is not a fact until a
-    brand is named. It is *context*, not authorisation: `recipients.manage`
-    stays platform-level because recipients themselves carry no brand — the
-    split ADR-172 point 1 makes available.
-
-    This call passed two arguments to a three-argument function from the day
-    `to_recipients` gained its brand until 2026-09-20, so `GET /recipients/`
-    raised `TypeError` for every one of those days. Nothing in the repo called
-    it, which is how a route that could not return went unnoticed; it was found
-    by an unrelated test reaching for a platform-level route to assert against.
-    """
-    records = db.query(RecipientDB).order_by(RecipientDB.id.asc()).all()
-    return to_recipients(db, records, brand_id)
 
 
 def get_recipient_by_external_id(

@@ -14,7 +14,6 @@ from app.delivery.exclusion import (
 )
 from app.delivery.providers.factory import get_provider, providers_for_channel
 from app.recipients.consent import DEFAULT_CHANNEL, MARKETING, ConsentDenied
-from app.rendering.service import render_variant
 from app.snapshots.db_models import SnapshotDB
 
 logger = logging.getLogger(__name__)
@@ -119,37 +118,6 @@ def page_delivery_executions_for_send_instance(
 
     return page_of_query(query, params, DeliveryExecutionDB.created_at.desc(),
                          DeliveryExecutionDB.id.desc(), convert_all=convert_all)
-
-def list_delivery_executions_for_send_instance(
-    db: Session,
-    send_instance_id: int,
-    *,
-    brand_id: int,
-) -> list[DeliveryExecution]:
-    records = (
-        db.query(DeliveryExecutionDB)
-        .join(SendInstanceDB, SendInstanceDB.id == DeliveryExecutionDB.send_instance_id)
-        .filter(
-            DeliveryExecutionDB.send_instance_id == send_instance_id,
-            SendInstanceDB.brand_id == brand_id,
-        )
-        .order_by(DeliveryExecutionDB.created_at.desc())
-        .all()
-    )
-    from app.recipients.db_models import RecipientDB
-
-    external = dict(
-        db.query(RecipientDB.id, RecipientDB.external_id)
-        .filter(RecipientDB.id.in_({r.recipient_id for r in records})).all()
-    ) if records else {}
-    return [
-        to_delivery_execution(record).model_copy(update={
-            "recipient_external_id": external.get(record.recipient_id),
-            "exclusion_reason": record.exclusion_reason,
-            "sent_at": record.sent_at,
-        })
-        for record in records
-    ]
 
 
 def get_send_instance(

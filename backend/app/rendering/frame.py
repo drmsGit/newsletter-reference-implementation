@@ -74,11 +74,6 @@ def artifact_hash(artifact: RenderedArtifact) -> str:
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
 
 
-def _public(content: dict | None) -> dict:
-    """Drop the private keys a resolved content dict carries (`_version_id`)."""
-    return {k: v for k, v in (content or {}).items() if not k.startswith("_")}
-
-
 def build_frame(db: Session, variant_id: int) -> dict:
     """Freeze a variant's composition, with its values, as of now (send mode).
 

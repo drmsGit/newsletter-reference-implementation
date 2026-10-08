@@ -34,7 +34,7 @@ by them).
 ## Public surface
 **Service / signal functions:**
 - `apply_event_to_signals(db, event_id)` — turn a click/open into per-category contributions (called by [[providers]] on webhook)
-- `create_engagement_event(...)` / `list_events_for_delivery_execution(...)`
+- `create_engagement_event(...)` / `page_events_for_delivery_execution(...)`
 - `record_contribution(...)` — append one contribution (used for manual/declared prefs too)
 - `get_operational_signal(db, recipient, category)` — the current decayed signal for one pair
 - `operational_signals_for_recipient(...)` / `operational_signals_for_category(...)` — the bulk reads [[decision]] and [[audience]] use

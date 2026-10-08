@@ -42,7 +42,7 @@ stores the results.
 - `reconcile_executions_to_audience(db, send_instance)` — for **every** send: re-resolve the group just before firing and add/drop executions. No-op when the send has no audience group, which is why the send-time exclusion stack is still the only gate for those.
 - `process_due_scheduled_sends(db)` — fire every scheduled send whose time has arrived (the seam a cron/worker/n8n drives).
 - `create_send_instance(...)` / `create_delivery_execution(...)` — low-level record creation (used by the JSON API and legacy paths).
-- `list_send_instances_for_snapshot(...)` / `list_delivery_executions_for_send_instance(...)` — read history.
+- `list_send_instances_for_snapshot(...)` / `page_delivery_executions_for_send_instance(...)` — read history.
 - `get_provider(name, from_address)` (`providers/factory.py`) — resolve a provider name to an adapter instance.
 
 **Routes** (`delivery/router.py`, prefix `/delivery`, tag `delivery`):

@@ -524,11 +524,6 @@ def address_value(address: AddressabilityDB | None, key: str = "email") -> str |
     return value if isinstance(value, str) and value else None
 
 
-def resolve_email(db: Session, recipient_id: int) -> str | None:
-    """The send address for the email channel, via the point 11 rules."""
-    return address_value(resolve_address(db, recipient_id, channel="email"))
-
-
 def resolve_addresses(
     db: Session,
     recipient_ids: list[int],

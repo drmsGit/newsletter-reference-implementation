@@ -32,11 +32,11 @@ audit of what a slot resolved to) — though the *resolving* is done by [[decisi
 ## Public surface
 
 **Service functions** (`campaigns/service.py`, selected):
-- `create_campaign` (creates an initial variant) / `list_campaigns`
+- `create_campaign` (creates an initial variant) / `page_campaigns`
 - `create_variant_for_campaign` / `update_variant` (subject/preheader live here)
 - `create_module_for_variant` / `update_module` / `move_module` / `delete_module`
 - `create_decision_slot_for_variant` / `update_decision_slot` (validates config via `_normalize_for_strategy` → [[decision]]'s `normalize_slot_config`)
-- `create_decision_resolution` / `list_resolutions_for_decision_slot` — the resolution audit rows
+- `create_decision_resolution` / `page_resolutions_for_decision_slot` — the resolution audit rows
 
 **Routes** (`/campaigns`, tag `campaigns`): 12 routes — campaigns; variants; module instances (+ move/delete); decision slots; decision resolutions.
 

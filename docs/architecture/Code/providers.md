@@ -32,7 +32,7 @@ quarantines the un-correlatable, and hands content-tied events to [[insight]].
 **Service functions** (`providers/service.py`):
 - `process_provider_webhook_event(db, normalized)` — **the end-to-end entry point**: correlate → record (dedup/quarantine) → apply signals for a content-tied event
 - `ingest_provider_event(...)` — correlate a normalized event to a `DeliveryExecutionDB` by `provider_message_id`; dedupe; quarantine if no match
-- `list_quarantined_events(db)` — read the dead-letter table
+- `page_quarantined_events(db, params, ...)` — read the dead-letter table
 
 **Adapter** (`providers/adapters/resend.py`): `verify_signature`, `parse_webhook` → `NormalizedEvent`.
 

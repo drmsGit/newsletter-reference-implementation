@@ -3,7 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import working_brand
-from app.pagination import Page, PageParams, page_of_list, page_params
+from app.pagination import Page, PageParams, page_params
 from app.database import get_db
 from app.delivery.models import (
     TestSendRequest,
@@ -23,7 +23,6 @@ from app.delivery.service import (
     send_test_email,
     create_delivery_execution,
     create_send_instance,
-    list_delivery_executions_for_send_instance,
     list_send_instances,
     list_send_instances_for_snapshot,
     send_instance_detail,

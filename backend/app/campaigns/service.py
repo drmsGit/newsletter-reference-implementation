@@ -165,23 +165,6 @@ def to_variant(record: VariantDB, db: Session) -> Variant:
     )
 
 
-def list_campaigns(db: Session, *, brand_id: int) -> list[Campaign]:
-    """Campaigns, scoped to one brand (ADR-150 point 2).
-
-    **`brand_id=None` means every brand, and is not the caller's default.**
-    It exists for the places that genuinely span brands — a platform-wide
-    count, a migration, a test. Any surface a user looks at must pass the
-    working brand, because ADR-150 point 2 makes the switcher a hard boundary,
-    not a preference.
-    """
-    return [
-        to_campaign(record)
-        for record in db.query(CampaignDB)
-        .filter(CampaignDB.brand_id == brand_id)
-        .all()
-    ]
-
-
 def page_campaigns(db: Session, params, *, brand_id: int, q: str | None = None):
     """One ADR-185 page of the brand's campaigns, newest first, narrowed by name.
 
@@ -1148,26 +1131,6 @@ def page_decision_slots_with_stats(db: Session, params, *, brand_id: int):
     # Grouped and aggregated in one query already; paging the assembled rows
     # keeps that one query instead of a second count over a GROUP BY.
     return page_of_list(list_decision_slots_with_stats(db, brand_id=brand_id), params)
-
-def list_resolutions_for_decision_slot(
-    db: Session,
-    decision_slot_id: int,
-    *,
-    brand_id: int,
-) -> list[DecisionResolution]:
-    records = (
-        db.query(DecisionResolutionDB)
-        .join(DecisionSlotDB, DecisionSlotDB.id == DecisionResolutionDB.decision_slot_id)
-        .join(VariantDB, VariantDB.id == DecisionSlotDB.variant_id)
-        .join(CampaignDB, CampaignDB.id == VariantDB.campaign_id)
-        .filter(
-            DecisionResolutionDB.decision_slot_id == decision_slot_id,
-            CampaignDB.brand_id == brand_id,
-        )
-        .all()
-    )
-
-    return [to_decision_resolution(record) for record in records]
 
 
 

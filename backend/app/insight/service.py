@@ -75,19 +75,6 @@ def page_events_for_delivery_execution(db: Session, delivery_execution_id: int, 
     return page_of_query(query, params, EngagementEventDB.occurred_at.desc(),
                          EngagementEventDB.id.desc(), convert=to_engagement_event)
 
-def list_events_for_delivery_execution(
-    db: Session,
-    delivery_execution_id: int,
-) -> list[EngagementEvent]:
-    records = (
-        db.query(EngagementEventDB)
-        .filter(EngagementEventDB.delivery_execution_id == delivery_execution_id)
-        .order_by(EngagementEventDB.occurred_at.desc())
-        .all()
-    )
-
-    return [to_engagement_event(record) for record in records]
-
 
 def apply_event_to_signals(
     db: Session,

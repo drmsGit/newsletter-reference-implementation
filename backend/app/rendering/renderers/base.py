@@ -72,13 +72,6 @@ class RenderedArtifact:
         return cls(role=ROLE_HTML, media_type="text/html", body=html,
                    envelope={"subject": subject} if subject else {})
 
-    def size_bytes(self) -> int:
-        if self.body is not None:
-            return len(self.body.encode("utf-8"))
-        import json
-
-        return len(json.dumps(self.fields or {}, ensure_ascii=False).encode("utf-8"))
-
 
 class ChannelRenderer(ABC):
     """Drop a file in this package and the channel has a renderer.

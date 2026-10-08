@@ -26,12 +26,13 @@ from app.auth.db_models import BrandDB, RoleAssignmentDB, RoleDB, SessionDB, Use
 from app.auth.permissions import MANAGER
 from app.campaigns.db_models import CampaignDB, VariantDB
 from app.delivery.db_models import SendInstanceDB
-from app.campaigns.service import create_campaign, list_campaigns
+from app.campaigns.service import create_campaign, page_campaigns
 from app.content.db_models import ContentRecordDB
 from app.content.service import (
-    create_content, list_all_content_records, list_content_records,
+    create_content, list_all_content_records, page_content_records,
 )
 from app.database import SessionLocal
+from app.pagination import MAX_LIMIT, PageParams
 
 
 # `db`, `default_brand` and `temp_brand` live in `conftest.py` since
@@ -71,6 +72,20 @@ def user_on(db):
         ).delete(synchronize_session=False)
         db.query(UserDB).filter(UserDB.id == user_id).delete()
     db.commit()
+
+
+#: Every row these tests create is titled or named `brandtest-…`, so one page
+#: narrowed by that prefix holds all of them. The paged functions are what the
+#: routes call (ADR-185); the unpaged `list_*` ones were removed 2026-10-08.
+_ALL = PageParams(limit=MAX_LIMIT, offset=0)
+
+
+def _content_ids(db, brand_id: int) -> list[int]:
+    return [r.id for r in page_content_records(db, _ALL, brand_id=brand_id, q="brandtest-").items]
+
+
+def _campaign_ids(db, brand_id: int) -> list[int]:
+    return [c.id for c in page_campaigns(db, _ALL, brand_id=brand_id, q="brandtest-").items]
 
 
 @pytest.fixture
@@ -208,8 +223,8 @@ class TestListsAreScopedToTheWorkingBrand:
         other = temp_brand()
         record_id = temp_content(default_brand)
 
-        here = [r.id for r in list_content_records(db, brand_id=default_brand.id)]
-        there = [r.id for r in list_content_records(db, brand_id=other.id)]
+        here = _content_ids(db, default_brand.id)
+        there = _content_ids(db, other.id)
 
         assert record_id in here
         assert record_id not in there, (
@@ -222,8 +237,8 @@ class TestListsAreScopedToTheWorkingBrand:
         campaign = create_campaign(db, channel="email", name=f"brandtest-{uuid.uuid4().hex[:8]}",
                                    brand_id=default_brand.id)
         try:
-            assert campaign.id in [c.id for c in list_campaigns(db, brand_id=default_brand.id)]
-            assert campaign.id not in [c.id for c in list_campaigns(db, brand_id=other.id)]
+            assert campaign.id in _campaign_ids(db, default_brand.id)
+            assert campaign.id not in _campaign_ids(db, other.id)
         finally:
             # create_campaign also creates an initial variant, so the child
             # goes first or the foreign key refuses the delete.
@@ -251,7 +266,7 @@ class TestListsAreScopedToTheWorkingBrand:
         """
         temp_content(default_brand)
         with pytest.raises(TypeError):
-            list_content_records(db)
+            page_content_records(db, _ALL)
 
     def test_spanning_every_brand_is_possible_and_has_to_say_so(
         self, db, default_brand, temp_brand, temp_content
@@ -275,7 +290,7 @@ class TestListsAreScopedToTheWorkingBrand:
         # brand, because every fallback here returns the default one and a
         # test written against it could not tell a working filter from a
         # deleted one.
-        theirs_only = [r.id for r in list_content_records(db, brand_id=other.id)]
+        theirs_only = _content_ids(db, other.id)
         assert theirs.id in theirs_only and mine not in theirs_only
 
 

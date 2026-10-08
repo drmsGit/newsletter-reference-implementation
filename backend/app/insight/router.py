@@ -3,7 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import working_brand
-from app.pagination import Page, PageParams, page_of_list, page_params
+from app.pagination import Page, PageParams, page_params
 from app.database import get_db
 from app.insight.graph import category_graph
 from app.insight.models import (
@@ -18,7 +18,6 @@ from app.insight.models import (
 )
 from app.insight.service import (
     create_engagement_event,
-    list_events_for_delivery_execution,
     apply_event_to_signals,
 )
 

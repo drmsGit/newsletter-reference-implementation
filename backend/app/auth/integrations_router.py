@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from app.audit import service as audit
 from app.auth import integrations as ints
 from app.auth.db_models import (
-    IntegrationCredentialDB, IntegrationDB, IntegrationGrantDB,
+    IntegrationDB, IntegrationGrantDB,
 )
 from app.auth.dependencies import (
     auth_is_enforced, request_principal, require_person_with,

@@ -144,10 +144,9 @@ from app.audience.router import router as audience_router
 # Imported for metadata registration so create_all() knows the table —
 # the audit log has no router of its own in this slice.
 from app.audit.db_models import AuditEventDB  # noqa: F401
-# Same reason, and the same absence of a router in this slice: the approvals
-# spine ships wired to nothing, so `create_all` needs the import to know the
-# table exists (ADR-142 §4).
-from app.approvals.db_models import PendingActionDB  # noqa: F401
+# The approval inbox's table (ADR-142 §4). Its router is included below;
+# `_approval_required` reads this model directly to find an open request.
+from app.approvals.db_models import PendingActionDB
 from app.approvals.service import pending_count as pending_approval_count
 from app.settings.db_models import AppConfigDB
 

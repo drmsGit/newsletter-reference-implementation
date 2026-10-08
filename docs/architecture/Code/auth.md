@@ -44,7 +44,6 @@ point 1 refuses a parallel authorization system, and `permissions_for`
 | `enforce_csrf` | `:147` | `main.py:430`, `:445` | Rejects a state-changing form with a missing/wrong token |
 | `enforce_api_policy` | `:289` | `main.py:470`, 12 JSON routers | The machine plane. Bearer credential only, **no cookies** |
 | `require_permission(perm)` | `:115` | per-route | Explicit guard for routes outside the table's reach |
-| `current_user` | `:110` | optional | Resolves the cookie or None; never raises |
 
 **Permission resolution** — the two functions both planes share: `Principal = UserDB | IntegrationDB` (`service.py:816`), `permissions_for(db, principal, brand_id=None)` (`:819`), `has_permission(...)` (`:869`).
 

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import request_principal, working_brand
 from app.auth.service import actor_label
-from app.pagination import Page, PageParams, page_of_list, page_params
+from app.pagination import Page, PageParams, page_params
 from app.database import get_db
 from app.overrides.models import (
     ContentOverride, ContentOverrideCreate, ModuleOverrideState, OutcomeDeltaUpdate, OverrideFieldsSet,

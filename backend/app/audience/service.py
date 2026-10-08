@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB, AudienceRuleBlockDB
 from app.recipients.db_models import RecipientDB
-from app.recipients.consent import DEFAULT_CHANNEL, MARKETING, is_consenting_filter, resolve_emails
+from app.recipients.consent import MARKETING, is_consenting_filter
 from app.insight.signals import operational_signals_for_category
 
 logger = logging.getLogger(__name__)

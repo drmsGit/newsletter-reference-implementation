@@ -124,14 +124,6 @@ def page_quarantined_events(db: Session, params):
                          ProviderEventQuarantineDB.id.desc(),
                          convert=to_provider_event_quarantine)
 
-def list_quarantined_events(db: Session) -> list[ProviderEventQuarantine]:
-    records = (
-        db.query(ProviderEventQuarantineDB)
-        .order_by(ProviderEventQuarantineDB.created_at.desc())
-        .all()
-    )
-    return [to_provider_event_quarantine(record) for record in records]
-
 def process_provider_webhook_event(db: Session, normalized) -> ProviderEventIngestResult:
     """End-to-end handling of one normalized webhook event: correlate → record
     (dedup/quarantine via ingest_provider_event) → and, for a content-tied

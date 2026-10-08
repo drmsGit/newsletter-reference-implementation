@@ -31,9 +31,9 @@ affinity. It deliberately does not try to own contact management.
 ## Public surface
 
 **Service functions** (`recipients/service.py`):
-- `create_recipient` / `list_recipients` / `get_recipient_by_external_id` / `validate_recipient_attributes`
+- `create_recipient` / `page_recipients` / `get_recipient_by_external_id` / `validate_recipient_attributes`
 - `sync_consent_from_crm` — apply a CRM-asserted consent value, logging the before/after
-- `detect_consent_drift` / `list_consent_sync_logs` — surface divergence between CRM and platform
+- `detect_consent_drift` / `page_consent_sync_logs` — surface divergence between CRM and platform
 - `suppress_recipient(db, recipient_id, reason)` — opt a recipient out from a delivery-feedback signal (hard bounce / spam complaint). Idempotent; deliberately does **not** write the CRM sync log (see invariants). Called by [[providers]]'s webhook handler.
 - `create_recipient_preference` / `list_preferences_for_recipient` — declared (manual) preferences → seed `manual` signal contributions
 

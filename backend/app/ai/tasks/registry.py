@@ -17,7 +17,6 @@ and excluding them by name would break the moment somebody adds a helper.
 """
 
 import importlib
-import inspect
 import logging
 import pkgutil
 import sys

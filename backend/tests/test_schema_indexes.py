@@ -96,7 +96,7 @@ MIGRATION_0019 = (
 #: ADR-162 point 3. `html_*` described one of the two storage shapes and lied
 #: about the other: a push payload's byte count in a column called `html_size`
 #: is a name the next reader has to decode. Both branches write
-#: `artifact.size_bytes()`, so the value always meant "the serialised
+#: `artifact.size_bytes()` (removed with the column), so the value always meant "the serialised
 #: artifact", and only the name was channel-specific.
 ARTIFACT_COLUMNS = {
     "html_storage_type": "artifact_storage_type",

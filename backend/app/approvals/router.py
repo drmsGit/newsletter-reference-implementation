@@ -16,7 +16,7 @@ depends on the row. The Jinja plane asks the same function (ADR-172 point 7).
 """
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.approvals import service as approvals
@@ -30,7 +30,7 @@ from app.approvals.models import (
 from app.audit.service import ACTOR_USER, events_for_subject
 from app.auth.dependencies import require_person, working_brand
 from app.auth.service import SESSION_COOKIE, user_for_token
-from app.pagination import Page, PageParams, page_of_list, page_params
+from app.pagination import Page, PageParams, page_params
 from app.database import get_db
 
 logger = logging.getLogger(__name__)
