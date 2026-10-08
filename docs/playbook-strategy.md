@@ -589,6 +589,19 @@ Recorded in the 2026-10-06 addendum to [[ADR-188 — Audience Rules Are Flat, an
 
 **Status:** decided, not built. Build task task-300, before task-298.
 
+### 2026-10-08 — A person for whom nothing meaningful rendered is not sent to
+
+**Context:** ADR-086 said an email with no meaningful content must not be sent, and never said what "meaningful" is; nothing in the send path checked it, and a push whose only slot found nothing went out blank (task-228). Decided with the user 2026-09-28 and, one question at a time, 2026-10-08.
+
+1. **Per recipient, after rendering.** A send never aborts because one person resolved to nothing.
+2. **The floor, always:** skipped when nothing but the envelope rendered (email: only the header's subject and preheader; push: an empty notification). No "decorative" marker until a footer or divider module exists.
+3. **The option, per send, off by default:** "Don't send if no slot resolved" — for sends where the personalised blocks are the point. Never applies to a variant without slots. Set at plan time: the JSON route and the existing plan form; React planning takes it over when built.
+4. **Recorded as exclusions under the stage "render"**, with two reasons — "nothing to show" and "no personalised block found anything" — beside the other exclusion reasons.
+
+Recorded in the 2026-10-08 addendum to [[ADR-086 — Decision Slots Fail Gracefully]].
+
+**Status:** built the same day (task-228).
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*

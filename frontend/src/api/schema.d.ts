@@ -5556,6 +5556,11 @@ export interface components {
              * @default 0
              */
             excluded_count: number;
+            /**
+             * Skip Without Resolution
+             * @default false
+             */
+            skip_without_resolution: boolean;
         };
         /** SendInstanceCreate */
         SendInstanceCreate: {
@@ -5626,6 +5631,11 @@ export interface components {
              * @default 0
              */
             excluded_count: number;
+            /**
+             * Skip Without Resolution
+             * @default false
+             */
+            skip_without_resolution: boolean;
             /** Execution Count */
             execution_count: number;
             /** Exclusions By Stage */
@@ -5682,6 +5692,11 @@ export interface components {
              * @default 0
              */
             excluded_count: number;
+            /**
+             * Skip Without Resolution
+             * @default false
+             */
+            skip_without_resolution: boolean;
             /** Campaign Id */
             campaign_id?: number | null;
             /** Campaign Name */
@@ -5723,6 +5738,11 @@ export interface components {
             from_address?: string | null;
             /** Scheduled At */
             scheduled_at?: string | null;
+            /**
+             * Skip Without Resolution
+             * @default false
+             */
+            skip_without_resolution: boolean;
         };
         /** SessionBrand */
         SessionBrand: {

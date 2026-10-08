@@ -646,6 +646,15 @@
                                         Re-resolved just before sending, so consent and
                                         exclusions are current at the moment it goes out.
                                     </p>
+                                    {# task-228 (ADR-086 addendum 2026-10-08): off by default,
+                                       because a personalised block is usually a bonus. #}
+                                    <div class="form-check mt-1">
+                                        <input class="form-check-input" type="checkbox" name="skip_without_resolution"
+                                               id="skip-{{ snapshot.id }}" value="on">
+                                        <label class="form-check-label small" for="skip-{{ snapshot.id }}">
+                                            Don't send to someone if no personalised block found anything for them
+                                        </label>
+                                    </div>
                                 </div>
                                 <div class="col-md-3">
                                     <label class="form-label small mb-1">Send timing</label>

@@ -49,6 +49,8 @@ class SendInstance(BaseModel):
     sent_count: int = 0
     failed_count: int = 0
     excluded_count: int = 0
+    # "Don't send if no slot resolved", chosen at plan time (task-228).
+    skip_without_resolution: bool = False
 
 
 class SendPlanRequest(BaseModel):
@@ -66,6 +68,9 @@ class SendPlanRequest(BaseModel):
     from_address: str | None = None
     # Omitted: a draft, fired later by hand. Given: status "scheduled".
     scheduled_at: datetime | None = None
+    # "Don't send if no slot resolved" (ADR-086 addendum 2026-10-08): skip a
+    # recipient whose personalised blocks all came up empty. Off by default.
+    skip_without_resolution: bool = False
 
 
 class SendInstanceListed(SendInstance):

@@ -57,6 +57,15 @@ STAGE_ADDRESSABILITY = "addressability"
 STAGE_CONSENT = "consent"
 STAGE_SUPPRESSION = "suppression"
 STAGE_FREQUENCY = "frequency"
+# After rendering, per recipient, in the send loop rather than this stack
+# (task-228; ADR-086 addendum 2026-10-08): the stack runs before anything is
+# rendered and this needs the rendered result. Its reasons land in the same
+# column, so "why didn't this person get it" still has one place to look.
+STAGE_RENDER = "render"
+#: The floor: nothing but the envelope rendered. Not a manager's choice.
+REASON_NOTHING_TO_SHOW = "nothing to show — no module produced content for this person"
+#: The send's "Don't send if no slot resolved": a signal about the rule.
+REASON_NO_PICK = "no personalised block found anything for this person"
 
 
 @dataclass(frozen=True)

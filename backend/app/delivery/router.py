@@ -129,6 +129,7 @@ def plan_send(
             provider=payload.provider,
             from_address=(payload.from_address or "").strip() or None,
             scheduled_at=payload.scheduled_at,
+            skip_without_resolution=payload.skip_without_resolution,
             brand_id=brand_id,
         )
     except NotInBrand as error:

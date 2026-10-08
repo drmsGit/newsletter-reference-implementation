@@ -1813,6 +1813,7 @@ def send_instance_create(
     from_address: str = Form(""),
     send_timing: str = Form("now"),
     scheduled_at: str = Form(""),
+    skip_without_resolution: str = Form(""),
     db: Session = Depends(get_db),
 ):
     """Plan a delivery: pick an audience → provider / from address → resolution
@@ -1851,6 +1852,8 @@ def send_instance_create(
             from_address=from_address.strip() or None,
             scheduled_at=scheduled,
             brand_id=working_brand_id(request, db),
+            # A checkbox posts its value only when ticked (task-228).
+            skip_without_resolution=bool(skip_without_resolution),
         )
     except ValueError as error:
         return RedirectResponse(

@@ -9,7 +9,9 @@ from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
 from app.delivery.models import DeliveryExecution, SendInstance, SendInstanceDetail, SendInstanceListed
 
 from app.campaigns.db_models import VariantDB
-from app.delivery.exclusion import run_exclusion_stack
+from app.delivery.exclusion import (
+    REASON_NO_PICK, REASON_NOTHING_TO_SHOW, STAGE_RENDER, run_exclusion_stack,
+)
 from app.delivery.providers.factory import get_provider, providers_for_channel
 from app.recipients.consent import DEFAULT_CHANNEL, MARKETING, ConsentDenied
 from app.rendering.service import render_variant, render_variant_html
@@ -389,6 +391,7 @@ def prepare_send_from_audience(
     scheduled_at=None,
     *,
     brand_id: int,
+    skip_without_resolution: bool = False,
 ) -> SendInstanceDB:
     """Materialize a planned send: resolve the audience group to its live
     recipient set (consent-gated) and create one DeliveryExecution per
@@ -493,6 +496,7 @@ def prepare_send_from_audience(
         audience_group_id=audience_group_id,
         from_address=from_address or None,
         audience_resolution_mode=audience_resolution_mode,
+        skip_without_resolution=skip_without_resolution,
         scheduled_at=scheduled_at,
     )
     db.add(send_instance)
@@ -971,7 +975,7 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
     from app.campaigns.db_models import DecisionSlotDB
     from app.decision.service import execute_decision_slot
 
-    from app.rendering.frame import render_frame, slot_ids, artifact_hash
+    from app.rendering.frame import render_frame, slot_ids, artifact_hash, what_rendered
 
     # The frame's slots, not the variant's: a slot added after the snapshot is
     # not in what was approved (ADR-183).
@@ -1095,6 +1099,24 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
         artifact, picks = render_frame(
             db, snapshot.render_context, recipient_id=execution.recipient_id,
         )
+
+        # Nothing meaningful for this person (task-228; ADR-086 addendum
+        # 2026-10-08): skipped, not failed, and the send goes on for everyone
+        # else. The floor always applies; the send's "Don't send if no slot
+        # resolved" only where the variant had a slot to resolve.
+        meaningful, slots = what_rendered(snapshot.render_context, picks)
+        skipped = (
+            REASON_NOTHING_TO_SHOW if not meaningful
+            else REASON_NO_PICK if send_instance.skip_without_resolution and slots and not picks
+            else None
+        )
+        if skipped:
+            execution.status = "excluded"
+            execution.exclusion_reason = f"{STAGE_RENDER}: {skipped}"
+            logger.info("execution %s excluded: recipient %s — %s",
+                        execution.id, execution.recipient_id, execution.exclusion_reason)
+            db.commit()
+            continue
         # The envelope comes from the snapshot's frame: the envelope module's
         # subject as it was approved (ADR-162 point 1, ADR-183). A variant
         # with no envelope module has no subject, so the send instance's name

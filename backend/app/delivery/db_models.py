@@ -1,4 +1,4 @@
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, func, text
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, func, text
 
 from app.database import Base
 
@@ -40,6 +40,12 @@ class SendInstanceDB(Base):
     # be written with it; a reader who sees one is looking at a send planned
     # before that date.
     audience_resolution_mode = Column(String(20), nullable=False, default="rerun")
+    # "Don't send if no slot resolved" (task-228; ADR-086 addendum 2026-10-08):
+    # chosen when the send is planned, off by default. On, a recipient whose
+    # personalised blocks all came up empty is skipped even though static
+    # content rendered. Per send, not per variant: the same variant may go out
+    # once where those blocks are the point and once where they are a bonus.
+    skip_without_resolution = Column(Boolean, nullable=False, default=False, server_default="false")
     # Derived from the child executions once the send finishes, rather than set
     # unconditionally. Persisted rather than computed on read because
     # monitoring, retries and the audit trail all want the number without a

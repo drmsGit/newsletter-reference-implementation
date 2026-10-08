@@ -192,6 +192,32 @@ def _pick_for_slot(db: Session, entry: dict, channel: str, recipient_id: int | N
     }
 
 
+def what_rendered(frame: dict, picks: list[dict]) -> tuple[bool, int]:
+    """For one recipient's render: whether anything meaningful came out, and
+    how many slots the frame has (task-228; ADR-086 addendum 2026-10-08).
+
+    Meaningful is any module but the envelope that produced output: typed-in
+    content, a catalogue record, or a slot that found something for this
+    person (`picks` holds only those). An empty slot, an unbound module and an
+    unknown one do not count, and neither does the envelope module — for
+    email the header, which holds only the subject and preheader; push has
+    none. There is no "decorative" marker because no decorative module exists
+    yet; one added later is given a manifest marker then.
+    """
+    from app.modules.registry import envelope_module_type
+
+    envelope = envelope_module_type(frame["channel"])
+    picked = {p["module_id"] for p in picks}
+    slots = sum(1 for entry in frame["modules"] if entry["kind"] == KIND_SLOT)
+    meaningful = any(
+        entry["module_type"] != envelope
+        and (entry["kind"] in (KIND_CONTENT, KIND_STATIC)
+             or (entry["kind"] == KIND_SLOT and entry["module_id"] in picked))
+        for entry in frame["modules"]
+    )
+    return meaningful, slots
+
+
 def render_frame(
     db: Session, frame: dict, recipient_id: int | None = None, picks: list[dict] | None = None,
 ) -> tuple[RenderedArtifact, list[dict]]:
