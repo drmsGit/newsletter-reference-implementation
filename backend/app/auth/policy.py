@@ -251,6 +251,64 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
 )
 
 
+#: **What an integration may read without `view`** (task-53; ADR-166 addendum
+#: 2026-10-08). Every GET needs `view`, which every role implies and an
+#: integration deliberately does not hold — implying it would hand every
+#: integration the recipient list. So a write permission also admits reads of
+#: its own area, **only what it writes**: data the platform derives about people
+#: or sends (activity, memberships, signals, per-recipient results, previews
+#: that list people, reporting) stays behind `view`.
+#:
+#: **Exact route templates, not prefixes, and that is the point.** A read route
+#: added later stays behind `view` until someone lists it here — nothing opens by
+#: accident, the stance `UNMAPPED` takes for writes. A brand-scoped permission is
+#: checked in the working brand, as for writes (ADR-172).
+MACHINE_READS: dict[str, str] = {
+    # What a CRM connector writes: the person, their addresses and consent status.
+    "/recipients/": RECIPIENTS_MANAGE,
+    "/recipients/{external_id}": RECIPIENTS_MANAGE,
+    # The catalogue and its taxonomy.
+    "/content/": CONTENT_MANAGE,
+    "/content/{content_id}": CONTENT_MANAGE,
+    "/content/{content_record_id}/versions": CONTENT_MANAGE,
+    "/content/categories": CONTENT_MANAGE,
+    "/content/categories/{category_id}/children": CONTENT_MANAGE,
+    "/content/categories/{category_id}/parents": CONTENT_MANAGE,
+    "/content/category-relations": CONTENT_MANAGE,
+    "/content/fields": CONTENT_MANAGE,
+    "/content/{content_id}/assignments": CONTENT_MANAGE,
+    "/content/{content_id}/categories": CONTENT_MANAGE,
+    "/content/{content_id}/duplicate-targets": CONTENT_MANAGE,
+    # Campaigns as composed.
+    "/campaigns/": CAMPAIGNS_MANAGE,
+    "/campaigns/{campaign_id}/variants": CAMPAIGNS_MANAGE,
+    "/campaigns/{campaign_id}/composition": CAMPAIGNS_MANAGE,
+    "/campaigns/variants/{variant_id}/modules": CAMPAIGNS_MANAGE,
+    "/campaigns/variants/{variant_id}/decision-slots": CAMPAIGNS_MANAGE,
+    "/campaigns/decision-slots": CAMPAIGNS_MANAGE,
+    "/campaigns/{campaign_id}/duplicate-options": CAMPAIGNS_MANAGE,
+    "/decision/strategies": CAMPAIGNS_MANAGE,
+    # Audience groups and their rules; the hand-added members for a pin grant.
+    "/api/audience-groups/": AUDIENCES_MANAGE,
+    "/api/audience-groups/{group_id}": AUDIENCES_MANAGE,
+    "/api/audience-groups/{group_id}/blocks": AUDIENCES_MANAGE,
+    "/api/audience-groups/criteria-values": AUDIENCES_MANAGE,
+    "/api/audience-groups/{group_id}/members": AUDIENCES_PIN,
+    # Sends as planned, and their snapshots.
+    "/delivery/send-instances": SENDS_PLAN,
+    "/delivery/send-instances/{send_instance_id}": SENDS_PLAN,
+    "/delivery/snapshots/{snapshot_id}/send-instances": SENDS_PLAN,
+    "/snapshots/variants/{variant_id}": SENDS_PLAN,
+    "/snapshots/{snapshot_id}/html": SENDS_PLAN,
+    "/overrides/": OVERRIDES_MANAGE,
+    "/overrides/{override_id}": OVERRIDES_MANAGE,
+    # Not listed: /settings and /integrations. Changing either is a person's
+    # act (every settings write and the whole integrations router refuse a
+    # machine), so a machine holding those permissions writes nothing — and,
+    # by this table's rule, reads nothing through it.
+}
+
+
 #: Which held action a refused route turns into (ADR-166 point 5, ADR-142 §4).
 #:
 #: Here rather than in `main.py` for this file's own stated reason: the policy

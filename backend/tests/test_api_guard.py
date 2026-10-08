@@ -27,7 +27,7 @@ from app.auth.db_models import (
     IntegrationAuthFailureDB, IntegrationCredentialDB,
 )
 from app.auth.permissions import (
-    CONTENT_MANAGE, RECIPIENTS_CONSENT, RECIPIENTS_MANAGE, VIEW,
+    CONTENT_MANAGE, INSIGHT_WRITE, RECIPIENTS_CONSENT, RECIPIENTS_MANAGE, VIEW,
 )
 from app.auth.policy import (
     PROVIDER_SIGNED, PUBLIC_AUTH, UNMAPPED, required_permission,
@@ -290,8 +290,13 @@ class TestPermissionsDecideTheRest:
 
     def test_reads_need_view_and_a_machine_is_not_given_it_for_free(self):
         """`view` is implied by every role and by no grant. A machine that
-        writes engagement events has no business listing recipients."""
-        with machine([RECIPIENTS_MANAGE]) as headers:
+        writes engagement events has no business listing recipients.
+
+        Since 2026-10-08 (task-53, ADR-166 addendum) a write permission admits
+        reads of what it writes, so `recipients.manage` may list recipients
+        (tests/test_machine_reads.py); `insight.write` writes events, not
+        people, and still may not."""
+        with machine([INSIGHT_WRITE]) as headers:
             assert client.get("/recipients/", headers=headers).status_code == 403
 
 

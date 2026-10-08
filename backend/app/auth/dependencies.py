@@ -24,9 +24,10 @@ from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
 from app.auth.db_models import UserDB
-from app.auth.permissions import SENDS_EXECUTE, is_brand_scoped
+from app.auth.permissions import SENDS_EXECUTE, VIEW, is_brand_scoped
 from app.auth.policy import (
-    APPROVABLE_ROUTES, HELD_FOR_EVERY_INTEGRATION, PROVIDER_SIGNED, UNMAPPED, required_permission,
+    APPROVABLE_ROUTES, HELD_FOR_EVERY_INTEGRATION, MACHINE_READS, PROVIDER_SIGNED, UNMAPPED,
+    required_permission,
 )
 from app.auth.integrations import authenticate, record_auth_failure
 from app.auth.service import (
@@ -602,6 +603,21 @@ def enforce_api_policy(request: Request, db: Session = Depends(get_db)):
     # task-50): the policy table above checks the working brand only, so such a
     # route must ask the same question again about its target, as this caller.
     request.state.principal = principal
+
+    # **An integration reads what its permission writes** (task-53; ADR-166
+    # addendum 2026-10-08). Every GET needs `view`, which an integration holds
+    # only if it was granted; without it, a route listed in MACHINE_READS asks
+    # for that area's write permission instead, and the checks below apply to
+    # it unchanged — brand-scoped in the working brand, as for a write. A route
+    # not listed keeps asking for `view`. People are untouched: every role
+    # implies `view`.
+    if (
+        credential
+        and permission == VIEW
+        and template in MACHINE_READS
+        and not has_permission(db, principal, VIEW, brand_id=ALL_BRANDS)
+    ):
+        permission = MACHINE_READS[template]
 
     if is_brand_scoped(permission):
         if brand_id is None:

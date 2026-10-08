@@ -637,7 +637,18 @@ The first lock records the versions tested that day, not the newest. Recorded in
 
 Its first runs found real problems: a model class defined twice that made two recipient routes answer 500, and published advisories in starlette and anyio — all fixed before CI went in. Recorded in [[ADR-190 — Continuous Integration Blocks on Defects and Reports Style]].
 
-**Status:** built the same day (task-105); the workflow's first run on GitHub is pending.
+**Status:** built the same day (task-105); green on GitHub.
+
+### 2026-10-08 — An integration reads what its permission writes
+
+**Context:** every read on the API needs `view`, which every person has and an integration deliberately does not (it would hand every integration the recipient list). So a CRM connector could write a contact and not read it back — and could not reconcile (task-53). Decided with the user one question at a time:
+
+1. **A write permission also admits reads of its own area** — no new permission names; read-only permissions can come later, when a read-only integration exists (reporting, task-58).
+2. **Only what it writes:** an integration managing recipients reads people and their consent, not their activity, memberships or signals; derived data and reporting stay behind `view`.
+
+Built as an explicit list of exact routes, so a new read route stays closed until someone lists it. Recorded in the 2026-10-08 addendum to [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]].
+
+**Status:** built the same day (task-53).
 
 ## 6. Roadmap
 
