@@ -54,3 +54,24 @@ def test_rejects_a_tampered_body(monkeypatch):
     monkeypatch.setenv("RESEND_WEBHOOK_SECRET", SECRET)
     headers = _signed_headers()
     assert verify_signature(BODY + b" ", headers) is False
+
+
+def test_the_route_refuses_a_well_signed_event_while_the_secret_is_unset(monkeypatch):
+    """task-98 item 5, at the route and not only the function: a request
+    signed perfectly still gets nowhere when the server has no secret to check
+    it against — the configuration mistake fails closed end to end."""
+    from fastapi.testclient import TestClient
+
+    from main import app
+
+    client = TestClient(app, raise_server_exceptions=False)
+    monkeypatch.delenv("RESEND_WEBHOOK_SECRET", raising=False)
+    refused = client.post("/provider/webhooks/resend", content=BODY,
+                          headers={**_signed_headers(), "Content-Type": "application/json"})
+    assert refused.status_code == 401
+    assert refused.json()["detail"] == "invalid webhook signature"
+
+    monkeypatch.setenv("RESEND_WEBHOOK_SECRET", SECRET)
+    admitted = client.post("/provider/webhooks/resend", content=BODY,
+                           headers={**_signed_headers(), "Content-Type": "application/json"})
+    assert admitted.status_code != 401, "the same request passes the door once the secret is set"

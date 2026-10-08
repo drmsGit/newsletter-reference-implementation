@@ -423,3 +423,82 @@ def test_a_click_on_a_delivered_link_credits_exactly_its_content(db, world, sent
             ContentCategoryAssignmentDB.category_id == category.id).delete()
         db.query(CategoryDB).filter(CategoryDB.id == category.id).delete()
         db.commit()
+
+
+def test_clicking_the_second_records_link_credits_only_the_second(db, world, sent):
+    """task-98 item 6, the review's exact case: two content records, two tracked
+    links in one message; clicking the second credits the second record's
+    category and nothing of the first."""
+    import re
+    import uuid as _uuid
+
+    from app.content.db_models import CategoryDB, ContentCategoryAssignmentDB
+    from app.insight.db_models import EngagementEventDB
+    from app.providers.adapters.resend import parse_webhook
+    from app.providers.service import process_provider_webhook_event
+    from app.recipients.db_models import SignalContributionDB
+    from app.rendering.tracking import content_id_from_url
+
+    execution = sent["execution"]
+    links: dict[int, str] = {}
+    for url in re.findall(r'href="([^"]+)"', sent["artifact"].body):
+        cid = content_id_from_url(url)
+        if cid is not None:
+            links.setdefault(cid, url)
+    assert len(links) >= 2, f"the message must carry links of two records, carried {sorted(links)}"
+    first_id, second_id = list(links)[:2]
+    categories = {}
+    for cid in (first_id, second_id):
+        category = CategoryDB(name=f"e2e2-{_uuid.uuid4().hex[:6]}", type="main")
+        db.add(category); db.flush()
+        db.add(ContentCategoryAssignmentDB(content_id=cid, category_id=category.id, score=5))
+        categories[cid] = category.id
+    db.commit()
+    try:
+        event = parse_webhook({"type": "email.clicked", "created_at": "t-e2e2",
+                               "data": {"email_id": execution.provider_message_id,
+                                        "click": {"link": links[second_id]}}})
+        assert process_provider_webhook_event(db, event).status == "matched"
+        db.expire_all()
+
+        def credited(cid):
+            return db.query(SignalContributionDB).filter(
+                SignalContributionDB.recipient_id == execution.recipient_id,
+                SignalContributionDB.category_id == categories[cid]).count()
+
+        # Only the clicked record's categories; the second record may carry
+        # categories of its own too (the slot's per-recipient pick can be a
+        # seeded record), which is why cleanup goes by the click's event.
+        assert (credited(first_id), credited(second_id)) == (0, 1)
+    finally:
+        db.rollback()
+        ids = list(categories.values())
+        events = [e for (e,) in db.query(EngagementEventDB.id).filter(
+            EngagementEventDB.delivery_execution_id == execution.id)]
+        db.query(SignalContributionDB).filter(SignalContributionDB.event_id.in_(events)).delete(synchronize_session=False)
+        db.query(SignalContributionDB).filter(SignalContributionDB.category_id.in_(ids)).delete(synchronize_session=False)
+        db.query(EngagementEventDB).filter(
+            EngagementEventDB.delivery_execution_id == execution.id).delete()
+        db.query(ContentCategoryAssignmentDB).filter(
+            ContentCategoryAssignmentDB.category_id.in_(ids)).delete(synchronize_session=False)
+        db.query(CategoryDB).filter(CategoryDB.id.in_(ids)).delete(synchronize_session=False)
+        db.commit()
+
+
+@pytest.mark.parametrize("stage", ["build_frame", "render_frame"])
+def test_a_snapshot_that_cannot_be_made_leaves_no_row(db, world, monkeypatch, stage):
+    """task-98 item 8: a failure while making a snapshot leaves no row a send
+    could later pick up. The frame is built and test-rendered before anything
+    is added (ADR-183), so either stage failing must leave the table as it was."""
+    from app.snapshots.db_models import SnapshotDB
+    from app.snapshots.service import create_snapshot_for_variant
+
+    def explode(*args, **kwargs):
+        raise RuntimeError(f"{stage} exploded")
+
+    monkeypatch.setattr(f"app.rendering.frame.{stage}", explode)
+    before = db.query(SnapshotDB).filter(SnapshotDB.variant_id == world["variant"].id).count()
+    with pytest.raises(RuntimeError, match="exploded"):
+        create_snapshot_for_variant(db, world["variant"].id, brand_id=world["brand"].id)
+    db.rollback()
+    assert db.query(SnapshotDB).filter(SnapshotDB.variant_id == world["variant"].id).count() == before

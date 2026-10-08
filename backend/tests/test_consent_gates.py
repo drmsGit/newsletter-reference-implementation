@@ -757,6 +757,53 @@ class TestSendTimeConsentRevocation:
         assert execution.exclusion_reason is not None
         assert "consent" in execution.exclusion_reason
 
+    def test_the_provider_is_never_handed_an_opted_out_recipient(self, db, monkeypatch):
+        """The review's wording, held literally (task-98): not only is the row
+        marked excluded, the provider is never called for that person."""
+        from app.delivery.providers import mock as mock_module
+
+        handed = []
+        original = mock_module.MockProvider.send
+        monkeypatch.setattr(mock_module.MockProvider, "send",
+                            lambda self, address, artifact: handed.append(address) or original(self, address, artifact))
+        recipient = db.recipient("opted_in")
+        send_instance, _ = db.send_to(recipient)
+        record_consent(db.session, recipient.id, "opted_out", ensure_default_brand(db.session).id,
+                       source="test", note="withdrew", commit=False, purpose="marketing")
+        db.session.commit()
+        send_send_instance(db.session, send_instance.id, brand_id=send_instance.brand_id)
+        assert handed == []
+
+    def test_every_provider_failure_reports_the_send_failed(self, db, monkeypatch):
+        """task-98 item 2: a provider that refuses everyone — the case the
+        review found reported as sent."""
+        from app.delivery.providers import mock as mock_module
+        from app.delivery.providers.base import SendResult
+
+        monkeypatch.setattr(mock_module.MockProvider, "send",
+                            lambda self, address, artifact: SendResult(success=False, message="refused"))
+        send_instance, execution = db.send_to(db.recipient("opted_in"))
+        send_send_instance(db.session, send_instance.id, brand_id=send_instance.brand_id)
+        db.session.refresh(send_instance); db.session.refresh(execution)
+        assert execution.status == "failed"
+        assert (send_instance.status, send_instance.sent_count, send_instance.failed_count) == ("failed", 0, 1)
+
+    def test_some_provider_failures_report_the_send_partly_failed(self, db, monkeypatch):
+        """task-98 item 2: mixed outcomes are neither "sent" nor "failed"."""
+        from app.delivery.providers import mock as mock_module
+        from app.delivery.providers.base import SendResult
+
+        refused = f"refused-{uuid.uuid4().hex[:8]}@example.invalid"
+        original = mock_module.MockProvider.send
+        monkeypatch.setattr(mock_module.MockProvider, "send", lambda self, address, artifact: (
+            SendResult(success=False, message="refused") if address == refused else original(self, address, artifact)))
+        send_instance, first = db.send_to(db.recipient("opted_in"))
+        second = db.also_send_to(send_instance, db.recipient("opted_in", email=refused))
+        send_send_instance(db.session, send_instance.id, brand_id=send_instance.brand_id)
+        db.session.refresh(send_instance); db.session.refresh(first); db.session.refresh(second)
+        assert (first.status, second.status) == ("sent", "failed")
+        assert (send_instance.status, send_instance.sent_count, send_instance.failed_count) == ("partial_failed", 1, 1)
+
     def test_consenting_recipient_still_sends(self, db):
         """The gate must not be a blanket refusal."""
         recipient = db.recipient("opted_in")
@@ -961,6 +1008,58 @@ class TestSendTimeAudienceReResolution:
             "re-resolution dropped a consenting, pinned recipient that no "
             "exclude block touched, so the exclusion test proves nothing"
         )
+
+
+class TestTwoTriggersAtOnce:
+    """task-98 item 7: two sessions firing one send at the same moment send it
+    once. A real Postgres test, not reasoning: two threads, each with its own
+    session, released together; the row lock and status claim in
+    `send_send_instance` must let exactly one through."""
+
+    def test_only_one_of_two_simultaneous_triggers_sends(self, db, monkeypatch):
+        import threading
+        import time
+
+        from app.database import SessionLocal
+        from app.delivery.providers import mock as mock_module
+
+        calls, lock = [], threading.Lock()
+        original = mock_module.MockProvider.send
+
+        def slow_send(self, address, artifact):
+            time.sleep(0.3)  # keep the first send in flight while the second arrives
+            with lock:
+                calls.append(address)
+            return original(self, address, artifact)
+
+        monkeypatch.setattr(mock_module.MockProvider, "send", slow_send)
+        send_instance, execution = db.send_to(db.recipient("opted_in"))
+        send_id, brand_id = send_instance.id, send_instance.brand_id
+        barrier = threading.Barrier(2)
+        outcomes = []
+
+        def trigger():
+            session = SessionLocal()
+            try:
+                barrier.wait()
+                send_send_instance(session, send_id, brand_id=brand_id)
+                outcomes.append("sent")
+            except ValueError as refusal:
+                outcomes.append(f"refused: {refusal}")
+            finally:
+                session.close()
+
+        threads = [threading.Thread(target=trigger) for _ in range(2)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=30)
+
+        assert sorted(o.split(":")[0] for o in outcomes) == ["refused", "sent"], outcomes
+        assert "already" in next(o for o in outcomes if o.startswith("refused"))
+        assert len(calls) == 1, f"the provider was called {len(calls)} times for one recipient"
+        db.session.refresh(execution)
+        assert execution.status == "sent"
 
 
 class TestASendIsNeverStrandedInSending:
