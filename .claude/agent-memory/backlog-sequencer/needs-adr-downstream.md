@@ -64,3 +64,14 @@ ADR-150 (2026-09-20, 2026-09-24), ADR-161 (2026-09-24), ADR-168 (2026-09-20,
 2026-09-24). Verified in the files. **One record still owed**: the Cluster 4 Q2
 pin-vs-exclude reversal, which "is not in an ADR — it lives in a docstring and
 four documentation pages."
+
+---
+
+# Run 3 — 2026-10-08
+Closed since run 2: field model (ADR-177), edit-vs-override (ADR-178 -> ADR-186),
+lock policy (ADR-180), human-beats-system stays as task-220 (needs task-109).
+Today's addenda answer no Needs-ADR item outright. task-136 gained a direct
+dependant (ADR-153 retention/indexes). task-119 lost its technical blocker (task-53).
+New Needs-ADR since run 2: task-246 consent note, task-294 related data,
+task-299 follow-up sends, task-230 preview link, task-231 exclude kinds.
+Widest live fan: task-136+117 (lifecycle) and task-135 (suppression).

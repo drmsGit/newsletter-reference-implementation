@@ -121,3 +121,37 @@ ADR-162 §3, ADR-101, and the new "nothing hard-deleted" Needs-ADR.
 
 **Still valid from run 1:** B2 (`app/auth/`), B4 (recipient/consent), B6
 (settings grid — now gated on C2), B7 (providers).
+
+---
+
+# Run 3 batches — 2026-10-08
+
+Measured 2026-10-08: `frontend/router.py` 3,982 loc (frozen, shrinking);
+`audience/service.py` 1,581; `campaigns/service.py` 1,386; `content/service.py`
+1,384; `auth/service.py` 1,318; `delivery/service.py` 1,301. B1-B8 and M1-M8 are
+largely closed; do not reuse them without checking.
+
+- **R1 recipient-facing frame + first-send compliance**: task-56 (public routes,
+  consent write, `delivery/providers/{base,resend,mock}.py` headers), task-301
+  (frame in `rendering/service.py`, per-brand profile), task-108 (decorative
+  marker), task-94 (`brand.css` per brand, `rendering/service.py:36-44`).
+  task-112 only for the logo. Crosses ADR-169, ADR-163, ADR-086 addendum, ADR-160 p6.
+- **R2 decision resolution**: task-109, task-220, task-234 (+ task-126 B, task-87,
+  task-83). `campaigns/db_models.py`, `rendering/service.py` `resolve_content_for_module`,
+  `decision/`. Crosses ADR-083/086/176.
+- **R3 overrides**: task-225, task-226, task-60 (`overrides/service.py:37-72`),
+  task-114 + task-130 (same trust-loop question). Crosses ADR-040/041/178/186.
+- **R4 consent / suppression / recipient data**: task-135, task-231, task-246,
+  task-128, task-104 points 2-3. `recipients/{db_models,consent,service,router}.py`,
+  `delivery/exclusion.py` stage 3, audience exclude kind. Crosses ADR-163/154/176.
+- **R5 data lifecycle**: task-117, task-136, task-85, ADR-153 retention, ADR-154
+  erasure (`app/privacy/` empty).
+- **R6 AI layer `app/ai/`**: task-102 (`ai/service.py:89`), task-74, task-75,
+  task-77, task-124(c) spend-cap TOCTOU, task-125, task-68; task-100 when React
+  gets an Assistive action. Crosses ADR-140/141/144.
+- **R7 test harness**: task-304 (`tests/test_consent_gates.py` fixture), task-302
+  (Playwright), task-106 (benchmark + query-count smoke tests).
+- **R8 pre-review hygiene**: task-237 remainder, task-238, plus orphans with no
+  task: gradual mypy, one-off Vulture (task-105 deferred both), README (one line),
+  no LICENSE, stale CODE-REVIEW-BRIEF.md, root `project_tree.txt`.
+- **R9 data-in interview**: task-119, task-294, task-120, task-84, task-128.

@@ -213,3 +213,49 @@ approval gate. File measured 4,415 loc 2026-09-27 (backlog says 4,419 — drift)
 
 ## Cycles
 Still none between items.
+
+---
+
+# Run 3 — 2026-10-08 (after the pre-review plan closed)
+
+## Run-2 nodes now CLOSED (do not re-derive; verify in docs/queue/completed/)
+C2 settings router (exists: `app/settings/router.py`); C8 + L138 service-boundary
+(task-49/50, 2026-10-02; Jinja frozen by a route-list test); M1 field model
+(ADR-177, task-219/223/111); M4 list envelope (ADR-185); VE-15/20 refuse override
+on a slot (ADR-178 p5, `overrides/service.py:37-72`) — so the "refusal before
+max_results" edge is SATISFIED; VE-7/8 optimistic concurrency + fence (ADR-180,
+task-110/254); L142 audit read-back (task-52, ADR-153 addendum 2026-10-08);
+L144 machine reads (task-53, ADR-166 addendum 2026-10-08); MW-17 self-approval
+(task-200); VE-25 (task-203); VE-27 duplicate_variant (task-229); VE-16/28
+(task-113); click attribution (task-45, ADR-182); snapshot/artifact (ADR-183).
+
+## Live edges (task IDs now, not backlog lines)
+- task-109 (ranked picks / max_results) -> task-220 (manual binding vs slot;
+  its own text: "Depends on task-109").
+- task-126(B) resolution scope <-> task-234 (recipient-independent strategy run
+  per recipient) <-> task-127 (batching). task-234 is the code instance of 126(B).
+- task-126(A) candidate-pool fix now has its building block: one shared
+  candidate query (`GET /campaigns/decision-slots/{id}/candidates`, 2026-10-03).
+- task-135 (suppression model) -> task-231 (P2, says "blocked on" it),
+  task-104 point 3, task-128, CRM opt-out relay (task-70's remainder),
+  exclusion stage 3 (`delivery/exclusion.py`, named and empty).
+- task-136 (data lifecycle) <-> task-117 (never hard-delete): same question from
+  opposite ends (task-117's text). task-136 -> task-85 prune, task-246 AC#3,
+  task-112 deletion half, ADR-153 retention + index count (deferred to task-136
+  by the 2026-10-08 addendum), ADR-154 erasure (`app/privacy/` empty).
+- task-246 (consent note) shares the write-time-refusal shape of ADR-153's
+  2026-10-08 addendum and the reason-code shape of task-225. Not answered by it.
+- task-301 (visible header/footer) -> task-108 (decorative marker decided
+  together, ADR-086 addendum 2026-10-08), task-112 (logo needs an asset id),
+  task-94 (per-brand styling). task-56 -> task-301 (footer unsubscribe link
+  needs the route). task-56 itself is UNBLOCKED by ADR-169 point 1.
+- task-119 (n8n/CRM use cases) no longer has a technical precondition: task-53
+  closed the read-back defect. Pairs with task-294 and task-120 (data in).
+- task-299 (follow-up sends) <- ADR-169 p3/p4 + audience editor (done) + the
+  send-schedule mechanism; shares the rule builder with task-294.
+- task-304 <- task-228's floor (the fixture's zero-module fallback).
+- task-302 <- an isolated e2e database + a test-only sign-in path.
+- task-106 carries task-98's three query-count smoke tests.
+
+## Cycles
+None.

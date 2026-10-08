@@ -131,3 +131,47 @@ and 2026-08-21. Drift is likely; verify before editing. Numbers checked live on
   `campaigns/db_models.py:64,83` (`updated_at` on both tables).
 - Verified absent: any `UploadFile` in `backend/app/`; `app/settings/router.py`;
   `app/ai/router.py`; `storage/fields.json`.
+
+---
+
+# Run 3 — 2026-10-08 (code-verified unless marked)
+
+## Resolved since run 2
+Run-2 items 3 (pagination repricing), 5 (router.py growth: now 3,982 and frozen),
+9 (override/duplication docstrings: task-113, ADR-178 p5) — done.
+Gate 4b CLOSED 2026-09-29 (timing oracle, task-5).
+
+## Still open from run 2
+- **task-56 text still says wait for the flow question**; ADR-169 point 1 says
+  unsubscribe and DOI are routes. Third run flagging it.
+- **LAUNCH-GATES still has no unsubscribe gate** (run-2 item 6).
+- **BETA-SCOPE §2 still lists the React frontend as "not started"** (`:59`);
+  §5 adopted in practice, never in writing (run-2 item 8).
+- **Playbook §6 "Status at a glance" still dated 2026-09-12.**
+
+## New, run 3
+- task-67: provider choice + cap exist (`campaign_detail.html` provider select,
+  `delivery/models.py` `SendPlanRequest.provider`, `settings/router.py:151` send
+  cap). Remainder: no React plan-send screen.
+- task-70: "currently an empty mock file" false — `providers/adapters/resend.py`
+  is the worked inbound adapter with an event map; bounce/complaint opt-out built.
+  Remainder: CRM relay (task-135/128), complaint-as-content-signal.
+- task-65: its blocker `VariantDB.channel` exists (`campaigns/db_models.py:46`).
+- task-207: "C2 has no router at all" false.
+- task-124: (a) and (b) answered by ADR-180 and built; (c) + spend-cap TOCTOU
+  (`ai/service.py:89`) remain.
+- task-104: point 1 answered (address dedup = exclusion stage 1,
+  `delivery/exclusion.py:150-165`); its description also carries a glued-on
+  Done entry (AI task registry, done 2026-09-18) — migration artifact.
+- task-237: ADR-190 addendum 2026-10-08 settles template escaping, `random`, shell
+  use; raw SQL (S608) explicitly left to review = task-237's remaining core.
+- task-90: "Phase 3B isn't built yet" false (playbook §6: 3B done).
+- task-71: realistic content exists as `scripts/seed_content_chatgpt.csv` +
+  importer; `seed_demo_data.py:146` still writes placeholders.
+- task-162 (Done 2026-07-12) left "dedup before sending" open; now built (stage 1).
+- **ADR-188 has no 2026-10-08 addendum** (only 2026-10-06), contrary to a brief.
+- **CODE-REVIEW-BRIEF.md is stale** (2026-09-19 content: "Jinja UI", known-issue
+  list of items since fixed, test count, `docs/backlog.md` pointer). Not a task.
+- task-105 deferred mypy (gradual) and Vulture (once by hand); no task holds them.
+- Queue mode letters (Mode A/B/C) are NOT stale: ADR-140 addendum p2 keeps dated
+  records, including the queue, as written.

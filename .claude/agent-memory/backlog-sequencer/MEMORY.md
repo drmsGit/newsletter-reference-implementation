@@ -1,7 +1,8 @@
 # Memory Index — backlog-sequencer
 
-First run 2026-09-12. Second run 2026-09-27 (after the Manager Workflow and
-Variant Editor interviews closed). Refine these files; do not rebuild from scratch.
+First run 2026-09-12. Second run 2026-09-27. Third run 2026-10-08 (pre-review
+plan closed). Each file has dated run sections; newest at the bottom wins.
+Refine these files; do not rebuild from scratch.
 
 - [Dependency edges](graph-edges.md)
 - [Cost-of-delay classes](cost-of-delay.md)
@@ -57,3 +58,10 @@ Useful absolute line anchors (2026-09-27, will drift):
   All four Manager-Workflow addenda (142, 150, 161, 168) are written.
 - Frontend: `frontend/src/screens/` has exactly the four Phase 2 list screens
   (Content, Campaigns, Audiences, Approvals) + two details + SignIn. Phase 3 paused.
+
+## Run-3 orientation snapshot (2026-10-08)
+- Open gates: 1, 8, 9 only (4b closed 2026-09-29). BETA-SCOPE still Definition A on paper.
+- React SPA built for the core loop; Jinja frozen. Backlog line anchors above are history;
+  cite task IDs now.
+- Next planned after run 3: code-slimmer sweep, then the user's interview break
+  (and maybe an external review). `code-slimmer-report.md` is 2026-08-21, pre-SPA.

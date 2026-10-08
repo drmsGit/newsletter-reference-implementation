@@ -34,4 +34,17 @@ Confirmed present as of 2026-08-21:
 - Concurrency has a 📋 item noting `send_send_instance`'s `with_for_update()` is
   the project's one ad-hoc answer with no convention.
 
-Related: [[seams-do-not-flag]]
+Held by queue tasks as of 2026-10-08 (verify status before relying on it):
+- **task-306**: the repository's front door. Root `project_tree.txt`,
+  `HANDOFF.md`, README, LICENSE, `CODE-REVIEW-BRIEF.md`, untracked agent
+  folders. Does **not** cover `backend/project_tree.txt`.
+- **task-237**: raw SQL `text()`/`DDL()` sites, Jinja escaping, `random`,
+  `subprocess`, `FileResponse`/`StaticFiles` paths in `main.py`.
+- **task-109**: `DecisionSlotDB.max_results` is dead config. **task-114**:
+  `outcome_delta` has no producer.
+- **task-71**: realistic seed content; the curly-quote CSV is handled by the importer.
+- **task-104**: per-task approval form; plans another drop-a-file registry copy.
+- **task-246 / task-136**: privacy/erasure unbuilt, which is why `app/privacy/` is empty.
+- The `httpx2` pin from 2026-08 is fixed (`requirements.in` names `httpx`).
+
+Related: [[seams-do-not-flag]], [[full-sweep-2026-10-08]]

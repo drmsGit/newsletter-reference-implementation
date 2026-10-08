@@ -115,3 +115,35 @@ resolving to nobody."
   (L364), design settled, and still out of beta scope under Definition A.**
   It moved from "convenience Feature" to "subsystem with a settled design",
   which changes its size but not its launch relevance.
+
+---
+
+# Run 3 — 2026-10-08
+
+Most run-1/run-2 Rises items are DONE (consent migration, artifact rename,
+signal channel column, Gate 3/4/4b, signal-weight no-op, click attribution,
+uniqueness constraints, field model, pagination, self-approval, variants.status,
+held-action deadline). Re-check `docs/queue/completed/` before citing one.
+
+## Rises (live)
+| Task | Why | Who pays |
+|---|---|---|
+| task-109 max_results / ranked picks | `DecisionResolutionDB` (fastest-growing table) keeps writing one-row-per-recipient-per-slot; the shape change gets heavier per send. Detail screen already displays the dead value (`DecisionSlotDetail.tsx:68`) | task-220, multi-pick personalisation |
+| task-136 + task-117 data lifecycle | Data accumulates with no retention; erasure unbuilt; each new table decides deletion alone. ADR-153's 2026-10-08 addendum deferred audit retention + indexes here | ADR-154 erasure, task-85, task-246, task-112 deletion |
+| task-246 consent note | CRM sync writes unbounded free text into a compliance record nothing can erase | task-136 erasure scope |
+| task-135 suppression model | Bounces are written as consent events (`source="provider"`) in the interim shape; reclassification later | task-231, task-128, CRM relay, stage 3 |
+| task-231 exclude-kind conflation | Editorial and legal exclusions accumulate under one `kind` | depends on task-135 |
+| task-225 reason as prose | Constraining after rows exist means cleaning them first | preset analysis |
+
+## Scope-dependent (Definition A vs adopted-in-practice §5)
+task-56 unsubscribe/DOI/List-Unsubscribe and task-301 header/footer: Flat under
+Definition A (no real recipients), RISES the moment a real send to real people is
+planned (RFC 8058 bulk-sender requirement; no imprint/unsubscribe in any email).
+
+## Decays (new or confirmed)
+task-63 (Jinja form; Jinja frozen, React form is manifest-driven), task-65
+(Jinja labelling pass; its blocker `VariantDB.channel` exists), task-67 and
+task-70 (largely answered — see staleness), task-89 (ADR-188 rules are the
+reversible form of criteria membership), task-90 (premise "3B not built" false;
+no consumer), task-100 (only when Assistive AI reaches React), task-107
+("if expiry is wanted at all").
