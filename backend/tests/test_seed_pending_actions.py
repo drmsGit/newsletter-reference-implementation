@@ -20,7 +20,15 @@ def test_requests_come_from_a_named_integration_and_a_person_decides():
 
     db = SessionLocal()
     extra = []
+    made_admin = None
     try:
+        # A person must exist to decide. Locally the initial admin from .env is
+        # one; CI has no .env, so the test brings its own (found by CI's first
+        # run, 2026-10-08) rather than depending on the environment.
+        if seed_script._deciding_person(db) is None:
+            from app.auth import service as auth
+            made_admin = auth.create_user(db, email="seedtest-admin@example.invalid", role_key="admin",
+                                          brand_id=auth.ensure_default_brand(db).id)
         template = db.query(SendInstanceDB).filter(SendInstanceDB.status == "sent").first()
         for i in range(2):
             row = SendInstanceDB(brand_id=template.brand_id, snapshot_id=template.snapshot_id,
@@ -56,5 +64,11 @@ def test_requests_come_from_a_named_integration_and_a_person_decides():
         seed_script.clear(db)
         for row in extra:
             db.delete(db.merge(row))
+        if made_admin is not None:
+            from sqlalchemy import text
+            for table in ("audit_events", ):
+                db.execute(text(f"DELETE FROM {table} WHERE actor_type = 'user' AND actor_id = :u"), {"u": made_admin.id})
+            db.execute(text("DELETE FROM role_assignments WHERE user_id = :u"), {"u": made_admin.id})
+            db.execute(text("DELETE FROM users WHERE id = :u"), {"u": made_admin.id})
         db.commit()
         db.close()
