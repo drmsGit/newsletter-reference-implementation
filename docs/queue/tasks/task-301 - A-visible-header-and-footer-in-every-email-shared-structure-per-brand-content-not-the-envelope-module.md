@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-08 18:26'
+updated_date: '2026-10-08 18:29'
 labels:
   - needs-adr
   - backend
@@ -65,3 +66,12 @@ It sits beside task-56 in the queue because both stand between the platform and 
 - [ ] #2 The unsubscribe and preference-center links, the logo and per-brand styling are each tied to their own task or decided here
 - [ ] #3 Task-228's floor still treats an email holding only a visible header and footer as nothing to show
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+The user, 2026-10-08, added before the design session: even within one brand, several footers may be needed - with an unsubscribe link, without one, with special texts and so on. That may answer the "placed module or fixed frame" question: not a fixed frame. Every email must have a footer, but it is not automatically the same one, unless the footer has dynamic options. So the session weighs:
+- several footer variants per brand that the manager chooses between, with a footer always required;
+- one footer per brand with dynamic options (unsubscribe shown or not, an extra text).
+Open alongside: which emails may go out without an unsubscribe link (a transactional or service email, task-134?), and who decides that.
+<!-- SECTION:NOTES:END -->
