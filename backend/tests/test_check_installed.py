@@ -107,9 +107,10 @@ def test_a_lock_that_disagrees_with_package_json_fails(tmp_path):
     (root / "package.json").write_text(json.dumps({
         "dependencies": {"react": "^19.3.0"}, "devDependencies": {"vite": "^8.3.0"}}))
     (root / "package-lock.json").write_text(json.dumps({"packages": {"": {
-        "dependencies": {"react": "^19.2.0", "left-pad": "^1.0.0"}, "devDependencies": {"vite": "^8.3.0"}}}}))
+        "dependencies": {"react": "^19.2.0", "left-pad": "^1.0.0"}, "devDependencies": {"vite": "^8.2.0"}}}}))
     problems = check.package_json_against_lock(root)
-    assert sorted((p.kind, p.name) for p in problems) == [("not in package.json", "left-pad"), ("other range", "react")]
+    assert sorted((p.kind, p.name) for p in problems) == [
+        ("not in package.json", "left-pad"), ("other range", "react"), ("other range", "vite")], "dev dependencies too"
     assert "left-pad" in problems[0].describe() or "left-pad" in problems[1].describe()
 
 
