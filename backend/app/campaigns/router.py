@@ -541,11 +541,14 @@ def unblock_variant(
     if variant is None:
         raise HTTPException(status_code=404, detail="Variant not found")
     was = fence.view(variant)
+    by_id = variant.fenced_by_id  # read before clear() empties it
     fence.clear(db, request, variant)
     if was is not None:
         audit.record_from_request(
             request, db, audit.VARIANT_UNFENCED, subject_type="variant", subject_id=variant_id,
-            detail={"was": was["by"], "active": was["active"]},
+            # Whose fence, by type and id — never the label, which is an email
+            # address for a person (task-52, ADR-153 point 5).
+            detail={"was": {"type": was["by_type"], "id": by_id}, "active": was["active"]},
         )
     return None
 

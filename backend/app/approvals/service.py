@@ -32,14 +32,13 @@ from app.audit import service as audit
 
 logger = logging.getLogger(__name__)
 
-# The audit vocabulary for the approval lifecycle. Constants rather than an enum
-# column, the same reasoning `audit/service.py` gives: a new event costs a line
-# here, not a migration.
-REQUESTED = "approval.requested"
-GRANTED = "approval.granted"
-DENIED = "approval.rejected"
-LAPSED = "approval.expired"
-EXECUTION_FAILED = "approval.failed"
+# The approval lifecycle's audit actions, by their short local names. The names
+# themselves live in the one vocabulary in `audit/service.py` (task-52).
+REQUESTED = audit.APPROVAL_REQUESTED
+GRANTED = audit.APPROVAL_GRANTED
+DENIED = audit.APPROVAL_REJECTED
+LAPSED = audit.APPROVAL_EXPIRED
+EXECUTION_FAILED = audit.APPROVAL_FAILED
 
 #: The subject type every approval event points at.
 SUBJECT = "pending_action"

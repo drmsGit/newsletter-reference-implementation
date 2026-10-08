@@ -25,6 +25,7 @@ import logging
 
 from sqlalchemy.orm import Session
 
+from app.audit import service as audit
 from app.approvals.actions.base import (
     ActionDescription, ActionResult, ApprovableAction,
 )
@@ -195,7 +196,7 @@ def execute(
     return ActionResult(
         ok=True,
         message=f"Applied: {picked.get('subject', '')}",
-        audit_action="ai.suggestion_applied",
+        audit_action=audit.AI_SUGGESTION_APPLIED,
         audit_detail={
             "ai_run_id": run.id,
             "variant_id": variant.id,

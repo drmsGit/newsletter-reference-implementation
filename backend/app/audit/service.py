@@ -27,7 +27,9 @@ actor is not audited.** Nothing infers an actor; writing one requires saying
 who it was.
 """
 import logging
+import re
 
+from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -113,6 +115,25 @@ INTEGRATION_GRANT_ADDED = "integration.grant_added"
 INTEGRATION_GRANT_REMOVED = "integration.grant_removed"
 INTEGRATION_UNATTENDED_SET = "integration.unattended_set"
 INTEGRATION_DEACTIVATED = "integration.deactivated"
+# The approval lifecycle (ADR-142). Named here since 2026-10-08 (task-52);
+# approvals/service.py keeps its short names as aliases of these.
+APPROVAL_REQUESTED = "approval.requested"
+APPROVAL_GRANTED = "approval.granted"
+APPROVAL_REJECTED = "approval.rejected"
+APPROVAL_EXPIRED = "approval.expired"
+APPROVAL_FAILED = "approval.failed"
+# What a granted held action did, written by the action through ActionResult.
+SEND_FIRED = "send.fired"
+AI_SUGGESTION_APPLIED = "ai.suggestion_applied"
+
+#: Every action name an entry may carry (task-52, ADR-153 addendum
+#: 2026-10-08). Collected from the constants above, so adding one is still one
+#: line; `record` refuses a name not in it, which turns a typo into an error
+#: at the first write instead of a row no reader ever finds.
+ACTIONS = frozenset(
+    value for name, value in dict(globals()).items()
+    if name.isupper() and isinstance(value, str) and "." in value
+)
 
 # The three kinds of actor, together — the pattern in the module docstring
 # names all three, so they live beside each other (task-23).
@@ -136,6 +157,35 @@ _failures = 0
 
 def failure_count() -> int:
     return _failures
+
+
+# Deliberately loose: anything shaped like an address is refused, so a label
+# that merely looks like one is refused too. Phone numbers are not checked
+# (too many false positives against ids and counts). A company address that
+# must be recorded would need a named exemption here, decided, not added.
+_EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+
+#: Top-level detail keys that hold authored copy, which the email check skips
+#: (decided with the user 2026-10-08, task-52). A name, a title, a subject or
+#: preheader is what a person wrote, not somebody's contact detail, and
+#: "Reply to hello@brand.test" must not fail the save it records. Top level
+#: only: a `name` nested deeper is not copy by that fact alone.
+COPY_KEYS = frozenset({"name", "title", "envelope"})
+
+
+def _detail_holds_an_email(detail: dict) -> bool:
+    return any(_holds_an_email(key) or (key not in COPY_KEYS and _holds_an_email(value))
+               for key, value in detail.items())
+
+
+def _holds_an_email(value) -> bool:
+    if isinstance(value, str):
+        return bool(_EMAIL.search(value))
+    if isinstance(value, dict):
+        return any(_holds_an_email(k) or _holds_an_email(v) for k, v in value.items())
+    if isinstance(value, (list, tuple, set)):
+        return any(_holds_an_email(v) for v in value)
+    return False
 
 
 def record(
@@ -170,9 +220,21 @@ def record(
     Schema drift, the other case the bare `except` used to hide, is refused at
     startup now by ADR-181's ledger and full schema check.
 
+    **What an entry may say is checked before anything is written** (task-52,
+    ADR-153 addendum 2026-10-08): the action must be in `ACTIONS`, and no
+    value in the detail may be an email address — internal identifiers only
+    (ADR-153 point 5), so erasing a person never has to rewrite the log;
+    authored copy (`COPY_KEYS`) is exempt. Both raise ValueError: they are bugs
+    in the caller, not database failures.
+
     Returns None on failure so a caller that cares can tell.
     """
     global _failures
+
+    if action not in ACTIONS:
+        raise ValueError(f"{action!r} is not an audit action; add it to the vocabulary in audit/service.py")
+    if detail is not None and _detail_holds_an_email(detail):
+        raise ValueError(f"an audit detail must not hold an email address ({action}); record the person's id")
 
     event = AuditEventDB(
         actor_type=actor_type,
@@ -263,15 +325,23 @@ def events_for_subject(
 
 
 def events_by_actor(
-    db: Session, actor_id: int, actor_type: str = ACTOR_USER, limit: int = 50
+    db: Session, actor_id: int, actor_type: str = ACTOR_USER, limit: int = 50,
+    brand_id: int | None = None,
 ) -> list[AuditEventDB]:
-    """What one operator has done, newest first — ADR-153 point 1's screen."""
+    """What one operator has done, newest first — ADR-153 point 1's screen.
+
+    With `brand_id`, that brand's entries **and the ones with no brand**
+    (task-52): a sign-in or a platform setting belongs to the person, not to
+    any brand, and a plain `brand_id = X` would hide it from every brand's view.
+    """
+    query = db.query(AuditEventDB).filter(
+        AuditEventDB.actor_type == actor_type,
+        AuditEventDB.actor_id == actor_id,
+    )
+    if brand_id is not None:
+        query = query.filter(or_(AuditEventDB.brand_id == brand_id, AuditEventDB.brand_id.is_(None)))
     return (
-        db.query(AuditEventDB)
-        .filter(
-            AuditEventDB.actor_type == actor_type,
-            AuditEventDB.actor_id == actor_id,
-        )
+        query
         .order_by(AuditEventDB.created_at.desc(), AuditEventDB.id.desc())
         .limit(limit)
         .all()

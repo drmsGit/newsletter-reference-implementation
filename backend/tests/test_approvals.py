@@ -31,6 +31,7 @@ from app.approvals.actions import registry as action_registry
 from app.approvals.db_models import (
     APPROVED, EXECUTING, EXPIRED, FAILED, PENDING, REJECTED, PendingActionDB,
 )
+from app.audit import service as audit
 from app.audit.db_models import AuditEventDB
 from app.audit.service import ACTOR_USER, events_for_subject
 from app.database import SessionLocal
@@ -50,13 +51,17 @@ def db():
 
 
 @pytest.fixture(autouse=True)
-def planted_action(tmp_path):
+def planted_action(tmp_path, monkeypatch):
     """Drop a real action file into the package, the way a company would.
 
     `_registry_mtime = None` is mandatory, not tidiness: `_ensure_fresh()`
     recomputes from the directory mtime, so a registry left primed from an
     earlier test silently ignores the new file.
+
+    Its own event joins the audit vocabulary for the test, as a company's
+    action would add its name there (task-52: `record` refuses unknown names).
     """
+    monkeypatch.setattr(audit, "ACTIONS", audit.ACTIONS | {"marker.written"})
     package = Path(action_registry.__file__).parent
     good = package / f"{TAG}_marker.py"
     good.write_text(

@@ -895,8 +895,10 @@ def unmark_ready(db: Session, content_id: int, channel: str, *, brand_id: int) -
     )
     if row is None:
         return None
-    was = {"channel": row.channel, "marked_by": row.marked_by,
-           "marked_at": row.marked_at.isoformat() if row.marked_at else None}
+    # Not `marked_by`: it is a person's label, an email address, and the audit
+    # log holds internal identifiers only (task-52). Who marked it is the
+    # actor of the `content.ready_marked` entry before this one.
+    was = {"channel": row.channel, "marked_at": row.marked_at.isoformat() if row.marked_at else None}
     db.delete(row)
     db.commit()
     return was

@@ -221,7 +221,7 @@ class TestTheLogIsEvidence:
         """
         before = audit.failure_count()
 
-        assert audit.record(db, "x" * 200, actor_id=1) is None, (
+        assert audit.record(db, audit.SIGNED_IN, subject_type="x" * 200, actor_id=1) is None, (
             "a refused audit write raised instead of returning None"
         )
         assert audit.failure_count() == before + 1, "the failure was not counted"
@@ -233,7 +233,7 @@ class TestTheLogIsEvidence:
         marker = f"audit.task22.{uuid.uuid4().hex[:8]}"
         db.add(AuditEventDB(actor_type=audit.ACTOR_USER, action=marker))   # the caller's work
 
-        audit.record(db, "x" * 200, commit=False)
+        audit.record(db, audit.SIGNED_IN, subject_type="x" * 200, commit=False)
         db.commit()
 
         try:
@@ -249,7 +249,7 @@ class TestTheLogIsEvidence:
         marker = f"audit.task22.{uuid.uuid4().hex[:8]}"
         db.add(AuditEventDB(actor_type=audit.ACTOR_USER, action=marker))
 
-        audit.record(db, "x" * 200, commit=True)
+        audit.record(db, audit.SIGNED_IN, subject_type="x" * 200, commit=True)
 
         db.expire_all()
         try:
@@ -313,10 +313,11 @@ class TestTheActorIsReadStrictly:
         with pytest.raises(AttributeError):
             audit.record_from_request(request, db, audit.SIGNED_IN)
 
-    def test_an_anonymous_request_still_writes_an_honest_null_actor(self, db):
+    def test_an_anonymous_request_still_writes_an_honest_null_actor(self, db, monkeypatch):
         """None is a real answer — enforcement off, nobody signed in — and
         recording "no actor" beats attributing the action to somebody."""
         marker = f"audit.task23.{uuid.uuid4().hex[:8]}"
+        monkeypatch.setattr(audit, "ACTIONS", audit.ACTIONS | {marker})  # task-52
         event = audit.record_from_request(
             self._request(current_user=None, current_brand=None), db, marker)
         try:
@@ -325,10 +326,11 @@ class TestTheActorIsReadStrictly:
             db.query(AuditEventDB).filter(AuditEventDB.action == marker).delete()
             db.commit()
 
-    def test_without_a_resolved_working_brand_the_session_brand_is_used(self, db):
+    def test_without_a_resolved_working_brand_the_session_brand_is_used(self, db, monkeypatch):
         """`working_brand_id` keeps its default on purpose: only the JSON guard
         sets it, so on the Jinja plane its absence is ordinary."""
         marker = f"audit.task23.{uuid.uuid4().hex[:8]}"
+        monkeypatch.setattr(audit, "ACTIONS", audit.ACTIONS | {marker})  # task-52
         event = audit.record_from_request(
             self._request(current_user={"id": 7}, current_brand={"id": 3}), db, marker)
         try:

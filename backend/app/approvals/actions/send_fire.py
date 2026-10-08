@@ -16,6 +16,7 @@ import logging
 
 from sqlalchemy.orm import Session
 
+from app.audit import service as audit
 from app.approvals.actions.base import (
     ActionDescription, ActionResult, ApprovableAction,
 )
@@ -228,6 +229,6 @@ def execute(
             f"{send_instance.failed_count} failed, "
             f"{send_instance.excluded_count} excluded."
         ) if send_instance else "Sent.",
-        audit_action="send.fired",
+        audit_action=audit.SEND_FIRED,
         audit_detail={"send_instance_id": send_instance_id},
     )

@@ -123,7 +123,7 @@ def test_a_person_is_never_stopped(world, person):
 
 
 def test_unblock_a_person_clears_any_a_machine_only_its_own(db, world, person):
-    client, _ = person
+    client, user = person
     assert _rename(client, world["variant"], "theirs").status_code == 200
     url = f"/campaigns/variants/{world['variant'].id}/fence"
     with machine(MACHINE) as headers:
@@ -131,8 +131,10 @@ def test_unblock_a_person_clears_any_a_machine_only_its_own(db, world, person):
         assert _rename(api, world["variant"], "still refused", headers).status_code == 423
     assert client.delete(url).status_code == 200
     assert _fence(client, world["campaign"]) is None
-    assert db.query(AuditEventDB).filter(AuditEventDB.action == audit.VARIANT_UNFENCED,
-                                         AuditEventDB.subject_id == world["variant"].id).count() == 1
+    [entry] = db.query(AuditEventDB).filter(AuditEventDB.action == audit.VARIANT_UNFENCED,
+                                            AuditEventDB.subject_id == world["variant"].id).all()
+    # Whose fence it was, by id — not the person's address (task-52).
+    assert entry.detail["was"] == {"type": audit.ACTOR_USER, "id": user.id}
     with machine(MACHINE) as headers:
         assert _rename(api, world["variant"], "now mine", headers).status_code == 200
         assert api.delete(url, headers=headers).status_code == 200

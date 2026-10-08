@@ -218,6 +218,7 @@ class TestAnIntegration:
         assert db.query(ContentChannelReadinessDB).filter_by(content_id=record).count() == 0
         [entry] = _entries(db, audit.CONTENT_READY_UNMARKED, record)
         assert entry.actor_type == audit.ACTOR_INTEGRATION and entry.detail["channel"] == "email"
+        assert "marked_by" not in entry.detail, "the marker's address stays out of the log (task-52)"
 
     def test_it_may_not_change_machine_ready(self, record):
         with machine([CONTENT_MANAGE]) as headers:
