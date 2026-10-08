@@ -8,6 +8,11 @@ fastapi
 uvicorn
 psycopg2-binary
 sqlalchemy
+# SQLAlchemy needs greenlet only on some processors (Linux x86-64, CI's) and
+# not on Apple Silicon, so a lock compiled on a Mac left it out and CI's
+# hash-checked install refused it (2026-10-08). Declared so it is locked, with
+# hashes for every platform, wherever the lock is compiled.
+greenlet
 jinja2
 # Imported by our own code (app/rendering/service.py), not only by Jinja.
 markupsafe
