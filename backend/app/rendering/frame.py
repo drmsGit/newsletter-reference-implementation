@@ -215,12 +215,18 @@ def what_rendered(frame: dict, picks: list[dict]) -> tuple[bool, int]:
 
 def render_frame(
     db: Session, frame: dict, recipient_id: int | None = None, picks: list[dict] | None = None,
+    *, empty_slots: frozenset[int] = frozenset(),
 ) -> tuple[RenderedArtifact, list[dict]]:
     """Lay a frame out for one recipient. Returns `(artifact, picks)`.
 
     `picks=None` makes each slot's pick now (the send, or a preview); recorded
     `picks` are re-used as they are (reconstruction). The returned picks are
     what a delivery record stores.
+
+    `empty_slots` names slots whose decision found nothing in this run: they
+    render empty instead of falling back to an older stored pick that the
+    decision has just refused (task-320). A preview, which runs no decision,
+    passes none and shows the last stored pick, as it always has.
     """
     from app.rendering.service import module_html, email_document, strip_rich_text
 
@@ -238,9 +244,12 @@ def render_frame(
             if kind == KIND_STATIC:
                 content_id = None  # the static wrapper never carried one
         elif kind == KIND_SLOT:
-            pick = recorded.get(entry["module_id"]) if picks is not None else _pick_for_slot(
-                db, entry, channel, recipient_id,
-            )
+            if picks is not None:
+                pick = recorded.get(entry["module_id"])
+            elif entry["decision_slot_id"] in empty_slots:
+                pick = None
+            else:
+                pick = _pick_for_slot(db, entry, channel, recipient_id)
             if pick is not None:
                 made.append(pick)
                 variables, content_id = pick["variables"], pick["content_record_id"]

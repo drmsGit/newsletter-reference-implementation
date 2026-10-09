@@ -1045,9 +1045,14 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
 
         # Resolve + persist each decision slot for this recipient before
         # rendering, so their personalized content is chosen and recorded.
+        # A slot that finds nothing NOW is remembered, so the render does not
+        # fall back to an older stored pick the decision has just refused
+        # (task-320) — the stored resolutions stay as history.
+        empty_slots: set[int] = set()
         for slot in decision_slots:
             try:
-                execute_decision_slot(db, slot.id, recipient_id=execution.recipient_id)
+                if execute_decision_slot(db, slot.id, recipient_id=execution.recipient_id) is None:
+                    empty_slots.add(slot.id)
             except ConsentDenied:
                 # Unreachable in practice — the stack above already excluded
                 # every non-consenting recipient, so this is belt and braces
@@ -1062,7 +1067,7 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
                 # this handler is for. Before ADR-163 point 8 it also
                 # swallowed the consent guard, which is how a compliance
                 # defect came to read as a rendering behaviour.
-                pass
+                empty_slots.add(slot.id)
 
         # Resolve HTML per recipient rather than reusing one shared
         # variant-level snapshot — decision-slot personalization can
@@ -1080,6 +1085,7 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
         # recipient, and returned so it can be recorded.
         artifact, picks = render_frame(
             db, snapshot.render_context, recipient_id=execution.recipient_id,
+            empty_slots=frozenset(empty_slots),
         )
 
         # Nothing meaningful for this person (task-228; ADR-086 addendum

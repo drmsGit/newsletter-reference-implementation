@@ -72,9 +72,13 @@ def world(db, monkeypatch):
     def fake_execute(db_, slot_id, recipient_id=None, **_):
         if recipient_id not in resolves:
             raise ValueError("nothing to pick")
-        db_.add(DecisionResolutionDB(decision_slot_id=slot_id, recipient_id=recipient_id,
-                                     content_record_id=record.id))
+        resolution = DecisionResolutionDB(decision_slot_id=slot_id, recipient_id=recipient_id,
+                                          content_record_id=record.id)
+        db_.add(resolution)
         db_.commit()
+        # Like the real one: the resolution it made. A send treats None as
+        # "found nothing now" (task-320).
+        return resolution
 
     monkeypatch.setattr("app.decision.service.execute_decision_slot", fake_execute)
     original = mock_module.MockProvider.send
