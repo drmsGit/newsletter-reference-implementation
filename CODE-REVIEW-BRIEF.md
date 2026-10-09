@@ -69,6 +69,13 @@ Each is argued in an ADR or a docstring. Disagree if you like, but as a
 
 From the work queue (`docs/queue/`, read with the `backlog` CLI):
 
+- **The external review of 2026-10-09 found nine bugs**, all open and at the
+  head of the queue (task-315 to task-323): a cross-brand scheduled-send
+  sweep, a login-code verification race, the sign-in timing oracle reopened
+  by the scrypt hash, duplicate mail on retry, a suppression lost on a failed
+  webhook, a stale decision pick, push slots checked against email consent, a
+  lost envelope edit, and "sent" reported for a failed send. The report is
+  `docs/queue/docs/doc-1`.
 - **No unsubscribe.** There is no unsubscribe or double opt-in route and no
   `List-Unsubscribe` header, and emails carry no footer yet (task-56, task-301).
   The design question that blocked it is settled (ADR-169 point 1); it is not
@@ -92,7 +99,7 @@ the fix is worth more than a fresh look elsewhere:
 
 | Was | Fixed in |
 |---|---|
-| The sign-in timing oracle (a known address answered slower) | task-5; launch gate 4b closed 2026-09-29 (ADR-151 addendum) |
+| The sign-in timing oracle (a known address answered slower) | task-5; launch gate 4b closed 2026-09-29 (ADR-151 addendum). **Reopened** by task-35's scrypt hash, found 2026-10-09: task-317 |
 | `brand_id=None` meaning *every brand* on list functions; `permissions_for(brand_id=None)` as a union across brands | task-16, task-38; brand is now a required argument (ADR-172) |
 | `recipients.consent` platform-level, so one brand's manager could write another brand's consent | task-7 |
 | `delete_brand` guarding fewer tables than carry a brand | task-19, task-40 |
