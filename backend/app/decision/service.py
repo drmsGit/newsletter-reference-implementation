@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app.campaigns.db_models import DecisionSlotDB, DecisionResolutionDB
+from app.campaigns.db_models import DecisionSlotDB, DecisionResolutionDB, VariantDB
 from app.campaigns.models import DecisionResolution
 from app.campaigns.service import create_decision_resolution, to_decision_resolution
 from app.decision.strategies.base import sending_brand_id
@@ -48,7 +48,11 @@ def execute_decision_slot(
         # catch ValueError are unaffected, while a caller that needs to tell a
         # compliance refusal apart from "the strategy resolved nothing" now can.
         # That conflation is the root of the open P0 (ADR-163 point 8).
-        require_consent(db, recipient_id, sending_brand_id(db, slot), purpose=MARKETING)
+        # On the slot's own channel (task-321): consent is per channel and
+        # purpose (ADR-163), and the default here is email — so a push slot
+        # refused push-only consent and accepted email-only consent.
+        channel = db.query(VariantDB.channel).filter(VariantDB.id == slot.variant_id).scalar()
+        require_consent(db, recipient_id, sending_brand_id(db, slot), channel=channel, purpose=MARKETING)
 
     strategy = get_strategy(slot.decision_strategy)
 
