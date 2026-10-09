@@ -36,8 +36,14 @@ commercial product. Learnings feed the separate Condor use case.
     `docs/queue/completed/`. Check there before calling something unfixed.
   - Descriptions are essays, not tickets: keep the reasoning and `file:line`
     citations; never summarise an entry down.
-  - Backlog.md's own `docs/queue/decisions/` and `docs/queue/docs/` stay
-    unused — decisions go in ADRs or `docs/business/decisions/`.
+  - **Pre-stage for ChatGPT only:** `docs/queue/drafts/`,
+    `docs/queue/decisions/` and `docs/queue/docs/` are where the external
+    reviewer (ChatGPT) puts its findings, design questions and review
+    report. Nothing there is accepted work. Claude never writes there; it
+    reads them only to triage with the user, item by item. What the user
+    accepts becomes a task (`backlog draft promote`, then an ordinal), an ADR
+    or a business decision — decisions still live in ADRs or
+    `docs/business/decisions/`, never in `docs/queue/decisions/`.
 - `docs/backlog.md` is a signpost to the queue since 2026-09-27. Never add to
   it. The last full version is `git show b70f432^:docs/backlog.md`; the "line
   N" in each migrated task's notes refers to that version. ADRs and agent
