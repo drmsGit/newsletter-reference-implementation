@@ -56,6 +56,14 @@ class ResendProvider(DeliveryProvider):
             "subject": artifact.envelope.get("subject") or "",
             "html": artifact.body or "",
         }
+        # One-click unsubscribe (RFC 8058; ADR-191): required of bulk senders by
+        # Gmail and Yahoo. The URL rides in the envelope like the subject.
+        unsubscribe = artifact.envelope.get("list_unsubscribe")
+        if unsubscribe:
+            payload["headers"] = {
+                "List-Unsubscribe": f"<{unsubscribe}>",
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            }
         try:
             response = httpx.post(
                 RESEND_API_URL,

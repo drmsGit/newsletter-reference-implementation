@@ -215,7 +215,7 @@ def what_rendered(frame: dict, picks: list[dict]) -> tuple[bool, int]:
 
 def render_frame(
     db: Session, frame: dict, recipient_id: int | None = None, picks: list[dict] | None = None,
-    *, empty_slots: frozenset[int] = frozenset(),
+    *, empty_slots: frozenset[int] = frozenset(), unsubscribe: dict | None = None,
 ) -> tuple[RenderedArtifact, list[dict]]:
     """Lay a frame out for one recipient. Returns `(artifact, picks)`.
 
@@ -227,6 +227,12 @@ def render_frame(
     render empty instead of falling back to an older stored pick that the
     decision has just refused (task-320). A preview, which runs no decision,
     passes none and shows the last stored pick, as it always has.
+
+    `unsubscribe` — `{"url", "brand"}` from `subscriptions.footer_for`, or as
+    recorded in a delivery record — adds the footer line and puts the URL in the
+    envelope, where the provider turns it into the List-Unsubscribe headers
+    (ADR-191 point 5; the envelope is the artifact's delivery metadata, ADR-161
+    point 1). Email only; a preview passes none.
     """
     from app.rendering.service import module_html, email_document, strip_rich_text
 
@@ -277,9 +283,16 @@ def render_frame(
             fields = strip_rich_text(variables, get_manifest(channel, entry["module_type"]))
 
     if channel == "email":
+        from app.subscriptions.texts import footer_html
+
+        envelope = dict(frame.get("envelope") or {})
+        footer = ""
+        if unsubscribe:
+            footer = footer_html(unsubscribe["brand"], unsubscribe["url"])
+            envelope["list_unsubscribe"] = unsubscribe["url"]
         artifact = RenderedArtifact(
-            role=ROLE_HTML, media_type="text/html", body=email_document(html_parts),
-            envelope=dict(frame.get("envelope") or {}),
+            role=ROLE_HTML, media_type="text/html", body=email_document(html_parts, footer),
+            envelope=envelope,
         )
     else:
         artifact = RenderedArtifact(

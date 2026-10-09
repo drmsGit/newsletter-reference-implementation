@@ -30,7 +30,7 @@ from app.auth.permissions import (
     CONTENT_MANAGE, INSIGHT_WRITE, RECIPIENTS_CONSENT, RECIPIENTS_MANAGE, VIEW,
 )
 from app.auth.policy import (
-    PROVIDER_SIGNED, PUBLIC_AUTH, UNMAPPED, required_permission,
+    PROVIDER_SIGNED, PUBLIC_AUTH, RECIPIENT_TOKEN, UNMAPPED, required_permission,
 )
 from app.database import SessionLocal
 from main import app
@@ -252,6 +252,12 @@ class TestAPersonMayUseTheJsonApi:
             if path.startswith("/ui") or path.startswith("/static"):
                 continue
             if not (methods & {"POST", "PUT", "PATCH", "DELETE"}):
+                continue
+            # The recipient's unsubscribe page (ADR-191) is the one exemption,
+            # and it is asserted exactly in `TestPermissionsDecideTheRest`:
+            # its token is the credential and no session is read, so there is
+            # no cookie-authorised request for CSRF to protect.
+            if required_permission("POST", path) == RECIPIENT_TOKEN:
                 continue
             # Read the resolved `dependant`, not `route.dependencies`: FastAPI
             # merges router-level dependencies into the former, and the latter
@@ -582,6 +588,11 @@ class TestNoRouteIsUnguarded:
             if m in {"POST", "PUT", "PATCH", "DELETE"}
             and required_permission(m, getattr(r, "path", "")) == sentinel
         )
+
+    def test_only_the_unsubscribe_page_is_exempt_as_recipient_token(self):
+        """ADR-191: the token in the path is the whole credential. A second
+        route here would be a second door with no principal behind it."""
+        assert self._exempt(RECIPIENT_TOKEN) == ["POST /unsubscribe/{token}"]
 
     def test_exactly_one_route_is_exempt_as_provider_signed(self):
         """The exemption list is a security boundary. It should be one door,

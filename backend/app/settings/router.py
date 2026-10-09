@@ -25,7 +25,7 @@ from app.settings.audited import audited_settings
 from app.settings.models import (
     AIBudget, AITaskSettings, ApprovalModeChoice, ChannelSetting, DeliveryProviderSetting, ModelChoice,
     PromptPublish, PromptVersion, ProviderUpdate, SendCapUpdate, Settings,
-    SignalTuning, SpendCapUpdate,
+    SignalTuning, SpendCapUpdate, UnsubscribeOptions,
 )
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -152,6 +152,19 @@ def put_send_cap(payload: SendCapUpdate, request: Request, db: Session = Depends
     with audited_settings(request, db, "send_cap", [service.MAX_SEND_RECIPIENTS_KEY]):
         service.save_max_send_recipients(db, payload.max_send_recipients)
     return SendCapUpdate(max_send_recipients=service.get_max_send_recipients(db))
+
+
+@router.get("/unsubscribe", response_model=UnsubscribeOptions, summary="What the unsubscribe page offers")
+def get_unsubscribe_options(db: Session = Depends(get_db)):
+    return UnsubscribeOptions(offer_everything=service.get_unsubscribe_offer_everything(db))
+
+
+@router.put("/unsubscribe", response_model=UnsubscribeOptions, dependencies=_PERSON,
+            summary="Offer 'everything from the company' on the unsubscribe page")
+def put_unsubscribe_options(payload: UnsubscribeOptions, request: Request, db: Session = Depends(get_db)):
+    with audited_settings(request, db, "unsubscribe", [service.UNSUBSCRIBE_OFFER_EVERYTHING_KEY]):
+        service.set_unsubscribe_offer_everything(db, payload.offer_everything)
+    return UnsubscribeOptions(offer_everything=service.get_unsubscribe_offer_everything(db))
 
 
 @router.put(

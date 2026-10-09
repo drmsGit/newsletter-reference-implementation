@@ -376,9 +376,15 @@ def module_html(
     )
 
 
-def email_document(rendered_modules: list[str]) -> str:
+def email_document(rendered_modules: list[str], footer: str = "") -> str:
     """Wrap rendered modules into the inlined email document. Shared by the live
-    and the frame render for the same reason as `module_html`."""
+    and the frame render for the same reason as `module_html`.
+
+    `footer` is the unsubscribe line a sent marketing email carries (ADR-191
+    point 5); a preview has none. **Without one the document is byte-for-byte
+    what it always was**, so every delivery record written before ADR-191
+    still reconstructs to its stored hash (ADR-183).
+    """
     raw_html = f"""<!doctype html>
 <html>
   <head>
@@ -388,7 +394,8 @@ def email_document(rendered_modules: list[str]) -> str:
   </head>
   <body>
     {""}
-    {"".join(rendered_modules)}
+    {"".join(rendered_modules)}{f"""
+    {footer}""" if footer else ""}
   </body>
 </html>"""
     return _inliner.inline(raw_html)

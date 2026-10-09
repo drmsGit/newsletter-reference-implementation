@@ -315,7 +315,9 @@ def test_without_a_subject_the_rebuild_uses_the_sends_fallback(db, world, sent):
     snapshot.render_context = {**snapshot.render_context, "envelope": {}}
     db.commit()
     send_name = db.get(SendInstanceDB, execution.send_instance_id).name
-    expected, _ = render_frame(db, snapshot.render_context, picks=execution.delivery_record["picks"])
+    # With the footer the send recorded (ADR-191), as the rebuild uses it.
+    expected, _ = render_frame(db, snapshot.render_context, picks=execution.delivery_record["picks"],
+                               unsubscribe=execution.delivery_record.get("unsubscribe"))
     expected.envelope["subject"] = send_name
     execution.artifact_hash = artifact_hash(expected)
     db.commit()

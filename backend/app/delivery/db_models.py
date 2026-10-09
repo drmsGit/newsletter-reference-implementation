@@ -98,6 +98,11 @@ class DeliveryExecutionDB(Base):
     exclusion_reason = Column(String(255), nullable=True)
     provider = Column(String(100), nullable=True)
     provider_message_id = Column(String(255), nullable=True, unique=True, index=True)
+    #: The unsubscribe link's credential (ADR-191 point 2, migration 0041): a
+    #: random token minted when the message is sent. The message knows the
+    #: person, brand, channel and purpose, so nothing else is needed — and
+    #: nothing is signed, so no rotated secret can break a link already sent.
+    unsubscribe_token = Column(String(64), nullable=True, unique=True, index=True)
     # Denormalized at plan time (ADR-163 addendum 2026-09-12, point 1). An
     # inbound bounce/complaint webhook resolves a provider message id to this
     # row and must write a consent event keyed (recipient, channel, purpose) —

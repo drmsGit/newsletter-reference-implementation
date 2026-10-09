@@ -98,6 +98,13 @@ class SendCapUpdate(BaseModel):
     max_send_recipients: int = Field(gt=0)
 
 
+class UnsubscribeOptions(BaseModel):
+    """Whether the unsubscribe page offers opting out of everything from the
+    company, beside the sending brand (ADR-191 point 4). Off by default."""
+
+    offer_everything: bool
+
+
 class SpendCapUpdate(BaseModel):
     """Any of the three; an omitted field keeps its current value."""
 

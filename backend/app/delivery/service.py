@@ -1087,9 +1087,15 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
         # From the snapshot's frame, not the live variant (ADR-183): what was
         # approved is what is sent. Each slot's pick is made now, per
         # recipient, and returned so it can be recorded.
+        # The unsubscribe link this message carries (ADR-191): a marketing
+        # email gets a token minted now, a footer line and the one-click
+        # headers. Recorded below so a reconstruction renders the same footer.
+        from app.subscriptions.service import footer_for
+
+        unsubscribe = footer_for(db, execution, send_instance)
         artifact, picks = render_frame(
             db, snapshot.render_context, recipient_id=execution.recipient_id,
-            empty_slots=frozenset(empty_slots),
+            empty_slots=frozenset(empty_slots), unsubscribe=unsubscribe,
         )
 
         # Nothing meaningful for this person (task-228; ADR-086 addendum
@@ -1150,6 +1156,8 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
                 "templates_fingerprint": snapshot.render_context["templates_fingerprint"],
                 "picks": picks,
             }
+            if unsubscribe:
+                execution.delivery_record["unsubscribe"] = unsubscribe
             execution.artifact_hash = artifact_hash(artifact)
 
         # Commit after each execution — if provider.send() raises mid-batch,
@@ -1229,7 +1237,8 @@ def reconstruct_delivery(db: Session, execution_id: int, *, brand_id: int) -> di
     frame = snapshot.render_context
 
     artifact, _ = render_frame(db, frame, recipient_id=execution.recipient_id,
-                               picks=record.get("picks") or [])
+                               picks=record.get("picks") or [],
+                               unsubscribe=record.get("unsubscribe"))
     # The same fallback the send applied, so the two hashes are comparable.
     if artifact.body is not None and not artifact.envelope.get("subject"):
         artifact.envelope["subject"] = send_instance.name

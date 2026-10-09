@@ -299,6 +299,7 @@ class TestEverySettingsWriteIsAudited:
 
         weights, half = settings.get_signal_weights(db), settings.get_half_lives(db)
         cap = settings.get_max_send_recipients(db)
+        offer_everything = settings.get_unsubscribe_offer_everything(db)
         spend = settings.get_ai_spend_cap(db)
         provider = settings.get_ai_provider_name(db)
         mode = settings.get_task_approval_mode(db, task_key)
@@ -314,6 +315,7 @@ class TestEverySettingsWriteIsAudited:
         return {
             ("PUT", "/settings/signals"): ("signals", {"json": {"weights": weights, "half_lives": half}}),
             ("PUT", "/settings/send-cap"): ("send_cap", {"json": {"max_send_recipients": cap}}),
+            ("PUT", "/settings/unsubscribe"): ("unsubscribe", {"json": {"offer_everything": offer_everything}}),
             ("PUT", "/settings/ai/spend-cap"): ("ai_spend_cap", {"json": spend_json}),
             ("PUT", "/settings/ai/provider"): ("ai_provider", {"json": {"provider": provider}}),
             ("PUT", "/settings/ai/tasks/{task_key}/approval"):

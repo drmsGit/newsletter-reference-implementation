@@ -133,6 +133,7 @@ from app.modules.router import router as modules_router
 from app.approvals.router import router as approvals_router
 from app.auth.integrations_router import router as integrations_router
 from app.settings.router import router as settings_router
+from app.subscriptions.router import router as unsubscribe_router
 from app.auth.router import context_router
 
 from app.overrides.db_models import ContentOverrideDB
@@ -810,6 +811,13 @@ app.include_router(integrations_router, dependencies=_api)
 # Reads are `view`; writes are people only and `settings.manage` (ADR-150's
 # addendum of 2026-10-02), with `ai.run` too for prompts and models.
 app.include_router(settings_router, dependencies=_api)
+
+# **Public, and deliberately outside both signed-in planes** (ADR-191): the
+# recipient's unsubscribe page. The token in its path is the only credential —
+# no session is read and no principal acts — so it carries neither the session
+# guard nor CSRF. `policy.py` classes the path as RECIPIENT_TOKEN, where an
+# auditor reading the table will find it.
+app.include_router(unsubscribe_router)
 
 
 # --- the manager client (ADR-170 point 1, ADR-168 point 3) ------------------

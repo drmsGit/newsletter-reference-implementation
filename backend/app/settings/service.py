@@ -19,6 +19,10 @@ AI_SPEND_CAP_KEY = "ai_spend_cap"
 AI_PROVIDER_KEY = "ai_provider"
 AI_TASK_MODELS_KEY = "ai_task_models"
 CHANNEL_AVAILABILITY_KEY = "channel_availability"
+#: ADR-191 point 4: whether the unsubscribe page offers "everything from the
+#: company" beside the sending brand. Off by default, so a one-brand deployment
+#: never shows a second option that implies brands the reader has not heard of.
+UNSUBSCRIBE_OFFER_EVERYTHING_KEY = "unsubscribe_offer_everything"
 
 # AI token budget (ADR-144 §5). Two numbers, not one: warn first, then hard stop.
 # The buffer between them is the point — it is what lets the hard stop be a
@@ -130,6 +134,16 @@ def get_max_send_recipients(db: Session) -> int:
         return int(value) if value is not None else DEFAULT_MAX_SEND_RECIPIENTS
     except (TypeError, ValueError):
         return DEFAULT_MAX_SEND_RECIPIENTS
+
+
+def get_unsubscribe_offer_everything(db: Session) -> bool:
+    """Whether the unsubscribe page offers opting out of everything (ADR-191)."""
+    return bool(get_config(db, UNSUBSCRIBE_OFFER_EVERYTHING_KEY, False))
+
+
+def set_unsubscribe_offer_everything(db: Session, offered: bool) -> bool:
+    set_config(db, UNSUBSCRIBE_OFFER_EVERYTHING_KEY, bool(offered))
+    return get_unsubscribe_offer_everything(db)
 
 
 # --- channel availability (ADR-160 point 8) --------------------------------

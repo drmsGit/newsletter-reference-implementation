@@ -60,6 +60,14 @@ PROVIDER_SIGNED = "provider.signed"
 # which is what caught this being conflated in the first place.
 PUBLIC_AUTH = "auth.public"
 
+# Returned for the recipient-facing unsubscribe page (ADR-191). A third reason
+# to be exempt, and so a third sentinel: the caller is a person who received a
+# message, not a principal of this platform, and the random token in the path
+# is the whole credential — it names one delivered message, which says who,
+# which brand, channel and purpose. No session is read, so CSRF has nothing to
+# protect. A test asserts the list exactly.
+RECIPIENT_TOKEN = "recipient.token"
+
 WRITE_POLICY: tuple[tuple[str, str], ...] = (
     # --- the working context -------------------------------------------------
     # **`/ui/brands` must stay above `/ui/brand`, and the reason is the table's
@@ -213,6 +221,8 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
 
     # A provider signs its own callbacks. Above /provider so it wins.
     ("/provider/webhooks/", PROVIDER_SIGNED),
+    # A recipient's unsubscribe link: its token is the credential (ADR-191).
+    ("/unsubscribe/", RECIPIENT_TOKEN),
     # ADR-150 point 5: gated by `insight.write` rather than an `events.ingest`
     # key of its own, because ingesting a provider event and posting an insight
     # event both end in an engagement row feeding the signal layer. One key

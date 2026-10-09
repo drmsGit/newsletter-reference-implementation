@@ -58,6 +58,7 @@ const API_PREFIXES = [
   '/settings',
   '/snapshots',
   '/ui',
+  '/unsubscribe',
 ]
 
 /**
