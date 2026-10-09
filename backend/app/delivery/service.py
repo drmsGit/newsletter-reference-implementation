@@ -1036,6 +1036,12 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
         # opt-out stops future mail, it does not rewrite what was sent.
         if execution.status == "sent":
             continue
+        # Already found uncertain by an earlier retry: still never resent, on
+        # this retry or any later one (task-318). Found by Codex's regression
+        # test 2026-10-09 — the first version skipped only on the retry that
+        # made it uncertain, and the one after mailed the person.
+        if execution.status == UNCERTAIN:
+            continue
 
         # Left `sending` by an earlier run: the provider was called and gave no
         # answer — it may have sent (task-318, AC #3). Decided by the user: never
