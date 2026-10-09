@@ -7,7 +7,7 @@ topic:
   - automation
   - governance
 created: 2026-07-31
-modified: 2026-10-08
+modified: 2026-10-09
 source:
   - "AI Layer design interview (interview-prep, 2026-07-27 – 31), Cluster 3"
 depends_on:
@@ -612,6 +612,73 @@ Nothing else in §4 changes: the inbox, the audit trail shared with ADR-141, the
 notification-only rule for email and push, the state-based claim, the brand check and
 the named-subject rule of the 2026-09-29 addenda are untouched.
 
+## Addendum 2026-10-09 — releasing a stranded send fails its stuck held request
+
+Prompted by task-326, and decided by the user in chat on 2026-10-09 (option 3 of
+three). Point 6 of the first 2026-09-29 addendum stands for every action but one.
+What changes is how a held send's request leaves `executing` once its send has been
+released.
+
+**What point 6 says.** A crash during execution leaves a held request `executing`,
+deliberately, and nothing retries it, because nobody can know whether the action ran.
+Resolving it is *"a person's investigation, not a button"*, and point 6 calls it
+*"the same shape as a send left in `sending`"*.
+
+**That shape now has a way out, and the request did not.**
+[[ADR-192 — A Stranded Send Is Flagged, and a Person Releases It]] (task-325) lets a
+person release a send that has been `sending` with no activity for 30 minutes. The
+send becomes `failed`, and task-318's retry rules make retrying it safe: sent stays
+sent, the in-flight recipient becomes `uncertain` and is never resent, and the
+never-attempted ones are sent. But the held request whose approval was running that
+send stayed `executing`. Point 5 keeps `executing` inside
+`ux_pending_actions_one_open_per_subject`, so the stuck row blocked any new held
+request for that send, and only SQL could clear it.
+
+**1. Releasing a stranded send also fails its `executing` held requests.** Every held
+request for `send.fire_send_instance` on that send that is `executing` moves to
+`failed`, in the same transaction as the release. The send and its request change
+together or not at all. `release_send_instance` in `backend/app/delivery/service.py`
+does this through `fail_stuck_requests` in `backend/app/approvals/service.py`.
+
+**2. The request records why.** Its `execution_error` says it was released with its
+stranded send. Each request failed this way is audited `approval.failed`, with the
+person who released the send as the actor.
+
+**3. This adds no new judgement.** Point 6 refused a button because nobody could know
+whether the action ran. For this one action, the release has already answered that:
+a person has seen the flag and judged the send's run dead. Failing the request records
+that same finding on the request's row. It does not run anything again, and retrying
+the send still goes through ADR-192 and task-318.
+
+**4. Everything else stays as point 6 says.** A release does not touch requests for
+other actions, for other sends, or still `pending`. Every other action's crashed
+request, such as content readiness or applying an AI suggestion, stays `executing`
+until a person investigates, because nobody has yet checked, action by action, whether
+a retry is safe there.
+
+**Two other options were rejected.** Keeping point 6 unchanged for sends too would
+have left a released send's held request with a SQL-only way out, after ADR-192 had
+given the send itself one without SQL. A general flag-and-fail for every action's
+stuck request was rejected because it needs a safety analysis for each action, and
+that has not been done. For sends, task-318 and ADR-192 supply it.
+
+**What it gains.**
+
+- **A released send needs no database edit at all.** The send and its held request
+  leave their stuck states in one act by one person.
+- **A held request for the send can be raised again after release**, because the
+  failed row no longer occupies the open-request index.
+
+**What it costs.**
+
+- **Two places now know about stuck requests:** the send release, and point 6 for
+  everything else. A reader of one has to know about the other.
+- **Every other action's stuck `executing` request still needs SQL.**
+
+Nothing else in §4 changes: the inbox, the audit trail shared with ADR-141, the
+notification-only rule for email and push, the state-based claim, the brand check, the
+named-subject rule and the subject scope of the earlier addenda are untouched.
+
 ## Related ADRs
 
 ### Depends On
@@ -623,3 +690,6 @@ the named-subject rule of the 2026-09-29 addenda are untouched.
 - [[ADR-092 — Automation Layer Receives Triggers, It Does Not Own Trigger Sources]]
 - [[ADR-094 — Campaign Execution May Be Started by Scheduler or Automation]]
 - [[ADR-132 — Signal Layer Implementation Event-Sourced Contributions with Decay-on-Read]]
+
+### Referenced By
+- [[ADR-192 — A Stranded Send Is Flagged, and a Person Releases It]]

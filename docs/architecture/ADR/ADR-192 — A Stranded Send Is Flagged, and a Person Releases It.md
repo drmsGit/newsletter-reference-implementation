@@ -84,11 +84,15 @@ The send carries `stranded` and the time of its last activity. Both appear on th
 
 ## Notes
 
-- **Not a supersession, and no ADR's status changes.** The second 2026-09-29 addendum of [[ADR-142 — Autonomous Workflows and the Automation Boundary]] (point 6) compares a crashed held request left `executing` to "a send left in `sending`", and says resolving it is "a person's investigation, not a button". That point is about the held request's row, and this record does not change it. For a send, release is still a person's decision, taken after the flag has said what the send holds.
+- **Not a supersession, and no ADR's status changes.** The first 2026-09-29 addendum of [[ADR-142 — Autonomous Workflows and the Automation Boundary]] (point 6) compares a crashed held request left `executing` to "a send left in `sending`", and says resolving it is "a person's investigation, not a button". That point is about the held request's row, and this record does not change it. For a send, release is still a person's decision, taken after the flag has said what the send holds.
 - **Not decided here: the held request of a send that died during approval.** If the process dies while `send_fire` runs, the send is stranded and its held request stays `executing`. Releasing the send does not touch that request. ADR-142's one-open-request index covers `executing`, so a new held request for the same send would be refused until the old row is resolved. A person can still retry the send directly.
 - **The same 30 minutes as the composer fence.** [[ADR-180 — A Lock Is Advisory for a Person and Binding for a Machine]], addendum 2026-10-04, lets a fence lapse after 30 minutes without edits. The two thresholds were chosen separately and do not depend on each other. ADR-180 is also the precedent for an action that a person may take and a machine may not.
 - **Related queue items.** task-124 part (c), a queue with a log, would give a send a better liveness signal than `updated_at`. task-81, provider-side reconciliation, could later turn an `uncertain` execution into sent or not-sent by asking the provider. That would shrink what a person has to resend by hand after a release.
 - **No decision-log entry.** `docs/playbook-strategy.md` has no entry for this decision. The reasoning above comes from task-325 and the 2026-10-09 conversation.
+
+## Addendum 2026-10-09 — release also fails the send's stuck held request
+
+Prompted by task-326 and decided the same day by the user, recorded in the 2026-10-09 addendum to [[ADR-142 — Autonomous Workflows and the Automation Boundary]]. This settles the Notes' *"Not decided here"* item above. Releasing a stranded send now also moves every held request for `send.fire_send_instance` on that send that is still `executing` to `failed`, in the same transaction as the release, so the send and its request change together or not at all. Each such request's `execution_error` says it was released with its stranded send, each is audited `approval.failed` by the person who released, and the `send.released` entry lists their ids. A new held request for the send is therefore no longer refused after a release. Point 4 is unchanged: release is still a person's act, refused unless the send is stranded at that moment. Held requests for other actions, for other sends, or still `pending` are not touched.
 
 ## Related ADRs
 

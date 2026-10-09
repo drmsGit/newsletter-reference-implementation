@@ -713,6 +713,14 @@ Recorded in [[ADR-192 — A Stranded Send Is Flagged, and a Person Releases It]]
 
 **Status:** built the same day (task-325).
 
+### 2026-10-09 — Releasing a stuck send also clears its stuck approval
+
+**Context:** when the program dies while an approval is running a send, the approval request stays "executing" too — deliberately, by the 2026-09-29 rule that a crashed request is a person's investigation, not a button. Since stuck sends can be released (ADR-192), the two halves disagreed: the send could be freed, its request could not, and while it stood no new request could be raised for that send (task-326). **Decided by the user: release clears it** (option 3 of three) — releasing the send already establishes that the run died, so the send's request is marked failed with it, in the same step, recorded as the releasing person's. Every other kind of approved action keeps the old rule until each is checked for whether retrying it is safe.
+
+Recorded in the 2026-10-09 addendum to [[ADR-142 — Autonomous Workflows and the Automation Boundary]].
+
+**Status:** built the same day (task-326).
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*
