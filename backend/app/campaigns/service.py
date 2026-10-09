@@ -379,9 +379,13 @@ def update_variant(
     # alone leaves this row clean and `onupdate` never fires — two editors
     # changing the subject would never conflict (task-110).
     variant.updated_at = func.now()
-    db.commit()
+    # **One commit for the rename and the envelope** (task-322). Committing
+    # the rename first released the lock `refuse_stale` took, and a second
+    # editor could write its envelope in between — then be overwritten by this
+    # one, which never saw it: the lost update ADR-180 point 2 exists to stop.
     if envelope is not None:
-        set_envelope_fields(db, variant.id, envelope, brand_id=brand_id)
+        set_envelope_fields(db, variant.id, envelope, brand_id=brand_id, commit=False)
+    db.commit()
     db.refresh(variant)
     return to_variant(variant, db)
 
@@ -444,7 +448,7 @@ def list_modules_for_variant(
 
 
 def set_envelope_fields(
-    db: Session, variant_id: int, fields: dict, *, brand_id: int
+    db: Session, variant_id: int, fields: dict, *, brand_id: int, commit: bool = True,
 ) -> None:
     """Write this variant's envelope copy into the module that declares it.
 
@@ -494,7 +498,10 @@ def set_envelope_fields(
         # Everything cleared: remove the module rather than keep an empty one.
         if existing is not None:
             db.delete(existing)
-            db.commit()
+            if commit:
+                db.commit()
+            else:
+                db.flush()
         return
 
     if existing is None:
@@ -506,7 +513,10 @@ def set_envelope_fields(
         ))
     else:
         existing.module_data = data
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
 
 
 def create_module_for_variant(
