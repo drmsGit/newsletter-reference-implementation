@@ -6,7 +6,7 @@ topic:
   - business-strategy
   - market-context
 created: 2026-07-12
-modified: 2026-07-12
+modified: 2026-10-09
 ---
 
 # Business Interview — Per-Feature Log
@@ -148,3 +148,88 @@ A Klaviyo-AI or Claude+MCP user gets "suggest 3 subject lines" instantly, no set
 - **PII posture** — the task deliberately sends only editorial content, no recipient identity (`subject_preheader.py:13-15`); a "sync everything to the vendor's AI" flow can't make that guarantee.
 
 **Not flagged as wrong-axis.** It would be wrong-axis only if sold as "generate marketing copy faster" — it isn't; it's sold (per the ADRs and docstrings) as *AI you can budget, audit, and reproduce, behind a swappable contract*. That squarely matches the sharpened governance/data-ownership/teaching audience, and directly answers the baseline's own worry about competing with Klaviyo+AI on production speed — this competes on the control axis instead, where the single-vendor agent is structurally weak. **One caveat to carry into positioning:** the "hard spend cap" claim is currently honest only for sequential runs (see interview-prep Q4); pitching it as concurrency-safe would overstate what the code guarantees today.
+
+---
+
+## Per-feature round since 2026-08-02 (ChatGPT) — 2026-10-09
+
+> Prepared by ChatGPT (GPT-6 / Codex) on 2026-10-09 in its pre-stage (`docs/queue/docs`, doc-9) and appended here by the user's decision the same day.
+
+Prepared 2026-10-09. Questions for the maintainer; no adopted answers, classifications of core/surface, or proposed fixes. Severity markers describe the interview finding, not new launch gates. Only `docs/business/LAUNCH-GATES.md` governs exposure. Code checked at `50db60f` and rechecked at `05088de4`; delivery source advanced during concurrent work, and citations below use the final inspected source.
+
+### BF-CI1 — Who inherits maintenance when the reference becomes a fork? 🟡 deferred
+
+**Question / adopter assumption:** The workflow now checks vulnerabilities even without a push. What ongoing advisory-triage responsibility is the adopter expected to assume once an agency hands the installation to its customer? Who is assumed to read a failed scheduled run and determine whether the deployed revision is affected?
+
+**Premise and evidence:** `.github/workflows/ci.yml:20` enables scheduled execution, `:24` supplies the weekly trigger, `:91` checks runtime Python dependencies, `:118` checks client runtime dependencies and `:120` reports dev-tool vulnerabilities without blocking. This code is a check workflow; no deployment or agency/customer handoff is implemented there. It proves execution of checks, not somebody's response to them. ADR-189 and ADR-190 govern the area. There is no dedicated CI/dependency page in `docs/architecture/Code/`; `testing.md` is adjacent documentation.
+
+**Other per-feature prompts, left for the interview:**
+- **Sendy/Listmonk/Mautic:** In an adopter's actual comparison with those tools, is owning advisory response part of the purchasing decision, or an unpriced operational duty? Which installed revision and hosting arrangement would make that comparison fair?
+- **Core versus surface:** Which part of the ongoing maintenance duty belongs to learning the reference architecture, and which belongs to the agency's particular support contract? The chosen blocking rule set and scan cadence are already settled; this question does not reopen them.
+- **Teaching gap:** What must a teacher explain about a green code check versus the security state of an already deployed installation, and about the different meaning of runtime failures and dev-tool warnings?
+- **Klaviyo + an AI agent in one prompt:** Even if an agent produces equivalent checks in one instruction, what adoption evidence would show that owning their operation is valuable to this buyer? Does transparent maintenance responsibility support the existing control/teachability axis, or merely add unpaid work?
+
+**Checked against:** Both passes of `docs/business-interview-baseline.md` (A3 addresses stack choice, P2-H3 addresses governed AI vendor scope); `docs/business-interview.md`'s 2026-07-12 positioning and 2026-08-02 AI sections; all interview-prep files, with relevant hits in the AI design interview's development boundary; `docs/business/` and its decision files; playbook §5; completed task-105, task-235, task-236 and task-98; open task-311 and task-55. ADR-190 Decision points 1–5 and Negative already accept weekly red runs, warning-only style findings and manual SHA updates. ADR-143 addresses CI portability. None of these assigns post-handoff responsibility for acting on a scheduled result or claims a checked source revision equals the deployed installation. This is that narrower operating assumption, not a request for another CI feature.
+
+### BF-SUB1 — Does the promise of durable links include durable infrastructure? 🟡 deferred
+
+**Question / adopter assumption:** A delivered message embeds the deployment's public address, while its token never expires. What continuity of the public callback address and installation is assumed when an agency changes hosting or ends a support engagement? Is the documented claim that links never break intended to cover only token/key lifetime, or also that operational continuity?
+
+**Premise and evidence:** `backend/app/subscriptions/service.py:25` reads the public base URL, `:33` concatenates the fixed token path, and `:49` produces the URL stored with the delivered artifact. `backend/app/delivery/service.py:1201` passes that data to rendering and `:1271` preserves it in the delivery record. Public GET/POST handlers are `backend/app/subscriptions/router.py:24` and `:36`; lookup requires the execution and sending-brand rows in `backend/app/subscriptions/service.py:56`. ADR-191 point 2 settles non-expiring stored tokens and Negative settles configuring the public URL; Positive says links never break because signing and expiry cannot invalidate them. The remaining question is the scope of the durability claim across infrastructure changes, not whether tokens should expire. There is no subscriptions page in `docs/architecture/Code/`.
+
+**Other per-feature prompts, left for the interview:**
+- **Sendy/Listmonk/Mautic:** For the deployment the adopter actually considers, which party owns continued service of callback URLs in those alternatives? Which responsibility is comparable to the agency's own callback endpoint here? No current comparative feature claim is assumed.
+- **Core versus surface:** Is continuity of an already mailed address a universal obligation of using the stored-token core, while the hosting arrangement is an adopter-specific responsibility? Which part of that distinction should the maintainer confirm?
+- **Teaching gap:** What must a teacher add so a reader understands that a non-expiring database credential does not prove that an old domain remains reachable or that the referenced rows remain available?
+- **Klaviyo + an AI agent in one prompt:** If an agent can produce an unsubscribe endpoint in one instruction, what value does independently owning its lifetime deliver, and what continuing duty is transferred to the adopter? This is a question about ownership, not a claim that another product lacks unsubscribe.
+
+**Checked against:** Baseline F1, G1, M2, P2-E1/E2/E3; per-feature 2026-07-12 consent/ownership axis; all interview-prep files (Delivery/Providers/Recipients consent and provider questions and Manager Workflow route-versus-flow discussion); `docs/business/` including the provider strategy and naming records; playbook §5; completed task-56 and open task-301, task-324, task-136 and task-55. ADR-191 settles token generation, no expiry, confirmation/one-click, scope and the public base URL; ADR-154 and task-136 already own data retention. Task-55 asks for the reference hosting/security deployment, rather than continuity of URLs already sent after an agency handoff. Those choices remain closed. No question here proposes token expiry, a retention model or a hosting design; it asks whether the link-durability claim assumes continued infrastructure ownership after handoff.
+
+### Significant shipped features covered, with settled questions excluded
+
+The following is a coverage ledger, not additional interview questions. Each row was checked against current code and the prior decisions. Established business judgements are left with their original owners.
+
+| Shipped area | Current code premise | Duplicate disposition and where the five business lenses were already reached |
+|---|---|---|
+| Human/machine access and brand scope | `backend/app/auth/service.py:1045` shares permission resolution; `backend/app/auth/integrations.py:387` authenticates machines | ADR-150/151/166/172; Auth and Brand Boundary clusters; P2-A/B/G. Do not ask again whether brands are tenants, whether machines get `view`, or whether agencies want unlimited multi-tenant SaaS. |
+| Approval inbox and held channel readiness | `backend/app/approvals/service.py:103` holds requests; `:261` approves them; `backend/app/content/service.py:838` writes readiness | ADR-142 addenda, Manager Workflow cluster 1, Channel Readiness final pass, task-206/task-210. The judgement-first entry screen, optional comments and no deadline on copy review are already choices. Approval crash recovery is now open task-326. |
+| React manager and keyboard workflows | `frontend/src/App.tsx:35` routes the manager screens; `frontend/src/shortcuts/Shortcuts.tsx:75` handles the shared shortcut registry | ADR-168/170/173; Variant Editor Cluster 1 and Manager Workflow; BETA-SCOPE §5. Framework, same-origin auth, keyboard-first workflow, and plain CSS are settled. Browser-level flow verification is already task-302. |
+| Composer, catalogue writes and overrides | `backend/app/content/service.py:305` edits records and `:1046` publishes versions; `backend/app/campaigns/service.py:767` records hidden fields | ADR-177/178/180/186/187; Variant Editor plus Campaign/Content Write and Element Hiding final passes. Reuse, explicit catalogue edits, field-level hiding and required-when-shown already have resolutions; do not ask them again as adoption assumptions. |
+| Channel-neutral composition, readiness and second-channel evidence | `backend/app/content/service.py:888` writes machine readiness; the channel renderers/providers are separately registered | ADR-160–165/167/174; Omni-Channel interview and Channel Readiness final pass; P2-F/H. Channel tailoring and the locale gap are already asked; updated code evidence belongs in the separate P2-overtaken appendix. |
+| Audience authoring, explanations and engagement criteria | `backend/app/audience/service.py:1096` resolves audiences; `backend/app/insight/service.py:32` records events | ADR-176/188; Audience Write Surface final pass; Manager Workflow cluster 4; baseline K1/J1; task-294/task-299. Flat rules, event-time windows, “received” meaning and follow-up scope already have decisions or queue entries. |
+| Snapshots and delivery reconstruction | `backend/app/snapshots/service.py:37` freezes a frame; `backend/app/delivery/service.py:1266` records recipient picks | ADR-183; Snapshots/Rendering cluster and Variant Editor send-review cluster; reporting task-58. Do not re-ask full-artifact storage, reconstruction guarantees or generic export/analytics scope. |
+| Send eligibility and empty-content suppression | `backend/app/delivery/service.py:1207` applies meaningful-output checks before calling the provider | Baseline E3, Variant Editor 4.7 and ADR-086 dated addendum; task-228. Under-sending versus irrelevant mail was already asked and resolved. |
+| Send retry, uncertainty and stranded release | `backend/app/delivery/service.py:1115` skips committed successes and `:1119` handles left-sending recipients | Completed task-318/task-325, ADR-192 and playbook §5. Never-risk-duplicate and person-only release are already decisions. Verified retry defects are referenced below instead of becoming policy questions. |
+| Audit write checks and read attribution | `backend/app/audit/service.py:193` validates and records accountability; `:268` resolves request actors | Audit cluster Q1–Q5, P2-D1/D2, ADR-153 dated addendum, task-52/task-252/task-275. New evidence is in the P2-overtaken appendix; no repeat of the fail-open decision. |
+| CI and hash-locked installs | `.github/workflows/ci.yml:74` installs with hashes; `backend/scripts/check_installed.py:149` compares installed versions | ADR-189/190; task-105/task-235/task-236. Only BF-CI1's adopter maintenance duty is retained. |
+| Unsubscribe | `backend/app/subscriptions/service.py:76` writes marketing opt-outs | ADR-191/task-56 resolve the missing surface. DOI entry remains task-324; footer/frame remains task-301; neither is a fresh question. Only BF-SUB1's infrastructure continuity is retained. |
+| AI task registry and provider/model settings | `backend/app/ai/tasks/registry.py:30` supplies discovery; per-task model configuration is in settings | AI interview and design interview, business per-feature 2026-08-02, P2-H1/H2/H3, task-73. Prompt ownership, cost gates, company-wide budget, pricing/adapter limits and the English seed must not be restated. |
+| Product-name source and name-free development environment | `product.json:2` is the name source | `docs/business/decisions/naming-brand-tarrow.md`, task-29/task-288/task-97. Naming, legal-clearance caveat and mode names are settled or tracked. |
+
+### Defects found while checking premises
+
+See the technical sweep's defect appendix: draft-1 (local draft loss), draft-2 (Resend timeout replay), draft-3 (failed recipient retained outside rerun audience). The confirmed cases concern involuntary loss of an unsaved field draft, retrying an ambiguously timed-out Resend call, and retaining a failed recipient after a rerun audience no longer selects them. These are behavior defects, not unresolved adopter preferences. No source or test fix was made.
+
+### Coverage and method
+
+Read the requested source commands from `.claude/commands/`, CLAUDE.md, CODE-REVIEW-BRIEF.md, Code module pages, both business interview files, business context/decisions, and playbook decision-log sections. Used Git history since 2026-08-02 to locate shipped changes and current source to verify premises. Searched all interview-prep files and open/completed queue descriptions for candidate overlap, then read relevant resolutions; the delegated baseline pass checks ADR Decision/addendum coverage. `git fetch` succeeded after the initial sandbox restriction. The remote regression branch contains cherry-picked-equivalent tests already in this checkout; no tests were brought in. Temporary content and proof harnesses live outside the repository. Writes are only through the Backlog CLI to pre-stage documents/drafts.
+
+Comparisons with Sendy/Listmonk/Mautic and Klaviyo plus an agent are interview prompts, not verified current market claims. The 2026-07-12 supplied comparison remains historical context; no new competitor capabilities are asserted and no purchase recommendation is made.
+
+### Dropped as duplicates
+
+- “Should approval work begin on an inbox, include comments and notify expiries?” → Manager Workflow cluster 1; ADR-142 addenda; task-206/task-210.
+- “Is a plain React SPA the right product surface; why keyboard-first?” → BETA-SCOPE §5; ADR-168/170/173; Variant Editor Cluster 1.
+- “Does an override mean the catalogue changes; can a hidden required field block a send?” → ADR-186/187; Element Hiding and Campaign Write final passes.
+- “Does human readiness really mean automation may select a record?” → ADR-174/179 and Channel Readiness final pass.
+- “Can engagement select a follow-up audience, and what does received mean?” → ADR-188; Audience Write final pass; task-299.
+- “Should empty or unresolved messages send; should unknown outcomes automatically retry?” → baseline E3; ADR-086 addendum; completed task-318; ADR-192.
+- “Is audit fail-open a universal compliance stance?” → P2-D2 and Audit Q1; not reopened by a changed write-time validator.
+- “Should CI style warnings or vulnerabilities block, and should checks be portable?” → ADR-190, ADR-143 and task-311; only operator responsibility beyond those decisions retained.
+- “Should unsubscribe tokens expire, opt everyone out, relay to the CRM, or support DOI?” → ADR-191; task-135/task-324; lifetime/transport mechanics not reopened.
+- “Is personalization/AI a speed advantage over SaaS plus an agent?” → per-feature 2026-07-12 and 2026-08-02; the existing control/teachability axis stands.
+- “Should privacy/automation be implemented before calling the reference complete?” → baseline I1 and P2-E3; task-117/task-136; accepted-but-unimplemented remains known.
+
+### What was not reached
+
+No maintainer answers were solicited or invented, no pilot/agency interviews were conducted, and no deployed-host or notification delivery was inspected. This pass does not verify actual advisory response or callback uptime; those are exactly BF-CI1/BF-SUB1's unknowns. No live ESP, migration, seed, provider switch or development-database action ran. The draft-loss proof uses the real component in a temporary unit harness; delivery proofs use actual function bodies with mocked boundaries, not a live vendor. Broader model-checking, performance benchmarking, legal interpretation and market research remain outside this question sweep.

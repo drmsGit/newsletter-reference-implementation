@@ -30,6 +30,7 @@ A living baseline of interview-style questions about the codebase as implemented
 - [[Interview Prep - Auth, Permissions, Machine Principals]] ⬜ 8 questions
 - [[Interview Prep - Brand Boundary]] ⬜ 8 questions
 - [[Interview Prep - Channels, Audit]] ⬜ 9 + 5 questions
+- [[Interview Prep - Since 2026-09-18]] ⬜ open — the client, CI and delivery work since 2026-09-18 (ChatGPT, 2026-10-09)
 
 ### Findings from the 2026-09-18 run that are defects, not questions
 Surfaced while generating the above; they belong in [[backlog]] rather than in a review cycle.
