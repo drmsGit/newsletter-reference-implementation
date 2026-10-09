@@ -721,6 +721,12 @@ Recorded in the 2026-10-09 addendum to [[ADR-142 — Autonomous Workflows and th
 
 **Status:** built the same day (task-326).
 
+### 2026-10-09 — A provider timeout counts as "maybe sent", and every send carries an idempotency key
+
+**Context:** ChatGPT found that a Resend timeout was recorded as an ordinary failure and resent on retry — though the provider may already have accepted the mail before the answer was lost (task-327). The earlier rule applies (task-318: never risk a duplicate): a connection that never opened is a real failure and may be retried; anything later is "maybe sent" and never resent. **Decided with the user, in addition:** every send carries an idempotency key, the same on every retry, so Resend itself refuses a second copy for 24 hours — a backstop for paths nobody has foreseen.
+
+**Status:** built the same day (task-327).
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*
