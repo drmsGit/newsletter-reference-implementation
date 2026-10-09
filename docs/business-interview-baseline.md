@@ -460,7 +460,7 @@ ADR-144 §5, via the 2026-07-31 decision log: *"Cost cap: warn → hard stop, **
 
 ## P2-M. Cross-cutting
 
-### P2-M1. Eleven business decisions live in ADRs and docstrings; `docs/business/decisions/` is empty `🔴 blocking`
+### P2-M1. Eleven business decisions live in ADRs and docstrings; `docs/business/decisions/` is empty `✅ resolved 2026-10-09`
 `CLAUDE.md` states the rule: *"Business decisions go in `docs/business/decisions/`, not in ADRs."* The directory contains nothing. Meanwhile these are business, legal or market positions currently living in accepted ADRs or code comments:
 
 | Decision | Where it lives now |
@@ -478,6 +478,8 @@ ADR-144 §5, via the 2026-07-31 decision log: *"Cost cap: warn → hard stop, **
 | The shipped subject-line editorial policy | `ai/tasks/subject_preheader.py` DEFAULT_PROMPT |
 
 **Why this is the highest-leverage item for positioning:** `POSITIONING.md` blocks beta on a statement that must *"make no claim that cannot be demonstrated in the repo today."* The business record is currently distributed across ~12 ADRs and two docstrings, none of which a positioning pass would read. `ASSUMPTIONS.md` says of itself that *"a full sweep has not been run against `docs/business/` since these files were created"* — this pass confirms the gap is now larger than that seed file describes, and that the new material arrived through the ADR channel because the security and channel clusters were run as design interviews with **no business-decision counterpart**.
+
+**Resolution (2026-10-09):** The business record of these positions is the decision log in `docs/playbook-strategy.md` §5, which is tracked. The new entry "2026-10-09 — The business positions that lived only in ADRs and code comments" lists all eleven, each pointing at the ADR that implements it, and marks the four still under review in this pass (P2-A2, P2-F3, P2-H1, P2-H2). One premise was wrong: the folder was not empty but gitignored, since 2026-09-25, to keep confidential items such as the naming draft private. Decided by the user: it stays private for exactly that, and `CLAUDE.md` now says so instead of naming it as the home of all business decisions. ADRs keep the mechanism.
 
 ## Pass 2 summary
 
@@ -504,7 +506,7 @@ ADR-144 §5, via the 2026-07-31 decision log: *"Cost cap: warn → hard stop, **
 | P2-H1 | ADR-141 | The manager-owned-prompt seam ships a developer-written English house style | 🔴 |
 | P2-H2 | ADR-144 | Lifetime spend cap; "per role/user" drifted to one pot, unamended | 🟡 |
 | P2-H3 | ADR-144 | Governed model list is one US vendor on a governance-risk pitch | 🟡 |
-| P2-M1 | all | Eleven business decisions in ADRs and docstrings; `docs/business/decisions/` empty | 🔴 |
+| P2-M1 | all | Eleven business decisions in ADRs and docstrings; `docs/business/decisions/` empty | ✅ |
 
 **Highest positioning leverage, in order: P2-M1, P2-E1, P2-F1, P2-H1, P2-D1.** Each is a claim in `BRIEF.md` or `POSITIONING.md` that the repo as built does not yet demonstrate — which is exactly what rule 2 of the positioning gate tests against.
 

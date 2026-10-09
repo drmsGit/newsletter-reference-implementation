@@ -755,6 +755,25 @@ The technical items became queue tasks:
 
 The decision on held requests is recorded in a second 2026-10-09 addendum to [[ADR-142 — Autonomous Workflows and the Automation Boundary]]. The owed "a person's choice beats the engine's" record is an addendum to [[ADR-176 — A Negative Decision Outranks a Positive One]].
 
+### 2026-10-09 — The business positions that lived only in ADRs and code comments
+
+**Context:** the business baseline (Pass 2, finding P2-M1) found eleven business, legal or market positions written only inside ADRs or code comments, where a positioning pass would never read them. `docs/business/decisions/` is gitignored since 2026-09-25, to keep confidential items such as the naming draft private. **Decided by the user:** this decision log is the tracked business record. The folder stays private for confidential decisions. The ADRs keep the mechanism and point here for the business reason.
+
+The positions, as the ADRs state them today:
+1. **Brands do not share a lawful basis for contact.** Consent to one brand says nothing about another ([[ADR-163 — Per-Channel Consent and Addressability]], 2026-09-15 addendum §1). *Under review: P2-A2.*
+2. **Full erasure is the shipped default.** Pseudonymised retention is a documented variation, not a toggle ([[ADR-154 — Erasure and Retention]] point 2). Stays deferred to the lifecycle work (task-136).
+3. **Consent proof is kept through an erasure**, under Art. 17(3)(e) GDPR and UWG §7 (ADR-154 point 6).
+4. **Two installs, no mixed-but-separated mode**, for a company whose brands must be kept apart ([[ADR-150 — Tenancy and Access Model]] point 3; also BRIEF.md).
+5. **The agency operator is not a role.** An agency works with the roles the company grants it (ADR-150 point 7).
+6. **Time to the first working integration beats completeness: "a weekend, not half a year"** ([[ADR-160 — Channel Model and Composition]] point 6). *Under review: P2-F3.*
+7. **One company-wide AI budget.** Per-brand budgets are a direction, not a build commitment (ADR-150, 2026-09-15 addendum). *Under review: P2-H2.*
+8. **Passing data to an ad platform is a consent purpose of its own**, on a contested German supervisory line (ADR-163 point 3). The vocabulary itself is open in task-134.
+9. **A letter is an advanced feature.** What we deliver for it is a library article, not a built channel ([[ADR-161 — Channel Execution Shapes]] point 5).
+10. **Duplication is deliberate only where content is forked**, that is, a copy into another brand. Within a campaign it is one click (P2-A3, decided today).
+11. **The shipped subject-line prompt's editorial house style** (`backend/app/ai/tasks/subject_preheader.py`). *Under review: P2-H1.*
+
+The positions marked "under review" are open findings in the same review. Their outcome is logged when decided.
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*

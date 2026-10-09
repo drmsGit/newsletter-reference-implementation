@@ -42,8 +42,8 @@ commercial product. Learnings feed the separate Condor use case.
     report. Nothing there is accepted work. Claude never writes there; it
     reads them only to triage with the user, item by item. What the user
     accepts becomes a task (`backlog draft promote`, then an ordinal), an ADR
-    or a business decision — decisions still live in ADRs or
-    `docs/business/decisions/`, never in `docs/queue/decisions/`.
+    or a business decision — decisions still live in ADRs or the playbook
+    decision log, never in `docs/queue/decisions/`.
   - **Before starting queue work, check for ChatGPT's handoff:** `git fetch`,
     then look for new commits on `origin/codex/*` branches (regression tests
     Codex writes against our commits) and new notes in `docs/queue/docs/`.
@@ -59,7 +59,10 @@ commercial product. Learnings feed the separate Condor use case.
   date: `git show $(git rev-list -1 --before=<date written> HEAD):docs/backlog.md`. The citations themselves are historical; do not
   rewrite them.
 - Business context: `docs/business/` — brief, positioning, gates, assumptions
-- Business decisions: `docs/business/decisions/` — same shape as ADRs
+- Business decisions: the decision log in `docs/playbook-strategy.md` §5 is the
+  tracked business record. `docs/business/decisions/` (same shape as ADRs) is
+  **gitignored** and holds only confidential decisions, such as the naming draft
+  (decided 2026-10-09, business baseline P2-M1).
 - Technology explainers: `docs/implementation/` — one file per technology,
   pitched below the ADRs: what it is, why it was chosen, what was rejected.
   **This tier has its own template and it is NOT an ADR** — it carries an
@@ -89,7 +92,8 @@ commercial product. Learnings feed the separate Condor use case.
 - Never read all ADRs into the main session. Delegate the sweep to a subagent.
 - Architecture decisions are made in this repo, not in chat. If a decision is
   reached elsewhere, write the ADR before implementing it.
-- Business-side decisions go in `docs/business/decisions/`, not in ADRs.
+- Business-side decisions go in the playbook decision log (or, if confidential,
+  the gitignored `docs/business/decisions/`), not in ADRs.
 - **An accepted ADR is not an implementation plan.** Before implementing one,
   hold a **final-design pass**: where exactly each part lands, which existing
   functions it reuses, what it deliberately does not touch, and what could

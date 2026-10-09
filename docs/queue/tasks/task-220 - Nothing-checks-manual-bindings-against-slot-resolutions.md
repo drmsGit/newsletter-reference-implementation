@@ -4,7 +4,7 @@ title: Nothing checks manual bindings against slot resolutions
 status: To Do
 assignee: []
 created_date: '2026-09-27 14:20'
-updated_date: '2026-10-09 18:20'
+updated_date: '2026-10-09 18:30'
 labels:
   - backend
 dependencies:
@@ -42,4 +42,6 @@ Logged 2026-09-27 from the "What Cluster N produced" sections of the two design 
 (2) A slot with several records (max_results above 1) where one is bound by hand.
 (3) How a slot that stood aside counts under ADR-086's 2026-10-08 'don't send if no slot resolved' option, and what exclusion_reason says.
 Line numbers re-checked: resolve_content_for_module is at backend/app/rendering/service.py:646.
+
+2026-10-09, decided by the user (interview review, VE-1.6): when a slot's pick for a recipient is already bound by hand in the variant, the slot takes its NEXT ranked pick (this task's original reading), not the interview's 'hide the module'. That makes task-109 a prerequisite. With no other candidate, the slot resolves nothing and ADR-086's unresolved-slot handling applies. Recorded in the ADR-176 2026-10-09 addendum. Open points 2 (max_results above 1) and 3 (counting) are readings for the final-design pass, not decisions.
 <!-- SECTION:NOTES:END -->

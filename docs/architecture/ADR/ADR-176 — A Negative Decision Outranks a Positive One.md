@@ -319,6 +319,24 @@ entry is owed. It is not written here.
 
 Nothing here changes the Decision section above.
 
+**Decided later on 2026-10-09 (open point 1):** the slot takes its next pick.
+The user decided this in the interview review. When a decision slot's pick for
+a recipient is a content record already bound by hand in the same variant, the
+slot takes its next pick from its ranked candidates. The reader still gets a
+personalised piece, and the layout keeps its shape. This is what task-220's
+description said. The interview's answer, hiding the slot's module by reusing
+[[ADR-086 — Decision Slots Fail Gracefully]], is not taken. So task-220 depends
+on task-109 being built first: a decision resolution that can hold more than
+one pick, which is the ranked queue. When the slot has no other candidate, it
+resolves nothing, and the existing handling of an unresolved slot applies, as
+set by ADR-086 and its 2026-10-08 addendum. Open points 2 and 3 were not
+decided. What follows is how they read under this decision, as input to
+task-220's final-design pass, and it is not a decision. For point 2, the
+natural reading is that the hand-bound record is skipped and the slot fills
+from further down its ranking. For point 3, a slot only stands aside when it
+runs out of candidates, which is the ordinary unresolved case, so the separate
+third case largely dissolves.
+
 ## Related ADRs
 
 ### Depends On
