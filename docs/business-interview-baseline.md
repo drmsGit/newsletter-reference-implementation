@@ -407,8 +407,10 @@ ADR-153 promises an operator screen, a SIEM export, a place to point a DPO, even
 
 ## P2-E. Consent and erasure posture — ADR-154, ADR-163
 
-### P2-E1. The consent stack is calibrated to EU law and presents itself as universal `🔴 blocking`
+### P2-E1. The consent stack is calibrated to EU law and presents itself as universal `✅ resolved 2026-10-09`
 UWG §7 is named as the justifying case in ADR-150 point 5, ADR-154 §6, ADR-166 Context and `auth/permissions.py:66-72`. `is_consenting_filter` **fails closed** — no event means no consent, inherited from `NULL = 'opted_in'` never being true — and ADR-163 point 5 refuses to infer a grant under any circumstance. Under CAN-SPAM, PIPEDA's implied-consent provisions, or most non-EU regimes the default is the opposite, and stage 2 of `delivery/exclusion.py` would exclude an entire legitimately-mailable list on day one with the reason `"consent"`. Note the asymmetry: decision strategies, providers, AI adapters, renderers and channels are all drop-a-file seams; **the lawful-basis rule is a `WHERE` clause.** ADR-163's Context says *"we do not make the legal determination, we make the model granular enough that the adopter can encode whatever their counsel says"* — true of the `(brand, channel, purpose)` grid, and **not** true of the fail-closed default underneath it. The teaching gap: "fail closed" and "make it expressible" are two different promises, and only the second is jurisdiction-neutral.
+
+**Resolution (2026-10-09):** Built for EU consent law, and said plainly. Fail-closed, meaning no recorded opt-in and no marketing, is the deliberate default for the German and EU buyer (UWG §7, GDPR). It stays code, not a setting: a switch that lets an EU company send unlawfully with one click is worse than a seam a non-EU adopter changes knowingly. The positioning claims "built for EU consent rules", never "jurisdiction-neutral". The seam a non-EU fork would change is named here: `backend/app/recipients/consent.py:9-13` (the rule) and the consent stage of the send-time exclusion stack (`backend/app/delivery/exclusion.py`). Decided by the user in the 2026-10-09 interview review; logged in `docs/playbook-strategy.md` §5.
 
 ### P2-E2. `purpose` ships with a vocabulary of one, and defaults where `brand_id` refuses to `🔴 blocking`
 ADR-163 point 3 makes `transfer` a first-class purpose; `BETA-SCOPE.md` flags the transactional-consent model as *"a possible adoption dealbreaker."* As built: `ConsentEventDB.purpose` is `String(50), default="marketing"`, `DEFAULT_PURPOSE = "marketing"`, and every consent function takes `purpose: str = DEFAULT_PURPOSE`. `"transfer"` appears nowhere in `backend/app/`. The precise inconsistency: the same 2026-09-15 addendum made `brand_id` a **required positional with no default** on exactly these functions, arguing *"a consent row whose brand was assumed is a consent record nobody gave."* The identical argument applies to purpose — a row whose purpose was assumed is a marketing grant nobody gave — and purpose got the opposite treatment in the same file, in the same build. Verified 2026-09-18.
@@ -420,8 +422,12 @@ ADR-154 point 2 ships full erasure and documents pseudonymised retention *"as a 
 
 ## P2-F. The channel cluster — ADR-160..165
 
-### P2-F1. "Two files, no config step" is the cluster's teachability claim, and it is false as built `🔴 blocking`
+### P2-F1. "Two files, no config step" is the cluster's teachability claim, and it is false as built `✅ resolved 2026-10-09`
 ADR-160 point 6: *"Registering a channel means a channel manifest plus a provider adapter — two files, no config step."* [[channels]] lists **nine** ordered steps, two of which the code will not fail on: `ADDRESS_KEYS` (*"the code will not fail; it falls back to the channel name and reports everyone unaddressable"*) and the content-authoring form, where the route's parameters are hardcoded per field name and the merge is keyed on the literal `"push"`. Pillar 2 in `BRIEF.md` is *"drop a file that follows a contract and the system picks it up"*; channels are the newest and most prominent instance of that pattern and the one where the promise does not hold. `POSITIONING.md` rule 2 applies directly.
+
+**Resolution (2026-10-09):** The channel model does not hold the "two files" claim. The user's principle: such a claim is only worth holding as "at most two files, always"; where it cannot hold, it is dropped rather than defended. A channel is not a plug-in but a new dimension cutting through rendering, addressing, per-brand-and-channel consent and provider choice. Consent rows and a provider are real-world prerequisites, not files, so no rework would make "two files" honest. A new channel is added from the documented checklist in `docs/architecture/Code/channels.md`, which is itself the teaching material. Recorded in the 2026-10-09 addendum to ADR-160.
+
+For the positioning pass, as information and not decided: other extension kinds largely keep the claim today. An email module is a manifest plus a template. An AI task, a decision strategy and an approvable action are each one Python file discovered from its folder. Providers need an adapter plus a factory edit. Making the two quietly failing channel steps speak up was not decided; no task filed.
 
 ### P2-F2. The channel model has no locale axis, and the cluster just made that expensive `🟡 deferred`
 ADR-160 point 3 made channel-readiness separate required fields on the content record, explicitly rejecting derivation; ADR-162 point 1 moved subject and preheader into module fields. Both multiply the field count on a communication unit along a channel axis. **Neither record mentions language or locale.** `RecipientDB.language` exists and is used in exactly one place — an audience rule-block criterion. It reaches no renderer, no strategy, no AI task, no module manifest. DE/EN is the ordinary case for the named buyer and DE/EN/FR common; a forker adding locale faces the same multiplication the channel cluster just chose how to handle, with no precedent to follow.
@@ -449,8 +455,10 @@ Manager deliberately excludes `recipients.manage`, `recipients.consent` and `ins
 
 ## P2-H. The AI task library — ADR-140/141/144
 
-### P2-H1. The one worked example of "the manager owns the prompt" ships a developer-written English house style `🔴 blocking`
+### P2-H1. The one worked example of "the manager owns the prompt" ships a developer-written English house style `✅ resolved 2026-10-09`
 ADR-140 point 1 makes prompts manager-owned because *"a developer cannot meaningfully evaluate marketing copy."* What ships as the seed of every deployment (`ai/tasks/subject_preheader.py:41-64`) is English instructions, English output format, and a specific editorial policy — *"max 60 characters… No exclamation marks, no 'Discover', no emoji."* Three assumptions: the adopter's marketing language is English; 60 characters is the right subject budget (an English-inbox heuristic that German compound nouns break routinely); and one company's style guide is a sensible default. The task label also says *"an email newsletter"* — channel-bound copy in the file ADR-162 point 1 says should generalise. Trivially overridable in the UI, which is the point and also why it matters: **the demo that proves "the manager owns this" opens with a prompt only a developer would have written, in the wrong language for the named buyer.** `BRIEF.md`'s one-worked-example-per-seam rule means this file teaches the pattern to every reader.
+
+**Resolution (2026-10-09):** The shipped starting prompt becomes neutral. It keeps only what the code needs (the three-option format the reply is parsed in) and the technical limits (60 and 90 characters). The taste rules go ("no exclamation marks, no 'Discover', no emoji", "be concrete"), and a marked line is left for the manager's own house style. The prompt asks for suggestions in the language of the content, so a German newsletter gets German suggestions without German being hardcoded; that is also right for an English brand. The manager-owned prompt then opens on the company's own voice, not a developer's. Queued as task-339. Decided by the user in the 2026-10-09 interview review.
 
 ### P2-H2. The spend cap is a lifetime budget; ADR-144 says per role/user `🟡 deferred`
 ADR-144 §5, via the 2026-07-31 decision log: *"Cost cap: warn → hard stop, **per role/user**, enforced as a pre-call gate… role/permission-bound."* ADR-150's addendum reinterprets it as *"one company-wide pot with one ledger and one bill"*, used as the load-bearing reason `ai.run` is platform-level. As built, `tokens_used(db)` scans **all** `ai_runs` rows ever written — no time window, no user filter, no role filter — and `ai_runs` carries neither `brand_id` nor `user_id`. So AI spend is a one-time allowance for the installation's lifetime; a company that budgets monthly cannot express it, and the ledger cannot be re-cut per period, brand or person retroactively because the dimensions were never recorded. The "per role/user" → "one pot" drift is not recorded as an amendment anywhere.
@@ -493,17 +501,17 @@ ADR-144 §5, via the 2026-07-31 decision log: *"Cost cap: warn → hard stop, **
 | P2-C1 | ADR-152 | §1 and §4 cannot both hold | 🟡 |
 | P2-D1 | ADR-153 | Audit covers administration only; ADR-166's integration-actor promise has no writer | 🔴 |
 | P2-D2 | ADR-153 | Fail-open audit write + unenforced `detail` policy, decided in docstrings | ✅ |
-| P2-E1 | ADR-163 | Fail-closed opt-in is jurisdictional, hardcoded, the one seam that is not a seam | 🔴 |
+| P2-E1 | ADR-163 | Fail-closed opt-in is jurisdictional, hardcoded, the one seam that is not a seam | ✅ |
 | P2-E2 | ADR-163 | `purpose` defaults to `"marketing"` where `brand_id` is a required positional | 🔴 |
 | P2-E3 | ADR-154 | Full-erasure default vs. the BI-team audience it most affects | 🟡 |
-| P2-F1 | ADR-160 | "Two files, no config step" is nine steps, two of them silent | 🔴 |
+| P2-F1 | ADR-160 | "Two files, no config step" is nine steps, two of them silent | ✅ |
 | P2-F2 | ADR-160/162 | Channel multiplies record fields; locale axis never considered | 🟡 |
 | P2-F3 | ADR-160 | "Weekend not half a year" is a market criterion in an ADR | 🟡 |
 | P2-F4 | cluster | Four documented-and-fine trades, listed so they are not re-flagged | ⚪ |
 | P2-G1 | ADR-166 | Unattended-send risk modelled by caller identity, not scale — inverts 2026-07-05 | 🔴 |
 | P2-G2 | ADR-166 | No request budget for an authenticated machine | ✅ |
 | P2-G3 | ADR-166 | No shipped role can write consent or manage recipients | ✅ |
-| P2-H1 | ADR-141 | The manager-owned-prompt seam ships a developer-written English house style | 🔴 |
+| P2-H1 | ADR-141 | The manager-owned-prompt seam ships a developer-written English house style | ✅ |
 | P2-H2 | ADR-144 | Lifetime spend cap; "per role/user" drifted to one pot, unamended | 🟡 |
 | P2-H3 | ADR-144 | Governed model list is one US vendor on a governance-risk pitch | 🟡 |
 | P2-M1 | all | Eleven business decisions in ADRs and docstrings; `docs/business/decisions/` empty | ✅ |

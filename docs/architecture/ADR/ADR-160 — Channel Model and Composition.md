@@ -8,7 +8,7 @@ topic:
   - variant
   - composition
 created: 2026-09-01
-modified: 2026-09-12
+modified: 2026-10-09
 source:
   - "Omni-Channel design interview (interview-prep, closed 2026-09-01), Cluster 1 / Q1–Q5"
 depends_on:
@@ -91,6 +91,74 @@ A deployment not licensed for a channel — no paid-social ad account, no letter
 - **Resolved 2026-09-12:** whether a deployment can *disable* a channel it is not licensed for without deleting files — yes, via the settings-row toggle in Decision point 8.
 - **Amendments other records need — none of them made here.** [[ADR-021 — Variants Are Human Created Versions]] does not anticipate a variant carrying a channel and would benefit from a dated addendum recording the second meaning and that it is a display concern. [[ADR-001 — Newsletter Architecture Boundaries]] scopes the core to "newsletter-specific responsibilities", which no longer describes the intended scope; **no resolution in this interview decided what to do about it**, so it is flagged rather than answered.
 - Nothing in this ADR supersedes an accepted record. What point 7 supersedes is a *lean* recorded in the interview prep and in the playbook decision log (entry 16, 2026-08-12), not a decision in force.
+
+## Addendum 2026-10-09 — a channel is added from a checklist, not from two files
+
+Prompted by finding P2-F1 in `docs/business-interview-baseline.md` ("'Two
+files, no config step' is the cluster's teachability claim, and it is false as
+built"), decided by the user in the 2026-10-09 interview review. The playbook
+decision log records the same position under "Teachability (P2-F1)" in
+`docs/playbook-strategy.md`. Decision point 6 above is left as written; this
+addendum governs how its "two files, no config step" sentence, and the
+Positive consequence that repeats it, are to be read.
+
+**What was found.** Point 6 promises that a new channel is a channel manifest
+plus a provider adapter — two files, no config step. As built, adding a
+channel is the nine ordered steps under "Change-impact — adding a third
+channel, in order" in `docs/architecture/Code/channels.md`: a channel
+manifest; module manifests for the channel; a `ChannelRenderer` subclass; an
+`ADDRESS_KEYS` entry in `backend/app/recipients/consent.py`; a provider
+adapter; a decision about availability, which defaults to on; consent rows for
+the new channel; authoring form fields that are still hardcoded per field name
+in the old Jinja UI; and, for a channel that is not addressed, a second
+provider interface that does not exist yet. Two of those steps fail quietly.
+A missing `ADDRESS_KEYS` entry does not raise — everyone is reported
+unaddressable. Missing consent rows exclude everyone, which is correct, but
+nothing says why.
+
+**Why the claim cannot be repaired.** A channel is not a plug-in. It is a new
+dimension that cuts through rendering, addressing, per-brand-and-channel
+consent ([[ADR-163 — Per-Channel Consent and Addressability]]) and provider
+choice ([[ADR-100 — Provider Layer as Send and Feedback Adapter]]). Consent and
+a provider are real-world prerequisites, not files: a company needs recorded
+opt-ins and a vendor contract before the channel can reach anyone. So
+reworking the code would not make "two files" honest, and that is why the
+claim is dropped instead of being made true.
+
+**What this records.**
+
+- The channel model does not hold the "two files" claim.
+- A new channel is added from the documented checklist in
+  `docs/architecture/Code/channels.md`. The checklist is itself the teachable
+  artefact. It belongs to the code documentation, not to this record, so it
+  can change as the code does.
+- "Two files" is not used for channels in any positioning claim.
+- The principle behind this, as the user put it: a "two files" claim is only
+  worth holding if it means **at most two files, always**. Where it cannot
+  hold, it is dropped rather than defended.
+
+The rest of point 6 is unaffected. The manifest is still the channel and the
+adapter is still the vendor, and there is still no separate registry. Point 8's
+availability row is unaffected too.
+
+**As information, not a decision.** For other extension kinds the claim largely
+holds today. An email module is a `.json` manifest plus an `.html` template.
+An AI task, a decision strategy and an approvable action are each one Python
+file, found automatically in its package by a registry that uses `pkgutil`.
+AI and delivery providers need an adapter plus an edit to their factory.
+Whether the positioning uses a narrower claim for those kinds is not decided
+here.
+
+**Consequences.**
+
+- *Positive:* this record no longer makes a teachability promise the code does
+  not keep.
+- *Negative:* adding a channel stays a multi-step job, and this record now says
+  so.
+
+**Not decided.** Whether the two steps that fail quietly — the `ADDRESS_KEYS`
+entry and the consent rows — are made to report the problem. No task has been
+filed for it.
 
 ## Related ADRs
 

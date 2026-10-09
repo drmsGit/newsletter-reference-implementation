@@ -774,6 +774,14 @@ The positions, as the ADRs state them today:
 
 The positions marked "under review" are open findings in the same review. Their outcome is logged when decided.
 
+### 2026-10-09 — Business findings decided one by one in the interview review
+
+Each was decided by the user in its own question. The full narrative is under the finding in `docs/business-interview-baseline.md`.
+
+- **Consent law (P2-E1): built for the EU, said plainly.** "No recorded opt-in, no marketing" is the deliberate default for the German and EU buyer, and it stays code, not a setting. A switch that lets an EU company send unlawfully with one click is worse than a seam a non-EU fork changes knowingly. The positioning says "built for EU consent rules", never "jurisdiction-neutral".
+- **Teachability (P2-F1): channels do not claim "two files".** A claim like that is only worth holding as "at most two files, always". A channel cuts through rendering, addressing, consent and provider choice, so it is added from a documented checklist instead (ADR-160 addendum). Building blocks, AI tasks, decision strategies and approval actions largely keep a one-or-two-file shape; whether the positioning says so is not yet decided.
+- **The shipped AI prompt (P2-H1): a neutral seed in the content's language.** The subject-line prompt keeps only its parsed format and the 60/90-character limits. The developer's taste rules go, a marked line awaits the company's own house style, and suggestions come in the language of the content (task-339).
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*
