@@ -58,6 +58,11 @@ class RenderedArtifact:
     envelope: dict = field(default_factory=dict)
     #: Per-module resolutions actually used, for the render context.
     resolutions_by_module_id: dict[int, DecisionResolutionDB] = field(default_factory=dict)
+    #: Identifies one delivery to the provider, stable across retries, so a
+    #: provider that honours it refuses a second copy (task-327; Resend: the
+    #: Idempotency-Key header, 24 hours). Delivery metadata, not content: not
+    #: part of `artifact_hash`, so reconstruction is unaffected.
+    idempotency_key: str | None = None
 
     @classmethod
     def email(cls, html: str, subject: str | None = None) -> "RenderedArtifact":

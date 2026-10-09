@@ -70,13 +70,25 @@ class ResendProvider(DeliveryProvider):
                 headers={
                     "Authorization": f"Bearer {self.api_key}",
                     "Content-Type": "application/json",
+                    # Resend refuses a second request with the same key for
+                    # 24 hours, so even an unforeseen resend cannot duplicate
+                    # the mail (task-327).
+                    **({"Idempotency-Key": artifact.idempotency_key} if artifact.idempotency_key else {}),
                 },
                 json=payload,
                 timeout=15.0,
             )
-        except httpx.HTTPError as error:
-            logger.warning("resend send network error: %s", error)
+        except (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout) as error:
+            # The connection never opened: the request was never sent, so this
+            # is a real failure and a retry is safe.
+            logger.warning("resend send network error before sending: %s", error)
             return SendResult(success=False, message=f"network error: {error}")
+        except httpx.HTTPError as error:
+            # Anything later — a read timeout, a connection dropped mid-response —
+            # may come after Resend accepted the mail. Maybe sent: never resent
+            # (task-327, the user's task-318 decision).
+            logger.warning("resend send outcome unknown: %s", error)
+            return SendResult(success=False, uncertain=True, message=f"outcome unknown: {error}")
 
         if response.status_code == 200:
             message_id = response.json().get("id")

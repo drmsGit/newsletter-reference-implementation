@@ -1241,6 +1241,11 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
         # mail carrying it can leave.
         execution.status = "sending"
         db.commit()
+        # Stable across retries and practically unique across deployments
+        # sharing one provider account (task-327).
+        artifact.idempotency_key = (
+            f"delivery-execution-{execution.id}-{execution.created_at:%Y%m%dT%H%M%S%f}"
+        )
         result = provider.send(recipient_email, artifact)
 
         logger.info(
@@ -1253,6 +1258,16 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
             result.message,
         )
 
+        if result.uncertain:
+            # The provider may have accepted it (task-327): recorded as maybe
+            # sent, and like every uncertain execution never sent again.
+            execution.status = UNCERTAIN
+            execution.exclusion_reason = (
+                f"provider outcome unknown ({result.message or 'no answer'}), "
+                "so this person was not sent again"
+            )
+            db.commit()
+            continue
         execution.status = "sent" if result.success else "failed"
         execution.provider_message_id = (
             result.provider_message_id

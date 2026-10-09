@@ -35,6 +35,11 @@ class SendResult(BaseModel):
     # so failures don't collide on an empty string.
     provider_message_id: str | None = None
     message: str | None = None
+    #: The provider may have accepted the message before the answer was lost —
+    #: a read timeout, a connection dropped mid-response (task-327). Not a
+    #: failure to retry: the send records it `uncertain` and never sends it
+    #: again (task-318, decided by the user: never risk a duplicate).
+    uncertain: bool = False
 
 
 class DeliveryProvider(ABC):
