@@ -785,6 +785,8 @@ Each was decided by the user in its own question. The full narrative is under th
 - **Unattended machine sends (P2-G1): a ceiling per integration.** Up to its own recipient ceiling, an integration may send without a person; above it, the send waits for approval. Friction follows scale, as decided for people on 2026-07-05 (ADR-166 addendum, task-341).
 - **Security numbers (P2-B1): session lengths are the company's, attack resistance is the product's.** Absolute and idle session length become bounded company settings. Sign-in code lifetime, guesses and request limits stay in code as a stated exception to "numbers belong to the company" (ADR-151 addendum, task-342).
 - **What brands cost a single-brand company (P2-A1): two costs, said apart.** Running it costs a default value, tested. Extending it costs a rule that every table, route and permission follows. The pitch may claim the first and must name the second to developers and agencies (ADR-150 addendum).
+- **Consent purpose (P2-E2): never assumed.** The API refuses a consent assertion without a purpose, like every internal consent function since task-42 (task-343). Which purposes exist stays with task-134.
+- **Addresses in the platform (G1): the July intent was replaced, and now it is said.** "Identifiers only, never the email" (2026-07-05) gave way to ADR-163's local address store: the platform holds the addresses it needs to deliver, synced from the CRM, which stays the source of truth. The pitch must not claim "no personal data held". Where a salutation's data comes from stays deferred.
 
 ## 6. Roadmap
 

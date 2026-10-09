@@ -7,7 +7,7 @@ topic:
   - access
   - governance
 created: 2026-08-02
-modified: 2026-10-02
+modified: 2026-10-09
 source:
   - "Security Chapter design interview, Part 1 (playbook-strategy.md Decision Log, 2026-08-02)"
 depends_on:
@@ -588,6 +588,93 @@ record, including its own 2026-09-15 addenda, refers back to the state they desc
 **Nothing in this record's Decision changes.** Status, the sixteen keys and the
 classification of permissions are untouched; this addendum records that what they
 specified has been built.
+
+## Addendum 2026-10-09 — what brands cost a single-brand company is two costs, and point 4 names only one
+
+Prompted by finding P2-A1 of the business interview baseline
+(`docs/business-interview-baseline.md`, "The cost ADR-150 quoted to a single-brand
+adopter is falsified by what got built"), and decided by the user in the 2026-10-09
+interview review. The decision is logged in `docs/playbook-strategy.md` under
+"2026-10-09 — Business findings decided one by one in the interview review". The
+evidence below was checked against the code on 2026-10-09.
+
+**What point 4 says, and what it leaves out.** Point 4 prices the single-brand case in
+one sentence: *"A company treating brands as a skin pays a default value in a
+column."* The sixth bullet under `### Positive` repeats it: *"a company using brands as
+a skin still only carries a default value in a column."* Both sentences read as the
+whole cost. They are the cost of **running** the product. They say nothing about the
+cost of **extending** it, and for anyone who writes code against this platform that
+second cost is the larger one.
+
+**The decision: the two costs are said apart.**
+
+**1. Running the product costs a single-brand company a default value. That holds,
+and it is tested.** One default brand always exists, the working context supplies it,
+and nothing asks a single-brand user for one. `TestTheSingleBrandCompanyPaysNothing` in
+`backend/tests/test_brand_scoping.py:112` pins this three ways. A user granted only one
+brand gets a working brand that is not switchable (`:121`). Over HTTP, the
+server-rendered `/ui/content` page renders no brand switcher (`:134`). Creating a
+content record needs no brand from the caller (`:158`). The React client makes the same
+promise: its switcher is absent entirely when the session is not switchable
+(`frontend/src/shell/BrandSwitcher.test.tsx:8`).
+
+**2. Extending the code costs a cross-cutting rule: every new table, route and
+permission follows brand scoping.** Brand handling is mandatory in every route that
+touches a brand-owned row, and a single-brand deployment does not exempt the code from
+it. A brand-owned route takes its brand from `working_brand` in
+`backend/app/auth/dependencies.py:339-361`, which **raises rather than defaulting**.
+The exception it raises, `BrandNotDeclared` (`:281`), is explicitly not a fallback to
+"the one brand this integration holds". A single-brand company never meets that
+refusal, because its one brand always resolves. Whoever writes the next route has to
+call it all the same. The rest of the rule is written down on the brand page,
+[[brand]] (`docs/architecture/Code/brand.md`), under its change-impact section:
+
+- a call to `has_permission` passes a scope;
+- a new permission key is classified in `BRAND_SCOPED` and given a `WRITE_POLICY`
+  entry;
+- a new detail route gets a `SWITCH_LANDINGS` entry;
+- a cross-brand write checks its target brand with `brands_with_permission`.
+
+A key left out of `BRAND_SCOPED` is platform-level by omission
+(`backend/app/auth/permissions.py:107`). For a key that guards brand-owned rows, that
+means it is checked against the union of every grant its holder has.
+
+**The rule is not hypothetical, and the evidence is that it has already been missed.**
+The Brand Boundary interview ([[Interview Prep - Brand Boundary]], Q7, resolved
+2026-09-19) found `delete_brand` counting five brand-carrying tables where seven
+existed. `consent_events` and `integration_grants` had been added *"without following a
+maintenance rule the brand page already states."* That one list has since been derived
+from the models (`brand_holders()`, task-19, 2026-10-01, as the brand page records), so
+a new brand-carrying table no longer needs anything for `delete_brand`. The rest of the
+rule above is still kept by hand. Two tables slipped past it in a codebase written by
+people who knew the rule. That is the measure of what the rule costs someone who does
+not.
+
+**What the positioning may say.** It may claim the first cost to anyone: a single-brand
+company runs the product without meeting brands. When it speaks to developers or
+agencies who extend the code, it must also name the second: brand scoping is a rule
+that every new table, route and permission follows, as the brand page documents.
+Claiming the first to that audience without the second is the understatement this
+addendum corrects.
+
+**Wording only.** Nothing is built, and no guard task was chosen. Nothing checks that a
+new route uses `working_brand`, or that a new key that guards brand-owned rows is in
+`BRAND_SCOPED`. The one part that already fails closed is unchanged: a write route with
+no `WRITE_POLICY` entry is refused as `UNMAPPED` (point 5). The rest of the rule is held
+by the brand page and by review.
+
+**What it costs.**
+
+- **Positive:** the record no longer understates what a developer pays. Someone
+  deciding whether to extend the platform for a single-brand client learns from this
+  record that brand scoping is part of every change, not only from the code.
+- **Negative:** the single-brand pitch carries a qualification for the developer
+  audience. "Brands cost you nothing" can no longer be said to an agency that will
+  write code, and the shorter claim is the more attractive one.
+
+**Nothing in this record's Decision changes.** Point 4 stands as written. It is true of
+running the product, and this addendum records that it says nothing about extending
+it. The sixth `### Positive` bullet is read the same way.
 
 ## Related ADRs
 

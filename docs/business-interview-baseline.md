@@ -50,7 +50,7 @@ Two new concepts surfaced during this pass that aren't decisions about existing 
 
 Not implemented, and no near-term backlog/roadmap item builds them yet. Forcing an answer now would be guessing ahead of scope. Left open, not closed.
 
-- **G1** — Email-in-platform vs. identifiers-only ([[ADR-120 — CRM as Customer Source of Truth]] / [[ADR-054 — Use Internal Recipient Identifiers]] / [[ADR-126 — Maintain Local Recipient Projection]]) — resolved from "unsure" 2026-07-05: confirmed intended design is identifiers-only (internal + CRM/provider external IDs), `email` on `RecipientDB` today is a known deviation, not an open question. What's genuinely undecided — how simple personalization (salutation, "you're subscribed with this email" footer) gets its data without the platform owning email/name as a system of record — has no feature building it yet. Revisit once an example CRM integration is built (the planned proof-of-concept for how CRM ↔ newsletter platform ↔ provider hand off identity), since that's what will surface the real shape of the identifier/personalization boundary. See updated reasoning in §G1 below.
+- **G1** — Email-in-platform vs. identifiers-only ([[ADR-120 — CRM as Customer Source of Truth]] / [[ADR-054 — Use Internal Recipient Identifiers]] / [[ADR-126 — Maintain Local Recipient Projection]]) — resolved from "unsure" 2026-07-05: confirmed intended design is identifiers-only (internal + CRM/provider external IDs), `email` on `RecipientDB` today is a known deviation, not an open question. What's genuinely undecided — how simple personalization (salutation, "you're subscribed with this email" footer) gets its data without the platform owning email/name as a system of record — has no feature building it yet. Revisit once an example CRM integration is built (the planned proof-of-concept for how CRM ↔ newsletter platform ↔ provider hand off identity), since that's what will surface the real shape of the identifier/personalization boundary. See updated reasoning in §G1 below. **2026-10-09:** the address half is resolved (a local address store replaced "identifiers only"); only the personalisation-data half stays deferred.
 
 ### ⚪ Non-blocking / cosmetic — batch for later
 
@@ -248,6 +248,10 @@ Concrete evidence: `RecipientDB` (`backend/app/recipients/db_models.py:6-22`) ha
 
 ---
 
+**Resolution (2026-10-09), address half:** The 2026-07-05 intent, "identifiers only, never the email", was replaced by ADR-163 point 2 and the ADR-121 addendum of 2026-09-12. The platform keeps every person's deliverable addresses in its own `recipient_addresses` table (`backend/app/recipients/db_models.py`), synced from the CRM, which stays the source of truth (ADR-120); a send needs an address per channel. The old `RecipientDB.email` column is gone (2026-09-13). Decided by the user: record the change, and the pitch follows it. The positioning must not claim "no personal data held"; it may say the platform holds what it needs to deliver and the CRM owns the record.
+
+**Still deferred, personalisation half:** where a salutation or a "subscribed as …" line gets its data stays open until merge fields or the example CRM integration exist. ADR-183 point 7 says no recipient substitution exists yet.
+
 ## H. Provider Layer
 
 ### H1. [[ADR-100 — Provider Layer as Send and Feedback Adapter]] / [[ADR-101 — Provider Capabilities Are Explicit]] / [[ADR-105 — Provider-Specific Data Must Not Be Architecture-Critical]] — provider independence and swap-ability `✅ resolved 2026-07-11`
@@ -418,8 +422,10 @@ UWG §7 is named as the justifying case in ADR-150 point 5, ADR-154 §6, ADR-166
 
 **Resolution (2026-10-09):** Built for EU consent law, and said plainly. Fail-closed, meaning no recorded opt-in and no marketing, is the deliberate default for the German and EU buyer (UWG §7, GDPR). It stays code, not a setting: a switch that lets an EU company send unlawfully with one click is worse than a seam a non-EU adopter changes knowingly. The positioning claims "built for EU consent rules", never "jurisdiction-neutral". The seam a non-EU fork would change is named here: `backend/app/recipients/consent.py:9-13` (the rule) and the consent stage of the send-time exclusion stack (`backend/app/delivery/exclusion.py`). Decided by the user in the 2026-10-09 interview review; logged in `docs/playbook-strategy.md` §5.
 
-### P2-E2. `purpose` ships with a vocabulary of one, and defaults where `brand_id` refuses to `🔴 blocking`
+### P2-E2. `purpose` ships with a vocabulary of one, and defaults where `brand_id` refuses to `⚪ non-blocking`
 ADR-163 point 3 makes `transfer` a first-class purpose; `BETA-SCOPE.md` flags the transactional-consent model as *"a possible adoption dealbreaker."* As built: `ConsentEventDB.purpose` is `String(50), default="marketing"`, `DEFAULT_PURPOSE = "marketing"`, and every consent function takes `purpose: str = DEFAULT_PURPOSE`. `"transfer"` appears nowhere in `backend/app/`. The precise inconsistency: the same 2026-09-15 addendum made `brand_id` a **required positional with no default** on exactly these functions, arguing *"a consent row whose brand was assumed is a consent record nobody gave."* The identical argument applies to purpose — a row whose purpose was assumed is a marketing grant nobody gave — and purpose got the opposite treatment in the same file, in the same build. Verified 2026-09-18.
+
+**Reclassified (2026-10-09): ⚪ non-blocking.** The core inconsistency was fixed by task-42: every internal consent function now requires a purpose. What remained was the API's consent-assertion input, which still defaulted the purpose to "marketing". Decided by the user: the API refuses an assertion without a purpose (task-343), because a silent default is how consent for one purpose gets recorded as another. The vocabulary question, a second purpose such as transfer to an ad platform, belongs to task-134. Marketing-only consent limits what can be adopted; it does not make any current claim untrue.
 
 ### P2-E3. Full erasure as the shipped default, against the audience it most affects `🟡 deferred`
 ADR-154 point 2 ships full erasure and documents pseudonymised retention *"as a variation, not shipped as a toggle"*, on the same refuse-to-judge grounds as ADR-144 §3. The reasoning is stated and sound. The mismatch: `BRIEF.md` names **BI teams** among the people who tailor this, and point 2's Negative concedes *"full erasure loses data that has legitimate analytical value."* So the most likely adopter override requires a code change at a seam that does not exist — ADR-154's own status is *"Nothing in this record is built."*
@@ -510,7 +516,7 @@ ADR-144 §5, via the 2026-07-31 decision log: *"Cost cap: warn → hard stop, **
 | P2-D1 | ADR-153 | Audit covers administration only; ADR-166's integration-actor promise has no writer | ✅ |
 | P2-D2 | ADR-153 | Fail-open audit write + unenforced `detail` policy, decided in docstrings | ✅ |
 | P2-E1 | ADR-163 | Fail-closed opt-in is jurisdictional, hardcoded, the one seam that is not a seam | ✅ |
-| P2-E2 | ADR-163 | `purpose` defaults to `"marketing"` where `brand_id` is a required positional | 🔴 |
+| P2-E2 | ADR-163 | `purpose` defaults to `"marketing"` where `brand_id` is a required positional | ⚪ |
 | P2-E3 | ADR-154 | Full-erasure default vs. the BI-team audience it most affects | 🟡 |
 | P2-F1 | ADR-160 | "Two files, no config step" is nine steps, two of them silent | ✅ |
 | P2-F2 | ADR-160/162 | Channel multiplies record fields; locale axis never considered | 🟡 |
