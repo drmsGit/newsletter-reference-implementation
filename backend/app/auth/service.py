@@ -775,6 +775,10 @@ def issue_login_code(db: Session, email: str) -> IssuedCode | None:
     user = db.query(UserDB).filter(UserDB.email == address).first()
     if user is None or not user.is_active:
         logger.info("auth: sign-in requested for unknown or inactive address")
+        # The same KDF work a real code costs, discarded (task-317). Without it
+        # a known address answered ~25 ms slower than an unknown one: the
+        # account oracle ADR-151 section 2 closes, reopened by task-35's scrypt.
+        hash_login_code(f"{secrets.randbelow(1_000_000):06d}")
         return None
 
     # Supersede any outstanding code so a request cannot be used to keep an
@@ -840,10 +844,17 @@ def verify_login_code(db: Session, email: str, code: str) -> str | None:
     user = db.query(UserDB).filter(UserDB.email == address).first()
     row = None
     if user is not None and user.is_active:
+        # Locked until this verification commits (task-316). Without the lock
+        # two simultaneous submissions both read the code unconsumed — one code
+        # opened two sessions — and parallel guesses overwrote each other's
+        # `attempts`. A waiting verification is re-checked against the
+        # committed row: a consumed code no longer matches, and the count it
+        # sees is current (ADR-151 section 2: single use, bounded guesses).
         row = (
             db.query(LoginCodeDB)
             .filter(LoginCodeDB.user_id == user.id, LoginCodeDB.consumed_at.is_(None))
             .order_by(LoginCodeDB.id.desc())
+            .with_for_update()
             .first()
         )
     current = now()
