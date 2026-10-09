@@ -727,6 +727,12 @@ Recorded in the 2026-10-09 addendum to [[ADR-142 — Autonomous Workflows and th
 
 **Status:** built the same day (task-327).
 
+### 2026-10-09 — Someone else's change never replaces what you are typing
+
+**Context:** ChatGPT found that an editor field replaced unsaved typing whenever the stored value changed — a refresh when the window regains focus was enough (task-329). The "somebody is working on this" notice cannot prevent it: it exists only in the variant editor, and appears only after the other person's edit has landed. **Decided with the user:** the typing stays, a notice under the field shows the other person's value, and — because it is rare and worth a look — leaving the field does not save over theirs. The manager chooses "Save mine" or "Use theirs". A field nobody has typed in still follows the stored value. In line with [[ADR-180 — A Lock Is Advisory for a Person and Binding for a Machine]]: a person is told, not blocked.
+
+**Status:** built the same day (task-329).
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*

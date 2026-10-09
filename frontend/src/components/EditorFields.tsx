@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Button, Input, Label, Text, TextArea, TextField } from 'react-aria-components'
 
 import type { ModuleVariable } from '../api/resources'
@@ -7,8 +7,13 @@ import { HttpError } from '../api/session'
 /**
  * A field that saves when it loses focus, and only when its value changed.
  *
- * The draft follows the saved value whenever the server's answer changes —
- * after a save, and after a reload that discards a refused edit.
+ * The draft follows the stored value while nobody has typed in it, and when
+ * the stored value becomes the draft (its own save coming back). Typing is
+ * never replaced by a refresh (task-329): if somebody else's value arrives
+ * underneath it, the typing stays, a notice shows theirs, and leaving the
+ * field saves nothing — the manager chooses "Save mine" or "Use theirs"
+ * (decided with the user 2026-10-09; ADR-180: a person is told, not blocked).
+ * Discarding a refused save is "Load their version", which remounts the page.
  *
  * `onLeave` lets the caller see where the focus went before anything is
  * saved, and take the draft elsewhere instead (return true). A field whose
@@ -30,7 +35,14 @@ export function AutosaveField({
   error: string | undefined
 }) {
   const [draft, setDraft] = useState(value)
-  useEffect(() => setDraft(value), [value])
+  // The stored value the draft started from. Adjusted during render, not in
+  // an effect, so a refresh never paints the wrong text for a frame.
+  const [base, setBase] = useState(value)
+  if (value !== base && (draft === base || draft === value)) {
+    setDraft(value)
+    setBase(value)
+  }
+  const conflict = value !== base
   const label = field.label ?? field.name
   const multiline = field.type === 'richtext'
 
@@ -42,6 +54,7 @@ export function AutosaveField({
       onBlur={(event) => {
         if (draft === value) return
         if (onLeave?.(draft, event.relatedTarget as Element | null)) return
+        if (conflict) return
         onSave(draft)
       }}
       isInvalid={!!error}
@@ -67,6 +80,23 @@ export function AutosaveField({
         <Text slot="description" className="muted">
           Empty — needed before this is sent.
         </Text>
+      )}
+      {conflict && (
+        <div role="alert" className="field-error">
+          <p>
+            Somebody else changed this while you were typing. Theirs: <q>{value}</q>. Yours is not saved
+            until you choose.
+          </p>
+          <Button
+            onPress={() => {
+              setBase(value)
+              onSave(draft)
+            }}
+          >
+            Save mine
+          </Button>{' '}
+          <Button onPress={() => setDraft(value) /* base follows on the next render */}>Use theirs</Button>
+        </div>
       )}
       {error && (
         <p role="alert" className="field-error">
