@@ -69,6 +69,8 @@ def record_contribution(
     source: str = "engagement",
     base_weight: float | None = None,
     channel: str | None = None,
+    *,
+    commit: bool = True,
 ) -> SignalContributionDB:
     """Append one contribution to the log. `base_weight` defaults to the
     configured weight for the type; pass it explicitly to scale (e.g. by a
@@ -94,8 +96,11 @@ def record_contribution(
         channel=channel,
     )
     db.add(contribution)
-    db.commit()
-    db.refresh(contribution)
+    if commit:
+        db.commit()
+        db.refresh(contribution)
+    else:
+        db.flush()
     return contribution
 
 

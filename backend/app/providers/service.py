@@ -57,6 +57,8 @@ def ingest_provider_event(
     event_type: str,
     provider_event_id: str,
     event_data: dict,
+    *,
+    commit: bool = True,
 ) -> ProviderEventIngestResult:
     delivery_execution = (
         db.query(DeliveryExecutionDB)
@@ -110,6 +112,7 @@ def ingest_provider_event(
         provider_event_id=provider_event_id,
         event_data=event_data,
         occurred_at=None,
+        commit=commit,
     )
 
     return ProviderEventIngestResult(status="matched", engagement_event=engagement_event)
@@ -130,8 +133,6 @@ def process_provider_webhook_event(db: Session, normalized) -> ProviderEventInge
     click/open, turn it into per-category signal contributions immediately so a
     recipient's score updates live. `normalized` is a NormalizedEvent from a
     provider adapter (e.g. app.providers.adapters.resend.parse_webhook)."""
-    from app.insight.service import apply_event_to_signals
-
     # **The content is the event's to name, never ours to guess** (ADR-182,
     # task-45). Until 2026-10-02 a "primary" record — the latest personalized
     # pick, else the first content-bound module — was attached to every click
@@ -162,6 +163,26 @@ def process_provider_webhook_event(db: Session, normalized) -> ProviderEventInge
             )
             event_data.pop("content_record_id")
 
+    # **The event and its mandatory effects commit together, or not at all**
+    # (task-319). The event used to be committed first: when an effect then
+    # failed, the provider's retry of the same event was answered "duplicate"
+    # and a complaint's opt-out never landed (ADR-106 makes it mandatory). Now
+    # a failure rolls everything back and the retry starts from the beginning;
+    # a completed event retried is still a duplicate, and changes nothing.
+    try:
+        result = _record_with_effects(db, normalized, event_data)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return result
+
+
+def _record_with_effects(db: Session, normalized, event_data: dict) -> ProviderEventIngestResult:
+    """Record the event and apply its effects without committing — the caller
+    commits all of it at once (task-319)."""
+    from app.insight.service import apply_event_to_signals
+
     result = ingest_provider_event(
         db=db,
         provider=normalized.provider,
@@ -169,6 +190,7 @@ def process_provider_webhook_event(db: Session, normalized) -> ProviderEventInge
         event_type=normalized.event_type,
         provider_event_id=normalized.provider_event_id,
         event_data=event_data,
+        commit=False,
     )
 
     if (
@@ -179,7 +201,7 @@ def process_provider_webhook_event(db: Session, normalized) -> ProviderEventInge
         and event_data.get("content_record_id") is not None
     ):
         try:
-            apply_event_to_signals(db, result.engagement_event.id)
+            apply_event_to_signals(db, result.engagement_event.id, commit=False)
         except ValueError as error:
             # e.g. open weight 0, or content has no category assignments — the
             # raw event is still recorded, it just moved no signal.
@@ -215,6 +237,7 @@ def process_provider_webhook_event(db: Session, normalized) -> ProviderEventInge
                 reason=normalized.event_type,
                 channel=delivery_execution.channel,
                 purpose=delivery_execution.purpose,
+                commit=False,
             )
             if changed:
                 logger.info(

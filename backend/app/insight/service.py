@@ -37,7 +37,11 @@ def create_engagement_event(
     provider_event_id: str | None = None,
     event_data: dict | None = None,
     occurred_at: datetime | None = None,
+    *,
+    commit: bool = True,
 ) -> EngagementEvent:
+    """`commit=False` only flushes, for a caller that commits the event
+    together with its effects (task-319)."""
     event = EngagementEventDB(
         delivery_execution_id=delivery_execution_id,
         event_type=event_type,
@@ -48,8 +52,11 @@ def create_engagement_event(
     )
 
     db.add(event)
-    db.commit()
-    db.refresh(event)
+    if commit:
+        db.commit()
+        db.refresh(event)
+    else:
+        db.flush()
 
     return to_engagement_event(event)
 
@@ -79,6 +86,8 @@ def page_events_for_delivery_execution(db: Session, delivery_execution_id: int, 
 def apply_event_to_signals(
     db: Session,
     event_id: int,
+    *,
+    commit: bool = True,
 ) -> PreferenceUpdateResult:
     """Turn a content-tied engagement event (click/open) into per-category
     signal contributions (ADR-132). Appends to the contribution log; there is
@@ -173,6 +182,7 @@ def apply_event_to_signals(
             contribution_type=event.event_type,
             occurred_at=event.occurred_at,
             event_id=event.id,
+            commit=commit,
             source="engagement",
             base_weight=category_weight,
             # The execution carries the real channel since ADR-160 point 4 was
