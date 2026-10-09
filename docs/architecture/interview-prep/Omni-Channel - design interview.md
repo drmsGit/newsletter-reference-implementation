@@ -6,7 +6,7 @@ topic:
   - channels
   - design
 created: 2026-08-12
-status: open
+status: closed
 ---
 
 > **Status: interview CLOSED 2026-09-01 — all five clusters, 25/25 questions

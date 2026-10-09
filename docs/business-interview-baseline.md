@@ -50,7 +50,6 @@ Two new concepts surfaced during this pass that aren't decisions about existing 
 
 Not implemented, and no near-term backlog/roadmap item builds them yet. Forcing an answer now would be guessing ahead of scope. Left open, not closed.
 
-- **I1** — Automation layer accepted-but-unimplemented (ADR-090–095) — entire domain has no code and isn't on the Phase 1–4 roadmap at all.
 - **G1** — Email-in-platform vs. identifiers-only ([[ADR-120 — CRM as Customer Source of Truth]] / [[ADR-054 — Use Internal Recipient Identifiers]] / [[ADR-126 — Maintain Local Recipient Projection]]) — resolved from "unsure" 2026-07-05: confirmed intended design is identifiers-only (internal + CRM/provider external IDs), `email` on `RecipientDB` today is a known deviation, not an open question. What's genuinely undecided — how simple personalization (salutation, "you're subscribed with this email" footer) gets its data without the platform owning email/name as a system of record — has no feature building it yet. Revisit once an example CRM integration is built (the planned proof-of-concept for how CRM ↔ newsletter platform ↔ provider hand off identity), since that's what will surface the real shape of the identifier/personalization boundary. See updated reasoning in §G1 below.
 
 ### ⚪ Non-blocking / cosmetic — batch for later
@@ -65,6 +64,7 @@ Stable, already-shipped, or pure positioning/naming — doesn't affect current o
 - **C2** — [[ADR-012 — Content Records Represent Communication Units]] (foundational, shipped, stable)
 - **C3** — `preferred_airport` / travel-vertical demo data (nullable field, naming/scope-clarity issue only)
 - **D1** — [[ADR-020 — Campaign Equals Newsletter]] (foundational, shipped; journeys/programs aren't on the roadmap)
+- **I1** — Automation layer accepted-but-unimplemented (ADR-090–095) — reclassified 2026-10-09: POSITIONING.md now says accepted ADRs demonstrate a design, not a capability, and parts are built.
 
 ### ⚠️ Unsure — skip, needs your input
 
@@ -264,7 +264,7 @@ Concrete evidence: `RecipientDB` (`backend/app/recipients/db_models.py:6-22`) ha
 
 ## I. Automation Layer
 
-### I1. [[ADR-090 — Automation References Campaigns, Not Decisions]] through [[ADR-095 — Use Send Instances for Technical Execution Tracking]] — six "Accepted" ADRs, zero implementation `🟡 deferred`
+### I1. [[ADR-090 — Automation References Campaigns, Not Decisions]] through [[ADR-095 — Use Send Instances for Technical Execution Tracking]] — six "Accepted" ADRs, zero implementation `⚪ non-blocking`
 
 Concrete evidence: `backend/app/automation/` does not exist as a directory (compare to `content/`, `campaigns/`, `decision/`, `delivery/`, `insight/`, `overrides/`, `providers/`, `recipients/`, `rendering/`, `snapshots/` — all present with code). All six Automation ADRs (090–095) carry `status: accepted`.
 
@@ -273,6 +273,8 @@ Concrete evidence: `backend/app/automation/` does not exist as a directory (comp
 3. **Forking impact:** Doesn't block a fork technically (there's nothing to conflict with), but it does mean anyone using ADR status as a proxy for "is this real" will be misled specifically in this cluster.
 4. **Not documented anywhere** — no ADR or note flags that the Automation domain is accepted-on-paper-only. `docs/playbook-strategy.md`'s "What exists today (baseline)" list (§Roadmap) confirms Automation isn't mentioned among implemented modules, but doesn't call out the ADR-status mismatch explicitly either.
 5. **What you'd need to explain:** That ADR status in this repo tracks *design agreement*, not *build status* — and that the Automation cluster specifically is 100% design, 0% code, despite reading identically to fully-implemented clusters like Delivery or Content.
+
+**Reclassified (2026-10-09): ⚪ non-blocking.** The convention this finding asked for is now on record: `docs/business/POSITIONING.md` (decided 2026-09-12) says accepted ADRs demonstrate a design, not a capability. And "zero implementation" is no longer true: send instances exist (ADR-095, `backend/app/delivery/db_models.py`), ADR-093 is honoured in audience and recipient code, and `backend/app/automation/README.md` says the domain is empty on purpose (task-306). Confirmed in the 2026-10-09 interview-review triage.
 
 ---
 
@@ -375,8 +377,10 @@ ADR-150 point 4 prices multi-brand exactly: *"A company treating brands as a ski
 ### P2-A2. "Consent to brand A says nothing about brand B" is a legal posture sitting in an ADR `🟡 deferred`
 ADR-163's addendum decides that one company's brands do not share a lawful basis for contact, and `recipients/consent.py` enforces it with `brand_id` as a required positional and no default anywhere. Many German companies capture one group-level opt-in and treat the brand as a presentation detail — which is word for word what ADR-150 point 2 says brands *are*. The addendum adopts the stricter reading on the adopter's behalf, which is the same kind of compliance judgement ADR-150 point 3, ADR-144 §3 and ADR-154 point 2 all explicitly refuse to make in the other direction. A forker with group-level consent has no config path; it must be edited out of every consent function.
 
-### P2-A3. Cross-brand duplication re-applies a principle superseded on 2026-07-05 `🟡 deferred`
+### P2-A3. Cross-brand duplication re-applies a principle superseded on 2026-07-05 `✅ resolved 2026-10-09`
 `campaigns/duplication.py:1-8` states: *"Duplication is a risky topic, so why do it with a one-click solution. Make the manager make his decision deliberately instead of fast."* That is the 2026-06-24 tiered-friction philosophy, which decision-log item 2 of 2026-07-05 **superseded**: *"friction should be low across the board… The real friction trigger is scale/anomaly, not category."* Duplication is a new surface so this is not a strict contradiction — but the superseded framing was re-applied without anyone recording that the reversal exists.
+
+**Resolution (2026-10-09):** Overtaken in practice, and now said. Since the Variant Editor interview (Q5.1; `frontend/src/screens/CampaignDetail.tsx:176-181`) duplicating a variant within its campaign is one click and the primary way a variant is made. The deliberate wizard remains only for copying a campaign into another brand, the one case where content is forked. That is consistent with the 2026-07-05 principle rather than against it: friction is triggered by risk, and a fork across the brand boundary is the risky case, not the kind of act. The docstring at `campaigns/duplication.py:1-8` still quotes the old premise as governing; rewording it is queued in task-334. Decided in the 2026-10-09 interview-review triage.
 
 ## P2-B. Authentication — ADR-151, ADR-166
 
@@ -396,8 +400,10 @@ The rule is stated four times: ADR-161 §8 (frequency capping — *"Numbers belo
 ### P2-D1. The accountability the positioning rests on is not written by anything that matters `🔴 blocking`
 ADR-153 promises an operator screen, a SIEM export, a place to point a DPO, events with no domain record, and a non-human actor. As built: eight actions — sign-in, role granted/revoked, user deactivated/reactivated, `brand.created`, `campaign.duplicated`, `content.duplicated`. Seven write sites, all in routers. **No send, no consent write, no AI run, no export, no bulk read.** `actor_type="integration"` is declared and nothing writes it — while ADR-166's headline benefit is *"'n8n triggered this send' still reads correctly a year and three key rotations later, which is the property an audit is for."* `POSITIONING.md` lists transparency among the four surviving differentiators and `LAUNCH-GATES.md` Gate 7 reads ✅ "base built". The scope choice (writes + exports, not page views) is sound; the *first slice being the administrative half* is a sequencing decision presented as scope.
 
-### P2-D2. Audit writes fail open, by a decision that lives in a docstring `🟡 deferred`
+### P2-D2. Audit writes fail open, by a decision that lives in a docstring `✅ resolved 2026-10-09`
 `record` swallows every exception, logs, rolls back, returns `None`, because *"a failure that rolls back a role grant because its log entry would not write is worse than an incomplete log."* Defensible engineering, contestable compliance — an auditor reviewing an append-only log generally wants the opposite, and ADR-153's value proposition is "one artefact to hand an auditor." Compounding it, `detail` is unvalidated JSON with a policy ADR-154 §3 calls *"the enforcing rule"* and that nothing enforces. Neither is in ADR-153, which is where a reviewer would look.
+
+**Resolution (2026-10-09):** Closed on the record. The premise is gone: `backend/app/audit/service.py:236-239` refuses unknown actions and email-shaped detail at write time, and `:251-253` catches only database errors, undoing only the audit write, not the caller's work. The fail-open-on-database-failure posture was accepted in the Audit interview (Q3, 2026-09-19) and is now stated in ADR-153 itself (2026-10-08 addendum: `record` "never raises for a database failure"). Nothing is decided only in a docstring any more. Confirmed in the 2026-10-09 interview-review triage.
 
 ## P2-E. Consent and erasure posture — ADR-154, ADR-163
 
@@ -409,6 +415,8 @@ ADR-163 point 3 makes `transfer` a first-class purpose; `BETA-SCOPE.md` flags th
 
 ### P2-E3. Full erasure as the shipped default, against the audience it most affects `🟡 deferred`
 ADR-154 point 2 ships full erasure and documents pseudonymised retention *"as a variation, not shipped as a toggle"*, on the same refuse-to-judge grounds as ADR-144 §3. The reasoning is stated and sound. The mismatch: `BRIEF.md` names **BI teams** among the people who tailor this, and point 2's Negative concedes *"full erasure loses data that has legitimate analytical value."* So the most likely adopter override requires a code change at a seam that does not exist — ADR-154's own status is *"Nothing in this record is built."*
+
+**Status (2026-10-09):** Still deferred, with the reason narrowed. ADR-154 point 2 stands: full erasure by default, pseudonymised retention as a documented variation at a defined seam, the analytical loss accepted. Nothing of erasure is built yet (`backend/app/privacy/README.md:3`). When the lifecycle work builds it (task-136, task-117), the variation seam must be a named hook, and keeping non-personal per-send totals should be considered so BI baselines don't shift. Confirmed in the 2026-10-09 interview-review triage.
 
 ## P2-F. The channel cluster — ADR-160..165
 
@@ -429,11 +437,15 @@ ADR-161 §4 (*"if transferred, count as has seen"* — trade and known wrongness
 ### P2-G1. Unattended-send risk is modelled as a property of the caller, not of the send `🔴 blocking`
 `may_send_unattended` is one boolean, checked once against `SENDS_EXECUTE`. Flipped on, an integration may fire any send, to any audience, on any brand it holds a grant for. The only bound is one company-wide `DEFAULT_MAX_SEND_RECIPIENTS = 1000` applied at plan time — not something an integration can be given its own value of. **The inversion worth naming:** decision-log item 2 of 2026-07-05 settled, for humans, that *"the real friction trigger is scale/anomaly, not category — a manager inflating a 500-person segment to 200k is the actual risk case."* ADR-166 point 5 models the machine case on category (who you are) and not scale. Same risk, opposite answer, three months apart, with no record noticing. An adopter wanting "n8n may send up to 5,000 unattended, above that it queues" has no expression for it — and the queue does not exist either.
 
-### P2-G2. An authenticated machine has no request budget `🟡 deferred`
+### P2-G2. An authenticated machine has no request budget `✅ resolved 2026-10-09`
 Human sign-in rate limiting occupied a whole launch-gate sub-decision with four stated properties. Failed machine auth is aggregated per `(key, client, hour)`. A **successful** integration is unlimited: no per-credential quota anywhere. On a plane whose named routes fire real mail, write consent records, return the recipient list and write into the signal layer. ADR-166 point 1 mentions rate limiting only as a *reason* for key+secret over a bare token — the enabling property was built, the limit was not.
 
-### P2-G3. No shipped role can operate the consent or recipient surface `🟡 deferred`
+**Resolution (2026-10-09):** Request budgets for machines belong to the gateway in front of the app, keyed on the API key, not to the application. Inside the app, the one thing that must be bounded is mail, and it is: held sends need a person's approval, and every send is capped by the recipient limit (`backend/app/settings/service.py:45`). Only failed machine sign-ins are counted in the app (`auth/integrations.py:338`), which stays. Recorded on task-55 (reference deployment), whose gateway seam already carries rate and request limits. Decided in the 2026-10-09 interview-review triage.
+
+### P2-G3. No shipped role can operate the consent or recipient surface `✅ resolved 2026-10-09`
 Manager deliberately excludes `recipients.manage`, `recipients.consent` and `insight.write`, with the reason in a code comment: *"these guard no UI surface… so these exist for machine callers."* That follows cleanly from ADR-120/126/167 — and it means the adopter ADR-167's Negative names as blocked (*"a company with no CDP or CRM capable of minting a device contact"*) has no human fallback either. They would have to create a custom role, which is possible and is nowhere in the preset or the docs.
+
+**Resolution (2026-10-09):** Premise corrected. Admin holds every permission (`backend/app/auth/permissions.py:139`), including recipient and consent writes; only Manager lacks them, by design (`:157-161`), and the Manager's read-only consent view was itself decided (Manager Workflow interview Q6, 2026-09-24). A person can use the JSON API with the session cookie (ADR-168), and Swagger's Try-it-out authenticates. So a company without a CRM has a human fallback: an Admin, through the API. A manager-facing consent-write screen is a separate product question, not this finding. Confirmed in the 2026-10-09 interview-review triage.
 
 ## P2-H. The AI task library — ADR-140/141/144
 
@@ -473,12 +485,12 @@ ADR-144 §5, via the 2026-07-31 decision log: *"Cost cap: warn → hard stop, **
 |---|---|---|---|
 | P2-A1 | ADR-150 | Single-brand cost is a cross-cutting concern, not "a default value in a column" | 🔴 |
 | P2-A2 | ADR-163 add. | Brand-scoped consent is a legal interpretation with no config path | 🟡 |
-| P2-A3 | ADR-013 add. | Duplication friction re-applies a 2026-07-05-superseded principle | 🟡 |
+| P2-A3 | ADR-013 add. | Duplication friction re-applies a 2026-07-05-superseded principle | ✅ |
 | P2-B1 | ADR-151 | Security numbers hardcoded while the repo's rule gives numbers to the company | 🔴 |
 | P2-B2 | ADR-166 | Machine credentials never expire; humans expire twice | 🟡 |
 | P2-C1 | ADR-152 | §1 and §4 cannot both hold | 🟡 |
 | P2-D1 | ADR-153 | Audit covers administration only; ADR-166's integration-actor promise has no writer | 🔴 |
-| P2-D2 | ADR-153 | Fail-open audit write + unenforced `detail` policy, decided in docstrings | 🟡 |
+| P2-D2 | ADR-153 | Fail-open audit write + unenforced `detail` policy, decided in docstrings | ✅ |
 | P2-E1 | ADR-163 | Fail-closed opt-in is jurisdictional, hardcoded, the one seam that is not a seam | 🔴 |
 | P2-E2 | ADR-163 | `purpose` defaults to `"marketing"` where `brand_id` is a required positional | 🔴 |
 | P2-E3 | ADR-154 | Full-erasure default vs. the BI-team audience it most affects | 🟡 |
@@ -487,8 +499,8 @@ ADR-144 §5, via the 2026-07-31 decision log: *"Cost cap: warn → hard stop, **
 | P2-F3 | ADR-160 | "Weekend not half a year" is a market criterion in an ADR | 🟡 |
 | P2-F4 | cluster | Four documented-and-fine trades, listed so they are not re-flagged | ⚪ |
 | P2-G1 | ADR-166 | Unattended-send risk modelled by caller identity, not scale — inverts 2026-07-05 | 🔴 |
-| P2-G2 | ADR-166 | No request budget for an authenticated machine | 🟡 |
-| P2-G3 | ADR-166 | No shipped role can write consent or manage recipients | 🟡 |
+| P2-G2 | ADR-166 | No request budget for an authenticated machine | ✅ |
+| P2-G3 | ADR-166 | No shipped role can write consent or manage recipients | ✅ |
 | P2-H1 | ADR-141 | The manager-owned-prompt seam ships a developer-written English house style | 🔴 |
 | P2-H2 | ADR-144 | Lifetime spend cap; "per role/user" drifted to one pot, unamended | 🟡 |
 | P2-H3 | ADR-144 | Governed model list is one US vendor on a governance-risk pitch | 🟡 |

@@ -4,7 +4,7 @@ title: Nothing checks manual bindings against slot resolutions
 status: To Do
 assignee: []
 created_date: '2026-09-27 14:20'
-updated_date: '2026-10-01 20:54'
+updated_date: '2026-10-09 18:13'
 labels:
   - backend
 dependencies:
@@ -34,4 +34,6 @@ Depends on task-109: when a slot's pick is already bound by hand, the next pick 
 
 <!-- SECTION:NOTES:BEGIN -->
 Logged 2026-09-27 from the "What Cluster N produced" sections of the two design interviews, each gap re-verified against the code that day. The plan was reviewed and approved by the session that ran the interviews. Parked: not yet ranked by anyone.
+
+2026-10-09 (interview-review triage, Variant Editor design interview Q1.6): the 'human beats system' rule this task builds had no ADR. ADR-178:118 said the ADR-176 addendum was owed. The adr-author agent is writing that ADR-176 addendum (2026-10-09); build against it, not against the interview text.
 <!-- SECTION:NOTES:END -->

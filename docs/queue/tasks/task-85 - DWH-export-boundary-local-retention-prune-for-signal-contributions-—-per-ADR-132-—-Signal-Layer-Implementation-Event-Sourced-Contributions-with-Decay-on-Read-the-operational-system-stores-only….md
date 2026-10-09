@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
-updated_date: '2026-09-27 14:29'
+updated_date: '2026-10-09 18:13'
 labels:
   - backend
 dependencies: []
@@ -25,4 +25,6 @@ ordinal: 203800
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 246, section "Features", position 38 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-09 (interview-review triage, AI Layer design interview Q18; ADR-142:153-155 says the two decisions belong together): the fatigue check reads engagement history, so the configured fatigue window must fit inside the retention window chosen here. Whoever sets retention checks the fatigue setting, and vice versa.
 <!-- SECTION:NOTES:END -->

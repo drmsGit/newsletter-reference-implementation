@@ -9,8 +9,8 @@ modified: 2026-09-22
 status: closed
 ---
 
-> **Status: interview OPEN.** Clustering approved 2026-09-21. All five clusters
-> written out — 49 questions, 18 answered.
+> **Status: interview CLOSED** (see the cluster lines below; this line said OPEN
+> until 2026-10-09). Clustering approved 2026-09-21.
 > **Cluster 2 CLOSED 2026-09-21, 18/18** — see *What Cluster 2 produced* for the
 > five backend requirements and the ADR work it owes.
 > **Cluster 1 ✅ CLOSED 2026-09-24, 8/8.**

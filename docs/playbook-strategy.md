@@ -733,6 +733,28 @@ Recorded in the 2026-10-09 addendum to [[ADR-142 — Autonomous Workflows and th
 
 **Status:** built the same day (task-329).
 
+### 2026-10-09 — Interview review: what later decisions had already answered
+
+**Context:** before going through the open interview questions one by one, every open item was checked against what was decided after it was asked. That covered the technical questions from ChatGPT's round, the open business findings, and loose ends in the design interviews. The items that records or the code already answered were confirmed by the user in one go; only the rest are taken one at a time.
+
+Business findings settled this way, each with its narrative in `docs/business-interview-baseline.md`:
+1. **Duplication friction (P2-A3).** The deliberate wizard applies only to copying a campaign into another brand, where content is forked. Within a campaign, duplicating is one click. This matches the 2026-07-05 rule that friction follows risk, not the kind of act.
+2. **Audit failing open (P2-D2).** Closed. The rules on what an entry may contain are enforced at write time, and the fail-open posture is stated in ADR-153 itself, not only in a docstring.
+3. **Machine request budgets (P2-G2).** A per-key budget is the gateway's job (task-55). Inside the app, mail is what must be bounded, and it is: held sends need approval, and the recipient cap applies.
+4. **No role for consent (P2-G3).** The premise was wrong. Admin holds every permission and can work through the API. The Manager's read-only consent view was decided.
+5. **Accepted-but-unbuilt automation ADRs (I1).** Non-blocking. Accepted ADRs demonstrate a design, not a capability (POSITIONING.md, 2026-09-12), and parts are built now.
+6. **Full erasure versus BI teams (P2-E3).** ADR-154 stands. It stays deferred to the lifecycle work (task-136), which must make the retention variation a named hook.
+
+The technical items became queue tasks:
+- task-330: an unsubscribe link must never point at localhost.
+- task-331: a held request is void once its requester is switched off.
+- task-332: CI pins its scanner and never cancels the weekly scan.
+- task-333: no retry on a refused read.
+- task-334: six stale comments.
+- task-335 and task-336: parked records of deferred features.
+
+The decision on held requests is recorded in a second 2026-10-09 addendum to [[ADR-142 — Autonomous Workflows and the Automation Boundary]]. The owed "a person's choice beats the engine's" record is an addendum to [[ADR-176 — A Negative Decision Outranks a Positive One]].
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*

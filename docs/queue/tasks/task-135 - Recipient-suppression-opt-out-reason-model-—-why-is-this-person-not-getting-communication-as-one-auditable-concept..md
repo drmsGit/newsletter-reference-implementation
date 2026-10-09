@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
-updated_date: '2026-09-27 14:29'
+updated_date: '2026-10-09 18:13'
 labels:
   - needs-adr
   - backend
@@ -25,4 +25,6 @@ ordinal: 300160
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 487, section "Needs ADR", position 19 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-09 (interview-review triage, Manager Workflow design interview Q4.5, lines 1355-1359): an emergency opt-out of one person from the recipient page was parked as 'possibly part of the GDPR package'. The built recipient page (task-292) leaves it out on purpose. Decided: it belongs here, as one audited act alongside the suppression and opt-out reasons, not as its own task.
 <!-- SECTION:NOTES:END -->

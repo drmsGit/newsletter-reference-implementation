@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
-updated_date: '2026-10-08 22:25'
+updated_date: '2026-10-09 18:13'
 labels:
   - needs-adr
   - backend
@@ -27,4 +27,6 @@ ordinal: 300300
 Migrated 2026-09-27 from `docs/backlog.md` line 414, section "Needs ADR", position 3 in that section (top = do next). The description is the original entry, verbatim.
 
 2026-10-08 queue cleanup (backlog-sequencer run 3, verified by hand): related since today: task-53 (done 2026-10-08, ADR-166 addendum) lets an integration read back what its write permission covers, through the MACHINE_READS table in backend/app/auth/policy.py. Any finite list of what n8n and the CRM must be able to do can now include reading back recipients, content, campaigns and audiences. Derived data, such as activity and signals, still needs view.
+
+2026-10-09 (interview-review triage, Client Q5): the generated TypeScript client promises only that this checkout's client matches this checkout's server (ADR-170 point 5). Outside integrations get no compatibility promise from it. Whatever contract n8n and the CRM need, including what happens when a response's meaning changes but its shape does not, is part of this task's design.
 <!-- SECTION:NOTES:END -->
