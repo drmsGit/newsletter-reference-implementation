@@ -1,10 +1,11 @@
 ---
 id: TASK-316
 title: Concurrent login-code verification bypasses single use and the attempt limit
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-09 08:01'
-updated_date: '2026-10-09 08:23'
+updated_date: '2026-10-09 08:32'
 labels:
   - backend
 dependencies: []

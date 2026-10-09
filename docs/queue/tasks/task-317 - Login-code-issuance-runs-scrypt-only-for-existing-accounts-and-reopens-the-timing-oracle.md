@@ -3,10 +3,11 @@ id: TASK-317
 title: >-
   Login-code issuance runs scrypt only for existing accounts and reopens the
   timing oracle
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-09 08:02'
-updated_date: '2026-10-09 08:23'
+updated_date: '2026-10-09 08:32'
 labels:
   - backend
 dependencies: []
