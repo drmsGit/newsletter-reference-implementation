@@ -201,6 +201,9 @@ def get_send_instances_for_snapshot(
 def get_executions_for_send_instance(
     send_instance_id: int,
     q: str | None = Query(None, description="Find recipients by identifier or address (part, any case)."),
+    status: str | None = Query(None, description=(
+        "Only executions with this status, e.g. `uncertain`: people the provider may or may not "
+        "have reached, never sent again — to check and resend by hand (task-318).")),
     params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
@@ -208,7 +211,7 @@ def get_executions_for_send_instance(
     from app.delivery.service import page_delivery_executions_for_send_instance
 
     return page_delivery_executions_for_send_instance(
-        db, send_instance_id, params, brand_id=brand_id, q=q)
+        db, send_instance_id, params, brand_id=brand_id, q=q, status=status)
 
 
 @router.post(

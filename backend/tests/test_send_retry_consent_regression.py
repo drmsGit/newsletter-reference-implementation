@@ -2,7 +2,6 @@
 import pytest
 
 from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
-from app.delivery.providers import mock as mock_module
 from app.delivery.service import send_send_instance
 from app.recipients.consent import record_consent
 from app.snapshots.service import create_snapshot_for_variant
@@ -28,17 +27,24 @@ def test_retry_after_unfinished_recipient_opts_out_sends_nobody(db, world, monke
                                   status="created", provider="mock", channel="email",
                                   purpose="marketing"))
     db.commit()
-    capture = mock_module.MockProvider.send
+    # Interrupted before the second recipient's provider call (in its render),
+    # so that recipient was never attempted. Since task-318 AC #3 a failure
+    # INSIDE the provider call marks the recipient uncertain and is never
+    # retried, so this test's case — an unattempted recipient who opts out
+    # before the retry — needs the failure to come before the call.
+    import app.rendering.frame as frame
+
+    real_render = frame.render_frame
     calls = 0
 
-    def fail_second(self, address, artifact):
+    def fail_second(*args, **kwargs):
         nonlocal calls
         calls += 1
         if calls == 2:
             raise RuntimeError("interrupted batch")
-        return capture(self, address, artifact)
+        return real_render(*args, **kwargs)
 
-    monkeypatch.setattr(mock_module.MockProvider, "send", fail_second)
+    monkeypatch.setattr(frame, "render_frame", fail_second)
     with pytest.raises(RuntimeError, match="interrupted batch"):
         send_send_instance(db, send.id, brand_id=brand_id)
     db.expire_all()
@@ -48,7 +54,7 @@ def test_retry_after_unfinished_recipient_opts_out_sends_nobody(db, world, monke
     original_id, original_record = done.provider_message_id, done.delivery_record
     record_consent(db, unfinished.recipient_id, "opted_out", brand_id,
                    channel="email", purpose="marketing", source="test")
-    monkeypatch.setattr(mock_module.MockProvider, "send", capture)
+    monkeypatch.setattr(frame, "render_frame", real_render)
     world["delivered"].clear()
 
     send_send_instance(db, send.id, brand_id=brand_id)

@@ -44,18 +44,24 @@ def _executions(db, send_id):
 
 
 def test_a_retry_after_a_mid_batch_failure_does_not_resend_the_successes(db, world, monkeypatch):
+    """The batch fails before the second recipient's provider call (in its
+    render), so that person was never attempted and the retry sends them. A
+    failure INSIDE the provider call is the other case: maybe sent, never
+    resent (test_send_uncertain.py, task-318 AC #3)."""
+    import app.rendering.frame as frame
+
     people = [world["person"](), world["person"]()]
     send = _send_with(db, world, people)
-    capture = mock_module.MockProvider.send     # the world's recording provider
+    real_render = frame.render_frame
     calls = {"n": 0}
 
-    def second_one_raises(self, address, artifact):
+    def second_render_fails(*args, **kwargs):
         calls["n"] += 1
         if calls["n"] == 2:
-            raise RuntimeError("provider fell over mid-batch")
-        return capture(self, address, artifact)
+            raise RuntimeError("batch fell over before the second provider call")
+        return real_render(*args, **kwargs)
 
-    monkeypatch.setattr(mock_module.MockProvider, "send", second_one_raises)
+    monkeypatch.setattr(frame, "render_frame", second_render_fails)
     with pytest.raises(RuntimeError):
         send_send_instance(db, send.id, brand_id=world["brand"].id)
 
@@ -65,7 +71,7 @@ def test_a_retry_after_a_mid_batch_failure_does_not_resend_the_successes(db, wor
     db.refresh(db.get(SendInstanceDB, send.id))
     assert db.get(SendInstanceDB, send.id).status == "failed", "the failed send must be retryable"
 
-    monkeypatch.setattr(mock_module.MockProvider, "send", capture)
+    monkeypatch.setattr(frame, "render_frame", real_render)
     world["delivered"].clear()
     send_send_instance(db, send.id, brand_id=world["brand"].id)
 

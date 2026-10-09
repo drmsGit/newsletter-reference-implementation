@@ -8789,6 +8789,8 @@ export interface operations {
             query?: {
                 /** @description Find recipients by identifier or address (part, any case). */
                 q?: string | null;
+                /** @description Only executions with this status, e.g. `uncertain`: people the provider may or may not have reached, never sent again — to check and resend by hand (task-318). */
+                status?: string | null;
                 /** @description Rows per page (1-200). */
                 limit?: number;
                 /** @description Rows to skip. */

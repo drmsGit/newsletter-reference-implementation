@@ -18,6 +18,10 @@ from app.snapshots.db_models import SnapshotDB
 
 logger = logging.getLogger(__name__)
 
+#: An execution whose provider call gave no answer: maybe sent, never resent
+#: (task-318, decided by the user 2026-10-09).
+UNCERTAIN = "uncertain"
+
 
 def to_delivery_execution(record: DeliveryExecutionDB) -> DeliveryExecution:
     return DeliveryExecution(
@@ -81,6 +85,7 @@ def create_delivery_execution(
 
 def page_delivery_executions_for_send_instance(
     db: Session, send_instance_id: int, params, *, brand_id: int, q: str | None = None,
+    status: str | None = None,
 ):
     """One ADR-185 page of a send's executions, newest first."""
     from app.pagination import page_of_query
@@ -92,6 +97,9 @@ def page_delivery_executions_for_send_instance(
         .filter(DeliveryExecutionDB.send_instance_id == send_instance_id,
                 SendInstanceDB.brand_id == brand_id)
     )
+    if status:
+        # e.g. `uncertain`: the people to check and resend by hand (task-318).
+        query = query.filter(DeliveryExecutionDB.status == status)
     if q:
         # Find a recipient by identifier or address on this send's channel —
         # the same rule an audience's search uses (`recipients.search`).
@@ -1029,6 +1037,20 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
         if execution.status == "sent":
             continue
 
+        # Left `sending` by an earlier run: the provider was called and gave no
+        # answer — it may have sent (task-318, AC #3). Decided by the user: never
+        # risk a duplicate. Recorded as `uncertain` and skipped; a large group
+        # of these is checked and resent by hand (filter the executions by
+        # status, paste the people into an audience group, plan a new send).
+        if execution.status == "sending":
+            execution.status = UNCERTAIN
+            execution.exclusion_reason = (
+                "provider outcome unknown: the provider was called and gave no answer, "
+                "so this person was not sent again"
+            )
+            db.commit()
+            continue
+
         # Excluded by the stack above: record why and move on, before any
         # work is done for this recipient. Ordering matters — a recipient
         # who may not be contacted must not have decision slots resolved
@@ -1129,6 +1151,12 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
         # address that is *used*.
         recipient_email = gate.addresses[execution.recipient_id]
 
+        # Marked and committed before the call (task-318): if the call raises or
+        # the process dies, a later run knows this person may have been sent
+        # to. Committing here also stores the unsubscribe token before the
+        # mail carrying it can leave.
+        execution.status = "sending"
+        db.commit()
         result = provider.send(recipient_email, artifact)
 
         logger.info(
@@ -1174,10 +1202,14 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
     # "excluded" is counted apart from "failed" on purpose: an excluded
     # recipient is the ADR-163 point 7 stack working, not a delivery problem.
     # Folding them together would recreate the same lie one level down.
-    counts = {"sent": 0, "failed": 0, "excluded": 0}
+    counts = {"sent": 0, "failed": 0, "excluded": 0, UNCERTAIN: 0}
     for execution in executions:
         if execution.status in counts:
             counts[execution.status] += 1
+    # An uncertain delivery is not a delivery (task-318): it counts with the
+    # failures, so the send never reads "sent" over people who may not have
+    # had it. Its own status keeps it findable in the executions list.
+    counts["failed"] += counts.pop(UNCERTAIN)
 
     send_instance.sent_count = counts["sent"]
     send_instance.failed_count = counts["failed"]
