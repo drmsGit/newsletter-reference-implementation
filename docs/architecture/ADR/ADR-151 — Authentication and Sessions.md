@@ -6,7 +6,7 @@ topic:
   - security
   - access
 created: 2026-08-02
-modified: 2026-09-29
+modified: 2026-10-09
 source:
   - "Security Chapter design interview, Part 2 (playbook-strategy.md Decision Log, 2026-08-02)"
 depends_on:
@@ -150,6 +150,94 @@ connection is not a side channel. Every background send completed.
 Gate 4b in [[LAUNCH-GATES]] is updated separately to reflect this fix. This
 addendum does not change it. Nothing else in point 2 changes: codes are still
 short-lived, single-use, hashed and rate limited per address and per IP.
+
+## Addendum 2026-10-09 — session lengths are the company's, attack resistance stays in code
+
+Prompted by finding P2-B1 in [[business-interview-baseline]] ("Security numbers
+are code; marketing numbers are settings rows — against the repo's own stated
+rule"), decided by the user in the 2026-10-09 interview review and logged in the
+[[playbook-strategy]] decision log under that date. Points 2 and 3 stand as
+written. This addendum records who owns the numbers they leave open.
+
+**Points 2 and 3 name properties, and the build fixed their values in code.**
+Point 2 asks for a short time-to-live, an attempt limit and request limits per
+address and per IP. Point 3 asks for an absolute lifetime and an idle timeout.
+All of them are module constants in `backend/app/auth/service.py:39-53`:
+`CODE_TTL_MINUTES = 10`, `CODE_MAX_ATTEMPTS = 5`, `CODE_REQUESTS_PER_ADDRESS = 5`
+per `CODE_REQUEST_ADDRESS_WINDOW_MINUTES = 15`, `CODE_REQUESTS_PER_CLIENT = 20`
+per `CODE_REQUEST_CLIENT_WINDOW_MINUTES = 60`, `SESSION_ABSOLUTE_HOURS = 12` and
+`SESSION_IDLE_MINUTES = 60`. `backend/app/settings/service.py` has getters for
+signal weights, half-lives, the AI provider, the AI spend cap, the send
+recipient cap and per-task models, and none for any of these.
+
+The repository's own rule points the other way.
+[[ADR-161 — Channel Execution Shapes]] point 8 states it: "Numbers belong to the
+company, the mechanism to us, the same split already used for retention periods
+and the AI spend cap." [[ADR-164 — Channel Feedback and Signals]] point 10
+repeats it for channel weights, [[ADR-154 — Erasure and Retention]] applies it
+to retention periods in its Notes, and
+[[ADR-144 — AI Data and Model Governance]] point 5 to the spend cap. Read
+literally, the rule would make every number above a company setting. The
+opposite answer, keeping all of them in code and recording the whole of
+sign-in and sessions as the exception, would leave a company whose works
+council or auditor sets its own session lengths with no seam short of a fork.
+Neither was adopted. The numbers are split by whom they serve.
+
+**1. The absolute session lifetime and the idle timeout are company policy and
+become company settings, each clamped to a safe range.** How long a person stays
+signed in, and how long an unattended screen stays usable, is a workplace rule.
+Twelve hours and sixty minutes encode one working day and one coffee break. A
+works council or an ISO 27001 auditor may require other lengths, and the company
+must be able to set them without a fork. Point 3 is unchanged: both expiries
+still apply, and a setting moves their lengths within the range without removing
+either.
+
+The safe ranges are not set here. They belong to the build's final-design pass.
+Two facts in the code bear on them. The idle timeout slides on a write of
+`last_seen_at` that happens at most once per `TOUCH_INTERVAL`
+(`backend/app/auth/service.py:905`, 60 seconds), which that constant's comment
+describes as "short against the idle timeout"; an idle lower bound close to it
+would break that assumption. And the absolute lifetime also sets the session
+cookie's `max_age` (`backend/app/auth/router.py:194` and `:663`), so the cookie
+has to follow the setting.
+
+**2. The attack-resistance numbers stay fixed in code, as a stated exception to
+"numbers belong to the company".** These are the sign-in code lifetime, the
+guess attempts per code, and the code-request limits per address and per client.
+They protect the system rather than express a company preference, and a wrong
+value opens a hole. The 2026-09-29 addendum above already depends on them: its
+timing claim is "sampled at most five times per address per quarter hour". That
+claim is stated in these exact numbers, and a setting that raised them would
+weaken it without any response changing. A company that must change them does
+so in its fork, knowingly.
+
+Making them settings bounded like the session lengths was considered and not
+adopted. A bound still lets a company choose the weakest value inside it, and
+for these numbers the weakest permitted value is then the system's real
+security level. Because they express no company preference, there is nothing
+for such a setting to serve that would outweigh that.
+
+**3. Decided now, built later.** Until the build lands, the session lengths
+remain the constants above. The build is tracked as task-342. Its final-design
+pass decides the safe ranges. It also decides whether a changed length applies
+to sessions that already exist, and the two expiries differ here: the absolute
+lifetime is stamped into each session row when it is created
+(`backend/app/auth/service.py:892`), while the idle timeout is evaluated against
+the constant on every request (`:930`). The pass also covers auditing the change
+like other settings (`backend/app/settings/audited.py`).
+
+**What it costs.**
+
+- **Two more settings.** Each has a range to choose, defend and test, and each
+  changes the length of every session in the company at once.
+- **A company that needs different attack-resistance values must change code.**
+  The exception is now written down rather than implicit, but it is still an
+  exception, and such a company carries the change in its own fork.
+
+**What it buys.** The numbers a company legitimately owns become its own. The
+one place the repository departs from "numbers belong to the company" is
+recorded, with its reason, instead of being discovered by reading module
+constants.
 
 ## Related ADRs
 

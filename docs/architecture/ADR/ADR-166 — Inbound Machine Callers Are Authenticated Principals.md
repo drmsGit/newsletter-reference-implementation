@@ -8,7 +8,7 @@ topic:
   - automation
   - governance
 created: 2026-09-13
-modified: 2026-10-08
+modified: 2026-10-09
 source:
   - "Machine authentication design interview (2026-09-13)"
 depends_on:
@@ -364,6 +364,104 @@ either permission writes nothing, so by point 2 it reads nothing through the tab
 
 **Unchanged:** points 1 through 8, and build-note 2. Nothing here changes the
 Decision section above.
+
+## Addendum 2026-10-09 — An integration's unattended sends have a recipient ceiling of their own
+
+Prompted by business finding P2-G1 in `docs/business-interview-baseline.md`
+("Unattended-send risk is modelled as a property of the caller, not of the
+send"). The user decided it in the interview review on 2026-10-09. It is logged in
+`docs/playbook-strategy.md` §5, "2026-10-09 — Business findings decided one by one
+in the interview review". **This does not touch the Decision.** Point 5 stands: a
+machine-triggered send is held for approval unless the integration is allowed
+otherwise, and held is the default. What changes is what "allowed otherwise" means.
+
+**The finding.** Point 5 made unattended sending a property of the caller. It is
+one boolean per integration, `may_send_unattended`
+(`backend/app/auth/db_models.py:233`), checked against `sends.execute` in
+`enforce_api_policy` (`backend/app/auth/dependencies.py:636-637`). Switched on, an
+integration may fire any send, of any size, on any brand it holds a grant for. The
+only size limit is the company-wide recipient cap, `DEFAULT_MAX_SEND_RECIPIENTS =
+1000` (`backend/app/settings/service.py:45`), read by `get_max_send_recipients`
+(`:130`). It is applied when a send is planned and again when its audience is
+re-resolved before firing (`backend/app/delivery/service.py:538`, `:653`). There
+is no per-integration value. An adopter who wants "n8n may send up to 5,000
+unattended; above that it waits" has no way to say it.
+
+That contradicts a business decision already on the record. The 2026-07-05
+triage (`docs/playbook-strategy.md` §5, "2026-07-05 — Business-Assumption Triage
+Resolutions", item 2, finding B2) settled for people that friction follows scale
+or anomaly, not the kind of act: a manager inflating a 500-person segment to 200k
+is the risk case. Point 5 answered the same risk for machines by who is calling.
+Same risk, opposite answer, and no record noticed.
+
+**1. An integration allowed to send unattended has its own recipient ceiling.** A
+send at or below the ceiling runs unattended. A send above it is held for a
+person's approval, like any other held request: the same pending action, the same
+inbox, the same history ([[ADR-142 — Autonomous Workflows and the Automation Boundary]]
+§4; `request_approval` in `backend/app/approvals/service.py:103`). Nothing new is
+built to hold it.
+
+**2. The ceiling reuses the existing cap mechanism, as a per-integration value.**
+It is not a second kind of limit. It stays bounded by the company-wide cap. A send
+above the company cap is still refused at planning, for a person and an
+integration alike. Below that line, the ceiling decides which sends run without a
+person.
+
+**3. Decided now, built later.** The build is deferred and tracked as task-341.
+Until it lands, point 5 runs as built: the boolean, with the company cap as the
+only size limit.
+
+**Not taken.** Keeping the switch and relying on the company cap alone is the
+shape P2-G1 found wanting. The cap bounds every send by one number for everyone,
+so whether a send waits for a person still depends on who is calling and not on
+how large the send is. Never allowing unattended sends at all answers the same
+question by category too, only in the other direction: every machine send waits,
+whatever its size. Both keep friction tied to the kind of act, which is what
+2026-07-05 set aside.
+
+**Left open for the build's final-design pass.** Not decided here, and not to be
+read as settled by this addendum:
+
+- **The default ceiling** for an integration that is granted unattended sending,
+  and whether the existing boolean goes away and becomes "ceiling greater than 0".
+- **Where the ceiling is set and who may set it.** The integration management
+  screen (2026-10-02 addendum) is where it would be set. That addendum gates
+  switching unattended sending **on** behind holding every grant the integration
+  has (`require_holds_integration`). Whether raising a ceiling counts as switching
+  it on is part of this question.
+- **How a held over-ceiling send is described in the inbox**, so the person
+  deciding can see it was held for its size and not for its kind.
+
+Two facts from the code the final-design pass will meet. They are recorded so they
+are not found late, and they are not decided here:
+
+- The hold is raised in a request dependency that sees only path parameters
+  (`backend/app/auth/dependencies.py:646-648`). The size of a send is in its
+  planned executions, and it can change when the audience is re-resolved before
+  firing (`backend/app/delivery/service.py:653`). Which count the ceiling is
+  compared against, and when, is open.
+- `sends.execute` guards more than the fire route. `/delivery/process-due` fires
+  every due scheduled send of a brand in one request, and `/delivery/send-test`
+  sends a test (`backend/app/auth/policy.py:144`, `:249`). Neither has an entry in
+  `APPROVABLE_ROUTES` (`backend/app/auth/policy.py:332-335`), so today an
+  integration not allowed unattended is refused them outright rather than held.
+  How the ceiling applies to a batch of sends is open.
+
+**Consequences.**
+
+- **Positive.** Machine sends follow the same scale rule as people's. An
+  integration allowed to send unattended still cannot send a large mailing without
+  a person, so a company's control over its automation holds for size and not only
+  for who is calling. The `### Negative` item above about the switched-off default
+  is narrowed: logging the change is no longer the whole control, because above
+  the ceiling a person decides again. The cap and the approval queue are reused,
+  not duplicated.
+- **Negative.** One more value per integration to set and to explain, next to its
+  grants and keys. A large unattended send now waits for a person, so an
+  orchestrator that fired large sends unattended will see them held.
+
+**Unchanged:** points 1 through 8, the build-notes and the earlier addenda.
+Nothing here changes the Decision section above.
 
 ## Related ADRs
 

@@ -371,8 +371,10 @@ Read first and treated as already decided, not re-surfaced: `playbook-strategy.m
 
 ## P2-A. Tenancy and brand — ADR-150 as built
 
-### P2-A1. The cost ADR-150 quoted to a single-brand adopter is falsified by what got built `🔴 blocking`
+### P2-A1. The cost ADR-150 quoted to a single-brand adopter is falsified by what got built `✅ resolved 2026-10-09`
 ADR-150 point 4 prices multi-brand exactly: *"A company treating brands as a skin pays a default value in a column."* What got built is not a column. [[brand]] documents a cross-cutting concern with an 8-row leak table, nine brand-carrying tables, a `BrandNotDeclared` exception on the machine plane, a `brands_with_permission` path for cross-brand writes, a `SWITCH_LANDINGS` table, and a `BRAND_SCOPED` classification every new permission key must pass through. The *mechanism* is context-specific (the ADR's own Negative rests it on one pilot customer); the *cost* is now universal — every adopter must understand brand scoping to add a route, a permission, or a table. Point 4's sentence still reads as current and is the most misleading line in the cluster.
+
+**Resolution (2026-10-09):** Split the two costs. For running the product, a single-brand company really does pay only a default value: the screens show no brand switcher, and a test proves it. For anyone extending the code, brands are a cross-cutting rule: every new table, route and permission follows brand scoping, as the brand page documents. The Brand Boundary interview found two tables that had missed it. The positioning may claim the first. When it speaks to developers or agencies who extend the code, it must name the second. Recorded in a 2026-10-09 addendum to ADR-150; wording only. Decided by the user in the 2026-10-09 interview review.
 
 ### P2-A2. "Consent to brand A says nothing about brand B" is a legal posture sitting in an ADR `🟡 deferred`
 ADR-163's addendum decides that one company's brands do not share a lawful basis for contact, and `recipients/consent.py` enforces it with `brand_id` as a required positional and no default anywhere. Many German companies capture one group-level opt-in and treat the brand as a presentation detail — which is word for word what ADR-150 point 2 says brands *are*. The addendum adopts the stricter reading on the adopter's behalf, which is the same kind of compliance judgement ADR-150 point 3, ADR-144 §3 and ADR-154 point 2 all explicitly refuse to make in the other direction. A forker with group-level consent has no config path; it must be edited out of every consent function.
@@ -384,8 +386,10 @@ ADR-163's addendum decides that one company's brands do not share a lawful basis
 
 ## P2-B. Authentication — ADR-151, ADR-166
 
-### P2-B1. Security numbers are code; marketing numbers are settings rows — against the repo's own stated rule `🔴 blocking`
+### P2-B1. Security numbers are code; marketing numbers are settings rows — against the repo's own stated rule `✅ resolved 2026-10-09`
 The rule is stated four times: ADR-161 §8 (frequency capping — *"Numbers belong to the company, the mechanism to us, the same split already used for retention periods and the AI spend cap"*), ADR-164 §10, ADR-154 Notes, ADR-144 §5. As built (`auth/service.py:37-52`), `CODE_TTL_MINUTES`, `CODE_MAX_ATTEMPTS`, the four rate-limit constants, `SESSION_ABSOLUTE_HOURS = 12` and `SESSION_IDLE_MINUTES = 60` are Python module constants. `settings/service.py` exposes getters for signal weights, half-lives, AI provider, AI spend cap, max send recipients and per-task model — **and nothing for any of the above.** A 12-hour absolute session and a 60-minute idle timeout encode one working day and one coffee break; a company with a works council, an ISO 27001 auditor or a shared shop-floor workstation has its own numbers and no seam. Verified 2026-09-18.
+
+**Resolution (2026-10-09):** Split by who the number serves. The absolute session lifetime and the idle timeout are company policy and become company settings, clamped to safe ranges; a works council or auditor may require other lengths. The attack-resistance numbers stay in code as a stated exception to "numbers belong to the company": sign-in code lifetime, guesses, request limits. They protect the system rather than express a company preference, and a wrong value opens a hole; a company that must change them does so in its fork, knowingly. Recorded in a 2026-10-09 addendum to ADR-151; the build is queued as task-342. Decided by the user in the 2026-10-09 interview review.
 
 ### P2-B2. Machine credentials never expire; human sessions expire twice `🟡 deferred`
 `IntegrationCredentialDB` carries `created_at`, `last_used_at`, `revoked_at` and **no `expires_at`**. ADR-166 point 3 inherits four properties from ADR-151 (hashed, shown once, immediately revocable, header-only) and does not inherit expiry, without saying so. Combined with ADR-166's own Negative — *"an agency operator who leaves has their sessions revoked and leaves working keys behind"* — an unexpiring key is the strictly worse half of a risk the record already accepts. Discoverable only by reading the column list.
@@ -397,8 +401,10 @@ The rule is stated four times: ADR-161 §8 (frequency capping — *"Numbers belo
 
 ## P2-D. Audit — ADR-153 as built
 
-### P2-D1. The accountability the positioning rests on is not written by anything that matters `🔴 blocking`
+### P2-D1. The accountability the positioning rests on is not written by anything that matters `✅ resolved 2026-10-09`
 ADR-153 promises an operator screen, a SIEM export, a place to point a DPO, events with no domain record, and a non-human actor. As built: eight actions — sign-in, role granted/revoked, user deactivated/reactivated, `brand.created`, `campaign.duplicated`, `content.duplicated`. Seven write sites, all in routers. **No send, no consent write, no AI run, no export, no bulk read.** `actor_type="integration"` is declared and nothing writes it — while ADR-166's headline benefit is *"'n8n triggered this send' still reads correctly a year and three key rotations later, which is the property an audit is for."* `POSITIONING.md` lists transparency among the four surviving differentiators and `LAUNCH-GATES.md` Gate 7 reads ✅ "base built". The scope choice (writes + exports, not page views) is sound; the *first slice being the administrative half* is a sequencing decision presented as scope.
+
+**Resolution (2026-10-09):** Pass 3's "partly overtaken" holds. The audit log now covers far more than administration: approvals, the integration actor (since 2026-10-02), settings, and composer, audience and content writes. But the two events that matter most for transparency were still missing. A send fired directly, by a person or by an integration allowed to send unattended, wrote nothing; only approval-routed sends logged `send.fired`. And a consent change keeps what and from which source, but not who made it. Decided by the user: both are required before public beta. Every send fire, by any path, is audited with its actor. Every consent write by a person or integration is audited with its actor; a recipient's own unsubscribe stays in the consent history. Exports follow when an export exists. Queued as task-340; launch gate 11 added.
 
 ### P2-D2. Audit writes fail open, by a decision that lives in a docstring `✅ resolved 2026-10-09`
 `record` swallows every exception, logs, rolls back, returns `None`, because *"a failure that rolls back a role grant because its log entry would not write is worse than an incomplete log."* Defensible engineering, contestable compliance — an auditor reviewing an append-only log generally wants the opposite, and ADR-153's value proposition is "one artefact to hand an auditor." Compounding it, `detail` is unvalidated JSON with a policy ADR-154 §3 calls *"the enforcing rule"* and that nothing enforces. Neither is in ADR-153, which is where a reviewer would look.
@@ -440,8 +446,10 @@ ADR-161 §4 (*"if transferred, count as has seen"* — trade and known wrongness
 
 ## P2-G. Machine callers — ADR-166 as built
 
-### P2-G1. Unattended-send risk is modelled as a property of the caller, not of the send `🔴 blocking`
+### P2-G1. Unattended-send risk is modelled as a property of the caller, not of the send `✅ resolved 2026-10-09`
 `may_send_unattended` is one boolean, checked once against `SENDS_EXECUTE`. Flipped on, an integration may fire any send, to any audience, on any brand it holds a grant for. The only bound is one company-wide `DEFAULT_MAX_SEND_RECIPIENTS = 1000` applied at plan time — not something an integration can be given its own value of. **The inversion worth naming:** decision-log item 2 of 2026-07-05 settled, for humans, that *"the real friction trigger is scale/anomaly, not category — a manager inflating a 500-person segment to 200k is the actual risk case."* ADR-166 point 5 models the machine case on category (who you are) and not scale. Same risk, opposite answer, three months apart, with no record noticing. An adopter wanting "n8n may send up to 5,000 unattended, above that it queues" has no expression for it — and the queue does not exist either.
+
+**Resolution (2026-10-09):** The sub-claim that no approval queue exists is overtaken: held requests exist (ADR-142 §4). The main point stood: unattended machine sending was one on/off switch per integration, bounded only by the company-wide recipient cap. Decided by the user: an integration allowed to send unattended gets its own recipient ceiling. At or below it the send runs; above it the send is held for a person's approval. Machine sends now follow the same scale rule the 2026-07-05 decision set for people. Recorded in a 2026-10-09 addendum to ADR-166; the build is queued as task-341.
 
 ### P2-G2. An authenticated machine has no request budget `✅ resolved 2026-10-09`
 Human sign-in rate limiting occupied a whole launch-gate sub-decision with four stated properties. Failed machine auth is aggregated per `(key, client, hour)`. A **successful** integration is unlimited: no per-credential quota anywhere. On a plane whose named routes fire real mail, write consent records, return the recipient list and write into the signal layer. ADR-166 point 1 mentions rate limiting only as a *reason* for key+secret over a bare token — the enabling property was built, the limit was not.
@@ -493,13 +501,13 @@ ADR-144 §5, via the 2026-07-31 decision log: *"Cost cap: warn → hard stop, **
 
 | # | Area | Finding | Class |
 |---|---|---|---|
-| P2-A1 | ADR-150 | Single-brand cost is a cross-cutting concern, not "a default value in a column" | 🔴 |
+| P2-A1 | ADR-150 | Single-brand cost is a cross-cutting concern, not "a default value in a column" | ✅ |
 | P2-A2 | ADR-163 add. | Brand-scoped consent is a legal interpretation with no config path | 🟡 |
 | P2-A3 | ADR-013 add. | Duplication friction re-applies a 2026-07-05-superseded principle | ✅ |
-| P2-B1 | ADR-151 | Security numbers hardcoded while the repo's rule gives numbers to the company | 🔴 |
+| P2-B1 | ADR-151 | Security numbers hardcoded while the repo's rule gives numbers to the company | ✅ |
 | P2-B2 | ADR-166 | Machine credentials never expire; humans expire twice | 🟡 |
 | P2-C1 | ADR-152 | §1 and §4 cannot both hold | 🟡 |
-| P2-D1 | ADR-153 | Audit covers administration only; ADR-166's integration-actor promise has no writer | 🔴 |
+| P2-D1 | ADR-153 | Audit covers administration only; ADR-166's integration-actor promise has no writer | ✅ |
 | P2-D2 | ADR-153 | Fail-open audit write + unenforced `detail` policy, decided in docstrings | ✅ |
 | P2-E1 | ADR-163 | Fail-closed opt-in is jurisdictional, hardcoded, the one seam that is not a seam | ✅ |
 | P2-E2 | ADR-163 | `purpose` defaults to `"marketing"` where `brand_id` is a required positional | 🔴 |
@@ -508,7 +516,7 @@ ADR-144 §5, via the 2026-07-31 decision log: *"Cost cap: warn → hard stop, **
 | P2-F2 | ADR-160/162 | Channel multiplies record fields; locale axis never considered | 🟡 |
 | P2-F3 | ADR-160 | "Weekend not half a year" is a market criterion in an ADR | 🟡 |
 | P2-F4 | cluster | Four documented-and-fine trades, listed so they are not re-flagged | ⚪ |
-| P2-G1 | ADR-166 | Unattended-send risk modelled by caller identity, not scale — inverts 2026-07-05 | 🔴 |
+| P2-G1 | ADR-166 | Unattended-send risk modelled by caller identity, not scale — inverts 2026-07-05 | ✅ |
 | P2-G2 | ADR-166 | No request budget for an authenticated machine | ✅ |
 | P2-G3 | ADR-166 | No shipped role can write consent or manage recipients | ✅ |
 | P2-H1 | ADR-141 | The manager-owned-prompt seam ships a developer-written English house style | ✅ |
