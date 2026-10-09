@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 18:13'
+updated_date: '2026-10-09 18:22'
 labels:
   - docs
   - frontend
@@ -34,3 +35,9 @@ Source: [[Interview Prep - Since 2026-09-18]] (Client Q2, Q4, Q5; CI Q2, Q5) and
 <!-- AC:BEGIN -->
 - [ ] #1 Each of the six places says what is true, citing the record that settles it
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-09: a seventh item, from CI Q3. The README tells an adopter that a fork must configure its own required checks: CI in a fork checks that fork's code and enforces nothing by itself (ADR-190, 2026-10-09 addendum).
+<!-- SECTION:NOTES:END -->

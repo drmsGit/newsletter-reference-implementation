@@ -7,6 +7,7 @@ topic:
   - operations
   - development
 created: 2026-10-08
+modified: 2026-10-09
 source:
   - "Decided by the user in chat, 2026-10-08, one question at a time (task-105)"
   - "Ruff and gitleaks measurements, 2026-10-08"
@@ -147,6 +148,31 @@ The one parse-only Jinja environment carries a `# noqa: S701`, with a comment sa
 
 - **Positive: the security checks that matter fail a build, with no new tool.**
 - **Negative: the rest of bandit's checks are not run at all.** That covers asserts, the SQL-string heuristics and `random`. A real case among them relies on review.
+
+Nothing here changes the Decision section above.
+
+## Addendum 2026-10-09 — CI fails visibly; it does not stop a change landing
+
+**What prompted it.** The interview review of 2026-10-09 asked what makes a failing check an enforced merge gate, for this repository or an adopter's fork ([[Interview Prep - Since 2026-09-18]], "CI and dependency verification", Q3). The workflow file declares when CI runs. Whether a failing run refuses a merge is hosted configuration, branch protection or a ruleset, and nothing in the checkout expresses it. The user decided the answer that day.
+
+**What was found that day.**
+
+- **This repository cannot have required checks today.** It is private, on a personal free GitHub plan. GitHub refuses branch protection and rulesets for it: "Upgrade to GitHub Pro or make this repository public" (HTTP 403). This was checked read-only on 2026-10-09; nothing was changed.
+- **Required checks would change nothing today anyway.** The one developer commits straight to `main`. Every push is followed until CI is green; that is part of the working method. In practice CI is an after-the-fact signal that is always read.
+- **What GitHub charges for.** Required status checks, through branch protection or rulesets, are available for public repositories on every plan, free organisation accounts included. A private repository needs GitHub Pro on a personal account, or GitHub Team on an organisation. Enterprise is not required.
+
+**1. CI makes a defect in the blocking set fail visibly on the commit that introduced it. It does not stop it landing.** This sentence supersedes "A defect in the blocking set cannot land" in this record's Positive consequences. That line stays as written; this addendum is its correction.
+
+**2. Required checks are switched on when the code moves to the product's own GitHub account.** Point 3 already defers rewriting git history to the same move. Required checks there are free if that repository is public, and need the Team plan if it stays private.
+
+Not before. Paying for Pro on the personal account would gate the wrong account, the one the code is leaving. Making this repository public now is blocked by [[LAUNCH-GATES|launch gate 1]], the positioning gate, and by a product name that is not legally cleared ([[naming-brand-tarrow]]).
+
+**3. A fork configures its own required checks.** CI in a fork checks that fork's code and enforces nothing by itself. The README tells an adopter so. That edit is tracked in task-334, not made by this record.
+
+**Consequences.**
+
+- **Positive: the record no longer promises an enforcement that does not exist, and the point where enforcement is switched on is named.**
+- **Negative: until the move, a red check depends on the developer reading it.** That is a procedure, not the structure this record's Context asks for under [[ADR-143 — AI-Assisted Development Boundary]] point 2. It holds for as long as one person commits and follows every push.
 
 Nothing here changes the Decision section above.
 
