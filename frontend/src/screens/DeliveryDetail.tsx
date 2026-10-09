@@ -1,6 +1,8 @@
+import { Button } from 'react-aria-components'
 import { Link, useParams } from 'react-router'
 
-import { useDelivery, useDeliveryExecutions, type DeliveryExecution } from '../api/resources'
+import { useDelivery, useDeliveryExecutions, useReleaseDelivery, type DeliveryExecution } from '../api/resources'
+import { HttpError } from '../api/session'
 import DataTable, { type DataColumn } from '../components/DataTable'
 import RecipientSearch, { useSearch } from '../components/RecipientSearch'
 import ScreenState from '../components/ScreenState'
@@ -52,6 +54,7 @@ export default function DeliveryDetail() {
   const delivery = useDelivery(id)
   const q = useSearch()
   const executions = useDeliveryExecutions(id, q)
+  const release = useReleaseDelivery(id)
 
   return (
     <>
@@ -88,6 +91,27 @@ export default function DeliveryDetail() {
                 </div>
               ))}
             </dl>
+
+            {delivery.data.stranded && (
+              <section aria-labelledby="stranded-heading">
+                <h2 id="stranded-heading">This send looks stranded</h2>
+                <p>
+                  It is still marked sending, but nothing has happened since{' '}
+                  {formatDate(delivery.data.last_activity_at)}. The process sending it may have stopped.
+                  Releasing it marks it failed so it can be retried: a retry skips everyone already sent
+                  to, marks the person in flight as uncertain (never sent again), and sends the rest.
+                </p>
+                <Button onPress={() => release.mutate()} isDisabled={release.isPending}>
+                  Release this send
+                </Button>
+                {release.isError && (
+                  <p role="alert">
+                    Not released:{' '}
+                    {release.error instanceof HttpError ? release.error.detail : 'the request failed.'}
+                  </p>
+                )}
+              </section>
+            )}
 
             <h2>Recipients</h2>
             <RecipientSearch />

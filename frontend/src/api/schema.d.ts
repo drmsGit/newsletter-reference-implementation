@@ -1232,6 +1232,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/delivery/send-instances/{send_instance_id}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Release a send stranded in 'sending'
+         * @description ADR-192. A send whose process died stays `sending`, and the double-send guard refuses every retry. When the send is flagged `stranded` (no activity for 30 minutes), a person may release it: it becomes `failed`, and a retry then skips what was sent, marks the in-flight recipient `uncertain` and sends the rest (task-318). People only; refused (409) unless stranded at this moment. Mails nobody, so `sends.plan`, not `sends.execute`.
+         */
+        post: operations["release_send_delivery_send_instances__send_instance_id__release_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/delivery/process-due": {
         parameters: {
             query?: never;
@@ -5583,6 +5603,13 @@ export interface components {
              */
             excluded_count: number;
             /**
+             * Stranded
+             * @default false
+             */
+            stranded: boolean;
+            /** Last Activity At */
+            last_activity_at?: string | null;
+            /**
              * Skip Without Resolution
              * @default false
              */
@@ -5658,6 +5685,13 @@ export interface components {
              */
             excluded_count: number;
             /**
+             * Stranded
+             * @default false
+             */
+            stranded: boolean;
+            /** Last Activity At */
+            last_activity_at?: string | null;
+            /**
              * Skip Without Resolution
              * @default false
              */
@@ -5718,6 +5752,13 @@ export interface components {
              * @default 0
              */
             excluded_count: number;
+            /**
+             * Stranded
+             * @default false
+             */
+            stranded: boolean;
+            /** Last Activity At */
+            last_activity_at?: string | null;
             /**
              * Skip Without Resolution
              * @default false
@@ -8894,6 +8935,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TestSendResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    release_send_delivery_send_instances__send_instance_id__release_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                send_instance_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SendInstanceDetail"];
                 };
             };
             /** @description Validation Error */

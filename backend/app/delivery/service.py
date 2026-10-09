@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import logging
 
 from sqlalchemy import func
@@ -21,6 +21,12 @@ logger = logging.getLogger(__name__)
 #: An execution whose provider call gave no answer: maybe sent, never resent
 #: (task-318, decided by the user 2026-10-09).
 UNCERTAIN = "uncertain"
+
+#: ADR-192: a "sending" send quiet for this long is flagged as stranded. Since
+#: task-318 every execution is written just before its provider call, so a
+#: living send shows activity per recipient and a dead one goes quiet. A guess,
+#: and only a flag: a person decides.
+STRANDED_AFTER = timedelta(minutes=30)
 
 
 def to_delivery_execution(record: DeliveryExecutionDB) -> DeliveryExecution:
@@ -165,6 +171,67 @@ def to_send_instance(record: SendInstanceDB) -> SendInstance:
     )
 
 
+def _last_activity(db: Session, records) -> dict[int, datetime]:
+    """The newest change to each "sending" send or any of its executions — one
+    grouped query for all of them (ADR-192)."""
+    sending = [r for r in records if r.status == "sending"]
+    if not sending:
+        return {}
+    from sqlalchemy import func
+
+    newest = dict(
+        db.query(DeliveryExecutionDB.send_instance_id, func.max(DeliveryExecutionDB.updated_at))
+        .filter(DeliveryExecutionDB.send_instance_id.in_([r.id for r in sending]))
+        .group_by(DeliveryExecutionDB.send_instance_id).all()
+    )
+    return {r.id: max(t for t in (r.updated_at, newest.get(r.id)) if t is not None) for r in sending}
+
+
+def _with_stranded(model, record, activity: dict[int, datetime]):
+    last = activity.get(record.id)
+    if last is None:
+        return model
+    stranded = datetime.now(timezone.utc) - last > STRANDED_AFTER
+    return model.model_copy(update={"stranded": stranded, "last_activity_at": last})
+
+
+def release_send_instance(db: Session, send_instance_id: int, *, brand_id: int) -> dict[str, int]:
+    """Release a send stranded in "sending" (ADR-192): it becomes "failed", so
+    a retry may run and follows task-318 — sent stays sent, the in-flight
+    recipient becomes uncertain, the never-attempted ones are sent.
+
+    Refused unless the send is stranded at this moment, re-checked under the
+    row lock: a send that came back to life must not be released mid-delivery,
+    or two runs could deliver it at once. Returns the executions by status, for
+    the audit entry."""
+    from sqlalchemy import func
+
+    record = (
+        db.query(SendInstanceDB)
+        .filter(SendInstanceDB.id == send_instance_id, SendInstanceDB.brand_id == brand_id)
+        .with_for_update()
+        .first()
+    )
+    if record is None:
+        raise LookupError(f"SendInstance {send_instance_id} not found")
+    activity = _last_activity(db, [record])
+    last = activity.get(record.id)
+    if last is None or datetime.now(timezone.utc) - last <= STRANDED_AFTER:
+        db.rollback()
+        raise ValueError(
+            f"SendInstance {send_instance_id} is not stranded: it is {record.status}"
+            + (f", last active {last.isoformat()}" if last else "")
+        )
+    counts = dict(
+        db.query(DeliveryExecutionDB.status, func.count(DeliveryExecutionDB.id))
+        .filter(DeliveryExecutionDB.send_instance_id == record.id)
+        .group_by(DeliveryExecutionDB.status).all()
+    )
+    record.status = "failed"
+    db.commit()
+    return counts
+
+
 def list_send_instances(
     db: Session, *, brand_id: int, limit: int = 50, offset: int = 0,
     status: str | None = None,
@@ -220,14 +287,15 @@ def list_send_instances(
         .filter(DeliveryExecutionDB.send_instance_id.in_(ids))
         .group_by(DeliveryExecutionDB.send_instance_id).all()
     )
+    activity = _last_activity(db, records)
     listed = []
     for record in records:
         cid, cname, vid, vname = sources.get(record.snapshot_id, (None, None, None, None))
-        listed.append(SendInstanceListed(
+        listed.append(_with_stranded(SendInstanceListed(
             **to_send_instance(record).model_dump(),
             campaign_id=cid, campaign_name=cname, variant_id=vid, variant_name=vname,
             execution_count=executions.get(record.id, 0), event_count=events.get(record.id, 0),
-        ))
+        ), record, activity))
     return Page(items=listed, total=total, limit=limit, offset=offset)
 
 
@@ -259,12 +327,12 @@ def send_instance_detail(
 
         group = db.get(AudienceGroupDB, record.audience_group_id)
         group_name = group.name if group is not None else None
-    return SendInstanceDetail(
+    return _with_stranded(SendInstanceDetail(
         **to_send_instance(record).model_dump(),
         execution_count=len(reasons),
         exclusions_by_stage=by_stage,
         audience_group_name=group_name,
-    )
+    ), record, _last_activity(db, [record]))
 
 
 def brand_for_snapshot(db: Session, snapshot_id: int) -> int:

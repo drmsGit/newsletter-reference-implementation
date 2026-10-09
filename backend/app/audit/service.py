@@ -124,6 +124,8 @@ APPROVAL_EXPIRED = "approval.expired"
 APPROVAL_FAILED = "approval.failed"
 # What a granted held action did, written by the action through ActionResult.
 SEND_FIRED = "send.fired"
+# ADR-192: a person released a send stranded in "sending" (task-325).
+SEND_RELEASED = "send.released"
 AI_SUGGESTION_APPLIED = "ai.suggestion_applied"
 
 #: Every action name an entry may carry (task-52, ADR-153 addendum

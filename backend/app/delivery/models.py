@@ -49,6 +49,12 @@ class SendInstance(BaseModel):
     sent_count: int = 0
     failed_count: int = 0
     excluded_count: int = 0
+    #: ADR-192: a send still "sending" with no activity for 30 minutes — likely
+    #: left by a process that died. Flagged, never released automatically; a
+    #: person releases it (POST .../release). `last_activity_at` is the newest
+    #: change to the send or any of its executions, set for "sending" sends.
+    stranded: bool = False
+    last_activity_at: datetime | None = None
     # "Don't send if no slot resolved", chosen at plan time (task-228).
     skip_without_resolution: bool = False
 

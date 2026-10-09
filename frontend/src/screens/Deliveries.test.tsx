@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router'
 
@@ -260,5 +260,70 @@ describe("finding someone in a send", () => {
       .filter((u) => u.pathname === '/delivery/send-instances/4/executions')
       .at(-1)!.searchParams
     expect([asked.get('q'), asked.get('limit')]).toEqual(['anna@', '20'])
+  })
+})
+
+describe('a send stranded in sending (ADR-192, task-325)', () => {
+  const STRANDED = {
+    ...A_SEND,
+    status: 'sending',
+    stranded: true,
+    last_activity_at: '2026-10-09T10:00:00Z',
+    execution_count: 3,
+    exclusions_by_stage: {},
+    audience_group_name: null,
+  }
+
+  function render(handlers: Record<string, (request: Request) => Response>) {
+    const fetchMock = stubFetch({
+      'GET /delivery/send-instances/4/executions': () => jsonResponse(page([])),
+      ...handlers,
+    })
+    renderWithProviders(
+      <Routes>
+        <Route path="/deliveries/:id" element={<DeliveryDetail />} />
+      </Routes>,
+      { route: '/deliveries/4' },
+    )
+    return fetchMock
+  }
+
+  it('is flagged, and a person can release it', async () => {
+    let released = false
+    const fetchMock = render({
+      'GET /delivery/send-instances/4': () =>
+        jsonResponse(released ? { ...STRANDED, status: 'failed', stranded: false } : STRANDED),
+      'POST /delivery/send-instances/4/release': () => {
+        released = true
+        return jsonResponse({ ...STRANDED, status: 'failed', stranded: false })
+      },
+    })
+    expect(await screen.findByRole('heading', { name: 'This send looks stranded' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Release this send' }))
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { name: 'This send looks stranded' })).not.toBeInTheDocument(),
+    )
+    expect(
+      fetchMock.mock.calls.some(([input]) => {
+        const request = typeof input === 'string' ? new Request(input) : (input as Request)
+        return request.method === 'POST' && request.url.endsWith('/delivery/send-instances/4/release')
+      }),
+    ).toBe(true)
+  })
+
+  it('says why a release was refused', async () => {
+    render({
+      'GET /delivery/send-instances/4': () => jsonResponse(STRANDED),
+      'POST /delivery/send-instances/4/release': () =>
+        jsonResponse({ detail: 'SendInstance 4 is not stranded: it is sending' }, 409),
+    })
+    fireEvent.click(await screen.findByRole('button', { name: 'Release this send' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('not stranded')
+  })
+
+  it('offers nothing for a send that is not stranded', async () => {
+    render({ 'GET /delivery/send-instances/4': () => jsonResponse({ ...STRANDED, stranded: false }) })
+    expect(await screen.findByText(A_SEND.name)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Release this send' })).not.toBeInTheDocument()
   })
 })

@@ -374,8 +374,9 @@ class MachineRefused(Exception):
 def require_person(request: Request, db: Session = Depends(get_db)) -> None:
     """Refuse a machine credential on a route that only a person may use.
 
-    **The one place this applies is approving** (ADR-166 point 5, as ADR-168's
-    2026-09-19 addendum re-read it). A machine may *request* approval and may
+    **It applies to approving** (ADR-166 point 5, as ADR-168's 2026-09-19
+    addendum re-read it), **and to releasing a stranded send** (ADR-192): both
+    are a person's judgement about something a machine cannot see. A machine may *request* approval and may
     never grant it — an integration that can approve its own held request has
     defeated the mechanism it was held by.
 

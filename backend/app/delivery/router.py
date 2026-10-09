@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import working_brand
+from app.audit import service as audit
+from app.auth.dependencies import require_person, working_brand
 from app.pagination import Page, PageParams, page_params
 from app.database import get_db
 from app.delivery.models import (
@@ -25,6 +26,7 @@ from app.delivery.service import (
     create_send_instance,
     list_send_instances,
     list_send_instances_for_snapshot,
+    release_send_instance,
     send_instance_detail,
     send_send_instance,
     NotInBrand,
@@ -296,6 +298,38 @@ def send_test(
         "message": sent.message,
         "render_note": sent.render_note,
     }
+
+
+@router.post(
+    "/send-instances/{send_instance_id}/release",
+    response_model=SendInstanceDetail,
+    dependencies=[Depends(require_person)],
+    summary="Release a send stranded in 'sending'",
+    description=(
+        "ADR-192. A send whose process died stays `sending`, and the double-send guard refuses "
+        "every retry. When the send is flagged `stranded` (no activity for 30 minutes), a person "
+        "may release it: it becomes `failed`, and a retry then skips what was sent, marks the "
+        "in-flight recipient `uncertain` and sends the rest (task-318). People only; refused (409) "
+        "unless stranded at this moment. Mails nobody, so `sends.plan`, not `sends.execute`."
+    ),
+)
+def release_send(
+    send_instance_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    try:
+        counts = release_send_instance(db, send_instance_id, brand_id=brand_id)
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error))
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error))
+    audit.record_from_request(
+        request, db, audit.SEND_RELEASED, subject_type="send_instance", subject_id=send_instance_id,
+        detail={"executions": counts},
+    )
+    return send_instance_detail(db, send_instance_id, brand_id=brand_id)
 
 
 @router.post("/process-due", response_model=ProcessDueResult)

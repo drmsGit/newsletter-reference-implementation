@@ -232,6 +232,23 @@ export function useDelivery(id: number) {
   })
 }
 
+/**
+ * Release a send stranded in 'sending' (ADR-192): it becomes 'failed', so a
+ * retry may run. People only; refused unless the send is stranded right now.
+ */
+export function useReleaseDelivery(id: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () =>
+      read(
+        api.POST('/delivery/send-instances/{send_instance_id}/release', {
+          params: { path: { send_instance_id: id } },
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['deliveries'] }),
+  })
+}
+
 /** How many recipients a screen shows before the person searches. */
 export const SAMPLE_SIZE = 20
 
