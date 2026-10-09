@@ -10,7 +10,8 @@ from app.delivery.models import DeliveryExecution, SendInstance, SendInstanceDet
 
 from app.campaigns.db_models import VariantDB
 from app.delivery.exclusion import (
-    REASON_NO_PICK, REASON_NOTHING_TO_SHOW, STAGE_RENDER, run_exclusion_stack,
+    REASON_LEFT_AUDIENCE, REASON_NO_PICK, REASON_NOTHING_TO_SHOW, STAGE_AUDIENCE, STAGE_RENDER,
+    run_exclusion_stack,
 )
 from app.delivery.providers.factory import get_provider, providers_for_channel
 from app.recipients.consent import DEFAULT_CHANNEL, MARKETING, ConsentDenied
@@ -584,7 +585,7 @@ def prepare_send_from_audience(
     return send_instance
 
 
-def reconcile_executions_to_audience(db: Session, send_instance: SendInstanceDB) -> None:
+def reconcile_executions_to_audience(db: Session, send_instance: SendInstanceDB) -> set[int] | None:
     """Re-resolve this send's audience and adjust THIS send's executions.
 
     **Called for every send since ADR-176 point 4** (2026-09-29), rather than
@@ -617,9 +618,14 @@ def reconcile_executions_to_audience(db: Session, send_instance: SendInstanceDB)
     executions for recipients who no longer match *and* haven't sent yet (an
     already-sent execution is history and is left as-is). Enforces the recipient
     cap on the freshly-resolved set. No-op if the send has no audience group.
+
+    **Returns the current members** (None without an audience group), so the
+    send loop can refuse anyone outside them whose execution is not final.
+    Only a `created` row is deleted here; a `failed` one stayed, and the retry
+    mailed a person the audience no longer includes (task-328).
     """
     if not send_instance.audience_group_id:
-        return
+        return None
 
     from app.audience.service import resolve_audience
     from app.settings.service import get_max_send_recipients
@@ -679,6 +685,7 @@ def reconcile_executions_to_audience(db: Session, send_instance: SendInstanceDB)
             )
 
     db.commit()
+    return resolved_ids
 
 
 def process_due_scheduled_sends(db: Session, *, brand_id: int) -> list[int]:
@@ -1024,7 +1031,7 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
     #
     # No-op for a send with no audience group: `reconcile_executions_to_audience`
     # returns early, and those executions were never group-derived.
-    reconcile_executions_to_audience(db, send_instance)
+    members = reconcile_executions_to_audience(db, send_instance)
 
 
     # Decision slots on this variant. Rendering only *looks up* an existing
@@ -1135,6 +1142,16 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
             db.commit()
             continue
 
+        # No longer in the send's re-resolved audience (task-328): a row the
+        # reconciliation above does not delete because it was attempted
+        # before — `failed`, or excluded on an earlier run. Recorded, not
+        # deleted, and checked on every run, so someone who rejoins is sent to.
+        if members is not None and execution.recipient_id not in members:
+            execution.status = "excluded"
+            execution.exclusion_reason = f"{STAGE_AUDIENCE}: {REASON_LEFT_AUDIENCE}"
+            db.commit()
+            continue
+
         # Excluded by the stack above: record why and move on, before any
         # work is done for this recipient. Ordering matters — a recipient
         # who may not be contacted must not have decision slots resolved
@@ -1238,8 +1255,11 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
         # Marked and committed before the call (task-318): if the call raises or
         # the process dies, a later run knows this person may have been sent
         # to. Committing here also stores the unsubscribe token before the
-        # mail carrying it can leave.
+        # mail carrying it can leave. An exclusion from an earlier run no longer
+        # describes this row — say, someone who left the audience and rejoined
+        # (task-328) — so its reason goes with it.
         execution.status = "sending"
+        execution.exclusion_reason = None
         db.commit()
         # Stable across retries and practically unique across deployments
         # sharing one provider account (task-327).

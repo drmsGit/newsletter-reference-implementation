@@ -62,6 +62,12 @@ STAGE_FREQUENCY = "frequency"
 # rendered and this needs the rendered result. Its reasons land in the same
 # column, so "why didn't this person get it" still has one place to look.
 STAGE_RENDER = "render"
+#: Before the stack, in the send loop (task-328): a recipient whose execution
+#: is not final and who is no longer in the send's re-resolved audience — say,
+#: one whose first attempt failed and who has since left the group. Recorded,
+#: not deleted, so the earlier attempt keeps its trace.
+STAGE_AUDIENCE = "audience"
+REASON_LEFT_AUDIENCE = "no longer in the send's audience"
 #: The floor: nothing but the envelope rendered. Not a manager's choice.
 REASON_NOTHING_TO_SHOW = "nothing to show — no module produced content for this person"
 #: The send's "Don't send if no slot resolved": a signal about the rule.
