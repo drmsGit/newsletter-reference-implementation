@@ -68,6 +68,7 @@ from app.recipients.service import (
     sync_consent_from_crm,
 )
 from app.rendering.frame import build_frame
+from app.campaigns.db_models import ModuleInstanceDB
 from app.snapshots.db_models import SnapshotDB
 
 # The states the gates must treat as non-consenting. "pending" is included
@@ -216,11 +217,16 @@ def db():
                 # avoiding. The required-field gate gets to refuse; it does not
                 # get to quietly delete coverage of something else.
                 #
-                # Zero modules is deliberate: a variant with none declares no
-                # required fields, so it passes the gate without dragging in
-                # the module and storage path this fixture's docstring is at
-                # pains to avoid. These tests assert who is excluded, never
-                # what the mail says.
+                # No catalogue content, deliberately: a subject and one
+                # static call-to-action declare no catalogue fields, so the
+                # variant passes the required-field gate without dragging in
+                # the content storage path this fixture's docstring is at
+                # pains to avoid. Not zero modules (task-304): since task-228
+                # a recipient for whom nothing but the envelope rendered is
+                # excluded as "nothing to show", so an empty variant would
+                # fail every consent test expecting a send for a rendering
+                # reason. These tests assert who is excluded, never what the
+                # mail says.
                 from app.campaigns.db_models import CampaignDB
 
                 brand = ensure_default_brand(self.session)
@@ -234,6 +240,13 @@ def db():
                     name="consent-gate fixture", status="draft",
                 )
                 self.session.add(variant)
+                self.session.flush()
+                self.session.add_all([
+                    ModuleInstanceDB(variant_id=variant.id, module_type="header", position=0,
+                                     module_data={"subject": "Consent gate", "preheader": "fixture"}),
+                    ModuleInstanceDB(variant_id=variant.id, module_type="cta", position=1,
+                                     module_data={"label": "Read", "url": "https://example.com"}),
+                ])
                 self.session.flush()
                 snapshot = SnapshotDB(
                     variant_id=variant.id,
@@ -818,6 +831,20 @@ class TestSendTimeConsentRevocation:
             f"{execution.status!r}, reason {execution.exclusion_reason!r})"
         )
         assert execution.exclusion_reason is None
+
+    def test_the_fixtures_fallback_snapshot_still_sends(self, db, monkeypatch):
+        """task-304: with no complete email snapshot in the database, `send_to`
+        builds its own. It must render something meaningful under task-228's
+        floor, or every consent test expecting a send would fail for a
+        rendering reason. Forced here by making every existing snapshot look
+        incomplete while the fixture chooses — and only then, so the real send
+        check still runs."""
+        with monkeypatch.context() as forced:
+            forced.setattr("app.rendering.service.missing_required_fields", lambda *a, **k: ["forced"])
+            send_instance, execution = db.send_to(db.recipient("opted_in"))
+        send_send_instance(db.session, send_instance.id, brand_id=send_instance.brand_id)
+        db.session.refresh(execution)
+        assert (execution.status, execution.exclusion_reason) == ("sent", None)
 
     def test_parent_status_is_derived_not_declared(self, db):
         """P1: the send's own status must reflect what actually happened.
