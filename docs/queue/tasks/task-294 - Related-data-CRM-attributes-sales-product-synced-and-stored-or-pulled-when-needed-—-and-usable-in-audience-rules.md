@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-06 19:25'
-updated_date: '2026-10-06 20:11'
+updated_date: '2026-10-09 17:15'
 labels:
   - backend
   - needs-adr
@@ -48,4 +48,6 @@ ordinal: 300350
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-06: overlaps task-120 ('Sales and transaction data from the CRM or DWH — probably a playbook chapter rather than an implementation'); read it in the same session.
+
+2026-10-09: interview planned, not started. The plan, the first feedback on the pull-versus-store hypothesis and the full cluster and question list (A principle, B content time and merge context, C proof and privacy, D selection time and audience rules, E seams and operations) are written down in [[Related Data Access - design interview]] (docs/architecture/interview-prep). It runs when this task is picked up: re-verify the pre-read facts in that file, then start Cluster A question 1, one question at a time. Read task-119 and task-120 in the same session. Coupling: task-136 (retention) - carve out the retention of the values used in a send, because delivery records may have to copy merge values (ADR-183 point 7, ADR-154). Gap found: no task owns the content-side merge context (ADR-005, ADR-183 point 7, the drift table in playbook-strategy) - decide at the close whether to widen this task or file a sibling. Boundary: product data that feeds decision slots belongs to the content-selection design session.
 <!-- SECTION:NOTES:END -->
