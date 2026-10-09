@@ -43,7 +43,7 @@ offered it.
 - `assert_manifests_load()` — forces discovery at startup so a misfiled manifest stops the process rather than a request
 - `ModuleManifest` / `ModuleVariable` — the manifest dataclasses (also used by [[overrides]] to validate field edits)
 
-**Routes** (`/email-modules`, tag `email-modules`): 2 routes — list manifests, get one by name.
+**Routes** (`/email-modules`, tag `email-modules`): list manifests, get one by name.
 
 ## Data model
 **None.** State is the `storage/modules/` directory tree, one subdirectory per channel. A file-change is detected by directory mtime and the registry rebuilds — no DB, no migration, no restart for a new module.

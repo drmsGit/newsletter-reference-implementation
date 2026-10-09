@@ -37,7 +37,7 @@ affinity. It deliberately does not try to own contact management.
 - `suppress_recipient(db, recipient_id, reason)` — opt a recipient out from a delivery-feedback signal (hard bounce / spam complaint). Idempotent; deliberately does **not** write the CRM sync log (see invariants). Called by [[providers]]'s webhook handler.
 - `create_recipient_preference` / `list_preferences_for_recipient` — declared (manual) preferences → seed `manual` signal contributions
 
-**Routes** (`/recipients`, tag `recipients`): 8 routes — create/list recipients; get by external id; consent drift; consent sync-log; post a consent update.
+**Routes** (`/recipients`, tag `recipients`): create/list recipients; get by external id; consent drift; consent sync-log; post a consent update.
 
 ## Data model
 

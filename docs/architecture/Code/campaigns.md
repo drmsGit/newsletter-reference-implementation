@@ -38,7 +38,7 @@ audit of what a slot resolved to) — though the *resolving* is done by [[decisi
 - `create_decision_slot_for_variant` / `update_decision_slot` (validates config via `_normalize_for_strategy` → [[decision]]'s `normalize_slot_config`)
 - `create_decision_resolution` / `page_resolutions_for_decision_slot` — the resolution audit rows
 
-**Routes** (`/campaigns`, tag `campaigns`): 12 routes — campaigns; variants; module instances (+ move/delete); decision slots; decision resolutions.
+**Routes** (`/campaigns`, tag `campaigns`): campaigns; variants; module instances (+ move/delete); decision slots; decision resolutions.
 
 ## Data model
 

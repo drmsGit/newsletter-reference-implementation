@@ -38,7 +38,7 @@ for personalization signals and audience targeting) and **content versioning**
 - `delete_content_record` — **tiered delete**: hard-blocks if decision/override history references it, soft-reassigns the rest
 - `create_demo_content_if_empty` — seeds a starter catalog on first boot (called from `main.py`)
 
-**Routes** (`/content`, tag `content`): 16 routes — list/get/create/update/delete records; categories CRUD; category relations; category assignments; content versions. (Ordering matters — see change-impact.)
+**Routes** (`/content`, tag `content`): list/get/create/update/delete records; categories CRUD; category relations; category assignments; content versions. (Ordering matters — see change-impact.)
 
 ## Data model
 

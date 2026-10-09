@@ -25,18 +25,18 @@ modified: 2026-10-04
 
 The frontend module owns **the server-rendered admin UI** — the Jinja/Bootstrap
 pages a manager uses to drive everything: author content, compose campaigns, run
-decisions, build audiences, plan and fire sends. It is **one file with 57
-routes** (`frontend/router.py`), each a thin handler that calls a service
+decisions, build audiences, plan and fire sends. It is **one file of
+routes** (`frontend/router.py`), frozen since task-50,, each a thin handler that calls a service
 function and renders (or redirects to) a template. It holds **no business logic
 and no database** of its own — it's the presentation layer over every other
 module, using the **post/redirect/get** pattern throughout.
 
-Because per-route pages would be 57 notes that rot, this page is a **route index
+Because per-route pages would be a note per route, and those rot, this page is a **route index
 table grouped by feature** instead. The source of truth is the decorators in
 `frontend/router.py`; the JSON API equivalents are in Swagger (`/docs`).
 
 ## Key files
-- `backend/app/frontend/router.py` — all 57 UI routes (~59 functions)
+- `backend/app/frontend/router.py` — every Jinja UI route, frozen (no new routes)
 - `backend/app/templates/*.html` — the Jinja templates they render
 
 ## Data model
@@ -148,5 +148,5 @@ table grouped by feature** instead. The source of truth is the decorators in
 
 ## ⚠️ Change-impact — if you touch this, also check…
 - **Adding/moving a route** → update this table (it can't auto-detect drift). The path is the anchor other pages link to (e.g. the plan/fire routes referenced from [[delivery]] and [[Flow - Send a campaign]]).
-- **A service signature this calls** → 57 handlers are thin wrappers; a changed service function surfaces here first.
+- **A service signature this calls** → the handlers are thin wrappers; a changed service function surfaces here first.
 - **Templates in `backend/app/templates/`** → renamed templates break the matching route silently.

@@ -50,7 +50,7 @@ DATED = (
     "docs/business-interview.md",
     "docs/weekly-summary.md",
     "docs/architecture/code-slimmer-report.md",
-    "HANDOFF.md",
+    "docs/history/",  # HANDOFF.md moved here 2026-10-09 (task-306)
     ".claude/agent-memory/",
     "product.json",
 )

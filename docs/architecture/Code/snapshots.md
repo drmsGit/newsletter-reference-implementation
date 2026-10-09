@@ -33,7 +33,7 @@ send anything.
 - `build_render_context(...)` — assemble the audit context (which resolutions/versions were used)
 - `list_snapshots_for_variant(...)` / `get_snapshot_html(...)`
 
-**Routes** (`/snapshots`, tag `snapshots`): 3 routes — create for variant, list for variant, get HTML (`GET /snapshots/{id}/html`, HTML response).
+**Routes** (`/snapshots`, tag `snapshots`): create for variant, list for variant, get HTML (`GET /snapshots/{id}/html`, HTML response).
 
 ## Data model
 *One table.*

@@ -40,7 +40,7 @@ by them).
 - `operational_signals_for_recipient(...)` / `operational_signals_for_category(...)` — the bulk reads [[decision]] and [[audience]] use
 - `CONTRIBUTION_WEIGHTS` / `HALF_LIFE_DAYS` — the POC defaults (retunable via [[settings]])
 
-**Routes** (`/insight`, tag `insight`): 3 routes — post an engagement event, list events for a delivery execution, apply-signals for an event.
+**Routes** (`/insight`, tag `insight`): post an engagement event, list events for a delivery execution, apply-signals for an event.
 
 ## Data model
 - **`engagement_events`** (`EngagementEventDB`, owned here) — one normalized event: `delivery_execution_id`, `event_type`, `provider`, `provider_event_id`, `event_data`. Unique `(provider, provider_event_id)` as a dedup safety net.

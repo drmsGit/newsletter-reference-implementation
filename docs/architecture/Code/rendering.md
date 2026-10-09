@@ -33,7 +33,7 @@ resolutions but does **not** execute decisions, and it has **no database**.
 - `resolve_content_for_module` / `resolve_renderable_content` — pick the content (pinned version, latest published, or live draft) for a module
 - `render_rich_text` — safe rich-text → HTML
 
-**Routes** (`/rendering`, tag `rendering`): 1 route — `GET /rendering/variants/{id}` (rendered preview).
+**Routes** (`/rendering`, tag `rendering`): `GET /rendering/variants/{id}` (rendered preview).
 
 ## Data model
 **None.** Reads across [[campaigns]], [[content]], [[overrides]], and [[modules]]; produces HTML.

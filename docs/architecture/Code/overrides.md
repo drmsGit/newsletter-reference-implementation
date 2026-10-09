@@ -37,7 +37,7 @@ that most didn't beat the system."
 - `list_content_overrides(...)` / `get_content_override(...)` — read history
 - `record_outcome_delta(db, override_id, data)` — retroactively record whether the edit outperformed (row-locked, merge-not-replace)
 
-**Routes** (`/overrides`, tag `overrides`): 5 routes — create, list, get, reset, PATCH outcome.
+**Routes** (`/overrides`, tag `overrides`): create, list, get, reset, PATCH outcome.
 
 ## Data model
 *One table.*

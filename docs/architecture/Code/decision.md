@@ -36,7 +36,7 @@ anything (that's [[rendering]]).
 - `get_strategy(name)` / `list_strategies()` (`strategies/registry.py`) — the live strategy registry
 - `normalize_slot_config(meta, candidate_filter, strategy_config)` (`strategies/base.py`) — validate a slot's JSON config against a strategy's declared shape (called from [[campaigns]])
 
-**Routes** (`/decision`, tag `decision`): 2 routes — list strategies (`GET /decision/strategies`), execute a slot (`POST /decision/slots/{id}/execute`).
+**Routes** (`/decision`, tag `decision`): list strategies (`GET /decision/strategies`), execute a slot (`POST /decision/slots/{id}/execute`).
 
 ## Data model
 **None of its own.** Reads `decision_slots`, writes `decision_resolutions` — both owned by [[campaigns]]. Strategies are **code plugins**, not DB rows.

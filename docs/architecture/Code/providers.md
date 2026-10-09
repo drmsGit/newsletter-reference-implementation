@@ -36,7 +36,7 @@ quarantines the un-correlatable, and hands content-tied events to [[insight]].
 
 **Adapter** (`providers/adapters/resend.py`): `verify_signature`, `parse_webhook` → `NormalizedEvent`.
 
-**Routes** (`/provider`, tag `provider`): 3 routes — `POST /provider/events` (manual/normalized ingest), `GET /provider/quarantine`, and the public **`POST /provider/webhooks/resend`** (returns 200 for handled *and* ignored events so Resend won't retry unmapped ones; 401 only on a bad signature).
+**Routes** (`/provider`, tag `provider`): `POST /provider/events` (manual/normalized ingest), `GET /provider/quarantine`, and the public **`POST /provider/webhooks/resend`** (returns 200 for handled *and* ignored events so Resend won't retry unmapped ones; 401 only on a bad signature).
 
 ## Data model
 *One table.*

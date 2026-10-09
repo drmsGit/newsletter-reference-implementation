@@ -38,7 +38,7 @@ one reader these pages do not serve: this folder's own stated audience is an
 engineer ready to take the codebase over.
 
 **Design rule that keeps this low-maintenance:** we document at the **module
-level**, not the function level. There are ~290 functions — a page per function
+level**, not the function level. There are hundreds of functions — a page per function
 would rot the day someone renames one. Module boundaries and the flows between
 them change rarely, so these pages stay true. Function internals live in
 docstrings (the source of truth); we do **not** re-transcribe them here. The
@@ -48,7 +48,7 @@ endpoint list lives in Swagger, generated from the code — never hand-maintaine
 
 ## The system at a glance
 
-The backend is a FastAPI app (~14 modules, 70 files, 125 routes). Data flows
+The backend is a FastAPI modular monolith, one package per module. Data flows
 left-to-right: content and recipients come in, get composed into a campaign,
 personalized per recipient, rendered to HTML, sent through a provider, and the
 resulting engagement feeds back as signals that shape the next decision.
@@ -137,7 +137,7 @@ Each links to its module page. One line = what it owns. Full detail is on the pa
 ### Cross-cutting
 - [[settings]] — app configuration (e.g. `max_send_recipients`), editable in the UI.
 - [[manager-client]] — the React SPA in the top-level `frontend/` directory ([[ADR-170 — The Manager Client Is a Plain React SPA, Not Next.js]]): one screen per area, typed against the JSON API from the OpenAPI schema.
-- [[frontend]] — the older Jinja/Bootstrap admin UI in `backend/app/frontend/`. **57 routes in one file** — documented as a [[frontend#Route index|route index table]], not per-route pages. Not the React client, despite the name.
+- [[frontend]] — the older Jinja/Bootstrap admin UI in `backend/app/frontend/`. **all in one file, frozen** — documented as a [[frontend#Route index|route index table]], not per-route pages. Not the React client, despite the name.
 - [[auth]] — who is calling, and may they do this here: brands, users × roles × brands, passwordless sessions, machine principals, and the one route→permission policy table. Every other module is ignorant that users exist.
 - [[audit]] — the append-only accountability log. Deliberately separate from the domain history the product needs to function.
 - [[ai]] — the AI capability layer: discovered tasks, manager-owned prompts, vendor adapters, and the token ledger that gates spend. Proposes; never applies.
@@ -160,8 +160,9 @@ module pages to understand *structure*.
 
 ## The special case: `frontend/router.py`
 
-One file, 57 routes, ~59 functions — the entire admin UI. Documenting it
-per-route would be 57 pages that rot. Instead [[frontend]] carries a **route
+One file holds the entire Jinja admin UI, frozen since task-50 (no new routes;
+`backend/tests/test_jinja_freeze.py`). Documenting it per-route would be a page
+per route, and those rot. Instead [[frontend]] carries a **route
 index table grouped by feature** (Content, Campaigns, Audience, Deliveries, …),
 each row: method, path, what it does. The Jinja templates it renders live in
 `backend/app/templates/`.

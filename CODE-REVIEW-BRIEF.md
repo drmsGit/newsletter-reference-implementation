@@ -1,37 +1,47 @@
-# Code review brief — Tarrow backend
+# Code review brief — Tarrow
 
-**Prepared 2026-09-19.** Read this before reviewing. It is short, and it will
-save you from reporting a dozen deliberate decisions as defects.
+**Prepared 2026-10-09** (replacing the brief of 2026-09-19). Read this before
+reviewing. It is short, and it will save you from reporting deliberate
+decisions as defects, and from skipping fixes that are worth checking.
 
 ## What this is
 
-A vendor-neutral **reference architecture** for email and omni-channel
-marketing systems, published as a playbook plus a starter package. A FastAPI
-modular monolith with a server-side Jinja UI, Postgres, and 86 architecture
-decision records in `docs/architecture/ADR/`. It is not a product; the
-*decisions* are the deliverable, and the code exists to prove they work.
+A vendor-neutral **reference architecture** for newsletter and omni-channel
+content orchestration, published as a playbook plus a reference
+implementation: a FastAPI modular monolith on Postgres, a React manager client,
+and the architecture decision records in `docs/architecture/ADR/`. It is not a
+product; the *decisions* are the deliverable, and the code exists to prove they
+work. How to run it is in `README.md`.
 
 That framing matters for review: **"this is unusual" is only a finding if it is
-also wrong.** Much of what looks unusual is argued at length in an ADR, and
-where it is, the docstring usually names the record.
+also wrong.** Much of what looks unusual is argued in an ADR, and where it is,
+the docstring usually names the record.
 
 ## What to review
 
-**The diff since the last external review (2026-08-07): 149 commits, 155 files,
-~25,700 insertions.** In rough order of how much a second pair of eyes is worth:
+Everything since the last external review (2026-08-07). In rough order of how
+much a second pair of eyes is worth:
 
-1. **`backend/app/approvals/`** — a week old, written in one stretch, and it
-   *executes real sends* on approval. Least-reviewed, highest blast radius.
-2. **`backend/app/auth/dependencies.py`** — the machine/person guard. The check
-   ordering here was wrong once already (an integration with no grant could
-   have minted a held send); assume it can be wrong again.
-3. **Brand isolation** — `brand_id` is a `WHERE` clause with no structural
-   backstop, and three list functions default it to *every brand*. Leak paths
-   are the thing to hunt.
-4. **The JSON API surface added this week** — session sign-in, builder edits,
-   audience rule blocks, the delivery cron seam.
-5. **`backend/app/recipients/consent.py`** — the send-time exclusion stack. A
-   defect here is a compliance defect.
+1. **`backend/app/approvals/`** — the held-action inbox (ADR-142). It *executes
+   real sends* on approval, and since October it also holds an integration's
+   "ready for this channel" mark for a person. Approve and reject are API
+   routes for people only.
+2. **`backend/app/auth/dependencies.py` and `backend/app/auth/policy.py`** — the
+   person and machine guards (ADR-166). Machines are authenticated principals
+   with explicit grants; a write permission also admits reads of its own area,
+   through an exact table of routes (`MACHINE_READS`). Check ordering here was
+   wrong once already; assume it can be wrong again.
+3. **Brand isolation** — the working brand is resolved once and passed into
+   every query as a required argument (ADR-172), but it is still a `WHERE`
+   clause with no structural backstop such as row-level security. Leak paths
+   are the thing to hunt; one is already known (below).
+4. **Consent and the send-time exclusion stack** — `backend/app/recipients/consent.py`
+   and `backend/app/delivery/exclusion.py`. A defect here is a compliance
+   defect.
+5. **The JSON API and the React client** (`frontend/`, ADR-170) — the newest
+   surface; every screen of the React client goes through it.
+6. **Inbound webhooks** — `backend/app/providers/adapters/resend.py`: signature
+   check, fail-closed without a secret, and a five-minute window against replay.
 
 ## Deliberate — please do not report these as defects
 
@@ -40,39 +50,57 @@ Each is argued in an ADR or a docstring. Disagree if you like, but as a
 
 | Thing | Why |
 |---|---|
-| No Alembic; hand-written SQL + `create_all` | Migrations are meant to be *read*; numbered files beat a generated chain. **Since 2026-09-29 a database records which files it has had** (`schema_migrations`, ADR-181) and the app refuses to start while one is pending — that refines this choice, it does not reverse it |
+| No Alembic; hand-written SQL migrations | Migrations are meant to be *read*. A database records which files it has had (`schema_migrations`, ADR-181), and the app refuses to start while one is pending. A fresh database is built from the models instead |
 | No foreign keys on `audit_events` | An accountability entry must outlive what it references |
-| `audit.record()` swallows a database failure | A failed *log write* must not roll back the action it records — so the entry is written in a savepoint and only that is undone, never the caller's transaction; a non-database error raises like any bug (task-22) |
-| Unsalted sha256 in `hash_secret` | 256-bit CSPRNG secrets; nothing to brute-force. The six-digit login code, the one low-entropy input, uses salted scrypt instead (`hash_login_code`, task-35), checked once on every verify path so the slow hash is not a timing oracle |
-| Mock provider / mock AI as defaults | Nothing commercial may be required to run this (ADR-171) |
+| `audit.record()` swallows a database failure, but raises on a bad entry | A failed *log write* must not roll back the action it records, so the entry is written in a savepoint and only that is undone. An unknown action name or an email address in the detail is a bug in the caller and raises (ADR-153 addendum 2026-10-08) |
+| The audit table refuses updates | Append-only is enforced by a database trigger, not by discipline (task-25) |
+| Unsalted sha256 in `hash_secret` | 256-bit random secrets; nothing to brute-force. The six-digit sign-in code, the one low-entropy input, uses salted scrypt (`hash_login_code`), checked once on every path so the slow hash is not a timing oracle |
+| Mock email and mock AI as defaults | Nothing commercial may be required to run this (ADR-171) |
 | `blocked_reason` is advisory, not enforced | The action refuses itself; the UI hint is a courtesy |
-| Prefix-matching policy table, first match wins | One legible policy that refuses unclassified writes, vs decorators that fail open |
-| Consent computed from events, not stored | ADR-163: a status you can overwrite beats nothing |
-| Postgres-specific features | ADR/testing.md: SQLite silently changes behaviour, so portability is explicitly not claimed |
+| A policy table rather than per-route decorators | One legible table that refuses unclassified writes, versus decorators that fail open; machine reads are listed route by route |
+| Consent computed from events, not stored | ADR-163: an event carries the source and timestamp that make consent provable; a column cannot |
+| Postgres-specific features | SQLite silently changes behaviour, so portability is not claimed |
 | No per-recipient state for lifecycle cycles | ADR-169: the anchor is a date, so position is computed |
-| Approve has no API route | Deliberate, and **already being changed** — see below |
+| The server-rendered Jinja UI still exists | It is **frozen** by a test (`backend/tests/test_jinja_freeze.py`): no new routes. The React client replaces it; its retirement is not yet scheduled (task-312). Duplication between a Jinja route and a JSON route is expected until then |
+| Dependencies installed only from hash-locked files | ADR-189; CI checks that what is installed is what is locked |
 
-## Already known — no need to re-find
+## Already known and open — no need to re-find
 
-**21 items were logged on 2026-09-19** from an internal review. The sharpest,
-so you do not spend time on them:
+From the work queue (`docs/queue/`, read with the `backlog` CLI):
 
-- The sign-in **timing** oracle (a known address makes a synchronous provider
-  call before its 303; an unknown one returns after a SELECT). Launch gate 4b
-  is reopened for it.
-- `brand_id=None` meaning *every brand* on three list functions.
-- `permissions_for(brand_id=None)` meaning the union across every brand.
-- `recipients.consent` being platform-level although `consent_events.brand_id`
-  is now NOT NULL — so a Manager on brand A can write brand B's consent row.
-- `delete_brand` guards five tables; there are seven NOT NULL brand FKs.
-- `record_auth_failure` buckets on an attacker-supplied `key_id`.
-- The session resolving 4–5 times per request, each with a write and commit.
-- No `REVOKE UPDATE` on the audit table — append-only is discipline, not a
-  guarantee.
-- `sending_brand_id` returns `int | None` into parameters typed `int`; it fails
-  closed only because SQLAlchemy renders `== None` as `IS NULL`.
+- **No unsubscribe.** There is no unsubscribe or double opt-in route and no
+  `List-Unsubscribe` header, and emails carry no footer yet (task-56, task-301).
+  The design question that blocked it is settled (ADR-169 point 1); it is not
+  built.
+- **The consent-drift report ignores brand** — it compares and answers across
+  brands (task-307).
+- **Nothing is ever erased.** Erasure and retention (ADR-154) are designed, not
+  built; `backend/app/privacy/` is empty (task-136, task-117).
+- **Raw SQL strings and file-serving paths** have not had their dedicated
+  review yet (task-237). Reviewing them is welcome.
+- **The AI spend cap is check-then-act**: two concurrent runs can both pass the
+  gate (task-124, part c).
+- **Known structural debt:** six near-identical plugin registries (task-308),
+  concurrency helpers living in `campaigns/` (task-309), approval logic in
+  `main.py`'s exception handler (task-310), and `max_results` as dead
+  configuration (task-109).
+- **No licence has been chosen yet.**
 
-Full text with reasoning: `docs/backlog.md`, Bugs section.
+## Recently fixed — please verify
+
+These were known at the last brief and have since been fixed. A second look at
+the fix is worth more than a fresh look elsewhere:
+
+| Was | Fixed in |
+|---|---|
+| The sign-in timing oracle (a known address answered slower) | task-5; launch gate 4b closed 2026-09-29 (ADR-151 addendum) |
+| `brand_id=None` meaning *every brand* on list functions; `permissions_for(brand_id=None)` as a union across brands | task-16, task-38; brand is now a required argument (ADR-172) |
+| `recipients.consent` platform-level, so one brand's manager could write another brand's consent | task-7 |
+| `delete_brand` guarding fewer tables than carry a brand | task-19, task-40 |
+| `record_auth_failure` keyed on an attacker-supplied `key_id` | task-33 |
+| The session resolved several times per request, each with a write | task-32 |
+| Append-only audit by discipline only | task-25 (database trigger) |
+| `sending_brand_id` returning `None` into `int` parameters | task-18 |
 
 ## What would be most valuable
 
@@ -80,24 +108,23 @@ Things **nobody decided** — which is where the last external review earned its
 keep, by finding a bare `except ValueError` that swallowed a consent guard and
 turned a compliance defect into a rendering behaviour.
 
-Specifically: guards that do not guard, two checks that mask each other (this
-codebase has found six such pairs and expects more), a path where an error is
+Specifically: guards that do not guard, two checks that mask each other (several
+such pairs have been found and more are expected), a path where an error is
 reported as success, anywhere a permission is checked against one thing and a
 row written against another, and concurrency on the send and approval paths.
 
 ## Ground rules
 
-- **Verify against the code before reporting.** This project's backlog records
-  that every finding from the 2026-08-07 review was checked before being
-  logged, and that rule is why that review was useful rather than a pile of
-  plausible-sounding bugs.
+- **Verify against the code before reporting.** Every finding from the
+  2026-08-07 review was checked before being logged, and that rule is why that
+  review was useful rather than a pile of plausible-sounding bugs.
 - Cite `file:line`.
 - Say whether a finding is *reachable today* or *reachable after a plausible
   change*. Both are worth having; conflating them is not.
 
 ## Running it
 
-Tests: `cd backend && venv/bin/python -m pytest tests/ -q` — **567 passing**,
-against an isolated test database the suite creates and seeds itself
-(`backend/tests/conftest.py`). It refuses to run against the development
-database.
+See `README.md`. Tests: `cd backend && venv/bin/python -m pytest -q`, against a
+test database the suite creates and seeds itself; it refuses to run against the
+development database. CI (`.github/workflows/ci.yml`) runs the same suite on
+every push.
