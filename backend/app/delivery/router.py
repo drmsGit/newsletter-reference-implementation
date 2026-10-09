@@ -294,7 +294,7 @@ def send_test(
 
 
 @router.post("/process-due", response_model=ProcessDueResult)
-def process_due(db: Session = Depends(get_db)):
+def process_due(db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
     """Fire every scheduled send whose time has arrived.
 
     **The seam ADR-142 assumes exists.** That record has the orchestrator
@@ -308,11 +308,15 @@ def process_due(db: Session = Depends(get_db)):
     split the two, and a scheduler is exactly the caller the split was for: it
     prepares nothing and fires everything that is due.
 
+    **The working brand's sends only** (task-315): a scheduler for several
+    brands calls this once per brand, declaring each (`X-Brand`), so every
+    call is authorised where its mail goes.
+
     Idempotent by the send path rather than by this route —
     `send_send_instance` takes a row lock and refuses an instance already
     `sending` or `sent`, so two schedulers overlapping cannot double-send.
     """
-    triggered = process_due_scheduled_sends(db)
+    triggered = process_due_scheduled_sends(db, brand_id=brand_id)
     return {
         "triggered": len(triggered),
         "send_instance_ids": [getattr(s, "id", s) for s in triggered],

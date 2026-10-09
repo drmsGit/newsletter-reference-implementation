@@ -1936,12 +1936,13 @@ def send_instance_trigger(
 
 
 @router.post("/ui/deliveries/process-due")
-def deliveries_process_due(db: Session = Depends(get_db)):
+def deliveries_process_due(request: Request, db: Session = Depends(get_db)):
     """Fire all scheduled sends that are due now. In the POC this is a manual
     button; in a real deployment a cron/worker/automation platform calls this
     same operation on an interval (the architecture exposes the seam, doesn't
     bake in a scheduler)."""
-    triggered = process_due_scheduled_sends(db)
+    # The working brand's sends only (task-315).
+    triggered = process_due_scheduled_sends(db, brand_id=working_brand_id(request, db))
     msg = f"Triggered {len(triggered)} due scheduled send(s)." if triggered else "No scheduled sends were due."
     return RedirectResponse(url=f"/ui/deliveries?notice={quote(msg)}", status_code=303)
 

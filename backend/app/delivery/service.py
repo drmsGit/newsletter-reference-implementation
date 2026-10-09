@@ -595,14 +595,22 @@ def reconcile_executions_to_audience(db: Session, send_instance: SendInstanceDB)
     db.commit()
 
 
-def process_due_scheduled_sends(db: Session) -> list[int]:
-    """Fire every scheduled send whose time has arrived. This is the operation a
-    scheduler drives — a cron job, worker, or automation platform (n8n) calls it
-    on an interval; the architecture just exposes the seam rather than baking in
-    a specific scheduler. Returns the ids of the send instances it triggered."""
+def process_due_scheduled_sends(db: Session, *, brand_id: int) -> list[int]:
+    """Fire every scheduled send of this brand whose time has arrived. This is
+    the operation a scheduler drives — a cron job, worker, or automation
+    platform (n8n) calls it on an interval; the architecture just exposes the
+    seam rather than baking in a specific scheduler. Returns the ids of the send
+    instances it triggered.
+
+    **One brand per call** (task-315). It used to sweep every brand while its
+    route checked `sends.execute` in the caller's working brand only, so a
+    credential for brand A fired brand B's mail. The working brand is carried
+    in like everywhere else (ADR-172); a deployment with several brands calls
+    this once per brand, each call authorised where it lands."""
     due = (
         db.query(SendInstanceDB)
         .filter(
+            SendInstanceDB.brand_id == brand_id,
             SendInstanceDB.status == "scheduled",
             SendInstanceDB.scheduled_at.isnot(None),
             SendInstanceDB.scheduled_at <= func.now(),  # DB-side comparison avoids tz drift
@@ -612,13 +620,6 @@ def process_due_scheduled_sends(db: Session) -> list[int]:
     triggered = []
     for send_instance in due:
         try:
-            # **Not a `list_all_*` case, deliberately.** The SELECT spans
-            # brands because a scheduler has no working brand — but each fire
-            # already knows its own, from the column `brand_for_snapshot` set
-            # when the instance was created. So the sweep hands the send its
-            # own brand rather than an escape hatch, and the whitelist of
-            # spanning functions stays three entries that all mean the same
-            # thing.
             send_send_instance(
                 db, send_instance_id=send_instance.id,
                 brand_id=send_instance.brand_id,

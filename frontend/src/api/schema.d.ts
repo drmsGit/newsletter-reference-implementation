@@ -1256,6 +1256,10 @@ export interface paths {
          *     split the two, and a scheduler is exactly the caller the split was for: it
          *     prepares nothing and fires everything that is due.
          *
+         *     **The working brand's sends only** (task-315): a scheduler for several
+         *     brands calls this once per brand, declaring each (`X-Brand`), so every
+         *     call is authorised where its mail goes.
+         *
          *     Idempotent by the send path rather than by this route —
          *     `send_send_instance` takes a row lock and refuses an instance already
          *     `sending` or `sent`, so two schedulers overlapping cannot double-send.
