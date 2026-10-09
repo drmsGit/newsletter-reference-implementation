@@ -105,3 +105,21 @@ def test_the_jinja_button_fires_only_the_working_brands_sends(db, due, fired, de
     assert response.status_code == 303, response.text
     fired_ids = [sid for sid, _ in fired]
     assert mine in fired_ids and theirs not in fired_ids
+
+
+def test_non_default_working_brand_fires_its_own_due_send(due, fired, default_brand, foreign_brand):
+    """X-Brand selects B rather than falling back to default A (task-315)."""
+    default_send = due(default_brand.id)
+    selected_send = due(foreign_brand.id)
+    with machine([SENDS_EXECUTE], brand_id=foreign_brand.id) as headers:
+        key_id = headers["Authorization"].split()[1].split(".")[0]
+        with SessionLocal() as session:
+            credential = session.query(IntegrationCredentialDB).filter_by(key_id=key_id).one()
+            ints.set_unattended_sending(session, credential.integration_id, True)
+        response = api.post("/delivery/process-due", headers=headers)
+
+    assert response.status_code == 200, response.text
+    assert selected_send in response.json()["send_instance_ids"]
+    assert default_send not in response.json()["send_instance_ids"]
+    assert (selected_send, foreign_brand.id) in fired
+    assert all(sid != default_send for sid, _brand in fired)
