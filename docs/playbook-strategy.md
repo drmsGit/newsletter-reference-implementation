@@ -685,6 +685,22 @@ Renamed in place after a full backup, data checked before and after; the user's 
 
 **Status:** done the same day (task-288).
 
+### 2026-10-09 — Every marketing email can be unsubscribed from
+
+**Context:** there was no unsubscribe anywhere — no link, no page, no one-click header — while Gmail and Yahoo require one-click unsubscribe from bulk senders and most marketing-mail rules require a visible way out (task-56). ADR-169 had already settled that it is a route, not a flow, and ADR-163 that an opt-out defaults to the brand that sent the mail. Decided with the user one question at a time:
+
+1. **Unsubscribe first; double opt-in split off** (task-324), because nothing in the platform receives a signup yet — the CRM owns who agreed.
+2. **A random token per sent message**, stored with it: no secret to configure, so no link already sent can break.
+3. **Opening the link shows a page; only a button opts out** — link scanners open every link and would otherwise unsubscribe people who never clicked. A mail client's one-click button opts out at once.
+4. **The sending brand by default; "everything from the company" only where a company setting offers it** — off by default, so a one-brand company never shows a confusing second option. Messages a person needs, such as sign-in codes, are never affected.
+5. **A plain footer line now**, until the designed footer (task-301) replaces it.
+6. **A new launch gate**: no public exposure until every marketing mail can be unsubscribed from.
+7. **English now, all wording in one place**, so translation is an addition later.
+
+Recorded in [[ADR-191 — Unsubscribe Is a Per-Message Token, a Confirm Page and One-Click]].
+
+**Status:** built the same day (task-56); gate 10 closes with it.
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*

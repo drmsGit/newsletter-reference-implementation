@@ -76,10 +76,6 @@ From the work queue (`docs/queue/`, read with the `backlog` CLI):
   webhook, a stale decision pick, push slots checked against email consent, a
   lost envelope edit, and "sent" reported for a failed send. The report is
   `docs/queue/docs/doc-1`.
-- **No unsubscribe.** There is no unsubscribe or double opt-in route and no
-  `List-Unsubscribe` header, and emails carry no footer yet (task-56, task-301).
-  The design question that blocked it is settled (ADR-169 point 1); it is not
-  built.
 - **The consent-drift report ignores brand** — it compares and answers across
   brands (task-307).
 - **Nothing is ever erased.** Erasure and retention (ADR-154) are designed, not
@@ -107,6 +103,7 @@ the fix is worth more than a fresh look elsewhere:
 | The session resolved several times per request, each with a write | task-32 |
 | Append-only audit by discipline only | task-25 (database trigger) |
 | `sending_brand_id` returning `None` into `int` parameters | task-18 |
+| No unsubscribe anywhere (no link, page or one-click header) | task-56, ADR-191, 2026-10-09: a per-message token, a confirm page, RFC 8058 one-click; a new launch gate 10, closed. The visible footer is still the interim line until task-301 |
 
 ## What would be most valuable
 

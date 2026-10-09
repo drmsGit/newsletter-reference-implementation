@@ -9,12 +9,13 @@ What must be true before public beta. Reviewed against commits and
 | 2 | P0 consent defect fixed | any public exposure (compliance) | ✅ done 2026-09-13 — send-time exclusion stack |
 | 3 | P0 inbound machine authentication | any public exposure | ✅ done 2026-09-18 — ADR-166 accepted and built |
 | 4 | Auth enforcement flag switched on | any public exposure | ✅ CLOSED 2026-09-13 — default ON, CSRF on all 62 forms, code requests rate limited |
-| 4b | Sign-in code disclosure fixed (P0, security) | any public exposure | ✅ CLOSED 2026-09-29 — response oracle 2026-09-13; timing oracle 2026-09-29, to a measured sub-millisecond bound (ADR-151 addendum) |
+| 4b | Sign-in code disclosure fixed (P0, security) | any public exposure | ✅ CLOSED 2026-09-29 — response oracle 2026-09-13; timing oracle 2026-09-29, to a measured sub-millisecond bound (ADR-151 addendum). Reopened by task-35's scrypt hash on code issue, found by the external review 2026-10-09; re-closed the same day (task-317) |
 | 5 | Real provider integration proven | the "no lock-in" claim | ✅ done — Resend, live, verified domain |
 | 6 | Inbound engagement loop proven | the signal-layer claim | ✅ done — signed webhooks, end-to-end |
 | 7 | Security model designed + base built | Phase 4C | ✅ ADR-150–154; base built, proposed status |
 | 8 | Playbook structure decided (4A) | 4C | 🟡 started in Cowork |
 | 9 | 2–3 client cases mapped to the pillars (4B) | 4C | ❌ open |
+| 10 | Every marketing mail can be unsubscribed from — one-click header, a visible link and a working page | any public exposure (compliance, deliverability) | ✅ CLOSED 2026-10-09 — task-56, ADR-191 (gate added the same day by the user). Live-checked on scratch data: a real send's link opened the page without opting out; the button opted out |
 
 ## The three that actually block exposure
 Gates 2, 3 and 4 are the ones where "we launched" and "we were fine" come

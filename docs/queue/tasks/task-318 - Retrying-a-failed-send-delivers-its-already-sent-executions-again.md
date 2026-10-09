@@ -4,7 +4,7 @@ title: Retrying a failed send delivers its already-sent executions again
 status: Blocked
 assignee: []
 created_date: '2026-10-09 08:01'
-updated_date: '2026-10-09 08:46'
+updated_date: '2026-10-09 11:14'
 labels:
   - backend
 dependencies: []
@@ -51,4 +51,9 @@ Blocked, AC #3 (uncertain provider outcomes): when provider.send raises, the exe
 - resend it: never missed, but maybe a duplicate;
 - hold the send for reconciliation, which is task-81 (provider-side partial-failure reconciliation).
 This is the user's decision.
+
+2026-10-09, decided by the user for AC #3: an execution whose provider outcome is uncertain is SKIPPED on retry, never resent. Reason (user): a duplicate send must not be risked. If many recipients end up 'not delivered', they are checked and resent by hand. To build:
+- mark each execution just before the provider call, committed, so a crash leaves it distinguishable from 'never attempted';
+- a retry skips it and records it under a distinct status, visible and filterable in the send's executions list.
+The manual resend path that exists today: paste those people into an audience group and plan a new send to it. Nothing automates that, by decision. Not built yet; the task stays Blocked until the build.
 <!-- SECTION:NOTES:END -->
