@@ -221,8 +221,11 @@ def get_executions_for_send_instance(
     ),
     responses={
         200: {
-            "description": "The send completed.",
-            "content": {"application/json": {"example": {"status": "sent"}}},
+            "description": (
+                "The send ran. `status` is its persisted outcome: `sent`, `partial_failed`, "
+                "`failed` or `no_recipients` — a run that completed is not a successful delivery."
+            ),
+            "content": {"application/json": {"example": {"status": "partial_failed"}}},
         },
         409: {
             "description": "Already sending/sent, or a rerun audience exceeded the send cap.",
@@ -240,7 +243,7 @@ def send_instance(
     brand_id: int = Depends(working_brand),
 ):
     try:
-        send_send_instance(
+        outcome = send_send_instance(
             db=db,
             send_instance_id=send_instance_id,
             brand_id=brand_id,
@@ -248,9 +251,8 @@ def send_instance(
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error))
 
-    return {
-        "status": "sent"
-    }
+    # The persisted outcome, never an assumed "sent" (task-323).
+    return {"status": outcome}
 
 @router.post(
     "/send-test",

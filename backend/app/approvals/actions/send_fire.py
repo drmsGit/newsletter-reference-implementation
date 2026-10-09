@@ -212,7 +212,7 @@ def execute(
         return ActionResult(ok=False, message="this request names no send")
 
     try:
-        send_send_instance(db, send_instance_id, brand_id=brand_id)
+        outcome = send_send_instance(db, send_instance_id, brand_id=brand_id)
     except ValueError as refusal:
         # A clean refusal from the send path — already sent, snapshot missing,
         # audience unresolvable. Not an exception the approver caused, so it is
@@ -224,11 +224,13 @@ def execute(
     ).first()
     return ActionResult(
         ok=True,
+        # The outcome first, never an assumed "Sent" (task-323): a run in which
+        # every delivery failed is a run that completed, not a success.
         message=(
-            f"Sent: {send_instance.sent_count} delivered, "
+            f"{outcome.replace('_', ' ').capitalize()}: {send_instance.sent_count} delivered, "
             f"{send_instance.failed_count} failed, "
             f"{send_instance.excluded_count} excluded."
-        ) if send_instance else "Sent.",
+        ) if send_instance else outcome.replace("_", " ").capitalize() + ".",
         audit_action=audit.SEND_FIRED,
         audit_detail={"send_instance_id": send_instance_id},
     )

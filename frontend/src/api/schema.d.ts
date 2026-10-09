@@ -8806,7 +8806,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The send completed. */
+            /** @description The send ran. `status` is its persisted outcome: `sent`, `partial_failed`, `failed` or `no_recipients` — a run that completed is not a successful delivery. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8814,7 +8814,7 @@ export interface operations {
                 content: {
                     /**
                      * @example {
-                     *       "status": "sent"
+                     *       "status": "partial_failed"
                      *     }
                      */
                     "application/json": unknown;

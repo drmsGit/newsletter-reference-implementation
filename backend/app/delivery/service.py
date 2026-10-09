@@ -785,7 +785,10 @@ def send_send_instance(
     send_instance_id: int,
     *,
     brand_id: int,
-):
+) -> str:
+    """Fire a planned send. Returns its persisted outcome — sent,
+    partial_failed, failed or no_recipients — so a caller reports what
+    happened rather than assuming success (task-323)."""
     # Row lock + status guard: two concurrent calls both reading "draft"
     # before either commits would otherwise both proceed to send. FOR UPDATE
     # serializes the read-check-write of the status transition itself — the
@@ -913,6 +916,7 @@ def send_send_instance(
         ).update({"status": "failed"}, synchronize_session=False)
         db.commit()
         raise
+    return send_instance.status
 
 
 def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, provider) -> None:
