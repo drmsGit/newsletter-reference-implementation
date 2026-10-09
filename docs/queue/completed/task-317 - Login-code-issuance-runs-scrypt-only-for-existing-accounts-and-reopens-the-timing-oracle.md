@@ -3,11 +3,11 @@ id: TASK-317
 title: >-
   Login-code issuance runs scrypt only for existing accounts and reopens the
   timing oracle
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-09 08:02'
-updated_date: '2026-10-09 08:32'
+updated_date: '2026-10-09 08:39'
 labels:
   - backend
 dependencies: []
@@ -31,13 +31,27 @@ Related: completed task-5 removed synchronous transport latency and task-35 late
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Known and unknown account requests perform equivalent response-critical KDF work, or both defer it beyond the response.
-- [ ] #2 Both JSON and form request routes preserve identical response behavior and request throttling.
-- [ ] #3 A regression check detects reintroducing account-dependent expensive work even when mail delivery remains deferred.
+- [x] #1 Known and unknown account requests perform equivalent response-critical KDF work, or both defer it beyond the response.
+- [x] #2 Both JSON and form request routes preserve identical response behavior and request throttling.
+- [x] #3 A regression check detects reintroducing account-dependent expensive work even when mail delivery remains deferred.
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-09: promoted from ChatGPT's code review (docs/queue/docs/doc-1, draft-9) by the user's decision, ordered by severity. Claude verified the core evidence against the code the same day: issue_login_code returns for an unknown or inactive address (backend/app/auth/service.py:775-778) before any hashing, while a known address runs hash_login_code (scrypt) at :789 before the response. This regression came from task-35. Fix together with task-316 if convenient.
+
+2026-10-09: fixed together with task-316 (commit 68b3589; CI green).
+
+Change: issue_login_code runs hash_login_code on a throwaway random code for an unknown or inactive address before returning None, so both outcomes do the same scrypt work before the response (backend/app/auth/service.py). This is the approach verification already takes on every path (login_code_matches). The regression came from task-35, which added scrypt to issuing for known addresses only. The residual difference is the database write for a known address (supersede, insert, commit), which is what task-5's measured bound already covered.
+
+Test: test_issuing_runs_the_same_kdf_work_for_every_address (backend/tests/test_login_code_races.py) counts hashlib.scrypt calls inside issue_login_code for a known and an unknown address, and asserts they are equal and at least one. It failed before the fix (1 against 0). Mutation check: removing the dummy hash fails it. This is a structural check, not a latency measurement. It catches the expensive work being reintroduced for one outcome only, which is AC #3.
+
+Both routes (the JSON /auth/session/request and the form /ui/login) call the same issue_login_code (backend/app/auth/service.py:820, backend/app/auth/router.py:85), so their behaviour and throttling are unchanged and identical.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Issuing a sign-in code now does the same scrypt work for unknown and known addresses, closing the account oracle task-35's hash had reopened. Verified by a KDF-count test that failed before the fix, a mutation check, the full suite and CI green.
+<!-- SECTION:FINAL_SUMMARY:END -->
