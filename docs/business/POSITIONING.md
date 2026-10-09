@@ -30,6 +30,11 @@ The *axis* is decided, even though the sentence is not. Recorded across
   stays out of the headline claim until there is code.** The rule's bar is
   *demonstrable in the repo*, and accepted ADRs demonstrate a design, not a
   capability. Revisit when a second channel actually sends.
+- **AI claims are bounded by what is built (decided 2026-10-09, P2-H3).** Until an
+  EU-hosted AI provider adapter exists, a statement may claim "a swappable AI
+  provider contract, with one worked example and a free mock", never "GDPR-friendly
+  AI demonstrated" or "EU-hosted AI". The only real adapter today is a US vendor's
+  (`backend/app/ai/adapters/factory.py`). The EU adapter stays deferred.
 
 ## What a candidate statement must satisfy
 1. Names the primary audience (agencies and freelancers serving mid-market),

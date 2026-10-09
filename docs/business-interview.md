@@ -157,7 +157,7 @@ A Klaviyo-AI or Claude+MCP user gets "suggest 3 subject lines" instantly, no set
 
 Prepared 2026-10-09. Questions for the maintainer; no adopted answers, classifications of core/surface, or proposed fixes. Severity markers describe the interview finding, not new launch gates. Only `docs/business/LAUNCH-GATES.md` governs exposure. Code checked at `50db60f` and rechecked at `05088de4`; delivery source advanced during concurrent work, and citations below use the final inspected source.
 
-### BF-CI1 — Who inherits maintenance when the reference becomes a fork? 🟡 deferred
+### BF-CI1 — Who inherits maintenance when the reference becomes a fork? ✅ resolved 2026-10-09
 
 **Question / adopter assumption:** The workflow now checks vulnerabilities even without a push. What ongoing advisory-triage responsibility is the adopter expected to assume once an agency hands the installation to its customer? Who is assumed to read a failed scheduled run and determine whether the deployed revision is affected?
 
@@ -170,6 +170,8 @@ Prepared 2026-10-09. Questions for the maintainer; no adopted answers, classific
 - **Klaviyo + an AI agent in one prompt:** Even if an agent produces equivalent checks in one instruction, what adoption evidence would show that owning their operation is valuable to this buyer? Does transparent maintenance responsibility support the existing control/teachability axis, or merely add unpaid work?
 
 **Checked against:** Both passes of `docs/business-interview-baseline.md` (A3 addresses stack choice, P2-H3 addresses governed AI vendor scope); `docs/business-interview.md`'s 2026-07-12 positioning and 2026-08-02 AI sections; all interview-prep files, with relevant hits in the AI design interview's development boundary; `docs/business/` and its decision files; playbook §5; completed task-105, task-235, task-236 and task-98; open task-311 and task-55. ADR-190 Decision points 1–5 and Negative already accept weekly red runs, warning-only style findings and manual SHA updates. ADR-143 addresses CI portability. None of these assigns post-handoff responsibility for acting on a scheduled result or claims a checked source revision equals the deployed installation. This is that narrower operating assumption, not a request for another CI feature.
+
+**Resolution (2026-10-09):** The fork's owner. A fork's CI checks that fork's code, and nothing else. Whoever owns the fork runs its checks against the version actually deployed and acts on the result: the company, or the agency if its contract says so. We maintain the reference, not forks. A green check on the reference says nothing about the security state of a deployed installation. Stated in `docs/business/BRIEF.md` (under "Not a hosted service") and noted on task-55, the reference deployment. Decided by the user in the 2026-10-09 interview review; logged in `docs/playbook-strategy.md` §5.
 
 ### BF-SUB1 — Does the promise of durable links include durable infrastructure? 🟡 deferred
 

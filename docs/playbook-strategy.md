@@ -760,19 +760,19 @@ The decision on held requests is recorded in a second 2026-10-09 addendum to [[A
 **Context:** the business baseline (Pass 2, finding P2-M1) found eleven business, legal or market positions written only inside ADRs or code comments, where a positioning pass would never read them. `docs/business/decisions/` is gitignored since 2026-09-25, to keep confidential items such as the naming draft private. **Decided by the user:** this decision log is the tracked business record. The folder stays private for confidential decisions. The ADRs keep the mechanism and point here for the business reason.
 
 The positions, as the ADRs state them today:
-1. **Brands do not share a lawful basis for contact.** Consent to one brand says nothing about another ([[ADR-163 — Per-Channel Consent and Addressability]], 2026-09-15 addendum §1). *Under review: P2-A2.*
+1. **Brands do not share a lawful basis for contact.** Consent to one brand says nothing about another ([[ADR-163 — Per-Channel Consent and Addressability]], 2026-09-15 addendum §1). *Confirmed later the same day (P2-A2): a group-wide opt-in is the CRM asserting each brand.*
 2. **Full erasure is the shipped default.** Pseudonymised retention is a documented variation, not a toggle ([[ADR-154 — Erasure and Retention]] point 2). Stays deferred to the lifecycle work (task-136).
 3. **Consent proof is kept through an erasure**, under Art. 17(3)(e) GDPR and UWG §7 (ADR-154 point 6).
 4. **Two installs, no mixed-but-separated mode**, for a company whose brands must be kept apart ([[ADR-150 — Tenancy and Access Model]] point 3; also BRIEF.md).
 5. **The agency operator is not a role.** An agency works with the roles the company grants it (ADR-150 point 7).
-6. **Time to the first working integration beats completeness: "a weekend, not half a year"** ([[ADR-160 — Channel Model and Composition]] point 6). *Under review: P2-F3.*
-7. **One company-wide AI budget.** Per-brand budgets are a direction, not a build commitment (ADR-150, 2026-09-15 addendum). *Under review: P2-H2.*
+6. **Time to the first working integration beats completeness: "a weekend, not half a year"** ([[ADR-160 — Channel Model and Composition]] point 6). *Confirmed later the same day (P2-F3): now a stated positioning claim.*
+7. **One company-wide AI budget.** Per-brand budgets are a direction, not a build commitment (ADR-150, 2026-09-15 addendum). *Settled later the same day (P2-H2): still one pot, now monthly by default.*
 8. **Passing data to an ad platform is a consent purpose of its own**, on a contested German supervisory line (ADR-163 point 3). The vocabulary itself is open in task-134.
 9. **A letter is an advanced feature.** What we deliver for it is a library article, not a built channel ([[ADR-161 — Channel Execution Shapes]] point 5).
 10. **Duplication is deliberate only where content is forked**, that is, a copy into another brand. Within a campaign it is one click (P2-A3, decided today).
-11. **The shipped subject-line prompt's editorial house style** (`backend/app/ai/tasks/subject_preheader.py`). *Under review: P2-H1.*
+11. **The shipped subject-line prompt's editorial house style** (`backend/app/ai/tasks/subject_preheader.py`). *Replaced later the same day (P2-H1): a neutral seed in the content's language, task-339.*
 
-The positions marked "under review" are open findings in the same review. Their outcome is logged when decided.
+The four positions that were under review when this entry was written were decided later the same day, as marked.
 
 ### 2026-10-09 — Business findings decided one by one in the interview review
 
@@ -792,6 +792,9 @@ Each was decided by the user in its own question. The full narrative is under th
 - **Credentials in the UI (P2-C1): the environment wins for the keys the platform uses.** The sending and AI keys are set in the environment or the company's secret store. The UI only shows whether they are configured. Inbound integration keys (issued, hashed, shown once) were never in conflict (ADR-152 addendum).
 - **Multilingual newsletters (P2-F2): one variant per language.** Each language is its own variant, sent to an audience filtered by the recipient's language. That is today's tools and no new layer. A language axis on content is a later idea, if the pattern proves too laborious.
 - **The one speed we claim (P2-F3): time to the first working integration.** "A weekend, not half a year" is now a stated positioning claim in BRIEF and POSITIONING, beside the ceded campaign-production speed. Like every claim, it must be demonstrable.
+- **AI budget (P2-H2): one company pot, monthly by default.** The period is a company setting, and every AI run records who triggered it, so spend can be split later (ADR-144 addendum, task-345).
+- **AI vendor claim (P2-H3): "swappable, one worked example".** Until an EU-hosted adapter exists, nothing claims GDPR-friendly or EU-hosted AI. The constraint is in POSITIONING.md; the EU adapter stays deferred.
+- **Security checks after handoff (BF-CI1): the fork's owner.** A fork's checks cover that fork; its owner runs them against the deployed version and acts on them. We maintain the reference, not forks (BRIEF, task-55).
 
 ## 6. Roadmap
 

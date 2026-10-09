@@ -7,7 +7,7 @@ topic:
   - governance
   - privacy
 created: 2026-07-31
-modified: 2026-07-31
+modified: 2026-10-09
 source:
   - "AI Layer design interview (interview-prep, 2026-07-27 – 31), Cluster 5"
 depends_on:
@@ -151,6 +151,103 @@ scaffold, config for the prompt.**
 - **Status.** Decided in the design interview; the model adapter, EU worked
   example, and cap enforcement are phased with the Mode-A build. Accepted as a
   design decision, not as shipped code.
+
+## Addendum 2026-10-09 — the AI budget is one company pot, it refills each month by default, and every run records who started it
+
+Prompted by finding P2-H2 in [[business-interview-baseline]] ("The spend cap is a
+lifetime budget; ADR-144 says per role/user"), decided by the user in the 2026-10-09
+interview review and logged in the [[playbook-strategy]] decision log under
+"2026-10-09 — Business findings decided one by one in the interview review". Point 5's
+mechanism stands as written: warn first, then hard stop, enforced as a pre-call gate.
+This addendum settles two things point 5 left loose: whose budget it is, and over what
+period it is counted. The code facts below were checked on 2026-10-09.
+
+**Point 5 says "per role/user", and a later record decided one pot without saying so
+here.** Point 5 scopes the cap *"per role/user"*, and the third `### Positive` bullet
+repeats it: *"the cap is enforced before a task starts, per role/user"*.
+[[ADR-150 — Tenancy and Access Model]] decided otherwise in its 2026-09-15 addendum on
+permission scope, where it explains why `ai.run` is platform-level: *"the budget is one
+company-wide pot with one ledger and one bill"*. It also says *"This is not deferred
+indecision"*: the platform must not assume how a company wants to share a budget across
+brands. That addendum cites this record's §5 as the source of the pot, but this record
+was never amended to point back. A reader of ADR-144 alone still finds a per-user cap.
+
+**What the build does.** The build followed ADR-150, not the wording here, and it added
+a property neither record decided: the budget never refills.
+
+- `tokens_used` in `backend/app/ai/service.py:89-104` sums the tokens of every billable
+  run in `ai_runs`. It has no time window and no filter by person or role. The pre-call
+  gate measures what remains against that sum (`:196-199`).
+- The cap itself is two token figures, `warn_tokens` and `hard_stop_tokens`
+  (`get_ai_spend_cap`, `backend/app/settings/service.py:95`), with no period beside
+  them.
+- `AIRunDB` (`backend/app/ai/db_models.py:47-72`) records a run's task, prompt,
+  provider, model, tokens, target and time. It does not record who started the run.
+
+So the budget is a lifetime allowance. Once it is spent it never refills, and a company
+that budgets monthly cannot say so. Spend also cannot be split by person afterwards,
+because the column to split on was never written.
+
+**The decision.**
+
+**1. The budget is one company-wide pot.** This is ADR-150's 2026-09-15 decision, and
+this record now points to it. Point 5's "per role/user" and the third `### Positive`
+bullet are read accordingly: the cap is one budget for the whole company, and no person
+or role has a budget of their own. Per-brand budgets stay where ADR-150 left them: a
+playbook article for a company that needs them, not a build commitment.
+
+**2. The pot resets each calendar month by default, and the period is a company
+setting.** The company chooses the period, for example month, quarter or lifetime.
+Month is the default. Lifetime, which is today's behaviour, stays available as one of
+the choices. This is the split [[ADR-161 — Channel Execution Shapes]] point 8 states:
+*"Numbers belong to the company, the mechanism to us, the same split already used for
+retention periods and the AI spend cap."* Point 5 already gives the cap's figures to the
+company. The period over which they are counted is the same kind of number, so it goes
+to the company too. The mechanism stays ours: the pre-call gate counts the runs of the
+current period instead of every run ever recorded, and is otherwise unchanged. Changing
+the period is a settings write, so it falls under the rule that every settings write is
+made by a person ([[ADR-150 — Tenancy and Access Model]], 2026-10-02 (second) addendum,
+point 2).
+
+**3. Every AI run records who triggered it: a person or an integration.** The actor is
+written on the run, so the ledger can later be split by person, by integration or by
+period. An integration is a principal of its own
+([[ADR-166 — Inbound Machine Callers Are Authenticated Principals]]), which is why it is
+named beside a person. **No per-person budget is decided.** Recording the actor makes
+one possible later; it does not introduce one.
+
+**4. Decided now, built later.** Until the build lands, the cap stays a lifetime total
+and runs carry no actor. The build is tracked as task-345.
+
+**Left to the final-design pass.**
+
+- Which time zone "calendar month" is counted in.
+- What happens to a run that is in flight when the period resets.
+- How existing runs, written before the actor was recorded, are shown.
+
+**Options not taken.** Keeping the lifetime pot as the default was not adopted. It is
+the behaviour P2-H2 found, and under it a company that budgets monthly cannot express
+its budget at all. It remains available as one value of the period setting.
+
+Waiting for task-75 was not adopted either. task-75, still open, would read the
+remaining budget from the company's AI source instead of a local setting. It changes
+where the "remaining" figure comes from, not how the local ledger counts. Its own entry
+keeps the manual setting as the default and notes that the pre-call gate needs only a
+"remaining" number. So the local ledger needs a period whether task-75 is built or not.
+task-75 is related to this addendum and is not superseded by it.
+
+**What it costs.**
+
+- **Positive:** a company that budgets monthly can set its AI budget the way it plans
+  it. The ledger can later be split by person or period, because the actor is recorded
+  from the build on.
+- **Negative:** one more setting to understand and configure. And a company that wants
+  a lifetime cap, today's behaviour, no longer gets it by default; it has to choose it.
+
+**Nothing in this record's Decision changes.** Point 5 stands as written. Its "per
+role/user" is read as one company pot, as above, and so is the third `### Positive`
+bullet. Point 5's statement that the buffer is *"strictly bound to user
+role/permission"* is not reinterpreted here.
 
 ## Related ADRs
 

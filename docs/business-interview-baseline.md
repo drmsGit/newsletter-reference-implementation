@@ -484,11 +484,15 @@ ADR-140 point 1 makes prompts manager-owned because *"a developer cannot meaning
 
 **Resolution (2026-10-09):** The shipped starting prompt becomes neutral. It keeps only what the code needs (the three-option format the reply is parsed in) and the technical limits (60 and 90 characters). The taste rules go ("no exclamation marks, no 'Discover', no emoji", "be concrete"), and a marked line is left for the manager's own house style. The prompt asks for suggestions in the language of the content, so a German newsletter gets German suggestions without German being hardcoded; that is also right for an English brand. The manager-owned prompt then opens on the company's own voice, not a developer's. Queued as task-339. Decided by the user in the 2026-10-09 interview review.
 
-### P2-H2. The spend cap is a lifetime budget; ADR-144 says per role/user `🟡 deferred`
+### P2-H2. The spend cap is a lifetime budget; ADR-144 says per role/user `✅ resolved 2026-10-09`
 ADR-144 §5, via the 2026-07-31 decision log: *"Cost cap: warn → hard stop, **per role/user**, enforced as a pre-call gate… role/permission-bound."* ADR-150's addendum reinterprets it as *"one company-wide pot with one ledger and one bill"*, used as the load-bearing reason `ai.run` is platform-level. As built, `tokens_used(db)` scans **all** `ai_runs` rows ever written — no time window, no user filter, no role filter — and `ai_runs` carries neither `brand_id` nor `user_id`. So AI spend is a one-time allowance for the installation's lifetime; a company that budgets monthly cannot express it, and the ledger cannot be re-cut per period, brand or person retroactively because the dimensions were never recorded. The "per role/user" → "one pot" drift is not recorded as an amendment anywhere.
 
-### P2-H3. The governed model list is one US vendor, on a product that sells governance-risk avoidance `🟡 deferred`
+**Resolution (2026-10-09):** The pot stays one company-wide budget, as ADR-150's 2026-09-15 addendum decided, and ADR-144's "per role/user" is now read against it. What changes is the period. The budget resets each calendar month by default, and the period is a company setting (month, quarter or lifetime). Every AI run records who triggered it, so spend can later be split by person or period; no per-person budget is decided. Recorded in a 2026-10-09 addendum to ADR-144; the build is queued as task-345. Decided by the user in the 2026-10-09 interview review.
+
+### P2-H3. The governed model list is one US vendor, on a product that sells governance-risk avoidance `✅ resolved 2026-10-09`
 `AVAILABLE_AI_PROVIDERS = ("mock", "claude")`, and `MODEL_PRICING` doubles as the allow-list. ADR-144 §1 requires *"Claude + one EU worked example so 'GDPR-friendly is possible' is demonstrated"*; `BETA-SCOPE.md` lists the second EU-hosted adapter as out of scope for beta. `BRIEF.md`'s sharpened audience is *"organisations where 'sync everything into one vendor's AI surface' is a governance risk rather than a convenience."* Documented as a build gap in two business files — **not** as a positioning constraint on the AI pillar; `POSITIONING.md`'s rule-2 test was run against omni-channel and not against AI vendor-neutrality.
+
+**Resolution (2026-10-09):** The claim is bounded by what is built. Until an EU-hosted AI provider adapter exists, the positioning may claim "a swappable AI provider contract, with one worked example and a free mock". It may never claim "GDPR-friendly AI demonstrated" or "EU-hosted AI". The only real adapter today is a US vendor's (`backend/app/ai/adapters/factory.py:20`). Recorded as a constraint in `docs/business/POSITIONING.md`. Building the EU adapter stays deferred and outside beta scope (BETA-SCOPE.md). Decided by the user in the 2026-10-09 interview review.
 
 ## P2-M. Cross-cutting
 
@@ -536,8 +540,8 @@ ADR-144 §5, via the 2026-07-31 decision log: *"Cost cap: warn → hard stop, **
 | P2-G2 | ADR-166 | No request budget for an authenticated machine | ✅ |
 | P2-G3 | ADR-166 | No shipped role can write consent or manage recipients | ✅ |
 | P2-H1 | ADR-141 | The manager-owned-prompt seam ships a developer-written English house style | ✅ |
-| P2-H2 | ADR-144 | Lifetime spend cap; "per role/user" drifted to one pot, unamended | 🟡 |
-| P2-H3 | ADR-144 | Governed model list is one US vendor on a governance-risk pitch | 🟡 |
+| P2-H2 | ADR-144 | Lifetime spend cap; "per role/user" drifted to one pot, unamended | ✅ |
+| P2-H3 | ADR-144 | Governed model list is one US vendor on a governance-risk pitch | ✅ |
 | P2-M1 | all | Eleven business decisions in ADRs and docstrings; `docs/business/decisions/` empty | ✅ |
 
 **Highest positioning leverage, in order: P2-M1, P2-E1, P2-F1, P2-H1, P2-D1.** Each is a claim in `BRIEF.md` or `POSITIONING.md` that the repo as built does not yet demonstrate — which is exactly what rule 2 of the positioning gate tests against.

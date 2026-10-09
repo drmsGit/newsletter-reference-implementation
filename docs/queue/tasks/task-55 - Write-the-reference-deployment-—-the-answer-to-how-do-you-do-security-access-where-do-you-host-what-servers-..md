@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:56'
-updated_date: '2026-10-09 18:13'
+updated_date: '2026-10-09 19:08'
 labels:
   - docs
 dependencies: []
@@ -26,4 +26,6 @@ ordinal: 200800
 Migrated 2026-09-27 from `docs/backlog.md` line 158, section "Features", position 8 in that section (top = do next). The description is the original entry, verbatim.
 
 2026-10-09 (interview-review triage): two items for the reference deployment. (1) PUBLIC_BASE_URL is a required setting, an https address on a domain the company owns; task-330 makes a real send refuse without it. (2) Business P2-G2: per-integration request budgets belong to the gateway in front of the app, keyed on the API key; inside the app only sends are bounded, by approval holds and the recipient cap. This task's gateway seam is where that lives.
+
+2026-10-09 (business interview BF-CI1, decided by the user): a fork's CI checks that fork's code. Its owner (the company, or the agency by contract) runs the checks against the deployed version and acts on them; we maintain the reference, not forks. The reference deployment should say so, alongside where the weekly vulnerability check's results go.
 <!-- SECTION:NOTES:END -->

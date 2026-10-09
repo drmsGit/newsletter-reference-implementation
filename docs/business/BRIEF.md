@@ -20,6 +20,9 @@ optional starter package, workshops/consulting) — not the software alone.
 - **Not a hosted service.** One install = one company, on the company's own
   infrastructure. Single-tenant, definitively — no tenant filter anywhere, and an
   agency never runs multiple clients on one system.
+  **Maintenance follows ownership** (decided 2026-10-09, BF-CI1): a fork's checks
+  cover that fork; its owner (the company, or the agency by contract) runs them
+  against the deployed version and acts on them. We maintain the reference, not forks.
 - **Not a second ESP.** We don't rebuild Mailchimp/Klaviyo/Sendy/Listmonk/Mautic.
 - **Not a maintained connector library.** No shipped provider plugins (Salesforce,
   Braze, …), no custom n8n node, no workflow library. The connector *is* the
