@@ -911,7 +911,8 @@ def _event_count(session, recipient_id: int) -> int:
 
 
 def _drift_for(session, recipient_id: int) -> list:
-    return [d for d in detect_consent_drift(session) if d.recipient_id == recipient_id]
+    return [d for d in detect_consent_drift(session, brand_id=_brand(session))
+            if d.recipient_id == recipient_id]
 
 
 def _any_decision_slot_id(session) -> int:

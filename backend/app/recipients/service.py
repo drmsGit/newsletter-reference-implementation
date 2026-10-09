@@ -406,7 +406,7 @@ def page_consent_sync_logs(db: Session, params, recipient_id: int | None = None)
                              note=r.note, synced_at=r.synced_at))
 
 
-def detect_consent_drift(db: Session) -> list[ConsentDriftItem]:
+def detect_consent_drift(db: Session, *, brand_id: int) -> list[ConsentDriftItem]:
     """Surface cells where the platform's consent disagrees with the CRM's last
     assertion, and say **which way**.
 
@@ -430,9 +430,17 @@ def detect_consent_drift(db: Session) -> list[ConsentDriftItem]:
 
     Reads the event log once and groups in Python rather than issuing a query
     per recipient, which is what the previous implementation did.
+
+    **Per brand** (task-307): consent is keyed by brand (ADR-163 addendum
+    2026-09-15), so drift is one brand's platform consent against that brand's
+    CRM assertion. Read across brands, another brand's opt-out was reported as
+    drift here and another brand's newer CRM event hid real drift here. The
+    brand is required and keyword-only, so forgetting it is a TypeError, not
+    every brand (ADR-172 point 4).
     """
     rows = (
         db.query(ConsentEventDB)
+        .filter(ConsentEventDB.brand_id == brand_id)
         .order_by(ConsentEventDB.created_at.asc(), ConsentEventDB.id.asc())
         .all()
     )

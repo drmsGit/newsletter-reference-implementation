@@ -1505,6 +1505,7 @@ export interface paths {
          * Get Consent Drift
          * @description Recipients whose platform consent_status diverges from the CRM's most
          *     recent assertion — a sync that failed to stick, which must not be silent.
+         *     The working brand's drift only (task-307).
          */
         get: operations["get_consent_drift_recipients_consent_drift_get"];
         put?: never;

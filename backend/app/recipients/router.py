@@ -132,11 +132,16 @@ def get_recipients(
 
 
 @router.get("/consent/drift", response_model=Page[ConsentDriftItem])
-def get_consent_drift(params: PageParams = Depends(page_params), db: Session = Depends(get_db)):
+def get_consent_drift(
+    params: PageParams = Depends(page_params),
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
     """Recipients whose platform consent_status diverges from the CRM's most
-    recent assertion — a sync that failed to stick, which must not be silent."""
+    recent assertion — a sync that failed to stick, which must not be silent.
+    The working brand's drift only (task-307)."""
     # Computed across the log, so paged after (ADR-185, `page_of_list`).
-    return page_of_list(detect_consent_drift(db), params)
+    return page_of_list(detect_consent_drift(db, brand_id=brand_id), params)
 
 
 @router.get("/consent/sync-log", response_model=Page[ConsentSyncLog])
