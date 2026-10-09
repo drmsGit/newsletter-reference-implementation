@@ -1016,6 +1016,15 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
 
     for execution in executions:
 
+        # Already sent, by an earlier run of this send that then failed and is
+        # being retried (task-318). A known success is never sent again and
+        # never rewritten: its provider message id and delivery record are the
+        # as-sent evidence (ADR-183). First, before the exclusion check, so a
+        # person who opted out since is not relabelled "excluded" either; the
+        # opt-out stops future mail, it does not rewrite what was sent.
+        if execution.status == "sent":
+            continue
+
         # Excluded by the stack above: record why and move on, before any
         # work is done for this recipient. Ordering matters — a recipient
         # who may not be contacted must not have decision slots resolved
