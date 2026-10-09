@@ -795,6 +795,7 @@ Each was decided by the user in its own question. The full narrative is under th
 - **AI budget (P2-H2): one company pot, monthly by default.** The period is a company setting, and every AI run records who triggered it, so spend can be split later (ADR-144 addendum, task-345).
 - **AI vendor claim (P2-H3): "swappable, one worked example".** Until an EU-hosted adapter exists, nothing claims GDPR-friendly or EU-hosted AI. The constraint is in POSITIONING.md; the EU adapter stays deferred.
 - **Security checks after handoff (BF-CI1): the fork's owner.** A fork's checks cover that fork; its owner runs them against the deployed version and acts on them. We maintain the reference, not forks (BRIEF, task-55).
+- **Unsubscribe links over time (BF-SUB1): the product guarantees the token, the adopter the address and the records.** A token never expires. The link's domain should be the company's own, kept reachable by the adopter (task-55). Retention must keep the unsubscribe lookup working for a minimum period (task-136; ADR-191 addendum).
 
 ## 6. Roadmap
 

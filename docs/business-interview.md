@@ -173,7 +173,7 @@ Prepared 2026-10-09. Questions for the maintainer; no adopted answers, classific
 
 **Resolution (2026-10-09):** The fork's owner. A fork's CI checks that fork's code, and nothing else. Whoever owns the fork runs its checks against the version actually deployed and acts on the result: the company, or the agency if its contract says so. We maintain the reference, not forks. A green check on the reference says nothing about the security state of a deployed installation. Stated in `docs/business/BRIEF.md` (under "Not a hosted service") and noted on task-55, the reference deployment. Decided by the user in the 2026-10-09 interview review; logged in `docs/playbook-strategy.md` §5.
 
-### BF-SUB1 — Does the promise of durable links include durable infrastructure? 🟡 deferred
+### BF-SUB1 — Does the promise of durable links include durable infrastructure? ✅ resolved 2026-10-09
 
 **Question / adopter assumption:** A delivered message embeds the deployment's public address, while its token never expires. What continuity of the public callback address and installation is assumed when an agency changes hosting or ends a support engagement? Is the documented claim that links never break intended to cover only token/key lifetime, or also that operational continuity?
 
@@ -186,6 +186,8 @@ Prepared 2026-10-09. Questions for the maintainer; no adopted answers, classific
 - **Klaviyo + an AI agent in one prompt:** If an agent can produce an unsubscribe endpoint in one instruction, what value does independently owning its lifetime deliver, and what continuing duty is transferred to the adopter? This is a question about ownership, not a claim that another product lacks unsubscribe.
 
 **Checked against:** Baseline F1, G1, M2, P2-E1/E2/E3; per-feature 2026-07-12 consent/ownership axis; all interview-prep files (Delivery/Providers/Recipients consent and provider questions and Manager Workflow route-versus-flow discussion); `docs/business/` including the provider strategy and naming records; playbook §5; completed task-56 and open task-301, task-324, task-136 and task-55. ADR-191 settles token generation, no expiry, confirmation/one-click, scope and the public base URL; ADR-154 and task-136 already own data retention. Task-55 asks for the reference hosting/security deployment, rather than continuity of URLs already sent after an agency handoff. Those choices remain closed. No question here proposes token expiry, a retention model or a hosting design; it asks whether the link-durability claim assumes continued infrastructure ownership after handoff.
+
+**Resolution (2026-10-09):** "Links never break" covers the token's lifetime: a token never expires and needs no key. The rest is assigned. The public address should be a domain the company owns, not an agency's host, and keeping it reachable is the adopter's job (task-55); a real send already refuses a missing or non-https address (task-330). Any retention clean-up of delivery records must keep the unsubscribe lookup working for a minimum period, which is a constraint on the retention design (task-136). Recorded in a 2026-10-09 addendum to ADR-191. Decided by the user in the 2026-10-09 interview review; logged in `docs/playbook-strategy.md` §5.
 
 ### Significant shipped features covered, with settled questions excluded
 

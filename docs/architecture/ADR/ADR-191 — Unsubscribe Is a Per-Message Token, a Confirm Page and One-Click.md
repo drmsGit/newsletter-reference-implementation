@@ -118,6 +118,34 @@ The route writes through the existing consent writer (`record_consent` in `backe
 - **Not decided here: whether an unsubscribe also writes a negative signal.** [[ADR-132 — Signal Layer Implementation Event-Sourced Contributions with Decay-on-Read]] lists unsubscribe as a strong negative signal. This record only decides the consent write.
 - **No decision-log entry.** `docs/playbook-strategy.md` has no entry for this decision. The reasoning above is from the 2026-10-09 conversation, and from ADR-163 and ADR-169.
 
+## Addendum 2026-10-09 — "links never break" means the token; the address and the records are the adopter's
+
+Prompted by business per-feature finding BF-SUB1 in `docs/business-interview.md` ("Does the promise of durable links include durable infrastructure?"), decided by the user in the 2026-10-09 interview review. The playbook decision log records the same position under "Unsubscribe links over time (BF-SUB1)" in `docs/playbook-strategy.md` §5. A related decision of the same day came from the technical interview, [[Interview Prep - Since 2026-09-18]], Audience Q6, and is queued as task-330. Decision point 2 above is left as written. This addendum governs how its promise that "a link in a mail sent last year must still work", and the Positive consequence "Links never break", are to be read.
+
+**What was found.** Point 2 and the Positive consequence promise that links never break: nothing is signed, nothing expires, and no key rotation can invalidate mail already sent. That holds for the token. But a working link needs two more things, and the token carries neither.
+
+- **The address.** The link is built at send time from `PUBLIC_BASE_URL` (`backend/app/subscriptions/service.py:25-26` and `:33-34`, returned by `footer_for` at `:49`). It is recorded in the delivery record (`backend/app/delivery/service.py:1306-1307`) and fixed into the mail, which can no longer be changed. If the address stops reaching this installation, every link in every mail already sent stops with it.
+- **The records.** Resolving a token joins the delivery execution, its send instance and the sending brand (`backend/app/subscriptions/service.py:52-63`). If any of those rows is gone, both the page and the POST answer 404 (`backend/app/subscriptions/router.py:27-28` and `:47-48`). Neither [[ADR-154 — Erasure and Retention]] nor the retention design item, task-136, mentioned unsubscribe links.
+
+The question was whether "never break" also promised those two.
+
+**What this records.**
+
+1. **"Links never break" covers the token's lifetime.** A token never expires and needs no key. That is what point 2 decided, and it is what the product guarantees. It is not a promise that the address stays reachable or that the rows behind the token survive.
+2. **The address is the adopter's to keep reachable.** The public address the link points to should be a domain the company owns, not an agency's host. Keeping it reachable is the adopter's job, and it is part of the reference deployment (task-55). The product already carries its own share of this: a real marketing send refuses a `PUBLIC_BASE_URL` that is unset or not https (task-330), so the localhost fallback in Notes above cannot end up in a real recipient's mail.
+3. **Retention must keep the lookup working for a minimum period.** Any retention clean-up of delivery records must keep the unsubscribe lookup working for a minimum period. That constraint belongs to the retention design (task-136). The period is not decided here.
+
+**Nothing is built by this addendum.** Points 2 and 3 are recorded as notes on task-55 and task-136. The one code change in this area is task-330, which was decided separately.
+
+**The option not taken: the product guarantees all three.** The product could have promised the address and the records as well, for example with a fixed domain and a lookup table that is never pruned. That would contradict two settled positions. An install runs on the company's own infrastructure and is not a hosted service (`docs/business/BRIEF.md`, "Not a hosted service"), so the product has no address of its own to guarantee. And how long delivery history is kept is the company's determination ([[ADR-154 — Erasure and Retention]], Notes), which a table that is never pruned would take away.
+
+**Consequences.**
+
+- *Positive:* the promise says exactly what the product guarantees, and who carries the rest.
+- *Negative:* an adopter who moves hosts or prunes records carelessly can still break links in mail already sent, and only documentation stands between them and that. A broken link answers 404, so its reader is back to having no visible way out, which is the complaint risk this record exists to remove.
+
+**Not decided.** What an erasure does to a link. [[ADR-154 — Erasure and Retention]] point 2 removes a person's delivery executions by default, so that person's old links stop resolving after an erasure. Point 3 above speaks only of retention clean-up. Whether erasure needs the same care is not decided here.
+
 ## Related ADRs
 
 ### Depends On
