@@ -701,6 +701,18 @@ Recorded in [[ADR-191 — Unsubscribe Is a Per-Message Token, a Confirm Page and
 
 **Status:** built the same day (task-56); gate 10 closes with it.
 
+### 2026-10-09 — A send left stuck by a crash is flagged, and a person releases it
+
+**Context:** a send whose program dies mid-send stayed "sending" forever: the guard that prevents double sends refused every retry, and only a database edit could free it (task-325, found while finishing task-318). Three options were weighed — release automatically after a timeout, let a person release it, or both. **Decided by the user: both, with the platform only flagging** (option 3).
+
+1. **The platform flags, it never releases on its own** — no timeout can tell a slow living send from a dead one for certain, and a wrong release could send the same campaign twice at once.
+2. **"Stranded" means no activity for 30 minutes** on the send or any of its recipients; since task-318 every recipient is written just before its provider call, so a living send keeps moving.
+3. **A person releases it**, with the planning permission (releasing mails nobody; the retry that could is still guarded by the sending permission), audited. The retry then skips what was sent, marks the recipient in flight as uncertain, and sends the rest — task-318's rules, unchanged.
+
+Recorded in [[ADR-192 — A Stranded Send Is Flagged, and a Person Releases It]].
+
+**Status:** built the same day (task-325).
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*
