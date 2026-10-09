@@ -95,7 +95,7 @@ to ADR-174 and ADR-179.
   its stated reason, the false ADR-161 rider, is corrected);
 - facets;
 - a variant's own "ready" status;
-- what counts as a "thin" slot (MW Q4b, still open).
+- what counts as a "thin" slot (MW Q4b; resolved 2026-10-09: no threshold, the count only).
 
 ## What could break
 

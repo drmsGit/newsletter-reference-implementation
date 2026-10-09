@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
-updated_date: '2026-10-09 18:13'
+updated_date: '2026-10-09 18:24'
 labels:
   - needs-adr
   - backend
@@ -27,4 +27,6 @@ ordinal: 300160
 Migrated 2026-09-27 from `docs/backlog.md` line 487, section "Needs ADR", position 19 in that section (top = do next). The description is the original entry, verbatim.
 
 2026-10-09 (interview-review triage, Manager Workflow design interview Q4.5, lines 1355-1359): an emergency opt-out of one person from the recipient page was parked as 'possibly part of the GDPR package'. The built recipient page (task-292) leaves it out on purpose. Decided: it belongs here, as one audited act alongside the suppression and opt-out reasons, not as its own task.
+
+2026-10-09 (interview review, Audience Q5, decided by the user): 'stop everything from this company' (ADR-191 decision 4) means the company, now and later. Today it writes one opt-out per existing brand x channel (backend/app/subscriptions/service.py:94-96), and fail-closed covers new brands and channels (no consent record, no marketing). The remaining gap belongs here: store the company-wide refusal, and make later automated grants (CRM sync, import) check it. A fresh opt-in by the person themselves still wins.
 <!-- SECTION:NOTES:END -->

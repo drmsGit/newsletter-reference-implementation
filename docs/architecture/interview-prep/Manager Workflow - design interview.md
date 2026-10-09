@@ -328,6 +328,10 @@ Screens: **approvals**, **approval detail**, the shell itself.
    **Open, and deferred with question 5:** what the history says *about outcome* —
    whether an approved send that later failed is the approver's business — belongs
    to the question 5 revisit rather than being settled here.
+   **Resolved 2026-10-09 (interview review): show the result, no alert.** The
+   revisit never picked this up. The history shows what an approved action ended in
+   ("Partly failed: 940 delivered, 60 failed"), linked to the send. The approver is
+   not notified: following up failures is monitoring's job. Queued as task-338.
 7. ✅ **A held request expires without anyone deciding it. Who needs to know?**
    **Resolution (2026-09-23): the question is wrong for content review — expiry
    should not exist for it.** A deadline is right for firing a send, where the
@@ -594,6 +598,9 @@ Screens: **content list**, **content detail**, **categories**, **category detail
    **Open, deliberately:** what counts as "thin". The count alone may be enough
    and a threshold may be the system inferring again — the shape question 2
    rejected.
+   **Resolved 2026-10-09 (interview review): no threshold, the count only.** The
+   manager judges; what is thin depends on the audience size and the strategy, and
+   a line drawn by the system would be the inference question 2 rejected.
 5. ✅ **A new channel is registered. Several hundred existing records have no
    fields for it. What happens?**
    **Resolution (2026-09-21): a filter — the gap is workable, not nagged about.**
@@ -1676,6 +1683,13 @@ Screens: **deliveries**, **delivery detail**.
    a button on the review screen with their own address prefilled; the operator's
    is a documented call.
 
+   **Resolved 2026-10-09 (interview review): accepted.** `send-test` stays priced
+   `sends.execute`. A real mail to a real inbox is the same kind of act, only
+   smaller, and whoever verifies an installation is trusted anyway. Today nobody is
+   blocked: Admin holds every permission and Manager holds `sends.execute`. A
+   separate test-send permission only becomes useful once a narrow operator role
+   exists; `MAILS_A_PERSON` in `test_api_guard.py` keeps any change deliberate.
+
 8. ✅ **When is the approval gate on a send used: machines only, or do people
    route sends to each other?**
    **Resolution (2026-09-24): people too — a manager may require a second pair of
@@ -1753,7 +1767,7 @@ fire-now path for the machine plane (Q3).
 **The inventory is overturned once** (Q7): `send-test` is not only a deployment
 diagnostic. No review screen can show what an email client does to the HTML, which
 is what [[ADR-063 — Rendering Parity Over Rendering Implementation]] exists about.
-Its `sends.execute` pricing is left as an open question for the operator case.
+Its `sends.execute` pricing for the operator case was accepted on 2026-10-09 (see Q7).
 
 **Two records owed.** ADR-168's build note — *"a person firing a send is the
 approval"* — becomes insufficient once people can request (Q8). And the

@@ -1,6 +1,6 @@
 ---
 type: interview-prep
-status: open
+status: closed
 topic:
   - architecture
   - review
@@ -127,10 +127,11 @@ Governing ADRs: ADR-188 (flat engagement predicates), ADR-176 (exclusion precede
   **Suggested answer (for the maintainer to confirm or reject):** Yes in today's code: the old token still names the person and creates a new latest marketing opt-out (`backend/app/subscriptions/service.py:98`, `backend/app/recipients/consent.py:134`). Confirm whether perpetual access to stopping mail intentionally survives re-subscription.
   **Resolution (2026-10-09): keep in project — yes, an old link still unsubscribes.** Stopping mail must always work (ADR-191 decision 2: tokens never expire, a link from last year still works); the worst case is one unwanted opt-out the person can undo. A later double opt-in or CRM re-sync design must not add "old links stop working after re-signup".
 
-- [ ] **Q5.** Does “everything we send” mean the brand/channel cells that exist now, or an enduring company-wide preference applying to future brands and channels too?
+- [x] **Q5.** Does “everything we send” mean the brand/channel cells that exist now, or an enduring company-wide preference applying to future brands and channels too?
   **Why it's worth asking:** The operation iterates current brands and registered channels and writes ordinary marketing consent cells (`backend/app/subscriptions/service.py:94`). It does not store a separate company-wide refusal that a future grant must consult.
   **Checked against:** ADR-191 Decision 4; ADR-163 2026-09-15 addendum point 2; completed task-56; business baseline P2-A2 (brand-local lawful basis), F1; task-135 (unified suppression reasons). Those settle the current all-brands/all-channels option, not its temporal scope when dimensions are later introduced.
   **Suggested answer (for the maintainer to confirm or reject):** It is a snapshot operation over existing cells. A new brand/channel has no grant by default, so cannot send marketing merely because it was added; a later explicit opt-in can permit it under the cell model (`backend/app/subscriptions/service.py:94`, `backend/app/recipients/consent.py:139`). Confirm the promise intended by the recipient-facing phrase.
+  **Resolution (2026-10-09): keep in project — "everything" means the company, now and later.** Fail-closed already covers brands and channels added later: with no consent record, nothing is sent. The remaining gap is a later automated grant (CRM sync, import) for a new brand to someone who said stop everything. That goes to task-135 (note added): store the company-wide refusal and make automated grants check it, while a fresh opt-in by the person still wins. Nothing built now.
 
 - [x] **Q6.** What establishes that the configured unsubscribe URL is reachable HTTPS before a real marketing send is permitted?
   **Why it's worth asking:** `public_base_url` accepts the environment value without scheme validation and falls back to `http://localhost:8000` (`backend/app/subscriptions/service.py:25`). That URL is put into the outgoing email headers (`backend/app/delivery/providers/resend.py:61`), so a missing deployment setting can send a valid token at an unusable location.
