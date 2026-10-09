@@ -3,11 +3,11 @@ id: TASK-304
 title: >-
   The consent tests' fallback snapshot has no modules, which task-228's floor
   would skip
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-08 20:54'
-updated_date: '2026-10-09 09:00'
+updated_date: '2026-10-09 09:07'
 labels:
   - backend
 dependencies: []
@@ -31,6 +31,18 @@ Today the fallback never runs: the dev test database and CI's seeded one both ho
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The fixture's fallback variant renders meaningful content under task-228's floor
-- [ ] #2 A test forces the fallback path and the consent tests still pass on it
+- [x] #1 The fixture's fallback variant renders meaningful content under task-228's floor
+- [x] #2 A test forces the fallback path and the consent tests still pass on it
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-09: fixed (commit dcb385c; CI green on 34849f4). The consent tests' fallback variant (send_to in backend/tests/test_consent_gates.py) now gets a header module (subject, preheader) and one static cta (label, url) instead of zero modules: meaningful under task-228's floor, still no catalogue fields, so the required-field gate passes. New test test_the_fixtures_fallback_snapshot_still_sends forces the fallback by making every existing snapshot look incomplete while the fixture chooses (monkeypatch.context, so the real send check still runs) and asserts the recipient is sent. It failed before the fix, excluded as 'nothing to show', which is the predicted failure. All 33 consent tests pass; full suite 1564.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The consent tests' fallback snapshot now renders a subject and a static call-to-action, so it is meaningful under task-228's floor; a test forces the fallback path and reproduced the failure before the fix. Full suite and CI green.
+<!-- SECTION:FINAL_SUMMARY:END -->
