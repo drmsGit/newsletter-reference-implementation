@@ -63,6 +63,7 @@ Each is argued in an ADR or a docstring. Disagree if you like, but as a
 | No per-recipient state for lifecycle cycles | ADR-169: the anchor is a date, so position is computed |
 | The server-rendered Jinja UI still exists | It is **frozen** by a test (`backend/tests/test_jinja_freeze.py`): no new routes. The React client replaces it; its retirement is not yet scheduled (task-312). Duplication between a Jinja route and a JSON route is expected until then |
 | Dependencies installed only from hash-locked files | ADR-189; CI checks that what is installed is what is locked |
+| A few SQL strings are built with f-strings | Audited 2026-10-09 (task-237): each interpolates an identifier Postgres cannot bind (a database name from configuration, or one read from the catalogue), never request data. Every value is a bound parameter. The same audit cleared template rendering, `random` and the file-serving paths |
 
 ## Already known and open — no need to re-find
 
@@ -76,8 +77,6 @@ From the work queue (`docs/queue/`, read with the `backlog` CLI):
   brands (task-307).
 - **Nothing is ever erased.** Erasure and retention (ADR-154) are designed, not
   built; `backend/app/privacy/` is empty (task-136, task-117).
-- **Raw SQL strings and file-serving paths** have not had their dedicated
-  review yet (task-237). Reviewing them is welcome.
 - **The AI spend cap is check-then-act**: two concurrent runs can both pass the
   gate (task-124, part c).
 - **Known structural debt:** six near-identical plugin registries (task-308),
