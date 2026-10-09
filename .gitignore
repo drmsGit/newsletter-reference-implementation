@@ -30,3 +30,10 @@ storage/snapshots/*.html
 .claude/agent-memory-local/
 .claude/.DS_Store
 backend/openapi.json
+
+# Codex's local copy of the Claude setup (agents, skills, AGENTS.md). Codex
+# regenerates it; the repository keeps one source, CLAUDE.md and .claude/
+# (decided by the user 2026-10-09, task-306).
+.agents/
+.codex/
+AGENTS.md
