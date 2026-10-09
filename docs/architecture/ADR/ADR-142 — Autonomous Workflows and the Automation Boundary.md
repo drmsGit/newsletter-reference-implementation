@@ -679,6 +679,115 @@ Nothing else in §4 changes: the inbox, the audit trail shared with ADR-141, the
 notification-only rule for email and push, the state-based claim, the brand check, the
 named-subject rule and the subject scope of the earlier addenda are untouched.
 
+## Addendum 2026-10-09 (second) — an approval runs only if its requester is still allowed
+
+Prompted by question Q6 of [[Interview Prep - Since 2026-09-18]], section *"Manager
+client, held approvals and machine reads"*, and decided by the user in that interview
+review on 2026-10-09. §4's *"approving executes it"* stands. What changes is that
+approving now asks about the requester as well as the approver.
+
+**The question.** An integration raises a held request and is then deactivated, or
+loses its grants. Does a person's later approval still run the request?
+
+**Today it does.** `approve` in `backend/app/approvals/service.py` claims the request
+and runs its action. The gate in front of it, `may_decide` with `requester_is_decider`
+in the same file, asks two things about the approving person: whether they hold the
+action's `approve_permission` on the request's brand, and whether they made the request
+themselves (task-200, the self-approval refusal owed by
+[[ADR-168 — The Manager SPA Authenticates With Its Session Cookie]]'s addendum of
+2026-09-24). The requester, `requested_by_type` and `requested_by_id`, is stored as
+history and never checked again. `deactivate_integration` and `revoke_grant` in
+`backend/app/auth/integrations.py` do nothing to the integration's open requests.
+
+**Why that is a gap.**
+[[ADR-166 — Inbound Machine Callers Are Authenticated Principals]] point 3 makes
+revocation immediate, *"because an integration that has started misbehaving is exactly
+the case where waiting is unacceptable"*. That holds for every request the integration
+makes after it is switched off. It does not reach a request the integration made
+before, because a held request carries authority the integration used while it still
+had it. So an integration switched off for misbehaving leaves its queued proposals
+approvable, and nothing in the inbox tells the approver.
+
+**1. A held request is void at decision if its requester is no longer allowed.** When a
+person approves, the request is checked against its requester's standing at that
+moment. If the requesting integration is no longer active, or no longer holds the
+permission the held action required of it, nothing runs. The request closes as
+withdrawn, with a reason such as *"requester no longer allowed"*, and the closing is
+audited.
+
+**2. One check covers deactivation and grant revocation.** Both are caught by the same
+question, asked at the same moment. Nothing has to happen when an integration is
+switched off or a grant is removed.
+
+**3. The inbox marks such a request before anyone decides.** A person can see that the
+requester no longer stands, and that approving will not run the action.
+
+**4. A person who still wants the action does it themselves, under their own
+authority.** §2 makes every action an orchestrator can trigger also triggerable in-app,
+so that path always exists. The voided request does not pass to the approver.
+
+**5. Follows from the same rule, flagged as such: a person's requests are judged the
+same way.** Since [[ADR-168 — The Manager SPA Authenticates With Its Session Cookie]]'s
+addendum of 2026-09-24, a person may request approval too. A request raised by a person
+who has since been deactivated is void at decision as well. That is the natural reading
+of one rule for both kinds of principal, the symmetry
+[[ADR-166 — Inbound Machine Callers Are Authenticated Principals]] point 1 sets. It was
+not asked as a separate question.
+
+**Two other options were weighed and not taken.** Cancelling open requests when an
+integration is switched off needs a hook in every path that can remove a requester's
+standing: deactivation, each way a grant is revoked, and any path added later. It
+covers only those paths, and a path that forgets the hook leaves its requests
+approvable. The check at decision covers every path, including ones not yet written.
+Keeping today's behaviour, where the approver's authority alone runs the request, would
+leave an offboarded or misbehaving integration's queued proposals approvable, and an
+approver could not tell.
+
+**Left to the final-design pass, not decided here.**
+
+- **Which permission the requester is checked for.** The action contract declares only
+  the approver's. `approve_permission` in `backend/app/approvals/actions/base.py` is
+  documented as *"declared rather than derived from the requesting route, because what
+  the requester needed and what approving needs are different questions about different
+  principals"*. The two coincide for a machine send and differ for an AI suggestion,
+  which costs `ai.run` to request and `campaigns.manage` to approve. The re-check needs
+  the requester's permission, and today that is recorded neither on the action nor on
+  the held row.
+- **How *withdrawn* is stored.** `ck_pending_actions_status` admits six states, and none
+  of them is this one. If it becomes a seventh, every consumer that lists the statuses
+  has to learn it, as `executing` required in the first 2026-09-29 addendum.
+- **How it leaves `pending`.** Point 2 of the first 2026-09-29 addendum has reject and
+  expiry leave `pending` only by a conditional transition, so neither can overwrite a
+  decision. A withdrawal is a third way out of `pending` that runs nothing, and the same
+  reasoning applies to it.
+
+Implementation is tracked as a queue bug.
+
+**What it gains.**
+
+- **Offboarding an integration also retires what it queued**, with no sweep of the
+  inbox.
+- **An approver can see that a request is void** before deciding, rather than running
+  it on authority the requester no longer has.
+
+**What it costs.**
+
+- **A legitimate request is voided if its requester's standing is removed before a
+  person decides**, for example when an integration is retired for a replacement during
+  a planned changeover, or a grant is moved to another integration. It must be filed
+  again or done by hand. Rotating a credential alone voids nothing: credentials are
+  issued and revoked beneath the integration
+  ([[ADR-166 — Inbound Machine Callers Are Authenticated Principals]] point 3), and
+  `revoke_credential` leaves the integration active and its grants in place.
+- **Standing that is absent at the moment of decision is final for that request.** A
+  grant removed and restored while a request waits does no harm. If it is missing at the
+  moment a person approves, the request is withdrawn and does not come back.
+
+Nothing else in §4 changes: the inbox, the audit trail shared with ADR-141, the
+notification-only rule for email and push, the state-based claim, the brand check, the
+named-subject rule, the subject scope and the stranded-send release of the earlier
+addenda are untouched.
+
 ## Related ADRs
 
 ### Depends On

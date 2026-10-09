@@ -4,7 +4,7 @@ title: Nothing checks manual bindings against slot resolutions
 status: To Do
 assignee: []
 created_date: '2026-09-27 14:20'
-updated_date: '2026-10-09 18:13'
+updated_date: '2026-10-09 18:20'
 labels:
   - backend
 dependencies:
@@ -36,4 +36,10 @@ Depends on task-109: when a slot's pick is already bound by hand, the next pick 
 Logged 2026-09-27 from the "What Cluster N produced" sections of the two design interviews, each gap re-verified against the code that day. The plan was reviewed and approved by the session that ran the interviews. Parked: not yet ranked by anyone.
 
 2026-10-09 (interview-review triage, Variant Editor design interview Q1.6): the 'human beats system' rule this task builds had no ADR. ADR-178:118 said the ADR-176 addendum was owed. The adr-author agent is writing that ADR-176 addendum (2026-10-09); build against it, not against the interview text.
+
+2026-10-09: the ADR-176 addendum ('a person's pick outranks the engine's pick of the same content, on a second axis') is written and leaves three points OPEN for the user before this is built.
+(1) Hide the slot's module, as the interview says (reusing ADR-086), or take the next ranked pick, as this task's description says (which needs task-109). The sources disagree.
+(2) A slot with several records (max_results above 1) where one is bound by hand.
+(3) How a slot that stood aside counts under ADR-086's 2026-10-08 'don't send if no slot resolved' option, and what exclusion_reason says.
+Line numbers re-checked: resolve_content_for_module is at backend/app/rendering/service.py:646.
 <!-- SECTION:NOTES:END -->

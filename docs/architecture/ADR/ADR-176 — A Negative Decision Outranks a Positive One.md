@@ -7,9 +7,10 @@ topic:
   - consent
   - delivery
 created: 2026-09-24
-modified: 2026-09-29
+modified: 2026-10-09
 source:
   - "Manager Workflow design interview (interview-prep, Cluster 4 Q2–Q4 and Cluster 5 Q2, closed 2026-09-24)"
+  - "[[Variant Editor - design interview]] question 1.6, resolved 2026-09-25 (addendum 2026-10-09)"
 depends_on:
   - "[[ADR-052 — Delivery Layer Supports Multiple Audience Resolution Modes]]"
   - "[[ADR-093 — Audience Intelligence Is Derived, Not Authoritative]]"
@@ -206,6 +207,115 @@ suppression data model is decided (task-231, task-135).
 ADR-188 point 5 also makes every "did not" condition an exclude block, so point
 1 applies to it: a hand-added person who matches a "did not" condition is left
 out. That is this record's principle applied, not an exception to it.
+
+Nothing here changes the Decision section above.
+
+## Addendum 2026-10-09 — a person's pick outranks the engine's pick of the same content, on a second axis
+
+**What prompted it.** [[Variant Editor - design interview]] question 1.6,
+resolved 2026-09-25, decided a precedence rule the user called *human beats
+system*. The interview's list of owed ADR work named this record as its home:
+*"probably an addendum rather than a record"*.
+[[ADR-178 — Scope of the Correction, Not Location of the Manager]]'s Notes said
+the addendum was still owed. It was never written. The build is task-220, which
+depends on task-109. On 2026-10-09 the user decided this record must exist
+before task-220 is built. This section records the rule. It does not change the
+Decision above.
+
+**The rule.** A variant may bind a content record by hand, and a decision slot
+in the same variant may pick that same record for a recipient. When both
+happen, the hand-bound module wins. The slot does not show that record to that
+recipient a second time. The user:
+
+> *"decision resolution rule — when rendering 'if contentid already in email
+> manually selected, do not render module' (human beats system)"*
+
+- "By hand" means a module instance bound to a content record
+  (`content_record_id`). The other kind is a module bound to a decision slot
+  (`decision_slot_id`). The CHECK at
+  `backend/app/campaigns/db_models.py:111-113` stops one module holding both.
+- The comparison is by content record, within one variant, per recipient. The
+  hand-bound records are the same for every recipient. The slot's pick is not.
+  So the collision happens for some recipients and not for others.
+- Two hand-bound modules holding the same record are not something this rule
+  decides. The same question allowed manual duplicates, with a note in the
+  composer. Only a person's pick against the engine's pick is ranked.
+
+**How it relates to point 2, and how it differs.** The two rules sit on
+different axes.
+
+- **Point 2 ranks by polarity.** A decision that refuses outranks one that
+  admits, whoever made either. Point 2's wording is *"Shouldn't get it by human
+  beats Should get it by system/human"*. The admitting side may be a person or
+  the system, and it loses either way. The word "human" there describes the
+  refusal. It is not a ranking of people over machines.
+- **This rule ranks by author, between two positives.** A person's choice and
+  the engine's choice point at the same content. Neither refuses anything. The
+  person's choice wins.
+
+The interview said: *"Different axis, no conflict, and both can hold at once."*
+Neither rule implies the other. This rule decides only between two positives.
+Where one side refuses, point 2 decides, as written.
+
+This is said out loud because a reader will meet "the manager's pick wins" next
+to point 1's "the manager's pin loses" and suspect one of them is wrong. Both
+stand. A pin is a positive that meets a negative, so it loses on point 2's
+axis. A hand binding that meets a slot's pick meets another positive, so it wins
+on this one.
+
+**It does not mean "a person always wins".** Two other rules have a person's
+act give way, and neither contradicts this one.
+
+- Point 1 above: an exclusion removes a hand-pinned recipient. That is polarity.
+- [[ADR-186 — In the Composer an Override Is the Default and a Catalogue Edit Is Explicit]]
+  point 5, carried from ADR-178 point 5: a module bound to a decision slot is
+  never overridden. ADR-178's Notes put that on a different axis from this
+  record too. It is not about which of two instructions wins. It is about a
+  capability that may not be used at all, because using it defeats the slot.
+
+**What exists today.** Nothing applies the rule. Re-checked 2026-10-09 against
+task-220's citations of 2026-09-27, whose line numbers have drifted.
+`resolve_content_for_module` (`backend/app/rendering/service.py:646`) reads only
+its own module. The render loop calls `render_module` (`:159`) without the
+variant's hand-bound records. The composer preview's `module_states` (`:768`)
+resolves each module the same way. The only guard is the CHECK above. It works
+inside one module and compares nothing across modules.
+
+**Open points.** The sources agree on the precedence. On what follows from it,
+they disagree or say nothing. These are left open here, for the user to decide
+before task-220 is built.
+
+1. **What the slot shows instead: nothing, or its next pick.** The interview
+   resolved the collision by hiding the module, reusing
+   [[ADR-086 — Decision Slots Fail Gracefully]]: *"a slot with nothing to show
+   — the same outcome as a slot that resolved to nothing, reached by a
+   different route."* It kept the ranked queue for a different case: several
+   slots in one email picking the same record. task-220 says otherwise: *"when
+   a slot's pick is already bound by hand, the next pick comes from the ranked
+   queue"* that task-109 builds. These are two behaviours. Hiding needs no
+   queue. The next pick needs task-109 first.
+2. **A slot that shows several records** (`max_results` above 1, task-109)
+   **where one of them is bound by hand.** The user's words, *"do not render
+   module"*, were given for a slot with one pick. Whether the whole module
+   hides, or only that record drops or is replaced, was not discussed.
+3. **How a hidden slot counts after ADR-086's 2026-10-08 addendum**, if the
+   answer to point 1 is to hide. That addendum came after the interview. Its
+   per-send option "Don't send if no slot resolved" skips a recipient whose
+   slots all came up empty. A slot that hid because a person already chose its
+   pick did find something. Whether it counts as resolved for that option, and
+   what `exclusion_reason` says if it decides a skip, is not settled. Related:
+   the playbook's 2026-09-27 entry states as a rule that *the system tried and
+   found nothing* is not *nobody tried*, and the two must not look alike. A
+   slot hidden because a person already chose its pick is a third case.
+   Whether the composer preview and the send record show it apart from "found
+   nothing" is not decided.
+
+**No decision-log entry stands behind this addendum.** The 2026-09-27 entry in
+`docs/playbook-strategy.md` for the Variant Editor interview does not mention
+question 1.6 or this rule. Its 2026-09-24 entry quotes point 2's *"shouldn't get
+it by human beats should get it by system/human"*, which is the polarity rule,
+not this one. The sources here are the interview record and task-220. A log
+entry is owed. It is not written here.
 
 Nothing here changes the Decision section above.
 

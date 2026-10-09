@@ -4,6 +4,7 @@ title: A held request still runs after its requester was switched off
 status: To Do
 assignee: []
 created_date: '2026-10-09 18:12'
+updated_date: '2026-10-09 18:20'
 labels:
   - backend
 dependencies: []
@@ -30,3 +31,12 @@ Source: [[Interview Prep - Since 2026-09-18]] → Manager client, held approvals
 - [ ] #3 The approvals inbox shows that a pending request's requester is no longer allowed
 - [ ] #4 A request whose requester is still allowed approves and runs as before
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-09, from writing the ADR-142 addendum ('Addendum 2026-10-09 (second)'), for the final-design pass:
+(1) 'The permission the held action requires' has no source today. The action contract declares only approve_permission (backend/app/approvals/actions/base.py:43-53), and what the requester needed differs, e.g. ai.run to request an AI suggestion versus campaigns.manage to approve it. Nothing records it on the action or the row.
+(2) Where 'withdrawn' is stored is open. It is not one of the six states in ck_pending_actions_status; a seventh means a migration and every status consumer (as executing did). It is also open whether it leaves pending by the same conditional transition as reject and expiry.
+(3) Rotating a credential voids nothing: revoke_credential only sets revoked_at, and the integration and its grants stay. The addendum says so.
+<!-- SECTION:NOTES:END -->
