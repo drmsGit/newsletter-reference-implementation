@@ -208,6 +208,37 @@ def request_approval(
 
 # --- deciding ---------------------------------------------------------------
 
+def fail_stuck_requests(
+    db: Session, *, action_key: str, subject_type: str, subject_id: int, reason: str,
+) -> list[int]:
+    """Move the `executing` requests for one action on one subject to `failed`,
+    WITHOUT committing — the caller commits it with whatever established that
+    the run died. Returns their ids, for the caller to audit.
+
+    ADR-142 addendum 2026-10-09 (task-326): the only caller is releasing a
+    stranded send (ADR-192), which already establishes that the send's run
+    died; its held request would otherwise stay `executing` and block a new
+    request for that send. Every other action's crashed request stays as the
+    2026-09-29 addendum's point 6 left it: a person's investigation.
+    """
+    rows = (
+        db.query(PendingActionDB)
+        .filter(
+            PendingActionDB.action_key == action_key,
+            PendingActionDB.subject_type == subject_type,
+            PendingActionDB.subject_id == subject_id,
+            PendingActionDB.status == EXECUTING,
+        )
+        .with_for_update()
+        .all()
+    )
+    for row in rows:
+        row.status = FAILED
+        row.execution_error = reason[:1000]
+    db.flush()
+    return [row.id for row in rows]
+
+
 def _transition(
     db: Session, pending_id: int, *, from_status: str, to_status: str,
     also: tuple = (), **values,

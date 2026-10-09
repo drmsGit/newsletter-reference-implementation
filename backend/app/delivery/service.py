@@ -195,7 +195,7 @@ def _with_stranded(model, record, activity: dict[int, datetime]):
     return model.model_copy(update={"stranded": stranded, "last_activity_at": last})
 
 
-def release_send_instance(db: Session, send_instance_id: int, *, brand_id: int) -> dict[str, int]:
+def release_send_instance(db: Session, send_instance_id: int, *, brand_id: int) -> tuple[dict[str, int], list[int]]:
     """Release a send stranded in "sending" (ADR-192): it becomes "failed", so
     a retry may run and follows task-318 — sent stays sent, the in-flight
     recipient becomes uncertain, the never-attempted ones are sent.
@@ -203,8 +203,11 @@ def release_send_instance(db: Session, send_instance_id: int, *, brand_id: int) 
     Refused unless the send is stranded at this moment, re-checked under the
     row lock: a send that came back to life must not be released mid-delivery,
     or two runs could deliver it at once. Returns the executions by status, for
-    the audit entry."""
+    the audit entry, and the held requests failed with it (task-326)."""
     from sqlalchemy import func
+
+    from app.approvals.actions.send_fire import META as SEND_FIRE
+    from app.approvals.service import fail_stuck_requests
 
     record = (
         db.query(SendInstanceDB)
@@ -228,8 +231,15 @@ def release_send_instance(db: Session, send_instance_id: int, *, brand_id: int) 
         .group_by(DeliveryExecutionDB.status).all()
     )
     record.status = "failed"
+    # The held request whose approval was running this send stays `executing`
+    # otherwise, blocking any new request for it (ADR-142 addendum 2026-10-09,
+    # task-326). Same transaction: the send and its request change together.
+    failed_requests = fail_stuck_requests(
+        db, action_key=SEND_FIRE.key, subject_type=SEND_FIRE.subject_type, subject_id=record.id,
+        reason="released with its stranded send (ADR-192): the run that was executing it died",
+    )
     db.commit()
-    return counts
+    return counts, failed_requests
 
 
 def list_send_instances(

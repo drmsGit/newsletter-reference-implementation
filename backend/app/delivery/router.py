@@ -320,15 +320,21 @@ def release_send(
     brand_id: int = Depends(working_brand),
 ):
     try:
-        counts = release_send_instance(db, send_instance_id, brand_id=brand_id)
+        counts, failed_requests = release_send_instance(db, send_instance_id, brand_id=brand_id)
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error))
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error))
     audit.record_from_request(
         request, db, audit.SEND_RELEASED, subject_type="send_instance", subject_id=send_instance_id,
-        detail={"executions": counts},
+        detail={"executions": counts, "held_requests_failed": failed_requests},
     )
+    # Each held request failed with it, by the person who released (task-326).
+    for pending_id in failed_requests:
+        audit.record_from_request(
+            request, db, audit.APPROVAL_FAILED, subject_type="pending_action", subject_id=pending_id,
+            detail={"action_key": "send.fire_send_instance", "reason": "released with its stranded send"},
+        )
     return send_instance_detail(db, send_instance_id, brand_id=brand_id)
 
 

@@ -131,3 +131,77 @@ def test_the_service_refuses_what_is_not_stranded(db, world):
     send, _ = _stranded(db, world, idle=timedelta(minutes=5))
     with pytest.raises(ValueError, match="not stranded"):
         delivery.release_send_instance(db, send.id, brand_id=world["brand"].id)
+
+
+class TestTheHeldRequest:
+    """task-326, option 3 (ADR-142 addendum 2026-10-09): releasing a stranded
+    send also fails the held request whose approval was running it, so a new
+    request can be raised. The send's release already establishes the run died.
+    """
+
+    @pytest.fixture
+    def held(self, db):
+        from app.approvals.db_models import PendingActionDB
+
+        made: list[int] = []
+
+        def make(send_id: int, *, status: str = "executing", action_key: str = "send.fire_send_instance") -> int:
+            decided = status != "pending"
+            row = PendingActionDB(
+                action_key=action_key, payload={"send_instance_id": send_id}, summary="task-326",
+                requested_by_type="integration", subject_type="send_instance", subject_id=send_id,
+                brand_id=1, status=status,
+                expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+                decided_at=datetime.now(timezone.utc) if decided else None,
+                decided_by_type="user" if decided else None,
+            )
+            db.add(row)
+            db.commit()
+            made.append(row.id)
+            return row.id
+
+        yield make
+        db.rollback()
+        db.query(PendingActionDB).filter(PendingActionDB.id.in_(made)).delete(synchronize_session=False)
+        db.query(AuditEventDB).filter(AuditEventDB.subject_type == "pending_action",
+                                      AuditEventDB.subject_id.in_(made)).delete(synchronize_session=False)
+        db.commit()
+
+    def _release(self, db, send_id):
+        with signed_in(db) as (client, _token, csrf):
+            return client.post(f"/delivery/send-instances/{send_id}/release", headers={"X-CSRF-Token": csrf})
+
+    def test_releasing_the_send_fails_its_stuck_request_and_frees_the_subject(self, db, world, held):
+        from app.approvals.db_models import PendingActionDB
+
+        send, _ = _stranded(db, world, idle=timedelta(hours=2))
+        stuck = held(send.id)
+        assert self._release(db, send.id).status_code == 200
+        db.expire_all()
+        row = db.get(PendingActionDB, stuck)
+        assert row.status == "failed" and "released" in row.execution_error
+        entry = db.query(AuditEventDB).filter(AuditEventDB.action == "approval.failed",
+                                              AuditEventDB.subject_id == stuck).one()
+        assert entry.actor_type == "user" and entry.actor_id is not None
+        held(send.id, status="pending")      # a new request for the same send is allowed again
+
+    def test_other_requests_are_untouched(self, db, world, held):
+        from app.approvals.db_models import PendingActionDB
+
+        send, _ = _stranded(db, world, idle=timedelta(hours=2))
+        other_send, _ = _stranded(db, world, idle=timedelta(hours=2))
+        elsewhere = held(other_send.id)
+        other_action = held(send.id, action_key="content.mark_ready")
+        assert self._release(db, send.id).status_code == 200
+        db.expire_all()
+        assert db.get(PendingActionDB, elsewhere).status == "executing"
+        assert db.get(PendingActionDB, other_action).status == "executing"
+
+    def test_a_refused_release_leaves_the_request_alone(self, db, world, held):
+        from app.approvals.db_models import PendingActionDB
+
+        send, _ = _stranded(db, world, idle=timedelta(minutes=5))
+        stuck = held(send.id)
+        assert self._release(db, send.id).status_code == 409
+        db.expire_all()
+        assert db.get(PendingActionDB, stuck).status == "executing"
