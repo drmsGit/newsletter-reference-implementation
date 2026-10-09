@@ -3,9 +3,11 @@ id: TASK-304
 title: >-
   The consent tests' fallback snapshot has no modules, which task-228's floor
   would skip
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-08 20:54'
+updated_date: '2026-10-09 09:00'
 labels:
   - backend
 dependencies: []
