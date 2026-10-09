@@ -6,7 +6,7 @@ topic:
   - security
   - operations
 created: 2026-08-02
-modified: 2026-09-18
+modified: 2026-10-09
 source:
   - "Security Chapter design interview, Part 2 (playbook-strategy.md Decision Log, 2026-08-02)"
 depends_on:
@@ -66,6 +66,110 @@ A credential that is present but not loaded is invisible, and the resulting fail
 - **Accepted 2026-09-18, unchanged.** The acceptance came with one scoping call worth recording here, because it is the question this record kept attracting: **the reference deployment is documentation, not a further ADR.** How an adopter injects the environment — a gateway in front, an egress proxy behind, Docker or systemd or Kubernetes secrets, a managed store — is infrastructure, and point 1 exists precisely so the architecture does not have to know. Writing it as an ADR would turn a hosting choice into an architectural commitment and invite adopters to inherit ours. It belongs in the playbook as a worked reference deployment; see `docs/backlog.md`.
 - **Machine credentials issued *by* the platform** to inbound API callers are a separate concern, picked up by [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]], which designs exactly this carve-out. This ADR covers credentials the platform *holds*, not credentials it *issues*.
 - **Implementation status, 2026-09-14:** Points 1, 2, 3 and 5 are built — credentials are read from the process environment, `backend/.env` is development-only and loaded at startup, nothing is cached beyond process lifetime, and startup reports what it found by name. **Point 4 guards a surface that does not exist.** There is no set-or-replace credential route anywhere in `backend/`; the only credential-shaped thing the UI exposes is `"ai_key_present": bool(os.environ.get("ANTHROPIC_API_KEY"))` in `backend/app/frontend/router.py`, a presence indicator that honours "never its value" but is not the write-only credential interface point 4 describes.
+
+## Addendum 2026-10-09 — the environment wins for the keys the platform uses, and the UI only shows that they are set
+
+Prompted by finding P2-C1 in [[business-interview-baseline]] ("§1 and §4 cannot
+both be true"), decided by the user in the 2026-10-09 interview review and logged
+in the [[playbook-strategy]] decision log under that date. Points 1, 2, 3 and 5
+stand as written. Point 4's text is not edited; this addendum records how it is
+read from now on.
+
+**Points 1 and 4 could not both hold.** Point 1 allows no secrets "in code, in
+the database, or in any file the application itself manages". Point 4 lets an
+Admin "set or replace a credential". A UI that sets a credential has to store it
+somewhere, and every place the application could store it is a place point 1
+forbids. The contradiction never had to resolve because, as the 2026-09-14
+implementation note above records, point 4 guards a surface that does not
+exist. It also rested on an assumption that runs the wrong way for the buyer it
+was written for: that whoever operates the system can reach a settings screen
+but not the deployment. [[ADR-150 — Tenancy and Access Model]] point 1 has the
+agency help the client host the platform on the client's own infrastructure. The
+deployment is the company's, and so is the place its credentials are set.
+
+**There are two kinds of credential, and only one of them was in conflict.**
+
+- *Credentials the platform issues and only verifies.* An inbound integration's
+  key and secret ([[ADR-166 — Inbound Machine Callers Are Authenticated Principals]])
+  are created by a person on the integrations screen of the server-rendered UI
+  (`backend/app/templates/integrations.html`). The secret is shown once to copy,
+  under the heading "Copy this key now — it is not shown again", and is stored
+  only as a hash (`IntegrationCredentialDB.secret_hash`,
+  `backend/app/auth/db_models.py:263`). A hash is not a usable secret; nobody can
+  call anything with it. That fits point 1, which forbids storing secrets, and
+  the spirit of point 4, which forbids returning them. This screen is the
+  existing example of "never shown again", and nothing here changes it.
+- *Credentials the platform holds and uses to call others.* The sending key
+  (`RESEND_API_KEY`, read at `backend/app/delivery/providers/resend.py:42`) and
+  the model key (`ANTHROPIC_API_KEY`, read at
+  `backend/app/ai/adapters/claude.py:86`) have to be usable in clear at the
+  moment of the call, so they cannot be reduced to a hash. These are the
+  credentials point 4 was written about, and the ones point 1 keeps out of
+  anything the application manages.
+
+The Notes above already draw this line: "This ADR covers credentials the platform
+*holds*, not credentials it *issues*." This addendum applies it to point 4.
+
+**1. For outbound credentials, the environment wins.** They are set or replaced
+in the environment or in the secret store the company controls, which is the
+documented seam of point 2, and never through the application. Point 1 holds
+without exception.
+
+**2. Point 4 reads as "configured or not, read-only" for outbound credentials.**
+The UI shows whether each outbound credential is configured, and never its
+value. It offers no way to set or replace one. Point 4's second sentence still
+applies and is now easy to keep: the API cannot return a stored outbound
+credential, because none is stored. Point 4's agency argument also still holds.
+An agency Admin can neither read the company's sending and model keys nor swap
+them from a settings page. A replacement happens where the company controls
+access, outside the application.
+
+**3. A UI that writes through to a managed secret store remains a documented
+option, not shipped.** A company running Vault, Infisical or a cloud secret
+manager could have a settings screen write a new value straight into that store,
+so the application itself still holds nothing. That is a use of the seam point 2
+already names. It is not built, and this addendum does not commit to building it.
+
+The option not taken was to let the UI set outbound credentials and store them
+encrypted in the database. The Notes above rejected exactly that on 2026-08-02:
+it moves the problem rather than solving it, because the decryption key still
+has to live somewhere outside the database, and it adds a schema, a migration
+path and a false sense of security. Keeping point 4's "set or replace" would
+have required that store or one like it.
+
+**The webhook signing secret.** The Context also lists an inbound webhook signing
+secret (`RESEND_WEBHOOK_SECRET`, read at
+`backend/app/providers/adapters/resend.py:80`). It does not call anyone, but it is
+not issued by the platform either: the provider issues it, and the platform
+holds a usable copy to verify the provider's signatures with. It therefore sits
+on the *held* side of the line above, and point 1 governs it as before. The
+2026-10-09 decision named the sending and model keys; it did not separately
+decide whether the UI shows this secret's presence.
+
+**What exists today.** The model key has a presence indicator, `ai_key_present`
+(`backend/app/settings/router.py:99` and `backend/app/frontend/router.py:244`).
+The settings page uses it to warn when an AI provider other than the mock is
+selected and no key is set (`backend/app/templates/settings.html:95`). The
+sending key has no indicator in the settings UI. Its absence surfaces as a failed
+send ("RESEND_API_KEY is not set", `backend/app/delivery/providers/resend.py:47`)
+and in hints on the send-test and sign-in screens. No task is queued for a
+sending-key indicator as of this addendum.
+
+**What it costs.**
+
+- **Replacing a sending or model key needs access to the deployment**, meaning
+  its environment or the company's secret store, not just the Admin screen. An
+  agency that operates the system without that access has to ask the company,
+  and the replacement still takes the restart point 3 describes.
+- **Point 4's wording now says more than it means.** A reader who stops at the
+  Decision will find a set-and-replace promise that this addendum withdraws for
+  outbound credentials. The Decision is left intact by rule, so this addendum is
+  where the narrowing is recorded.
+
+**What it buys.** The record no longer promises agencies a feature that breaks
+its own first rule. The one credential screen the platform does have, for keys it
+issues, is named as the model for "never shown again" instead of being mistaken
+for the surface point 4 described.
 
 ## Related ADRs
 

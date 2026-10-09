@@ -29,6 +29,9 @@ optional starter package, workshops/consulting) — not the software alone.
 - **Not competing on production speed.** Klaviyo + an AI agent already wins on raw
   output (templates, copy, basic segments) and we deliberately cede that ground.
   We compete on control, transparency, portability and teachability.
+  One speed we do compete on: how fast a developer gets the first integration
+  working — "a weekend, not half a year" (ADR-160 point 6; decided 2026-10-09,
+  business baseline P2-F3). Campaign production speed is not it.
 - **Not a compliance guarantee.** We take no data-protection liability; the adopter
   chooses provider, residency and retention. We supply the mechanisms.
 

@@ -380,8 +380,10 @@ ADR-150 point 4 prices multi-brand exactly: *"A company treating brands as a ski
 
 **Resolution (2026-10-09):** Split the two costs. For running the product, a single-brand company really does pay only a default value: the screens show no brand switcher, and a test proves it. For anyone extending the code, brands are a cross-cutting rule: every new table, route and permission follows brand scoping, as the brand page documents. The Brand Boundary interview found two tables that had missed it. The positioning may claim the first. When it speaks to developers or agencies who extend the code, it must name the second. Recorded in a 2026-10-09 addendum to ADR-150; wording only. Decided by the user in the 2026-10-09 interview review.
 
-### P2-A2. "Consent to brand A says nothing about brand B" is a legal posture sitting in an ADR `🟡 deferred`
+### P2-A2. "Consent to brand A says nothing about brand B" is a legal posture sitting in an ADR `✅ resolved 2026-10-09`
 ADR-163's addendum decides that one company's brands do not share a lawful basis for contact, and `recipients/consent.py` enforces it with `brand_id` as a required positional and no default anywhere. Many German companies capture one group-level opt-in and treat the brand as a presentation detail — which is word for word what ADR-150 point 2 says brands *are*. The addendum adopts the stricter reading on the adopter's behalf, which is the same kind of compliance judgement ADR-150 point 3, ADR-144 §3 and ADR-154 point 2 all explicitly refuse to make in the other direction. A forker with group-level consent has no config path; it must be edited out of every consent function.
+
+**Resolution (2026-10-09):** Per-brand consent is the business default: a yes to one brand says nothing about another (ADR-163, 2026-09-15 addendum §1). A group that collects one group-wide opt-in expresses it through its CRM, which sends one consent assertion per brand the opt-in covers (ADR-163 :149-155). That works today, needs no setting and no code edit. A new brand starts with nobody reachable until the CRM asserts it. Whether a group opt-in legally covers a given brand is the company's judgement, not the product's. No switch bakes in a contested reading. The opposite direction already has a company-wide option behind a setting ("stop everything", ADR-191). Decided by the user in the 2026-10-09 interview review.
 
 ### P2-A3. Cross-brand duplication re-applies a principle superseded on 2026-07-05 `✅ resolved 2026-10-09`
 `campaigns/duplication.py:1-8` states: *"Duplication is a risky topic, so why do it with a one-click solution. Make the manager make his decision deliberately instead of fast."* That is the 2026-06-24 tiered-friction philosophy, which decision-log item 2 of 2026-07-05 **superseded**: *"friction should be low across the board… The real friction trigger is scale/anomaly, not category."* Duplication is a new surface so this is not a strict contradiction — but the superseded framing was re-applied without anyone recording that the reversal exists.
@@ -395,13 +397,17 @@ The rule is stated four times: ADR-161 §8 (frequency capping — *"Numbers belo
 
 **Resolution (2026-10-09):** Split by who the number serves. The absolute session lifetime and the idle timeout are company policy and become company settings, clamped to safe ranges; a works council or auditor may require other lengths. The attack-resistance numbers stay in code as a stated exception to "numbers belong to the company": sign-in code lifetime, guesses, request limits. They protect the system rather than express a company preference, and a wrong value opens a hole; a company that must change them does so in its fork, knowingly. Recorded in a 2026-10-09 addendum to ADR-151; the build is queued as task-342. Decided by the user in the 2026-10-09 interview review.
 
-### P2-B2. Machine credentials never expire; human sessions expire twice `🟡 deferred`
+### P2-B2. Machine credentials never expire; human sessions expire twice `✅ resolved 2026-10-09`
 `IntegrationCredentialDB` carries `created_at`, `last_used_at`, `revoked_at` and **no `expires_at`**. ADR-166 point 3 inherits four properties from ADR-151 (hashed, shown once, immediately revocable, header-only) and does not inherit expiry, without saying so. Combined with ADR-166's own Negative — *"an agency operator who leaves has their sessions revoked and leaves working keys behind"* — an unexpiring key is the strictly worse half of a risk the record already accepts. Discoverable only by reading the column list.
+
+**Resolution (2026-10-09):** Keys get an optional expiry. When a key is issued, the issuer may set an expiry date, its length chosen by the company. The integrations list shows every key's age and expiry. An expired key is refused like a revoked one. Optional rather than mandatory, because a mandatory expiry could break an unattended integration overnight; a company that hands a key to an agency can now time-limit it at issue. Recorded in a second 2026-10-09 addendum to ADR-166; the build is queued as task-344. Decided by the user in the 2026-10-09 interview review.
 
 ## P2-C. Secrets — ADR-152
 
-### P2-C1. §1 and §4 cannot both be true, and each exists for a business reason `🟡 deferred`
+### P2-C1. §1 and §4 cannot both be true, and each exists for a business reason `✅ resolved 2026-10-09`
 §1: *"No secrets in code, in the database, or in any file the application itself manages."* §4: *"An Admin may set or replace a credential"*, justified by the agency-operator model. A UI that can *replace* a credential must persist it where the application manages it. The record's own status notes §4 *"guards a surface that does not exist"*, so the contradiction has never had to resolve. The assumption underneath is that the agency operating the system has shell access to the box — but ADR-150 point 1 says the agency *"helps the client host it on the client's own infrastructure"*, which makes that backwards for the buyer §4 exists to serve.
+
+**Resolution (2026-10-09):** The environment wins, for outbound credentials. Those are the secrets the platform itself uses, the sending key and the AI model key. The UI shows only whether each is configured, never its value. Setting or replacing one happens in the environment or the company's secret store; a UI writing through to a managed secret store stays a documented option. The user pointed out the integrations screen, where a person creates an inbound integration's key and secret, copies it once, and can never reveal it again. That is a different kind of credential: one the platform issues and stores only as a hash. It already fits both points. Recorded in a 2026-10-09 addendum to ADR-152. Decided by the user in the 2026-10-09 interview review.
 
 ## P2-D. Audit — ADR-153 as built
 
@@ -441,11 +447,15 @@ ADR-160 point 6: *"Registering a channel means a channel manifest plus a provide
 
 For the positioning pass, as information and not decided: other extension kinds largely keep the claim today. An email module is a manifest plus a template. An AI task, a decision strategy and an approvable action are each one Python file discovered from its folder. Providers need an adapter plus a factory edit. Making the two quietly failing channel steps speak up was not decided; no task filed.
 
-### P2-F2. The channel model has no locale axis, and the cluster just made that expensive `🟡 deferred`
+### P2-F2. The channel model has no locale axis, and the cluster just made that expensive `✅ resolved 2026-10-09`
 ADR-160 point 3 made channel-readiness separate required fields on the content record, explicitly rejecting derivation; ADR-162 point 1 moved subject and preheader into module fields. Both multiply the field count on a communication unit along a channel axis. **Neither record mentions language or locale.** `RecipientDB.language` exists and is used in exactly one place — an audience rule-block criterion. It reaches no renderer, no strategy, no AI task, no module manifest. DE/EN is the ordinary case for the named buyer and DE/EN/FR common; a forker adding locale faces the same multiplication the channel cluster just chose how to handle, with no precedent to follow.
 
-### P2-F3. "Time-to-first-output beats completeness" is a market criterion doing tie-breaker work in an ADR `🟡 deferred`
+**Resolution (2026-10-09):** A language version is a variant. A multilingual newsletter is one variant per language, each sent to an audience filtered by recipient language (`RecipientDB.language`, usable as an audience filter today). That works with the existing tools, adds no new layer, and avoids repeating the field multiplication channels caused. It is written up in the playbook decision log so every adopter does it the same way. A language axis on content stays a later idea, for if the pattern proves too laborious in practice. Decided by the user in the 2026-10-09 interview review.
+
+### P2-F3. "Time-to-first-output beats completeness" is a market criterion doing tie-breaker work in an ADR `✅ resolved 2026-10-09`
 ADR-160 point 6 states it and promotes it explicitly: *"If a requirement slows the weekend path, it is optional or it is defaulted."* ADR-161 point 2 cites it again. It sits at an angle to `BRIEF.md`'s *"Not competing on production speed"* — the two are about different clocks (integration vs. campaign production), a distinction a reader will not draw unaided. By the repo's own rule this is a business criterion, currently load-bearing for two accepted ADRs and recorded in neither `BRIEF.md` nor `POSITIONING.md`.
+
+**Resolution (2026-10-09):** Said in the positioning. BRIEF.md and POSITIONING.md now state the one speed the product does compete on: how fast a developer gets the first integration working, "a weekend, not half a year" (ADR-160 point 6). Campaign production speed stays ceded to Klaviyo plus an AI agent. The two claims stand side by side instead of reading as a contradiction. The gate-1 statement may use the weekend claim and, under POSITIONING rule 2, must be able to demonstrate it. Decided by the user in the 2026-10-09 interview review.
 
 ### P2-F4. Documented and fine — listed so they are not re-flagged `⚪ non-blocking`
 ADR-161 §4 (*"if transferred, count as has seen"* — trade and known wrongness both in the Negative); ADR-164 §10 (equal channel weights, explicitly *"a placeholder nobody has data to tune yet"*); ADR-161 §8 (platform owns frequency capping, numbers deferred to the company, stage 4 named and empty); ADR-167 (the no-CDP dependency booked in the Negative, and its second Negative now appears closed — `create_recipient` takes `address` and `channel`).
@@ -508,19 +518,19 @@ ADR-144 §5, via the 2026-07-31 decision log: *"Cost cap: warn → hard stop, **
 | # | Area | Finding | Class |
 |---|---|---|---|
 | P2-A1 | ADR-150 | Single-brand cost is a cross-cutting concern, not "a default value in a column" | ✅ |
-| P2-A2 | ADR-163 add. | Brand-scoped consent is a legal interpretation with no config path | 🟡 |
+| P2-A2 | ADR-163 add. | Brand-scoped consent is a legal interpretation with no config path | ✅ |
 | P2-A3 | ADR-013 add. | Duplication friction re-applies a 2026-07-05-superseded principle | ✅ |
 | P2-B1 | ADR-151 | Security numbers hardcoded while the repo's rule gives numbers to the company | ✅ |
-| P2-B2 | ADR-166 | Machine credentials never expire; humans expire twice | 🟡 |
-| P2-C1 | ADR-152 | §1 and §4 cannot both hold | 🟡 |
+| P2-B2 | ADR-166 | Machine credentials never expire; humans expire twice | ✅ |
+| P2-C1 | ADR-152 | §1 and §4 cannot both hold | ✅ |
 | P2-D1 | ADR-153 | Audit covers administration only; ADR-166's integration-actor promise has no writer | ✅ |
 | P2-D2 | ADR-153 | Fail-open audit write + unenforced `detail` policy, decided in docstrings | ✅ |
 | P2-E1 | ADR-163 | Fail-closed opt-in is jurisdictional, hardcoded, the one seam that is not a seam | ✅ |
 | P2-E2 | ADR-163 | `purpose` defaults to `"marketing"` where `brand_id` is a required positional | ⚪ |
 | P2-E3 | ADR-154 | Full-erasure default vs. the BI-team audience it most affects | 🟡 |
 | P2-F1 | ADR-160 | "Two files, no config step" is nine steps, two of them silent | ✅ |
-| P2-F2 | ADR-160/162 | Channel multiplies record fields; locale axis never considered | 🟡 |
-| P2-F3 | ADR-160 | "Weekend not half a year" is a market criterion in an ADR | 🟡 |
+| P2-F2 | ADR-160/162 | Channel multiplies record fields; locale axis never considered | ✅ |
+| P2-F3 | ADR-160 | "Weekend not half a year" is a market criterion in an ADR | ✅ |
 | P2-F4 | cluster | Four documented-and-fine trades, listed so they are not re-flagged | ⚪ |
 | P2-G1 | ADR-166 | Unattended-send risk modelled by caller identity, not scale — inverts 2026-07-05 | ✅ |
 | P2-G2 | ADR-166 | No request budget for an authenticated machine | ✅ |

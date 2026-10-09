@@ -463,6 +463,118 @@ are not found late, and they are not decided here:
 **Unchanged:** points 1 through 8, the build-notes and the earlier addenda.
 Nothing here changes the Decision section above.
 
+## Addendum 2026-10-09 (second) — An integration's key may be given an expiry date when it is issued
+
+Prompted by business finding P2-B2 in `docs/business-interview-baseline.md`
+("Machine credentials never expire; human sessions expire twice"). The user
+decided it in the interview review on 2026-10-09. It is logged in
+`docs/playbook-strategy.md` §5, "2026-10-09 — Business findings decided one by one
+in the interview review" (`:791`). **This does not touch the Decision.** Point 3's
+credential mechanics stand, and so does point 4: a key is still independent of
+the person who issued it. What this adds is a way to bound, at issue, how long a
+key lives.
+
+It answers one of the two gaps the 2026-10-02 addendum left open: "Credential
+expiry — a key lives until someone revokes it." The playbook carried the same
+item among the decisions recorded and not yet taken (`docs/playbook-strategy.md:923`,
+and `:935` in the 2026-10-02 list kept below it). The other gap, step-up or second
+approval for granting `sends.execute`, stays open.
+
+**The finding.** `IntegrationCredentialDB` (`backend/app/auth/db_models.py:242`)
+records when a key was issued, last used and revoked (`created_at`,
+`last_used_at`, `revoked_at` at `:267`, `:271`, `:275`) and has no expiry.
+`authenticate` (`backend/app/auth/integrations.py:387`) refuses an unknown key, a
+revoked one (`:408`), a wrong secret (`:410`) and a deactivated integration
+(`:416`), and checks no date. A person's session expires twice under
+[[ADR-151 — Authentication and Sessions]] §3: after `SESSION_ABSOLUTE_HOURS = 12`
+and after `SESSION_IDLE_MINUTES = 60` idle (`backend/app/auth/service.py:52-53`).
+Point 3 inherits four properties from that record (hashed, shown once,
+immediately revocable, carried in a header) and not expiry, without saying so.
+Read together with this record's first `### Negative` item, where an agency
+operator who leaves "leaves working keys behind", a key that never expires is the
+worse half of a risk this record already accepts.
+
+**1. When a key is issued, the issuer may set an expiry.** A key issued with one
+stops working when it is reached. A key issued without one behaves as today and
+lives until it is revoked.
+
+**2. The length is the company's choice.** The platform supplies the mechanism;
+the company picks the number. This is [[ADR-161 — Channel Execution Shapes]]
+point 8, "Numbers belong to the company, the mechanism to us", which a 2026-10-09
+addendum to [[ADR-151 — Authentication and Sessions]] applied to session lengths
+the same day.
+
+**3. An expired key is refused exactly like a revoked one.** It takes the same
+path and gets the same answer. `authenticate` returns one value for every kind of
+failure, so that an unauthenticated caller cannot tell which of their guesses came
+closest (its docstring, `backend/app/auth/integrations.py:390-393`). An expired
+key joins that list and does not get a refusal of its own.
+
+**4. The integrations list shows each key's age and its expiry.** The list route
+already returns each key's created, last-used and revoked times (point 3 of the
+2026-10-02 addendum; `backend/app/auth/integrations_router.py:43-45`). Age comes
+from the issue time; expiry is the new value. The person reviewing integrations
+sees how long each key has left without reading the column list.
+
+**5. Optional, not mandatory.** A mandatory expiry could break an unattended
+integration overnight: a key that lapses while nobody is at the screen stops the
+orchestrator's sends until someone issues a new one. That is the failure point 4
+refused to build in when it kept a key alive past the person who issued it, "an
+integration whose credentials died with the operator who set it up would fail at
+the worst possible moment". A forced expiry would trade the leaver risk for an
+outage risk on every company's behalf. Making it optional leaves that trade to the
+company, key by key.
+
+**6. Decided now, built later.** The build is deferred and tracked as task-344.
+Until it lands, a key lives until it is revoked, as built.
+
+**Not taken.** A mandatory expiry, for the reason in point 5. And no expiry at
+all, with only each key's age shown in the list. The list already returns each
+key's issue time, so that option is today's state with the arithmetic done for
+the reader. The 2026-10-02 addendum said what that surface can and cannot do: it
+"only makes the stale key visible to someone who goes and looks". Showing age
+changes nothing for the key nobody looks at, and that is the key the leaver risk
+is about.
+
+**Left open for the build's final-design pass.** Not decided here, and not to be
+read as settled by this addendum:
+
+- **Whether the expiry is set as a date or as a duration.**
+- **Any warning before a key expires.**
+- **Whether an existing key can have an expiry added later.** The 2026-10-02
+  addendum leaves reductions ungated, revoking a key among them. Adding an expiry
+  to a key that had none shortens its life; changing or removing one may lengthen
+  it. Which gate each of those falls under is part of this question.
+- **How expiry interacts with rotation.** Point 3 lets several credentials sit
+  under one integration, so a replacement can be issued before the old key lapses.
+  Whether a new key takes the old one's expiry, or any expiry at all, is open.
+
+One fact from the code the final-design pass will meet. It is recorded so it is
+not found late, and it is not decided here: "live" is counted from `revoked_at`
+alone, in the JSON list's `live_keys`
+(`backend/app/auth/integrations_router.py:106`) and on the Jinja page
+(`backend/app/frontend/router.py:3516`). An expired key would count as live in both
+unless that changes.
+
+**Consequences.**
+
+- **Positive.** A key handed to an agency can be time-limited when it is issued.
+  That closes the "leaver keeps a working key" risk this record names in its first
+  `### Negative` item, for every key issued with an expiry, and it does so ahead of
+  the leaving, so it does not depend on anyone being told. The `### Negative` item
+  is narrowed, not closed. The refusal reuses the revoked-key path, so no new
+  failure answer is built.
+- **Negative.** It is optional, so a company that never sets it keeps today's
+  exposure in full. Expiry adds one more state to explain: a key is now live,
+  revoked or expired. Because an expired key is refused exactly like a revoked
+  one, an integration that stops working on its expiry date looks the same to the
+  caller as one whose key was revoked; the list is where a person tells the two
+  apart.
+
+**Unchanged:** points 1 through 8, the build-notes and the earlier addenda,
+including the recipient ceiling of the first 2026-10-09 addendum. Nothing here
+changes the Decision section above.
+
 ## Related ADRs
 
 ### Depends On

@@ -10,6 +10,9 @@ The *axis* is decided, even though the sentence is not. Recorded across
 - Compete on **control, transparency, portability, teachability**.
 - Do **not** compete on production speed. Klaviyo plus an AI agent wins that
   outright, and the small-shop-wants-speed persona is deliberately ceded.
+- One speed **is** claimed: time to the first working integration, "a weekend,
+  not half a year" (ADR-160 point 6; decided 2026-10-09, P2-F3). It is a developer
+  claim, not campaign speed, and under rule 2 it must be demonstrable in the repo.
 - The differentiators that survived the Klaviyo/MCP market shift: recipient-projection
   ownership, consent and suppression as a provider-independent enforcement point,
   provider independence, explainable decisioning, and the architecture itself as a
