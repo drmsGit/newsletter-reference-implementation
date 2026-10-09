@@ -44,6 +44,13 @@ commercial product. Learnings feed the separate Condor use case.
     accepts becomes a task (`backlog draft promote`, then an ordinal), an ADR
     or a business decision — decisions still live in ADRs or
     `docs/business/decisions/`, never in `docs/queue/decisions/`.
+  - **Before starting queue work, check for ChatGPT's handoff:** `git fetch`,
+    then look for new commits on `origin/codex/*` branches (regression tests
+    Codex writes against our commits) and new notes in `docs/queue/docs/`.
+    Codex never commits to `main`. Bring its tests in only after reading
+    them, and run the suite on them. A test that fails because it exposes an
+    open bug lands together with that bug's fix, as its failing test first —
+    never on its own, which would turn `main` red.
 - `docs/backlog.md` is a signpost to the queue since 2026-09-27. Never add to
   it. The last full version is `git show b70f432^:docs/backlog.md`; the "line
   N" in each migrated task's notes refers to that version. ADRs and agent
