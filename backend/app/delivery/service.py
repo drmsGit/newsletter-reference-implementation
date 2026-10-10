@@ -981,6 +981,22 @@ def send_send_instance(
         channel=variant.channel if variant else DEFAULT_CHANNEL,
     )
 
+    # A real marketing email carries an unsubscribe link built from
+    # PUBLIC_BASE_URL and fixed into it for good (ADR-191). Unset, it fell back
+    # to localhost silently, so every mail of the run had a dead link (task-330).
+    # Refused here, before the claim, so the send keeps its status and can be
+    # retried once the setting is fixed. The mock reaches no inbox.
+    if provider.reaches_real_inboxes and (variant.channel if variant else DEFAULT_CHANNEL) == "email":
+        carries_link = db.query(DeliveryExecutionDB.id).filter(
+            DeliveryExecutionDB.send_instance_id == send_instance.id,
+            DeliveryExecutionDB.purpose == MARKETING,
+        ).first() is not None
+        from app.subscriptions.service import public_base_url_problem
+
+        problem = public_base_url_problem() if carries_link else None
+        if problem:
+            raise ValueError(f"This send is refused: {problem}. Set it to the company's public https address.")
+
     # **Everything above this line only reads, and everything below it is
     # inside the handler** (task-14). The status transition is the claim: once
     # it is committed, every later attempt is refused by the guard above, so an

@@ -8,6 +8,7 @@ exclusion stack honours it with no new mechanism (ADR-163).
 """
 import os
 import secrets
+from urllib.parse import urlsplit
 
 from sqlalchemy.orm import Session
 
@@ -24,6 +25,22 @@ OPTED_OUT = "opted_out"
 
 def public_base_url() -> str:
     return (os.environ.get("PUBLIC_BASE_URL") or PUBLIC_BASE_URL_DEFAULT).rstrip("/")
+
+
+def public_base_url_problem() -> str | None:
+    """Why the configured address cannot go into a real mail, or None.
+
+    The link is fixed into each mail when it is sent and can never be
+    corrected afterwards (ADR-191), so a real send needs an address set on
+    purpose, reachable over https. The development default fails this on
+    purpose: it only works on this machine (task-330)."""
+    configured = (os.environ.get("PUBLIC_BASE_URL") or "").strip()
+    if not configured:
+        return "PUBLIC_BASE_URL is not set, so the unsubscribe link would point at this machine"
+    parts = urlsplit(configured)
+    if parts.scheme != "https" or not parts.hostname:
+        return f"PUBLIC_BASE_URL must be an https address with a host, not {configured!r}"
+    return None
 
 
 def unsubscribe_path(token: str) -> str:

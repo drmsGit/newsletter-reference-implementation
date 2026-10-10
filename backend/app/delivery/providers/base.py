@@ -59,6 +59,11 @@ class DeliveryProvider(ABC):
     #: (ADR-182 point 4, ADR-101). False is not a fault: the provider stays
     #: selectable, and its clicks count for the email and credit no category.
     click_content_attribution: bool = False
+    #: Whether what this adapter sends lands in a real inbox (task-330). True
+    #: by default, so a new adapter is treated as real until it says otherwise.
+    #: A real mail carries an unsubscribe link fixed into it for good, so a
+    #: real send refuses an address that would only work on this machine.
+    reaches_real_inboxes: bool = True
 
     def supports(self, channel: str) -> bool:
         return not self.channels or channel in self.channels

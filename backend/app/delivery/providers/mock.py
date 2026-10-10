@@ -25,6 +25,8 @@ class MockProvider(DeliveryProvider):
 
     #: Empty = every channel. See the module docstring.
     channels = frozenset()
+    #: Nothing leaves this machine, so the development address is fine here.
+    reaches_real_inboxes = False
 
     def send(self, address: str, artifact: RenderedArtifact) -> SendResult:
         # Logged rather than discarded: with no app and no device, this line is
