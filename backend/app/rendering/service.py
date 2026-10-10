@@ -346,6 +346,8 @@ def module_html(
     module_id: int,
     variables: dict,
     content_id: int | None = None,
+    *,
+    template_type: str | None = None,
 ) -> str:
     """One module's HTML from values already decided — the formatting half.
 
@@ -353,8 +355,12 @@ def module_html(
     the frame render (`app.rendering.frame`), so a module looks the same
     whichever path produced it. Rich text is applied here; nothing is resolved.
     """
-    manifest = get_manifest(channel, module_type)
-    html_source = get_template_html(channel, module_type)
+    # `template_type` is where the template and manifest are found when that
+    # differs from the name written into the HTML: a frame frozen before the
+    # envelope was renamed still renders as `header` (task-349).
+    looked_up = template_type or module_type
+    manifest = get_manifest(channel, looked_up)
+    html_source = get_template_html(channel, looked_up)
     if manifest is None or html_source is None:
         return (
             f'<div data-module-id="{module_id}" data-module-type="{module_type}">'

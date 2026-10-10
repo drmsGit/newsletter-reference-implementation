@@ -61,7 +61,7 @@ def _put(module_id, module_type):
 
 class TestCreate:
     def test_the_envelope_type_is_refused_as_a_module(self, db, variant):
-        response = _create(variant, "header")
+        response = _create(variant, "envelope")
         assert response.status_code == 400, response.text
         assert "subject" in response.json()["detail"]
         assert _types(db, variant) == []
@@ -78,7 +78,7 @@ class TestUpdate:
         assert response.status_code == 200, response.text
         return response.json()["id"]
 
-    @pytest.mark.parametrize("module_type", ["notification", "no_such_module", "header"])
+    @pytest.mark.parametrize("module_type", ["notification", "no_such_module", "envelope"])
     def test_a_type_the_channel_does_not_accept_as_a_module_is_refused(self, db, variant, module, module_type):
         response = _put(module, module_type)
         assert response.status_code == 400, response.text
@@ -107,4 +107,4 @@ def test_the_limit_counts_the_same_modules_on_create_as_in_the_composition(db, v
     assert _create(variant, "img_left").status_code == 200
     second = _create(variant, "img_right")
     assert second.status_code == 400, second.text
-    assert _types(db, variant) == ["header", "img_left"]
+    assert _types(db, variant) == ["envelope", "img_left"]

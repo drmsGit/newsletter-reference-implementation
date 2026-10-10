@@ -33,7 +33,15 @@ from app.overrides.service import get_active_content_override
 from app.rendering.renderers.base import ROLE_HTML, ROLE_PAYLOAD, RenderedArtifact
 
 #: Bumped when the frame's shape changes, so a reader can tell what it holds.
-FRAME_VERSION = 1
+FRAME_VERSION = 2
+#: Every version a reader understands. Version 2 (2026-10-10, task-349): the
+#: email envelope module is `envelope`; in a version-1 email frame it is
+#: `header`. Frozen frames are never rewritten — `module_html` writes the type
+#: into the HTML, so a rewrite would change what a sent email reconstructs to
+#: (ADR-183) — so readers translate instead, keyed on the version so a
+#: version-1 `header` can never be confused with ADR-193's visible `header`.
+FRAME_VERSIONS = (1, 2)
+LEGACY_EMAIL_ENVELOPE = "header"
 
 KIND_CONTENT = "content"   # cms module bound to a content record
 KIND_STATIC = "static"     # cms: false module (module_data, maybe a content fill)
@@ -45,7 +53,26 @@ KIND_UNKNOWN = "unknown"   # no manifest for this type on this channel
 def is_frame(render_context: dict | None) -> bool:
     """Whether a snapshot carries a frame. Snapshots made before ADR-183 do
     not, and are refused at send time rather than sent from live state."""
-    return bool(render_context) and render_context.get("frame_version") == FRAME_VERSION
+    return bool(render_context) and render_context.get("frame_version") in FRAME_VERSIONS
+
+
+def _frame_envelope(frame: dict) -> str | None:
+    """The name this frame's envelope module was frozen under."""
+    from app.modules.registry import envelope_module_type
+
+    if frame.get("frame_version") == 1 and frame.get("channel") == "email":
+        return LEGACY_EMAIL_ENVELOPE
+    return envelope_module_type(frame["channel"])
+
+
+def lookup_type(frame: dict, entry: dict) -> str:
+    """Where an entry's manifest and template are found today. The same as
+    the name it was frozen under, except a version-1 email frame's envelope."""
+    from app.modules.registry import envelope_module_type
+
+    if entry["module_type"] == LEGACY_EMAIL_ENVELOPE and _frame_envelope(frame) == LEGACY_EMAIL_ENVELOPE:
+        return envelope_module_type(frame["channel"]) or entry["module_type"]
+    return entry["module_type"]
 
 
 def templates_fingerprint(channel: str) -> str:
@@ -199,9 +226,7 @@ def what_rendered(frame: dict, picks: list[dict]) -> tuple[bool, int]:
     none. There is no "decorative" marker because no decorative module exists
     yet; one added later is given a manifest marker then.
     """
-    from app.modules.registry import envelope_module_type
-
-    envelope = envelope_module_type(frame["channel"])
+    envelope = _frame_envelope(frame)
     picked = {p["module_id"] for p in picks}
     slots = sum(1 for entry in frame["modules"] if entry["kind"] == KIND_SLOT)
     meaningful = any(
@@ -275,7 +300,7 @@ def render_frame(
             else:
                 html_parts.append(module_html(
                     channel, entry["module_type"], entry["module_id"], variables,
-                    content_id=content_id,
+                    content_id=content_id, template_type=lookup_type(frame, entry),
                 ))
         elif variables is not None and not fields:
             # A push carries one module's fields (ADR-160 point 2), stripped of
@@ -315,7 +340,7 @@ def missing_required_in_frame(frame: dict) -> list[tuple[int, str, str]]:
     for entry in frame["modules"]:
         if entry["kind"] not in (KIND_CONTENT, KIND_STATIC):
             continue
-        manifest = get_manifest(frame["channel"], entry["module_type"])
+        manifest = get_manifest(frame["channel"], lookup_type(frame, entry))
         # Required when shown (ADR-187 point 6), from the list the frame froze.
         for name in required_when_shown(manifest, entry.get("hidden_fields")):
             if not str(entry["variables"].get(name, "") or "").strip():

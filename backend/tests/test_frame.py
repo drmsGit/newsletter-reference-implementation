@@ -101,7 +101,7 @@ def test_edits_after_the_frame_do_not_reach_it(db, world):
     # Edit everything the frame copied: the header, and a newly published version.
     header = db.query(ModuleInstanceDB).filter(
         ModuleInstanceDB.variant_id == world["variant"].id,
-        ModuleInstanceDB.module_type == "header").one()
+        ModuleInstanceDB.module_type == "envelope").one()
     header.module_data = {"subject": "Changed", "preheader": "Changed"}
     record = db.get(ContentRecordDB, world["fixed"].id)
     record.content = {"headline_medium": "Edited later", "body_medium": "x"}
@@ -239,7 +239,7 @@ def _change_everything(db, world):
     """Everything a message depends on, changed after the send."""
     header = db.query(ModuleInstanceDB).filter(
         ModuleInstanceDB.variant_id == world["variant"].id,
-        ModuleInstanceDB.module_type == "header").one()
+        ModuleInstanceDB.module_type == "envelope").one()
     header.module_data = {"subject": "Rewritten", "preheader": "Rewritten"}
     db.add(DecisionResolutionDB(decision_slot_id=world["slot_id"], content_record_id=world["later"].id))
     db.commit()

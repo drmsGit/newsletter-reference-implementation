@@ -2203,12 +2203,12 @@ class TestEnvelopeFieldsLiveInAModule:
     def test_the_envelope_is_found_by_declaration_not_by_module_name(self):
         from app.modules.registry import envelope_module_type, get_manifest
 
-        assert envelope_module_type("email") == "header"
+        assert envelope_module_type("email") == "envelope"
         assert envelope_module_type("push") is None, (
             "push declares no envelope field — a notification's title is body, "
             "because the OS renders the whole thing"
         )
-        subject = [v for v in get_manifest("email", "header").variables
+        subject = [v for v in get_manifest("email", "envelope").variables
                    if v.name == "subject"][0]
         assert subject.envelope is True
 
@@ -2267,7 +2267,7 @@ class TestEnvelopeFieldsLiveInAModule:
 
         module = db.query(ModuleInstanceDB).filter(
             ModuleInstanceDB.variant_id == variant.id,
-            ModuleInstanceDB.module_type == "header").first()
+            ModuleInstanceDB.module_type == "envelope").first()
         assert module is not None, "the envelope copy went nowhere"
         assert module.position == 0, "the envelope module must be first"
         assert module.module_data == {
@@ -2326,7 +2326,7 @@ class TestEnvelopeFieldsLiveInAModule:
         )
         assert db.query(ModuleInstanceDB).filter(
             ModuleInstanceDB.variant_id == variant.id,
-            ModuleInstanceDB.module_type == "header").count() == 0
+            ModuleInstanceDB.module_type == "envelope").count() == 0
 
     def test_the_envelope_module_is_not_offered_as_a_composable_module(self, db):
         """It is authored through the variant's own subject field. Offering it
@@ -2337,7 +2337,7 @@ class TestEnvelopeFieldsLiveInAModule:
 
         offered = [m.name for m in list_manifests("email")
                    if not any(v.envelope for v in m.variables)]
-        assert "header" not in offered
+        assert "envelope" not in offered
         assert "single_stack" in offered, "the real modules must still be offered"
 
 
@@ -3087,7 +3087,7 @@ class TestARequiredFieldIsCheckedBeforeASendFires:
         from app.rendering.service import missing_required_fields
 
         # `header` declares subject and preheader, both optional.
-        variant = self._variant_with(db, "header", {})
+        variant = self._variant_with(db, "envelope", {})
 
         assert missing_required_fields(db, variant.id) == []
 

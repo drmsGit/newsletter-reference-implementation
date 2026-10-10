@@ -38,7 +38,7 @@ const COMPOSITION = {
       has_envelope: true,
       accepted_module_types: ['single_stack', 'cta'],
       envelope_modules: [
-        module(9, 0, { module_type: 'header', module_data: { subject: 'Spring is here' } }),
+        module(9, 0, { module_type: 'envelope', module_data: { subject: 'Spring is here' } }),
       ],
       modules: [
         module(10, 1, {

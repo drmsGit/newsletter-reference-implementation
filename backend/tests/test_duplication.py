@@ -578,7 +578,7 @@ class TestWhatTheCopyArrivesAs:
             # renumber from 1 and close the source's gaps.
             assert positions == [0, 1, 2, 3], f"positions came across as {positions}"
             types = [m.module_type for m in _modules(db, report.campaign_id)]
-            assert types == ["header", "single_stack", "cta", "single_stack"], (
+            assert types == ["envelope", "single_stack", "cta", "single_stack"], (
                 "renumbering reordered the layout"
             )
         finally:

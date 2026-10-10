@@ -102,7 +102,7 @@ classes). The module types and the fields they show:
 | `img_left` | A section heading, an image on the left, a headline, body text and a button |
 | `img_right` | The same, with the image on the right |
 | `single_stack` | The same, stacked |
-| `header` | **Invisible.** The subject and preheader (the "envelope"); it renders no visible content. Being renamed to `envelope` (task-349). |
+| `envelope` | **Invisible.** The subject and preheader; it renders no visible content. Called `header` until 2026-10-10 (task-349), which frees that name for the visible logo header. |
 
 Styling is one file for every email, `storage/modules/email/brand.css`, inlined
 into each email when it is sent. It uses these classes: `.module-wrapper`,

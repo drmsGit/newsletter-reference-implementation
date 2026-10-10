@@ -53,7 +53,7 @@ def _create(campaign, **fields):
 def _envelope(db, variant_id):
     db.expire_all()
     module = (db.query(ModuleInstanceDB)
-              .filter(ModuleInstanceDB.variant_id == variant_id, ModuleInstanceDB.module_type == "header")
+              .filter(ModuleInstanceDB.variant_id == variant_id, ModuleInstanceDB.module_type == "envelope")
               .one_or_none())
     return None if module is None else module.module_data
 

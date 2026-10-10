@@ -162,7 +162,7 @@ class TestB11CampaignComposition:
         # The envelope is written through the variant, never added as a module (task-249).
         set_envelope_fields(db, variant.id, {"subject": "S"}, brand_id=default_brand.id)
         header = db.query(ModuleInstanceDB).filter(ModuleInstanceDB.variant_id == variant.id,
-                                                   ModuleInstanceDB.module_type == "header").one()
+                                                   ModuleInstanceDB.module_type == "envelope").one()
         content = create_module_for_variant(db, variant_id=variant.id, module_type="img_right",
                                             content_record_id=record.id, brand_id=default_brand.id)
         slot = DecisionSlotDB(variant_id=variant.id, name="slot", decision_type="content_recommendation",
@@ -210,7 +210,7 @@ class TestB11CampaignComposition:
         [variant] = self._get(composed["campaign"].id).json()["variants"]
         assert [m["id"] for m in variant["envelope_modules"]] == [composed["header"]]
         assert composed["header"] not in {m["id"] for m in variant["modules"]}
-        assert variant["has_envelope"] is True and "header" not in variant["accepted_module_types"]
+        assert variant["has_envelope"] is True and "envelope" not in variant["accepted_module_types"]
         assert variant["module_limit"] is None and variant["can_add_module"] is True
 
     def test_slots_carry_their_counts(self, composed):

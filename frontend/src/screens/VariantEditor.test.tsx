@@ -9,7 +9,7 @@ afterEach(() => vi.unstubAllGlobals())
 
 const MANIFESTS = [
   {
-    name: 'header', channel: 'email', label: 'Header', description: '', cms: false, carries_envelope: true,
+    name: 'envelope', channel: 'email', label: 'Envelope (subject and preheader)', description: '', cms: false, carries_envelope: true,
     variables: [
       { name: 'subject', required: true, label: 'Subject', envelope: true, type: 'text' },
       { name: 'preheader', required: false, label: 'Preheader', envelope: true, type: 'text' },
@@ -239,8 +239,8 @@ describe('the variant editor', () => {
     open({
       ...handlers,
       'GET /modules': () => jsonResponse([
-        ...MANIFESTS.filter((m) => m.name !== 'header'),
-        { name: 'header', channel: 'email', label: 'Header', description: '', cms: false, carries_envelope: true,
+        ...MANIFESTS.filter((m) => m.name !== 'envelope'),
+        { name: 'envelope', channel: 'email', label: 'Envelope (subject and preheader)', description: '', cms: false, carries_envelope: true,
           variables: [{ name: 'sender_name', required: false, label: 'Sender name', envelope: true, type: 'text' }] },
       ]),
     })

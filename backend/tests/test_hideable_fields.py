@@ -114,7 +114,7 @@ class TestTheStandardSet:
         ("img_right", {"image_url", "headline_medium", "body_medium", "button_label"}),
         ("single_stack", {"image_url", "headline_medium", "body_medium", "button_label"}),
         ("hero", {"headline_hero", "button_label_hero"}),
-        ("cta", set()), ("editorial", set()), ("header", set()),
+        ("cta", set()), ("editorial", set()), ("envelope", set()),
     ])
     def test_the_agreed_fields_are_hideable(self, module, hideable):
         manifest = get_manifest("email", module)

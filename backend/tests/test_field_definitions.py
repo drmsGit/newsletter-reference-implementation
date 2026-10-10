@@ -139,9 +139,9 @@ def test_every_shipped_manifest_uses_only_allowed_keys_and_loads():
 def test_the_envelope_still_comes_from_the_definitions():
     """The header manifest no longer says so; the definitions do, and the
     envelope lookup still finds header for email and nothing for push."""
-    header = {v.name: v.envelope for v in registry.get_manifest("email", "header").variables}
+    header = {v.name: v.envelope for v in registry.get_manifest("email", "envelope").variables}
     assert header == {"subject": True, "preheader": True}
-    assert registry.envelope_module_type("email") == "header"
+    assert registry.envelope_module_type("email") == "envelope"
     assert registry.envelope_module_type("push") is None
 
 
@@ -200,11 +200,11 @@ def test_the_module_list_says_which_module_carries_the_envelope():
     so no client re-derives it by scanning every module's fields."""
     email = {m["name"]: m["carries_envelope"] for m in _get("/modules", channel="email")}
     assert [name for name, carries in email.items() if carries] == [registry.envelope_module_type("email")]
-    assert email["header"] is True and email["hero"] is False
+    assert email["envelope"] is True and email["hero"] is False
     push = _get("/modules", channel="push")
     assert push and not any(m["carries_envelope"] for m in push), "push has no envelope"
 
 
 def test_one_module_says_so_too():
-    assert _get("/modules/header", channel="email")["carries_envelope"] is True
+    assert _get("/modules/envelope", channel="email")["carries_envelope"] is True
     assert _get("/modules/hero", channel="email")["carries_envelope"] is False

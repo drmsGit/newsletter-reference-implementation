@@ -58,7 +58,7 @@ def world(db, default_brand):
     db.add(DecisionResolutionDB(decision_slot_id=nothing.id, recipient_id=None,
                                 content_record_id=published.id, reason="r", score=1))
     modules = [
-        ModuleInstanceDB(variant_id=variant.id, module_type="header", position=0, module_data={"subject": "S"}),
+        ModuleInstanceDB(variant_id=variant.id, module_type="envelope", position=0, module_data={"subject": "S"}),
         ModuleInstanceDB(variant_id=variant.id, module_type="img_left", position=1, content_record_id=published.id),
         ModuleInstanceDB(variant_id=variant.id, module_type="img_left", position=2, content_record_id=drafted.id),
         ModuleInstanceDB(variant_id=variant.id, module_type="img_left", position=3, decision_slot_id=resolved.id),

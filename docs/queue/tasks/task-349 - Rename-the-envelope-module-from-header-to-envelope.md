@@ -1,10 +1,11 @@
 ---
 id: TASK-349
 title: Rename the envelope module from header to envelope
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-10 21:17'
-updated_date: '2026-10-10 21:19'
+updated_date: '2026-10-10 22:06'
 labels:
   - backend
   - frontend
@@ -39,6 +40,29 @@ First of three build tasks from task-301: this, then the brand profile, then the
 - [ ] #2 Snapshots and delivery records made before the rename still read and reconstruct as sent
 - [ ] #3 The name header is free for the visible header module
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Final-design pass, 2026-10-10. Decided with the user after a finding: module_html writes data-module-type into every module's HTML (backend/app/rendering/service.py around :372). So rewriting frozen frames would change every sent email's bytes and break ADR-183's hash match. Frozen frames are therefore left exactly as they are, and old frames are read with the old name.
+
+1. Rename the files storage/modules/email/header.json and header.html to envelope.json and envelope.html (git mv). Label: 'Envelope (subject and preheader)'. envelope_module_type() finds it by its envelope fields, so no code names it.
+2. Frames, in backend/app/rendering/frame.py:
+   - FRAME_VERSION becomes 2, and new frames say which module is their envelope.
+   - is_frame() accepts versions 1 and 2. Today it accepts only the current one, so a bump alone would refuse every existing snapshot at send time.
+   - In a version-1 email frame, a 'header' entry IS the envelope. Readers translate it for manifest and template lookups only; the HTML keeps data-module-type='header', so old emails render byte-identically.
+   - The translation is keyed on the version, so it can never be confused with task-351's visible 'header' (a version-2 frame).
+   - Touches what_rendered, render_frame/module_html (template lookup separate from the written name), missing_required_in_frame and _pick_for_slot.
+3. Live module rows: migration 0043 renames module_instances.module_type 'header' to 'envelope'. Snapshots are untouched.
+4. Tests first:
+   - a v2 frame names 'envelope';
+   - a v1 frame with 'header' renders data-module-type='header' with the preheader, counts as the envelope in what_rendered, and is still a frame;
+   - the required-field check reads it;
+   - live rows use 'envelope'.
+   Frontend fixtures renamed for honesty.
+5. Proof on real data: before the change, 9 sent dev deliveries had a 'header' frame; 1 reconstructed with hash_matches true and 8 already differed (templates changed since). After the change and the migration, the same 1 must still match and the 8 must be unchanged (scratchpad recon_probe.py).
+6. Mutation-check, full suites, docs mentions (ADR-086 addendum wording stays dated), commit, CI.
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
