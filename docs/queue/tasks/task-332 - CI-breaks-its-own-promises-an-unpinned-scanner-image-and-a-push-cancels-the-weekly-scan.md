@@ -3,9 +3,11 @@ id: TASK-332
 title: >-
   CI breaks its own promises: an unpinned scanner image, and a push cancels the
   weekly scan
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-09 18:12'
+updated_date: '2026-10-10 19:45'
 labels:
   - docs
 dependencies: []

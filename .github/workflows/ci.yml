@@ -11,9 +11,9 @@
 #     dependencies) — dev tooling is reported only;
 #   - a secret in the git history.
 # Weekly as well as on push, so a newly published vulnerability is noticed
-# when nobody pushes. Third-party actions are pinned to commit SHAs (the tag
-# they were taken from is in the comment), so a moved tag cannot change what
-# runs here.
+# when nobody pushes. Third-party actions are pinned to commit SHAs and the
+# scanner image to a digest (the tag each was taken from is in the comment), so
+# a moved tag cannot change what runs here; tests/test_ci_workflow.py holds it.
 
 name: CI
 
@@ -27,8 +27,11 @@ on:
 permissions:
   contents: read
 
+# A newer push cancels an older run for the same ref. The scheduled run gets a
+# group of its own: every push lands on main, so sharing one let a push cancel
+# the weekly scan, the run that exists for weeks without pushes (task-332).
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 env:
@@ -166,4 +169,6 @@ jobs:
       - name: gitleaks — the whole history, redacted
         # The container image rather than gitleaks-action, which needs a paid
         # licence on organisation accounts. Same version as the local scan.
-        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 git /repo --redact --no-banner
+        # Pinned by digest like the actions above, so a moved tag cannot change
+        # the one step that reads the whole history (task-332). Tag: v8.30.1.
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f git /repo --redact --no-banner
