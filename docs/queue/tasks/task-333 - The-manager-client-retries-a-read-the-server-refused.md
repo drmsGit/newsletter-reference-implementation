@@ -1,9 +1,11 @@
 ---
 id: TASK-333
 title: The manager client retries a read the server refused
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-09 18:12'
+updated_date: '2026-10-10 20:01'
 labels:
   - frontend
 dependencies: []
