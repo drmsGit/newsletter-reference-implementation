@@ -797,6 +797,19 @@ Each was decided by the user in its own question. The full narrative is under th
 - **Security checks after handoff (BF-CI1): the fork's owner.** A fork's checks cover that fork; its owner runs them against the deployed version and acts on them. We maintain the reference, not forks (BRIEF, task-55).
 - **Unsubscribe links over time (BF-SUB1): the product guarantees the token, the adopter the address and the records.** A token never expires. The link's domain should be the company's own, kept reachable by the adopter (task-55). Retention must keep the unsubscribe lookup working for a minimum period (task-136; ADR-191 addendum).
 
+### 2026-10-10 — An email's legal footer is fixed; its look is the company's
+
+**Context:** what a recipient sees at the top and bottom of an email did not exist (task-301). Every marketing email already carried a small fixed unsubscribe line, and a brand held nothing but its name. **Decided by the user, one question at a time:**
+1. **Two layers.** What the law needs is never optional: the frame appends the unsubscribe line plus the brand's legal details to every marketing email. The designed header (logo) and footer (links, special texts) are ordinary modules a manager places, so a brand can have as many footer variants as it likes.
+2. **A brand profile holds the legal details, in several named sets.** One brand may send for more than one legal entity: one set is the default, and a campaign may pick another. A marketing send is refused while its set lacks a required field.
+3. **Brands share one structure but get their own colour and font**, on top of the shared stylesheet.
+4. **Decoration never counts as content.** An email holding only a header and a footer still has "nothing to show".
+5. **The logo is a web address for now**, and an uploaded asset once asset management exists.
+6. **The invisible "envelope" module (subject, preheader) is renamed**, so the visible logo module can be called header.
+7. **A preference center is parked** as its own task.
+
+Recorded in [[ADR-193 — An Email's Legal Footer Is Fixed, Its Visible Header and Footer Are Placed Modules]], with an addendum to ADR-191 (the fixed line is permanent, not a stopgap). Built in task-349, then task-350, then task-351; the preference center is task-348.
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*

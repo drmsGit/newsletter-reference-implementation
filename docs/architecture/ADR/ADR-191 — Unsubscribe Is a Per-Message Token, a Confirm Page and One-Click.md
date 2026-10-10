@@ -8,7 +8,7 @@ topic:
   - deliverability
   - delivery
 created: 2026-10-09
-modified: 2026-10-09
+modified: 2026-10-10
 source:
   - "Decided by the user in chat, 2026-10-09, one question at a time (task-56)"
 depends_on:
@@ -146,6 +146,22 @@ The question was whether "never break" also promised those two.
 
 **Not decided.** What an erasure does to a link. [[ADR-154 — Erasure and Retention]] point 2 removes a person's delivery executions by default, so that person's old links stop resolving after an erasure. Point 3 above speaks only of retention clean-up. Whether erasure needs the same care is not decided here.
 
+## Addendum 2026-10-10 — the footer line is permanent, not a stopgap
+
+Prompted by the task-301 design session. The user decided on 2026-10-10, and [[ADR-193 — An Email's Legal Footer Is Fixed, Its Visible Header and Footer Are Placed Modules]] records it. Decision point 5 above and its Negative entry are left as written. This addendum governs how they are to be read.
+
+**What changed.** Point 5 called the footer line "a minimal footer line now, until the designed footer replaces it". It said the designed visible footer of task-301 would replace the line. The Negative list called the line "a stopgap". ADR-193 point 1 goes another way:
+
+- **The fixed line stays, permanently.** The frame keeps appending it to every marketing email.
+- **It is extended with the brand's legal details,** taken from a brand profile (ADR-193 point 2).
+- **The designed visible header and footer are placed modules on top of it.** A manager may place them or leave them out. They do not replace the line.
+
+**Why this is a refinement, not a supersession.** The guarantee in point 5 holds: every marketing email carries a visible unsubscribe link, and no manager can remove it. That guarantee is now permanent instead of interim. No designed footer can lose the link, because the link no longer depends on one. Only the expectation of how task-301 would deliver the link is not carried out. ADR-193's Notes reach the same conclusion. ADR-191's own Notes treated a wording difference with ADR-169 the same way.
+
+**One wording fix follows.** The docstring of `footer_html` (`backend/app/subscriptions/texts.py:13-14`) says the line lasts "until task-301's designed footer replaces it". It will be wrong once ADR-193 is built. Correcting it belongs to queue task-350, the brand profile build.
+
+**Nothing is built by this addendum.**
+
 ## Related ADRs
 
 ### Depends On
@@ -159,3 +175,4 @@ The question was whether "never break" also promised those two.
 - [[ADR-132 — Signal Layer Implementation Event-Sourced Contributions with Decay-on-Read]]
 - [[ADR-152 — Secret and Credential Handling]]
 - [[ADR-161 — Channel Execution Shapes]] — the envelope carries the List-Unsubscribe URL as delivery metadata.
+- [[ADR-193 — An Email's Legal Footer Is Fixed, Its Visible Header and Footer Are Placed Modules]] — makes point 5's footer line permanent and extends it with the brand's legal details.

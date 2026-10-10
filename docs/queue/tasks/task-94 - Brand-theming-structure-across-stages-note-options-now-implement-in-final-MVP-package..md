@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-10-10 21:16'
 labels:
   - backend
   - frontend
@@ -29,4 +30,6 @@ ordinal: 204700
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 264, section "Features", position 47 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-10 (task-301, ADR-193, decided by the user): brand.css stays the one shared full-CSS stylesheet for email structure, but each brand profile now also carries colour and font values, applied on top of brand.css at render. That widens this task's email side from one file per installation to one file plus per-brand values. How they are applied is still open: email clients handle CSS custom properties poorly, so the values must be resolved at render or inlining.
 <!-- SECTION:NOTES:END -->

@@ -4,7 +4,7 @@ title: 'There is no asset or media management: no table, no upload route, no pic
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
-updated_date: '2026-10-08 19:05'
+updated_date: '2026-10-10 21:16'
 labels:
   - backend
   - frontend
@@ -53,4 +53,6 @@ Migrated 2026-09-27 from `docs/backlog.md` line 374, section "Features", positio
 Content image fields (image_url/image_alt in ContentRecordDB.content) require managers to hand-paste a raw URL - no upload or media-library picker. Carried over from a past Condor implementation; a marketer shouldn't need to copy/paste image URLs. Needs an "upload / select image" UI component (upload to storage, or pick from previously-uploaded images) wired into the content create/edit forms, replacing the plain URL text input. New feature, not a bug - low priority, no rush.
 
 It describes the same gap from the content form's side; this task's 2026-09-27 design covers it. The logo for a visible header (task-301) is the next consumer.
+
+2026-10-10 (task-301, ADR-193): the visible email header's logo is an https URL in its content for now. When asset management lands, that field becomes an asset id, and the header logo is this task's first user.
 <!-- SECTION:NOTES:END -->
