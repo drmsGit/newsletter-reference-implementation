@@ -33,8 +33,13 @@ def test_the_adapter_cannot_send_for_real():
         ResendProvider(api_key="test").send("a@example.invalid", artifact)
 
 
-def test_the_send_that_leaked_on_2026_10_10_now_fails_loudly(db, world):
-    """Planned with provider "resend" and nothing faked — exactly the leak."""
+def test_the_send_that_leaked_on_2026_10_10_now_fails_loudly(db, world, monkeypatch):
+    """Planned with provider "resend" and nothing faked — exactly the leak. A
+    public https address is set so task-330's refusal does not stop it first,
+    and a key, because the leak needed one: without it the adapter gives up
+    before the network (which is why this passed locally and failed in CI)."""
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://news.example.com")
+    monkeypatch.setenv("RESEND_API_KEY", "test-not-a-real-key")
     brand = world["brand"]
     snapshot = create_snapshot_for_variant(db, world["variant"](static=True, slots=0).id, brand_id=brand.id)
     world["made"]["snapshots"].append(snapshot.id)
