@@ -3,11 +3,11 @@ id: TASK-334
 title: >-
   Correct six comments and rationale notes the 2026-10-09 interview review found
   stale or missing
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-09 18:13'
-updated_date: '2026-10-10 20:24'
+updated_date: '2026-10-10 20:33'
 labels:
   - docs
   - frontend
@@ -34,11 +34,28 @@ Source: [[Interview Prep - Since 2026-09-18]] (Client Q2, Q4, Q5; CI Q2, Q5) and
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Each of the six places says what is true, citing the record that settles it
+- [x] #1 Each of the six places says what is true, citing the record that settles it
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-09: a seventh item, from CI Q3. The README tells an adopter that a fork must configure its own required checks: CI in a fork checks that fork's code and enforces nothing by itself (ADR-190, 2026-10-09 addendum).
+
+2026-10-10, done (commit 69e3d3b). All seven items are worded as decided:
+- resources.ts manifest caching, Client Q2;
+- client.ts CSRF owner and write sites, Client Q4;
+- TypedApiClient.md 'What the guarantee covers', Client Q5;
+- check_installed.py docstring on this platform's bindings, CI Q2;
+- testing.md 'Why the installed-packages check runs on a fresh install', CI Q5;
+- duplication.py docstring, P2-A3;
+- README on forks setting their own required checks, CI Q3.
+
+No behaviour changes. The full backend suite (1652) passed, including the text-scanning guards, plus Ruff, tsc and ESLint. The CI run for 69e3d3b was cancelled by the next push; run 38083935595 on 5366e90, which contains it, is green.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Seven comments and notes the 2026-10-09 interview review found stale or missing now say what is true, each citing the record that settles it: manifest caching, the CSRF token's write sites, the typed client's guarantee, the optional-package exemption, why the installed-packages check runs on a fresh install, duplication friction, and that a fork sets its own required checks. Wording only. Verified by the full suite including the text guards, and green CI on 5366e90.
+<!-- SECTION:FINAL_SUMMARY:END -->
