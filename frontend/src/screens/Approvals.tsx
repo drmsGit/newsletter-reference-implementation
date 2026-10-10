@@ -32,7 +32,20 @@ export function deadline(iso: string | null | undefined): string {
 const waitingColumns: DataColumn<PendingActionRow>[] = [
   { key: 'label', header: 'Request', isRowHeader: true, render: (a) => a.label },
   { key: 'summary', header: 'Summary', render: (a) => a.summary },
-  { key: 'requested_by', header: 'Requested by', render: requester },
+  {
+    key: 'requested_by',
+    header: 'Requested by',
+    // Said before anyone decides (task-331): approving such a request
+    // withdraws it and nothing runs.
+    render: (a) =>
+      a.requester_allowed === false ? (
+        <>
+          {requester(a)} <strong>— no longer allowed; approving withdraws it</strong>
+        </>
+      ) : (
+        requester(a)
+      ),
+  },
   { key: 'expires', header: 'Expires', render: (a) => deadline(a.expires_at) },
 ]
 

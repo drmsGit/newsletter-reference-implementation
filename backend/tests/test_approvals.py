@@ -70,7 +70,7 @@ def planted_action(tmp_path, monkeypatch):
         "from pathlib import Path\n"
         "\n"
         f"META = ApprovableAction(key='{ACTION_KEY}', label='Write a marker',\n"
-        "                        approve_permission='sends.execute',\n"
+        "                        approve_permission='sends.execute', request_permission='sends.execute',\n"
         "                        default_ttl_seconds=3600,\n"
         "                        requester_may_decide=True,\n"
         "                        subject_type='marker')\n"
@@ -184,7 +184,7 @@ class TestTheRegistry:
         late = package / "c_apprtest_late.py"
         late.write_text(
             "from app.approvals.actions.base import ApprovableAction, ActionDescription, ActionResult\n"
-            "META = ApprovableAction(key='apprtest.late', label='Late', approve_permission='view',\n"
+            "META = ApprovableAction(key='apprtest.late', label='Late', approve_permission='view', request_permission='view',\n"
             "                        default_ttl_seconds=60, requester_may_decide=True, subject_type='marker')\n"
             "def describe(db, payload, *, brand_id=None): return ActionDescription(summary='late')\n"
             "def execute(db, payload, *, choice=None, brand_id=None): return ActionResult(ok=True)\n"
@@ -211,7 +211,7 @@ class TestTheRegistry:
         broken.write_text(
             "from app.approvals.actions.base import ApprovableAction\n"
             f"META = ApprovableAction(key='{BROKEN_KEY}', label='No execute',\n"
-            "                        approve_permission='view',\n"
+            "                        approve_permission='view', request_permission='view',\n"
             "                        default_ttl_seconds=60,\n"
             "                        requester_may_decide=True)\n"
         )
@@ -783,7 +783,7 @@ class TestEveryHeldRequestNamesItsSubject:
             "from app.approvals.actions.base import ApprovableAction, "
             "ActionDescription, ActionResult\n"
             "META = ApprovableAction(key='apprtest.no_subject', label='No subject',\n"
-            "                        approve_permission='sends.execute',\n"
+            "                        approve_permission='sends.execute', request_permission='sends.execute',\n"
             "                        default_ttl_seconds=3600,\n"
             "                        requester_may_decide=True)\n"
             "def describe(db, payload, *, brand_id=None):\n"
@@ -865,7 +865,7 @@ def ageless_action(planted_action):
     path.write_text(
         "from app.approvals.actions.base import ApprovableAction, ActionDescription, ActionResult\n"
         f"META = ApprovableAction(key='{AGELESS_KEY}', label='Never stale',\n"
-        "                        approve_permission='sends.execute',\n"
+        "                        approve_permission='sends.execute', request_permission='sends.execute',\n"
         "                        default_ttl_seconds=None,\n"
         "                        requester_may_decide=True,\n"
         "                        subject_type='marker')\n"
@@ -930,7 +930,7 @@ class TestAnActionWithNoDeadline:
         forgetful.write_text(
             "from app.approvals.actions.base import ApprovableAction\n"
             f"META = ApprovableAction(key='{FORGETFUL_KEY}', label='Forgot',\n"
-            "                        approve_permission='view',\n"
+            "                        approve_permission='view', request_permission='view',\n"
             "                        requester_may_decide=True)\n"
             "def describe(db, payload, *, brand_id=None): pass\n"
             "def execute(db, payload, *, choice=None, brand_id=None): pass\n"

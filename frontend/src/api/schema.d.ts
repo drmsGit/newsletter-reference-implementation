@@ -5063,6 +5063,8 @@ export interface components {
             requested_by_name?: string | null;
             /** Decided By Name */
             decided_by_name?: string | null;
+            /** Requester Allowed */
+            requester_allowed?: boolean | null;
             /**
              * Rows
              * @default []
@@ -5131,6 +5133,8 @@ export interface components {
             requested_by_name?: string | null;
             /** Decided By Name */
             decided_by_name?: string | null;
+            /** Requester Allowed */
+            requester_allowed?: boolean | null;
         };
         /** PreferenceUpdateResult */
         PreferenceUpdateResult: {

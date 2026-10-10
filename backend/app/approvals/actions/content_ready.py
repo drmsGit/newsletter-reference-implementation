@@ -26,6 +26,7 @@ META = ApprovableAction(
     label="Mark content ready for a channel",
     # What a person needs to mark a record ready themselves.
     approve_permission="content.manage",
+    request_permission="content.manage",
     # ADR-142 addendum 2026-09-24: an action whose moment does not pass.
     default_ttl_seconds=None,
     # A machine asks and a person decides; were a person ever to ask, someone

@@ -31,6 +31,19 @@ from main import app
 TAG = "apprui"
 ACTION_KEY = "apprui.write_marker"
 _CREATED: list[int] = []
+#: Real requesting integrations (task-331): an approval now re-checks that the
+#: requester is still allowed, so a held request must name one that exists and
+#: holds the action's request permission — no longer a bare id like 7.
+_MACHINES: list[int] = []
+
+
+def _machine_id(db) -> int:
+    from app.auth import integrations as ints
+
+    integration = ints.create_integration(db, name=f"{TAG}-{uuid.uuid4().hex[:6]}", description="test")
+    assert ints.grant(db, integration.id, "sends.execute", auth.ensure_default_brand(db).id)
+    _MACHINES.append(integration.id)
+    return integration.id
 
 
 @pytest.fixture
@@ -52,7 +65,7 @@ def planted_action(tmp_path):
         "from pathlib import Path\n"
         "\n"
         f"META = ApprovableAction(key='{ACTION_KEY}', label='Write a marker',\n"
-        "                        approve_permission='sends.execute',\n"
+        "                        approve_permission='sends.execute', request_permission='sends.execute',\n"
         "                        default_ttl_seconds=3600,\n"
         "                        requester_may_decide=True,\n"
         "                        subject_type='marker')\n"
@@ -90,6 +103,11 @@ def _sweep(db):
             PendingActionDB.id.in_(_CREATED)
         ).delete(synchronize_session=False)
         _CREATED.clear()
+    for integration_id in _MACHINES:
+        for table, column in (("integration_credentials", "integration_id"),
+                              ("integration_grants", "integration_id"), ("integrations", "id")):
+            db.execute(text(f"DELETE FROM {table} WHERE {column} = :i"), {"i": integration_id})
+    _MACHINES.clear()
     for table in ("login_codes", "auth_sessions", "role_assignments"):
         db.execute(text(
             f"DELETE FROM {table} WHERE user_id IN "
@@ -119,7 +137,7 @@ def _csrf(client):
 def _held(db, payload, brand_id=None):
     row = approvals.request_approval(
         db, ACTION_KEY, payload=payload, summary="a held marker",
-        requested_by_type="integration", requested_by_id=7,
+        requested_by_type="integration", requested_by_id=_machine_id(db),
         brand_id=brand_id or auth.ensure_default_brand(db).id,
         subject_id=int(uuid.uuid4().int % 10**8),
     )
@@ -146,7 +164,7 @@ def separation_of_duties_action(tmp_path):
         "ActionDescription, ActionResult\n"
         "\n"
         f"META = ApprovableAction(key='{SELF_KEY}', label='Fire something real',\n"
-        "                        approve_permission='sends.execute',\n"
+        "                        approve_permission='sends.execute', request_permission='sends.execute',\n"
         "                        default_ttl_seconds=3600,\n"
         "                        requester_may_decide=False,\n"
         "                        subject_type='marker')\n"
@@ -633,7 +651,7 @@ class TestAnActionThatCannotRun:
             "from pathlib import Path\n"
             "\n"
             f"META = ApprovableAction(key='{TAG}.blocked', label='Blocked action',\n"
-            "                        approve_permission='sends.execute',\n"
+            "                        approve_permission='sends.execute', request_permission='sends.execute',\n"
             "                        default_ttl_seconds=3600,\n"
         "                        requester_may_decide=True,\n"
             "                        subject_type='marker')\n"
@@ -658,7 +676,7 @@ class TestAnActionThatCannotRun:
     def _held_blocked(self, db, payload):
         row = approvals.request_approval(
             db, f"{TAG}.blocked", payload=payload, summary="a blocked request",
-            requested_by_type="integration", requested_by_id=7,
+            requested_by_type="integration", requested_by_id=_machine_id(db),
             brand_id=auth.ensure_default_brand(db).id,
             subject_id=int(uuid.uuid4().int % 10**8),
         )

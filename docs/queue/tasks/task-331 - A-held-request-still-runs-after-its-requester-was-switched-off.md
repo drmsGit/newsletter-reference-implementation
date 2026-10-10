@@ -1,10 +1,11 @@
 ---
 id: TASK-331
 title: A held request still runs after its requester was switched off
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-09 18:12'
-updated_date: '2026-10-09 18:20'
+updated_date: '2026-10-10 19:19'
 labels:
   - backend
 dependencies: []
@@ -31,6 +32,28 @@ Source: [[Interview Prep - Since 2026-09-18]] → Manager client, held approvals
 - [ ] #3 The approvals inbox shows that a pending request's requester is no longer allowed
 - [ ] #4 A request whose requester is still allowed approves and runs as before
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Final-design pass, 2026-10-10. Three decisions taken by the user, recorded in the ADR-142 addendum by adr-author:
+- declared request_permission on each action;
+- a new 'withdrawn' status;
+- one rule for every requester.
+
+1. approvals/actions/base.py: ApprovableAction gains a required request_permission beside approve_permission. Declared values: send_fire sends.execute; content_ready content.manage (the policy of PUT /content/{content_id}/readiness/{channel}); ai_subject_apply ai.run. A test pins that each APPROVABLE_ROUTES action declares exactly required_permission() of its route.
+2. approvals/db_models.py: WITHDRAWN = 'withdrawn' in STATUSES and DECIDED. The check constraint string gains it. scripts/migrate_0042_pending_action_withdrawn.sql drops and re-adds ck_pending_actions_status (0022's pattern). Applied to dev with scripts/migrate.py --apply before the .py edits run against it.
+3. audit/service.py: APPROVAL_WITHDRAWN = 'approval.withdrawn' in the vocabulary.
+4. approvals/service.py:
+   - requester_allowed(db, row) returns True, False or None. It loads the requester (user or integration); system or unknown types give None, meaning no standing to lose. It calls has_permission with the request's brand when request_permission is brand-scoped, else ALL_BRANDS. An inactive principal holds nothing, so one call covers both deactivation and permission loss. A requester row that no longer exists counts as not allowed.
+   - In approve(): after the expiry and action-exists checks and BEFORE the claim, a requester not allowed means a conditional transition pending to withdrawn (decided_at, decided_by the approver, decision_reason 'requester no longer allowed'), audited approval.withdrawn with the approver as actor, and an ActionResult refusal. Reject is unchanged.
+5. approvals/router.py: PendingActionRow.requester_allowed (bool | None), computed for pending rows in list and detail.
+6. Frontend: regenerate the API types. The Approvals list and ApprovalDetail show a notice on a pending request whose requester is no longer allowed ('approving will withdraw it, and nothing will run'). Status text 'withdrawn' shows as is.
+7. Tests first.
+   - Backend: an integration's held send, switched off, then approved, ends withdrawn with nothing sent and audited; the same with its grant revoked; the same for a deactivated person and for a person without ai.run; a still-allowed requester runs as before; the list shows requester_allowed; reject still works; the declaration test.
+   - Frontend: the notice.
+8. Mutation-check, full suites, Ruff, ESLint, tsc, commit, CI, live check on scratch data.
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 

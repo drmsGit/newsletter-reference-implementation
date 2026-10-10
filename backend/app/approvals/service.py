@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 from app.approvals.actions.base import ActionResult
 from app.approvals.actions.registry import get_action, get_action_module
 from app.approvals.db_models import (
-    APPROVED, DECIDED, EXECUTING, EXPIRED, FAILED, PENDING, REJECTED, PendingActionDB,
+    APPROVED, DECIDED, EXECUTING, EXPIRED, FAILED, PENDING, REJECTED, WITHDRAWN, PendingActionDB,
 )
 from app.audit import service as audit
 
@@ -39,6 +39,7 @@ GRANTED = audit.APPROVAL_GRANTED
 DENIED = audit.APPROVAL_REJECTED
 LAPSED = audit.APPROVAL_EXPIRED
 EXECUTION_FAILED = audit.APPROVAL_FAILED
+VOIDED = audit.APPROVAL_WITHDRAWN
 
 #: The subject type every approval event points at.
 SUBJECT = "pending_action"
@@ -331,6 +332,29 @@ def approve(
             message=f"'{row.action_key}' is no longer a registered action",
         )
 
+    # **The requester must still be allowed** (task-331, ADR-142 second addendum
+    # of 2026-10-09). Before the claim, so a withdrawn request never passes
+    # through EXECUTING, and by the same conditional move as reject and expiry,
+    # so it can only ever close a request that is still pending.
+    if requester_allowed(db, row) is False:
+        withdrawn = _transition(
+            db, pending_id, from_status=PENDING, to_status=WITHDRAWN,
+            decided_at=now(), decided_by_type=approver_type, decided_by_id=approver_id,
+            decision_reason=REQUESTER_GONE,
+        )
+        if not withdrawn:
+            return ActionResult(ok=False, message=f"already {_current(db, pending_id).status}")
+        audit.record(
+            db, VOIDED,
+            actor_type=approver_type, actor_id=approver_id,
+            subject_type=SUBJECT, subject_id=pending_id, brand_id=row.brand_id,
+            detail={"action_key": row.action_key, "reason": REQUESTER_GONE},
+        )
+        return ActionResult(
+            ok=False,
+            message=f"withdrawn: the {REQUESTER_GONE}, so nothing ran",
+        )
+
     # The decision is recorded at the claim, because that is when the person
     # decided. `ck_pending_actions_decided` still means what it did: only
     # `pending` is undecided.
@@ -449,6 +473,39 @@ def reject(
 
 
 # --- expiry -----------------------------------------------------------------
+
+#: Why a request was withdrawn, as its `decision_reason` and in the audit entry.
+REQUESTER_GONE = "requester is no longer allowed"
+
+
+def requester_allowed(db: Session, row: PendingActionDB) -> bool | None:
+    """Whether the request's requester may still raise it (task-331).
+
+    True or False for a person or an integration; None for a requester with no
+    standing to lose (a system sweep), or an action no longer registered.
+    **One rule for both** (decided 2026-10-10): still active, and still holding
+    the action's `request_permission`. `has_permission` answers both at once,
+    because an inactive principal holds nothing. Brand-scoped permissions are
+    checked on the request's own brand; a grant elsewhere is not standing here.
+    A requester whose row no longer exists is not allowed.
+    """
+    from app.auth.db_models import IntegrationDB, UserDB
+    from app.auth.permissions import BRAND_SCOPED
+    from app.auth.service import ALL_BRANDS, has_permission
+
+    meta = get_action(row.action_key)
+    if meta is None or row.requested_by_id is None:
+        return None
+    model = {audit.ACTOR_USER: UserDB, audit.ACTOR_INTEGRATION: IntegrationDB}.get(row.requested_by_type)
+    if model is None:
+        return None
+    principal = db.get(model, row.requested_by_id)
+    if principal is None:
+        return False
+    permission = meta.request_permission
+    scope = row.brand_id if permission in BRAND_SCOPED and row.brand_id is not None else ALL_BRANDS
+    return has_permission(db, principal, permission, brand_id=scope)
+
 
 def _expire(db: Session, row: PendingActionDB) -> bool:
     """Retire a request that lapsed — **only if it is still pending** (task-13).

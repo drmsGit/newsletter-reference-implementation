@@ -21,12 +21,17 @@ FAILED = "failed"
 #: can know whether the action ran, and re-approving it is the double execution
 #: this state exists to prevent.
 EXECUTING = "executing"
+#: A person tried to approve, and the requester was no longer allowed —
+#: switched off, or no longer holding the action's `request_permission`
+#: (task-331, ADR-142 second addendum of 2026-10-09). Nothing ran and nobody
+#: refused it, which is why it is neither REJECTED nor FAILED.
+WITHDRAWN = "withdrawn"
 
-STATUSES = (PENDING, EXECUTING, APPROVED, REJECTED, EXPIRED, FAILED)
+STATUSES = (PENDING, EXECUTING, APPROVED, REJECTED, EXPIRED, FAILED, WITHDRAWN)
 #: Everything that is no longer waiting on a person. EXECUTING is here because
 #: the person has decided; it is shown with the decided rows rather than in the
 #: inbox, which must never offer an Approve button on something already running.
-DECIDED = (EXECUTING, APPROVED, REJECTED, EXPIRED, FAILED)
+DECIDED = (EXECUTING, APPROVED, REJECTED, EXPIRED, FAILED, WITHDRAWN)
 #: A request that still occupies its subject: nobody may hold a second request
 #: for a thing whose first is waiting, or whose approved action is running.
 OPEN = (PENDING, EXECUTING)
@@ -131,7 +136,7 @@ class PendingActionDB(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "status IN ('pending','executing','approved','rejected','expired','failed')",
+            "status IN ('pending','executing','approved','rejected','expired','failed','withdrawn')",
             name="ck_pending_actions_status",
         ),
         # Decided-ness is one fact held in two columns, so the database keeps

@@ -44,6 +44,11 @@ class PendingActionRow(BaseModel):
     # nobody decided — an expired request.
     requested_by_name: str | None = None
     decided_by_name: str | None = None
+    # Whether the requester is still allowed to raise this request (task-331):
+    # False means approving will withdraw it and nothing will run. Set only on
+    # a request still waiting; None once decided, or for a requester with no
+    # standing to lose (a system sweep).
+    requester_allowed: bool | None = None
 
 
 class DescriptionRow(BaseModel):

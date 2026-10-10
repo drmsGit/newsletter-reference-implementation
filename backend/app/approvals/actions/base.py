@@ -52,6 +52,14 @@ class ApprovableAction:
     #: inference.
     approve_permission: str
 
+    #: The permission a **requester** needs to raise this request (task-331).
+    #: Re-checked when a person approves: a requester that no longer holds it,
+    #: or is switched off, voids the request (ADR-142, second addendum of
+    #: 2026-10-09). Declared for the same reason as `approve_permission` — the
+    #: two differ for an AI suggestion — and pinned by a test to the policy of
+    #: each approvable route, so it cannot drift from what the route checked.
+    request_permission: str
+
     #: ADR-142 §4: "Pending actions expire. A held 'send the morning campaign'
     #: is worthless three days later." The deadline belongs to the action type
     #: and may be absent (§4's addendum of 2026-09-24): "is this copy good" does

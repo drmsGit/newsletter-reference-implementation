@@ -38,9 +38,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/approvals", tags=["approvals"])
 
 
-def _row(row, names: dict | None = None) -> PendingActionRow:
+def _row(row, names: dict | None = None, db=None) -> PendingActionRow:
     meta = get_action(row.action_key)
     names = names or {}
+    status = approvals.effective_status(row)
     return PendingActionRow(
         id=row.id,
         action_key=row.action_key,
@@ -62,6 +63,8 @@ def _row(row, names: dict | None = None) -> PendingActionRow:
         requested_by_name=names.get((row.requested_by_type, row.requested_by_id)),
         decided_by_name=names.get((row.decided_by_type, row.decided_by_id))
         if row.decided_by_type else None,
+        requester_allowed=approvals.requester_allowed(db, row)
+        if db is not None and status == approvals.PENDING else None,
     )
 
 
@@ -104,7 +107,7 @@ def list_pending(
     )
     names = _names_for(db, found)
     return Page(
-        items=[_row(row, names) for row in found],
+        items=[_row(row, names, db) for row in found],
         total=approvals.count_for_brand(db, brand_id, status, **filters),
         limit=params.limit, offset=params.offset,
     )
@@ -180,7 +183,7 @@ def get_pending(
 
     user = user_for_token(db, request.cookies.get(SESSION_COOKIE))
     return PendingActionDetail(
-        **_row(row, _names_for(db, [row])).model_dump(),
+        **_row(row, _names_for(db, [row]), db).model_dump(),
         rows=rows,
         blocked_reason=blocked_reason,
         describe_error=describe_error,

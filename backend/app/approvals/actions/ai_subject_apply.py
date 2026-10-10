@@ -38,6 +38,7 @@ META = ApprovableAction(
     key="ai.apply_subject_preheader",
     label="Use an AI-suggested subject line",
     approve_permission="campaigns.manage",
+    request_permission="ai.run",
     # Shorter than a send's day. A suggestion is about copy that is being
     # written now; one from last week is answering a question nobody is still
     # asking, and the options can be regenerated for a few cents.

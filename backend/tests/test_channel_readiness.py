@@ -172,8 +172,10 @@ class TestAnIntegrationsMarkIsHeld:
         client, csrf, email = person
         with machine([CONTENT_MANAGE]) as headers:
             api.put(f"/content/{record}/readiness/email", headers=headers)
-        [row] = held()
-        response = client.post(f"/approvals/{row.id}/approve", headers=csrf, json={})
+            [row] = held()
+            # Approved while the requesting integration still exists: once it
+            # is gone, approving withdraws the request instead (task-331).
+            response = client.post(f"/approvals/{row.id}/approve", headers=csrf, json={})
         assert response.status_code == 200 and response.json()["ok"], response.text
         mark = db.query(ContentChannelReadinessDB).filter_by(content_id=record, channel="email").one()
         assert mark.marked_by == email, "the person who approved asserted it"

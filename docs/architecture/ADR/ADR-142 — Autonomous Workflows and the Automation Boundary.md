@@ -7,7 +7,7 @@ topic:
   - automation
   - governance
 created: 2026-07-31
-modified: 2026-10-09
+modified: 2026-10-10
 source:
   - "AI Layer design interview (interview-prep, 2026-07-27 – 31), Cluster 3"
 depends_on:
@@ -787,6 +787,26 @@ Nothing else in §4 changes: the inbox, the audit trail shared with ADR-141, the
 notification-only rule for email and push, the state-based claim, the brand check, the
 named-subject rule, the subject scope and the stranded-send release of the earlier
 addenda are untouched.
+
+**Decided 2026-10-10 in task-331's final-design pass:** the first two points left open
+above, and the one point 5 flagged, are settled as follows. **The requester's permission
+is declared on the action.** `ApprovableAction` in `backend/app/approvals/actions/base.py`
+gains a required `request_permission` beside `approve_permission`: the permission a
+requester needs to raise the request, which is `sends.execute` for a send, the readiness
+route's policy permission for a readiness mark, and `ai.run` for an AI suggestion. A test
+pins that each declaration matches the policy of its approvable route. It is not stored
+per row, and the held request gains no column. **Withdrawn is a seventh status,
+`withdrawn`**, added to `STATUSES` and `DECIDED` in `backend/app/approvals/db_models.py`
+and to the database check `ck_pending_actions_status` by migration 0042. It says what
+happened: nobody refused the request and nothing ran. `rejected`, which says a person
+refused, and `failed`, which says it ran and went wrong, were both considered and not
+taken. **One rule covers every requester.** A person and an integration are judged the
+same way: still active, and still holding the action's `request_permission`. So a person
+who has lost that permission, not only one who has been deactivated, has their pending
+request voided too, which settles what point 5 flagged as following from the rule but
+not decided. **Withdrawal happens only on an approve attempt.** Rejecting a request is
+unaffected, and the check runs before the claim of the first 2026-09-29 addendum, so a
+withdrawn request never passes through `executing`.
 
 ## Related ADRs
 

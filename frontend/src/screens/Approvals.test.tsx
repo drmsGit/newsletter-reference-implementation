@@ -123,6 +123,20 @@ describe('narrowing and paging the inbox', () => {
     expect(await within(table).findByText('Acme Agency (integration)')).toBeInTheDocument()
   })
 
+  it('says before anyone decides that a requester is no longer allowed (task-331)', async () => {
+    stubFetch({
+      'GET /approvals/': () =>
+        jsonResponse(page([
+          { ...A_ROW, requested_by_name: 'Acme Agency', requester_allowed: false },
+          { ...A_ROW, id: 8, requested_by_name: 'n8n', requester_allowed: true },
+        ])),
+      'GET /approvals/filter-options': () => jsonResponse(OPTIONS),
+    })
+    renderWithProviders(<Approvals />)
+    const table = await screen.findByRole('grid', { name: 'Waiting for a decision' })
+    expect(await within(table).findAllByText(/no longer allowed; approving withdraws it/)).toHaveLength(1)
+  })
+
   it('sends the filters held in the URL, so a narrowed inbox can be linked to', async () => {
     const fetchMock = stubFetch({
       'GET /approvals/': () => jsonResponse(page([])),
@@ -278,6 +292,20 @@ describe('deciding a request', () => {
     renderDetail()
     expect(await screen.findByRole('button', { name: 'Approve and run' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Reject' })).not.toBeDisabled()
+  })
+
+  it('warns on the detail that approving will withdraw it (task-331)', async () => {
+    stubFetch({ 'GET /approvals/7': () => jsonResponse({ ...PENDING, requester_allowed: false }) })
+    renderDetail()
+    expect(await screen.findByText(/Approving will withdraw the request, and nothing will run/))
+      .toBeInTheDocument()
+  })
+
+  it('does not warn while the requester is still allowed', async () => {
+    stubFetch({ 'GET /approvals/7': () => jsonResponse({ ...PENDING, requester_allowed: true }) })
+    renderDetail()
+    await screen.findByRole('button', { name: 'Reject' })
+    expect(screen.queryByText(/Approving will withdraw/)).not.toBeInTheDocument()
   })
 
   it('shows the warnings, and offers no decision once a request is decided', async () => {

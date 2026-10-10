@@ -32,6 +32,7 @@ META = ApprovableAction(
     # a machine's send — and they will not for every action, which is why the
     # contract asks each one rather than deriving it.
     approve_permission="sends.execute",
+    request_permission="sends.execute",
     # ADR-142 §4: "A held 'send the morning campaign' is worthless three days
     # later." Twenty-four hours is long enough to cover an overnight request and
     # a morning review, and short enough that a forgotten one dies before it

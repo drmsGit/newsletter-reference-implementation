@@ -106,6 +106,14 @@ export default function ApprovalDetail() {
               ))}
             </dl>
 
+            {approval.data.status === 'pending' && approval.data.requester_allowed === false && (
+              // task-331 (ADR-142, second addendum of 2026-10-09): the request is
+              // re-checked against its requester when approved.
+              <p role="status">
+                Whoever asked for this is no longer allowed to: they were switched off, or lost
+                the permission it needs. Approving will withdraw the request, and nothing will run.
+              </p>
+            )}
             {approval.data.may_decide && approval.data.status === 'pending' && (
               <Decision approval={approval.data} />
             )}

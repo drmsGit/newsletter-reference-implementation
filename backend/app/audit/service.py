@@ -122,6 +122,7 @@ APPROVAL_GRANTED = "approval.granted"
 APPROVAL_REJECTED = "approval.rejected"
 APPROVAL_EXPIRED = "approval.expired"
 APPROVAL_FAILED = "approval.failed"
+APPROVAL_WITHDRAWN = "approval.withdrawn"
 # What a granted held action did, written by the action through ActionResult.
 SEND_FIRED = "send.fired"
 # ADR-192: a person released a send stranded in "sending" (task-325).
