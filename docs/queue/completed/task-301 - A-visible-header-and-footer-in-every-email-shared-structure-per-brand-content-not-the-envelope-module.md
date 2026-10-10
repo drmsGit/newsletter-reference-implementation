@@ -3,11 +3,11 @@ id: TASK-301
 title: >-
   A visible header and footer in every email: shared structure, per-brand
   content (not the envelope module)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-08 18:26'
-updated_date: '2026-10-10 21:16'
+updated_date: '2026-10-10 21:22'
 labels:
   - backend
 dependencies: []
@@ -62,9 +62,8 @@ It sits beside task-56 in the queue because both stand between the platform and 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Decided and recorded: what the visible header and footer are (placed module or fixed frame), where per-brand content lives, and whether brands share one structure
-- [ ] #2 The unsubscribe and preference-center links, the logo and per-brand styling are each tied to their own task or decided here
-- [ ] #3 Task-228's floor still treats an email holding only a visible header and footer as nothing to show
+- [x] #1 Decided and recorded: what the visible header and footer are (placed module or fixed frame), where per-brand content lives, and whether brands share one structure
+- [x] #2 The unsubscribe and preference-center links, the logo and per-brand styling are each tied to their own task or decided here
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -93,4 +92,14 @@ Q2, decided: legal details live in a brand profile, and they can differ within a
 - Q5, logo: an https URL in the header's content for now, an asset id once task-112 exists. Noted on task-112.
 - Q6, naming: the envelope module is renamed from header to envelope, so the visible logo module can be called header. Open for the final-design pass: stored module rows, frames frozen in snapshots and delivery records name 'header'. Either migrate them, or let the readers accept the old name too; a frozen record is what was sent (ADR-183).
 - Q7, preference center: parked as its own task.
+
+2026-10-10: AC 3 ('Task-228's floor still treats an email holding only a visible header and footer as nothing to show') was decided here: the "decorative": true manifest flag, ADR-193 point 4. It describes built behaviour, though, so it moved to task-351, whose acceptance criteria state it as 'An email holding only decorative modules and the envelope is skipped as nothing to show', rather than being ticked here unproven.
+
+Design recorded in ADR-193, with an ADR-191 addendum (its footer line is permanent) and back-link, and a playbook entry. Commit 7c70b4e.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The design is decided and recorded in ADR-193. The rendering frame keeps appending the legal minimum to every marketing email: the unsubscribe line plus the brand's legal details from a brand profile, which holds several named sets with a default. The designed visible header and footer are placed modules, marked decorative so they never count as content. Brands share one structure and get their own colour and font. The logo is a URL until asset management (task-112). The envelope module is renamed to envelope. Every open link and asset is tied to a task: build in task-349, task-350 and task-351; preference center task-348; theming task-94. Decided with the user one question at a time; the full suite is green with the records in place.
+<!-- SECTION:FINAL_SUMMARY:END -->
