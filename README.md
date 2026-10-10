@@ -25,7 +25,8 @@ deliberately not started. The name is provisional.
 
 ## Running it locally
 
-You need Docker, Python 3.14 and Node 24.
+You need Docker, Python 3.14 and Node 24. For hosting it beyond your machine, see
+[`docs/reference-deployment.md`](docs/reference-deployment.md) (designed, not yet run).
 
 ```bash
 docker compose up -d                      # Postgres (database `app`)
