@@ -422,3 +422,32 @@ def foreign_api(foreign_brand):
             yield headers
 
     return make
+
+
+#: Hosts a test must never reach (task-346). `main.py` loads `.env` when a test
+#: imports the app, so the real keys are in the environment for the rest of the
+#: run; on 2026-10-10 a test planned a send with provider "resend" without
+#: faking it and two real Resend calls went out.
+REAL_VENDOR_HOSTS = ("api.resend.com", "api.anthropic.com")
+
+
+@pytest.fixture(autouse=True)
+def _no_real_vendor_calls(monkeypatch):
+    """Refuse any `httpx.post` to a real vendor, whatever `.env` holds.
+
+    Both real adapters call the module-level `httpx.post`, so this is the one
+    place both pass through. A test that fakes `httpx.post` itself replaces
+    this guard for its own duration, which is what the adapter tests do."""
+    import httpx
+
+    real_post = httpx.post
+
+    def guarded(url, *args, **kwargs):
+        if urlsplit(str(url)).hostname in REAL_VENDOR_HOSTS:
+            raise RuntimeError(
+                f"a test tried to reach a real vendor ({url}); fake httpx.post or "
+                "use the mock provider — no real email or AI calls in tests"
+            )
+        return real_post(url, *args, **kwargs)
+
+    monkeypatch.setattr(httpx, "post", guarded)
