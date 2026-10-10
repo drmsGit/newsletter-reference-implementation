@@ -3,11 +3,11 @@ id: TASK-352
 title: >-
   A filter-options test assumes integration #6 never exists, and fails when it
   does
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-10 21:41'
-updated_date: '2026-10-10 21:50'
+updated_date: '2026-10-10 21:56'
 labels:
   - backend
 dependencies: []
@@ -31,6 +31,26 @@ Found 2026-10-10 while writing docs/design/CONSTRAINTS.md; filed on the user's d
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The test no longer depends on any fixed integration or user id being absent
-- [ ] #2 It passes alone, in the full suite, and in a -k subset that previously failed
+- [x] #1 The test no longer depends on any fixed integration or user id being absent
+- [x] #2 It passes alone, in the full suite, and in a -k subset that previously failed
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-10, done (commit 91ee17c).
+
+Reproduced with a throwaway session plugin (scratchpad, not in the repo) that plants integrations 5 and 6 and advances the id sequence. Both name assertions failed: integration #6 in the filter-options test, and integration #5 in the decision-history test, which the entry had flagged as the same assumption.
+
+Fix: the rows fixture creates two integrations and deletes them, and uses their ids. Postgres never reuses a serial id, so they provably name nobody. Tests read the ids from rows[0], rows[3] and rows[4] instead of 5 and 6.
+
+User ids 1 and 2, and integration 99 in the foreign-brand test, stay: their tests do not depend on the id being absent. They are a filter or an 'is not offered' check.
+
+Verified: 9 passed with 5 and 6 planted, alone, and in the -k subset that failed (204 passed). Full suite 1660 passed. Ruff clean. CI green on 91ee17c.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The approvals-list tests no longer assume integrations 5 and 6 don't exist: the fixture now uses ids of integrations it created and deleted, which provably name nobody. It was reproduced by planting integrations 5 and 6 (two name checks failed); with the fix, all 9 pass there, alone and in the subset that failed. Full suite green, and CI green on 91ee17c.
+<!-- SECTION:FINAL_SUMMARY:END -->
