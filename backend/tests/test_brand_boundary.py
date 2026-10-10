@@ -1020,6 +1020,7 @@ class TestAConsentRecordLandsOnTheBrandItWasAuthorisedFor:
             "consent_status": "opted_in",
             "brand_id": brand_id,
             "source": "boundary-test",
+            "purpose": "marketing",     # required since task-343
         }
 
     # --- task-16: the same hole on the create route -------------------------

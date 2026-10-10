@@ -1,9 +1,11 @@
 ---
 id: TASK-343
 title: The consent API silently takes an assertion without a purpose as marketing
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-09 18:54'
+updated_date: '2026-10-10 20:13'
 labels:
   - backend
 dependencies: []

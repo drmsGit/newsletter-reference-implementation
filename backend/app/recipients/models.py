@@ -100,17 +100,21 @@ class ConsentSyncRequest(BaseModel):
     is one brand, so it hardcodes the value — one constant in an integration it
     is writing anyway.
 
-    `channel` and `purpose` default, because the grid's defaults are real
-    defaults: an assertion that says nothing about channel is an assertion
-    about email marketing, which is the only cell that exists today. Brand has
-    no such honest default.
+    **`purpose` is required too** (task-343, business baseline P2-E2). It
+    defaulted to "marketing" until 2026-10-10, against the rule every internal
+    consent function has kept since task-42: a silent default is how consent
+    for one purpose gets recorded as another. Which purposes exist is task-134.
+
+    `channel` still defaults to email. That was not decided with the purpose,
+    and push exists now, so "the only cell that exists today" no longer holds
+    for it; left for the purpose vocabulary work (task-134) to settle.
     """
 
     consent_status: ConsentStatus
     brand_id: int
     source: str = "crm"
     channel: str = "email"
-    purpose: str = "marketing"
+    purpose: str
     note: str | None = None
 
 
