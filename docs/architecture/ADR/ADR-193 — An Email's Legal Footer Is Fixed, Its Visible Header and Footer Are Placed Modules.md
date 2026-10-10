@@ -132,6 +132,21 @@ A preference center is a page where a recipient chooses which newsletters or cha
 - **Module files.** A header and a footer module are each a `.json` manifest plus an `.html` template, as the 2026-10-09 addendum of [[ADR-160 — Channel Model and Composition]] describes for email modules. Their MJML source follows [[ADR-131 — Email Module Templates Use MJML as Source Format]].
 - **No decision-log entry.** `docs/playbook-strategy.md` has no entry for this decision. Its §5 mentions the floor ("No 'decorative' marker until a footer or divider module exists") and ADR-191's interim footer line, and both are consistent with this record. The reasoning here comes from task-301's notes and the 2026-10-10 session.
 
+## Addendum 2026-10-10 — the rename leaves frozen frames as they were sent
+
+**Point 6 left open how the rename is carried out. Queue task-349's final-design pass settled it, decided by the user (commit `0d2ef14`).** Point 6 and the rest of the Decision above are unchanged.
+
+**A finding came first.** `module_html` (`backend/app/rendering/service.py:343-379`) writes each module's type into the HTML as `data-module-type`. So rewriting frozen frames from `header` to `envelope` would change the bytes of every email already sent. Every past delivery would then fail its "matches what was sent" check, the artifact hash of [[ADR-183 — A Snapshot Freezes the Composition and Every Delivery Records What It Got]]. The user had first chosen to migrate everything, with a proof that the output stayed byte-identical. This finding showed that proof could not hold. The user then chose as follows.
+
+1. **Frozen snapshot frames are never rewritten.** Live module rows were renamed (migration `backend/scripts/migrate_0043_envelope_module_rows.sql`). The manifest and template files are now `storage/modules/email/envelope.json` and `.html`.
+2. **The frame version marks which name an entry uses.** `FRAME_VERSION` is 2 (`backend/app/rendering/frame.py`), and `is_frame` accepts versions 1 and 2.
+3. **In a version-1 email frame, a `header` entry is the envelope.** Readers translate it in two places: for manifest and template lookups (`lookup_type`), and for the nothing-to-show floor (`what_rendered`). The HTML still names it `header`, so old emails render byte-identically.
+4. **The translation is keyed on the frame version.** It can therefore never be confused with the visible `header` module of a version-2 frame (queue task-351).
+
+**Proof on development data.** Nine sent deliveries were frozen with a `header` envelope. The one that reconstructed byte-for-byte before still does (`hash_matches`). The other eight are unchanged. `templates_match` flipped for that one delivery, because the template files changed: their names, and the manifest's label. That best-effort flag flips on any template edit. ADR-183 point 4 makes content exact and layout best-effort, so this is expected.
+
+**Consequence.** A small, permanent translation for version-1 frames lives in the frame reader. It stays for as long as version-1 frames exist, which is for as long as their deliveries are kept. This is the second cost named in the Negative list above ("readers that must accept two names"), taken in a narrower form: the reader accepts the old name only in version-1 frames, not everywhere.
+
 ## Related ADRs
 
 ### Depends On
