@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 from app.approvals import service as approvals
 from app.approvals.db_models import PendingActionDB
 from app.auth import service as auth
+from app.auth.db_models import IntegrationDB
 from app.auth.permissions import VIEW
 from app.database import SessionLocal
 from main import app
@@ -42,13 +43,26 @@ def rows(db):
     status shape — including a `pending` row whose deadline has passed and one
     that expires exactly now (the boundary)."""
     brand = auth.ensure_default_brand(db)
+    # Two integration ids that provably name nobody (task-352): made and
+    # deleted here, and Postgres never hands an id out twice. A fixed 5 and 6
+    # used to stand in for "a requester that no longer exists", and failed
+    # whenever an earlier test had created integration 5 or 6.
+    gone = []
+    for _ in range(2):
+        integration = IntegrationDB(name="listtest-gone")
+        db.add(integration)
+        db.flush()
+        gone.append(integration.id)
+        db.delete(integration)
+    db.commit()
+    first, second = gone
     spec = [
         # (action_key, requester type, requester id, stored status, expires in)
-        ("send.fire", "integration", 5, "pending", timedelta(hours=1)),
+        ("send.fire", "integration", first, "pending", timedelta(hours=1)),
         ("content.ready", "user", 1, "pending", timedelta(hours=1)),
         ("send.fire", "user", 1, "pending", -timedelta(hours=1)),   # expired by timestamp
-        ("content.ready", "integration", 5, "approved", timedelta(hours=1)),
-        ("send.fire", "integration", 6, "failed", timedelta(hours=1)),
+        ("content.ready", "integration", first, "approved", timedelta(hours=1)),
+        ("send.fire", "integration", second, "failed", timedelta(hours=1)),
         ("content.ready", "user", 2, "pending", timedelta(0)),       # expires right now
     ]
     made = []
@@ -95,7 +109,7 @@ def test_filtered_by_action_type(db, rows):
 
 def test_filtered_by_requester(db, rows):
     found = approvals.list_for_brand(db, rows[0].brand_id, "all",
-                                     requested_by_type="integration", requested_by_id=5)
+                                     requested_by_type="integration", requested_by_id=rows[0].requested_by_id)
     assert _ours(found, rows) == [rows[3].id, rows[0].id]
     by_type = approvals.list_for_brand(db, rows[0].brand_id, "all", requested_by_type="user")
     assert _ours(by_type, rows) == [rows[5].id, rows[2].id, rows[1].id]
@@ -158,7 +172,8 @@ class TestFilterOptions:
             assert named[("integration", integration.id)] == "Acme Agency"
             assert named[("user", person.id)] == "Sam Planner"
             # A requester that no longer exists is still offered, named honestly.
-            assert named[("integration", 6)] == "integration #6"
+            gone = rows[4].requested_by_id
+            assert named[("integration", gone)] == f"integration #{gone}"
         finally:
             db.rollback()
             db.query(UserDB).filter(UserDB.id == person.id).delete()
@@ -228,7 +243,7 @@ class TestDecisionHistory:
                                           "limit": 200}).json()["items"]
             mine = next(r for r in body if r["id"] == rows[3].id)
             assert mine["decided_by_name"] == "Robin Approver"
-            assert mine["requested_by_name"] == "integration #5"
+            assert mine["requested_by_name"] == f"integration #{rows[3].requested_by_id}"
             lapsed = next(r for r in body if r["id"] == rows[5].id)
             assert lapsed["decided_by_name"] is None, "an expired request was decided by nobody"
         finally:

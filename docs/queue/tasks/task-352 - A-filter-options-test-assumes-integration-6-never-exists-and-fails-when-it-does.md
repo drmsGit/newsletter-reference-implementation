@@ -3,9 +3,11 @@ id: TASK-352
 title: >-
   A filter-options test assumes integration #6 never exists, and fails when it
   does
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-10 21:41'
+updated_date: '2026-10-10 21:50'
 labels:
   - backend
 dependencies: []
