@@ -195,6 +195,27 @@ def describe(db: Session, payload: dict, *, brand_id: int) -> ActionDescription:
     )
 
 
+def said(status: str, send_instance: SendInstanceDB | None) -> str:
+    """A send's outcome in words, the status first: "Partial failed: 940
+    delivered, 60 failed, 0 excluded." One wording for what the approval
+    reported when it ran and what the history shows now (task-338)."""
+    head = status.replace("_", " ").capitalize()
+    if send_instance is None:
+        return head + "."
+    return (f"{head}: {send_instance.sent_count} delivered, {send_instance.failed_count} failed, "
+            f"{send_instance.excluded_count} excluded.")
+
+
+def outcome(db: Session, send_instance_id: int, *, brand_id: int) -> str | None:
+    """What the approved send stands at **now** (task-338, decided 2026-10-10):
+    read live, so a retry or a release after the approval shows. None for a send
+    that is gone or not in this brand."""
+    if not subject_in_brand(db, send_instance_id, brand_id=brand_id):
+        return None
+    send_instance = db.get(SendInstanceDB, send_instance_id)
+    return said(send_instance.status, send_instance) if send_instance else None
+
+
 def execute(
     db: Session, payload: dict, *, choice: dict | None = None, brand_id: int,
 ) -> ActionResult:
@@ -227,11 +248,7 @@ def execute(
         ok=True,
         # The outcome first, never an assumed "Sent" (task-323): a run in which
         # every delivery failed is a run that completed, not a success.
-        message=(
-            f"{outcome.replace('_', ' ').capitalize()}: {send_instance.sent_count} delivered, "
-            f"{send_instance.failed_count} failed, "
-            f"{send_instance.excluded_count} excluded."
-        ) if send_instance else outcome.replace("_", " ").capitalize() + ".",
+        message=said(outcome, send_instance),
         audit_action=audit.SEND_FIRED,
         audit_detail={"send_instance_id": send_instance_id},
     )

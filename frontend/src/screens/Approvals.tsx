@@ -29,6 +29,11 @@ export function deadline(iso: string | null | undefined): string {
   return iso ? formatDate(iso) : 'No deadline'
 }
 
+/** Where a request's subject lives in this app, when it has a page. */
+function subjectLink(a: PendingActionRow): string | null {
+  return a.subject_type === 'send_instance' && a.subject_id != null ? `/deliveries/${a.subject_id}` : null
+}
+
 const waitingColumns: DataColumn<PendingActionRow>[] = [
   { key: 'label', header: 'Request', isRowHeader: true, render: (a) => a.label },
   { key: 'summary', header: 'Summary', render: (a) => a.summary },
@@ -52,7 +57,21 @@ const waitingColumns: DataColumn<PendingActionRow>[] = [
 const historyColumns: DataColumn<PendingActionRow>[] = [
   { key: 'label', header: 'Request', isRowHeader: true, render: (a) => a.label },
   { key: 'summary', header: 'Summary', render: (a) => a.summary },
-  { key: 'outcome', header: 'Outcome', render: (a) => a.status },
+  {
+    key: 'outcome',
+    header: 'Outcome',
+    // What an approved action ended in, as it stands now (task-338), linked to
+    // what it acted on. Nobody is notified: following up is the deliveries
+    // screen's job, not the approver's.
+    render: (a) =>
+      a.outcome ? (
+        <>
+          {a.status} — {subjectLink(a) ? <Link to={subjectLink(a)!}>{a.outcome}</Link> : a.outcome}
+        </>
+      ) : (
+        a.status
+      ),
+  },
   { key: 'requested_by', header: 'Requested by', render: requester },
   {
     key: 'decided_by',

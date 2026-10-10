@@ -1,9 +1,11 @@
 ---
 id: TASK-338
 title: The approvals history says 'approved' for a send that delivered nothing
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-09 18:26'
+updated_date: '2026-10-10 20:31'
 labels:
   - backend
   - frontend

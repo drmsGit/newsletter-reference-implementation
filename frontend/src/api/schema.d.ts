@@ -5066,6 +5066,8 @@ export interface components {
             decided_by_name?: string | null;
             /** Requester Allowed */
             requester_allowed?: boolean | null;
+            /** Outcome */
+            outcome?: string | null;
             /**
              * Rows
              * @default []
@@ -5136,6 +5138,8 @@ export interface components {
             decided_by_name?: string | null;
             /** Requester Allowed */
             requester_allowed?: boolean | null;
+            /** Outcome */
+            outcome?: string | null;
         };
         /** PreferenceUpdateResult */
         PreferenceUpdateResult: {

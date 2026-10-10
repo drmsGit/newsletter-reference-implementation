@@ -360,6 +360,21 @@ describe('the decision history', () => {
       'href', '/approvals')
   })
 
+  it('says what an approved send ended in, linked to the send (task-338)', async () => {
+    stubFetch({
+      'GET /approvals/': () =>
+        jsonResponse(page([
+          { ...A_ROW, id: 3, status: 'approved', decided_at: '2026-10-02T10:00:00Z', subject_type: 'send_instance',
+            subject_id: 41, outcome: 'Partial failed: 940 delivered, 60 failed, 0 excluded.' },
+        ])),
+      'GET /approvals/filter-options': () => jsonResponse(OPTIONS),
+    })
+    renderWithProviders(<Approvals mode="history" />)
+    const table = await screen.findByRole('grid', { name: 'Decided requests' })
+    const link = await within(table).findByRole('link', { name: 'Partial failed: 940 delivered, 60 failed, 0 excluded.' })
+    expect(link).toHaveAttribute('href', '/deliveries/41')
+  })
+
   it('the inbox offers no status choice and links to the history instead', async () => {
     stubFetch({
       'GET /approvals/': () => jsonResponse(page([])),

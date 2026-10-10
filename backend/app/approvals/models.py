@@ -49,6 +49,11 @@ class PendingActionRow(BaseModel):
     # a request still waiting; None once decided, or for a requester with no
     # standing to lose (a system sweep).
     requester_allowed: bool | None = None
+    # What an approved action ended in, as it stands now (task-338): an
+    # approved send's "Partial failed: 940 delivered, 60 failed, 0 excluded."
+    # From the action's optional `outcome` hook, read live; None for a request
+    # that did not run, or an action that offers no outcome.
+    outcome: str | None = None
 
 
 class DescriptionRow(BaseModel):

@@ -65,7 +65,17 @@ def _row(row, names: dict | None = None, db=None) -> PendingActionRow:
         if row.decided_by_type else None,
         requester_allowed=approvals.requester_allowed(db, row)
         if db is not None and status == approvals.PENDING else None,
+        outcome=_outcome(db, row) if db is not None and status == approvals.APPROVED else None,
     )
+
+
+def _outcome(db, row) -> str | None:
+    """An approved action's current outcome, if its module offers one (task-338)."""
+    module = get_action_module(row.action_key)
+    hook = getattr(module, "outcome", None) if module else None
+    if not callable(hook) or row.subject_id is None:
+        return None
+    return hook(db, row.subject_id, brand_id=row.brand_id)
 
 
 def _names_for(db, rows) -> dict:
