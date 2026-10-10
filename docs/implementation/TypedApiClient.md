@@ -66,6 +66,12 @@ That file is committed, which is what gives `npm run check:contract` something t
 
 Its base address is deliberately empty, which makes every request relative and therefore same-origin, as ADR-168 requires.
 
+### What the guarantee covers
+
+The check proves one thing: this checkout's client matches this checkout's server. Client and backend live in one repository and the backend serves the built client, which is how ADR-170 point 5 avoids two versions drifting apart.
+
+It promises nothing beyond that. A browser tab opened before a deploy keeps running the old client until it reloads. Outside integrations (n8n, a CRM) do not use this client at all, so a change to what a response means, with its shape unchanged, could reach them unnoticed. Their contract belongs to task-119. Responses are not validated at runtime either; `docs/implementation/TypeScript.md` records that as a possible later addition. (Interview review 2026-10-09, Client Q5.)
+
 ## Architectural Impact
 
 The typed client supports:

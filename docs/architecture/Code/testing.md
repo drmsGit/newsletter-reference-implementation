@@ -113,6 +113,17 @@ had rows in it.
   rows, wrongly-expired demo requests and a changed settings row. An isolated
   database is what makes that harmless.
 
+## Why the installed-packages check runs on a fresh install
+
+In CI, `check_installed.py` runs in its own job on a freshly re-created environment (`ci.yml`, the contract-and-installs job), not in the environments the tests used. That is deliberate, and its guarantee is narrower than "installed packages verified" can sound:
+
+- The test jobs already refuse anything not locked: `pip install --require-hashes` and `npm ci` both fail on a mismatch.
+- In CI the check proves that a clean install reproduces the locks.
+- Its main value is local: the drift guard task-236 built, run against a working venv and `node_modules` that have been touched by hand.
+- It does not attest what an environment looked like after the tests ran.
+
+(Interview review 2026-10-09, CI Q5.)
+
 ## Related
 
 - `docs/backlog.md` — the 2026-07-31 entry that asked for this

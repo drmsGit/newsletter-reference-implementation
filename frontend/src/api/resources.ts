@@ -702,7 +702,10 @@ export function useModuleManifests(channel: string | undefined) {
     queryKey: ['modules', channel],
     queryFn: () => read(api.GET('/modules', { params: { query: { channel: channel! } } })),
     enabled: !!channel,
-    // Manifests are files read at startup; they do not change under a session.
+    // Manifests are files the backend reads at startup. Cached until a page
+    // reload or a brand switch (which invalidates everything, session.ts) —
+    // not across a backend deploy, so an open tab keeps the old field list
+    // until it reloads (interview review 2026-10-09, Client Q2; task-55).
     staleTime: Infinity,
   })
 }
@@ -908,7 +911,7 @@ export function useContentFields() {
   return useQuery({
     queryKey: [...keys.content, 'fields'],
     queryFn: () => read(api.GET('/content/fields')),
-    staleTime: Infinity,
+    staleTime: Infinity,     // until a page reload or brand switch, as manifests above
   })
 }
 
@@ -1228,7 +1231,7 @@ export function useStrategies() {
   return useQuery({
     queryKey: ['decision', 'strategies'],
     queryFn: () => read(api.GET('/decision/strategies')),
-    staleTime: Infinity,
+    staleTime: Infinity,     // until a page reload or brand switch, as manifests above
   })
 }
 

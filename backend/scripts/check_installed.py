@@ -12,7 +12,9 @@ Compares what is installed with what is locked, and fails on any difference:
 A difference is a package installed but not locked, locked at another
 version, or locked and missing. An npm package the lock marks optional may be
 missing: those are builds for other platforms (`@rolldown/binding-android-*`
-on a Mac). A name within two edits of a locked one is called out, because
+on a Mac). The exemption cannot hide a missing binding for THIS platform
+(rolldown, lightningcss): without it the frontend build and tests fail in the
+same CI run, which is what catches it (interview review 2026-10-09, CI Q2). A name within two edits of a locked one is called out, because
 that is the shape a typo or a squatted name takes — `httpx2` beside `httpx`,
 which sat in the venv for three months before this existed.
 

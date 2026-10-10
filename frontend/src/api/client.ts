@@ -50,9 +50,12 @@ const client = createClient<paths>({
  * plainest thing that both sides can reach.
  *
  * The cost is honest: this is mutable global state, which is normally worth
- * avoiding. It is acceptable here because exactly one writer exists
- * (`useSession` in `./session.ts`, on every load) and the value is not
- * rendered -- nothing re-renders when it changes, so React never needs to know.
+ * avoiding. It is acceptable here because one module owns it (`./session.ts`),
+ * through three lifecycle write sites: the session load, sign-in, and sign-out,
+ * which clears it. They cannot disagree, because the value is derived from the
+ * session token and fixed for the session's life (ADR-168, 2026-09-20
+ * addendum). And it is not rendered -- nothing re-renders when it changes, so
+ * React never needs to know.
  */
 let csrfToken = ''
 

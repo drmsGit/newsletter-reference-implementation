@@ -3,10 +3,11 @@ id: TASK-334
 title: >-
   Correct six comments and rationale notes the 2026-10-09 interview review found
   stale or missing
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-09 18:13'
-updated_date: '2026-10-09 18:22'
+updated_date: '2026-10-10 20:24'
 labels:
   - docs
   - frontend

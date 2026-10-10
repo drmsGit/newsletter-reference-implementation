@@ -58,7 +58,10 @@ the development one. The client: `cd frontend && npm test`.
 **CI** (`.github/workflows/ci.yml`, ADR-190) runs the backend suite, the
 client's type check, build and tests, the API contract check, lint, the
 installed-packages check, known-vulnerability scans and a secrets scan.
-Dependencies are installed from hash-locked files (ADR-189).
+Dependencies are installed from hash-locked files (ADR-189). CI fails visibly;
+it does not by itself stop a change landing (ADR-190, 2026-10-09 addendum). **A
+fork must set up its own required checks**: CI in a fork checks that fork's
+code and enforces nothing unless the fork's repository requires it.
 
 ## Licence
 

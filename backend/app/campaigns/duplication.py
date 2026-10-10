@@ -1,9 +1,14 @@
 """Duplicating a campaign — the escape hatch ADR-150 point 2 creates.
 
 A content record belongs to exactly one brand, so a campaign cannot be shared
-into a second one. Duplication is what replaces that, and the design premise is
-the user's: *"Duplication is a risky topic, so why do it with a one-click
+into a second one. Duplication is what replaces that. The user's original
+premise was *"Duplication is a risky topic, so why do it with a one-click
 solution. Make the manager make his decision deliberately instead of fast."*
+Since the Variant Editor interview (Q5.1) that friction applies only where it
+earns its place: duplicating within a campaign is one click, and the deliberate
+wizard remains for copying into another brand, because forking content is the
+risky case (friction follows risk, the 2026-07-05 rule; business baseline
+P2-A3, 2026-10-09).
 
 **The rule that decides everything is the boundary, not the act.** Duplicating a
 campaign does not imply duplicating content; crossing a brand boundary does.
