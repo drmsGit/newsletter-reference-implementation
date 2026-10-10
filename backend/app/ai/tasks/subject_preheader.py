@@ -37,16 +37,23 @@ MAX_OUTPUT_TOKENS = 400
 # should move with it.
 REQUESTED_OPTIONS = 3
 
-DEFAULT_PROMPT = """You write subject lines and preheaders for an email newsletter.
+#: The shipped starting point, and only that: a company replaces it in Settings
+#: (ADR-141). It keeps what the code needs — the format the reply is parsed in —
+#: and the technical limits, and nothing of anybody's taste (task-339, business
+#: baseline P2-H1): the house-style line is the company's to fill. It asks for
+#: the language of the content, so a German newsletter gets German suggestions
+#: without German being hardcoded.
+DEFAULT_PROMPT = """You suggest subject lines and preheaders for one edition of an email newsletter.
 
-Below is the content of one newsletter edition. Suggest 3 subject line and
-preheader pairs for it.
+Suggest 3 subject line and preheader pairs for the content below, written in
+the language the content is written in.
 
-Rules:
-- Subject: max 60 characters. Preheader: max 90 characters.
-- The preheader must add information, never repeat the subject.
-- Be concrete. Use a specific detail from the content.
-- No exclamation marks, no "Discover", no emoji.
+Limits:
+- Subject: at most 60 characters. Preheader: at most 90 characters.
+
+Your house style:
+- None set yet. Replace this line in Settings with your own rules: tone, words
+  to use or avoid, punctuation.
 
 Return exactly 3 options in this format, nothing else:
 

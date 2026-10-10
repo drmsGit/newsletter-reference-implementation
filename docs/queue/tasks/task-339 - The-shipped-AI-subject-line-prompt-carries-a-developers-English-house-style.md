@@ -1,9 +1,11 @@
 ---
 id: TASK-339
 title: The shipped AI subject-line prompt carries a developer's English house style
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-09 18:43'
+updated_date: '2026-10-10 20:41'
 labels:
   - backend
 dependencies: []
