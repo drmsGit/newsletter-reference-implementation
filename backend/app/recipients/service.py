@@ -1,5 +1,7 @@
 from sqlalchemy.orm import Session
 
+from app.audit import service as audit
+
 from app.recipients.consent import (
     CONSENTING_STATUS,
     DEFAULT_CHANNEL,
@@ -106,6 +108,26 @@ _FORBIDDEN_ATTRIBUTE_KEY_PATTERNS = (
 )
 
 
+def _audit_consent(
+    db: Session, actor: tuple[str, int | None] | None, recipient_id: int, brand_id: int,
+    *, status: str, channel: str, purpose: str, source: str,
+) -> None:
+    """Who changed this consent (task-340, launch gate 11), written beside the
+    consent event itself, in the same transaction. The change is the event;
+    this names who made it. No address in the detail (ADR-153). Nothing when
+    the caller names no actor — the provider webhook and a recipient's own
+    unsubscribe are not a person or an integration."""
+    if actor is None:
+        return
+    actor_type, actor_id = actor
+    audit.record(
+        db, audit.CONSENT_RECORDED, actor_type=actor_type, actor_id=actor_id,
+        subject_type="recipient", subject_id=recipient_id, brand_id=brand_id,
+        detail={"status": status, "channel": channel, "purpose": purpose, "source": source},
+        commit=False,
+    )
+
+
 def validate_recipient_attributes(attributes: dict | None) -> None:
     if not attributes:
         return
@@ -210,6 +232,8 @@ def create_recipient(
     attributes: dict | None = None,
     status: str = "active",
     consent_status: str = ConsentStatus.pending.value,
+    *,
+    actor: tuple[str, int | None] | None = None,
 ) -> Recipient:
     """Upserts keyed on external_id — a repeat CRM sync updates in place
     rather than hitting the unique constraint with a blind insert.
@@ -264,6 +288,8 @@ def create_recipient(
             note=f"set via create_recipient for external_id={external_id}",
             commit=False, purpose=MARKETING,
         )
+        _audit_consent(db, actor, recipient.id, brand_id, status=consent_status,
+                       channel=channel, purpose=MARKETING, source="import")
 
     # The address is a row on its channel (ADR-163 point 2), and since phase B
     # it is the only place a contact point lives — there is no column on the
@@ -329,6 +355,7 @@ def sync_consent_from_crm(
     *,
     channel: str = DEFAULT_CHANNEL,
     purpose: str,
+    actor: tuple[str, int | None] | None = None,
 ) -> Recipient:
     """Apply a CRM consent assertion to the local projection and record it in
     the append-only consent-sync log. The CRM is the source of truth; this
@@ -373,6 +400,8 @@ def sync_consent_from_crm(
         note=note,
         commit=False,
     )
+    _audit_consent(db, actor, recipient.id, brand_id, status=crm_consent_status,
+                   channel=channel, purpose=purpose, source=source)
 
     # The log records the conversation, not the value: it ran, it succeeded, it
     # applied N changes. The asserted value itself is the consent event above,

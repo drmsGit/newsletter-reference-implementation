@@ -125,6 +125,9 @@ APPROVAL_FAILED = "approval.failed"
 APPROVAL_WITHDRAWN = "approval.withdrawn"
 # What a granted held action did, written by the action through ActionResult.
 SEND_FIRED = "send.fired"
+#: A consent change made by a person or an integration (task-340): who changed
+#: it. The change itself is the consent event; this says who made it.
+CONSENT_RECORDED = "consent.recorded"
 # ADR-192: a person released a send stranded in "sending" (task-325).
 SEND_RELEASED = "send.released"
 AI_SUGGESTION_APPLIED = "ai.suggestion_applied"
@@ -264,6 +267,24 @@ def record(
         # its own write.
         db.commit()
     return event
+
+
+def actor_of(request) -> tuple[str, int | None]:
+    """Who is acting on this request, as `(actor_type, actor_id)` (task-340).
+
+    The same answer `record_from_request` uses, for code that records further
+    down, in a service that writes the thing being audited — a consent event is
+    only written when the state changes, and only the service knows. An
+    integration on the JSON plane is its own actor (ADR-166 point 3); otherwise
+    the signed-in person, or None when nobody is.
+    """
+    from app.auth.db_models import IntegrationDB
+
+    principal = getattr(request.state, "principal", None)
+    if isinstance(principal, IntegrationDB):
+        return ACTOR_INTEGRATION, principal.id
+    user = request.state.current_user
+    return ACTOR_USER, user["id"] if user else None
 
 
 def record_from_request(request, db: Session, action: str, **kwargs) -> AuditEventDB | None:

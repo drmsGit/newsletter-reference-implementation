@@ -243,6 +243,7 @@ def get_executions_for_send_instance(
     },
 )
 def send_instance(
+    request: Request,
     send_instance_id: int,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
@@ -256,6 +257,13 @@ def send_instance(
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error))
 
+    # Who fired it, whatever the outcome (task-340, launch gate 11): a refusal
+    # above fired nothing and says nothing. An approved send is audited by the
+    # approval instead, with the approver as actor.
+    audit.record_from_request(
+        request, db, audit.SEND_FIRED, subject_type="send_instance", subject_id=send_instance_id,
+        brand_id=brand_id, detail={"send_instance_id": send_instance_id, "outcome": outcome, "via": "direct"},
+    )
     # The persisted outcome, never an assumed "sent" (task-323).
     return {"status": outcome}
 
@@ -339,7 +347,7 @@ def release_send(
 
 
 @router.post("/process-due", response_model=ProcessDueResult)
-def process_due(db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
+def process_due(request: Request, db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
     """Fire every scheduled send whose time has arrived.
 
     **The seam ADR-142 assumes exists.** That record has the orchestrator
@@ -362,6 +370,12 @@ def process_due(db: Session = Depends(get_db), brand_id: int = Depends(working_b
     `sending` or `sent`, so two schedulers overlapping cannot double-send.
     """
     triggered = process_due_scheduled_sends(db, brand_id=brand_id)
+    # One entry per send it fired, naming whoever drove the scheduler (task-340).
+    for fired_id in triggered:
+        audit.record_from_request(
+            request, db, audit.SEND_FIRED, subject_type="send_instance", subject_id=fired_id,
+            brand_id=brand_id, detail={"send_instance_id": fired_id, "via": "scheduled"},
+        )
     return {
         "triggered": len(triggered),
         "send_instance_ids": [getattr(s, "id", s) for s in triggered],

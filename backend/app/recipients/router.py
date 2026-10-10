@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
+from app.audit.service import actor_of
 from app.auth.dependencies import enforce_api_policy
 from app.auth.permissions import RECIPIENTS_CONSENT
 from app.auth.service import has_permission
@@ -105,6 +106,7 @@ def create_recipient_record(
             attributes=payload.attributes,
             status=payload.status,
             consent_status=payload.consent_status.value,
+            actor=actor_of(request),     # who, if consent changes (task-340)
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
@@ -157,6 +159,7 @@ def get_consent_sync_log(
 
 @router.post("/{external_id}/consent", response_model=Recipient)
 def sync_recipient_consent(
+    request: Request,
     external_id: str,
     payload: ConsentSyncRequest,
     db: Session = Depends(get_db),
@@ -198,6 +201,7 @@ def sync_recipient_consent(
             channel=payload.channel,
             purpose=payload.purpose,
             note=payload.note,
+            actor=actor_of(request),     # who asserted it (task-340)
         )
     except ValueError as error:
         raise HTTPException(status_code=404, detail=str(error))

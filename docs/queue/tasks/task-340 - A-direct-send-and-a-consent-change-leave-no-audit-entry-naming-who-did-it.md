@@ -1,9 +1,11 @@
 ---
 id: TASK-340
 title: A direct send and a consent change leave no audit entry naming who did it
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-09 18:46'
+updated_date: '2026-10-10 20:05'
 labels:
   - backend
 dependencies: []
@@ -37,3 +39,21 @@ Source: docs/business-interview-baseline.md → P2-D1.
 - [ ] #3 A consent write through the API by a person or integration writes an audit entry with its actor
 - [ ] #4 A recipient's own unsubscribe writes no audit entry and stays in the consent history
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. audit/service.py:
+   - add CONSENT_RECORDED = 'consent.recorded';
+   - add actor_of(request), which returns (actor_type, actor_id): the integration on the JSON plane, else the signed-in person. record_from_request uses it, so the two cannot disagree.
+2. Sends, audited at the routes that fire them. send_send_instance itself stays actor-free, and the approval path already audits send.fired with the approver as actor.
+   - delivery/router.py: the send route records send.fired with detail send_instance_id, outcome and via 'direct', after a send that ran (a 409 refusal fired nothing). process-due records one send.fired per triggered send, with via 'scheduled'.
+   - frontend/router.py (Jinja): the send route and process-due, the same way.
+3. Consent, audited where the event is written:
+   - recipients/service.py: create_recipient and sync_consent_from_crm take an optional keyword actor=(type, id). When they write a consent event they record consent.recorded on the recipient, with detail status, channel, purpose, source and brand. No email (ADR-153).
+   - recipients/router.py passes actor_of(request).
+   - Not covered: the provider webhook suppression (not a person or integration) and the recipient's own unsubscribe (stays in the consent history), as decided.
+4. Tests first:
+   - backend/tests/test_send_consent_audit.py: a person's JSON send; an unattended integration's send; a Jinja send; process-due by an integration; a refused send writes nothing; a CRM sync by an integration; a recipient created with consent by a person; an unchanged create writes nothing; an unsubscribe writes nothing.
+5. Mutation-check, full suite, Ruff, commit, CI. Gate 11 in LAUNCH-GATES.md closes with it.
+<!-- SECTION:PLAN:END -->

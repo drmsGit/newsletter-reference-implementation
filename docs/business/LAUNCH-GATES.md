@@ -16,7 +16,7 @@ What must be true before public beta. Reviewed against commits and
 | 8 | Playbook structure decided (4A) | 4C | 🟡 started in Cowork |
 | 9 | 2–3 client cases mapped to the pillars (4B) | 4C | ❌ open |
 | 10 | Every marketing mail can be unsubscribed from — one-click header, a visible link and a working page | any public exposure (compliance, deliverability) | ✅ CLOSED 2026-10-09 — task-56, ADR-191 (gate added the same day by the user). Live-checked on scratch data: a real send's link opened the page without opting out; the button opted out |
-| 11 | Every send fire and every consent change by a person or integration is in the audit log, with who did it | public beta (the transparency claim) | ❌ open — task-340 (gate added 2026-10-09, business baseline P2-D1) |
+| 11 | Every send fire and every consent change by a person or integration is in the audit log, with who did it | public beta (the transparency claim) | ✅ CLOSED 2026-10-10 — task-340: direct, scheduled and old-screen sends write `send.fired` with their actor (approved sends already did); CRM consent syncs and consent set on recipient creation write `consent.recorded`. A recipient's own unsubscribe stays in the consent history (gate added 2026-10-09, business baseline P2-D1) |
 
 ## The three that actually block exposure
 Gates 2, 3 and 4 are the ones where "we launched" and "we were fine" come

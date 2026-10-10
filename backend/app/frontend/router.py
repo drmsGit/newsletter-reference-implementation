@@ -1921,17 +1921,20 @@ def send_instance_trigger(
     send_instance_id: int,
     db: Session = Depends(get_db),
 ):
+    brand_id = working_brand_id(request, db)
     try:
-        send_send_instance(
-            db, send_instance_id=send_instance_id,
-            brand_id=working_brand_id(request, db),
-        )
+        outcome = send_send_instance(db, send_instance_id=send_instance_id, brand_id=brand_id)
     except ValueError as error:
         # e.g. re-resolved "rerun" audience exceeds the send cap, or already sent.
         return RedirectResponse(
             url=f"/ui/deliveries/send-instances/{send_instance_id}?error={quote(str(error))}",
             status_code=303,
         )
+    # Who fired it (task-340), as on the JSON route.
+    audit.record_from_request(
+        request, db, audit.SEND_FIRED, subject_type="send_instance", subject_id=send_instance_id,
+        brand_id=brand_id, detail={"send_instance_id": send_instance_id, "outcome": outcome, "via": "direct"},
+    )
     return RedirectResponse(url=f"/ui/deliveries/send-instances/{send_instance_id}", status_code=303)
 
 
@@ -1942,7 +1945,13 @@ def deliveries_process_due(request: Request, db: Session = Depends(get_db)):
     same operation on an interval (the architecture exposes the seam, doesn't
     bake in a scheduler)."""
     # The working brand's sends only (task-315).
-    triggered = process_due_scheduled_sends(db, brand_id=working_brand_id(request, db))
+    brand_id = working_brand_id(request, db)
+    triggered = process_due_scheduled_sends(db, brand_id=brand_id)
+    for fired_id in triggered:      # who drove the scheduler (task-340)
+        audit.record_from_request(
+            request, db, audit.SEND_FIRED, subject_type="send_instance", subject_id=fired_id,
+            brand_id=brand_id, detail={"send_instance_id": fired_id, "via": "scheduled"},
+        )
     msg = f"Triggered {len(triggered)} due scheduled send(s)." if triggered else "No scheduled sends were due."
     return RedirectResponse(url=f"/ui/deliveries?notice={quote(msg)}", status_code=303)
 
