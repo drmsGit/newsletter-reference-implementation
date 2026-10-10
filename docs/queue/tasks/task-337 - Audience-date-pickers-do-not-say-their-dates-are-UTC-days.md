@@ -1,9 +1,11 @@
 ---
 id: TASK-337
 title: Audience date pickers do not say their dates are UTC days
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-09 18:23'
+updated_date: '2026-10-10 20:27'
 labels:
   - frontend
 dependencies: []

@@ -1,4 +1,4 @@
-import { Button, Input, Label, TextField } from 'react-aria-components'
+import { Button, Input, Label, Text, TextField } from 'react-aria-components'
 
 import { useCampaigns, useSentSends } from '../api/resources'
 import Choice from '../components/Choice'
@@ -143,13 +143,20 @@ export function EngagementFields({
       )}
       {draft.when === 'between' && (
         <>
+          {/*
+            The server counts each date as a UTC day (task-337, decided in the
+            2026-10-09 interview review): a day starts at midnight UTC, one or
+            two hours before midnight in Germany. Said here, not converted.
+          */}
           <TextField value={draft.from} onChange={(from) => set({ from })}>
             <Label>From</Label>
             <Input type="date" />
+            <Text slot="description" className="muted">A UTC day: it starts at midnight UTC.</Text>
           </TextField>
           <TextField value={draft.to} onChange={(to) => set({ to })}>
             <Label>To</Label>
             <Input type="date" />
+            <Text slot="description" className="muted">A UTC day, included to its end.</Text>
           </TextField>
         </>
       )}

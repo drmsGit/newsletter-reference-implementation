@@ -540,6 +540,18 @@ describe('engagement in a rule (task-298)', () => {
     await waitFor(() => expect(last(s).body).toMatchObject({ criteria: { engagement: { event: 'received', more_than_days: 90 } } }))
   })
 
+  it('says the dates are UTC days (task-337)', async () => {
+    // Counted as UTC days by the server (audience/service.py); a manager in
+    // Berlin is told, rather than silently shifted by an hour or two.
+    const s = server()
+    open(s)
+    const form = await newRule("Who's in")
+    fireEvent.click(within(form).getByRole('button', { name: 'Add engagement' }))
+    await choose(form, /When/, 'Between two dates')
+    expect(within(form).getByLabelText('From')).toHaveAccessibleDescription(/UTC/)
+    expect(within(form).getByLabelText('To')).toHaveAccessibleDescription(/UTC/)
+  })
+
   it('reads an engagement field back into the form, and removing it removes it', async () => {
     const s = server()
     s.state.blocks[0].criteria = { language: ['de'], engagement: { event: 'clicked', campaign_id: 77, more_than_days: 7 } }
