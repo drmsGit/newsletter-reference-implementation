@@ -1,0 +1,174 @@
+---
+type: reference
+created: 2026-10-10
+---
+
+# Design constraints: what the code allows
+
+For the design session. It says what the design is free to decide, and where the
+code, email clients or earlier decisions set limits. Checked against the code on
+2026-10-10. When the design is ready, it comes into the repo here (`docs/design/`),
+is checked against this page, and conflicts are settled before anything is built.
+
+**The split.** The design decides the *look*: tokens, components and their
+states, page patterns, the email visual language. The repo decides *behaviour*:
+which fields a screen has, what a button does, the wording of legal and system
+texts. Those come from decisions already recorded (ADRs, interview records). A
+design that changes behaviour is a decision to record first, not a style change.
+
+## Two surfaces
+
+| | The manager app | The emails |
+|---|---|---|
+| Who sees it | People running campaigns, at `/manager` | Recipients, in their mail program |
+| Built with | React, with React Aria components | HTML tables, one shared stylesheet inlined at send |
+| Freedom | Nearly full | Limited by what email clients render |
+
+## 1. The manager app
+
+**What exists.** One plain stylesheet, `frontend/src/index.css`, with no CSS
+framework and no preprocessor. It has nine design variables today:
+
+| Variable | Value |
+|---|---|
+| `--brand-fg` | `#1a1a1a` |
+| `--brand-bg` | `#ffffff` |
+| `--brand-muted` | `#6b6b6b` |
+| `--brand-line` | `#d8d8d8` |
+| `--brand-accent` | `#2a5db0` |
+| `--brand-danger` | `#b3261e` |
+| `--brand-font` | `system-ui, -apple-system, "Segoe UI", sans-serif` |
+| `--brand-radius` | `4px` |
+| `--brand-space` | `8px` |
+
+There is no dark mode and one layout breakpoint (900px).
+
+**Free to decide:** colours, type scale, spacing, radius, shadows, and how every
+component looks. The components come from React Aria, which supplies behaviour
+and accessibility but no look of its own, so nothing visual is fixed by the
+library.
+
+**Give it as** a token table (name and value) that maps onto CSS custom
+properties, plus each component's states. The components the app uses:
+
+- Button, including a button that is busy or disabled
+- Text field and text area, including a field with an error
+- Choice: a dropdown with a label
+- Data table, keyboard-navigable (React Aria grid), with paging
+- Notices: errors (`role="alert"`) and quiet status lines
+- Lists of checkboxes and options
+- Dialog
+- Tabs, if the design uses them
+
+**States every component needs:** default, hover, keyboard focus (always
+visible), pressed, disabled, invalid, and loading where it applies.
+
+**Limits:**
+- **Accessibility:**
+  - Text contrast WCAG AA, at least 4.5:1, or 3:1 for large text.
+  - A visible focus ring on everything focusable.
+  - Nothing conveyed by colour alone.
+- **Dense data.** Most screens are lists and tables of campaigns, content,
+  people and approvals. Design for many rows, not cards of five.
+- **Screens and their contents are fixed by earlier decisions.** The app has
+  these pages:
+  - sign-in;
+  - approvals: inbox, history, detail;
+  - campaigns, a campaign, and the variant editor;
+  - monitoring;
+  - settings;
+  - content, a content record;
+  - audiences, an audience;
+  - recipients, a recipient;
+  - decision slots, a slot;
+  - deliveries, a delivery.
+
+  Their fields and flows come from interview records (`docs/react-screen-inventory.md`).
+  A mock-up is a reference for look, not a spec for what a screen contains.
+- **Layout and keyboard accessibility are their own later session.** Visual
+  polish is not added screen by screen while features are built.
+
+## 2. The emails
+
+**What exists.** An email is a stack of modules a manager places. Each module
+type has a manifest (its fields) and a template (HTML tables with `.module-*`
+classes). The module types and the fields they show:
+
+| Module | Shows |
+|---|---|
+| `hero` | A headline and a button |
+| `editorial` | A block of text |
+| `cta` | A button (label and link) |
+| `img_left` | A section heading, an image on the left, a headline, body text and a button |
+| `img_right` | The same, with the image on the right |
+| `single_stack` | The same, stacked |
+| `header` | **Invisible.** The subject and preheader (the "envelope"); it renders no visible content. Being renamed to `envelope` (task-349). |
+
+Styling is one file for every email, `storage/modules/email/brand.css`, inlined
+into each email when it is sent. It uses these classes: `.module-wrapper`,
+`.module-headline`, `.module-body`, `.module-button`, `.module-image`,
+`.module-image-cell`, `.module-content-cell`, `.module-section-heading`,
+`.module-hero`, `.module-cta`. The default font is Arial or Helvetica.
+**Today no fixed content width is set** (`width: 100%`): the design should choose
+one. Around 600px is the common choice.
+
+**Decided and coming (ADR-193, 2026-10-10); the design should cover these:**
+- **A visible header module:** a logo, perhaps navigation.
+- **Footer modules:** links, special texts. A brand may have several, and a
+  manager picks one per email.
+- **A fixed legal footer line** at the bottom of every marketing email. It is
+  not a module, and no manager can remove it. It holds the unsubscribe link and
+  the brand's legal details: legal name, address, imprint and privacy links. It
+  is plain and small today (12px grey, centred). The design may style it but
+  not drop or hide any of it.
+- **Per-brand look:** each brand gets its own colour and font, and its own logo
+  in its header. Everything else is shared by every brand: the modules, their
+  structure, and the stylesheet. **So the design should say which of its values
+  are per brand (a "brand slot") and which are shared.**
+- **Decorative modules** (header, footer, later a section heading) are fine to
+  design freely; they never count as an email's content.
+
+**Limits set by email clients.** These are not ours, and they are the hard part:
+- **Layout is tables.** Flexbox, grid, `position`, floats and multi-column CSS
+  are not reliable across clients.
+- **No CSS variables.** Per-brand colours and fonts are filled in when the email
+  is built, not looked up by the client.
+- **Fonts:** web fonts work in some clients and fall back in others (Outlook,
+  Gmail). Every font needs a safe fallback, and the design should look right in
+  the fallback.
+- **Images:** many clients block images until the reader allows them. A logo or
+  hero image needs alt text, and the email must still make sense without it. No
+  text baked into images.
+- **Width:** design for one column, around 600px, readable on a phone.
+- **Dark mode:** clients invert colours by their own rules. Transparent logos and
+  very light or very dark brand colours need checking against that.
+- **Buttons:** a coloured link styled as a button works everywhere; rounded
+  corners and shadows degrade in some clients (old Outlook), so the design
+  should survive square corners.
+
+## 3. Other surfaces (mostly out of scope)
+
+- **Push notifications** carry only a title and body text, with no visual design.
+- **The unsubscribe page** (`/unsubscribe/{token}`), which a recipient opens
+  from an email, is a small public page. Its wording is fixed by ADR-191 and
+  English for now; its look may follow the brand.
+- **The older Jinja screens** are frozen and will be retired (task-312). Don't
+  design for them.
+
+## What the repo will check when the design comes in
+
+1. Every email design against the client limits above.
+2. Every screen mock-up against what that screen must contain.
+3. The tokens against the accessibility targets (contrast, focus).
+4. The brand slots against ADR-193 (colour, font and logo per brand; the rest
+   shared).
+5. Anything that changes a recorded decision is flagged for a decision first.
+   For example: task-94 decided one full-CSS file for email structure, and the
+   manager app's palette is meant to stay small.
+
+Related: [[ADR-193 — An Email's Legal Footer Is Fixed, Its Visible Header and Footer Are Placed Modules]],
+[[ADR-131 — Email Module Templates Use MJML as Source Format]],
+[[ADR-191 — Unsubscribe Is a Per-Message Token, a Confirm Page and One-Click]],
+[[ADR-173 — The Manager Client's Runtime Dependencies]], task-94 (theming),
+task-349 to task-351 (the header, footer and brand profile builds), task-112
+(assets, for logos).
