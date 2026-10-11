@@ -211,6 +211,73 @@ It is its own parked task, task-348. The unsubscribe link covers the legal minim
 - **Still owed from ADR-193.** The docstring of `footer_html` (`backend/app/subscriptions/texts.py:13-14`) says the line lasts "until task-301's designed footer replaces it". Rewording it belongs to task-350.
 - **The decision log.** `docs/playbook-strategy.md` §5 has the 2026-10-10 entry behind ADR-193. Its point 2 ("a campaign may pick another") and point 3 ("their own colour and font, on top of the shared stylesheet") are replaced by this record. There is no entry yet for the 2026-10-11 session. The reasoning here comes from task-350's notes of 2026-10-11.
 
+## Addendum 2026-10-11 — slice 1's final-design pass
+
+**Slice 1's final-design pass (queue task-350) settled the first item of "Open for the final-design passes" above, and several build questions the session had not stated.** The user decided them on 2026-10-11. Points marked *agreed default* are technical defaults that the user agreed to in the same pass. Points 1–18 of the Decision are unchanged. Task-350's implementation plan holds the full map of where each part lands.
+
+**1. The core field names and the field types.**
+
+- **The core fields are** `legal_company_name`, `legal_address`, `imprint_url`, `privacy_url` and `unsubscribe_text`.
+- **The field types are** `colour`, `font_family`, `size`, `image`, `text`, `url` and `number`: point 2's list, as names.
+- **A field name must match `[a-z][a-z0-9_]*`.**
+- **`storage/brand_profile.json` may relabel or regroup a core field.** It may never change a core field's type or its required flag.
+- **The shipped file declares no fields beyond the core** (agreed default).
+
+**2. Which fields a send requires.**
+
+- **Always:** legal company name, address, imprint URL and privacy URL.
+- **On a marketing profile, also the unsubscribe text.** This is point 10's rule.
+- **The setup file can add required fields.** It can never make a core field optional.
+
+**3. The footer's link labels are the platform's, not the profile's.**
+
+- **"Imprint" and "Privacy" come from a built-in table per language:** English and German, falling back to English. They are not profile fields.
+- **The profile's whole unsubscribe text is the link.**
+
+**4. Every existing brand gets one profile.**
+
+- **It is named "Default",** with language `en`, marked marketing, and unsubscribe text "Unsubscribe".
+- **Its legal fields are left empty.** Legal values are never guessed from the brand name.
+- **Every brand always has a default profile,** including brands created later.
+- **Profiles are deleted with their brand.** They do not block a brand's deletion; its campaigns already do.
+
+**5. Old snapshots and old frames.**
+
+- **An unsent send holding a snapshot made before brand profiles is refused:** "made before brand profiles; take a new snapshot". This is how [[ADR-183 — A Snapshot Freezes the Composition and Every Delivery Records What It Got]] point 6 treats snapshots made before frames.
+- **Email frames that freeze a profile are frame version 3.**
+- **Older frames keep today's footer line byte-for-byte,** so deliveries already sent reconstruct exactly.
+- **The legacy line must never change.** That is `footer_html` and `FOOTER_STYLE` in `backend/app/subscriptions/texts.py`. `templates_fingerprint` (`backend/app/rendering/frame.py:78-91`) hashes only the files in the channel's module directory, and `texts.py` is not among them. A change to the line would break the hash check of every delivery already sent, while `templates_match` still reported the layout as unchanged. The rewording of the `footer_html` docstring that Notes lists as owed is done in 1b, and it says this.
+
+**6. Where an incomplete profile is refused** (agreed default).
+
+- **At send time, not at snapshot time,** with warnings in the composer beforehand. This is the convention already used for missing required content. An incomplete profile can be saved.
+- **Test sends are refused too,** naming the missing fields.
+- **A test send carries the legal footer, with the unsubscribe text shown unlinked and no `List-Unsubscribe` header.** A test send has no token ([[ADR-191 — Unsubscribe Is a Per-Message Token, a Confirm Page and One-Click]], Negative).
+
+**7. Transactional profiles wait for their guard** (agreed default).
+The kind is stored, but the API refuses `transactional` until queue task-355 builds point 9's guard. So no transactional profile can exist without that guard. The transactional permission is not declared until then either. Until task-355, every profile is marketing.
+
+**8. The audit records which fields changed, never their values** (agreed default).
+A value may hold an email address, and the audit writer refuses those ([[ADR-153 — Audit and Accountability]], addendum of 2026-10-08).
+
+**9. Writes are people-only** (agreed default).
+This is the same rule as for settings. Point 5's permission is `brand_profiles.manage`, and it is brand-scoped. Admin holds it; a Manager holds it only if the company grants it.
+
+**10. Slice 1 is built in two halves.**
+
+- **1a, "profiles exist"** (queue task-350): the setup file, profiles, their screens and the choice on the variant. No email changes.
+- **1b, "every email carries them"** (queue task-357): frame version 3, the legal footer on every email, and the refusals.
+
+That way profiles can be filled in before enforcement starts. When 1b lands, every send of an existing campaign is refused until its brand's default profile has its legal fields filled. Planned sends holding an older snapshot need a new snapshot.
+
+**Still open after this pass.**
+
+- **The composer's language-mismatch warning,** including where the audience's language is read from.
+- **How `brand.css` refers to profile fields, and how MJML tag attributes take profile values** (queue task-354).
+- **How a transactional send meets the exclusion stack** (queue task-355).
+- **What following an unsubscribe link on a transactional email writes.**
+- **Where the footer module's per-email free text is stored** (queue task-351).
+
 ## Related ADRs
 
 ### Supersedes
