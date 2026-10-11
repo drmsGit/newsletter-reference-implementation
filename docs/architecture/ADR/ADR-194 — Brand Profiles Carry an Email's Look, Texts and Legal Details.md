@@ -278,6 +278,34 @@ That way profiles can be filled in before enforcement starts. When 1b lands, eve
 - **What following an unsubscribe link on a transactional email writes.**
 - **Where the footer module's per-email free text is stored** (queue task-351).
 
+## Addendum 2026-10-11 (second) — the legal footer is a template file
+
+**Starting slice 1b (queue task-357), the user decided on 2026-10-11 where the legal footer's markup lives.** Points 3 and 5 of the addendum above implied a function in `backend/app/subscriptions/texts.py`. It is a template file instead. Points 1–18 of the Decision are unchanged.
+
+**1. The legal footer is a template file.**
+
+- **Its markup lives in `storage/modules/email/_legal_footer.html`,** in the email template folder.
+- **It is rendered with the same Jinja environment as module templates,** so it is autoescaped.
+- **The built-in Imprint and Privacy labels live in it too,** per language: English and German, falling back to English. In German they read "Impressum" and "Datenschutz".
+- **It is not a function in `texts.py`.**
+
+**2. Why: only the template folder is fingerprinted.**
+
+- **`templates_fingerprint` (`backend/app/rendering/frame.py:78-91`) hashes every file in the channel's module directory.** `texts.py` is not among them.
+- **A footer kept in code could never be edited safely.** An edit would break `hash_matches` for every delivery sent with it, while `templates_match` still reported the layout unchanged. That is why the legacy `footer_html` line is frozen forever.
+- **In the template folder, a later edit shows honestly as "templates changed".** For example when the designed footer of queue task-351 and task-354 arrives.
+
+**3. The module registry skips template files whose name starts with an underscore.**
+So the footer is not taken for a module without a manifest. Today the registry warns about every `.html` file that has no manifest (`backend/app/modules/registry.py:360-362`).
+
+**4. The email fingerprint changes once** (accepted cost).
+Adding the file changes the fingerprint, as adding any module does. Deliveries sent before it then report `templates_match` false. Their `hash_matches` is unaffected: frames below version 3 keep rendering the legacy `footer_html` line byte-for-byte.
+
+**What still stands from the addendum above.**
+
+- **Point 3:** the labels are still built in, not profile fields. Only the place they are written changes.
+- **Point 5:** `footer_html` and `FOOTER_STYLE` still never change.
+
 ## Related ADRs
 
 ### Supersedes
