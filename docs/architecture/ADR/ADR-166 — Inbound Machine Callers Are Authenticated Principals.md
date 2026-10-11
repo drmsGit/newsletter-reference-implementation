@@ -8,7 +8,7 @@ topic:
   - automation
   - governance
 created: 2026-09-13
-modified: 2026-10-09
+modified: 2026-10-11
 source:
   - "Machine authentication design interview (2026-09-13)"
 depends_on:
@@ -574,6 +574,86 @@ unless that changes.
 **Unchanged:** points 1 through 8, the build-notes and the earlier addenda,
 including the recipient ceiling of the first 2026-10-09 addendum. Nothing here
 changes the Decision section above.
+
+## Addendum 2026-10-11 — the unattended ceiling's final-design pass
+
+Prompted by the final-design pass for task-341, which builds the first 2026-10-09
+addendum. The user decided it on 2026-10-11, one question at a time. **This does
+not touch the Decision.** Point 5 stands, and so does the first 2026-10-09
+addendum: a machine-triggered send is held for approval unless the integration is
+allowed otherwise, and above the integration's ceiling it is held again. This
+closes that addendum's list "Left open for the build's final-design pass", and it
+answers the two facts from the code that addendum recorded.
+
+**1. The switch becomes a number.** Each integration has `unattended_ceiling`: how
+many recipients it may send to without a person. 0 means never. It is the default,
+and it is what "off" means today. When unattended sending is switched on, the
+integration screen suggests 100. An integration switched on before this gets the
+company-wide cap at the time of the migration as its ceiling, so nothing changes
+for it until someone lowers it. The boolean `may_send_unattended`
+(`backend/app/auth/db_models.py:233`) goes away.
+
+This answers the first open item. The default is 0, and the boolean becomes
+"ceiling greater than 0".
+
+**2. Raising the ceiling follows the switch-on rule.** Raising it, from 0 or from a
+lower number, needs `integrations.manage` and holding every grant the integration
+has (`require_holds_integration`, the no-escalation rule of the 2026-10-02
+addendum). Lowering it, down to 0, needs `integrations.manage` only, as switching
+off did. Both are audited with the old and the new number. The ceiling is never
+set above the company-wide cap. A send above the cap is still refused at planning,
+for everyone (point 2 of the first 2026-10-09 addendum).
+
+This answers the second open item. Raising a ceiling widens what an integration may
+do without a person, so it counts as switching on. Lowering narrows it, so it stays
+an ungated reduction, like revoking a key.
+
+**3. The count is the count as of now.** When an integration fires a send, the
+platform counts who would be mailed right now. For a send with an audience group,
+that is the audience resolved again, read-only, with the send's purpose
+([[ADR-195 — A Transactional Send Skips the Opt-In Check, Never Provider Suppression]]).
+For a send without one, it is the send's planned recipients. Above the ceiling, the
+request is held for a person: the same pending action, the same inbox, the same
+history. The inbox says it was held for its size, with the number now and the
+ceiling. At or below the ceiling, it fires unattended.
+
+This answers the third open item and the first fact from the code. The hold is
+raised in a request dependency that sees only path parameters
+(`backend/app/auth/dependencies.py:646-648`). The guard now looks the count up
+itself, from the send the path names. It counts now, not at planning, because the
+audience can change between the two (`backend/app/delivery/service.py:653`).
+
+**4. A batch is decided send by send.** When an integration calls
+`/delivery/process-due`, each due send is checked on its own. At or below the
+ceiling, it fires. Above it, it becomes its own held request for the send-firing
+action, stays scheduled, and the response lists it as held. One large send does
+not stop the small ones. A person calling the route is unaffected, because no
+ceiling applies to people.
+
+`/delivery/send-test` sends to one address, so it needs a ceiling of at least 1.
+With 0 it is refused as before, because it has no approvable action.
+
+This answers the second fact from the code. Neither route has an entry in
+`APPROVABLE_ROUTES` (`backend/app/auth/policy.py:332-335`). The batch route is not
+held as one request: each send above the ceiling is held as the fire it would have
+been. The test route has nothing to hold, so it stays a refusal.
+
+**Consequences.**
+
+- **Positive.** Friction follows size for machines as it does for people, the rule
+  2026-07-05 set for people. One value replaces a switch plus a number. The
+  approval queue is reused: a send held for its size, from the fire route or from a
+  batch, is the same pending action as any other held send.
+- **Negative.** Counting "now" re-resolves the audience on every unattended fire.
+  The query is read-only, but it is not free. A batch call can now leave sends
+  held, so an orchestrator must read the response's held list; one that does not
+  will not know which sends are waiting for a person. Integrations switched on
+  before this keep the company cap as their ceiling until someone lowers it, so
+  for them the protection only starts once a ceiling is set.
+
+**Unchanged:** points 1 through 8, the build-notes and the earlier addenda. The
+first 2026-10-09 addendum's open list is answered here, not rewritten there.
+Nothing here changes the Decision section above.
 
 ## Related ADRs
 
