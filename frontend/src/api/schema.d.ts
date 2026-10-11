@@ -2644,6 +2644,100 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/brand-profiles/structure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The fields a profile may hold in this installation */
+        get: operations["read_structure_brand_profiles_structure_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/brand-profiles/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The working brand's profiles, the default first, then by name */
+        get: operations["list_profiles_brand_profiles__get"];
+        put?: never;
+        /** Add a profile to the working brand */
+        post: operations["create_profile_brand_profiles__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/brand-profiles/{profile_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One profile with its values */
+        get: operations["read_profile_brand_profiles__profile_id__get"];
+        /**
+         * Replace a profile's name and values
+         * @description States the profile's updated_at in If-Match; a stale one is refused with 409.
+         */
+        put: operations["update_profile_brand_profiles__profile_id__put"];
+        post?: never;
+        /**
+         * Delete a profile; variants using it fall back to the default
+         * @description The default cannot be deleted (409). Each variant that used the profile gets a notice saying it now uses the default.
+         */
+        delete: operations["delete_profile_brand_profiles__profile_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/brand-profiles/{profile_id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Copy a profile under a new name */
+        post: operations["duplicate_profile_brand_profiles__profile_id__duplicate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/brand-profiles/{profile_id}/make-default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Make this the brand's default profile */
+        post: operations["make_default_brand_profiles__profile_id__make_default_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2945,6 +3039,127 @@ export interface components {
             deliveries: number;
             /** Events */
             events: number;
+        };
+        /** BrandProfile */
+        BrandProfile: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Language */
+            language: string;
+            /** Kind */
+            kind: string;
+            /** Is Default */
+            is_default: boolean;
+            /**
+             * Complete
+             * @description Whether an email may use it: no required field is missing
+             */
+            complete: boolean;
+            /**
+             * Missing
+             * @description The required fields still empty, in the structure's order
+             */
+            missing: string[];
+            /**
+             * Updated At
+             * Format: date-time
+             * @description The version token for If-Match
+             */
+            updated_at: string;
+            /** Field Values */
+            field_values: {
+                [key: string]: unknown;
+            };
+            /**
+             * May Manage
+             * @description Whether this reader may write: a person holding brand_profiles.manage in the working brand. A machine never may. Like the settings screen's; the list carries none, because a paged list has one shape (ADR-185 point 2).
+             * @default false
+             */
+            may_manage: boolean;
+        };
+        /** BrandProfileCreate */
+        BrandProfileCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Language
+             * @default en
+             */
+            language: string;
+            /**
+             * Kind
+             * @description marketing; transactional is refused until task-355
+             * @default marketing
+             */
+            kind: string;
+            /** Field Values */
+            field_values?: {
+                [key: string]: unknown;
+            };
+        };
+        /** BrandProfileDeleted */
+        BrandProfileDeleted: {
+            /**
+             * Variants Moved
+             * @description Variants that used it and now use the default
+             */
+            variants_moved: number;
+        };
+        /** BrandProfileDuplicate */
+        BrandProfileDuplicate: {
+            /**
+             * Name
+             * @description Left out: "<name> (copy)", numbered when taken
+             */
+            name?: string | null;
+        };
+        /** BrandProfileSummary */
+        BrandProfileSummary: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Language */
+            language: string;
+            /** Kind */
+            kind: string;
+            /** Is Default */
+            is_default: boolean;
+            /**
+             * Complete
+             * @description Whether an email may use it: no required field is missing
+             */
+            complete: boolean;
+            /**
+             * Missing
+             * @description The required fields still empty, in the structure's order
+             */
+            missing: string[];
+            /**
+             * Updated At
+             * Format: date-time
+             * @description The version token for If-Match
+             */
+            updated_at: string;
+        };
+        /**
+         * BrandProfileUpdate
+         * @description A full replace of the name and values. Language and kind stay as they
+         *     are when left out.
+         */
+        BrandProfileUpdate: {
+            /** Name */
+            name: string;
+            /** Language */
+            language?: string | null;
+            /** Kind */
+            kind?: string | null;
+            /** Field Values */
+            field_values?: {
+                [key: string]: unknown;
+            };
         };
         /**
          * BrandSwitch
@@ -3327,6 +3542,32 @@ export interface components {
             /** Available */
             available: boolean;
         };
+        /**
+         * ComposedBrandProfile
+         * @description The profile a variant uses, as the editor shows it (task-350).
+         */
+        ComposedBrandProfile: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Language */
+            language: string;
+            /** Kind */
+            kind: string;
+            /** Is Default */
+            is_default: boolean;
+            /**
+             * Missing
+             * @description Required fields the profile still lacks
+             */
+            missing: string[];
+            /**
+             * Notice
+             * @description Why it changed without the manager choosing it
+             */
+            notice?: string | null;
+        };
         /** ComposedModule */
         ComposedModule: {
             /** Id */
@@ -3366,6 +3607,7 @@ export interface components {
         /** ComposedVariant */
         ComposedVariant: {
             variant: components["schemas"]["Variant"];
+            brand_profile: components["schemas"]["ComposedBrandProfile"];
             fence?: components["schemas"]["VariantFence"] | null;
             /** Module Limit */
             module_limit?: number | null;
@@ -4800,6 +5042,17 @@ export interface components {
             /** Offset */
             offset: number;
         };
+        /** Page[BrandProfileSummary] */
+        Page_BrandProfileSummary_: {
+            /** Items */
+            items: components["schemas"]["BrandProfileSummary"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
         /** Page[Campaign] */
         Page_Campaign_: {
             /** Items */
@@ -5214,6 +5467,35 @@ export interface components {
              * @default []
              */
             pending_action_ids: number[];
+        };
+        /**
+         * ProfileFieldOut
+         * @description One field a profile may hold, as `storage/brand_profile.json` declares it.
+         */
+        ProfileFieldOut: {
+            /** Name */
+            name: string;
+            /**
+             * Type
+             * @description colour, font_family, size, image, text, url or number
+             */
+            type: string;
+            /** Label */
+            label: string;
+            /** Group */
+            group: string;
+            /** Multiline */
+            multiline: boolean;
+            /**
+             * Core
+             * @description One of the fields the platform itself relies on (ADR-194 point 3)
+             */
+            core: boolean;
+            /**
+             * Required For
+             * @description The profile kinds that cannot send without it: marketing, transactional
+             */
+            required_for: string[];
         };
         /** PromptPublish */
         PromptPublish: {
@@ -6306,6 +6588,10 @@ export interface components {
              * @default draft
              */
             status: string;
+            /** Brand Profile Id */
+            brand_profile_id?: number | null;
+            /** Brand Profile Notice */
+            brand_profile_notice?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -6339,6 +6625,8 @@ export interface components {
              * @enum {string}
              */
             status: "draft" | "ready";
+            /** Brand Profile Id */
+            brand_profile_id?: number | null;
         };
         /**
          * VariantDuplicate
@@ -6413,6 +6701,8 @@ export interface components {
             envelope?: {
                 [key: string]: string | null;
             } | null;
+            /** Brand Profile Id */
+            brand_profile_id?: number | null;
         };
     };
     responses: never;
@@ -11501,6 +11791,262 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModelChoice"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_structure_brand_profiles_structure_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileFieldOut"][];
+                };
+            };
+        };
+    };
+    list_profiles_brand_profiles__get: {
+        parameters: {
+            query?: {
+                /** @description Rows per page (1-200). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_BrandProfileSummary_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_profile_brand_profiles__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrandProfileCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrandProfile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_profile_brand_profiles__profile_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrandProfile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_profile_brand_profiles__profile_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
+            path: {
+                profile_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrandProfileUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrandProfile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_profile_brand_profiles__profile_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
+            path: {
+                profile_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrandProfileDeleted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    duplicate_profile_brand_profiles__profile_id__duplicate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["BrandProfileDuplicate"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrandProfile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    make_default_brand_profiles__profile_id__make_default_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrandProfile"];
                 };
             };
             /** @description Validation Error */

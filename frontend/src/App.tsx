@@ -15,6 +15,8 @@ import ContentDetail from './screens/ContentDetail'
 import Monitoring from './screens/Monitoring'
 import VariantEditor from './screens/VariantEditor'
 import Settings from './screens/Settings'
+import BrandProfileDetail from './screens/BrandProfileDetail'
+import BrandProfiles from './screens/BrandProfiles'
 import Deliveries from './screens/Deliveries'
 import DeliveryAsSent from './screens/DeliveryAsSent'
 import DeliveryDetail from './screens/DeliveryDetail'
@@ -63,6 +65,8 @@ export default function App() {
         <Route path="/audiences/:id" element={<AudienceDetail />} />
         <Route path="/recipients" element={<Recipients />} />
         <Route path="/recipients/:id" element={<RecipientDetail />} />
+        <Route path="/brand-profiles" element={<BrandProfiles />} />
+        <Route path="/brand-profiles/:id" element={<BrandProfileDetail />} />
         <Route path="/decision-slots" element={<DecisionSlots />} />
         <Route path="/decision-slots/:id" element={<DecisionSlotDetail />} />
         <Route path="/deliveries" element={<Deliveries />} />

@@ -4,6 +4,8 @@ import { Link, useParams } from 'react-router'
 
 import {
   useAddModule,
+  useBrandProfileChoices,
+  useBrandProfileStructure,
   useComposition,
   useDeleteModule,
   useModuleManifests,
@@ -21,6 +23,7 @@ import CatalogueModule from './CatalogueModule'
 import Fence from './Fence'
 import PreviewBar from './Preview'
 import { ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
+import { fieldLabels } from './BrandProfiles'
 
 /**
  * One variant, edited (task-255, slice 5 of the campaign write surface).
@@ -108,6 +111,7 @@ function Editor({
         {variant.channel} · {variant.status}
       </p>
       <Fence campaignId={campaignId} variantId={variant.id} fence={composed.fence} />
+      <ProfileChoice campaignId={campaignId} composed={composed} reload={reload} />
       <PreviewBar variantId={variant.id} variantName={variant.name} stamp={stamp} byName={byName} />
       {composed.has_envelope && (
         <Envelope key={generation} campaignId={campaignId} composed={composed} manifests={manifests} reload={reload} />
@@ -143,6 +147,57 @@ function Editor({
         </section>
       </div>
     </>
+  )
+}
+
+/**
+ * Which of the brand's profiles this variant uses (task-350; ADR-194 point 4):
+ * its look, texts and legal details. Saved on choosing, like every field here.
+ * Says when the profile is incomplete, and when it changed without anybody
+ * choosing it because the one it used was deleted.
+ */
+function ProfileChoice({
+  campaignId,
+  composed,
+  reload,
+}: {
+  campaignId: number
+  composed: ComposedVariant
+  reload: () => void
+}) {
+  const choices = useBrandProfileChoices()
+  const structure = useBrandProfileStructure()
+  const save = useSaveVariant(campaignId)
+  const current = composed.brand_profile
+  const items = choices.data?.items ?? []
+  // The current one is offered even before the list arrives, so the choice
+  // never shows empty.
+  const options = (items.some((p) => p.id === current.id) ? items : [current, ...items]).map((p) => ({
+    id: String(p.id),
+    name: `${p.name}${p.is_default ? ' (default)' : ''} · ${p.language}`,
+  }))
+
+  return (
+    <section className="brand-profile-choice" aria-label="Brand profile">
+      <Choice
+        label="Brand profile"
+        options={options}
+        selected={String(current.id)}
+        onChange={(id) => save.mutate({ id: composed.variant.id, changes: { brand_profile_id: Number(id) } })}
+      />
+      {current.notice && <p role="status">{current.notice}</p>}
+      {current.missing.length > 0 && (
+        <p role="status">
+          This profile is incomplete:{' '}
+          {fieldLabels(current.missing, structure.data)}. <Link to={`/brand-profiles/${current.id}`}>Fill it in</Link>{' '}
+          before sending.
+        </p>
+      )}
+      {choices.data && choices.data.total > items.length && (
+        <p className="muted">Only the first {items.length} of {choices.data.total} profiles are offered.</p>
+      )}
+      <SaveState mutation={save} reload={reload} what="the variant" />
+    </section>
   )
 }
 

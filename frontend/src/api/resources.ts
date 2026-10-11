@@ -53,6 +53,9 @@ export const keys = {
   delivery: (id: number) => ['deliveries', id] as const,
   deliveryExecutions: (id: number) => ['deliveries', id, 'executions'] as const,
   asSent: (executionId: number) => ['executions', executionId, 'as-sent'] as const,
+  brandProfiles: ['brand-profiles'] as const,
+  brandProfile: (id: number) => ['brand-profiles', id] as const,
+  brandProfileStructure: ['brand-profile-structure'] as const,
 }
 
 /**
@@ -773,7 +776,13 @@ export function useSaveVariant(campaignId: number) {
     (
       // `envelope` replaces the stored one when sent and is left alone when
       // not (task-48), so a rename cannot clear the subject.
-      { id, changes }: { id: number; changes: { name?: string; envelope?: Record<string, string | null> } },
+      {
+        id,
+        changes,
+      }: {
+        id: number
+        changes: { name?: string; envelope?: Record<string, string | null>; brand_profile_id?: number }
+      },
       variant,
     ) =>
       read(
@@ -1377,5 +1386,131 @@ export function useUnblock(campaignId: number) {
     mutationFn: (variantId: number) =>
       read(api.DELETE('/campaigns/variants/{variant_id}/fence', { params: { path: { variant_id: variantId } } })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.composition(campaignId) }),
+  })
+}
+
+// --- brand profiles (task-350, ADR-194) -------------------------------------
+
+export type BrandProfile = components['schemas']['BrandProfile']
+export type BrandProfileSummary = components['schemas']['BrandProfileSummary']
+export type ProfileField = components['schemas']['ProfileFieldOut']
+
+/** The fields a profile may hold, as this installation's setup file declares them. */
+export function useBrandProfileStructure() {
+  return useQuery({
+    queryKey: keys.brandProfileStructure,
+    queryFn: () => read(api.GET('/brand-profiles/structure')),
+    staleTime: Infinity,
+  })
+}
+
+/** The working brand's profiles, the default first, then by name. */
+export function useBrandProfiles(offset = 0) {
+  return useQuery({
+    queryKey: [...keys.brandProfiles, 'page', offset],
+    queryFn: () => read(api.GET('/brand-profiles/', { params: { query: { limit: PAGE_SIZE, offset } } })),
+  })
+}
+
+/**
+ * Every profile of the brand, for the variant editor's choice. One page of the
+ * largest size: a brand with more than 200 looks is not a case worth paging a
+ * dropdown for, and the list says when it was cut.
+ */
+export function useBrandProfileChoices() {
+  return useQuery({
+    queryKey: [...keys.brandProfiles, 'choices'],
+    queryFn: () => read(api.GET('/brand-profiles/', { params: { query: { limit: 200, offset: 0 } } })),
+  })
+}
+
+export function useBrandProfile(id: number) {
+  return useQuery({
+    queryKey: keys.brandProfile(id),
+    queryFn: () => read(api.GET('/brand-profiles/{profile_id}', { params: { path: { profile_id: id } } })),
+  })
+}
+
+/** After any profile write: the list, the choices and the editor's composition. */
+function useProfileRefresh() {
+  const queryClient = useQueryClient()
+  return (profile?: BrandProfile) => {
+    if (profile) queryClient.setQueryData(keys.brandProfile(profile.id), profile)
+    void queryClient.invalidateQueries({ queryKey: keys.brandProfiles, predicate: (q) => q.queryKey[1] !== profile?.id })
+    // A variant shows its profile's name and what it misses.
+    void queryClient.invalidateQueries({ queryKey: keys.campaigns, predicate: (q) => q.queryKey[2] === 'composition' })
+  }
+}
+
+export function useCreateBrandProfile() {
+  const refresh = useProfileRefresh()
+  return useMutation({
+    // New profiles start English and marketing; transactional waits for task-355.
+    mutationFn: ({ name }: { name: string }) =>
+      read(api.POST('/brand-profiles/', { body: { name, language: 'en', kind: 'marketing' } })),
+    onSuccess: (profile) => refresh(profile),
+  })
+}
+
+/** Replace the name and values, stating the version that was read (If-Match). */
+export function useSaveBrandProfile(id: number) {
+  const queryClient = useQueryClient()
+  const refresh = useProfileRefresh()
+  return useMutation({
+    scope: { id: `brand-profile-${id}` },
+    mutationFn: (body: { name: string; language: string; field_values: Record<string, unknown> }) =>
+      read(
+        api.PUT('/brand-profiles/{profile_id}', {
+          params: {
+            path: { profile_id: id },
+            header: { 'If-Match': queryClient.getQueryData<BrandProfile>(keys.brandProfile(id))?.updated_at },
+          },
+          body,
+        }),
+      ),
+    onSuccess: (profile) => refresh(profile),
+  })
+}
+
+export function useDuplicateBrandProfile(id: number) {
+  const refresh = useProfileRefresh()
+  return useMutation({
+    mutationFn: () => read(api.POST('/brand-profiles/{profile_id}/duplicate', { params: { path: { profile_id: id } } })),
+    onSuccess: (profile) => refresh(profile),
+  })
+}
+
+export function useMakeDefaultBrandProfile(id: number) {
+  const queryClient = useQueryClient()
+  const refresh = useProfileRefresh()
+  return useMutation({
+    mutationFn: () =>
+      read(api.POST('/brand-profiles/{profile_id}/make-default', { params: { path: { profile_id: id } } })),
+    // The old default changed too, so every cached profile is re-read.
+    onSuccess: (profile) => {
+      refresh(profile)
+      return queryClient.invalidateQueries({ queryKey: keys.brandProfiles })
+    },
+  })
+}
+
+/** Delete a profile; the variants using it move to the default (with a notice). */
+export function useDeleteBrandProfile(id: number) {
+  const queryClient = useQueryClient()
+  const refresh = useProfileRefresh()
+  return useMutation({
+    mutationFn: () =>
+      read(
+        api.DELETE('/brand-profiles/{profile_id}', {
+          params: {
+            path: { profile_id: id },
+            header: { 'If-Match': queryClient.getQueryData<BrandProfile>(keys.brandProfile(id))?.updated_at },
+          },
+        }),
+      ),
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: keys.brandProfile(id) })
+      refresh()
+    },
   })
 }

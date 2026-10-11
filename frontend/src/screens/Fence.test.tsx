@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router'
 
 import VariantEditor from './VariantEditor'
-import { A_SESSION, jsonResponse, renderWithProviders, stubFetch } from '../test-utils'
+import { A_SESSION, jsonResponse, renderWithProviders, stubFetch, A_BRAND_PROFILE } from '../test-utils'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -17,7 +17,7 @@ function open(fence: object | null) {
       campaign: { id: 1, name: 'Spring' },
       variants: [{
         variant: { id: 3, name: 'Variant A', channel: 'email', status: 'draft', updated_at: AT },
-        fence: current, module_limit: null, can_add_module: true, has_envelope: false,
+        fence: current, module_limit: null, can_add_module: true, has_envelope: false, brand_profile: A_BRAND_PROFILE,
         accepted_module_types: [], modules: [], envelope_modules: [], decision_slots: [],
       }],
     }),

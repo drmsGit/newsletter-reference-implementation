@@ -65,6 +65,11 @@ export function jsonResponse(body: unknown, status = 200) {
   })
 }
 
+/** The profile a composed variant reports (task-350): the brand's default, complete. */
+export const A_BRAND_PROFILE = {
+  id: 1, name: 'Default', language: 'en', kind: 'marketing', is_default: true, missing: [], notice: null,
+}
+
 export const A_SESSION = {
   user: { id: 1, email: 'manager@example.invalid', display_name: 'A Manager' },
   brand: { id: 1, key: 'acme', name: 'Acme', switchable: true },

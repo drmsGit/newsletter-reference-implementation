@@ -4,7 +4,7 @@ import { Route, Routes } from 'react-router'
 
 import CampaignDetail from './CampaignDetail'
 import Campaigns from './Campaigns'
-import { jsonResponse, page, renderWithProviders, stubFetch } from '../test-utils'
+import { jsonResponse, page, renderWithProviders, stubFetch, A_BRAND_PROFILE } from '../test-utils'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -35,7 +35,7 @@ const COMPOSITION = {
       },
       module_limit: 10,
       can_add_module: true,
-      has_envelope: true,
+      has_envelope: true, brand_profile: A_BRAND_PROFILE,
       accepted_module_types: ['single_stack', 'cta'],
       envelope_modules: [
         module(9, 0, { module_type: 'envelope', module_data: { subject: 'Spring is here' } }),

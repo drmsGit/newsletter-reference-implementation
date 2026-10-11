@@ -71,6 +71,7 @@ Each row says what the screen needs and whether the API can serve it today.
 | Settings | twelve settings/AI service functions | ❌ **gap C2, the big one.** There is no `app/settings/router.py` and no `app/ai/router.py`. The entire settings surface is UI-only. |
 | Integrations | create, issue, revoke, grant, deactivate | ❌ **gap C14.** Note `issue_credential` must **not** redirect — the secret exists in one response body only (ADR-166 pt 3), and the SPA needs the same property. |
 | Users / roles | user and role administration | ❌ no JSON routes |
+| Brand profiles list / profile | `/brand-profiles` (structure, paged list, read, create, PUT with If-Match, duplicate, make default, delete) | ✅ 2026-10-11 (task-350, ADR-194). The form is built from `storage/brand_profile.json`; writes need `brand_profiles.manage` and a person. The variant editor chooses a variant's profile. |
 
 ---
 

@@ -20,6 +20,7 @@ export const SCREENS = [
   // Supporting, read-mostly screens after the core loop.
   { to: '/decision-slots', label: 'Decision slots', go: 's' },
   // Administration last, as the inventory orders it.
+  { to: '/brand-profiles', label: 'Brand profiles', go: 'b' },
   { to: '/settings', label: 'Settings', go: ',' },
 ]
 

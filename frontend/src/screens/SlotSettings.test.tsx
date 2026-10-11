@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router'
 
 import VariantEditor from './VariantEditor'
-import { jsonResponse, page, renderWithProviders, stubFetch } from '../test-utils'
+import { jsonResponse, page, renderWithProviders, stubFetch, A_BRAND_PROFILE } from '../test-utils'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -47,7 +47,7 @@ function server(options: { unbound?: boolean } = {}) {
       campaign: { id: 1, name: 'Spring' },
       variants: [{
         variant: { id: 3, name: 'Variant A', channel: 'email', status: 'draft', updated_at: T(1) },
-        module_limit: null, can_add_module: true, has_envelope: false, accepted_module_types: ['hero'],
+        module_limit: null, can_add_module: true, has_envelope: false, brand_profile: A_BRAND_PROFILE, accepted_module_types: ['hero'],
         modules: [state.module], envelope_modules: [], decision_slots: [],
       }],
     }),

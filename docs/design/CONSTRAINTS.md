@@ -81,7 +81,8 @@ visible), pressed, disabled, invalid, and loading where it applies.
   - audiences, an audience;
   - recipients, a recipient;
   - decision slots, a slot;
-  - deliveries, a delivery.
+  - deliveries, a delivery;
+  - brand profiles, a profile (since 2026-10-11, task-350).
 
   Their fields and flows come from interview records (`docs/react-screen-inventory.md`).
   A mock-up is a reference for look, not a spec for what a screen contains.

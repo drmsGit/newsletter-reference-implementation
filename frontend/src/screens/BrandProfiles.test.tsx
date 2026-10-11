@@ -1,0 +1,157 @@
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Route, Routes } from 'react-router'
+
+import BrandProfileDetail from './BrandProfileDetail'
+import BrandProfiles from './BrandProfiles'
+import { jsonResponse, page, renderWithProviders, stubFetch } from '../test-utils'
+
+afterEach(() => vi.unstubAllGlobals())
+
+const T = (n: number) => `2026-10-11T10:00:0${n}.000000Z`
+
+/** As `GET /brand-profiles/structure` answers: the core, plus one declared colour. */
+const STRUCTURE = [
+  { name: 'legal_company_name', type: 'text', label: 'Legal company name', group: 'Legal details',
+    multiline: false, core: true, required_for: ['marketing', 'transactional'] },
+  { name: 'legal_address', type: 'text', label: 'Legal address', group: 'Legal details',
+    multiline: true, core: true, required_for: ['marketing', 'transactional'] },
+  { name: 'imprint_url', type: 'url', label: 'Imprint URL', group: 'Legal details',
+    multiline: false, core: true, required_for: ['marketing', 'transactional'] },
+  { name: 'privacy_url', type: 'url', label: 'Privacy URL', group: 'Legal details',
+    multiline: false, core: true, required_for: ['marketing', 'transactional'] },
+  { name: 'unsubscribe_text', type: 'text', label: 'Unsubscribe text', group: 'Unsubscribe',
+    multiline: false, core: true, required_for: ['marketing'] },
+  { name: 'colour_primary', type: 'colour', label: 'Primary colour', group: 'Look',
+    multiline: false, core: false, required_for: [] },
+]
+
+const summary = (over: Record<string, unknown>) => ({
+  id: 1, name: 'Default', language: 'en', kind: 'marketing', is_default: true,
+  complete: true, missing: [], updated_at: T(1), ...over,
+})
+
+describe('the profile list', () => {
+  it('puts the default first and says in words what a profile still lacks', async () => {
+    stubFetch({
+      'GET /brand-profiles/': () => jsonResponse(page([
+        summary({}),
+        summary({ id: 2, name: 'Black Friday', is_default: false, complete: false,
+          missing: ['legal_company_name', 'imprint_url'] }),
+      ])),
+      'GET /brand-profiles/structure': () => jsonResponse(STRUCTURE),
+    })
+    renderWithProviders(<BrandProfiles />)
+    const rows = await screen.findAllByRole('row')
+    expect(within(rows[1]).getByText('Default', { selector: '[role="rowheader"] *, [role="rowheader"]' })).toBeInTheDocument()
+    expect(await screen.findByText('Missing: Legal company name, Imprint URL')).toBeInTheDocument()
+    expect(within(rows[1]).getByText('Complete')).toBeInTheDocument()
+  })
+})
+
+function detailServer(over: Record<string, unknown> = {}) {
+  const state = {
+    ...summary({ id: 2, name: 'Calm', is_default: false, complete: false,
+      missing: ['legal_address', 'imprint_url', 'privacy_url', 'unsubscribe_text'] }),
+    field_values: { legal_company_name: 'Example GmbH', colour_primary: '#1a5db0' } as Record<string, unknown>,
+    may_manage: true,
+    ...over,
+  }
+  const writes: Request[] = []
+  const handlers: Record<string, (request: Request) => Response | Promise<Response>> = {
+    'GET /brand-profiles/2': () => jsonResponse(state),
+    'GET /brand-profiles/structure': () => jsonResponse(STRUCTURE),
+    'PUT /brand-profiles/2': async (request) => {
+      writes.push(request.clone())
+      const body = await request.json()
+      if (body.field_values.imprint_url === 'imprint') {
+        return jsonResponse({ detail: [{ loc: ['body', 'field_values', 'imprint_url'],
+          msg: 'A full web address starting with https:// or http://.', type: 'value_error' }] }, 422)
+      }
+      Object.assign(state, { name: body.name, updated_at: T(2),
+        field_values: Object.fromEntries(Object.entries(body.field_values).filter(([, v]) => v !== '')) })
+      return jsonResponse(state)
+    },
+    'DELETE /brand-profiles/2': (request) => {
+      writes.push(request.clone())
+      return jsonResponse({ variants_moved: 1 })
+    },
+    'GET /brand-profiles/': () => jsonResponse(page([])),
+  }
+  return { state, writes, handlers }
+}
+
+function openDetail(handlers: Record<string, (request: Request) => Response | Promise<Response>>) {
+  stubFetch(handlers as never)
+  renderWithProviders(
+    <Routes>
+      <Route path="/brand-profiles/:id" element={<BrandProfileDetail />} />
+      <Route path="/brand-profiles" element={<p>The list</p>} />
+    </Routes>,
+    { route: '/brand-profiles/2' },
+  )
+}
+
+describe('one profile', () => {
+  it('builds its form from the setup file, grouped, and names what is missing', async () => {
+    openDetail(detailServer().handlers)
+    expect(await screen.findByRole('group', { name: 'Look' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Legal details' })).toBeInTheDocument()
+    expect(screen.getByLabelText(/^Primary colour/)).toHaveValue('#1a5db0')
+    expect(screen.getByText(/Incomplete\. .*Legal address, Imprint URL, Privacy URL, Unsubscribe text\./))
+      .toBeInTheDocument()
+    // Required to send only where the profile's kind needs it.
+    expect(screen.getByText('Unsubscribe text').parentElement).toHaveTextContent('(required to send)')
+    expect(screen.getByText('Primary colour').parentElement).not.toHaveTextContent('(required to send)')
+  })
+
+  it('saves every field together, with the version it read', async () => {
+    const { writes, handlers } = detailServer()
+    openDetail(handlers)
+    const save = await screen.findByRole('button', { name: 'Save' })
+    expect(save).toBeDisabled()
+    fireEvent.change(screen.getByLabelText(/^Imprint URL/), { target: { value: 'https://example.test/imprint' } })
+    fireEvent.click(save)
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect(writes[0].headers.get('If-Match')).toBe(T(1))
+    expect(await writes[0].json()).toEqual({
+      name: 'Calm', language: 'en',
+      field_values: { legal_company_name: 'Example GmbH', legal_address: '', imprint_url: 'https://example.test/imprint',
+        privacy_url: '', unsubscribe_text: '', colour_primary: '#1a5db0' },
+    })
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+  })
+
+  it('shows a refused value on its field', async () => {
+    openDetail(detailServer().handlers)
+    fireEvent.change(await screen.findByLabelText(/^Imprint URL/), { target: { value: 'imprint' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByText('A full web address starting with https:// or http://.')).toBeInTheDocument()
+  })
+
+  it('is read-only for a reader who may not manage profiles', async () => {
+    openDetail(detailServer({ may_manage: false }).handlers)
+    expect(await screen.findByText(/Changing it needs the brand-profile permission/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^Primary colour/)).toHaveAttribute('readonly')
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Delete/ })).not.toBeInTheDocument()
+  })
+
+  it('deletes only after a confirmation that says where its variants go', async () => {
+    const { writes, handlers } = detailServer()
+    openDetail(handlers)
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete…' }))
+    expect(screen.getByText(/Variants using it will move to the default profile/)).toBeInTheDocument()
+    expect(writes).toHaveLength(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Calm' }))
+    expect(await screen.findByText('The list')).toBeInTheDocument()
+    expect(writes.map((w) => w.method)).toEqual(['DELETE'])
+  })
+
+  it('offers no delete and no make-default on the default', async () => {
+    openDetail(detailServer({ is_default: true }).handlers)
+    expect(await screen.findByRole('button', { name: 'Duplicate' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Delete/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Make default' })).not.toBeInTheDocument()
+  })
+})

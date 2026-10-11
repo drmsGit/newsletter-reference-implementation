@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router'
 
 import VariantEditor from './VariantEditor'
-import { jsonResponse, renderWithProviders, stubFetch } from '../test-utils'
+import { jsonResponse, renderWithProviders, stubFetch, A_BRAND_PROFILE } from '../test-utils'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -59,7 +59,7 @@ function server(overrides: { canAdd?: boolean } = {}) {
     campaign: { id: 1, name: 'Spring', status: 'draft', created_at: T(0), updated_at: T(0) },
     variants: [{
       variant: state.variant, module_limit: null, can_add_module: overrides.canAdd ?? true,
-      has_envelope: true, accepted_module_types: ['cta', 'editorial', 'hero'],
+      has_envelope: true, brand_profile: A_BRAND_PROFILE, accepted_module_types: ['cta', 'editorial', 'hero'],
       modules: [...state.modules].sort((a, b) => a.position - b.position),
       envelope_modules: [], decision_slots: [],
     }],
@@ -294,6 +294,52 @@ describe('the module stack', () => {
     open(server({ canAdd: false }).handlers)
     await screen.findByLabelText(/^Subject/)
     expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
+  })
+})
+
+describe('the brand profile', () => {
+  const CALM = { id: 2, name: 'Calm', language: 'en', kind: 'marketing', is_default: false,
+    complete: true, missing: [], updated_at: T(1) }
+  const DEFAULT = { ...CALM, id: 1, name: 'Default', is_default: true }
+
+  function withProfiles(profile: Record<string, unknown> = {}) {
+    const { state, puts, handlers } = server()
+    const composed = handlers['GET /campaigns/1/composition']
+    return {
+      state, puts,
+      handlers: {
+        ...handlers,
+        // The composition as the server reports it, with the profile in use.
+        'GET /campaigns/1/composition': async () => {
+          const body = await composed().json()
+          body.variants[0].brand_profile = { ...A_BRAND_PROFILE, ...profile }
+          return jsonResponse(body)
+        },
+        'GET /brand-profiles/': () => jsonResponse({ items: [DEFAULT, CALM], total: 2, limit: 200, offset: 0 }),
+        'GET /brand-profiles/structure': () => jsonResponse([
+          { name: 'imprint_url', type: 'url', label: 'Imprint URL', group: 'Legal details',
+            multiline: false, core: true, required_for: ['marketing'] },
+        ]),
+      },
+    }
+  }
+
+  it('saves a chosen profile on the variant, with the version it read', async () => {
+    const { puts, handlers } = withProfiles()
+    open(handlers)
+    fireEvent.click(await screen.findByRole('button', { name: /Default \(default\) · en/ }))
+    fireEvent.click(await screen.findByRole('option', { name: 'Calm · en' }))
+    await waitFor(() => expect(puts).toHaveLength(1))
+    expect(puts[0].headers.get('If-Match')).toBe(T(1))
+    expect(await puts[0].json()).toMatchObject({ name: 'Variant A', brand_profile_id: 2 })
+  })
+
+  it('says why the profile changed, and what it still lacks, in words', async () => {
+    open(withProfiles({ notice: 'Its brand profile "Summer" was deleted, so it now uses the default "Default".',
+      missing: ['imprint_url'] }).handlers)
+    expect(await screen.findByText(/Its brand profile "Summer" was deleted/)).toBeInTheDocument()
+    expect(await screen.findByText(/This profile is incomplete: Imprint URL\./)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Fill it in' })).toHaveAttribute('href', '/brand-profiles/1')
   })
 })
 
