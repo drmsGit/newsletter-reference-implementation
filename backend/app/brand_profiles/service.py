@@ -55,6 +55,12 @@ def ensure_default_profile(db: Session, brand_id: int, *, commit: bool = True) -
 default_profile = ensure_default_profile
 
 
+def find_default_profile(db: Session, brand_id: int) -> BrandProfileDB | None:
+    """The brand's default profile, or None: a lookup that never creates one,
+    for reads that must not write (the session's logo, task-356)."""
+    return _default(db, brand_id)
+
+
 def _default(db: Session, brand_id: int) -> BrandProfileDB | None:
     return (
         db.query(BrandProfileDB)

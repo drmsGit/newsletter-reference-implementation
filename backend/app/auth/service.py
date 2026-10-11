@@ -397,9 +397,11 @@ def current_brand_summary(db: Session, token: str | None) -> dict | None:
     # by the user to the logo only: the app keeps one palette and its fonts).
     # The names are the setup file's Header fields (task-351); an installation
     # that declares no logo shows none.
-    from app.brand_profiles.service import default_profile
+    # Looked up, never created: reading the session must not write.
+    from app.brand_profiles.service import find_default_profile
 
-    values = default_profile(db, brand.id).field_values or {}
+    profile = find_default_profile(db, brand.id)
+    values = (profile.field_values if profile else None) or {}
     return {
         "id": brand.id,
         "key": brand.key,
