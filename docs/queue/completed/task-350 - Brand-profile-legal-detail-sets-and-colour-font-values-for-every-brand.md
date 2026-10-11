@@ -3,11 +3,11 @@ id: TASK-350
 title: >-
   Brand profiles 1a: the setup file, profiles per brand with their screens,
   chosen on the variant
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-10 21:17'
-updated_date: '2026-10-11 09:00'
+updated_date: '2026-10-11 09:41'
 labels:
   - backend
   - frontend
@@ -41,13 +41,13 @@ Not in this slice: filling brand.css and the templates (slice 2), header and foo
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A setup file declares the profile's fields; the core legal and unsubscribe fields are always present
-- [ ] #2 A brand can hold several profiles; one is the default; profiles can be duplicated and deleted, falling back to the default
-- [ ] #3 Profile changes need the per-brand permission and are audited
-- [ ] #4 Every brand has a default profile; existing brands get an English 'Default' one by migration
-- [ ] #5 A variant chooses a profile (default preselected); a copied variant keeps it within the brand and takes the target brand's default across brands
-- [ ] #6 Managers edit profiles in a screen built from the setup file; incomplete profiles say which fields are missing
-- [ ] #7 A profile cannot be created as transactional yet (task-355)
+- [x] #1 A setup file declares the profile's fields; the core legal and unsubscribe fields are always present
+- [x] #2 A brand can hold several profiles; one is the default; profiles can be duplicated and deleted, falling back to the default
+- [x] #3 Profile changes need the per-brand permission and are audited
+- [x] #4 Every brand has a default profile; existing brands get an English 'Default' one by migration
+- [x] #5 A variant chooses a profile (default preselected); a copied variant keeps it within the brand and takes the target brand's default across brands
+- [x] #6 Managers edit profiles in a screen built from the setup file; incomplete profiles say which fields are missing
+- [x] #7 A profile cannot be created as transactional yet (task-355)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -161,4 +161,32 @@ Second of three build tasks from task-301.
 2026-10-11, revised after reading docs/design/DESIGN.md: Q6 is narrowed by the user to the LOGO only. The manager app keeps one palette and its Plex fonts per installation, so the design's teal (system) and ochre (human) keep their meaning; task-356 is rescoped accordingly. The design draft covers only the manager app; emails are out of its scope, so the profile's email fields still come from the setup file.
 
 2026-10-11: rescoped to 1a after the final-design pass. The criteria about freezing, the footer on every email and refusing sends moved to task-357 (1b).
+
+2026-10-11, built (slice 1a, profiles exist). Commits 0944f34 (ADR-194 addendum), 69b4f64, 29071ab, a705fdd, 4c26291, 98fba72, 7904448, bcc55f5, db6e780.
+
+Where it landed:
+- backend/app/brand_profiles/: structure.py (setup file storage/brand_profile.json, core fields, startup check in main.py), db_models.py (brand_profiles, one default per brand by partial unique index), service.py (default per brand, value checks per field type, create/update/duplicate/make-default/delete, variant profile helpers), models.py, router.py (/brand-profiles).
+- Migration 0044: table, an English Default per brand (unsubscribe text Unsubscribe, legal fields empty), variants.brand_profile_id backfilled to the brand default, variants.brand_profile_notice. Applied to dev.
+- auth/service.py: create_brand and ensure_default_brand make the default; profiles are DELETED_WITH_BRAND, not holders.
+- Permission brand_profiles.manage: brand-scoped, Admin by preset, not Manager; writes people-only (require_person). Policy entry and BRAND_OWNED reason. No migration hands it to customised roles: a new capability, not a split (the 0014 precedent only re-granted what a split took away). Dev Admin is not customised and holds it.
+- Audit brand_profile.created/updated/duplicated/made_default/deleted; updated records changed field names only. variant.updated now records brand_profile_id.
+- Variants: new ones take the brand default or a named profile of the same brand (422 otherwise); picking clears the notice; copies keep the profile inside a brand and take the target default across brands (duplication._profile_for_copy, flushed inside the copy transaction via a savepoint). The composition reports brand_profile with missing fields and notice. NULL reads as the default.
+- Seed: demo brands default profiles get example.test legal details, only where empty.
+- Frontend: Settings got subpages (user, 2026-10-11: a profile is a setting part, not a menu area): General and Brand profiles at /settings/brand-profiles(/:id). The profile form is built from the structure, saved with one button and If-Match, noValidate so the server field messages are the only rules. The variant editor has a Brand profile choice with the notice and the incomplete warning.
+
+Decisions taken while building, not in the design pass:
+- The list route carries no may_manage: ADR-185 allows one paged shape. The single read carries it, like settings.
+- The profile form saves with an explicit button, not per field.
+- The variant choice shows on every channel, push included; only email will use it (task-357). Hide it on push if that confuses.
+- The dev proxy (vite.config.ts) and the pagination inventory test list the new routes.
+
+Verification: backend 1726 passed, Ruff clean; frontend 260 passed, tsc and eslint clean; every guarantee mutation-checked (model 4, API 11, variants 8, frontend 4). CI green through 7904448. Live check 2026-10-11 in the browser pane on scratch data: created Scratch check, a bad imprint link was refused on its field, saved complete, duplicated, made the copy default and switched back, picked it on a scratch variant (stored and audited), deleted it and the variant fell back to Default with the notice. Scratch profiles deleted in the app, scratch campaign 11 and variant 17 removed by id.
+
+Open for later: task-357 needs complete profiles for the temp_brand fixture (conftest) once sends are refused.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Slice 1a of brand profiles: a setup file declares a profile's fields around a fixed legal core; every brand has profiles with one default (migration 0044 gives existing brands an English Default); profiles are edited under Settings, Brand profiles, behind the new people-only brand_profiles.manage permission and audited by field name; each variant chooses its profile, and copies and deletions fall back to the default with a notice. No email changes yet (task-357). Verified by 1726 backend and 260 frontend tests, mutation checks, green CI and a live check on scratch data.
+<!-- SECTION:FINAL_SUMMARY:END -->
