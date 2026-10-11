@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
-updated_date: '2026-09-27 14:29'
+updated_date: '2026-10-11 19:10'
 labels:
   - needs-adr
   - backend
@@ -27,4 +27,6 @@ ordinal: 300900
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 449, section "Needs ADR", position 9 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-11, the user, from task-60: a wholly different subject per recipient (A gets Welcome to the beach, B gets This city trip was mindblowing) is an AI case, not a rendering one; a few versions are separate variants with their own subject, and a fully dynamic email is an automation case. See the ADR-162 addendum of 2026-10-11.
 <!-- SECTION:NOTES:END -->

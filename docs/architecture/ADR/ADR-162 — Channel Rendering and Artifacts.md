@@ -8,7 +8,7 @@ topic:
   - snapshot
   - templates
 created: 2026-09-01
-modified: 2026-09-12
+modified: 2026-10-11
 source:
   - "Omni-Channel design interview (interview-prep, closed 2026-09-01), Cluster 3 / Q11–Q15"
 depends_on:
@@ -94,6 +94,47 @@ What improves and what does not is worth stating rather than overclaiming. The p
 - **Amendments other records need, none of them made here.** [[ADR-063 — Rendering Parity Over Rendering Implementation]] needs **wording only** — "the same intended newsletter output" becomes "the same intended channel artifact" — which is an amendment, explicitly not a superseding decision. [[ADR-062 — Snapshot Stores Final Render State]] needs its wording generalised from a single final render to a **package** of role-tagged artifacts with a hash over the set. Both are the dated-addendum pattern; neither Decision section changes.
 - [[ADR-131 — Email Module Templates Use MJML as Source Format]] needs **no** amendment. The renames are to code paths, not to its decision: MJML remains the email module source format and compilation stays in the frontend layer.
 - The renderer contract is written in two steps in the source interview — a single `Artifact` return, then widened to a set with a package hash. Point 3 records the settled form.
+
+## Addendum 2026-10-11 — a personalised subject line is not an override, and will not become one
+
+Prompted by task-60 ("A personalised subject line still is not possible") and
+decided with the user on 2026-10-11. The Decision above is unchanged; this
+withdraws one of the three benefits point 1 claims, and the Positive that
+repeats it.
+
+**Point 1's "Overrides work unchanged … a personalised subject line comes
+free" is not how it works, and will not be made true.** Subject and preheader
+live in the variant's own envelope module — point 1's `header`, renamed
+`envelope` by [[ADR-193 — An Email's Legal Footer Is Fixed, Its Visible Header and Footer Are Placed Modules]]
+point 6 — whose values sit in `module_data` (`storage/modules/email/envelope.json`,
+`cms: false`). That module has no content record and no decision slot, so it
+is never overrideable: `is_overrideable` and `_overrideable_manifest` in
+`backend/app/overrides/service.py:25-72` allow an override only on a module
+bound to a catalogue record ([[ADR-040 — Introduce Override Layer]],
+[[ADR-178 — Scope of the Correction, Not Location of the Manager]] point 5,
+task-202). That is correct. An override exists to change catalogue content for
+one variant; a variant's subject is the variant's own text and is edited
+directly, per variant. A subject adjusted per variant therefore already
+exists, without overrides. Override eligibility stays as it is, and this
+addendum does not widen it. The Positive *"A personalised subject line becomes
+an ordinary override, with no mechanism of its own"* is withdrawn with it.
+
+**Per-recipient personalisation inside a text is a separate mechanism.** A
+salutation in a subject (`{{salutation_formal}}`) comes from a brand's
+expression dictionary, designed with the user on 2026-10-11 and filed as its
+own queue task; it gets its own ADR when built, and when it lands it fills the
+merge context that [[ADR-183 — A Snapshot Freezes the Composition and Every Delivery Records What It Got]]
+point 7 leaves undecided and [[ADR-005 — Separate Snapshot State from Recipient Delivery Artifact]]
+requires.
+
+**A wholly different subject per recipient is not a rendering concern.** A
+few versions — recipient A gets "Welcome to the beach", B gets "This city trip
+was mindblowing" — are separate variants: duplicate and change the subject.
+Subjects generated per recipient are an AI case (task-125). A fully dynamic
+email is an automation case.
+
+Point 1's other two benefits — Mode A generalises without a special case, and
+there is no third pattern to keep in step — are unaffected.
 
 ## Related ADRs
 
