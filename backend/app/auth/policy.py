@@ -23,7 +23,7 @@ ones they live inside.
 
 from app.auth.permissions import (
     AI_RUN, AUDIENCES_MANAGE, AUDIENCES_PIN, CAMPAIGNS_MANAGE, CONTENT_MANAGE,
-    INSIGHT_WRITE, INTEGRATIONS_MANAGE, OVERRIDES_MANAGE,
+    BRAND_PROFILES_MANAGE, INSIGHT_WRITE, INTEGRATIONS_MANAGE, OVERRIDES_MANAGE,
     RECIPIENTS_CONSENT, RECIPIENTS_MANAGE,
     SENDS_EXECUTE, SENDS_PLAN, SETTINGS_MANAGE, USERS_MANAGE, VIEW,
 )
@@ -195,6 +195,9 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
     ("/integrations", INTEGRATIONS_MANAGE),
     ("/ui/settings", SETTINGS_MANAGE),
     ("/settings", SETTINGS_MANAGE),
+    # A brand's profiles (ADR-194). Every write is also people-only, on the
+    # router, for the reason settings are: the table cannot say "no machine".
+    ("/brand-profiles", BRAND_PROFILES_MANAGE),
     ("/ui/users", USERS_MANAGE),
     ("/ui/roles", USERS_MANAGE),
 
@@ -446,6 +449,10 @@ BRAND_OWNED: dict[str, str] = {
         "here is the session's working CONTEXT, which is the thing ADR-172 "
         "point 1 separated from authorisation. A route that sets the context "
         "cannot itself be scoped by it."
+    ),
+    "/brand-profiles": (
+        "yes — `brand_profiles.brand_id`. A variant may only use a profile of "
+        "its own campaign's brand (ADR-194)."
     ),
     "/modules": (
         "no — module manifests read from disk. They describe what the "

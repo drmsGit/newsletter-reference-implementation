@@ -36,6 +36,8 @@ PAGED = {
     "/recipients/consent/drift",
     "/content/{content_id}/campaigns",
     "/recipients/{recipient_id}/audience-groups",
+    # One per look, per language, per season (ADR-194): it grows with use.
+    "/brand-profiles/",
 }
 
 #: Lists fixed by code or configuration, or bounded by one parent record
@@ -61,6 +63,8 @@ FIXED = {
     "/snapshots/variants/{variant_id}",
     "/recipients/{recipient_id}/preferences",
     "/delivery/snapshots/{snapshot_id}/send-instances",
+    # Declared in storage/brand_profile.json: fixed by configuration.
+    "/brand-profiles/structure",
 }
 
 #: Lists that grow with use and are not yet paged. Empty since task-88 closed;

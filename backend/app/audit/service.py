@@ -131,6 +131,13 @@ CONSENT_RECORDED = "consent.recorded"
 # ADR-192: a person released a send stranded in "sending" (task-325).
 SEND_RELEASED = "send.released"
 AI_SUGGESTION_APPLIED = "ai.suggestion_applied"
+# ADR-194, task-350. The detail names the fields that changed, never their
+# values (addendum 2026-10-11, point 8): a legal address may hold an email.
+BRAND_PROFILE_CREATED = "brand_profile.created"
+BRAND_PROFILE_UPDATED = "brand_profile.updated"
+BRAND_PROFILE_DUPLICATED = "brand_profile.duplicated"
+BRAND_PROFILE_MADE_DEFAULT = "brand_profile.made_default"
+BRAND_PROFILE_DELETED = "brand_profile.deleted"
 
 #: Every action name an entry may carry (task-52, ADR-153 addendum
 #: 2026-10-08). Collected from the constants above, so adding one is still one

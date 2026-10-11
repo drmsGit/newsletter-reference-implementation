@@ -57,3 +57,276 @@ def _default(db: Session, brand_id: int) -> BrandProfileDB | None:
 def missing(profile: BrandProfileDB) -> list[str]:
     """The fields this profile must still fill before an email may use it."""
     return missing_fields(profile.kind, profile.field_values or {})
+
+
+# --- reading and writing a brand's profiles (task-350) ----------------------
+#
+# Every function takes the working brand and finds the profile only inside it,
+# so another brand's profile reads as not found rather than forbidden: its
+# existence is not this caller's to learn (ADR-172).
+
+import re
+from datetime import datetime
+
+from app.brand_profiles.structure import KINDS, MARKETING, TRANSACTIONAL, profile_structure
+
+NAME_MAX = 200
+TEXT_MAX = 2000
+LANGUAGE = re.compile(r"[a-z]{2}(-[A-Z]{2})?")
+_COLOUR = re.compile(r"#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?")
+_SIZE = re.compile(r"\d+(\.\d+)?(px|em|rem|%)")
+_URL = re.compile(r"https?://\S+")
+
+
+class ProfileNotFound(LookupError):
+    pass
+
+
+class ProfileConflict(Exception):
+    """A write the profile's current state refuses: a taken name, deleting the
+    default. A 409 — the request was well-formed."""
+
+
+class ProfileInvalid(ValueError):
+    """One entry per refused part: `(location, message)`, where the location is
+    `("field_values", name)` or a top-level key such as `("kind",)`."""
+
+    def __init__(self, errors: list[tuple[tuple[str, ...], str]]):
+        self.errors = errors
+        super().__init__("; ".join(f"{'.'.join(loc)}: {msg}" for loc, msg in errors))
+
+
+def list_profiles(db: Session, brand_id: int):
+    """The brand's profiles as a query: the default first, then by name."""
+    ensure_default_profile(db, brand_id)
+    return db.query(BrandProfileDB).filter(BrandProfileDB.brand_id == brand_id)
+
+
+LIST_ORDER = (BrandProfileDB.is_default.desc(), BrandProfileDB.name.asc(), BrandProfileDB.id.asc())
+
+
+def get_profile(db: Session, profile_id: int, brand_id: int, *, lock: bool = False) -> BrandProfileDB:
+    query = db.query(BrandProfileDB).filter(
+        BrandProfileDB.id == profile_id, BrandProfileDB.brand_id == brand_id)
+    if lock:
+        query = query.with_for_update()
+    profile = query.first()
+    if profile is None:
+        raise ProfileNotFound(f"Brand profile {profile_id} not found")
+    return profile
+
+
+def clean_values(values: dict) -> dict:
+    """The values as stored: declared fields only, each of its type, empty ones
+    dropped. Raises `ProfileInvalid` naming every refused field at once."""
+    fields = {f.name: f for f in profile_structure()}
+    errors, cleaned = [], {}
+    for name, value in (values or {}).items():
+        field = fields.get(name)
+        if field is None:
+            errors.append((("field_values", name), "Not a field of this installation's brand profiles."))
+            continue
+        if value is None or (isinstance(value, str) and not value.strip()):
+            continue
+        problem, value = _check(field.type, value)
+        if problem:
+            errors.append((("field_values", name), problem))
+        else:
+            cleaned[name] = value
+    if errors:
+        raise ProfileInvalid(errors)
+    return cleaned
+
+
+def _check(field_type: str, value):
+    """(problem or None, the value to store)."""
+    if field_type == "number":
+        if isinstance(value, bool):
+            return "Must be a number.", value
+        if isinstance(value, (int, float)):
+            return None, value
+        try:
+            number = float(str(value).strip())
+        except ValueError:
+            return "Must be a number.", value
+        return None, int(number) if number.is_integer() else number
+    if not isinstance(value, str):
+        return "Must be text.", value
+    if len(value) > TEXT_MAX:
+        return f"At most {TEXT_MAX} characters.", value
+    value = value.strip()
+    if field_type == "colour" and not _COLOUR.fullmatch(value):
+        return "A colour as #rgb or #rrggbb, for example #1a5db0.", value
+    if field_type == "size" and not _SIZE.fullmatch(value):
+        return "A size with its unit: px, em, rem or %, for example 16px.", value
+    if field_type in ("url", "image") and not _URL.fullmatch(value):
+        return "A full web address starting with https:// or http://.", value
+    return None, value
+
+
+def _check_header(name: str | None, language: str | None, kind: str | None) -> list:
+    errors = []
+    if name is not None and not (0 < len(name.strip()) <= NAME_MAX):
+        errors.append((("name",), f"A name of 1 to {NAME_MAX} characters."))
+    if language is not None and not LANGUAGE.fullmatch(language):
+        errors.append((("language",), "A language code such as en, de or de-AT."))
+    if kind is not None and kind not in KINDS:
+        errors.append((("kind",), f"One of: {', '.join(KINDS)}."))
+    elif kind == TRANSACTIONAL:
+        # ADR-194 addendum 2026-10-11, point 7: stored, but refused until the
+        # guard that lets a transactional email go without an opt-in is built.
+        errors.append((("kind",), "Transactional profiles are not available yet: sending without "
+                                  "an opt-in needs its own safeguard first. Use marketing."))
+    return errors
+
+
+def _name_taken(db: Session, brand_id: int, name: str, except_id: int | None = None) -> bool:
+    query = db.query(BrandProfileDB.id).filter(
+        BrandProfileDB.brand_id == brand_id, BrandProfileDB.name == name)
+    if except_id is not None:
+        query = query.filter(BrandProfileDB.id != except_id)
+    return query.first() is not None
+
+
+def _taken(name: str) -> ProfileConflict:
+    return ProfileConflict(f'This brand already has a profile called "{name}".')
+
+
+def create_profile(db: Session, brand_id: int, *, name: str, language: str = "en",
+                   kind: str = MARKETING, field_values: dict | None = None) -> BrandProfileDB:
+    errors = _check_header(name, language, kind)
+    try:
+        values = clean_values(field_values or {})
+    except ProfileInvalid as invalid:
+        errors += invalid.errors
+    if errors:
+        raise ProfileInvalid(errors)
+    name = name.strip()
+    ensure_default_profile(db, brand_id)
+    if _name_taken(db, brand_id, name):
+        raise _taken(name)
+    profile = BrandProfileDB(brand_id=brand_id, name=name, language=language, kind=kind,
+                             is_default=False, field_values=values)
+    db.add(profile)
+    _commit_or_taken(db, name)
+    db.refresh(profile)
+    return profile
+
+
+def update_profile(db: Session, profile_id: int, brand_id: int, *, name: str,
+                   language: str | None = None, kind: str | None = None,
+                   field_values: dict | None = None,
+                   expected_updated_at: datetime | None = None) -> tuple[BrandProfileDB, list[str]]:
+    """Replace the name and values; language and kind only when given.
+    Returns the profile and the names of what changed, in the structure's order."""
+    from app.campaigns.service import refuse_stale
+
+    errors = _check_header(name, language, kind)
+    try:
+        values = clean_values(field_values or {})
+    except ProfileInvalid as invalid:
+        errors += invalid.errors
+    if errors:
+        raise ProfileInvalid(errors)
+    profile = get_profile(db, profile_id, brand_id)
+    refuse_stale(db, profile, expected_updated_at, "brand profile")
+    name = name.strip()
+    if _name_taken(db, brand_id, name, except_id=profile.id):
+        raise _taken(name)
+
+    before = dict(profile.field_values or {})
+    order = [f.name for f in profile_structure()]
+    changed = [key for key, new in (("name", name), ("language", language), ("kind", kind))
+               if new is not None and getattr(profile, key) != new]
+    changed += sorted((k for k in set(before) | set(values) if before.get(k) != values.get(k)),
+                      key=lambda k: (order.index(k) if k in order else len(order), k))
+    profile.name = name
+    if language is not None:
+        profile.language = language
+    if kind is not None:
+        profile.kind = kind
+    profile.field_values = values
+    _commit_or_taken(db, name)
+    db.refresh(profile)
+    return profile, changed
+
+
+def duplicate_profile(db: Session, profile_id: int, brand_id: int,
+                      name: str | None = None) -> BrandProfileDB:
+    """A copy under a free name, never the default (ADR-194 point 1)."""
+    source = get_profile(db, profile_id, brand_id)
+    if name is not None:
+        if errors := _check_header(name, None, None):
+            raise ProfileInvalid(errors)
+        name = name.strip()
+        if _name_taken(db, brand_id, name):
+            raise _taken(name)
+    else:
+        name = _free_copy_name(db, brand_id, source.name)
+    copy = BrandProfileDB(brand_id=brand_id, name=name, language=source.language,
+                          kind=source.kind, is_default=False,
+                          field_values=dict(source.field_values or {}))
+    db.add(copy)
+    _commit_or_taken(db, name)
+    db.refresh(copy)
+    return copy
+
+
+def _free_copy_name(db: Session, brand_id: int, name: str) -> str:
+    for n in range(1, 1000):
+        suffix = " (copy)" if n == 1 else f" (copy {n})"
+        candidate = name[:NAME_MAX - len(suffix)] + suffix
+        if not _name_taken(db, brand_id, candidate):
+            return candidate
+    raise ProfileConflict("No free name for the copy; name it yourself.")
+
+
+def make_default(db: Session, profile_id: int, brand_id: int) -> BrandProfileDB:
+    """Move the default mark. The brand's profiles are locked so two people
+    doing this at once end with one default, not a refused second commit."""
+    profiles = (db.query(BrandProfileDB).filter(BrandProfileDB.brand_id == brand_id)
+                .order_by(BrandProfileDB.id).with_for_update().all())
+    target = next((p for p in profiles if p.id == profile_id), None)
+    if target is None:
+        raise ProfileNotFound(f"Brand profile {profile_id} not found")
+    for profile in profiles:
+        if profile.is_default and profile.id != target.id:
+            profile.is_default = False
+    db.flush()               # the old mark goes before the new one, for the unique index
+    target.is_default = True
+    db.commit()
+    db.refresh(target)
+    return target
+
+
+def delete_profile(db: Session, profile_id: int, brand_id: int,
+                   expected_updated_at: datetime | None = None) -> int:
+    """Delete a profile; the variants using it fall back to the default, each
+    with a notice saying so (ADR-194 point 1). Returns how many moved."""
+    from app.campaigns.db_models import VariantDB
+    from app.campaigns.service import refuse_stale
+
+    profile = get_profile(db, profile_id, brand_id)
+    refuse_stale(db, profile, expected_updated_at, "brand profile")
+    if profile.is_default:
+        raise ProfileConflict(
+            "The default profile cannot be deleted. Make another profile the default first.")
+    default = ensure_default_profile(db, brand_id)
+    notice = (f'Its brand profile "{profile.name}" was deleted, so it now uses the default '
+              f'"{default.name}".')[:255]
+    moved = (db.query(VariantDB).filter(VariantDB.brand_profile_id == profile.id)
+             .update({"brand_profile_id": default.id, "brand_profile_notice": notice},
+                     synchronize_session=False))
+    db.delete(profile)
+    db.commit()
+    return moved
+
+
+def _commit_or_taken(db: Session, name: str) -> None:
+    """The name check above is a read; two writers can both pass it. The
+    unique constraint is the real guard, and this keeps it a 409."""
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise _taken(name)

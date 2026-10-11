@@ -133,6 +133,7 @@ from app.modules.router import router as modules_router
 from app.approvals.router import router as approvals_router
 from app.auth.integrations_router import router as integrations_router
 from app.settings.router import router as settings_router
+from app.brand_profiles.router import router as brand_profiles_router
 from app.subscriptions.router import router as unsubscribe_router
 from app.auth.router import context_router
 
@@ -815,6 +816,9 @@ app.include_router(integrations_router, dependencies=_api)
 # Reads are `view`; writes are people only and `settings.manage` (ADR-150's
 # addendum of 2026-10-02), with `ai.run` too for prompts and models.
 app.include_router(settings_router, dependencies=_api)
+# A brand's profiles (ADR-194): reads are `view`, writes are people only and
+# `brand_profiles.manage` in the working brand.
+app.include_router(brand_profiles_router, dependencies=_api)
 
 # **Public, and deliberately outside both signed-in planes** (ADR-191): the
 # recipient's unsubscribe page. The token in its path is the only credential —

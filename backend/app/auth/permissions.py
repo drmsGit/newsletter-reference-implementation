@@ -40,6 +40,11 @@ RECIPIENTS_CONSENT = "recipients.consent"  # write a consent record
 INSIGHT_WRITE = "insight.write"            # write engagement events
 OVERRIDES_MANAGE = "overrides.manage"      # override a system content pick
 INTEGRATIONS_MANAGE = "integrations.manage"  # issue/rotate/revoke machine keys
+# ADR-194 point 5 and its 2026-10-11 addendum point 9: a brand's looks, texts
+# and legal details. Its own key rather than `settings.manage` because the rows
+# carry a brand, and rather than `campaigns.manage` because a profile's legal
+# details speak for the company in every email that uses it.
+BRAND_PROFILES_MANAGE = "brand_profiles.manage"  # a brand's profiles
 
 ALL_PERMISSIONS: dict[str, str] = {
     VIEW: "See dashboards, campaigns, signals and delivery history",
@@ -58,6 +63,7 @@ ALL_PERMISSIONS: dict[str, str] = {
     INSIGHT_WRITE: "Write engagement events into the signal layer",
     OVERRIDES_MANAGE: "Override a system content pick, and reset one",
     INTEGRATIONS_MANAGE: "Issue, rotate and revoke machine credentials",
+    BRAND_PROFILES_MANAGE: "Create and edit a brand's profiles: look, texts and legal details",
 }
 
 # `recipients.consent` is separate from `recipients.manage` deliberately
@@ -102,6 +108,8 @@ BRAND_SCOPED: frozenset[str] = frozenset({
     # `consent_events.brand_id` became NOT NULL the same day the rule was
     # written. Eight and eight, not seven and nine.
     RECIPIENTS_CONSENT,
+    # `brand_profiles.brand_id` (ADR-194 addendum 2026-10-11, point 9).
+    BRAND_PROFILES_MANAGE,
 })
 
 # Platform-level by omission, and each for a reason from ADR-150 point 5:
@@ -158,7 +166,10 @@ BUILTIN_ROLES: dict[str, dict] = {
         # `insight.write` guard no UI surface — recipients originate in the
         # source system (ADR-167) and engagement arrives from providers and
         # integrations, so these exist for machine callers. `integrations.manage`
-        # is Admin's by ADR-166 point 4.
+        # is Admin's by ADR-166 point 4. `brand_profiles.manage` is Admin's
+        # too, and a Manager's only where the company grants it (ADR-194's
+        # 2026-10-11 addendum, point 9): a profile's legal details speak for
+        # the company in every email.
     },
     VIEWER: {
         "name": "Viewer",
