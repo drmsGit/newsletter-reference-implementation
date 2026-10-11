@@ -7,6 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-10-11 19:15'
 labels:
   - backend
 dependencies: []
@@ -24,4 +25,6 @@ ordinal: 202100
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 212, section "Features", position 21 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-11, the user changed the scope: no cost display before running a batch is needed; running Condor in production showed how cheap the calls are. What is wanted instead is basic spend monitoring under Settings: what was spent today, yesterday and in the current budget period (the period exists since task-345, ADR-144 addendum 2026-10-11; settings.ai_budget_status already reports the period). An AI action that cannot run because of the spending limit keeps showing its warning, as today.
 <!-- SECTION:NOTES:END -->
