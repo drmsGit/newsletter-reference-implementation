@@ -1471,6 +1471,7 @@ export function useSaveBrandProfile(id: number) {
       version: string
       name: string
       language: string
+      kind: string
       field_values: Record<string, unknown>
     }) =>
       read(

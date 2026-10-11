@@ -13,6 +13,7 @@ import {
   type ProfileField,
 } from '../api/resources'
 import { HttpError } from '../api/session'
+import Choice from '../components/Choice'
 import { SaveState, fieldError } from '../components/EditorFields'
 import ScreenState from '../components/ScreenState'
 import { BRAND_PROFILES, fieldLabels } from './BrandProfiles'
@@ -62,12 +63,13 @@ function asText(value: unknown): string {
   return value === null || value === undefined ? '' : String(value)
 }
 
-type Draft = { name: string; language: string; values: Record<string, string> }
+type Draft = { name: string; language: string; kind: string; values: Record<string, string> }
 
 function draftOf(profile: BrandProfile, fields: ProfileField[]): Draft {
   return {
     name: profile.name,
     language: profile.language,
+    kind: profile.kind,
     values: Object.fromEntries(fields.map((f) => [f.name, asText(profile.field_values[f.name])])),
   }
 }
@@ -76,6 +78,7 @@ function sameDraft(a: Draft, b: Draft): boolean {
   return (
     a.name === b.name &&
     a.language === b.language &&
+    a.kind === b.kind &&
     Object.keys({ ...a.values, ...b.values }).every((k) => (a.values[k] ?? '') === (b.values[k] ?? ''))
   )
 }
@@ -111,6 +114,7 @@ function ProfileForm({
   const { name, language, values } = draft
   const setName = (next: string) => setDraft((d) => ({ ...d, name: next }))
   const setLanguage = (next: string) => setDraft((d) => ({ ...d, language: next }))
+  const setKind = (next: string) => setDraft((d) => ({ ...d, kind: next }))
   const setValues = (change: (current: Record<string, string>) => Record<string, string>) =>
     setDraft((d) => ({ ...d, values: change(d.values) }))
 
@@ -129,7 +133,13 @@ function ProfileForm({
     // empty one is dropped by the server, which is how a value is cleared.
     // Stated against the version the draft started from, so a change made
     // meanwhile is refused (409), never overwritten.
-    save.mutate({ version: base.updated_at, name: name.trim(), language: language.trim(), field_values: values })
+    save.mutate({
+      version: base.updated_at,
+      name: name.trim(),
+      language: language.trim(),
+      kind: draft.kind,
+      field_values: values,
+    })
   }
 
   const groups = [...new Set(fields.map((f) => f.group))]
@@ -154,6 +164,13 @@ function ProfileForm({
           </p>
           <Button onPress={loadTheirs}>Load their version</Button>
         </div>
+      )}
+      {profile.kind === 'transactional' && (
+        // ADR-195: said where the profile is edited, not only where it is used.
+        <p role="status">
+          Transactional: emails using this profile go out without the opt-in check, and carry no unsubscribe
+          line. People the provider suppressed are still left out.
+        </p>
       )}
       {profile.missing.length > 0 && (
         <p role="status">
@@ -183,6 +200,23 @@ function ProfileForm({
           </Text>
           <FieldError message={fieldError(save.error, 'language')} />
         </TextField>
+        {!readOnly && profile.may_mark_transactional ? (
+          <Choice
+            label="Kind"
+            options={[
+              { id: 'marketing', name: 'Marketing: needs an opt-in' },
+              { id: 'transactional', name: 'Transactional: sent without the opt-in check' },
+            ]}
+            selected={draft.kind}
+            onChange={setKind}
+          />
+        ) : (
+          <p>
+            Kind: {profile.kind}
+            {!readOnly && <span className="muted"> (making a profile transactional needs its own permission)</span>}
+          </p>
+        )}
+        <FieldError message={fieldError(save.error, 'kind')} />
       </fieldset>
 
       {groups.map((group) => (

@@ -3078,6 +3078,12 @@ export interface components {
              * @default false
              */
             may_manage: boolean;
+            /**
+             * May Mark Transactional
+             * @description Whether this reader may make a profile transactional: a person holding brand_profiles.transactional in the working brand (ADR-195).
+             * @default false
+             */
+            may_mark_transactional: boolean;
         };
         /** BrandProfileCreate */
         BrandProfileCreate: {
@@ -3090,7 +3096,7 @@ export interface components {
             language: string;
             /**
              * Kind
-             * @description marketing; transactional is refused until task-355
+             * @description marketing, or transactional with brand_profiles.transactional (ADR-195)
              * @default marketing
              */
             kind: string;

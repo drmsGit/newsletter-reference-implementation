@@ -190,6 +190,18 @@ def describe(db: Session, payload: dict, *, brand_id: int) -> ActionDescription:
         warnings.append(
             f"This will send for real through {send_instance.provider}."
         )
+    # ADR-195: the approver is the person who can still say no to a send that
+    # skips the opt-in check, so it is said here, naming the profile.
+    from app.recipients.consent import TRANSACTIONAL
+    from app.rendering.frame import send_purpose
+
+    if snapshot is not None and send_purpose(snapshot.render_context) == TRANSACTIONAL:
+        profile_name = (snapshot.render_context.get("brand_profile") or {}).get("name")
+        warnings.append(
+            f"Sent without the opt-in check: its brand profile \u201c{profile_name}\u201d is "
+            "transactional, so everyone in the audience is mailed whether or not they agreed to "
+            "marketing. Provider-suppressed and unaddressable people are still left out."
+        )
 
     return ActionDescription(
         summary=f"Send “{send_instance.name}” to {planned} recipient(s).",

@@ -48,13 +48,13 @@ def session():
 
 class TestTheVocabularyIsComplete:
 
-    def test_seventeen_keys(self):
-        """Sixteen from the split, and `brand_profiles.manage` since 2026-10-11
-        (ADR-194's addendum, point 9)."""
-        assert len(ALL_PERMISSIONS) == 17, sorted(ALL_PERMISSIONS)
+    def test_eighteen_keys(self):
+        """Sixteen from the split, `brand_profiles.manage` (ADR-194's addendum,
+        point 9) and `brand_profiles.transactional` (ADR-195), both 2026-10-11."""
+        assert len(ALL_PERMISSIONS) == 18, sorted(ALL_PERMISSIONS)
 
     def test_every_key_is_classified_exactly_once(self):
-        """**Nine brand-scoped and eight platform-level** since 2026-10-11 (eight and
+        """**Ten brand-scoped and eight platform-level** since 2026-10-11 (eight and
         eight from 2026-09-20 until `brand_profiles.manage` joined).
 
         Asserted as a partition of the vocabulary rather than as two lists, so
@@ -78,6 +78,8 @@ class TestTheVocabularyIsComplete:
             "recipients.consent",
             # A brand's profiles carry the brand (ADR-194's addendum, point 9).
             "brand_profiles.manage",
+            # Its rows are the same profiles (ADR-195 point 5).
+            "brand_profiles.transactional",
         }
         assert "recipients.manage" in platform, (
             "recipients themselves carry no brand (ADR-150 point 9) — only "
@@ -116,7 +118,7 @@ class TestThePresetRolesKeepWhatTheyHad:
                     INTEGRATIONS_MANAGE,
                     # A Manager's only where the company grants it (ADR-194's
                     # addendum, point 9): legal details speak for the company.
-                    "brand_profiles.manage"):
+                    "brand_profiles.manage", "brand_profiles.transactional"):
             assert key not in manager, key
 
     def test_admin_holds_the_whole_vocabulary(self):

@@ -112,6 +112,23 @@ describe('one profile', () => {
     expect(screen.getByText('Primary colour').parentElement).not.toHaveTextContent('(required to send)')
   })
 
+  it('offers the transactional kind only to a holder of its permission', async () => {
+    const { writes, handlers } = detailServer({ may_mark_transactional: true })
+    openDetail(handlers)
+    fireEvent.click(await screen.findByRole('button', { name: /Marketing: needs an opt-in/ }))
+    fireEvent.click(await screen.findByRole('option', { name: /Transactional: sent without the opt-in check/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect((await writes[0].json()).kind).toBe('transactional')
+  })
+
+  it('shows the kind read-only without the permission, and says what transactional means', async () => {
+    openDetail(detailServer({ kind: 'transactional' }).handlers)
+    expect(await screen.findByText(/making a profile transactional needs its own permission/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Transactional: sent without/ })).not.toBeInTheDocument()
+    expect(screen.getByText(/go out without the opt-in check, and carry no unsubscribe line/)).toBeInTheDocument()
+  })
+
   it('takes a link list in a text box and says how to write it', async () => {
     openDetail(detailServer().handlers)
     const menu = await screen.findByLabelText(/^Menu links/)
@@ -129,7 +146,7 @@ describe('one profile', () => {
     await waitFor(() => expect(writes).toHaveLength(1))
     expect(writes[0].headers.get('If-Match')).toBe(T(1))
     expect(await writes[0].json()).toEqual({
-      name: 'Calm', language: 'en',
+      name: 'Calm', language: 'en', kind: 'marketing',
       field_values: { legal_company_name: 'Example GmbH', legal_address: '', imprint_url: 'https://example.test/imprint',
         privacy_url: '', unsubscribe_text: '', colour_primary: '#1a5db0', menu_links: '' },
     })

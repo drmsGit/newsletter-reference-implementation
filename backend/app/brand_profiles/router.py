@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.audit import service as audit
 from app.auth.dependencies import require_person, working_brand
+from app.auth.permissions import BRAND_PROFILES_MANAGE, BRAND_PROFILES_TRANSACTIONAL
 from app.brand_profiles import service
 from app.brand_profiles.models import (
     BrandProfile, BrandProfileCreate, BrandProfileDeleted, BrandProfileDuplicate,
@@ -34,15 +35,17 @@ def _summary(profile) -> dict:
                 updated_at=profile.updated_at)
 
 
-def _full(profile, may_manage: bool = True) -> BrandProfile:
+def _full(profile, may_manage: bool = True, may_mark_transactional: bool = False) -> BrandProfile:
     """`may_manage` is True after a write: whoever just wrote may write."""
     return BrandProfile(**_summary(profile), field_values=dict(profile.field_values or {}),
-                        may_manage=may_manage)
+                        may_manage=may_manage, may_mark_transactional=may_mark_transactional)
 
 
 def _http(error: Exception) -> HTTPException:
     if isinstance(error, service.ProfileNotFound):
         return HTTPException(status_code=404, detail=str(error))
+    if isinstance(error, service.ProfileForbidden):
+        return HTTPException(status_code=403, detail=str(error))
     if isinstance(error, (service.ProfileConflict, StaleWrite)):
         return HTTPException(status_code=409, detail=str(error))
     if isinstance(error, service.ProfileInvalid):
@@ -53,20 +56,29 @@ def _http(error: Exception) -> HTTPException:
     raise error
 
 
-_REFUSALS = (service.ProfileNotFound, service.ProfileConflict, service.ProfileInvalid, StaleWrite)
+_REFUSALS = (service.ProfileNotFound, service.ProfileConflict, service.ProfileInvalid,
+             service.ProfileForbidden, StaleWrite)
 
 
-def _may_manage(request: Request, db: Session, brand_id: int) -> bool:
-    """The write routes' own rule: a person, holding the permission in this brand."""
+def _may(request: Request, db: Session, brand_id: int, permission: str) -> bool:
+    """The write routes' own rule: a person, holding `permission` in this brand."""
     from app.auth.dependencies import _machine_credential, auth_is_enforced, request_principal
-    from app.auth.permissions import BRAND_PROFILES_MANAGE
     from app.auth.service import has_permission
 
     if _machine_credential(request) is not None:
         return False
     if not auth_is_enforced(request):
         return True
-    return has_permission(db, request_principal(request), BRAND_PROFILES_MANAGE, brand_id=brand_id)
+    return has_permission(db, request_principal(request), permission, brand_id=brand_id)
+
+
+def _may_manage(request: Request, db: Session, brand_id: int) -> bool:
+    return _may(request, db, brand_id, BRAND_PROFILES_MANAGE)
+
+
+def _may_mark_transactional(request: Request, db: Session, brand_id: int) -> bool:
+    """ADR-195 point 5: creating or marking a transactional profile is its own right."""
+    return _may(request, db, brand_id, BRAND_PROFILES_TRANSACTIONAL)
 
 
 def _audit(request: Request, db: Session, action: str, profile_id: int, brand_id: int, detail: dict):
@@ -100,7 +112,8 @@ def read_profile(profile_id: int, request: Request, db: Session = Depends(get_db
                  brand_id: int = Depends(working_brand)):
     try:
         return _full(service.get_profile(db, profile_id, brand_id),
-                     may_manage=_may_manage(request, db, brand_id))
+                     may_manage=_may_manage(request, db, brand_id),
+                     may_mark_transactional=_may_mark_transactional(request, db, brand_id))
     except _REFUSALS as error:
         raise _http(error)
 
@@ -110,12 +123,14 @@ def read_profile(profile_id: int, request: Request, db: Session = Depends(get_db
 def create_profile(body: BrandProfileCreate, request: Request, db: Session = Depends(get_db),
                    brand_id: int = Depends(working_brand)):
     try:
-        profile = service.create_profile(db, brand_id, name=body.name, language=body.language,
-                                         kind=body.kind, field_values=body.field_values)
+        profile = service.create_profile(
+            db, brand_id, name=body.name, language=body.language, kind=body.kind,
+            field_values=body.field_values,
+            allow_transactional=_may_mark_transactional(request, db, brand_id))
     except _REFUSALS as error:
         raise _http(error)
     _audit(request, db, audit.BRAND_PROFILE_CREATED, profile.id, brand_id,
-           {"fields": sorted(profile.field_values or {})})
+           {"fields": sorted(profile.field_values or {}), "kind": profile.kind})
     return _full(profile)
 
 
@@ -128,7 +143,8 @@ def update_profile(profile_id: int, body: BrandProfileUpdate, request: Request,
     try:
         profile, changed = service.update_profile(
             db, profile_id, brand_id, name=body.name, language=body.language, kind=body.kind,
-            field_values=body.field_values, expected_updated_at=_expected(if_match))
+            field_values=body.field_values, expected_updated_at=_expected(if_match),
+            allow_transactional=_may_mark_transactional(request, db, brand_id))
     except _REFUSALS as error:
         raise _http(error)
     if changed:
@@ -142,11 +158,13 @@ def duplicate_profile(profile_id: int, request: Request,
                       body: BrandProfileDuplicate | None = Body(None),
                       db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
     try:
-        copy = service.duplicate_profile(db, profile_id, brand_id, name=body.name if body else None)
+        copy = service.duplicate_profile(
+            db, profile_id, brand_id, name=body.name if body else None,
+            allow_transactional=_may_mark_transactional(request, db, brand_id))
     except _REFUSALS as error:
         raise _http(error)
     _audit(request, db, audit.BRAND_PROFILE_DUPLICATED, copy.id, brand_id,
-           {"source_profile_id": profile_id})
+           {"source_profile_id": profile_id, "kind": copy.kind})
     return _full(copy)
 
 

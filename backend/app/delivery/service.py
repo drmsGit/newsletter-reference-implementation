@@ -80,7 +80,7 @@ def create_delivery_execution(
         provider=provider,
         provider_message_id=provider_message_id,
         channel=channel_of_send(db, send_instance),
-        purpose=MARKETING,
+        purpose=_purpose_of_snapshot(db, send_instance.snapshot_id),
     )
 
     db.add(execution)
@@ -529,7 +529,10 @@ def prepare_send_from_audience(
             f"Choose one of: {', '.join(offered)}."
         )
 
-    recipients = resolve_audience(db, audience_group_id, channel=plan_channel)
+    # The purpose comes from the snapshot's frozen brand profile (ADR-195):
+    # it decides the audience floor and is written on every execution.
+    plan_purpose = _purpose_of_snapshot(db, snapshot_id)
+    recipients = resolve_audience(db, audience_group_id, channel=plan_channel, purpose=plan_purpose)
     if not recipients:
         raise ValueError(
             "The selected audience resolves to 0 consenting recipients — nothing to send."
@@ -571,9 +574,9 @@ def prepare_send_from_audience(
             DeliveryExecutionDB(
                 send_instance_id=send_instance.id,
                 channel=plan_channel,
-                # Every planned send is a marketing send today; said rather
-                # than defaulted (task-42).
-                purpose=MARKETING,
+                # Said rather than defaulted (task-42): marketing, or
+                # transactional when the snapshot's profile is (ADR-195).
+                purpose=plan_purpose,
                 recipient_id=recipient.id,
                 status="created",
                 provider=provider,
@@ -636,17 +639,12 @@ def reconcile_executions_to_audience(db: Session, send_instance: SendInstanceDB)
     # had been dropped. A "rerun" send re-resolves WHO is targeted, and must
     # ask about the channel it was planned for.
     rerun_channel = channel_of_send(db, send_instance)
-    # Purpose is not on the send instance; the planned executions carry it.
-    # Every planned send today is a marketing send (task-42).
-    rerun_purpose = (
-        db.query(DeliveryExecutionDB.purpose)
-        .filter(DeliveryExecutionDB.send_instance_id == send_instance.id)
-        .limit(1)
-        .scalar()
-    ) or MARKETING
+    # From the snapshot, as at planning (ADR-195) — not from the executions,
+    # which can all have been dropped by now.
+    rerun_purpose = _purpose_of_snapshot(db, send_instance.snapshot_id)
     resolved_ids = {
         r.id for r in resolve_audience(
-            db, send_instance.audience_group_id, channel=rerun_channel
+            db, send_instance.audience_group_id, channel=rerun_channel, purpose=rerun_purpose
         )
     }
 
@@ -759,6 +757,14 @@ class TestSendResult:
     render_note: str | None = None
 
 
+def _purpose_of_snapshot(db: Session, snapshot_id: int | None) -> str:
+    """A send's purpose, from its snapshot's frame (ADR-195)."""
+    from app.rendering.frame import send_purpose
+
+    snapshot = db.query(SnapshotDB).filter(SnapshotDB.id == snapshot_id).first() if snapshot_id else None
+    return send_purpose(snapshot.render_context if snapshot else None)
+
+
 def send_test_email(
     db: Session,
     *,
@@ -840,9 +846,12 @@ def send_test_email(
                 "carries the sender's legal details; fill them in under Settings, Brand profiles."
             ),
         )
+    from app.recipients.consent import MARKETING as _MARKETING
+
     footer = legal_footer_html(
         {"language": profile.language, "values": dict(profile.field_values or {})},
-        unsubscribe_unlinked=True,
+        # Only a marketing email has an unsubscribe line at all (ADR-195 point 3).
+        unsubscribe_unlinked=profile.kind == _MARKETING,
     )
 
     fallback = (
@@ -1141,7 +1150,11 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
     # them, so the first is representative; the defaults cover a send with no
     # executions at all.
     send_channel = executions[0].channel if executions else DEFAULT_CHANNEL
-    send_purpose = executions[0].purpose if executions else MARKETING
+    # The purpose from the frame being sent (ADR-195), the same answer the
+    # plan wrote on the executions.
+    from app.rendering.frame import send_purpose as _frame_purpose
+
+    send_purpose = _frame_purpose(snapshot.render_context)
 
     gate = run_exclusion_stack(
         db,

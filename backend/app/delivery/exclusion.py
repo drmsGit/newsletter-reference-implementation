@@ -46,7 +46,10 @@ from sqlalchemy.orm import Session
 
 from app.recipients.consent import (
     DEFAULT_CHANNEL,
+    MARKETING,
+    TRANSACTIONAL,
     is_consenting_filter,
+    provider_suppressed_filter,
     resolve_send_addresses,
 )
 from app.recipients.db_models import RecipientDB
@@ -195,7 +198,11 @@ def run_exclusion_stack(
     # (ADR-163 addendum 2026-09-15), so gating without one would ask "did this
     # person consent to anybody", which is the question that let a brand-B send
     # reach brand-A's subscribers.
-    if surviving:
+    # Marketing only (ADR-195 point 1): a transactional send asks no opt-in.
+    # Any other purpose is refused rather than waved through.
+    if purpose not in (MARKETING, TRANSACTIONAL):
+        raise ValueError(f"Unknown send purpose {purpose!r}")
+    if surviving and purpose == MARKETING:
         consenting = {
             row.id
             for row in db.query(RecipientDB.id)
@@ -217,20 +224,29 @@ def run_exclusion_stack(
         surviving -= withdrawn
 
     # --- Stage 3: suppression ----------------------------------------------
-    # Named, ordered, and currently empty by construction — not forgotten.
+    # Its first rule (ADR-195 point 2): anyone the provider suppressed for
+    # this brand and channel, on ANY purpose — a hard bounce, a spam complaint
+    # — is excluded from every send, marketing or transactional. A dead
+    # address is dead whatever the mail was.
     #
-    # Suppression has no store of its own yet; the data model is an open
-    # Needs-ADR item. Today a hard bounce or spam complaint is written as a
-    # consent event with source="provider", so stage 2 above already catches
-    # it. Inventing a suppression table here would pre-empt a decision that is
-    # deliberately still open, and a second mechanism for the same fact is the
-    # kind that gets checked in one place and forgotten in the other.
-    #
-    # When that item is decided, this is where it plugs in — and because the
-    # stack is ordered and each stage records its own reason, a recipient
-    # dropped for suppression will be distinguishable from one who simply never
-    # granted consent, which is a distinction the current single-status model
-    # cannot make.
+    # Still no store of its own: the provider-sourced opt-out events are read
+    # as suppression, the interim reading until task-135 decides the model (to
+    # be replaced then, not extended). For marketing, stage 2 usually caught
+    # the person already; this stage catches what stage 2 cannot see — a
+    # bounce recorded on another purpose — and records it as suppression.
+    if surviving:
+        suppressed = {
+            row.id
+            for row in db.query(RecipientDB.id)
+            .filter(RecipientDB.id.in_(sorted(surviving)), provider_suppressed_filter(brand_id, channel))
+            .all()
+        }
+        for recipient_id in sorted(suppressed):
+            exclusions.append(
+                Exclusion(recipient_id, STAGE_SUPPRESSION,
+                          f"suppressed by the provider for {channel} (hard bounce or complaint)")
+            )
+        surviving -= suppressed
 
     # --- Stage 4: frequency ------------------------------------------------
     # Post-POC by explicit decision (ADR-161 point 8). The platform owns

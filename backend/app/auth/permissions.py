@@ -45,6 +45,10 @@ INTEGRATIONS_MANAGE = "integrations.manage"  # issue/rotate/revoke machine keys
 # carry a brand, and rather than `campaigns.manage` because a profile's legal
 # details speak for the company in every email that uses it.
 BRAND_PROFILES_MANAGE = "brand_profiles.manage"  # a brand's profiles
+# ADR-195 point 5: creating or marking a transactional profile, whose emails go
+# out without the marketing opt-in check. Its own key because that is a legal
+# basis, not a look: a Manager who may edit profiles may not make one.
+BRAND_PROFILES_TRANSACTIONAL = "brand_profiles.transactional"
 
 ALL_PERMISSIONS: dict[str, str] = {
     VIEW: "See dashboards, campaigns, signals and delivery history",
@@ -64,6 +68,7 @@ ALL_PERMISSIONS: dict[str, str] = {
     OVERRIDES_MANAGE: "Override a system content pick, and reset one",
     INTEGRATIONS_MANAGE: "Issue, rotate and revoke machine credentials",
     BRAND_PROFILES_MANAGE: "Create and edit a brand's profiles: look, texts and legal details",
+    BRAND_PROFILES_TRANSACTIONAL: "Create or mark a transactional brand profile, sent without the opt-in check",
 }
 
 # `recipients.consent` is separate from `recipients.manage` deliberately
@@ -110,6 +115,8 @@ BRAND_SCOPED: frozenset[str] = frozenset({
     RECIPIENTS_CONSENT,
     # `brand_profiles.brand_id` (ADR-194 addendum 2026-10-11, point 9).
     BRAND_PROFILES_MANAGE,
+    # The same rows (ADR-195 point 5).
+    BRAND_PROFILES_TRANSACTIONAL,
 })
 
 # Platform-level by omission, and each for a reason from ADR-150 point 5:

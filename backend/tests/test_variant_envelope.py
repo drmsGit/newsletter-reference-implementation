@@ -117,7 +117,8 @@ def test_the_audit_entry_records_the_envelope(db, campaign):
              .filter(AuditEventDB.action == audit.VARIANT_UPDATED, AuditEventDB.subject_id == created["id"])
              .order_by(AuditEventDB.id.desc()).first())
     assert entry.detail == {"name": "B", "envelope": {"subject": "Summer"},
-                            "brand_profile_id": entry.detail["brand_profile_id"]}
+                            "brand_profile_id": entry.detail["brand_profile_id"],
+                            "brand_profile_kind": "marketing"}
     assert entry.detail["brand_profile_id"] is not None, "the profile it uses (task-350)"
 
 

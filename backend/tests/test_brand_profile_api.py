@@ -168,11 +168,11 @@ class TestWriting:
             assert _create(cookied, headers, name="Calm").status_code == 201
             assert _create(cookied, headers, name="Calm").status_code == 409
 
-    def test_transactional_is_refused_until_its_guard_exists(self, db):
-        with admin(db) as (cookied, headers):
+    def test_transactional_needs_its_own_permission(self, db):
+        """ADR-195 point 5; the full rules are in test_transactional.py."""
+        with person_with(db, [VIEW, BRAND_PROFILES_MANAGE]) as (cookied, headers):
             response = _create(cookied, headers, kind="transactional")
-        assert response.status_code == 422 and "task-355" not in response.text
-        assert "transactional" in response.text.lower()
+        assert response.status_code == 403 and "transactional" in response.text.lower()
 
     @pytest.mark.parametrize("values, field", [
         ({"glow": "x"}, "glow"),                                  # not declared

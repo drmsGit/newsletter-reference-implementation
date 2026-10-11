@@ -98,6 +98,13 @@ def _expected(if_match: str | None):
         )
 
 
+def _profile_kind(db: Session, profile_id: int | None) -> str | None:
+    from app.brand_profiles.db_models import BrandProfileDB
+
+    profile = db.get(BrandProfileDB, profile_id) if profile_id else None
+    return profile.kind if profile else None
+
+
 def _profile_refused(error: "ProfileNotFound") -> HTTPException:
     """422 on the field, in FastAPI's shape: the variant is there; the profile
     asked for is not one of this brand's (ADR-194 point 4)."""
@@ -600,7 +607,10 @@ def update_variant_record(
     audit.record_from_request(
         request, db, audit.VARIANT_UPDATED, subject_type="variant", subject_id=variant_id,
         detail={"name": updated.name, "envelope": updated.envelope,
-                "brand_profile_id": updated.brand_profile_id},
+                "brand_profile_id": updated.brand_profile_id,
+                # Said in the entry (ADR-195): choosing a transactional profile
+                # sends this variant without the opt-in check.
+                "brand_profile_kind": _profile_kind(db, updated.brand_profile_id)},
     )
     fence.touch(db, request, variant_id=variant_id)
     return updated

@@ -334,6 +334,11 @@ describe('the brand profile', () => {
     expect(await puts[0].json()).toMatchObject({ name: 'Variant A', brand_profile_id: 2 })
   })
 
+  it('says plainly when the profile sends without the opt-in check', async () => {
+    open(withProfiles({ kind: 'transactional', name: 'Receipts' }).handlers)
+    expect(await screen.findByText('Sent without opt-in check.')).toBeInTheDocument()
+  })
+
   it('says why the profile changed, and what it still lacks, in words', async () => {
     open(withProfiles({ notice: 'Its brand profile "Summer" was deleted, so it now uses the default "Default".',
       missing: ['imprint_url'] }).handlers)

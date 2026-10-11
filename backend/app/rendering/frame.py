@@ -438,3 +438,18 @@ def profile_refusal(frame: dict) -> str | None:
 
 def slot_ids(frame: dict) -> list[int]:
     return [m["decision_slot_id"] for m in frame["modules"] if m["kind"] == KIND_SLOT]
+
+
+def send_purpose(frame: dict | None) -> str:
+    """The purpose a send of this frame records and is gated on (ADR-195):
+    transactional when its frozen brand profile is, marketing otherwise. Read
+    from the frame, not the live profile, because the frame is what is sent:
+    a profile re-marked after the snapshot changes nothing already planned."""
+    from app.recipients.consent import MARKETING, TRANSACTIONAL
+
+    frame = frame or {}
+    profile = frame.get("brand_profile") or {}
+    if (frame.get("channel") == "email" and frame.get("frame_version", 0) >= PROFILE_FRAME_VERSION
+            and profile.get("kind") == TRANSACTIONAL):
+        return TRANSACTIONAL
+    return MARKETING

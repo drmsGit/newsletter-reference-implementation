@@ -64,11 +64,24 @@ def suppress_recipient(
     recipient = db.query(RecipientDB).filter(RecipientDB.id == recipient_id).first()
     if recipient is None:
         return False
-    current = latest_consent_status(
-        db, recipient_id, brand_id, channel=channel, purpose=purpose
+    # Recorded unless the PROVIDER already suppressed this cell (ADR-195 point
+    # 2). An opt-out from elsewhere (a marketing unsubscribe, the CRM) is not
+    # enough: provider suppression is read from provider-sourced events, so a
+    # complaint after an unsubscribe would otherwise leave nothing to read,
+    # and transactional mail would keep going to someone who complained.
+    from app.recipients.consent import PROVIDER_SOURCE
+
+    latest_from_provider = (
+        db.query(ConsentEventDB.status)
+        .filter(ConsentEventDB.recipient_id == recipient_id, ConsentEventDB.brand_id == brand_id,
+                ConsentEventDB.channel == channel, ConsentEventDB.purpose == purpose,
+                ConsentEventDB.source == PROVIDER_SOURCE)
+        .order_by(ConsentEventDB.created_at.desc(), ConsentEventDB.id.desc())
+        .limit(1)
+        .scalar()
     )
-    if current == ConsentStatus.opted_out.value:
-        return False  # already suppressed for THIS brand
+    if latest_from_provider == ConsentStatus.opted_out.value:
+        return False  # already suppressed by the provider for THIS brand
     record_consent(
         db,
         recipient_id,

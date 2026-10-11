@@ -103,6 +103,22 @@ class ProfileConflict(Exception):
     default. A 409 — the request was well-formed."""
 
 
+class ProfileForbidden(Exception):
+    """A write this caller may not make: marking a profile transactional
+    without `brand_profiles.transactional` (ADR-195 point 5). A 403."""
+
+
+def _transactional_needs_the_right(kind: str | None, allow_transactional: bool) -> None:
+    if kind == TRANSACTIONAL and not allow_transactional:
+        raise ProfileForbidden(
+            "Making a profile transactional needs the transactional brand-profile permission: its "
+            "emails go out without the opt-in check.")
+
+
+_NOT_DEFAULT = ("A transactional profile cannot be the brand's default: every new variant would then "
+                "go out without the opt-in check without anyone choosing it (ADR-195).")
+
+
 class ProfileInvalid(ValueError):
     """One entry per refused part: `(location, message)`, where the location is
     `("field_values", name)` or a top-level key such as `("kind",)`."""
@@ -204,11 +220,6 @@ def _check_header(name: str | None, language: str | None, kind: str | None) -> l
         errors.append((("language",), "A language code such as en, de or de-AT."))
     if kind is not None and kind not in KINDS:
         errors.append((("kind",), f"One of: {', '.join(KINDS)}."))
-    elif kind == TRANSACTIONAL:
-        # ADR-194 addendum 2026-10-11, point 7: stored, but refused until the
-        # guard that lets a transactional email go without an opt-in is built.
-        errors.append((("kind",), "Transactional profiles are not available yet: sending without "
-                                  "an opt-in needs its own safeguard first. Use marketing."))
     return errors
 
 
@@ -225,7 +236,8 @@ def _taken(name: str) -> ProfileConflict:
 
 
 def create_profile(db: Session, brand_id: int, *, name: str, language: str = "en",
-                   kind: str = MARKETING, field_values: dict | None = None) -> BrandProfileDB:
+                   kind: str = MARKETING, field_values: dict | None = None,
+                   allow_transactional: bool = False) -> BrandProfileDB:
     errors = _check_header(name, language, kind)
     try:
         values = clean_values(field_values or {})
@@ -233,6 +245,7 @@ def create_profile(db: Session, brand_id: int, *, name: str, language: str = "en
         errors += invalid.errors
     if errors:
         raise ProfileInvalid(errors)
+    _transactional_needs_the_right(kind, allow_transactional)
     name = name.strip()
     ensure_default_profile(db, brand_id)
     if _name_taken(db, brand_id, name):
@@ -248,7 +261,8 @@ def create_profile(db: Session, brand_id: int, *, name: str, language: str = "en
 def update_profile(db: Session, profile_id: int, brand_id: int, *, name: str,
                    language: str | None = None, kind: str | None = None,
                    field_values: dict | None = None,
-                   expected_updated_at: datetime | None = None) -> tuple[BrandProfileDB, list[str]]:
+                   expected_updated_at: datetime | None = None,
+                   allow_transactional: bool = False) -> tuple[BrandProfileDB, list[str]]:
     """Replace the name and values; language and kind only when given.
     Returns the profile and the names of what changed, in the structure's order."""
     from app.campaigns.service import refuse_stale
@@ -262,6 +276,12 @@ def update_profile(db: Session, profile_id: int, brand_id: int, *, name: str,
         raise ProfileInvalid(errors)
     profile = get_profile(db, profile_id, brand_id)
     refuse_stale(db, profile, expected_updated_at, "brand profile")
+    if kind == TRANSACTIONAL and profile.kind != TRANSACTIONAL:
+        # Marking needs the right; editing a profile that already is
+        # transactional does not (ADR-195 point 5).
+        _transactional_needs_the_right(kind, allow_transactional)
+        if profile.is_default:
+            raise ProfileConflict(_NOT_DEFAULT)
     name = name.strip()
     if _name_taken(db, brand_id, name, except_id=profile.id):
         raise _taken(name)
@@ -284,8 +304,10 @@ def update_profile(db: Session, profile_id: int, brand_id: int, *, name: str,
 
 
 def duplicate_profile(db: Session, profile_id: int, brand_id: int,
-                      name: str | None = None) -> BrandProfileDB:
-    """A copy under a free name, never the default (ADR-194 point 1)."""
+                      name: str | None = None, *, allow_transactional: bool = False) -> BrandProfileDB:
+    """A copy under a free name, never the default (ADR-194 point 1). A
+    transactional profile's copy stays transactional only for a holder of the
+    right; for anyone else it is marketing (ADR-195 point 5)."""
     source = get_profile(db, profile_id, brand_id)
     if name is not None:
         if errors := _check_header(name, None, None):
@@ -295,8 +317,9 @@ def duplicate_profile(db: Session, profile_id: int, brand_id: int,
             raise _taken(name)
     else:
         name = _free_copy_name(db, brand_id, source.name)
+    kind = source.kind if source.kind != TRANSACTIONAL or allow_transactional else MARKETING
     copy = BrandProfileDB(brand_id=brand_id, name=name, language=source.language,
-                          kind=source.kind, is_default=False,
+                          kind=kind, is_default=False,
                           field_values=dict(source.field_values or {}))
     db.add(copy)
     _commit_or_taken(db, name)
@@ -325,6 +348,8 @@ def make_default(db: Session, profile_id: int, brand_id: int) -> BrandProfileDB:
     target = next((p for p in profiles if p.id == profile_id), None)
     if target is None:
         raise ProfileNotFound(f"Brand profile {profile_id} not found")
+    if target.kind == TRANSACTIONAL:
+        raise ProfileConflict(_NOT_DEFAULT)
     for profile in profiles:
         if profile.is_default and profile.id != target.id:
             profile.is_default = False

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.audience.db_models import AudienceGroupDB, AudienceGroupMemberDB, AudienceRuleBlockDB
 from app.recipients.db_models import RecipientDB
-from app.recipients.consent import MARKETING, is_consenting_filter
+from app.recipients.consent import MARKETING, is_consenting_filter, send_floor_filter
 from app.insight.signals import operational_signals_for_category
 
 logger = logging.getLogger(__name__)
@@ -1094,7 +1094,7 @@ def preview_group(
 
 
 def resolve_audience(
-    db: Session, group_id: int, channel: str
+    db: Session, group_id: int, channel: str, *, purpose: str = MARKETING,
 ) -> list[RecipientDB]:
     """The group's live audience:
         ((∪ include blocks) ∪ (manual member pins)) − (∪ exclude blocks)
@@ -1144,8 +1144,13 @@ def resolve_audience(
     was the only channel, which made a push send unplannable — the audience
     resolved to nobody and the planner reported "0 consenting recipients".
     The send path passes the variant's channel; a screen previewing a group
-    with no variant in hand asks, because there is no channel-less count."""
-    return _resolve(db, group_id, channel)[0]
+    with no variant in hand asks, because there is no channel-less count.
+
+    **And the floor is per purpose** (ADR-195): a marketing send reaches only
+    people with an opt-in grant; a transactional send skips that check. Both
+    never reach anyone the provider suppressed for this brand and channel.
+    The send path passes its snapshot's purpose; screens ask about marketing."""
+    return _resolve(db, group_id, channel, purpose=purpose)[0]
 
 
 def audience_arithmetic(db: Session, group_id: int, channel: str) -> dict | None:
@@ -1233,7 +1238,8 @@ def audience_memberships(db: Session, recipient_id: int, *, brand_id: int, chann
     return rows
 
 
-def _resolve(db: Session, group_id: int, channel: str, *, with_arithmetic: bool = False):
+def _resolve(db: Session, group_id: int, channel: str, *, with_arithmetic: bool = False,
+             purpose: str = MARKETING):
     """`(audience, arithmetic or None)` — the one computation behind
     `resolve_audience` and `audience_arithmetic`."""
     # The brand comes from the GROUP, never from the caller's working context.
@@ -1276,8 +1282,10 @@ def _resolve(db: Session, group_id: int, channel: str, *, with_arithmetic: bool 
         db.query(RecipientDB)
         .filter(
             RecipientDB.id.in_(final_ids),
-            # Consent floor, for THIS brand AND this channel.
-            is_consenting_filter(brand_id, channel, purpose=MARKETING),
+            # The floor, for THIS brand, this channel and this purpose
+            # (ADR-195): never the provider-suppressed; for marketing, only
+            # those with an opt-in grant.
+            send_floor_filter(brand_id, channel, purpose=purpose),
         )
         .order_by(RecipientDB.id.asc())
         .all()

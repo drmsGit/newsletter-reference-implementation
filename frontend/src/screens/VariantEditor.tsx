@@ -174,7 +174,7 @@ function ProfileChoice({
   // never shows empty.
   const options = (items.some((p) => p.id === current.id) ? items : [current, ...items]).map((p) => ({
     id: String(p.id),
-    name: `${p.name}${p.is_default ? ' (default)' : ''} · ${p.language}`,
+    name: `${p.name}${p.is_default ? ' (default)' : ''} · ${p.language}${p.kind === 'transactional' ? ' · transactional' : ''}`,
   }))
 
   return (
@@ -185,6 +185,13 @@ function ProfileChoice({
         selected={String(current.id)}
         onChange={(id) => save.mutate({ id: composed.variant.id, changes: { brand_profile_id: Number(id) } })}
       />
+      {current.kind === 'transactional' && (
+        // ADR-195: the manager sees, where they choose, that this skips the opt-in.
+        <p role="status">
+          <strong>Sent without opt-in check.</strong> This profile is transactional: everyone in the audience is
+          mailed whether or not they agreed to marketing.
+        </p>
+      )}
       {current.notice && <p role="status">{current.notice}</p>}
       {current.missing.length > 0 && (
         <p role="status">

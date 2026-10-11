@@ -38,6 +38,13 @@ DEFAULT_CHANNEL = "email"
 #: a marketing grant nobody gave. ADR-163 point 3's `transfer` is not in the
 #: vocabulary yet; task-134 owns the transactional-consent model.
 MARKETING = "marketing"
+#: A send whose brand profile is transactional (ADR-195): it skips the
+#: marketing opt-in check, and asks no grant of its own; its floor is an
+#: address plus not being provider-suppressed.
+TRANSACTIONAL = "transactional"
+#: Where a provider's delivery feedback (a hard bounce, a spam complaint) is
+#: recorded from (`recipients.service.suppress_recipient`).
+PROVIDER_SOURCE = "provider"
 
 # The only status that is a grant.
 CONSENTING_STATUS = "opted_in"
@@ -598,3 +605,38 @@ def resolve_emails(
     that is channel-dependent uses `resolve_send_addresses` instead.
     """
     return resolve_send_addresses(db, recipient_ids, channel="email")
+
+
+def provider_suppressed_filter(brand_id: int, channel: str = DEFAULT_CHANNEL):
+    """Recipients the provider suppressed for this brand and channel, on any
+    purpose: a hard bounce or a spam complaint, recorded as a provider-sourced
+    opt-out (ADR-195 point 2). A dead address is dead whatever the mail was.
+
+    Read from the consent events as they are, with no store of its own: the
+    interim reading until task-135 decides suppression, to be replaced then
+    rather than extended. Nothing in the platform lifts it yet.
+    """
+    from sqlalchemy import exists
+
+    return exists().where(
+        ConsentEventDB.recipient_id == RecipientDB.id,
+        ConsentEventDB.brand_id == brand_id,
+        ConsentEventDB.channel == channel,
+        ConsentEventDB.source == PROVIDER_SOURCE,
+        ConsentEventDB.status == "opted_out",
+    )
+
+
+def send_floor_filter(brand_id: int, channel: str = DEFAULT_CHANNEL, *, purpose: str):
+    """Who a send of this purpose may reach at all (ADR-195): never anyone the
+    provider suppressed; for marketing also only those with an opt-in grant.
+    A transactional send asks no grant. Any other purpose is refused: a
+    purpose nobody defined must not decide who is mailed."""
+    from sqlalchemy import and_
+
+    if purpose == MARKETING:
+        return and_(is_consenting_filter(brand_id, channel, purpose=MARKETING),
+                    ~provider_suppressed_filter(brand_id, channel))
+    if purpose == TRANSACTIONAL:
+        return ~provider_suppressed_filter(brand_id, channel)
+    raise ValueError(f"Unknown send purpose {purpose!r}")

@@ -36,12 +36,15 @@ class BrandProfile(BrandProfileSummary):
                            "in the working brand. A machine never may. Like the settings "
                            "screen's; the list carries none, because a paged list has one "
                            "shape (ADR-185 point 2).")
+    may_mark_transactional: bool = Field(
+        False, description="Whether this reader may make a profile transactional: a person holding "
+                           "brand_profiles.transactional in the working brand (ADR-195).")
 
 
 class BrandProfileCreate(BaseModel):
     name: str
     language: str = "en"
-    kind: str = Field("marketing", description="marketing; transactional is refused until task-355")
+    kind: str = Field("marketing", description="marketing, or transactional with brand_profiles.transactional (ADR-195)")
     field_values: dict[str, Any] = Field(default_factory=dict)
 
 
