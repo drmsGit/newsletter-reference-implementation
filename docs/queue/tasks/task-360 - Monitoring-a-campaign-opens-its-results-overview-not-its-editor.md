@@ -4,6 +4,7 @@ title: 'Monitoring: a campaign opens its results overview, not its editor'
 status: To Do
 assignee: []
 created_date: '2026-10-11 10:01'
+updated_date: '2026-10-11 10:05'
 labels:
   - frontend
   - backend
@@ -37,3 +38,9 @@ ordinal: 209800
 - [ ] #2 A sent campaign shows its delivery figures and click rate; an unsent one what is planned and what is missing
 - [ ] #3 The scope is decided against task-58
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-11, the user, an alternative to a new screen: Monitoring may keep linking to the campaign page, if the campaign page itself shows the scheduled data (not sent yet) and/or a limited set of KPIs (sent). Then no extra screen is needed. The information does not have to be always visible: it can be a collapsible section on the campaign page. This answers the final-design pass's first open question (a new screen or the campaign page) in favour of the campaign page, unless the pass finds a reason against it.
+<!-- SECTION:NOTES:END -->
