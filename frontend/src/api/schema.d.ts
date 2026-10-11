@@ -2535,6 +2535,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/session-lengths": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * How long a sign-in lasts, and how long without activity
+         * @description Within 1-72 hours and 5-480 minutes, the idle timeout never longer than the lifetime (422 otherwise). A shorter value ends existing sessions past it at once; a longer lifetime reaches only sessions started afterwards.
+         */
+        put: operations["put_session_lengths_settings_session_lengths_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/unsubscribe": {
         parameters: {
             query?: never;
@@ -6158,6 +6178,18 @@ export interface components {
              */
             csrf_token: string;
         };
+        /**
+         * SessionLengths
+         * @description How long a sign-in lasts (task-342; ADR-151 addendum 2026-10-11): at
+         *     most `absolute_hours` (1-72), and `idle_minutes` (5-480, never longer than
+         *     the lifetime) without activity. A shorter value applies at once.
+         */
+        SessionLengths: {
+            /** Absolute Hours */
+            absolute_hours: number;
+            /** Idle Minutes */
+            idle_minutes: number;
+        };
         /** SessionUser */
         SessionUser: {
             /** Id */
@@ -6193,6 +6225,16 @@ export interface components {
             known_contribution_types: string[];
             /** Max Send Recipients */
             max_send_recipients: number;
+            /**
+             * Session Absolute Hours
+             * @default 12
+             */
+            session_absolute_hours: number;
+            /**
+             * Session Idle Minutes
+             * @default 60
+             */
+            session_idle_minutes: number;
             /** Channels */
             channels: components["schemas"]["ChannelSetting"][];
             /** Delivery Providers */
@@ -11582,6 +11624,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SendCapUpdate"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_session_lengths_settings_session_lengths_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionLengths"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionLengths"];
                 };
             };
             /** @description Validation Error */

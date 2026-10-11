@@ -15,6 +15,13 @@ from app.insight.signals import CONTRIBUTION_WEIGHTS, HALF_LIFE_DAYS
 SIGNAL_WEIGHTS = "signal_weights"
 HALF_LIFE_DAYS_KEY = "half_life_days"
 MAX_SEND_RECIPIENTS_KEY = "max_send_recipients"
+# Session lengths (task-342; ADR-151's 2026-10-09 and 2026-10-11 addenda).
+SESSION_ABSOLUTE_HOURS_KEY = "session_absolute_hours"
+SESSION_IDLE_MINUTES_KEY = "session_idle_minutes"
+#: The safe ranges. A value outside is refused when set, and a stored one
+#: outside (written by hand) is clamped on read.
+SESSION_ABSOLUTE_HOURS_RANGE = (1, 72)
+SESSION_IDLE_MINUTES_RANGE = (5, 480)
 AI_SPEND_CAP_KEY = "ai_spend_cap"
 AI_PROVIDER_KEY = "ai_provider"
 AI_TASK_MODELS_KEY = "ai_task_models"
@@ -351,6 +358,42 @@ def save_signal_tuning(
         t: float(w) for t, w in weights.items() if float(w) != CONTRIBUTION_WEIGHTS.get(t)})
     set_config(db, HALF_LIFE_DAYS_KEY, {
         t: float(d) for t, d in half_lives.items() if float(d) != HALF_LIFE_DAYS.get(t)})
+
+
+def get_session_lengths(db: Session) -> tuple[int, int]:
+    """`(absolute_hours, idle_minutes)`: the company's session lengths, or the
+    code defaults (12 hours, 60 minutes), within the safe ranges. One query,
+    because the session check asks on every request."""
+    from app.auth.service import SESSION_ABSOLUTE_HOURS, SESSION_IDLE_MINUTES
+
+    rows = dict(db.query(AppConfigDB.key, AppConfigDB.value).filter(
+        AppConfigDB.key.in_((SESSION_ABSOLUTE_HOURS_KEY, SESSION_IDLE_MINUTES_KEY))).all())
+
+    def within(value, default, bounds):
+        try:
+            number = int(value) if value is not None else default
+        except (TypeError, ValueError):
+            number = default
+        return max(bounds[0], min(bounds[1], number))
+
+    hours = within(rows.get(SESSION_ABSOLUTE_HOURS_KEY), SESSION_ABSOLUTE_HOURS, SESSION_ABSOLUTE_HOURS_RANGE)
+    minutes = within(rows.get(SESSION_IDLE_MINUTES_KEY), SESSION_IDLE_MINUTES, SESSION_IDLE_MINUTES_RANGE)
+    return hours, min(minutes, hours * 60)
+
+
+def save_session_lengths(db: Session, absolute_hours: int, idle_minutes: int) -> None:
+    """Set both lengths (ADR-151 addendum 2026-10-11). Refused outside the
+    safe ranges, and when the idle timeout is longer than the lifetime."""
+    low_h, high_h = SESSION_ABSOLUTE_HOURS_RANGE
+    low_m, high_m = SESSION_IDLE_MINUTES_RANGE
+    if not low_h <= absolute_hours <= high_h:
+        raise SettingsInvalid(f"A session lasts between {low_h} and {high_h} hours.")
+    if not low_m <= idle_minutes <= high_m:
+        raise SettingsInvalid(f"The idle timeout is between {low_m} and {high_m} minutes.")
+    if idle_minutes > absolute_hours * 60:
+        raise SettingsInvalid("The idle timeout cannot be longer than the session itself.")
+    set_config(db, SESSION_ABSOLUTE_HOURS_KEY, int(absolute_hours))
+    set_config(db, SESSION_IDLE_MINUTES_KEY, int(idle_minutes))
 
 
 def save_max_send_recipients(db: Session, cap: int) -> None:

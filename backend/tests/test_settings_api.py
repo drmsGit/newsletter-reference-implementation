@@ -315,6 +315,8 @@ class TestEverySettingsWriteIsAudited:
         return {
             ("PUT", "/settings/signals"): ("signals", {"json": {"weights": weights, "half_lives": half}}),
             ("PUT", "/settings/send-cap"): ("send_cap", {"json": {"max_send_recipients": cap}}),
+            ("PUT", "/settings/session-lengths"): ("session_lengths", {"json": dict(
+                zip(("absolute_hours", "idle_minutes"), settings.get_session_lengths(db)))}),
             ("PUT", "/settings/unsubscribe"): ("unsubscribe", {"json": {"offer_everything": offer_everything}}),
             ("PUT", "/settings/ai/spend-cap"): ("ai_spend_cap", {"json": spend_json}),
             ("PUT", "/settings/ai/provider"): ("ai_provider", {"json": {"provider": provider}}),

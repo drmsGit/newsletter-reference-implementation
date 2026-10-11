@@ -191,7 +191,8 @@ def verify_submit(
     response = RedirectResponse(url=target, status_code=303)
     response.set_cookie(
         SESSION_COOKIE, token,
-        max_age=SESSION_ABSOLUTE_HOURS * 3600,
+        # The company's lifetime at sign-in (task-342).
+        max_age=_cookie_max_age(db),
         # `secure` defaults on: without it a reachable HTTP path sends the
         # session token in clear. `httponly` stops script from reading it and
         # `samesite` blunts cross-site POST, but neither does anything about a
@@ -529,6 +530,12 @@ class SessionVerified(BaseModel):
     csrf_token: str
 
 
+def _cookie_max_age(db) -> int:
+    from app.settings.service import get_session_lengths
+
+    return get_session_lengths(db)[0] * 3600
+
+
 class SessionBrand(BaseModel):
     id: int
     key: str
@@ -664,7 +671,8 @@ def session_verify(
 
     response.set_cookie(
         SESSION_COOKIE, token,
-        max_age=SESSION_ABSOLUTE_HOURS * 3600,
+        # The company's lifetime at sign-in (task-342).
+        max_age=_cookie_max_age(db),
         httponly=True, samesite="lax", secure=cookie_secure(),
     )
     return {

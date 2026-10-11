@@ -6,6 +6,7 @@ import {
   useSaveAiProvider,
   useSaveSignals,
   useSaveSendCap,
+  useSaveSessionLengths,
   useSaveSpendCap,
   useSetTaskApproval,
   useSetTaskModel,
@@ -143,6 +144,54 @@ function SendCap({ s }: { s: SettingsView }) {
     >
       <NumberField label="Most recipients one send may reach" value={value} onChange={setValue} />
       {invalid && <p role="alert">Enter a whole number.</p>}
+      <Outcome write={save} />
+    </Form>
+  )
+}
+
+/**
+ * How long a sign-in lasts (task-342; ADR-151 addendum 2026-10-11). The ranges
+ * are said beside the fields; the server refuses anything outside them. A
+ * shorter value signs out people past it at once; a longer lifetime reaches
+ * only sign-ins after the change.
+ */
+function SessionLengths({ s }: { s: SettingsView }) {
+  const save = useSaveSessionLengths()
+  const [hours, setHours] = useState(String(s.session_absolute_hours))
+  const [minutes, setMinutes] = useState(String(s.session_idle_minutes))
+  const [invalid, setInvalid] = useState(false)
+  if (!s.may_manage) {
+    return (
+      <dl className="facts">
+        <dt>A sign-in lasts at most</dt>
+        <dd>{s.session_absolute_hours} hours</dd>
+        <dt>Signed out after no activity for</dt>
+        <dd>{s.session_idle_minutes} minutes</dd>
+      </dl>
+    )
+  }
+  return (
+    <Form
+      label="Save sign-in lengths"
+      saving={save.isPending}
+      onSave={() => {
+        const h = parseWhole(hours)
+        const m = parseWhole(minutes)
+        setInvalid(h === null || m === null)
+        if (h !== null && m !== null) save.mutate({ absolute_hours: h, idle_minutes: m })
+      }}
+    >
+      <NumberField label="A sign-in lasts at most (hours, 1 to 72)" value={hours} onChange={setHours} />
+      <NumberField
+        label="Signed out after no activity for (minutes, 5 to 480)"
+        value={minutes}
+        onChange={setMinutes}
+      />
+      <p className="muted">
+        Shorter values sign out anyone past them at once. A longer lifetime applies to sign-ins after the
+        change.
+      </p>
+      {invalid && <p role="alert">Enter whole numbers.</p>}
       <Outcome write={save} />
     </Form>
   )
@@ -432,6 +481,10 @@ function Sections({ s }: { s: SettingsView }) {
           items={s.delivery_providers.map((p, index) => ({ ...p, id: index }))}
           emptyMessage="No delivery providers are registered."
         />
+      </section>
+      <section aria-labelledby="sessions">
+        <h2 id="sessions">Sign-in sessions</h2>
+        <SessionLengths s={s} />
       </section>
 
       <section aria-labelledby="signals">

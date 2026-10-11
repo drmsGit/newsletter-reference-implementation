@@ -11,6 +11,8 @@ const SETTINGS = {
   signal_defaults: { weights: { click: 500, open: 0 }, half_lives: { click: 45, open: 45 } },
   known_contribution_types: ['click', 'open'],
   max_send_recipients: 200,
+  session_absolute_hours: 12,
+  session_idle_minutes: 60,
   channels: [
     { name: 'email', available: true },
     { name: 'push', available: false },
@@ -117,6 +119,21 @@ describe('editing settings', () => {
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
     expect(await sentBodies(fetchMock, 'PUT')).toEqual([{ max_send_recipients: 150 }])
     await waitFor(() => expect(reads).toBe(2))
+  })
+
+  it('sets how long a sign-in lasts, saying the ranges', async () => {
+    const fetchMock = stubFetch({
+      'GET /settings': () => jsonResponse(MANAGER),
+      'PUT /settings/session-lengths': () => jsonResponse({ absolute_hours: 8, idle_minutes: 30 }),
+    })
+    renderWithProviders(<Settings />)
+    const hours = await screen.findByLabelText(/A sign-in lasts at most \(hours, 1 to 72\)/)
+    fireEvent.change(hours, { target: { value: '8' } })
+    fireEvent.change(screen.getByLabelText(/no activity for \(minutes, 5 to 480\)/), { target: { value: '30' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save sign-in lengths' }))
+    await waitFor(async () =>
+      expect(await sentBodies(fetchMock, 'PUT')).toEqual([{ absolute_hours: 8, idle_minutes: 30 }]),
+    )
   })
 
   it("shows the server's reason when it refuses a value", async () => {

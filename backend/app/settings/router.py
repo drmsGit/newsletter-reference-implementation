@@ -24,7 +24,7 @@ from app.settings import service
 from app.settings.audited import audited_settings
 from app.settings.models import (
     AIBudget, AITaskSettings, ApprovalModeChoice, ChannelSetting, DeliveryProviderSetting, ModelChoice,
-    PromptPublish, PromptVersion, ProviderUpdate, SendCapUpdate, Settings,
+    PromptPublish, PromptVersion, ProviderUpdate, SendCapUpdate, SessionLengths, Settings,
     SignalTuning, SpendCapUpdate, UnsubscribeOptions,
 )
 
@@ -92,6 +92,8 @@ def read_settings(request: Request, db: Session = Depends(get_db)):
         ),
         known_contribution_types=sorted(service.known_contribution_types()),
         max_send_recipients=service.get_max_send_recipients(db),
+        session_absolute_hours=service.get_session_lengths(db)[0],
+        session_idle_minutes=service.get_session_lengths(db)[1],
         channels=[ChannelSetting(name=c.name, available=c.name in enabled) for c in list_channels()],
         delivery_providers=_delivery_providers(),
         ai_provider=service.get_ai_provider_name(db),
@@ -152,6 +154,22 @@ def put_send_cap(payload: SendCapUpdate, request: Request, db: Session = Depends
     with audited_settings(request, db, "send_cap", [service.MAX_SEND_RECIPIENTS_KEY]):
         service.save_max_send_recipients(db, payload.max_send_recipients)
     return SendCapUpdate(max_send_recipients=service.get_max_send_recipients(db))
+
+
+@router.put("/session-lengths", response_model=SessionLengths, dependencies=_PERSON,
+            summary="How long a sign-in lasts, and how long without activity",
+            description="Within 1-72 hours and 5-480 minutes, the idle timeout never longer than "
+                        "the lifetime (422 otherwise). A shorter value ends existing sessions past "
+                        "it at once; a longer lifetime reaches only sessions started afterwards.")
+def put_session_lengths(payload: SessionLengths, request: Request, db: Session = Depends(get_db)):
+    with audited_settings(request, db, "session_lengths",
+                          [service.SESSION_ABSOLUTE_HOURS_KEY, service.SESSION_IDLE_MINUTES_KEY]):
+        try:
+            service.save_session_lengths(db, payload.absolute_hours, payload.idle_minutes)
+        except service.SettingsInvalid as error:
+            raise _invalid(error)
+    hours, minutes = service.get_session_lengths(db)
+    return SessionLengths(absolute_hours=hours, idle_minutes=minutes)
 
 
 @router.get("/unsubscribe", response_model=UnsubscribeOptions, summary="What the unsubscribe page offers")

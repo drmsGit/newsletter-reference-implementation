@@ -49,6 +49,9 @@ CODE_REQUESTS_PER_ADDRESS = 5
 CODE_REQUEST_ADDRESS_WINDOW_MINUTES = 15
 CODE_REQUESTS_PER_CLIENT = 20
 CODE_REQUEST_CLIENT_WINDOW_MINUTES = 60
+#: The defaults only (task-342): the company sets both within safe ranges
+#: (`settings.service.get_session_lengths`; ADR-151 addenda 2026-10-09 and
+#: 2026-10-11). The sign-in code numbers above stay code: attack resistance.
 SESSION_ABSOLUTE_HOURS = 12
 SESSION_IDLE_MINUTES = 60
 # Named after the product slug (task-29), so it follows product.json. Not a
@@ -908,12 +911,17 @@ def verify_login_code(db: Session, email: str, code: str) -> str | None:
 
 
 def create_session(db: Session, user: UserDB) -> str:
+    from app.settings.service import get_session_lengths
+
     token = secrets.token_urlsafe(32)
     granted = brands_for_user(db, user)
+    absolute_hours, _ = get_session_lengths(db)
     db.add(SessionDB(
         user_id=user.id,
         token_hash=hash_secret(token),
-        expires_at=now() + timedelta(hours=SESSION_ABSOLUTE_HOURS),
+        # The company's lifetime when the session starts (task-342): a longer
+        # one set later reaches only sessions started after it.
+        expires_at=now() + timedelta(hours=absolute_hours),
         # The working brand starts at the first brand they hold, and stays None
         # for a user with no grant — `resolve_session_brand` falls back rather
         # than this column asserting access nobody gave.
@@ -948,10 +956,17 @@ def _session_user(db: Session, token: str | None, *, touch: bool) -> UserDB | No
     if row is None:
         return None
 
+    # The company's lengths as they are now (task-342; ADR-151 addendum
+    # 2026-10-11): a shorter lifetime ends an existing session at once (its
+    # start plus the current lifetime), a longer one never extends it (its
+    # stamped expiry still holds); the idle timeout is always the current one.
+    from app.settings.service import get_session_lengths
+
+    absolute_hours, idle_minutes = get_session_lengths(db)
     current = now()
-    if row.expires_at <= current:
+    if row.expires_at <= current or row.created_at + timedelta(hours=absolute_hours) <= current:
         return None
-    if row.last_seen_at + timedelta(minutes=SESSION_IDLE_MINUTES) <= current:
+    if row.last_seen_at + timedelta(minutes=idle_minutes) <= current:
         return None
 
     user = db.query(UserDB).filter(UserDB.id == row.user_id).first()

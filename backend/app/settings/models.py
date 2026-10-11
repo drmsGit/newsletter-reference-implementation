@@ -76,6 +76,8 @@ class Settings(BaseModel):
     signal_defaults: SignalTuning
     known_contribution_types: list[str]
     max_send_recipients: int
+    session_absolute_hours: int = 12
+    session_idle_minutes: int = 60
     channels: list[ChannelSetting]
     delivery_providers: list[DeliveryProviderSetting]
     ai_provider: str
@@ -96,6 +98,15 @@ class Settings(BaseModel):
 
 class SendCapUpdate(BaseModel):
     max_send_recipients: int = Field(gt=0)
+
+
+class SessionLengths(BaseModel):
+    """How long a sign-in lasts (task-342; ADR-151 addendum 2026-10-11): at
+    most `absolute_hours` (1-72), and `idle_minutes` (5-480, never longer than
+    the lifetime) without activity. A shorter value applies at once."""
+
+    absolute_hours: int
+    idle_minutes: int
 
 
 class UnsubscribeOptions(BaseModel):

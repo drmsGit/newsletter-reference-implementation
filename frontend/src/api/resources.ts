@@ -563,6 +563,13 @@ export function useSaveSendCap() {
   )
 }
 
+/** How long a sign-in lasts (task-342): within 1-72 hours and 5-480 minutes. */
+export function useSaveSessionLengths() {
+  return useSettingsWrite((lengths: { absolute_hours: number; idle_minutes: number }) =>
+    read(api.PUT('/settings/session-lengths', { body: lengths })),
+  )
+}
+
 export function useSaveSpendCap() {
   return useSettingsWrite(
     (cap: { warn_tokens: number; hard_stop_tokens: number; budget_usd: number }) =>
