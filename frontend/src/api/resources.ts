@@ -1453,18 +1453,29 @@ export function useCreateBrandProfile() {
 }
 
 /** Replace the name and values, stating the version that was read (If-Match). */
+/**
+ * Replace the name and values. `version` is the `updated_at` the editor's
+ * draft started from, **not** whatever the cache holds now: a background
+ * refresh may already have brought somebody else's newer version, and sending
+ * that would overwrite their change unseen instead of being refused (Codex
+ * doc-14).
+ */
 export function useSaveBrandProfile(id: number) {
-  const queryClient = useQueryClient()
   const refresh = useProfileRefresh()
   return useMutation({
     scope: { id: `brand-profile-${id}` },
-    mutationFn: (body: { name: string; language: string; field_values: Record<string, unknown> }) =>
+    mutationFn: ({
+      version,
+      ...body
+    }: {
+      version: string
+      name: string
+      language: string
+      field_values: Record<string, unknown>
+    }) =>
       read(
         api.PUT('/brand-profiles/{profile_id}', {
-          params: {
-            path: { profile_id: id },
-            header: { 'If-Match': queryClient.getQueryData<BrandProfile>(keys.brandProfile(id))?.updated_at },
-          },
+          params: { path: { profile_id: id }, header: { 'If-Match': version } },
           body,
         }),
       ),

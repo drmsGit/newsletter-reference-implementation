@@ -123,7 +123,7 @@ def get_profile(db: Session, profile_id: int, brand_id: int, *, lock: bool = Fal
     query = db.query(BrandProfileDB).filter(
         BrandProfileDB.id == profile_id, BrandProfileDB.brand_id == brand_id)
     if lock:
-        query = query.with_for_update()
+        query = query.with_for_update().populate_existing()  # fresh values under the lock
     profile = query.first()
     if profile is None:
         raise ProfileNotFound(f"Brand profile {profile_id} not found")
@@ -309,8 +309,12 @@ def _free_copy_name(db: Session, brand_id: int, name: str) -> str:
 def make_default(db: Session, profile_id: int, brand_id: int) -> BrandProfileDB:
     """Move the default mark. The brand's profiles are locked so two people
     doing this at once end with one default, not a refused second commit."""
+    # `populate_existing`: a row this session read before the lock keeps its
+    # old values in the identity map otherwise, so a default moved meanwhile by
+    # another request would look unmoved here, and the new mark would collide
+    # with it at the unique index (Codex doc-14).
     profiles = (db.query(BrandProfileDB).filter(BrandProfileDB.brand_id == brand_id)
-                .order_by(BrandProfileDB.id).with_for_update().all())
+                .order_by(BrandProfileDB.id).with_for_update().populate_existing().all())
     target = next((p for p in profiles if p.id == profile_id), None)
     if target is None:
         raise ProfileNotFound(f"Brand profile {profile_id} not found")

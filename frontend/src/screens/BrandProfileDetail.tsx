@@ -32,8 +32,6 @@ export default function BrandProfileDetail() {
   const id = Number(useParams().id)
   const profile = useBrandProfile(id)
   const structure = useBrandProfileStructure()
-  // Here rather than in the form: the form remounts on every new version, and
-  // the save's outcome ("Saved.", a refusal) must outlive that.
   const save = useSaveBrandProfile(id)
 
   return (
@@ -44,9 +42,10 @@ export default function BrandProfileDetail() {
       <ScreenState query={profile}>
         <ScreenState query={structure}>
           {profile.data && structure.data && (
-            // Keyed on the version: a save or a reload starts the form from what is stored.
+            // Keyed on the profile, not its version: a newer version arriving
+            // in the background must not wipe what somebody is typing.
             <ProfileForm
-              key={profile.data.updated_at}
+              key={profile.data.id}
               profile={profile.data}
               fields={structure.data}
               save={save}
@@ -63,6 +62,24 @@ function asText(value: unknown): string {
   return value === null || value === undefined ? '' : String(value)
 }
 
+type Draft = { name: string; language: string; values: Record<string, string> }
+
+function draftOf(profile: BrandProfile, fields: ProfileField[]): Draft {
+  return {
+    name: profile.name,
+    language: profile.language,
+    values: Object.fromEntries(fields.map((f) => [f.name, asText(profile.field_values[f.name])])),
+  }
+}
+
+function sameDraft(a: Draft, b: Draft): boolean {
+  return (
+    a.name === b.name &&
+    a.language === b.language &&
+    Object.keys({ ...a.values, ...b.values }).every((k) => (a.values[k] ?? '') === (b.values[k] ?? ''))
+  )
+}
+
 function ProfileForm({
   profile,
   fields,
@@ -75,22 +92,44 @@ function ProfileForm({
   reload: () => void
 }) {
   const readOnly = !profile.may_manage
-  const [name, setName] = useState(profile.name)
-  const [language, setLanguage] = useState(profile.language)
-  const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(fields.map((f) => [f.name, asText(profile.field_values[f.name])])),
-  )
-  const dirty =
-    name !== profile.name ||
-    language !== profile.language ||
-    fields.some((f) => values[f.name] !== asText(profile.field_values[f.name]))
+  // `base` is the stored version the draft started from. A newer one taken
+  // over while nothing is typed (or once it holds exactly what is typed, as
+  // after one's own save); kept apart while edits are pending, so they are
+  // neither wiped nor saved over it unseen (Codex doc-14). Adjusted during
+  // render, as the variant editor's fields do, so no frame shows stale text.
+  const [base, setBase] = useState(profile)
+  const [draft, setDraft] = useState(() => draftOf(profile, fields))
+  if (profile.updated_at !== base.updated_at) {
+    const stored = draftOf(profile, fields)
+    if (sameDraft(draft, draftOf(base, fields)) || sameDraft(draft, stored)) {
+      setBase(profile)
+      setDraft(stored)
+    }
+  }
+  const changedElsewhere = profile.updated_at !== base.updated_at
+  const dirty = !sameDraft(draft, draftOf(base, fields))
+  const { name, language, values } = draft
+  const setName = (next: string) => setDraft((d) => ({ ...d, name: next }))
+  const setLanguage = (next: string) => setDraft((d) => ({ ...d, language: next }))
+  const setValues = (change: (current: Record<string, string>) => Record<string, string>) =>
+    setDraft((d) => ({ ...d, values: change(d.values) }))
+
+  /** Drop the draft and start from what is stored now. */
+  function loadTheirs() {
+    save.reset()
+    setBase(profile)
+    setDraft(draftOf(profile, fields))
+    reload()
+  }
 
   function submit(event: FormEvent) {
     event.preventDefault()
     if (!dirty || save.isPending || readOnly) return
     // Every field goes with the save: the PUT replaces the values, and an
     // empty one is dropped by the server, which is how a value is cleared.
-    save.mutate({ name: name.trim(), language: language.trim(), field_values: values })
+    // Stated against the version the draft started from, so a change made
+    // meanwhile is refused (409), never overwritten.
+    save.mutate({ version: base.updated_at, name: name.trim(), language: language.trim(), field_values: values })
   }
 
   const groups = [...new Set(fields.map((f) => f.group))]
@@ -106,6 +145,15 @@ function ProfileForm({
       </p>
       {readOnly && (
         <p className="muted">You can read this profile. Changing it needs the brand-profile permission.</p>
+      )}
+      {changedElsewhere && dirty && (
+        <div role="alert">
+          <p>
+            Somebody changed this profile while you were editing it. Your changes are not saved; saving them now
+            would be refused.
+          </p>
+          <Button onPress={loadTheirs}>Load their version</Button>
+        </div>
       )}
       {profile.missing.length > 0 && (
         <p role="status">
@@ -164,7 +212,7 @@ function ProfileForm({
           {!dirty && save.isSuccess && <span className="muted"> Saved.</span>}
         </p>
       )}
-      <SaveState mutation={save} reload={reload} what="this profile" />
+      <SaveState mutation={save} reload={loadTheirs} what="this profile" />
       {!readOnly && <ProfileActions profile={profile} dirty={dirty} />}
     </form>
   )

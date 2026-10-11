@@ -1,10 +1,10 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router'
 
 import BrandProfileDetail from './BrandProfileDetail'
 import BrandProfiles from './BrandProfiles'
-import { jsonResponse, page, renderWithProviders, stubFetch } from '../test-utils'
+import { jsonResponse, makeQueryClient, page, renderWithProviders, stubFetch } from '../test-utils'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -63,6 +63,11 @@ function detailServer(over: Record<string, unknown> = {}) {
     'GET /brand-profiles/structure': () => jsonResponse(STRUCTURE),
     'PUT /brand-profiles/2': async (request) => {
       writes.push(request.clone())
+      // As the server does (ADR-180 point 2): a stale version is refused.
+      const version = request.headers.get('If-Match')
+      if (version !== null && version !== state.updated_at) {
+        return jsonResponse({ detail: 'This brand profile was changed after you loaded it.' }, 409)
+      }
       const body = await request.json()
       if (body.field_values.imprint_url === 'imprint') {
         return jsonResponse({ detail: [{ loc: ['body', 'field_values', 'imprint_url'],
@@ -146,6 +151,33 @@ describe('one profile', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete Calm' }))
     expect(await screen.findByText('The list')).toBeInTheDocument()
     expect(writes.map((w) => w.method)).toEqual(['DELETE'])
+  })
+
+  it('never saves over a version that arrived while editing, and can load it', async () => {
+    const { state, writes, handlers } = detailServer()
+    const client = makeQueryClient()
+    stubFetch(handlers as never)
+    renderWithProviders(
+      <Routes>
+        <Route path="/settings/brand-profiles/:id" element={<BrandProfileDetail />} />
+      </Routes>,
+      { client, route: '/settings/brand-profiles/2' },
+    )
+    fireEvent.change(await screen.findByLabelText(/^Legal company name/), { target: { value: 'Mine GmbH' } })
+    // Somebody else saves meanwhile; a background refresh brings it in.
+    Object.assign(state, { updated_at: T(5), field_values: { ...state.field_values, legal_company_name: 'Theirs GmbH' } })
+    await act(async () => {
+      await client.invalidateQueries()
+    })
+    expect(await screen.findByText(/Somebody changed this profile while you were editing/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^Legal company name/)).toHaveValue('Mine GmbH')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect(writes[0].headers.get('If-Match')).toBe(T(1)) // the version the edit began from
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Load their version' })[0])
+    await waitFor(() => expect(screen.getByLabelText(/^Legal company name/)).toHaveValue('Theirs GmbH'))
   })
 
   it('offers no delete and no make-default on the default', async () => {
