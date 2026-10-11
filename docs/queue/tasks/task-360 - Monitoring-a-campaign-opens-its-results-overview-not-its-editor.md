@@ -4,7 +4,7 @@ title: 'Monitoring: a campaign opens its results overview, not its editor'
 status: To Do
 assignee: []
 created_date: '2026-10-11 10:01'
-updated_date: '2026-10-11 10:05'
+updated_date: '2026-10-11 16:27'
 labels:
   - frontend
   - backend
@@ -43,4 +43,6 @@ ordinal: 209800
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-11, the user, an alternative to a new screen: Monitoring may keep linking to the campaign page, if the campaign page itself shows the scheduled data (not sent yet) and/or a limited set of KPIs (sent). Then no extra screen is needed. The information does not have to be always visible: it can be a collapsible section on the campaign page. This answers the final-design pass's first open question (a new screen or the campaign page) in favour of the campaign page, unless the pass finds a reason against it.
+
+2026-10-11, task-58's design pass (ADR-196) settled this task's scope: the campaign page's collapsible Results section is the overview, and Monitoring keeps linking to the campaign. Built in commit 4e59ed6. The user decided nothing is shown for unsent sends, so AC #2's planned-and-missing half is dropped; a dry-run readiness check would be its own task if wanted. What may remain here: nothing, unless the user wants Monitoring's rows to carry a figure.
 <!-- SECTION:NOTES:END -->

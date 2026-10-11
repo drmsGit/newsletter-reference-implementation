@@ -4,6 +4,7 @@ title: 'Content subpages: categories and the category graph with content KPIs'
 status: To Do
 assignee: []
 created_date: '2026-10-11 10:01'
+updated_date: '2026-10-11 16:27'
 labels:
   - frontend
   - backend
@@ -35,3 +36,9 @@ ordinal: 209700
 - [ ] #2 The graph shows per-category and per-content figures for the working brand
 - [ ] #3 The KPI scope is decided against task-58 before it is built
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-11, from task-58's design pass (ADR-196 point 5): per-link and per-content click figures live on the content catalogue side, not in the campaign's results section. The user: links and content KPIs will be displayed on the content catalogue side. Clicks name their content only through event_data.content_record_id (tracked links).
+<!-- SECTION:NOTES:END -->
