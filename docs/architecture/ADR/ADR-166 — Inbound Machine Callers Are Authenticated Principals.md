@@ -655,6 +655,82 @@ been. The test route has nothing to hold, so it stays a refusal.
 first 2026-10-09 addendum's open list is answered here, not rewritten there.
 Nothing here changes the Decision section above.
 
+## Addendum 2026-10-11 (second) — the key expiry's final-design pass
+
+Prompted by the final-design pass for task-344, which builds the second 2026-10-09
+addendum. The user decided it on 2026-10-11, one question at a time. **This does
+not touch the Decision.** Point 3's credential mechanics stand, and so does point
+4: a key is still independent of the person who issued it. The second 2026-10-09
+addendum stands too: an expiry is optional, it is set when a key is issued, and an
+expired key is refused like a revoked one. This closes that addendum's list "Left
+open for the build's final-design pass", and it answers the fact from the code
+that addendum recorded.
+
+**1. The expiry is a number of days.** When issuing a key, the issuer types how
+many days it should live, for example 90, or leaves the field empty for no expiry.
+The platform stores the resulting date and the number of days. The integrations
+list shows the date and the days left. The number is from 1 to 3650. The issuer
+picks it, so the length stays the company's choice (point 2 of the second
+2026-10-09 addendum).
+
+This answers the first open item. A number of days raises no calendar question and
+no time-zone question; a date would raise both.
+
+**2. A warning in the app, and no mail.** A key that expires within 14 days is
+marked in the integrations list, and so is the integration it belongs to. No email
+or other notification is built. There is no operator mail yet (task-76). And the
+issuer may have left, which is the very case expiry is for.
+
+This answers the second open item.
+
+**3. An existing key's expiry may be changed, and the gate follows the
+direction.** Adding an expiry to a key that had none, or bringing it forward,
+needs `integrations.manage` only, like revoking a key: it only takes power away.
+Pushing it later or removing it needs `integrations.manage` and holding every grant
+the integration has (`require_holds_integration`, the no-escalation rule of the
+2026-10-02 addendum), like issuing a key: it hands out more time. Every change is
+audited with the old and the new date.
+
+This answers the third open item. It is the split the first 2026-10-11 addendum
+made for the ceiling: what narrows stays an ungated reduction, and what widens
+counts as issuing.
+
+**4. Every key gets its own expiry when it is issued.** A new key does not inherit
+the old key's date. The issue form is pre-filled with the number of days the
+integration's newest key was given, so a 90-day agency stays at 90 days unless
+someone changes it. Old and new keys overlap until the old one expires or is
+revoked, which is what makes rotation without downtime possible.
+
+This answers the fourth open item.
+
+**5. "Live" means not revoked and not expired.** An expired key is refused on the
+same path and with the same answer as a revoked one (point 3 of the second
+2026-10-09 addendum). It no longer counts as live either: the JSON list's
+`live_keys` and the Jinja page's count both leave out a key that is revoked or
+expired.
+
+This answers the fact from the code. That addendum recorded that "live" was counted
+from `revoked_at` alone in both places (`backend/app/auth/integrations_router.py:106`
+and `backend/app/frontend/router.py:3516`, as cited there), so an expired key would
+have counted as live.
+
+**Consequences.**
+
+- **Positive.** Rotation without downtime stays possible: a new key can be issued
+  before the old one lapses, and both work until then. The leaver risk this record
+  names in its first `### Negative` item is closed for every key issued with an
+  expiry. Reductions stay ungated: whoever may revoke a key may also give it an
+  expiry or bring its expiry forward.
+- **Negative.** Expiry is still optional, so a key issued without one keeps
+  today's exposure. The warning reaches only someone who opens the integrations
+  list. A key can still expire unnoticed overnight, and its integration's calls
+  then fail like a revoked key's.
+
+**Unchanged:** points 1 through 8, the build-notes and the earlier addenda,
+including the ceiling of the first 2026-10-11 addendum. The second 2026-10-09
+addendum's open list is answered here, not rewritten there. Nothing here changes
+the Decision section above.
+
 ## Related ADRs
 
 ### Depends On
