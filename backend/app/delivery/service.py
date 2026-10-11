@@ -737,7 +737,9 @@ def process_due_scheduled_sends(
     for send_instance in due:
         if ceiling is not None:
             size = recipients_now(db, send_instance)
-            if size > ceiling:
+            # 0 means never, whatever the count (Codex doc-17): an empty
+            # send is held too, as on the fire route.
+            if ceiling == 0 or size > ceiling:
                 if held is not None:
                     held.append((send_instance.id, size))
                 continue
