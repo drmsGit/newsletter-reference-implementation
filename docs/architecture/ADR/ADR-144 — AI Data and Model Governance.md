@@ -7,7 +7,7 @@ topic:
   - governance
   - privacy
 created: 2026-07-31
-modified: 2026-10-09
+modified: 2026-10-11
 source:
   - "AI Layer design interview (interview-prep, 2026-07-27 – 31), Cluster 5"
 depends_on:
@@ -248,6 +248,56 @@ task-75 is related to this addendum and is not superseded by it.
 role/user" is read as one company pot, as above, and so is the third `### Positive`
 bullet. Point 5's statement that the buffer is *"strictly bound to user
 role/permission"* is not reinterpreted here.
+
+## Addendum 2026-10-11 — the AI budget period's final-design pass
+
+Prompted by the final-design pass for task-345, which builds the 2026-10-09 addendum
+above. The user decided its open questions on 2026-10-11, one question at a time. That
+addendum left three things to this pass: which time zone a calendar month is counted
+in, what happens to a run in flight when the period resets, and how runs written before
+the actor was recorded are shown. This addendum answers all three. Point 5 and the
+2026-10-09 addendum stand as written.
+
+**The decision.**
+
+**1. Periods start at midnight UTC.** A month, quarter or year begins on its 1st at
+00:00 UTC, which is 01:00 or 02:00 in Germany. No company time-zone setting is added.
+UTC is unambiguous and matches how every timestamp is already stored, and a few hours
+at the edge of a month rarely matter for a token budget. The settings screen says that
+periods start at midnight UTC.
+
+**2. A run counts in the period it is recorded in.** A run is recorded when the model
+answers. So a run that starts before the reset and finishes after it counts in the new
+period. The pre-call gate checked it against the old period's remaining budget before
+it started, so at worst one run's tokens land in the new month. Nothing new is stored.
+
+**Settled in the same pass.** These follow from the 2026-10-09 addendum and the records
+it cites. They are stated here so the build reads them in one place.
+
+- **The period setting.** It is one of month (the default), quarter, year or lifetime.
+  Lifetime is the behaviour before this build. Changing it is a person's settings write
+  under `settings.manage`, and it is audited.
+- **The actor on a run.** Every new AI run records who triggered it: a person (user
+  id), an integration (integration id), or `system` with no id, when a sweep or
+  scheduled job runs it with no request behind it. These are the actor kinds of
+  [[ADR-153 — Audit and Accountability]]; `system` is the `ACTOR_SYSTEM` its 2026-10-01
+  addendum added. The 2026-10-09 addendum named a person or an integration; `system`
+  covers a run that has neither.
+- **Runs recorded before the build.** They have no actor and are shown as "not
+  recorded". They cannot be attributed afterwards.
+- **The buffer.** Point 5's buffer, *"strictly bound to user role/permission"*, is
+  still not reinterpreted. It stays outside this build.
+
+**What it costs.**
+
+- **Positive:** a company that budgets monthly sees the cap refill on the 1st. Spend
+  can be split by person or integration from the build on.
+- **Negative:** the reset is at midnight UTC, not local midnight. Runs recorded before
+  the build cannot be attributed. A company that wants a lifetime cap must now choose
+  it explicitly.
+
+**Nothing in this record's Decision changes.** Point 5 stands as written and is read as
+the 2026-10-09 addendum reads it.
 
 ## Related ADRs
 
