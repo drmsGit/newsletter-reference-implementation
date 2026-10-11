@@ -338,6 +338,10 @@ with SessionLocal() as db:
     from app.modules.registry import assert_manifests_load, list_manifests
 
     assert_manifests_load()
+    # A bad brand-profile setup file fails the deploy, not the first send (task-350).
+    from app.brand_profiles.structure import assert_structure_loads
+
+    assert_structure_loads()
 
     # task-20: a channel whose manifest does not parse is skipped — unless
     # variants already use it, where skipping turns one typo into a failure on

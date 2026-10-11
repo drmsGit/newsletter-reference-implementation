@@ -209,6 +209,9 @@ def create_brand(db: Session, key: str, name: str) -> BrandDB | None:
     db.add(brand)
     db.commit()
     db.refresh(brand)
+    # Every brand always has a default profile (ADR-194 point 1).
+    from app.brand_profiles.service import ensure_default_profile
+    ensure_default_profile(db, brand.id)
     logger.warning("auth: brand created — %s (%s)", name, key)
     return brand
 
@@ -235,6 +238,12 @@ def rename_brand(db: Session, brand_id: int, name: str) -> BrandDB | None:
 #: hold". Everything else that references a brand blocks the delete.
 RELEASED_ON_BRAND_DELETE = {("auth_sessions", "brand_id")}
 
+#: Brand references deleted together with the brand. A brand's profiles are its
+#: own look (ADR-194), not anything a person or a send left behind, so they go
+#: with it. What still uses a profile — a variant — belongs to a campaign,
+#: which already blocks the delete.
+DELETED_WITH_BRAND = {("brand_profiles", "brand_id")}
+
 
 def brand_holders() -> list[tuple]:
     """Every (table, column) whose rows block deleting a brand.
@@ -256,7 +265,7 @@ def brand_holders() -> list[tuple]:
     holders = []
     for table in sorted(Base.metadata.tables.values(), key=lambda t: t.name):
         for column in table.columns:
-            if (table.name, column.name) in RELEASED_ON_BRAND_DELETE:
+            if (table.name, column.name) in RELEASED_ON_BRAND_DELETE | DELETED_WITH_BRAND:
                 continue
             if any(fk.column.table.name == "brands" for fk in column.foreign_keys):
                 holders.append((table, column))
@@ -300,6 +309,8 @@ def delete_brand(db: Session, brand_id: int) -> str | None:
     try:
         # Inside the try, not just the commit: a bulk `.delete()` executes at
         # once, so the foreign-key refusal is raised here, before any commit.
+        from app.brand_profiles.db_models import BrandProfileDB
+        db.query(BrandProfileDB).filter(BrandProfileDB.brand_id == brand_id).delete()
         db.query(BrandDB).filter(BrandDB.id == brand_id).delete()
         db.commit()
     except IntegrityError:
@@ -420,6 +431,8 @@ def ensure_default_brand(db: Session) -> BrandDB:
         db.add(brand)
         db.commit()
         db.refresh(brand)
+    from app.brand_profiles.service import ensure_default_profile
+    ensure_default_profile(db, brand.id)
     return brand
 
 

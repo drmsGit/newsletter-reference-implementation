@@ -1,5 +1,7 @@
 from sqlalchemy import Index, CheckConstraint, Column, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, func, JSON, text
 
+import app.brand_profiles.db_models  # noqa: F401 — registers brand_profiles, which variants reference
+
 from app.database import Base
 
 
@@ -76,6 +78,14 @@ class VariantDB(Base):
     fenced_by_id = Column(Integer, nullable=True)
     fenced_by_label = Column(String(255), nullable=True)
     fenced_at = Column(DateTime(timezone=True), nullable=True)
+    # The brand profile this variant uses (ADR-194 point 4, task-350). NULL
+    # reads as the brand's current default — rows built directly (the seed,
+    # older code) keep working; the services always store an explicit id.
+    brand_profile_id = Column(Integer, ForeignKey("brand_profiles.id"), nullable=True, index=True)
+    #: Why the profile changed without the manager choosing it: set when the
+    #: profile it used was deleted and it fell back to the default; cleared
+    #: when a manager picks one (ADR-194 point 1).
+    brand_profile_notice = Column(String(255), nullable=True)
 
 
 class ModuleInstanceDB(Base):

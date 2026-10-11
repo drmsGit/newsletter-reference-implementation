@@ -1,0 +1,20 @@
+{
+  "_comment": [
+    "Which fields a brand profile has (ADR-194; task-350). The installation's",
+    "own structure: one company declares two font sizes, another four.",
+    "",
+    "The CORE is always present and is not declared here: legal_company_name,",
+    "legal_address, imprint_url, privacy_url (required on every profile) and",
+    "unsubscribe_text (required on marketing profiles). A core field may be",
+    "listed here only to change its label or group; its type and requiredness",
+    "are fixed.",
+    "",
+    "Further fields: \"name\": {\"type\", \"label\", \"required\", \"group\", \"multiline\"}.",
+    "Types: colour, font_family, size, image, text, url, number. Names match",
+    "[a-z][a-z0-9_]* because brand.css and the templates refer to them.",
+    "",
+    "Careful: adding a field with \"required\": true makes every existing profile",
+    "incomplete, and sends using it are refused until someone fills it in."
+  ],
+  "fields": {}
+}

@@ -331,6 +331,7 @@ def temp_brand(db):
     """A second brand, so "multi-brand" is an actual state and not a theory."""
     from app.audience.db_models import AudienceGroupDB
     from app.auth.db_models import BrandDB, RoleAssignmentDB, SessionDB
+    from app.brand_profiles.db_models import BrandProfileDB
     from app.campaigns.db_models import CampaignDB, VariantDB
     from app.content.db_models import ContentRecordDB
     from app.delivery.db_models import SendInstanceDB
@@ -380,6 +381,7 @@ def temp_brand(db):
         db.query(ConsentEventDB).filter(ConsentEventDB.brand_id == brand_id).delete()
         db.query(RoleAssignmentDB).filter(RoleAssignmentDB.brand_id == brand_id).delete()
         db.query(SessionDB).filter(SessionDB.brand_id == brand_id).update({"brand_id": None})
+        db.query(BrandProfileDB).filter(BrandProfileDB.brand_id == brand_id).delete()
         db.query(BrandDB).filter(BrandDB.id == brand_id).delete()
     db.commit()
 

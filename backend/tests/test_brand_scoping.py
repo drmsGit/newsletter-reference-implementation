@@ -350,8 +350,7 @@ class TestBrandsCanActuallyBeAdministered:
                 "configuration and per-brand asset paths reference it"
             )
         finally:
-            db.query(BrandDB).filter(BrandDB.id == brand.id).delete()
-            db.commit()
+            assert auth.delete_brand(db, brand.id) is None   # takes its default profile along
 
     def test_a_duplicate_key_is_refused(self, db, default_brand):
         assert auth.create_brand(db, key=default_brand.key, name="Impostor") is None

@@ -201,6 +201,8 @@ class TestTheHomelessEventsAreRecorded:
             db.query(AuditEventDB).filter(
                 AuditEventDB.subject_type == "brand", AuditEventDB.subject_id == brand.id
             ).delete()
+            from app.brand_profiles.db_models import BrandProfileDB
+            db.query(BrandProfileDB).filter(BrandProfileDB.brand_id == brand.id).delete()
             db.query(BrandDB).filter(BrandDB.id == brand.id).delete()
             db.commit()
 
