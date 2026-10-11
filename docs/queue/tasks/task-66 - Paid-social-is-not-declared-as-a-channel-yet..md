@@ -4,9 +4,11 @@ title: Paid social is not declared as a channel yet.
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-10-11 18:49'
 labels:
   - backend
 dependencies: []
+priority: parked
 type: feature
 ordinal: 201900
 ---
@@ -23,4 +25,6 @@ ordinal: 201900
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 206, section "Features", position 19 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-11, the user: parked, like task-59, until there is a real need (and provider) to test against.
 <!-- SECTION:NOTES:END -->

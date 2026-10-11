@@ -6,9 +6,11 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:56'
+updated_date: '2026-10-11 18:49'
 labels:
   - backend
 dependencies: []
+priority: parked
 type: feature
 ordinal: 201200
 ---
@@ -27,4 +29,6 @@ ordinal: 201200
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 166, section "Features", position 12 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-11, the user: parked until there is a real push provider. Inbound push feedback cannot be built or tested against the mock alone.
 <!-- SECTION:NOTES:END -->
