@@ -42,8 +42,8 @@ and any own install as later. It stays as the record of that scope.
 
 | What | Task |
 |---|---|
-| Name clearance and branding | task-376 (details in the confidential naming record) |
-| Positioning statement and playbook strategy — important | task-375 |
+| Positioning statement and playbook strategy — important, and first | task-375 |
+| Name: reopened on 2026-10-11, after positioning a naming round | task-376 (details in the confidential naming record) |
 | Only after those: the own install | task-347 stays parked |
 
 ## Later: the own project as the first adopter
@@ -74,6 +74,8 @@ inside it. It is the live proof and the first real installation.
 1. Double opt-in: a public endpoint, the CRM, or both (task-324).
 2. AI suggestions alongside decision slots (task-125).
 3. Licensing options (task-313).
-4. Whether the demo runs on a laptop or a hosted instance — a hosted one
+4. The neutral working name the presentations run under, switched in
+   `product.json` before them (task-376).
+5. Whether the demo runs on a laptop or a hosted instance — a hosted one
    would be the first run of the install (task-347), which stays parked
    until positioning and naming are settled.

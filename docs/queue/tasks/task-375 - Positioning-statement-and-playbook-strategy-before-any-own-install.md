@@ -4,6 +4,7 @@ title: 'Positioning statement and playbook strategy, before any own install'
 status: To Do
 assignee: []
 created_date: '2026-10-11 20:44'
+updated_date: '2026-10-11 20:56'
 labels:
   - docs
 dependencies: []
@@ -16,3 +17,9 @@ ordinal: 201140
 <!-- SECTION:DESCRIPTION:BEGIN -->
 **[Decision]** Raised by the user 2026-10-11 as "important" for the own project, before the Tarrow.eu install starts: the positioning statement (launch gate 1, docs/business/POSITIONING.md, no statement adopted) and the playbook's strategy and structure (gate 8, docs/playbook-strategy.md Phase 4A, started in Cowork). The November presentations to agencies are where the positioning is tested, so the statement should be drafted before them and revised after. Business decisions are recorded in the playbook's decision log, not in ADRs.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-11: now also the first step of the naming round (task-376): the user reopened the product name, and the name should carry the positioning.
+<!-- SECTION:NOTES:END -->

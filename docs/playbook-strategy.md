@@ -830,6 +830,7 @@ Recorded in [[ADR-194 — Brand Profiles Carry an Email's Look, Texts and Legal 
 2. **For both audiences:** the real end-to-end flow in the React client, images, MJML blocks and two brand profiles, salutations, the category graph, users, roles and keys in Settings, AI that drafts, categorises and translates content and prepares a variant from a topic, a decision on double opt-in, an answer on journeys, and a rough install and implementation sketch. **For the agencies:** licensing options.
 3. **The own project comes after name clearance and branding, and after the positioning statement and playbook strategy** — the user called the latter important. Only then the install (task-347 stays parked). What that install will take is logged in the same file, so it is visible now.
 4. **No "living" decisions** (picks recomputed in the background) until AI-driven slots make send-time decisions expensive.
+5. **The working name is reopened, positioning first.** A product with the same name was found in the same market the same day. The positioning statement comes first, then a naming round; the November presentations run under a neutral working name. The details stay in the confidential naming record.
 
 ## 6. Roadmap
 
