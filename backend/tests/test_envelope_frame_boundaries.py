@@ -129,7 +129,16 @@ def test_migration_changes_only_live_email_rows_and_is_repeatable(db, world, fro
                  "scripts/migrate_0043_envelope_module_rows.sql").read_text()
     # Execute the actual script, including its transaction, on the isolated
     # suite engine. Fixtures own every row above and remove them on teardown.
-    assert "_test_" in db.bind.url.database
+    # Only on the database conftest chose for this suite, and never the
+    # development one: the suite's own rule rather than a name pattern (CI's
+    # database is `app_ci_test`, which a "_test_" check refused; 2026-10-11).
+    # conftest points DATABASE_URL at the suite's database before anything
+    # imports the app, and refuses the development one; hold the engine to that.
+    import os
+
+    from tests.checkout_database import DEV_DEFAULT, database_name
+    assert db.bind.url.database == database_name(os.environ["DATABASE_URL"])
+    assert db.bind.url.database != database_name(DEV_DEFAULT)
     for _ in range(2):
         connection = db.bind.raw_connection()
         try:
