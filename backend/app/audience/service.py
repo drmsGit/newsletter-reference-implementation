@@ -648,7 +648,15 @@ def find_by_criteria(
     not_agreed: bool = False,
     only_ids: set[int] | None = None,
     engagement: dict | None = None,
+    purpose: str = MARKETING,
+    floor: bool = True,
 ) -> list[RecipientDB]:
+    # `purpose` and `floor` (ADR-195, Codex doc-16): a rule matched for a
+    # transactional send uses that send's floor, not the marketing opt-in; an
+    # EXCLUDE rule matches with no floor at all (`floor=False`), because an
+    # exclusion only ever takes people away, and a negative decision outranks
+    # a pin whether or not the pinned person opted in (ADR-176 point 1).
+    #
     # Consent gate: audiences are resolved only from consenting recipients.
     # Filtering here — at audience-resolution time, before any decisioning or
     # rendering runs — is deliberate (F1 in docs/backlog.md): it keeps
@@ -690,7 +698,9 @@ def find_by_criteria(
             exists().where(ConsentEventDB.recipient_id == RecipientDB.id, ConsentEventDB.brand_id == brand_id),
         )
     else:
-        q = db.query(RecipientDB).filter(is_consenting_filter(brand_id, channel, purpose=MARKETING))
+        q = db.query(RecipientDB)
+        if floor:
+            q = q.filter(send_floor_filter(brand_id, channel, purpose=purpose))
 
     # "Is one of" (ADR-188 point 1): a rule may name several values. A single
     # string is an older rule's form and means a list of one.
@@ -846,7 +856,7 @@ def bulk_add_members(
 
 def _recipients_for_criteria(
     db: Session, criteria: dict, brand_id: int, channel: str, *, not_agreed: bool = False,
-    only_ids: set[int] | None = None,
+    only_ids: set[int] | None = None, purpose: str = MARKETING, floor: bool = True,
 ) -> list[RecipientDB]:
     """Resolve one block's criteria to consenting recipients. Thin adapter over
     find_by_criteria so blocks and the older bulk-add path share one definition
@@ -866,6 +876,8 @@ def _recipients_for_criteria(
         not_agreed=not_agreed,
         only_ids=only_ids,
         engagement=criteria.get("engagement"),
+        purpose=purpose,
+        floor=floor,
     )
 
 
@@ -1260,7 +1272,10 @@ def _resolve(db: Session, group_id: int, channel: str, *, with_arithmetic: bool 
     exclude_ids: set[int] = set()
     not_agreed_ids: set[int] = set()
     for block in blocks:
-        ids = {r.id for r in _recipients_for_criteria(db, block.criteria, brand_id, channel)}
+        # Include rules under the send's floor; exclude rules with none
+        # (ADR-195, ADR-176 point 1; Codex doc-16).
+        ids = {r.id for r in _recipients_for_criteria(
+            db, block.criteria, brand_id, channel, purpose=purpose, floor=block.kind != "exclude")}
         if block.kind == "exclude":
             exclude_ids |= ids
         else:

@@ -123,7 +123,11 @@ def test_it_is_per_channel(db, world):
     numbers = audience.audience_arithmetic(db, world["group"].id, channel="push")
     assert numbers["total"] == 0
     assert numbers["not_agreed"] == numbers["matched_rules"] == 4
-    assert numbers["dropped_by_consent"] == numbers["added_by_hand"] == 4
+    assert numbers["added_by_hand"] == 4
+    # Since 2026-10-11 (ADR-176 point 1, Codex doc-16) an exclude rule removes
+    # a hand-added person whether or not they agreed, so the one the exclusion
+    # catches counts there, and three drop for consent. The terms still add up.
+    assert (numbers["removed_by_exclusion"], numbers["dropped_by_consent"]) == (1, 3)
 
 
 def test_the_preview_carries_it(world):
