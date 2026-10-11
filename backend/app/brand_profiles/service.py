@@ -206,9 +206,14 @@ def _check(field_type: str, value):
 
 
 def _check_param_lines(value: str) -> str | None:
+    from app.rendering.tracking import CONTENT_PARAM
+
     for line in value.splitlines():
         if line.strip() and not _PARAM_LINE.fullmatch(line.strip()):
             return "One parameter per line, written as key=value, for example ref=newsletter."
+        if line.strip().partition("=")[0] == CONTENT_PARAM:
+            return (f"{CONTENT_PARAM} is the platform's own click-tracking parameter; it cannot be "
+                    "set here.")
     return None
 
 

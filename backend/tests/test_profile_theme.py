@@ -86,6 +86,14 @@ def test_tags_come_from_the_profile_and_the_names():
                       ["ref", "nl"], ["channel", "mail"]]
 
 
+def test_extras_never_carry_attribution_nor_repeat_a_tag():
+    """Codex doc-15: stored before the save-time refusal existed, still dropped."""
+    params = link_params({"utm_source": "nl", "utm_extra": "nl_content=42\nutm_source=other\nref=x"},
+                         "Spring", "A")
+    assert params == [["utm_source", "nl"], ["utm_campaign", "spring"], ["utm_content", "a"], ["ref", "x"]]
+    assert "nl_content" not in tag_params('<a href="https://a.test/">x</a>', [["nl_content", "42"]])
+
+
 def test_a_links_own_keys_are_kept_and_other_links_are_left_alone():
     html = ('<a href="https://shop.test/x?utm_source=partner&a=1">x</a>'
             '<a href="mailto:hi@example.test">m</a><a href="#top">t</a>')
@@ -107,6 +115,7 @@ def test_an_escaped_ampersand_in_a_link_stays_a_separator():
 @pytest.mark.parametrize("values, field", [
     ({"font_family": "Arial; } body { display:none"}, "font_family"),
     ({"utm_extra": "no equals sign"}, "utm_extra"),
+    ({"utm_extra": "ref=nl\nnl_content=42"}, "utm_extra"),   # click attribution is the platform's
 ])
 def test_values_that_would_break_css_or_links_are_refused(values, field):
     with pytest.raises(profiles.ProfileInvalid) as refused:

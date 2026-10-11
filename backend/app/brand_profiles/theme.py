@@ -10,6 +10,7 @@ from the profile and the campaign's and variant's names.
 import re
 
 from app.brand_profiles.structure import profile_structure
+from app.rendering.tracking import CONTENT_PARAM
 
 #: Field types whose values may go into CSS. A text, url or image field named
 #: in brand.css always falls back: free text never reaches a stylesheet.
@@ -55,10 +56,17 @@ def link_params(values: dict | None, campaign_name: str | None, variant_name: st
         params.append(["utm_campaign", campaign])
     if content := slug(variant_name):
         params.append(["utm_content", content])
+    taken = {key for key, _ in params}
     for line in str(values.get("utm_extra") or "").splitlines():
         key, _, value = line.strip().partition("=")
-        if key:
+        # Never the click-attribution parameter (ADR-182 point 3, Codex doc-15):
+        # a profile's extras go on every module link, so `nl_content` there
+        # would credit content to a header, footer or button. Nor a key set
+        # above. Dropped here as well as refused on save, because a value saved
+        # before the refusal existed must not attribute either.
+        if key and key != CONTENT_PARAM and key not in taken:
             params.append([key, value])
+            taken.add(key)
     return params
 
 

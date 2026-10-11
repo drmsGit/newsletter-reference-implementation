@@ -58,7 +58,9 @@ def with_params(url: str, params: list) -> str:
     parts = urlsplit(url)
     query = parse_qsl(parts.query, keep_blank_values=True)
     present = {k for k, _ in query}
-    query += [(k, v) for k, v in params if k not in present]
+    # Attribution is `tag_links`'s alone, inside a content-bound module:
+    # profile parameters never carry it (ADR-182 point 3).
+    query += [(k, v) for k, v in params if k not in present and k != CONTENT_PARAM]
     return urlunsplit(parts._replace(query=urlencode(query)))
 
 
