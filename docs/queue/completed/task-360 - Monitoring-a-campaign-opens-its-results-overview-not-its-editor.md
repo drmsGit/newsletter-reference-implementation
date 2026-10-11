@@ -1,10 +1,10 @@
 ---
 id: TASK-360
 title: 'Monitoring: a campaign opens its results overview, not its editor'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-11 10:01'
-updated_date: '2026-10-11 16:27'
+updated_date: '2026-10-11 16:33'
 labels:
   - frontend
   - backend
@@ -34,9 +34,9 @@ ordinal: 209800
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Choosing a campaign on Monitoring opens a results overview
-- [ ] #2 A sent campaign shows its delivery figures and click rate; an unsent one what is planned and what is missing
-- [ ] #3 The scope is decided against task-58
+- [x] #1 Choosing a campaign on Monitoring opens a results overview
+- [x] #2 The scope is decided against task-58
+- [x] #3 A sent campaign shows its delivery figures and click rate; the unsent half was dropped by the user on 2026-10-11 (nothing is shown for unsent sends)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -45,4 +45,12 @@ ordinal: 209800
 2026-10-11, the user, an alternative to a new screen: Monitoring may keep linking to the campaign page, if the campaign page itself shows the scheduled data (not sent yet) and/or a limited set of KPIs (sent). Then no extra screen is needed. The information does not have to be always visible: it can be a collapsible section on the campaign page. This answers the final-design pass's first open question (a new screen or the campaign page) in favour of the campaign page, unless the pass finds a reason against it.
 
 2026-10-11, task-58's design pass (ADR-196) settled this task's scope: the campaign page's collapsible Results section is the overview, and Monitoring keeps linking to the campaign. Built in commit 4e59ed6. The user decided nothing is shown for unsent sends, so AC #2's planned-and-missing half is dropped; a dry-run readiness check would be its own task if wanted. What may remain here: nothing, unless the user wants Monitoring's rows to carry a figure.
+
+Closed 2026-10-11 as covered by task-58 (commit 4e59ed6, ADR-196): Monitoring links to the campaign page, whose collapsible Results section is the overview. Verified there: live check from Monitoring on Demo Campaign 2 showed the section; tests/test_campaign_results.py and CampaignDetail.test.tsx cover the figures.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Covered by task-58: the campaign page's collapsible Results section is this overview (ADR-196); Monitoring keeps linking to the campaign. The unsent half was dropped by the user. Verified by task-58's tests and its live check opened from Monitoring.
+<!-- SECTION:FINAL_SUMMARY:END -->
