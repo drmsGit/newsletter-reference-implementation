@@ -132,14 +132,18 @@ class TestReading:
 
     def test_the_list_puts_the_default_first_and_says_what_is_missing(self, db):
         with admin(db) as (cookied, headers):
-            _create(cookied, headers, name="Aaa first by name",
+            _create(cookied, headers, name="Aab complete",
                     field_values={**LEGAL, "unsubscribe_text": "Unsubscribe"})
+            _create(cookied, headers, name="Aaa incomplete", field_values={"imprint_url": LEGAL["imprint_url"]})
             page = cookied.get("/brand-profiles/").json()
-        first, second = page["items"][:2]
-        assert first["is_default"] and first["complete"] is False
-        assert "legal_company_name" in first["missing"]
-        assert second["name"] == "Aaa first by name"
-        assert second["complete"] is True and second["missing"] == []
+        first, second, third = page["items"][:3]
+        # The default leads whatever its name; the rest follow by name.
+        assert first["is_default"]
+        assert (second["name"], third["name"]) == ("Aaa incomplete", "Aab complete")
+        assert second["complete"] is False
+        assert second["missing"] == ["legal_company_name", "legal_address", "privacy_url",
+                                     "unsubscribe_text"]
+        assert third["complete"] is True and third["missing"] == []
 
     def test_another_brands_profile_is_not_found(self, db, foreign_brand):
         other = profiles.ensure_default_profile(db, foreign_brand.id)

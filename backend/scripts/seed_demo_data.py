@@ -66,6 +66,30 @@ random.seed(42)
 NOW = datetime.now(timezone.utc)
 
 
+def _complete_demo_profile(db, brand_id: int, company: str) -> None:
+    """Fill the legal details of a demo brand's default profile (ADR-194).
+
+    **Only the fields still empty**: `_truncate` leaves brands and their
+    profiles alone, so on the dev database a reseed must not overwrite what
+    somebody typed into the profile screen. The values are example.test
+    placeholders, which is what makes them safe to send in a demo.
+    """
+    from app.brand_profiles.service import ensure_default_profile
+
+    profile = ensure_default_profile(db, brand_id)
+    values = dict(profile.field_values or {})
+    for name, value in {
+        "legal_company_name": f"{company} (demo)",
+        "legal_address": "Example Street 1\n10115 Example City",
+        "imprint_url": "https://example.test/imprint",
+        "privacy_url": "https://example.test/privacy",
+        "unsubscribe_text": "Unsubscribe",
+    }.items():
+        values.setdefault(name, value)
+    profile.field_values = values
+    db.commit()
+
+
 def _truncate(db):
     db.execute(text("""
         TRUNCATE TABLE
@@ -117,6 +141,7 @@ def seed(extended: bool = False):
         # exercising the degenerate case ADR-150 point 4 promises is free.
         global BRAND_ID
         BRAND_ID = ensure_default_brand(db).id
+        _complete_demo_profile(db, BRAND_ID, "Example Travel GmbH")
 
         # --- categories -------------------------------------------------
         cat = {}
@@ -523,6 +548,7 @@ def _seed_extras(db, recipients, cat, slots) -> None:
     if brand_b is None:
         brand_b = BrandDB(key="demo-b", name="Demo Brand B")
         db.add(brand_b); db.commit()
+    _complete_demo_profile(db, brand_b.id, "Example Brand B GmbH")
     admin = db.query(RoleDB).filter(RoleDB.key == "admin").first()
     if admin is not None:
         for assignment in db.query(RoleAssignmentDB).filter(
