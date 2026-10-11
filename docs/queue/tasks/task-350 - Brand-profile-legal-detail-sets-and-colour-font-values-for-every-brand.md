@@ -1,13 +1,13 @@
 ---
 id: TASK-350
 title: >-
-  Brand profiles: setup file, profiles per brand, chosen on the variant, legal
-  details on every email
+  Brand profiles 1a: the setup file, profiles per brand with their screens,
+  chosen on the variant
 status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-10 21:17'
-updated_date: '2026-10-11 08:42'
+updated_date: '2026-10-11 09:00'
 labels:
   - backend
   - frontend
@@ -43,11 +43,59 @@ Not in this slice: filling brand.css and the templates (slice 2), header and foo
 <!-- AC:BEGIN -->
 - [ ] #1 A setup file declares the profile's fields; the core legal and unsubscribe fields are always present
 - [ ] #2 A brand can hold several profiles; one is the default; profiles can be duplicated and deleted, falling back to the default
-- [ ] #3 A variant chooses a profile; the snapshot freezes its values
-- [ ] #4 Every email's fixed footer shows the profile's legal details; a marketing email also shows its unsubscribe text with the platform's link
-- [ ] #5 A send is refused while the variant's profile lacks a required field
-- [ ] #6 Profile changes need the per-brand permission and are audited
+- [ ] #3 Profile changes need the per-brand permission and are audited
+- [ ] #4 Every brand has a default profile; existing brands get an English 'Default' one by migration
+- [ ] #5 A variant chooses a profile (default preselected); a copied variant keeps it within the brand and takes the target brand's default across brands
+- [ ] #6 Managers edit profiles in a screen built from the setup file; incomplete profiles say which fields are missing
+- [ ] #7 A profile cannot be created as transactional yet (task-355)
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Final-design pass 2026-10-11 (Plan agent map plus the user's decisions). Split by effect: THIS task is 1a, 'profiles exist', with no change to any sent email. 1b, 'every email carries them', is task-357.
+
+1a lands in:
+1. Setup file: new backend/app/brand_profiles/structure.py.
+   - CORE_FIELDS: legal_company_name, legal_address, imprint_url, privacy_url, unsubscribe_text.
+   - FIELD_TYPES: colour, font_family, size, image, text, url, number.
+   - storage/brand_profile.json is shaped like storage/fields.json ({_comment, fields}) and ships with empty fields.
+   - Loading follows the module registry: mtime refresh, _refuse_unknown, assert_structure_loads() at startup in main.py next to assert_manifests_load. Field names must match [a-z][a-z0-9_]*. The file may relabel or regroup a core field, never change its type or required flag.
+2. Model: brand_profiles (id, brand_id FK, name, language, kind CHECK marketing/transactional, is_default, field_values JSON default {}, created_at, updated_at).
+   - UNIQUE(brand_id, name), and a partial unique index for one default per brand (pattern: overrides/db_models.py).
+   - variants.brand_profile_id is a nullable FK; NULL reads as the brand's default.
+   - variants.brand_profile_notice String(255) (D6): set when a delete re-points the variant, cleared when a profile is picked.
+   - Migration 0044: table, indexes, one 'Default' profile per brand (language en, marketing, unsubscribe_text 'Unsubscribe'), and a backfill of variants via raw SQL.
+   - ensure_default_profile() runs in create_brand, ensure_default_brand and bootstrap.
+   - Brand delete: profiles are DELETED_WITH_BRAND, not counted in brand_holders().
+3. Permission brand_profiles.manage (BRAND_SCOPED; Admin automatic, Manager not by default). The transactional permission is NOT declared yet (task-355).
+   - Policy: ('/brand-profiles', BRAND_PROFILES_MANAGE) and a BRAND_OWNED reason.
+   - Writes are people only.
+   - Audit brand_profile.created/updated/duplicated/deleted/made_default, recording changed field NAMES only, never values (the audit email check would raise; D8).
+4. API /brand-profiles:
+   - structure; paged list with complete/missing; get; create; PUT with If-Match; duplicate ('X (copy)', marketing); make-default; delete.
+   - Delete: 409 for the default; otherwise re-point variants to the default with a notice.
+   - Values are checked by type; incomplete profiles may be saved.
+   - kind 'transactional' is refused with 422 until task-355 (D2).
+5. Variant:
+   - brand_profile_id on the Variant, VariantCreate and VariantUpdate models, checked to belong to the brand.
+   - Defaults on create_campaign and create_variant_for_campaign.
+   - _copy_variant_into: same brand copies the profile, another brand takes the target's default.
+   - campaign_composition reports brand_profile {id, name, language, kind, is_default, missing, notice}.
+6. Frontend:
+   - BrandProfiles.tsx (list) and BrandProfileDetail.tsx (form from the structure, explicit Save, If-Match).
+   - Routes, a nav entry (g b), the variant editor dropdown with incomplete and fallback notices, hooks, regenerated schema.d.ts, screen inventory.
+7. Seed and fixtures: seed_demo_data fills complete example.test profiles for the default brand and demo-b; temp_brand creates a complete profile; conftest cleanup; test_brand_scoping and test_permission_split updated.
+
+Decided by the user 2026-10-11:
+- D7: unsent snapshots made before profiles are refused (in 1b).
+- D4: migrated defaults are English, 'Unsubscribe'.
+- D5: Imprint and Privacy labels come from a built-in per-language table (en/de, fallback en); the whole unsubscribe text is the link.
+- D1: required are legal name, address, imprint URL and privacy URL always, plus unsubscribe text on marketing; the setup file can never make a core field optional.
+- Split: 1a then 1b.
+
+Agreed technical defaults: writes people only; refuse at send, not at snapshot (D9); the shipped file has no extra fields (D10); a dated ADR-194 addendum records this pass (D12).
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
@@ -111,4 +159,6 @@ Open for the final-design pass:
 Second of three build tasks from task-301.
 
 2026-10-11, revised after reading docs/design/DESIGN.md: Q6 is narrowed by the user to the LOGO only. The manager app keeps one palette and its Plex fonts per installation, so the design's teal (system) and ochre (human) keep their meaning; task-356 is rescoped accordingly. The design draft covers only the manager app; emails are out of its scope, so the profile's email fields still come from the setup file.
+
+2026-10-11: rescoped to 1a after the final-design pass. The criteria about freezing, the footer on every email and refusing sends moved to task-357 (1b).
 <!-- SECTION:NOTES:END -->
