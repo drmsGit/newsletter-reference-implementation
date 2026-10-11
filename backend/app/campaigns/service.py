@@ -160,6 +160,8 @@ def to_variant(record: VariantDB, db: Session) -> Variant:
         name=record.name,
         envelope=envelope,
         status=record.status,
+        brand_profile_id=record.brand_profile_id,
+        brand_profile_notice=record.brand_profile_notice,
         created_at=record.created_at,
         updated_at=record.updated_at,
     )
@@ -217,6 +219,9 @@ def create_campaign(
     #
     # Before anything is written, so a refusal leaves no row behind.
     _refuse_unavailable_channel(db, channel)
+    # Before the campaign too: making a missing default commits.
+    from app.brand_profiles.service import profile_id_for_variant
+    profile_id = profile_id_for_variant(db, brand_id, None)
 
     # A campaign must always have a variant (invariant) — flush (not commit)
     # after the campaign insert so campaign.id is assigned without ending
@@ -237,6 +242,7 @@ def create_campaign(
         channel=channel,
         name=initial_variant_name,
         status="draft",
+        brand_profile_id=profile_id,
     )
 
     db.add(initial_variant)
@@ -284,6 +290,7 @@ def create_variant_for_campaign(
     status: str = "draft",
     *,
     brand_id: int,
+    brand_profile_id: int | None = None,
 ) -> Variant:
     """Add a variant. **The channel is chosen here and never again** (ADR-160
     point 5): switching an email variant to push would invalidate its modules,
@@ -311,11 +318,17 @@ def create_variant_for_campaign(
     # 5), so this is the only moment it can be refused at all.
     _refuse_unavailable_channel(db, channel)
 
+    # The brand's own profile or its default (ADR-194 point 4);
+    # `ProfileNotFound` for another brand's.
+    from app.brand_profiles.service import profile_id_for_variant
+    profile_id = profile_id_for_variant(db, brand_id, brand_profile_id)
+
     variant = VariantDB(
         campaign_id=campaign_id,
         channel=channel,
         name=name,
         status=status,
+        brand_profile_id=profile_id,
     )
 
     db.add(variant)
@@ -367,13 +380,22 @@ def update_variant(
     *,
     brand_id: int,
     expected_updated_at: datetime | None = None,
+    brand_profile_id: int | None = None,
 ) -> Variant | None:
     """Rename the variant and, when `envelope` is given, replace its envelope
-    copy. `None` leaves the envelope as it is: renaming is not clearing."""
+    copy. `None` leaves the envelope as it is: renaming is not clearing. The
+    same for `brand_profile_id`; picking one, even the same, clears the
+    fallback notice, because the manager has now chosen."""
+    from app.brand_profiles.service import profile_id_for_variant
+
     variant = get_variant(db, variant_id, brand_id=brand_id)
     if variant is None:
         return None
     refuse_stale(db, variant, expected_updated_at, "variant")
+    if brand_profile_id is not None:
+        # Checked before anything changes: `ProfileNotFound` for another brand's.
+        variant.brand_profile_id = profile_id_for_variant(db, brand_id, brand_profile_id)
+        variant.brand_profile_notice = None
     variant.name = name
     # Moved by hand: the envelope lives in the header module, so an edit to it
     # alone leaves this row clean and `onupdate` never fires — two editors
@@ -1295,6 +1317,7 @@ def campaign_composition(db: Session, campaign_id: int, *, brand_id: int) -> dic
     from app.modules.registry import envelope_module_type, get_manifest, list_manifests
     from app.overrides.service import get_active_content_override, is_overrideable
     from app.campaigns.fence import view as fence_view
+    from app.brand_profiles.service import missing as profile_missing, profile_of_variant
 
     campaign = get_campaign(db, campaign_id, brand_id=brand_id)
     if campaign is None:
@@ -1338,8 +1361,14 @@ def campaign_composition(db: Session, campaign_id: int, *, brand_id: int) -> dic
             is_envelope = bool(manifest and any(v.envelope for v in manifest.variables))
             (envelope_modules if is_envelope else modules).append(row)
         limit = max_modules_for(variant.channel)
+        profile = profile_of_variant(db, variant, brand_id)
         variants.append({
             "variant": to_variant(variant, db), "fence": fence_view(variant),
+            "brand_profile": {
+                "id": profile.id, "name": profile.name, "language": profile.language,
+                "kind": profile.kind, "is_default": profile.is_default,
+                "missing": profile_missing(profile), "notice": variant.brand_profile_notice,
+            },
             "module_limit": limit,
             "can_add_module": limit is None or len(modules) < limit,
             "has_envelope": envelope_module_type(variant.channel) is not None,

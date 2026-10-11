@@ -21,6 +21,12 @@ class Variant(BaseModel):
     # of every channel answered with them.
     envelope: dict[str, str] = {}
     status: str = "draft"
+    # The brand profile it uses (ADR-194 point 4). None only on rows built
+    # outside the services, which read as the brand's default.
+    brand_profile_id: int | None = None
+    # Set when its profile was deleted and it fell back to the default;
+    # cleared when a manager picks one (ADR-194 point 1).
+    brand_profile_notice: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -33,6 +39,8 @@ class VariantCreate(BaseModel):
     # `campaigns.service.VARIANT_STATUSES` (task-203). The read model `Variant`
     # keeps `str`, since rows written before the rule may hold other values.
     status: Literal["draft", "ready"] = "draft"
+    # One of the working brand's profiles; left out, the brand's default.
+    brand_profile_id: int | None = None
 
 
 class VariantUpdate(BaseModel):
@@ -40,6 +48,9 @@ class VariantUpdate(BaseModel):
     # Replaces the whole envelope when sent; left out, the envelope is untouched.
     # A blank field clears it.
     envelope: dict[str, str | None] | None = None
+    # One of the working brand's profiles; left out, the profile stays as it
+    # is. Picking one clears the fallback notice.
+    brand_profile_id: int | None = None
 
 
 class Campaign(BaseModel):
@@ -472,8 +483,21 @@ class VariantFence(BaseModel):
     active: bool
 
 
+class ComposedBrandProfile(BaseModel):
+    """The profile a variant uses, as the editor shows it (task-350)."""
+
+    id: int
+    name: str
+    language: str
+    kind: str
+    is_default: bool
+    missing: list[str] = Field(description="Required fields the profile still lacks")
+    notice: str | None = Field(None, description="Why it changed without the manager choosing it")
+
+
 class ComposedVariant(BaseModel):
     variant: Variant
+    brand_profile: ComposedBrandProfile
     fence: VariantFence | None = None
     # None: the channel sets no limit.
     module_limit: int | None = None

@@ -523,6 +523,10 @@ def _copy_variant_into(
         # copies like any other. Copying the columns too would restore the
         # second source of truth that point exists to remove.
         status="draft",
+        # Kept inside one brand; across brands, the target's default, which a
+        # manager changes afterwards (ADR-194 point 4). Never the source's
+        # profile in another brand: a variant only uses its own brand's looks.
+        brand_profile_id=_profile_for_copy(db, source_variant, target_brand_id),
     )
     db.add(variant)
     db.flush()
@@ -604,6 +608,18 @@ def _copy_variant_into(
                 f"{source_variant.name} → module {index} ({source_module.module_type}): {key}"
             )
     return variant
+
+
+def _profile_for_copy(db: Session, source_variant: VariantDB, target_brand_id: int) -> int:
+    from app.brand_profiles.db_models import BrandProfileDB
+    from app.brand_profiles.service import ensure_default_profile
+
+    if source_variant.brand_profile_id is not None:
+        source = db.get(BrandProfileDB, source_variant.brand_profile_id)
+        if source is not None and source.brand_id == target_brand_id:
+            return source.id
+    # Inside the caller's transaction: flushed, never committed.
+    return ensure_default_profile(db, target_brand_id, commit=False).id
 
 
 def _carried_override_count(db: Session, variant_ids: list[int]) -> int:

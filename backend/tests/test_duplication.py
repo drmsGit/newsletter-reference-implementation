@@ -158,6 +158,11 @@ def _purge_brand(db, brand_id: int) -> None:
     db.query(AuditEventDB).filter(AuditEventDB.brand_id == brand_id).delete(
         synchronize_session=False
     )
+    # A copy into a brand without a profile gives it its default (ADR-194).
+    from app.brand_profiles.db_models import BrandProfileDB
+    db.query(BrandProfileDB).filter(BrandProfileDB.brand_id == brand_id).delete(
+        synchronize_session=False
+    )
     db.commit()
 
 

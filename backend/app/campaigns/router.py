@@ -6,6 +6,7 @@ from app.auth.permissions import CAMPAIGNS_MANAGE
 from app.auth.dependencies import auth_is_enforced, request_principal, working_brand
 from app.pagination import Page, PageParams, page_of_list, page_params
 from app.database import get_db
+from app.brand_profiles.service import ProfileNotFound
 from app.campaigns import duplication, fence
 from app.campaigns.db_models import CampaignDB
 from app.campaigns.models import (
@@ -95,6 +96,14 @@ def _expected(if_match: str | None):
             status_code=400,
             detail="If-Match must be the updated_at you read, as an ISO 8601 timestamp",
         )
+
+
+def _profile_refused(error: "ProfileNotFound") -> HTTPException:
+    """422 on the field, in FastAPI's shape: the variant is there; the profile
+    asked for is not one of this brand's (ADR-194 point 4)."""
+    return HTTPException(status_code=422, detail=[
+        {"loc": ["body", "brand_profile_id"], "msg": "Not a brand profile of this brand.",
+         "type": "value_error"}])
 
 
 def _stale(error: StaleWrite) -> HTTPException:
@@ -219,7 +228,10 @@ def create_campaign_variant(
             envelope=payload.envelope,
             status=payload.status,
             brand_id=brand_id,
+            brand_profile_id=payload.brand_profile_id,
         )
+    except ProfileNotFound as error:
+        raise _profile_refused(error)
     except ChannelUnavailable as error:
         # 400, not 404: the campaign is right there and the request is
         # well-formed — the channel is switched off (ADR-160 point 8).
@@ -577,14 +589,18 @@ def update_variant_record(
             envelope=payload.envelope,
             brand_id=brand_id,
             expected_updated_at=_expected(if_match),
+            brand_profile_id=payload.brand_profile_id,
         )
     except StaleWrite as error:
         raise _stale(error)
+    except ProfileNotFound as error:
+        raise _profile_refused(error)
     if updated is None:
         raise HTTPException(status_code=404, detail="Variant not found")
     audit.record_from_request(
         request, db, audit.VARIANT_UPDATED, subject_type="variant", subject_id=variant_id,
-        detail={"name": updated.name, "envelope": updated.envelope},
+        detail={"name": updated.name, "envelope": updated.envelope,
+                "brand_profile_id": updated.brand_profile_id},
     )
     fence.touch(db, request, variant_id=variant_id)
     return updated

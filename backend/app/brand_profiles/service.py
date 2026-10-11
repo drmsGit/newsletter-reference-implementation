@@ -16,8 +16,10 @@ DEFAULT_PROFILE_NAME = "Default"
 DEFAULT_VALUES = {"unsubscribe_text": "Unsubscribe"}
 
 
-def ensure_default_profile(db: Session, brand_id: int) -> BrandProfileDB:
-    """The brand's default profile, made if it has none. Commits when it makes one.
+def ensure_default_profile(db: Session, brand_id: int, *, commit: bool = True) -> BrandProfileDB:
+    """The brand's default profile, made if it has none. Commits when it makes
+    one, unless `commit` is False: then it is only flushed, inside a savepoint,
+    for a caller whose transaction must stay open (a duplication).
 
     Two callers racing here both try to insert; the partial unique index lets
     one through, and the other reads the winner's row.
@@ -29,6 +31,13 @@ def ensure_default_profile(db: Session, brand_id: int) -> BrandProfileDB:
         brand_id=brand_id, name=DEFAULT_PROFILE_NAME, language="en", kind="marketing",
         is_default=True, field_values=dict(DEFAULT_VALUES),
     )
+    if not commit:
+        try:
+            with db.begin_nested():
+                db.add(profile)
+        except IntegrityError:
+            return _default(db, brand_id)
+        return profile
     db.add(profile)
     try:
         db.commit()
@@ -330,3 +339,25 @@ def _commit_or_taken(db: Session, name: str) -> None:
     except IntegrityError:
         db.rollback()
         raise _taken(name)
+
+
+# --- a variant's profile (ADR-194 point 4) ----------------------------------
+
+def profile_id_for_variant(db: Session, brand_id: int, profile_id: int | None, *,
+                           commit: bool = True) -> int:
+    """The profile a variant in this brand will use: the one asked for, which
+    must be this brand's (`ProfileNotFound` otherwise), or the default."""
+    if profile_id is None:
+        return ensure_default_profile(db, brand_id, commit=commit).id
+    return get_profile(db, profile_id, brand_id).id
+
+
+def profile_of_variant(db: Session, variant, brand_id: int) -> BrandProfileDB:
+    """The profile a variant uses. NULL reads as the brand's default, and so
+    does a profile of another brand, which no service writes: a variant never
+    shows a look its brand does not own."""
+    if variant.brand_profile_id is not None:
+        profile = db.get(BrandProfileDB, variant.brand_profile_id)
+        if profile is not None and profile.brand_id == brand_id:
+            return profile
+    return ensure_default_profile(db, brand_id)
