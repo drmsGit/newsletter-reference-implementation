@@ -136,6 +136,10 @@ class DecisionSlotDB(Base):
     decision_strategy = Column(String(100), nullable=False, default="top_score")
     candidate_filter = Column(JSON, nullable=True)
     strategy_config = Column(JSON, nullable=True)
+    # "Show up to": how many picks the slot's module shows, 1-5, best first
+    # (ADR-084 addendum 2026-10-11). A push slot is always 1 — a push is one
+    # notification — which the service holds, since the channel is the
+    # variant's. Read at send time like the strategy and filter.
     max_results = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(
@@ -143,6 +147,10 @@ class DecisionSlotDB(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+    )
+
+    __table_args__ = (
+        CheckConstraint("max_results BETWEEN 1 AND 5", name="ck_decision_slots_max_results"),
     )
 
 
@@ -160,6 +168,12 @@ class DecisionResolutionDB(Base):
     content_version_id = Column(Integer, ForeignKey("content_versions.id"), nullable=True)
     reason = Column(String(255), nullable=True)
     score = Column(Float, nullable=True)
+    # One pick of a ranked set (ADR-084 addendum 2026-10-11, task-109): `rank`
+    # is its place, 1 first; `pick_set` is shared by the rows one execution
+    # wrote. A row from before sets has none and is a set of one at rank 1.
+    # Read through `app.decision.sets`, never by taking the latest row.
+    rank = Column(Integer, nullable=False, default=1, server_default="1")
+    pick_set = Column(String(32), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # **Slot, then recipient — measured 2026-09-29 (task-11, migration 0023).**
@@ -177,4 +191,5 @@ class DecisionResolutionDB(Base):
     # separate, measured decision — not taken here.
     __table_args__ = (
         Index("ix_decision_resolutions_slot_recipient", "decision_slot_id", "recipient_id"),
+        Index("ix_decision_resolutions_pick_set", "pick_set", postgresql_where=text("pick_set IS NOT NULL")),
     )

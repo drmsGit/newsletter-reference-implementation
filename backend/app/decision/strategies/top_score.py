@@ -4,7 +4,8 @@ from app.campaigns.db_models import DecisionSlotDB
 from app.content.db_models import ContentCategoryAssignmentDB, ContentRecordDB
 from app.content.service import get_latest_version_for_content
 from app.decision.strategies.base import (
-    ConfigField, DecisionStrategy, StrategyMeta, StrategyResult, candidate_query, sending_brand_id,
+    ConfigField, DecisionStrategy, StrategyMeta, StrategyResult, best_per_record, candidate_query,
+    sending_brand_id,
 )
 
 
@@ -31,12 +32,15 @@ class TopScoreStrategy(DecisionStrategy):
             config_fields=[],
         )
 
-    def execute(
+    def rank(
         self,
         db: Session,
         slot: DecisionSlotDB,
         recipient_id: int | None = None,
-    ) -> StrategyResult | None:
+        *,
+        limit: int = 1,
+        exclude: frozenset[int] = frozenset(),
+    ) -> list[StrategyResult]:
         candidate_filter = slot.candidate_filter or {}
         category_ids = candidate_filter.get("category_ids", [])
 
@@ -47,22 +51,24 @@ class TopScoreStrategy(DecisionStrategy):
 
         query = candidate_query(db, slot, brand_id=brand_id)
 
-        result = query.order_by(
+        # Highest category score first, then the lowest id — the order the
+        # single pick always had, now read past its first row (task-109).
+        rows = query.order_by(
             ContentCategoryAssignmentDB.score.desc(),
             ContentRecordDB.id.asc(),
-        ).first()
+        ).all()
 
-        if result is None:
-            return None
-
-        content_record, score, _category_id = result
-        latest_version = get_latest_version_for_content(
-            db=db, content_record_id=content_record.id, brand_id=brand_id
-        )
-
-        return StrategyResult(
-            content_record_id=content_record.id,
-            content_version_id=latest_version.id if latest_version else None,
-            score=float(score),
-            reason=f"top_score: highest scored content in category_ids={category_ids}",
-        )
+        picks = []
+        for rank, (content_record, score, _category_id) in enumerate(
+                best_per_record(rows, lambda row: row[0].id, exclude, limit), start=1):
+            latest_version = get_latest_version_for_content(
+                db=db, content_record_id=content_record.id, brand_id=brand_id
+            )
+            picks.append(StrategyResult(
+                content_record_id=content_record.id,
+                content_version_id=latest_version.id if latest_version else None,
+                score=float(score),
+                reason=(f"top_score: highest scored content in category_ids={category_ids}"
+                        + (f", rank {rank}" if limit > 1 else "")),
+            ))
+        return picks

@@ -1,8 +1,11 @@
+import uuid
+
 from sqlalchemy.orm import Session
 
 from app.campaigns.db_models import DecisionSlotDB, DecisionResolutionDB, VariantDB
 from app.campaigns.models import DecisionResolution
 from app.campaigns.service import create_decision_resolution, to_decision_resolution
+from app.decision.sets import own_set
 from app.decision.strategies.base import sending_brand_id
 from app.decision.strategies.registry import get_strategy
 from app.recipients.db_models import RecipientDB
@@ -15,7 +18,16 @@ def execute_decision_slot(
     recipient_id: int | None = None,
     *,
     brand_id: int | None = None,
+    exclude: frozenset[int] = frozenset(),
 ) -> DecisionResolution | None:
+    """Resolve the slot for a recipient and store its ranked set of picks —
+    up to the slot's "show up to" (ADR-084 addendum 2026-10-11, task-109).
+    Returns the first pick, or None when nothing was found; the whole set is
+    read through `app.decision.sets`.
+
+    `exclude`: records an earlier slot in the same email already shows to
+    this recipient, which this slot passes over for its next candidates.
+    """
     # **Optional here and required by the route**, the same split rendering
     # takes. A request resolving a slot must not reach another brand's; the
     # send path already holds the brand it locked and would only be
@@ -61,45 +73,47 @@ def execute_decision_slot(
             f"Strategy '{slot.decision_strategy}' requires a recipient_id"
         )
 
-    result = strategy.execute(db=db, slot=slot, recipient_id=recipient_id)
+    limit = min(max(slot.max_results or 1, 1), 5)
+    if strategy.meta.requires_recipient:
+        return _store(db, slot, recipient_id,
+                      strategy.rank(db, slot, recipient_id, limit=limit, exclude=exclude))
 
-    if result is None:
+    # A global slot keeps one set for everyone, stored as always. Only when an
+    # earlier slot in this email already shows one of its picks does this
+    # recipient get a set of their own, re-ranked without those records; once
+    # that stops being so, the own set goes, so it can never hide the current
+    # global one (ADR-084 addendum 2026-10-11, point 4).
+    results = strategy.rank(db, slot, None, limit=limit)
+    head = _store(db, slot, None, results)
+    if recipient_id is None:
+        return head
+    if exclude & {r.content_record_id for r in results}:
+        return _store(db, slot, recipient_id, strategy.rank(db, slot, None, limit=limit, exclude=exclude))
+    db.query(DecisionResolutionDB).filter(
+        DecisionResolutionDB.decision_slot_id == slot.id,
+        DecisionResolutionDB.recipient_id == recipient_id,
+    ).delete(synchronize_session=False)
+    db.commit()
+    return head
+
+
+def _store(db: Session, slot: DecisionSlotDB, owner: int | None, results: list) -> DecisionResolution | None:
+    """Keep `results` as the slot's set for `owner` (None: the global set)
+    and return its first pick, or None when there are none.
+
+    A personalised set only gets new rows when the outcome changed since the
+    owner's last one — "no new signal, keep the last recommendation" —
+    instead of an ever-growing per-person history. The global set is updated
+    in place, never duplicated."""
+    if not results:
         return None
+    current = own_set(db, slot.id, owner)
 
-    # Non-personalized strategies (recipient_id=NULL) keep exactly one
-    # resolution row per slot — a re-run always updates it in place, never
-    # inserts a duplicate. Personalized strategies only get a new row when
-    # the outcome actually changed since the recipient's last resolution —
-    # "no new signal, keep the last recommendation" — instead of
-    # accumulating an unbounded, ever-growing per-person history.
-    effective_recipient_id = recipient_id if strategy.meta.requires_recipient else None
-    new_score = result.score
+    def shape(rows):
+        return [(r.content_record_id, r.content_version_id, r.score) for r in rows]
 
-    latest = (
-        db.query(DecisionResolutionDB)
-        .filter(
-            DecisionResolutionDB.decision_slot_id == slot.id,
-            DecisionResolutionDB.recipient_id == effective_recipient_id,
-        )
-        .order_by(DecisionResolutionDB.created_at.desc())
-        .first()
-    )
-
-    if latest is not None and (
-        latest.content_record_id == result.content_record_id
-        and latest.content_version_id == result.content_version_id
-        and latest.score == new_score
-    ):
-        return to_decision_resolution(latest)
-
-    if not strategy.meta.requires_recipient and latest is not None:
-        latest.content_record_id = result.content_record_id
-        latest.content_version_id = result.content_version_id
-        latest.reason = result.reason
-        latest.score = new_score
-        db.commit()
-        db.refresh(latest)
-        return to_decision_resolution(latest)
+    if current and shape(current) == shape(results):
+        return to_decision_resolution(current[0])
 
     # **Resolved from the slot, not from a caller.** Executing a slot happens
     # at send time and from the UI, neither of which should be able to tell a
@@ -107,13 +121,45 @@ def execute_decision_slot(
     # knows (ADR-172 point 5's resolver half).
     from app.campaigns.service import brand_of_variant
 
-    return create_decision_resolution(
-        db=db,
-        brand_id=brand_of_variant(db, slot.variant_id),
-        decision_slot_id=slot.id,
-        recipient_id=effective_recipient_id,
-        content_record_id=result.content_record_id,
-        content_version_id=result.content_version_id,
-        reason=result.reason,
-        score=new_score,
-    )
+    if owner is None and current:
+        pick_set = current[0].pick_set or uuid.uuid4().hex
+        for rank, result in enumerate(results, start=1):
+            if rank <= len(current):
+                row = current[rank - 1]
+                row.content_record_id = result.content_record_id
+                row.content_version_id = result.content_version_id
+                row.reason = result.reason
+                row.score = result.score
+                row.rank, row.pick_set = rank, pick_set
+            else:
+                db.add(DecisionResolutionDB(
+                    decision_slot_id=slot.id, recipient_id=None, content_record_id=result.content_record_id,
+                    content_version_id=result.content_version_id, reason=result.reason, score=result.score,
+                    rank=rank, pick_set=pick_set,
+                ))
+        for surplus in current[len(results):]:
+            db.delete(surplus)
+        db.commit()
+        db.refresh(current[0])
+        return to_decision_resolution(current[0])
+
+    pick_set = uuid.uuid4().hex
+    brand = brand_of_variant(db, slot.variant_id)
+    made = [
+        create_decision_resolution(
+            db=db,
+            brand_id=brand,
+            decision_slot_id=slot.id,
+            recipient_id=owner,
+            content_record_id=result.content_record_id,
+            content_version_id=result.content_version_id,
+            reason=result.reason,
+            score=result.score,
+            rank=rank,
+            pick_set=pick_set,
+            commit=False,
+        )
+        for rank, result in enumerate(results, start=1)
+    ]
+    db.commit()
+    return made[0]

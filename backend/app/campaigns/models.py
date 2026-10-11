@@ -185,7 +185,9 @@ class DecisionSlotCreate(BaseModel):
     decision_strategy: str = "top_score"
     candidate_filter: dict[str, Any] | None = None
     strategy_config: dict[str, Any] | None = None
-    max_results: int = 1
+    # "Show up to": 1-5 picks, best first; a push slot is always 1 (ADR-084
+    # addendum 2026-10-11).
+    max_results: int = Field(1, ge=1, le=5)
 
 
 class ModuleInstanceUpdate(BaseModel):
@@ -220,6 +222,8 @@ class DecisionSlotPatch(BaseModel):
     decision_strategy: str | None = None
     candidate_filter: dict | None = None
     strategy_config: dict | None = None
+    # "Show up to" (task-109): editable now that something reads it.
+    max_results: int | None = Field(None, ge=1, le=5)
 
     def sent(self, field: str) -> bool:
         """Whether the caller actually sent this field, null or not."""

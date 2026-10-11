@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 from app.campaigns.db_models import DecisionSlotDB
 from app.content.service import get_latest_version_for_content
 from app.decision.strategies.base import (
-    ConfigField, DecisionStrategy, StrategyMeta, StrategyResult, candidate_query, sending_brand_id,
+    ConfigField, DecisionStrategy, StrategyMeta, StrategyResult, best_per_record, candidate_query,
+    sending_brand_id,
 )
 from app.insight.signals import operational_signals_for_recipient
 
@@ -52,14 +53,17 @@ class RecipientTopScoreStrategy(DecisionStrategy):
             ],
         )
 
-    def execute(
+    def rank(
         self,
         db: Session,
         slot: DecisionSlotDB,
         recipient_id: int | None = None,
-    ) -> StrategyResult | None:
+        *,
+        limit: int = 1,
+        exclude: frozenset[int] = frozenset(),
+    ) -> list[StrategyResult]:
         if recipient_id is None:
-            return None
+            return []
 
         candidate_filter = slot.candidate_filter or {}
         category_ids = candidate_filter.get("category_ids", [])
@@ -88,43 +92,43 @@ class RecipientTopScoreStrategy(DecisionStrategy):
             if category_id in signals
         ]
         if not candidates:
-            return None
+            return []
 
         def candidate_score(row):
             return row[1] * content_weight + row[2] * preference_weight
 
-        top_score = max(candidate_score(row) for row in candidates)
-        tied = [row for row in candidates if candidate_score(row) == top_score]
+        # Ties are ordered at random rather than by whichever row the database
+        # returned first (an undisclosed bias toward lower content ids), and the
+        # reason says so, so a pick stays auditable (ADR-085). Shuffling first
+        # and then sorting stably keeps that random order inside each tie.
+        random.shuffle(candidates)
+        candidates.sort(key=candidate_score, reverse=True)
+        ties: dict[float, int] = {}
+        for row in candidates:
+            ties[candidate_score(row)] = ties.get(candidate_score(row), 0) + 1
 
-        # Ties are broken by an explicit, disclosed random choice rather than
-        # silently taking whichever row the DB happened to return first
-        # (undisclosed bias toward lower content IDs) — the reason string
-        # says so, so the pick stays auditable (ADR-085).
-        best = random.choice(tied) if len(tied) > 1 else tied[0]
-        tie_note = (
-            f" (tied at score {top_score} between {len(tied)} candidates, selected randomly)"
-            if len(tied) > 1
-            else ""
-        )
-
-        content_record, content_score, preference_score = best
-        combined = float(
-            content_score * content_weight + preference_score * preference_weight
-        )
-
-        latest_version = get_latest_version_for_content(
-            db=db, content_record_id=content_record.id, brand_id=brand_id
-        )
-
-        return StrategyResult(
-            content_record_id=content_record.id,
-            content_version_id=latest_version.id if latest_version else None,
-            score=combined,
-            reason=(
-                f"recipient_top_score: recipient={recipient_id}, "
-                f"category_ids={category_ids}, "
-                f"content_score={content_score}×{content_weight} + "
-                f"preference_score={preference_score}×{preference_weight} "
-                f"= {combined}{tie_note}"
-            ),
-        )
+        picks = []
+        for content_record, content_score, preference_score in best_per_record(
+                candidates, lambda row: row[0].id, exclude, limit):
+            combined = float(content_score * content_weight + preference_score * preference_weight)
+            tied = ties[content_score * content_weight + preference_score * preference_weight]
+            tie_note = (
+                f" (tied at score {combined} between {tied} candidates, ordered randomly)"
+                if tied > 1 else ""
+            )
+            latest_version = get_latest_version_for_content(
+                db=db, content_record_id=content_record.id, brand_id=brand_id
+            )
+            picks.append(StrategyResult(
+                content_record_id=content_record.id,
+                content_version_id=latest_version.id if latest_version else None,
+                score=combined,
+                reason=(
+                    f"recipient_top_score: recipient={recipient_id}, "
+                    f"category_ids={category_ids}, "
+                    f"content_score={content_score}×{content_weight} + "
+                    f"preference_score={preference_score}×{preference_weight} "
+                    f"= {combined}{tie_note}"
+                ),
+            ))
+        return picks

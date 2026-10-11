@@ -580,7 +580,7 @@ function SlotBound({
     <>
       <ModuleOwnFields campaignId={campaignId} module={module} manifest={manifest} />
       <HiddenFieldsGroup campaignId={campaignId} module={module} manifest={manifest} reload={reload} />
-      <SlotSettings campaignId={campaignId} slotId={slotId} />
+      <SlotSettings campaignId={campaignId} slotId={slotId} channel={channel} />
       <p className="muted">
         A slot is never overridden: one pinned value would replace every personal pick.
       </p>

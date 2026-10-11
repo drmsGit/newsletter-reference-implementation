@@ -212,46 +212,37 @@ def _frozen_profile(db: Session, variant: VariantDB) -> dict:
     }
 
 
-def _pick_for_slot(db: Session, entry: dict, channel: str, recipient_id: int | None) -> dict | None:
-    """The slot's pick for this recipient now: their resolution, else the
-    slot's global one — the order the live render has always used. Returns the
-    pick with a copy of its values, or None when nothing resolved (ADR-086)."""
+def _picks_for_slot(db: Session, entry: dict, channel: str, recipient_id: int | None) -> list[dict]:
+    """The slot's picks for this recipient now, first pick first: their set,
+    else the slot's global one — the order the live render has always used
+    (`app.decision.sets`). Each pick carries a copy of its values and its
+    rank. Empty when nothing resolved (ADR-086). A pick whose content cannot
+    be rendered now is left out, and the ones after it move up."""
+    from app.decision.sets import latest_pick_set
     from app.rendering.service import resolve_renderable_content
 
-    query = db.query(DecisionResolutionDB).filter(
-        DecisionResolutionDB.decision_slot_id == entry["decision_slot_id"]
-    )
-    resolution = None
-    if recipient_id is not None:
-        resolution = (
-            query.filter(DecisionResolutionDB.recipient_id == recipient_id)
-            .order_by(DecisionResolutionDB.created_at.desc()).first()
-        )
-    if resolution is None:
-        resolution = (
-            query.filter(DecisionResolutionDB.recipient_id.is_(None))
-            .order_by(DecisionResolutionDB.created_at.desc()).first()
-        )
-    if resolution is None:
-        return None
-    content = resolve_renderable_content(
-        db=db, content_record_id=resolution.content_record_id,
-        content_version_id=resolution.content_version_id, mode="send",
-    )
-    if content is None:
-        return None
     manifest = get_manifest(channel, entry["module_type"])
     # No override: a decision slot is never overridden (ADR-178 point 5). A
     # field the module hides is left out of the pick, as of every render.
     hidden = set(entry.get("hidden_fields") or ())
-    variables = {var.name: content.get(var.name, "") for var in manifest.variables if var.name not in hidden}
-    return {
-        "module_id": entry["module_id"],
-        "decision_resolution_id": resolution.id,
-        "content_record_id": resolution.content_record_id,
-        "content_version_id": content.get("_version_id"),
-        "variables": variables,
-    }
+    picks: list[dict] = []
+    for resolution in latest_pick_set(db, entry["decision_slot_id"], recipient_id):
+        content = resolve_renderable_content(
+            db=db, content_record_id=resolution.content_record_id,
+            content_version_id=resolution.content_version_id, mode="send",
+        )
+        if content is None:
+            continue
+        picks.append({
+            "module_id": entry["module_id"],
+            "rank": len(picks) + 1,
+            "decision_resolution_id": resolution.id,
+            "content_record_id": resolution.content_record_id,
+            "content_version_id": content.get("_version_id"),
+            "variables": {var.name: content.get(var.name, "") for var in manifest.variables
+                          if var.name not in hidden},
+        })
+    return picks
 
 
 def what_rendered(frame: dict, picks: list[dict]) -> tuple[bool, int]:
@@ -310,50 +301,59 @@ def render_frame(
 
     channel = frame["channel"]
     theme = _frame_theme(frame)
-    recorded = {p["module_id"]: p for p in (picks or [])}
+    # Recorded picks by module, in their order: a slot shows up to five, and
+    # a pick recorded before ranks existed is a set of one (task-109).
+    recorded: dict[int, list[dict]] = {}
+    for pick in picks or []:
+        recorded.setdefault(pick["module_id"], []).append(pick)
     made: list[dict] = []
     html_parts: list[str] = []
     fields: dict = {}
 
     for entry in frame["modules"]:
         kind = entry["kind"]
-        variables, content_id = None, None
+        # (variables, content id) per copy of the module: one for a content
+        # or static module, one per pick for a slot (ADR-084 addendum
+        # 2026-10-11 — several picks repeat the module, first pick first).
+        copies: list[tuple[dict, int | None]] = []
         if kind in (KIND_CONTENT, KIND_STATIC):
-            variables, content_id = entry["variables"], entry.get("content_record_id")
-            if kind == KIND_STATIC:
-                content_id = None  # the static wrapper never carried one
+            # The static wrapper never carried a content id.
+            copies = [(entry["variables"], None if kind == KIND_STATIC else entry.get("content_record_id"))]
         elif kind == KIND_SLOT:
             if picks is not None:
-                pick = recorded.get(entry["module_id"])
+                slot_picks = recorded.get(entry["module_id"], [])
             elif entry["decision_slot_id"] in empty_slots:
-                pick = None
+                slot_picks = []
             else:
-                pick = _pick_for_slot(db, entry, channel, recipient_id)
-            if pick is not None:
-                made.append(pick)
-                variables, content_id = pick["variables"], pick["content_record_id"]
-        if variables is not None and entry.get("hidden_fields"):
+                slot_picks = _picks_for_slot(db, entry, channel, recipient_id)
+            made.extend(slot_picks)
+            copies = [(pick["variables"], pick["content_record_id"]) for pick in slot_picks]
+        if entry.get("hidden_fields"):
             # Already left out when frozen or picked; a recorded pick from
             # before the list existed is held to it here too.
-            variables = {k: v for k, v in variables.items() if k not in set(entry["hidden_fields"])}
+            copies = [({k: v for k, v in variables.items() if k not in set(entry["hidden_fields"])}, content_id)
+                      for variables, content_id in copies]
 
         if channel == "email":
             if kind == KIND_UNKNOWN:
                 html_parts.append(module_html(channel, entry["module_type"], entry["module_id"], {}, theme=theme))
-            elif variables is None:
+            elif not copies:
                 html_parts.append(
                     f"<!-- module {entry['module_id']} ({entry['module_type']}): "
                     "no content resolved, slot hidden -->"
                 )
             else:
-                html_parts.append(module_html(
-                    channel, entry["module_type"], entry["module_id"], variables,
-                    content_id=content_id, template_type=lookup_type(frame, entry), theme=theme,
-                ))
-        elif variables is not None and not fields:
+                for variables, content_id in copies:
+                    html_parts.append(module_html(
+                        channel, entry["module_type"], entry["module_id"], variables,
+                        content_id=content_id, template_type=lookup_type(frame, entry), theme=theme,
+                    ))
+        elif copies and not fields:
             # A push carries one module's fields (ADR-160 point 2), stripped of
-            # rich-text markup an operating system would show literally.
-            fields = strip_rich_text(variables, get_manifest(channel, entry["module_type"]))
+            # rich-text markup an operating system would show literally. A
+            # push slot shows one pick; should more ever be recorded, the
+            # first is the one.
+            fields = strip_rich_text(copies[0][0], get_manifest(channel, entry["module_type"]))
 
     if channel == "email":
         from app.rendering.service import legal_footer_html

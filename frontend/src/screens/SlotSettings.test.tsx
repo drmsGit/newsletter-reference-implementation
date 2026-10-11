@@ -25,7 +25,7 @@ const STRATEGIES = [
 ]
 
 /** A server that keeps the slot's state and checks its version (ADR-180 point 2). */
-function server(options: { unbound?: boolean } = {}) {
+function server(options: { unbound?: boolean; channel?: string } = {}) {
   let clock = 1
   const state = {
     module: {
@@ -46,7 +46,7 @@ function server(options: { unbound?: boolean } = {}) {
     'GET /campaigns/1/composition': () => jsonResponse({
       campaign: { id: 1, name: 'Spring' },
       variants: [{
-        variant: { id: 3, name: 'Variant A', channel: 'email', status: 'draft', updated_at: T(1) },
+        variant: { id: 3, name: 'Variant A', channel: options.channel ?? 'email', status: 'draft', updated_at: T(1) },
         module_limit: null, can_add_module: true, has_envelope: false, brand_profile: A_BRAND_PROFILE, accepted_module_types: ['hero'],
         modules: [state.module], envelope_modules: [], decision_slots: [],
       }],
@@ -98,13 +98,30 @@ function open(handlers: Record<string, (request: Request) => Response | Promise<
 }
 
 describe('a slot on its module', () => {
-  it('shows its strategy, what it would choose between, and never max_results', async () => {
+  it('shows its strategy, what it would choose between, and how many it shows', async () => {
     open(server().handlers)
     expect(await screen.findByRole('status')).toHaveTextContent('Would choose between 7 active content records now')
     expect(screen.getByRole('button', { name: /Recipient Top Score/ })).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'Food' })).toBeChecked()
-    expect(screen.queryByLabelText(/max results/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Show up to/ })).toHaveTextContent('1 pick')
     expect(screen.getByRole('link', { name: 'See what it has picked' })).toHaveAttribute('href', '/decision-slots/5')
+  })
+
+  it('saves how many picks it shows, sending only that (task-109)', async () => {
+    const { handlers, writes } = server()
+    open(handlers)
+    fireEvent.click(await screen.findByRole('button', { name: /Show up to/ }))
+    fireEvent.click(await screen.findByRole('option', { name: '3 picks' }))
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect(writes[0].headers.get('If-Match')).toBe(T(1))
+    expect(await writes[0].json()).toEqual({ max_results: 3 })
+  })
+
+  it('offers no choice on a push slot: a push is one notification', async () => {
+    const { handlers } = server({ channel: 'push' })
+    open(handlers)
+    expect(await screen.findByText('Shows one pick: a push is one notification.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Show up to/ })).not.toBeInTheDocument()
   })
 
   it('saves a category with the slot version, keeping the rest of the filter', async () => {

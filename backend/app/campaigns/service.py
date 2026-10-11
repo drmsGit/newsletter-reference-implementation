@@ -430,6 +430,7 @@ def slot_audit_detail(slot) -> dict:
         "variant_id": slot.variant_id, "name": slot.name,
         "decision_strategy": slot.decision_strategy,
         "candidate_filter": slot.candidate_filter, "strategy_config": slot.strategy_config,
+        "max_results": slot.max_results,
     }
 
 
@@ -922,6 +923,16 @@ def _normalize_for_strategy(
     return normalize_slot_config(strategy.meta, candidate_filter, strategy_config)
 
 
+def check_max_results(db: Session, variant_id: int, max_results: int) -> None:
+    """"Show up to" is 1-5, and 1 on a push: a push is one notification
+    (ADR-084 addendum 2026-10-11). Raises ValueError otherwise."""
+    if not 1 <= max_results <= 5:
+        raise ValueError("a slot shows 1 to 5 picks")
+    channel = db.query(VariantDB.channel).filter(VariantDB.id == variant_id).scalar()
+    if channel == "push" and max_results != 1:
+        raise ValueError("a push slot shows one pick: a push is one notification")
+
+
 def update_decision_slot(
     db: Session,
     slot_id: int,
@@ -931,11 +942,16 @@ def update_decision_slot(
     *,
     brand_id: int,
     expected_updated_at: datetime | None = None,
+    max_results: int | None = None,
 ) -> DecisionSlotDB | None:
+    """`max_results` None leaves "show up to" as it is."""
     slot = get_decision_slot(db, slot_id, brand_id=brand_id)
     if slot is None:
         return None
     refuse_stale(db, slot, expected_updated_at, "decision slot")
+    if max_results is not None:
+        check_max_results(db, slot.variant_id, max_results)
+        slot.max_results = max_results
     # Lock the config/filter structure to the (possibly newly-chosen) strategy
     # before persisting — no more "accepts any shape for any strategy, only
     # fails at resolution time". Switching strategies re-derives the structure.
@@ -1001,6 +1017,7 @@ def create_decision_slot_for_variant(
     # same guard `create_variant_for_campaign` takes one level up.
     if get_variant(db, variant_id, brand_id=brand_id) is None:
         raise ValueError(f"variant {variant_id} does not exist")
+    check_max_results(db, variant_id, max_results)
 
     candidate_filter, strategy_config = _normalize_for_strategy(
         decision_strategy, candidate_filter, strategy_config
@@ -1096,6 +1113,9 @@ def create_decision_resolution(
     score: float | None = None,
     *,
     brand_id: int,
+    rank: int = 1,
+    pick_set: str | None = None,
+    commit: bool = True,
 ) -> DecisionResolution:
     # No orphan row should ever be silently accepted, regardless of whether
     # the DB engine happens to enforce FK constraints — validate referenced
@@ -1129,9 +1149,16 @@ def create_decision_resolution(
         content_version_id=content_version_id,
         reason=reason,
         score=score,
+        rank=rank,
+        pick_set=pick_set,
     )
 
     db.add(resolution)
+    if not commit:
+        # One pick of a set the caller commits whole (task-109).
+        db.flush()
+        db.refresh(resolution)
+        return to_decision_resolution(resolution)
     db.commit()
     db.refresh(resolution)
 

@@ -867,6 +867,7 @@ def patch_decision_slot_record(
                 payload.strategy_config if payload.sent("strategy_config")
                 else existing.strategy_config
             ),
+            max_results=payload.max_results if payload.sent("max_results") else None,
             brand_id=brand_id,
             # Checked against the row as it is now, so the sections merged in
             # above from `existing` are only ever written when they are current.

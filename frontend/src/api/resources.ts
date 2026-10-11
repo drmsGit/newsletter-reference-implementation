@@ -1358,6 +1358,7 @@ export function useSaveSlot(campaignId: number, slotId: number) {
       decision_strategy?: string
       candidate_filter?: Record<string, unknown>
       strategy_config?: Record<string, unknown>
+      max_results?: number
     }) =>
       read(
         api.PATCH('/campaigns/decision-slots/{slot_id}', {

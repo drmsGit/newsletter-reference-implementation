@@ -15,7 +15,11 @@ const moduleColumns: DataColumn<ModuleRow>[] = [
    * decision slot's pick for this recipient -- which is the answer to "why did
    * they get this", so it is shown as the server names it.
    */
-  { key: 'kind', header: 'Kind', render: (m) => m.kind },
+  /**
+   * A slot shows up to five picks, the module repeated once per pick: each
+   * copy is its own row, numbered in the order it appeared (task-109).
+   */
+  { key: 'kind', header: 'Kind', render: (m) => (m.rank != null ? `${m.kind} (pick ${m.rank})` : m.kind) },
   { key: 'content', header: 'Content record', render: (m) => m.content_record_id ?? '—' },
   { key: 'version', header: 'Version', render: (m) => m.content_version_id ?? '—' },
 ]
@@ -126,7 +130,9 @@ export default function DeliveryAsSent() {
               <DataTable
                 label="Modules in this message"
                 columns={moduleColumns}
-                items={asSent.data.modules.map((m) => ({ ...m, id: m.module_id }))}
+                // A row per copy, so a module that repeated has several: the
+                // position in the list is the key, not the module id.
+                items={asSent.data.modules.map((m, index) => ({ ...m, id: index }))}
                 emptyMessage="This message had no modules."
               />
             </>

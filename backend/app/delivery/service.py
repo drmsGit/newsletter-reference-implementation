@@ -1142,14 +1142,17 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
     from app.campaigns.db_models import DecisionSlotDB
     from app.decision.service import execute_decision_slot
 
+    from app.decision.sets import latest_pick_set
     from app.rendering.frame import render_frame, slot_ids, artifact_hash, what_rendered
 
     # The frame's slots, not the variant's: a slot added after the snapshot is
     # not in what was approved (ADR-183).
-    decision_slots = (
-        db.query(DecisionSlotDB)
-        .filter(DecisionSlotDB.id.in_(slot_ids(snapshot.render_context)))
-        .all()
+    # In the frame's module order: a slot further down passes over what an
+    # earlier slot already shows (ADR-084 addendum 2026-10-11, point 3).
+    frame_slot_ids = list(slot_ids(snapshot.render_context))
+    decision_slots = sorted(
+        db.query(DecisionSlotDB).filter(DecisionSlotDB.id.in_(frame_slot_ids)).all(),
+        key=lambda slot: frame_slot_ids.index(slot.id),
     )
 
     executions = (
@@ -1277,10 +1280,15 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
         # fall back to an older stored pick the decision has just refused
         # (task-320) — the stored resolutions stay as history.
         empty_slots: set[int] = set()
+        shown: set[int] = set()
         for slot in decision_slots:
             try:
-                if execute_decision_slot(db, slot.id, recipient_id=execution.recipient_id) is None:
+                if execute_decision_slot(db, slot.id, recipient_id=execution.recipient_id,
+                                         exclude=frozenset(shown)) is None:
                     empty_slots.add(slot.id)
+                else:
+                    shown.update(r.content_record_id
+                                 for r in latest_pick_set(db, slot.id, execution.recipient_id))
             except ConsentDenied:
                 # Unreachable in practice — the stack above already excluded
                 # every non-consenting recipient, so this is belt and braces
@@ -1495,20 +1503,25 @@ def reconstruct_delivery(db: Session, execution_id: int, *, brand_id: int) -> di
     if artifact.body is not None and not artifact.envelope.get("subject"):
         artifact.envelope["subject"] = send_instance.name
 
-    picks = {p["module_id"]: p for p in record.get("picks") or []}
+    # One row per copy: a slot that showed three picks lists three, in rank
+    # order (task-109). A pick recorded before ranks existed is rank 1.
+    picks: dict[int, list[dict]] = {}
+    for pick in record.get("picks") or []:
+        picks.setdefault(pick["module_id"], []).append(pick)
     modules = []
     for entry in frame["modules"]:
-        pick = picks.get(entry["module_id"])
-        source = pick or entry
-        modules.append({
-            "module_id": entry["module_id"],
-            "module_type": entry["module_type"],
-            "kind": entry["kind"],
-            "content_record_id": source.get("content_record_id"),
-            "content_version_id": source.get("content_version_id"),
-            "override_id": entry.get("override_id"),
-            "decision_resolution_id": (pick or {}).get("decision_resolution_id"),
-        })
+        for rank, pick in enumerate(picks.get(entry["module_id"]) or [None], start=1):
+            source = pick or entry
+            modules.append({
+                "module_id": entry["module_id"],
+                "module_type": entry["module_type"],
+                "kind": entry["kind"],
+                "rank": (pick.get("rank") or rank) if pick else None,
+                "content_record_id": source.get("content_record_id"),
+                "content_version_id": source.get("content_version_id"),
+                "override_id": entry.get("override_id"),
+                "decision_resolution_id": (pick or {}).get("decision_resolution_id"),
+            })
     return {
         "execution_id": execution.id,
         "send_instance_id": send_instance.id,

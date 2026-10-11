@@ -165,6 +165,8 @@ class ReconstructedModule(BaseModel):
     module_type: str
     # content | static | slot | empty | unknown
     kind: str
+    # A slot's pick, 1 first: a slot shows up to five, one row each (task-109).
+    rank: int | None = None
     content_record_id: int | None = None
     content_version_id: int | None = None
     override_id: int | None = None

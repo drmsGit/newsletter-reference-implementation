@@ -4543,6 +4543,8 @@ export interface components {
             strategy_config?: {
                 [key: string]: unknown;
             } | null;
+            /** Max Results */
+            max_results?: number | null;
         };
         /**
          * DecisionSlotStats
@@ -5959,6 +5961,8 @@ export interface components {
             module_type: string;
             /** Kind */
             kind: string;
+            /** Rank */
+            rank?: number | null;
             /** Content Record Id */
             content_record_id?: number | null;
             /** Content Version Id */

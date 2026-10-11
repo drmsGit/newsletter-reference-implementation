@@ -64,7 +64,7 @@ export default function DecisionSlotDetail() {
               <dd>{stats.data.slot.decision_type}</dd>
               <dt>Strategy</dt>
               <dd>{stats.data.slot.decision_strategy}</dd>
-              <dt>Picks per resolution</dt>
+              <dt>Shows up to</dt>
               <dd>{stats.data.slot.max_results}</dd>
             </dl>
 

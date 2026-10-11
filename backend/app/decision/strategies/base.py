@@ -115,18 +115,51 @@ class DecisionStrategy(ABC):
         pass
 
     @abstractmethod
+    def rank(
+        self,
+        db: Session,
+        slot: DecisionSlotDB,
+        recipient_id: int | None = None,
+        *,
+        limit: int = 1,
+        exclude: frozenset[int] = frozenset(),
+    ) -> list[StrategyResult]:
+        """
+        The slot's best candidates, best first: at most `limit`, each record
+        once, none of `exclude` (records an earlier slot in the same email
+        already shows; ADR-084 addendum 2026-10-11). Empty when nothing
+        suitable exists. Never raise for a missing-content case — the caller
+        handles graceful degradation (ADR-086).
+        """
+        pass
+
     def execute(
         self,
         db: Session,
         slot: DecisionSlotDB,
         recipient_id: int | None = None,
     ) -> StrategyResult | None:
-        """
-        Return a StrategyResult when content is found, or None when no
-        suitable content exists. Never raise for a missing-content case —
-        the caller handles graceful degradation (ADR-086).
-        """
-        pass
+        """The single best pick: the first of the ranking, or None."""
+        ranked = self.rank(db, slot, recipient_id, limit=1)
+        return ranked[0] if ranked else None
+
+
+def best_per_record(rows, key, exclude: frozenset[int], limit: int) -> list:
+    """`rows` sorted best first by the caller; one per record (a record in
+    two categories appears once per category in `candidate_query`, and only
+    its best row counts), skipping `exclude`, at most `limit`. `key` gives a
+    row's record id."""
+    seen: set[int] = set()
+    out = []
+    for row in rows:
+        record_id = key(row)
+        if record_id in seen or record_id in exclude:
+            continue
+        seen.add(record_id)
+        out.append(row)
+        if len(out) == limit:
+            break
+    return out
 
 
 class BrokenCampaignChain(RuntimeError):

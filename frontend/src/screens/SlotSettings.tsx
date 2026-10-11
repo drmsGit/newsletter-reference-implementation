@@ -21,10 +21,19 @@ import ScreenState from '../components/ScreenState'
  * settings here, in place; the Decisions screen is for seeing what slots
  * pick. Every setting saves as soon as it changes, with the slot's version
  * (ADR-180 point 2), and the count of records the slot would choose between
- * is shown without resolving it (task-205). `max_results` is not offered:
- * nothing reads it yet (task-109).
+ * is shown without resolving it (task-205). "Show up to" is how many picks the
+ * module shows, best first, the module repeated once per pick (task-109,
+ * ADR-084 addendum 2026-10-11); a push slot always shows one.
  */
-export default function SlotSettings({ campaignId, slotId }: { campaignId: number; slotId: number }) {
+export default function SlotSettings({
+  campaignId,
+  slotId,
+  channel,
+}: {
+  campaignId: number
+  slotId: number
+  channel: string
+}) {
   const stats = useDecisionSlotStats(slotId)
   const strategies = useStrategies()
   const save = useSaveSlot(campaignId, slotId)
@@ -37,6 +46,7 @@ export default function SlotSettings({ campaignId, slotId }: { campaignId: numbe
           strategies={strategies.data}
           save={save}
           slotId={slotId}
+          channel={channel}
         />
       )}
     </ScreenState>
@@ -48,15 +58,18 @@ function Settings({
   strategies,
   save,
   slotId,
+  channel,
 }: {
   slot: {
     decision_strategy: string
+    max_results: number
     candidate_filter?: Record<string, unknown> | null
     strategy_config?: Record<string, unknown> | null
   }
   strategies: StrategyMeta[]
   save: ReturnType<typeof useSaveSlot>
   slotId: number
+  channel: string
 }) {
   const meta = strategies.find((s) => s.name === slot.decision_strategy)
   const filter = slot.candidate_filter ?? {}
@@ -79,6 +92,18 @@ function Settings({
       />
       {meta && <Text className="muted">{meta.description}</Text>}
       <Candidates slotId={slotId} />
+      {channel === 'push' ? (
+        <Text className="muted">Shows one pick: a push is one notification.</Text>
+      ) : (
+        <Choice
+          label="Show up to"
+          options={[1, 2, 3, 4, 5].map((n) => ({ id: String(n), name: n === 1 ? '1 pick' : `${n} picks` }))}
+          selected={String(slot.max_results)}
+          onChange={(n) => {
+            if (Number(n) !== slot.max_results) save.mutate({ max_results: Number(n) })
+          }}
+        />
+      )}
       {takesCategories && (
         <Categories
           selected={Array.isArray(filter.category_ids) ? (filter.category_ids as number[]) : []}

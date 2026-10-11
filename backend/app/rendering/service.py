@@ -349,8 +349,14 @@ def resolve_module_variables(
         return None, None, decision_resolution
 
     field_overrides = (override.field_overrides if override else None) or {}
-    variables: dict = {}
+    return fill_variables(module, manifest, content, field_overrides), content, decision_resolution
 
+
+def fill_variables(module: ModuleInstanceDB, manifest: ModuleManifest, content: dict,
+                   field_overrides: dict | None = None) -> dict:
+    """One record's values onto the module's declared variables."""
+    field_overrides = field_overrides or {}
+    variables: dict = {}
     module_data = module.module_data or {}
     for var in manifest.variables:
         # A field typed in the module itself (ADR-179's 2026-10-04 addendum):
@@ -365,8 +371,7 @@ def resolve_module_variables(
             variables[var.name] = field_overrides[var.name]
         else:
             variables[var.name] = content.get(var.name, "")
-
-    return variables, content, decision_resolution
+    return variables
 
 
 def module_html(
@@ -486,6 +491,24 @@ def render_cms_module(
     mode: RenderMode = "preview",
     theme: dict | None = None,
 ) -> tuple[str, DecisionResolutionDB | None]:
+    if module.decision_slot_id is not None:
+        # A slot shows up to its "show up to", first pick first: the module
+        # repeats once per pick, each copy with its own content id (ADR-084
+        # addendum 2026-10-11). Never overridden (ADR-178 point 5).
+        picked = slot_contents(db, module, recipient_id=recipient_id, mode=mode)
+        if not picked:
+            return (f"<!-- module {module.id} ({module.module_type}): no content resolved, slot hidden -->",
+                    None)
+        return (
+            "\n".join(
+                module_html(channel, module.module_type, module.id,
+                            without_hidden(fill_variables(module, manifest, content), module.hidden_fields),
+                            content_id=content["id"], theme=theme)
+                for content, _resolution in picked
+            ),
+            picked[0][1],
+        )
+
     variables, content, decision_resolution = resolve_module_variables(
         db=db, module=module, manifest=manifest, recipient_id=recipient_id, mode=mode
     )
@@ -722,6 +745,28 @@ def resolve_renderable_content(
     return {"id": record.id, **(record.content or {}), "_version_id": None}
 
 
+def slot_contents(
+    db: Session,
+    module: ModuleInstanceDB,
+    recipient_id: int | None = None,
+    mode: RenderMode = "preview",
+) -> list[tuple[dict, DecisionResolutionDB]]:
+    """A slot module's picks as renderable content, first pick first: the
+    recipient's set, else the slot's global one (`app.decision.sets`). A pick
+    whose content cannot be rendered is left out. Empty: nothing to show."""
+    from app.decision.sets import latest_pick_set
+
+    picked = []
+    for resolution in latest_pick_set(db, module.decision_slot_id, recipient_id):
+        content = resolve_renderable_content(
+            db=db, content_record_id=resolution.content_record_id,
+            content_version_id=resolution.content_version_id, mode=mode,
+        )
+        if content is not None:
+            picked.append((content, resolution))
+    return picked
+
+
 def resolve_content_for_module(
     db: Session,
     module: ModuleInstanceDB,
@@ -749,43 +794,8 @@ def resolve_content_for_module(
         )
 
     if module.decision_slot_id is not None:
-        resolution_query = (
-            db.query(DecisionResolutionDB)
-            .filter(DecisionResolutionDB.decision_slot_id == module.decision_slot_id)
-        )
-
-        if recipient_id is not None:
-            resolution = (
-                resolution_query
-                .filter(DecisionResolutionDB.recipient_id == recipient_id)
-                .order_by(DecisionResolutionDB.created_at.desc())
-                .first()
-            )
-            if resolution is None:
-                resolution = (
-                    resolution_query
-                    .filter(DecisionResolutionDB.recipient_id.is_(None))
-                    .order_by(DecisionResolutionDB.created_at.desc())
-                    .first()
-                )
-        else:
-            resolution = (
-                resolution_query
-                .filter(DecisionResolutionDB.recipient_id.is_(None))
-                .order_by(DecisionResolutionDB.created_at.desc())
-                .first()
-            )
-
-        if resolution is None:
-            return None, None
-
-        content = resolve_renderable_content(
-            db=db,
-            content_record_id=resolution.content_record_id,
-            content_version_id=resolution.content_version_id,
-            mode=mode,
-        )
-        return content, resolution
+        picked = slot_contents(db, module, recipient_id=recipient_id, mode=mode)
+        return picked[0] if picked else (None, None)
 
     return None, None
 
