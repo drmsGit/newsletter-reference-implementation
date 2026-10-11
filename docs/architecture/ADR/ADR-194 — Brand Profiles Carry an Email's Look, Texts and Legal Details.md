@@ -441,6 +441,32 @@ This makes Decision point 15 concrete.
 - **https everywhere may refuse a company's existing http imprint link** on its next save.
 - **A footer's per-email note lives in the module.** It is not shared between emails.
 
+## Addendum 2026-10-11 (fifth) — narrowed by ADR-195
+
+**[[ADR-195 — A Transactional Send Skips the Opt-In Check, Never Provider Suppression]] (queue task-355) narrows two of this record's points without superseding them.** Points 1–18 of the Decision are unchanged. Read points 1 and 10 together with this addendum.
+
+**1. A transactional profile is never the default** (ADR-195 point 4).
+
+- **Decision point 1 lets any profile be made the default:** "The default can be changed, by marking another profile default."
+- **A transactional profile never can be.** Making one the default is refused. Marking the default transactional is refused.
+- **So a variant becomes transactional only when someone picks such a profile.**
+
+**2. A transactional email shows no unsubscribe line, in this slice** (ADR-195 point 3).
+
+- **Decision point 10 lets a transactional profile carry unsubscribe wording:** "Some companies do show one on transactional mail."
+- **A transactional email shows no unsubscribe line and no one-click header,** even when its profile has the wording.
+- **What an unsubscribe on transactional mail would mean stays open.** It is still the item "What following an unsubscribe link on a transactional email writes" in the first addendum's open list.
+
+**3. The transactional permission is `brand_profiles.transactional`** (ADR-195 point 5).
+It is brand-scoped, as Notes inferred.
+
+**4. Point 7 of the first addendum above is done.**
+It said the API "refuses `transactional` until queue task-355 builds point 9's guard". Task-355 has built the guard (commit `68c7f1f`), so transactional profiles can now exist.
+
+**What this settles.**
+
+- **"How a transactional send meets the exclusion stack"** from the Decision's open list and the first addendum's: ADR-195 points 1 and 2.
+
 ## Related ADRs
 
 ### Supersedes
@@ -455,3 +481,6 @@ This makes Decision point 15 concrete.
 - [[ADR-131 — Email Module Templates Use MJML as Source Format]] — why profile values must reach templates as variables.
 - [[ADR-086 — Decision Slots Fail Gracefully]] — the floor whose decorative marker point 15 carries over.
 - [[ADR-160 — Channel Model and Composition]] — variants, and two files per email module.
+
+### Referenced By
+- [[ADR-195 — A Transactional Send Skips the Opt-In Check, Never Provider Suppression]] — narrows points 1 and 10, and builds point 9's guard (fifth addendum of 2026-10-11).

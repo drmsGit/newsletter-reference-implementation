@@ -8,7 +8,7 @@ topic:
   - privacy
   - data-model
 created: 2026-09-01
-modified: 2026-10-06
+modified: 2026-10-11
 source:
   - "Omni-Channel design interview (interview-prep, closed 2026-09-01), Cluster 4 / Q16–Q20"
 depends_on:
@@ -226,6 +226,18 @@ Audience resolution keeps its consent gate. A rule block matches only people who
 
 Nothing here changes the Decision section above.
 
+## Addendum 2026-10-11 — stage 3 has its first rule (ADR-195)
+
+**Point 7 named stage 3 of the exclusion stack, suppression, as "hard bounce, complaint, manual blocklist". It held no rule until now.** [[ADR-195 — A Transactional Send Skips the Opt-In Check, Never Provider Suppression]] point 2 gives it its first. The user decided it on 2026-10-11, in queue task-355's final-design pass. Nothing here changes the Decision section above.
+
+**The rule.** Anyone the provider suppressed for a brand and channel, on any purpose, is excluded from every send, marketing and transactional. A provider suppression is a hard bounce or a spam complaint, recorded as a provider-sourced opt-out event. The audience floor applies the same rule.
+
+**No suppression store of its own.** The stage reads the provider-sourced consent events that already exist: the `source = provider` events of the 2026-09-12 addendum's point 4. It keeps that reading until queue task-135 decides a suppression store. Then the reading is replaced, not extended.
+
+**A transactional send skips stage 2.** It asks for no opt-in grant. It records purpose `transactional` on its executions, where the 2026-09-12 addendum's point 1 put the purpose. Stages 1 and 3 still apply to it.
+
+**Stage order still changes only the recorded reason** (point 9). Who is excluded is the same in any order. A marketing bounce on the marketing cell is also a missing grant, so it is still recorded under consent.
+
 ## Related ADRs
 
 ### Depends On
@@ -247,3 +259,4 @@ Nothing here changes the Decision section above.
 - [[ADR-144 — AI Data and Model Governance]]
 - [[ADR-150 — Tenancy and Access Model]]
 - [[ADR-153 — Audit and Accountability]]
+- [[ADR-195 — A Transactional Send Skips the Opt-In Check, Never Provider Suppression]]
