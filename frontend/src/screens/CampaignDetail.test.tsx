@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router'
 
@@ -60,6 +60,19 @@ const COMPOSITION = {
   ],
 }
 
+// task-58: nothing has gone out, so there is no results section.
+const NO_RESULTS = {
+  campaign: null, variants: [], unsubscribes_counted_since: '2026-10-12T00:00:00Z', unsubscribes_partial: false,
+}
+
+function figures(extra: object = {}) {
+  return {
+    recipients: 10, sent: 8, delivered: 7, failed: 1, excluded: 1, excluded_by_stage: { consent: 1 },
+    bounced: 1, complaints: 0, clicks_total: 5, unique_clickers: 3, click_rate: 0.375, unsubscribes: 2,
+    ...extra,
+  }
+}
+
 function renderDetail() {
   return renderWithProviders(
     <Routes>
@@ -73,6 +86,7 @@ describe('the campaign list', () => {
   it('opens a campaign from its row', async () => {
     stubFetch({
       'GET /campaigns/': () => jsonResponse(page([COMPOSITION.campaign])),
+      'GET /campaigns/1/results': () => jsonResponse(NO_RESULTS),
       'GET /campaigns/1/composition': () => jsonResponse(COMPOSITION),
     })
     renderWithProviders(
@@ -89,7 +103,10 @@ describe('the campaign list', () => {
 
 describe('a campaign in detail', () => {
   it("shows each module's source, the envelope and the limit as the server gives them", async () => {
-    stubFetch({ 'GET /campaigns/1/composition': () => jsonResponse(COMPOSITION) })
+    stubFetch({
+      'GET /campaigns/1/composition': () => jsonResponse(COMPOSITION),
+      'GET /campaigns/1/results': () => jsonResponse(NO_RESULTS),
+    })
     renderDetail()
 
     expect(await screen.findByText('Spring is here')).toBeInTheDocument()
@@ -110,6 +127,7 @@ describe('a campaign in detail', () => {
      */
     let reads = 0
     const fetchMock = stubFetch({
+      'GET /campaigns/1/results': () => jsonResponse(NO_RESULTS),
       'GET /campaigns/1/composition': () => {
         reads += 1
         return jsonResponse(COMPOSITION)
@@ -137,6 +155,7 @@ describe('a campaign in detail', () => {
 
   it('says so when the person may not create variants', async () => {
     stubFetch({
+      'GET /campaigns/1/results': () => jsonResponse(NO_RESULTS),
       'GET /campaigns/1/composition': () => jsonResponse(COMPOSITION),
       'POST /campaigns/variants/3/duplicate': () => jsonResponse({ detail: 'no' }, 403),
     })
@@ -177,6 +196,7 @@ describe('creating', () => {
 
   it('creates a blank variant below the variants and opens it in the editor', async () => {
     const fetchMock = stubFetch({
+      'GET /campaigns/1/results': () => jsonResponse(NO_RESULTS),
       'GET /campaigns/1/composition': () => jsonResponse(COMPOSITION),
       'GET /settings': () => jsonResponse(CHANNELS),
       'POST /campaigns/1/variants': () => jsonResponse({ id: 22 }),
@@ -197,5 +217,57 @@ describe('creating', () => {
     expect(await screen.findByText('editor 1/22')).toBeInTheDocument()
     const post = fetchMock.mock.calls.map(([r]) => r as Request).find((r) => r.method === 'POST')!
     expect(await post.clone().json()).toEqual({ name: 'Plain', channel: 'email', status: 'draft' })
+  })
+})
+
+describe('the results section (task-58)', () => {
+  it('shows the whole campaign and each variant that sent, as the server counts them', async () => {
+    stubFetch({
+      'GET /campaigns/1/composition': () => jsonResponse(COMPOSITION),
+      'GET /campaigns/1/results': () => jsonResponse({
+        campaign: figures(),
+        variants: [
+          { id: 3, name: 'Variant A', channel: 'email', ...figures() },
+          { id: 4, name: 'Push', channel: 'push', ...figures({ delivered: null, click_rate: null }) },
+        ],
+        unsubscribes_counted_since: '2026-10-12T00:00:00Z',
+        unsubscribes_partial: true,
+      }),
+    })
+    renderDetail()
+    const table = await screen.findByRole('grid', { name: 'Results by variant' })
+    const rows = within(table).getAllByRole('row')
+    expect(rows[1]).toHaveTextContent('Whole campaign')
+    expect(rows[1]).toHaveTextContent('37.5 %')
+    expect(rows[1]).toHaveTextContent('1 (consent 1)')
+    expect(rows[2]).toHaveTextContent('Variant A (email)')
+    // Push reports no deliveries, and with nothing sent there is no rate.
+    expect(within(rows[3]).getAllByText('—')).toHaveLength(2)
+    expect(screen.getByText(/Unsubscribes made before .* are not counted/)).toBeInTheDocument()
+  })
+
+  it('has no section while nothing has gone out', async () => {
+    stubFetch({
+      'GET /campaigns/1/composition': () => jsonResponse(COMPOSITION),
+      'GET /campaigns/1/results': () => jsonResponse(NO_RESULTS),
+    })
+    renderDetail()
+    expect(await screen.findByRole('heading', { name: 'Spring' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('Results')).not.toBeInTheDocument())
+    expect(screen.queryByRole('grid', { name: 'Results by variant' })).not.toBeInTheDocument()
+  })
+
+  it('leaves out the partial note when every send is counted in full', async () => {
+    stubFetch({
+      'GET /campaigns/1/composition': () => jsonResponse(COMPOSITION),
+      'GET /campaigns/1/results': () => jsonResponse({
+        campaign: figures(), variants: [{ id: 3, name: 'Variant A', channel: 'email', ...figures() }],
+        unsubscribes_counted_since: '2026-10-12T00:00:00Z', unsubscribes_partial: false,
+      }),
+    })
+    renderDetail()
+    await screen.findByRole('grid', { name: 'Results by variant' })
+    expect(screen.getByText(/Opens are not counted\./)).toBeInTheDocument()
+    expect(screen.queryByText(/Unsubscribes made before/)).not.toBeInTheDocument()
   })
 })

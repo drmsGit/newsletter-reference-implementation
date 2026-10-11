@@ -84,6 +84,45 @@ class MonitoredCampaign(BaseModel):
     variants: list[MonitoredVariant]
 
 
+class ResultFigures(BaseModel):
+    """A variant's or a campaign's figures (task-58, ADR-196 points 3 and 4).
+
+    Counted per delivery: "unique" is distinct deliveries with at least one
+    such event. `delivered` is None where the channel reports no deliveries
+    (push). `click_rate` is unique clickers over sent, None when nothing was
+    sent. Opens are not a figure (task-353)."""
+
+    recipients: int
+    sent: int
+    delivered: int | None = None
+    failed: int
+    excluded: int
+    excluded_by_stage: dict[str, int] = {}
+    bounced: int
+    complaints: int
+    clicks_total: int
+    unique_clickers: int
+    click_rate: float | None = None
+    unsubscribes: int
+
+
+class VariantResults(ResultFigures):
+    id: int
+    name: str
+    channel: str
+
+
+class CampaignResults(BaseModel):
+    """The campaign page's results section. Empty until a send has gone out."""
+
+    campaign: ResultFigures | None = None
+    variants: list[VariantResults]
+    # Unsubscribes record their delivery only since this moment; a send older
+    # than it may have had more than it shows (ADR-196 point 6).
+    unsubscribes_counted_since: datetime
+    unsubscribes_partial: bool
+
+
 class CampaignCreate(BaseModel):
     name: str
     # The channel of the initial variant this creates, not a property of the

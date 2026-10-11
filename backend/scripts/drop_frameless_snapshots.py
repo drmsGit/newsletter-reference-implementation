@@ -34,7 +34,7 @@ from app.database import SessionLocal  # noqa: E402
 from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB  # noqa: E402
 from app.insight.db_models import EngagementEventDB  # noqa: E402
 from app.overrides.db_models import ContentOverrideDB  # noqa: E402
-from app.recipients.db_models import SignalContributionDB  # noqa: E402
+from app.recipients.db_models import ConsentEventDB, SignalContributionDB  # noqa: E402
 from app.rendering.frame import is_frame  # noqa: E402
 from app.snapshots.db_models import SnapshotDB  # noqa: E402
 
@@ -55,10 +55,14 @@ def plan(db, storage: Path = STORAGE):
         SignalContributionDB.event_id.in_(events))] if events else []
     overrides = [o.id for o in db.query(ContentOverrideDB.id).filter(
         ContentOverrideDB.send_instance_id.in_(sends))] if sends else []
+    # Consent records are kept and only lose the delivery they came through
+    # (ADR-196 point 6): proof of consent never goes with a delivery row.
+    consents = [c.id for c in db.query(ConsentEventDB.id).filter(
+        ConsentEventDB.delivery_execution_id.in_(executions))] if executions else []
     return {
         "snapshots": snapshots, "send_instances": sends, "delivery_executions": executions,
         "engagement_events": events, "signal_contributions": contributions,
-        "overrides_unlinked": overrides,
+        "overrides_unlinked": overrides, "consents_unlinked": consents,
         "html_files": sorted(storage.glob("*.html")) if storage.exists() else [],
     }
 
@@ -66,6 +70,8 @@ def plan(db, storage: Path = STORAGE):
 def apply(db, ids) -> None:
     db.query(ContentOverrideDB).filter(ContentOverrideDB.id.in_(ids["overrides_unlinked"])).update(
         {"send_instance_id": None}, synchronize_session=False)
+    db.query(ConsentEventDB).filter(ConsentEventDB.id.in_(ids["consents_unlinked"])).update(
+        {"delivery_execution_id": None}, synchronize_session=False)
     for model, key in (
         (SignalContributionDB, "signal_contributions"),
         (EngagementEventDB, "engagement_events"),

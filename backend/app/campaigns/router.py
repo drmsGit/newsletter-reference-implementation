@@ -14,6 +14,7 @@ from app.campaigns.models import (
     CampaignDuplicate,
     CampaignDuplicated,
     MonitoredCampaign,
+    CampaignResults,
     VariantDuplicate,
     VariantDuplicated,
     DuplicationOptions,
@@ -199,6 +200,30 @@ def create_campaign_record(
                 "variant_ids": [v.id for v in created.variants]},
     )
     return created
+
+
+@router.get(
+    "/{campaign_id}/results",
+    response_model=CampaignResults,
+    summary="How the campaign went: per variant that has sent, and a campaign line",
+    description=(
+        "Computed on read from the deliveries and their events, never stored "
+        "(task-58, ADR-196). Only sends that went out count; a campaign that has "
+        "sent nothing has no rows. Counted per delivery; every click rate is "
+        "unique clickers over sent. Opens are not a figure."
+    ),
+)
+def get_campaign_results(
+    campaign_id: int,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    from app.campaigns.results import campaign_results
+
+    found = campaign_results(db, campaign_id, brand_id=brand_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    return found
 
 
 @router.get("/{campaign_id}/variants", response_model=list[Variant])

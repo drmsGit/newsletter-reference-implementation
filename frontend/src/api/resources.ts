@@ -7,6 +7,8 @@ import type { components } from './schema'
 
 export type Campaign = components['schemas']['Campaign']
 export type ContentRecord = components['schemas']['ContentRecord']
+export type CampaignResults = components['schemas']['CampaignResults']
+export type VariantResults = components['schemas']['VariantResults']
 export type ContentListItem = components['schemas']['ContentListItem']
 export type AudienceGroup = components['schemas']['AudienceGroup']
 export type PendingActionRow = components['schemas']['PendingActionRow']
@@ -39,6 +41,7 @@ export type SlotResolution = components['schemas']['SlotResolution']
 export const keys = {
   campaigns: ['campaigns'] as const,
   composition: (id: number) => ['campaigns', id, 'composition'] as const,
+  campaignResults: (id: number) => ['campaigns', id, 'results'] as const,
   monitoring: ['campaigns', 'monitoring'] as const,
   decisionSlots: ['decision-slots'] as const,
   decisionSlot: (id: number) => ['decision-slots', id] as const,
@@ -484,6 +487,23 @@ export function useAsSent(executionId: number) {
 }
 
 /** A campaign as the variant editor shows it (B11): one read for the screen. */
+/**
+ * How the campaign went: one row per variant that has sent, and a campaign
+ * line (task-58, ADR-196). Computed on read by the server; this screen
+ * derives none of it. Empty until a send has gone out.
+ */
+export function useCampaignResults(campaignId: number) {
+  return useQuery({
+    queryKey: keys.campaignResults(campaignId),
+    queryFn: () =>
+      read(
+        api.GET('/campaigns/{campaign_id}/results', {
+          params: { path: { campaign_id: campaignId } },
+        }),
+      ),
+  })
+}
+
 export function useComposition(campaignId: number) {
   return useQuery({
     queryKey: keys.composition(campaignId),

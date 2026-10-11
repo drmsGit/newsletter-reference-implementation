@@ -604,6 +604,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/campaigns/{campaign_id}/results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How the campaign went: per variant that has sent, and a campaign line
+         * @description Computed on read from the deliveries and their events, never stored (task-58, ADR-196). Only sends that went out count; a campaign that has sent nothing has no rows. Counted per delivery; every click rate is unique clickers over sent. Opens are not a figure.
+         */
+        get: operations["get_campaign_results_campaigns__campaign_id__results_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/campaigns/{campaign_id}/variants": {
         parameters: {
             query?: never;
@@ -3394,6 +3414,22 @@ export interface components {
              */
             overrides_not_carried: number;
         };
+        /**
+         * CampaignResults
+         * @description The campaign page's results section. Empty until a send has gone out.
+         */
+        CampaignResults: {
+            campaign?: components["schemas"]["ResultFigures"] | null;
+            /** Variants */
+            variants: components["schemas"]["VariantResults"][];
+            /**
+             * Unsubscribes Counted Since
+             * Format: date-time
+             */
+            unsubscribes_counted_since: string;
+            /** Unsubscribes Partial */
+            unsubscribes_partial: boolean;
+        };
         /** CampaignVariantUse */
         CampaignVariantUse: {
             /** Id */
@@ -5955,6 +5991,46 @@ export interface components {
              */
             modules: components["schemas"]["ModuleState"][];
         };
+        /**
+         * ResultFigures
+         * @description A variant's or a campaign's figures (task-58, ADR-196 points 3 and 4).
+         *
+         *     Counted per delivery: "unique" is distinct deliveries with at least one
+         *     such event. `delivered` is None where the channel reports no deliveries
+         *     (push). `click_rate` is unique clickers over sent, None when nothing was
+         *     sent. Opens are not a figure (task-353).
+         */
+        ResultFigures: {
+            /** Recipients */
+            recipients: number;
+            /** Sent */
+            sent: number;
+            /** Delivered */
+            delivered?: number | null;
+            /** Failed */
+            failed: number;
+            /** Excluded */
+            excluded: number;
+            /**
+             * Excluded By Stage
+             * @default {}
+             */
+            excluded_by_stage: {
+                [key: string]: number;
+            };
+            /** Bounced */
+            bounced: number;
+            /** Complaints */
+            complaints: number;
+            /** Clicks Total */
+            clicks_total: number;
+            /** Unique Clickers */
+            unique_clickers: number;
+            /** Click Rate */
+            click_rate?: number | null;
+            /** Unsubscribes */
+            unsubscribes: number;
+        };
         /** SendCapUpdate */
         SendCapUpdate: {
             /** Max Send Recipients */
@@ -6828,6 +6904,44 @@ export interface components {
             at: string;
             /** Active */
             active: boolean;
+        };
+        /** VariantResults */
+        VariantResults: {
+            /** Recipients */
+            recipients: number;
+            /** Sent */
+            sent: number;
+            /** Delivered */
+            delivered?: number | null;
+            /** Failed */
+            failed: number;
+            /** Excluded */
+            excluded: number;
+            /**
+             * Excluded By Stage
+             * @default {}
+             */
+            excluded_by_stage: {
+                [key: string]: number;
+            };
+            /** Bounced */
+            bounced: number;
+            /** Complaints */
+            complaints: number;
+            /** Clicks Total */
+            clicks_total: number;
+            /** Unique Clickers */
+            unique_clickers: number;
+            /** Click Rate */
+            click_rate?: number | null;
+            /** Unsubscribes */
+            unsubscribes: number;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Channel */
+            channel: string;
         };
         /** VariantUpdate */
         VariantUpdate: {
@@ -8031,6 +8145,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_MonitoredCampaign_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_campaign_results_campaigns__campaign_id__results_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaign_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignResults"];
                 };
             };
             /** @description Validation Error */

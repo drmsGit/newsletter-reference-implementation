@@ -91,6 +91,7 @@ def record_consent(
     purpose: str,
     note: str | None = None,
     commit: bool = True,
+    delivery_execution_id: int | None = None,
 ) -> ConsentEventDB:
     """Append a consent event. Never updates an existing row.
 
@@ -98,6 +99,9 @@ def record_consent(
     assertion from a provider suppression from a signup form, and therefore
     what makes drift computable without the sync log storing consent values
     (ADR-163 addendum 2026-09-12, points 2 and 4).
+
+    `delivery_execution_id` is the delivery it came through, when it came
+    through one — so a send can count its unsubscribes (ADR-196 point 6).
     """
     event = ConsentEventDB(
         recipient_id=recipient_id,
@@ -107,6 +111,7 @@ def record_consent(
         status=status,
         source=source,
         note=note,
+        delivery_execution_id=delivery_execution_id,
     )
     db.add(event)
     if commit:

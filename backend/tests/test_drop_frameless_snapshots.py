@@ -14,7 +14,7 @@ from app.campaigns.db_models import CampaignDB, VariantDB
 from app.database import Base, SessionLocal
 from app.delivery.db_models import DeliveryExecutionDB, SendInstanceDB
 from app.insight.db_models import EngagementEventDB
-from app.recipients.db_models import RecipientDB, SignalContributionDB
+from app.recipients.db_models import ConsentEventDB, RecipientDB, SignalContributionDB
 from app.rendering.frame import build_frame
 from app.snapshots.db_models import SnapshotDB
 from scripts import drop_frameless_snapshots as script
@@ -42,7 +42,7 @@ def test_every_foreign_key_into_the_dropped_tables_is_handled():
     assert found == {
         "send_instances.snapshot_id", "content_overrides.send_instance_id",
         "delivery_executions.send_instance_id", "engagement_events.delivery_execution_id",
-        "signal_contributions.event_id",
+        "signal_contributions.event_id", "consent_events.delivery_execution_id",
     }, f"a foreign key appeared that the drop script does not handle: {found}"
 
 
@@ -71,7 +71,11 @@ def test_it_drops_a_frameless_snapshot_and_its_chain_and_keeps_frames(db, tmp_pa
     db.add(event); db.flush()
     contribution = SignalContributionDB(recipient_id=recipient.id, category_id=category.id,
                                         contribution_type="click", base_weight=5, event_id=event.id)
-    db.add(contribution); db.commit()
+    db.add(contribution)
+    consent = ConsentEventDB(recipient_id=recipient.id, brand_id=brand.id, status="opted_out",
+                             source="unsubscribe", delivery_execution_id=execution.id)
+    db.add(consent); db.commit()
+    consent_id = consent.id
     (tmp_path / "old.html").write_text("<html></html>")
     # Ids captured now: the rows are about to be deleted, and reading an
     # attribute of a deleted instance raises.
@@ -90,10 +94,14 @@ def test_it_drops_a_frameless_snapshot_and_its_chain_and_keeps_frames(db, tmp_pa
         for model, key in chain:
             assert db.get(model, key) is None, model.__name__
         assert not (tmp_path / "old.html").exists()
+        kept_consent = db.get(ConsentEventDB, consent_id)
+        assert kept_consent is not None and kept_consent.delivery_execution_id is None, \
+            "a consent record went with its delivery"
     finally:
         db.rollback()
         db.query(SnapshotDB).filter(SnapshotDB.id.in_([old_id, kept_id])).delete(
             synchronize_session=False)
+        db.query(ConsentEventDB).filter(ConsentEventDB.recipient_id == recipient_id).delete()
         db.query(RecipientDB).filter(RecipientDB.id == recipient_id).delete()
         db.query(CategoryDB).filter(CategoryDB.id == category_id).delete()
         db.query(VariantDB).filter(VariantDB.id == variant_id).delete()

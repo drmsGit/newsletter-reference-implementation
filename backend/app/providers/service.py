@@ -238,6 +238,7 @@ def _record_with_effects(db: Session, normalized, event_data: dict) -> ProviderE
                 channel=delivery_execution.channel,
                 purpose=delivery_execution.purpose,
                 commit=False,
+                delivery_execution_id=delivery_execution.id,
             )
             if changed:
                 logger.info(

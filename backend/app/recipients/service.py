@@ -45,6 +45,7 @@ def suppress_recipient(
     channel: str = DEFAULT_CHANNEL,
     purpose: str,
     commit: bool = True,
+    delivery_execution_id: int | None = None,
 ) -> bool:
     """Opt a recipient out because of a delivery-feedback signal (hard bounce /
     spam complaint) the provider reported. Idempotent — returns True only if the
@@ -92,6 +93,7 @@ def suppress_recipient(
         purpose=purpose,
         note=reason,
         commit=commit,
+        delivery_execution_id=delivery_execution_id,
     )
     return True
 

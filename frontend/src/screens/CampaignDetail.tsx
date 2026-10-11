@@ -9,6 +9,7 @@ import {
   type ComposedVariant,
 } from '../api/resources'
 import { HttpError } from '../api/session'
+import CampaignResults from '../components/CampaignResults'
 import DataTable, { type DataColumn } from '../components/DataTable'
 import NameAndChannel from '../components/NameAndChannel'
 import ScreenState from '../components/ScreenState'
@@ -48,6 +49,7 @@ export default function CampaignDetail() {
               <dt>Updated</dt>
               <dd>{formatDate(composition.data.campaign.updated_at)}</dd>
             </dl>
+            <CampaignResults campaignId={id} />
             {composition.data.variants.map((composed) => (
               <VariantSection key={composed.variant.id} campaignId={id} composed={composed} />
             ))}

@@ -65,6 +65,14 @@ class ConsentEventDB(Base):
     # Where this came from: crm | provider | form | import | manual.
     source = Column(String(100), nullable=False)
     note = Column(String, nullable=True)
+    # The delivery this came through, when it came through one: a send's
+    # unsubscribe link, or a provider's bounce or complaint (ADR-196 point 6).
+    # It is what lets a send count its unsubscribes. Rows written before
+    # 2026-10-11 have none. SET NULL: removing a delivery row must never take
+    # a consent record with it.
+    delivery_execution_id = Column(
+        Integer, ForeignKey("delivery_executions.id", ondelete="SET NULL"), nullable=True
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     __table_args__ = (
@@ -77,6 +85,11 @@ class ConsentEventDB(Base):
             "channel",
             "purpose",
             "created_at",
+        ),
+        Index(
+            "ix_consent_events_delivery_execution_id",
+            "delivery_execution_id",
+            postgresql_where=(delivery_execution_id.isnot(None)),
         ),
     )
 

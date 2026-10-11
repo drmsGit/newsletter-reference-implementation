@@ -80,13 +80,14 @@ def message_for(db: Session, token: str) -> tuple[DeliveryExecutionDB, BrandDB] 
     return (row[0], row[1]) if row else None
 
 
-def _opt_out(db: Session, recipient_id: int, brand_id: int, channel: str) -> bool:
+def _opt_out(db: Session, recipient_id: int, brand_id: int, channel: str, execution_id: int) -> bool:
     """One cell, written only if it is not opted out already, so a repeated
-    click or one-click POST adds nothing."""
+    click or one-click POST adds nothing. It records the delivery the link
+    came from, so the send can count it (ADR-196 point 6)."""
     if latest_consent_status(db, recipient_id, brand_id, channel=channel, purpose=MARKETING) == OPTED_OUT:
         return False
     record_consent(db, recipient_id, OPTED_OUT, brand_id, source=SOURCE, channel=channel,
-                   purpose=MARKETING, commit=False)
+                   purpose=MARKETING, commit=False, delivery_execution_id=execution_id)
     return True
 
 
@@ -110,8 +111,8 @@ def unsubscribe(db: Session, token: str, *, everything: bool = False) -> tuple[B
     if everything:
         for brand_id in [b.id for b in db.query(BrandDB.id)]:
             for channel in list_channels():
-                _opt_out(db, execution.recipient_id, brand_id, channel.name)
+                _opt_out(db, execution.recipient_id, brand_id, channel.name, execution.id)
     else:
-        _opt_out(db, execution.recipient_id, brand.id, execution.channel)
+        _opt_out(db, execution.recipient_id, brand.id, execution.channel, execution.id)
     db.commit()
     return brand, everything
