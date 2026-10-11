@@ -306,6 +306,73 @@ Adding the file changes the fingerprint, as adding any module does. Deliveries s
 - **Point 3:** the labels are still built in, not profile fields. Only the place they are written changes.
 - **Point 5:** `footer_html` and `FOOTER_STYLE` still never change.
 
+## Addendum 2026-10-11 (third) — slice 2's final-design pass: look values and link tags
+
+**Slice 2's final-design pass (queue task-354) settled how profile values reach the look and the links.** The user decided points 1–4 on 2026-10-11, one question at a time. Points 5–8 are technical consequences settled in the same pass. Points 1–18 of the Decision are unchanged. Task-354's implementation plan holds the map of where each part lands.
+
+**1. `brand.css` names a profile value as a standard CSS variable with its fallback.**
+
+- **The form is `var(--field_name, fallback)`,** for example `color: var(--colour_text, #1a1a1a);`.
+- **The renderer replaces every `var()` before the CSS is inlined:** with the profile's value, or with the fallback when the profile leaves the field empty.
+- **No email ever contains `var()`.** Email clients cannot read CSS variables (Decision point 3).
+- **`brand.css` stays valid CSS** that a designer can open in any tool, and every value has a visible default.
+- **Only colour, size, font family and number values are filled in.** Any other field named in `brand.css` falls back.
+
+**2. The shipped setup file declares a starter set of look fields.**
+
+- **They are taken from today's `brand.css`,** each with today's value as its fallback, in the group "Look": text colour, body text colour, button colour, button text colour, hero background, font family, headline size, body size and button corner radius.
+- **Task-354's plan names them** `colour_text`, `colour_body_text`, `colour_button`, `colour_button_text`, `colour_hero_background`, `font_family`, `size_headline`, `size_body` and `radius_button`.
+- **Nothing looks different until a profile fills one.**
+- **This replaces slice 1's default** "the shipped file declares no fields beyond the core" (point 1 of the first addendum above), for these look fields.
+
+**3. UTM tags go on every http(s) link a module renders.**
+
+- **That is content links and typed-in static buttons,** and later the menu links of the header and footer modules.
+- **Never the legal footer's** imprint, privacy or unsubscribe links.
+- **A key the link already carries is kept.**
+- **No tags at all unless the profile sets `utm_source`.**
+- **The click-attribution parameter `nl_content` is separate and unchanged** ([[ADR-182 — A Click Credits Content Only When the Link Names It]]). Links are tagged after it is written.
+
+This makes Decision point 11's "content links" concrete.
+
+**4. `utm_campaign` and `utm_content` are the campaign's and the variant's names as slugs.**
+
+- **A slug is lowercase; any other character becomes a hyphen.** For example `utm_campaign=spring-sale-2026`.
+- **They read plainly in analytics,** without a lookup table.
+- **Two campaigns with the same name share a label.** The user accepted this.
+- **They are frozen at snapshot time.** Renaming a campaign after the send does not change what was sent.
+
+**5. Theme values are frozen with the profile.**
+
+- **The version-3 frame already holds all of a profile's values** (queue task-357). So a rebuilt email keeps the colours it was sent with.
+- **The frozen link parameters sit beside the profile in the frame.**
+- **There is no frame-version bump.** Frames without them render as before.
+
+**6. `utm_source`, `utm_medium` and `utm_extra` are core fields.**
+
+- **They are optional,** in the group "Link tracking".
+- **`utm_extra` holds further `key=value` pairs,** one per line.
+- **They are core because the platform reads them by name.** This adds to the core fields listed in point 1 of the first addendum above.
+
+**7. The email fingerprint changes once** (accepted cost).
+
+- **Editing `brand.css` changes the template fingerprint,** as any template edit does.
+- **The inlined output of older frames stays byte-identical.** The CSS inliner drops the style block after inlining, and the fallbacks equal today's values.
+
+**8. Profile values also reach the module templates as `profile.<field>`.**
+This is Decision point 3's second half. Today's `.html` templates can use it now. When templates move to MJML ([[ADR-131 — Email Module Templates Use MJML as Source Format]], not built yet), tag attributes can take profile values the same way.
+
+**What this pass settles.**
+
+- **"How `brand.css` refers to profile fields, and how MJML tag attributes take profile values"** from the open list of the first addendum above.
+- **The Notes item that the pass building link tagging or the content-id carrier "should place both".** Both are written at render, UTM after `nl_content`, and neither replaces the other.
+
+**Negative consequences of this pass.**
+
+- **Same-named campaigns share a `utm_campaign` label.** Analytics cannot tell them apart by that tag.
+- **Which `brand.css` values a profile may change is limited to the declared field types.** Colour, size, font family and number are filled in; nothing else is.
+- **A new value in `brand.css` is fillable only once the setup file declares it.** Until then it always shows its fallback.
+
 ## Related ADRs
 
 ### Supersedes
