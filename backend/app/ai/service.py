@@ -16,6 +16,7 @@ The order matters and is the ADR, not a preference:
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.ai.adapters.base import TokenCountUnavailable
@@ -165,7 +166,12 @@ def spend_to_date(db: Session) -> dict:
 
 
 def _record(db: Session, **kwargs) -> AIRunDB:
-    row = AIRunDB(**kwargs)
+    # Stamped when it is recorded, not when the transaction began: now() is
+    # the transaction's start, and the prompt and budget reads open it before
+    # the model answers, so a run in flight across a period reset would land
+    # in the period it started in. A run counts in the period it is recorded
+    # in (ADR-144 addendum 2026-10-11; doc-19).
+    row = AIRunDB(created_at=func.clock_timestamp(), **kwargs)
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -188,7 +194,10 @@ def run_task(
     """Execute one AI task, enforcing the cap before spending anything.
 
     `actor_type`/`actor_id`: who started it, recorded on the run (task-345):
-    a user, an integration, or "system" with no id."""
+    a user, an integration, or "system" with no id. Nothing given means
+    "system": NULL is kept for runs recorded before actors were (doc-19)."""
+    if actor_type is None:
+        actor_type, actor_id = "system", None
 
     provider_name = provider_name or get_ai_provider_name(db)
     # Which model THIS task runs on (ADR-144 §2). None means the deployment
