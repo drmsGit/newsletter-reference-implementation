@@ -76,13 +76,12 @@ visible), pressed, disabled, invalid, and loading where it applies.
   - approvals: inbox, history, detail;
   - campaigns, a campaign, and the variant editor;
   - monitoring;
-  - settings;
+  - settings, with its parts as subpages: general, and brand profiles with one profile (since 2026-10-11, task-350);
   - content, a content record;
   - audiences, an audience;
   - recipients, a recipient;
   - decision slots, a slot;
-  - deliveries, a delivery;
-  - brand profiles, a profile (since 2026-10-11, task-350).
+  - deliveries, a delivery.
 
   Their fields and flows come from interview records (`docs/react-screen-inventory.md`).
   A mock-up is a reference for look, not a spec for what a screen contains.

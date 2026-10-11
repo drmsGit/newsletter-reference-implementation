@@ -85,10 +85,10 @@ function openDetail(handlers: Record<string, (request: Request) => Response | Pr
   stubFetch(handlers as never)
   renderWithProviders(
     <Routes>
-      <Route path="/brand-profiles/:id" element={<BrandProfileDetail />} />
-      <Route path="/brand-profiles" element={<p>The list</p>} />
+      <Route path="/settings/brand-profiles/:id" element={<BrandProfileDetail />} />
+      <Route path="/settings/brand-profiles" element={<p>The list</p>} />
     </Routes>,
-    { route: '/brand-profiles/2' },
+    { route: '/settings/brand-profiles/2' },
   )
 }
 
@@ -153,5 +153,28 @@ describe('one profile', () => {
     expect(await screen.findByRole('button', { name: 'Duplicate' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Delete/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Make default' })).not.toBeInTheDocument()
+  })
+})
+
+describe('settings and its parts', () => {
+  it('reaches brand profiles as a part of Settings, marking the part that is open', async () => {
+    const { default: SettingsLayout } = await import('./SettingsLayout')
+    stubFetch({
+      'GET /brand-profiles/': () => jsonResponse(page([summary({})])),
+      'GET /brand-profiles/structure': () => jsonResponse(STRUCTURE),
+    })
+    renderWithProviders(
+      <Routes>
+        <Route path="/settings" element={<SettingsLayout />}>
+          <Route index element={<p>General settings</p>} />
+          <Route path="brand-profiles" element={<BrandProfiles />} />
+        </Route>
+      </Routes>,
+      { route: '/settings/brand-profiles' },
+    )
+    const parts = screen.getByRole('navigation', { name: 'Settings' })
+    expect(within(parts).getByRole('link', { name: 'Brand profiles' })).toHaveAttribute('aria-current', 'page')
+    expect(within(parts).getByRole('link', { name: 'General' })).not.toHaveAttribute('aria-current')
+    expect(await screen.findByRole('heading', { name: 'Brand profiles' })).toBeInTheDocument()
   })
 })

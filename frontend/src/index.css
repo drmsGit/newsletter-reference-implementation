@@ -193,6 +193,34 @@ input[data-focus-visible] {
   border-bottom-color: var(--brand-accent);
 }
 
+/* A section's own parts (Settings: General, Brand profiles), styled as the
+   main menu is; the visual design comes with the layout session. */
+.subnav {
+  border-bottom: 1px solid var(--brand-line);
+  margin-bottom: calc(var(--brand-space) * 2);
+}
+
+.subnav ul {
+  display: flex;
+  gap: calc(var(--brand-space) * 2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.subnav a {
+  display: inline-block;
+  padding: var(--brand-space) 0;
+  color: var(--brand-muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+}
+
+.subnav a[aria-current='page'] {
+  color: var(--brand-fg);
+  border-bottom-color: var(--brand-accent);
+}
+
 .react-aria-Table {
   width: 100%;
   border-collapse: collapse;

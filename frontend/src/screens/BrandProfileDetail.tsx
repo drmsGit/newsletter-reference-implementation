@@ -15,7 +15,7 @@ import {
 import { HttpError } from '../api/session'
 import { SaveState, fieldError } from '../components/EditorFields'
 import ScreenState from '../components/ScreenState'
-import { fieldLabels } from './BrandProfiles'
+import { BRAND_PROFILES, fieldLabels } from './BrandProfiles'
 
 /**
  * One brand profile (task-350; ADR-194). The form is built from the setup
@@ -39,7 +39,7 @@ export default function BrandProfileDetail() {
   return (
     <>
       <p>
-        <Link to="/brand-profiles">← Brand profiles</Link>
+        <Link to={BRAND_PROFILES}>← Brand profiles</Link>
       </p>
       <ScreenState query={profile}>
         <ScreenState query={structure}>
@@ -244,7 +244,7 @@ function ProfileActions({ profile, dirty }: { profile: BrandProfile; dirty: bool
       {dirty && <p className="muted">Save or undo your changes first; these act on the stored profile.</p>}
       <Button
         isDisabled={busy || dirty}
-        onPress={() => duplicate.mutate(undefined, { onSuccess: (copy) => navigate(`/brand-profiles/${copy.id}`) })}
+        onPress={() => duplicate.mutate(undefined, { onSuccess: (copy) => navigate(`${BRAND_PROFILES}/${copy.id}`) })}
       >
         Duplicate
       </Button>{' '}
@@ -258,7 +258,7 @@ function ProfileActions({ profile, dirty }: { profile: BrandProfile; dirty: bool
               Variants using it will move to the default profile.{' '}
               <Button
                 isDisabled={busy}
-                onPress={() => remove.mutate(undefined, { onSuccess: () => navigate('/brand-profiles') })}
+                onPress={() => remove.mutate(undefined, { onSuccess: () => navigate(BRAND_PROFILES) })}
               >
                 Delete {profile.name}
               </Button>{' '}

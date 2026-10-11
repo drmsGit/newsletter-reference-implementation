@@ -15,6 +15,9 @@ import Pager, { useOffset } from '../components/Pager'
 import ScreenState from '../components/ScreenState'
 import { ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
 
+/** Where the profiles live: a part of Settings, not an area of its own (user, 2026-10-11). */
+export const BRAND_PROFILES = '/settings/brand-profiles'
+
 /** "Legal company name, Imprint URL" from field names, by the setup file's labels. */
 export function fieldLabels(names: string[], structure: ProfileField[] | undefined): string {
   const labels = new Map((structure ?? []).map((f) => [f.name, f.label]))
@@ -61,7 +64,7 @@ export default function BrandProfiles() {
           columns={columns(structure.data)}
           items={profiles.data?.items ?? []}
           emptyMessage="This brand has no profiles yet."
-          onRowAction={(p) => navigate(`/brand-profiles/${p.id}`)}
+          onRowAction={(p) => navigate(`${BRAND_PROFILES}/${p.id}`)}
         />
         <Pager page={profiles.data} />
       </ScreenState>
@@ -97,7 +100,7 @@ function CreateForm({ onCancel }: { onCancel: () => void }) {
   function submit(event: FormEvent) {
     event.preventDefault()
     if (!name.trim() || create.isPending) return
-    create.mutate({ name: name.trim() }, { onSuccess: (profile) => navigate(`/brand-profiles/${profile.id}`) })
+    create.mutate({ name: name.trim() }, { onSuccess: (profile) => navigate(`${BRAND_PROFILES}/${profile.id}`) })
   }
 
   return (

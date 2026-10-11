@@ -23,7 +23,7 @@ import CatalogueModule from './CatalogueModule'
 import Fence from './Fence'
 import PreviewBar from './Preview'
 import { ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
-import { fieldLabels } from './BrandProfiles'
+import { BRAND_PROFILES, fieldLabels } from './BrandProfiles'
 
 /**
  * One variant, edited (task-255, slice 5 of the campaign write surface).
@@ -189,7 +189,7 @@ function ProfileChoice({
       {current.missing.length > 0 && (
         <p role="status">
           This profile is incomplete:{' '}
-          {fieldLabels(current.missing, structure.data)}. <Link to={`/brand-profiles/${current.id}`}>Fill it in</Link>{' '}
+          {fieldLabels(current.missing, structure.data)}. <Link to={`${BRAND_PROFILES}/${current.id}`}>Fill it in</Link>{' '}
           before sending.
         </p>
       )}

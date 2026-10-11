@@ -18,6 +18,7 @@ import Settings from './screens/Settings'
 import BrandProfileDetail from './screens/BrandProfileDetail'
 import BrandProfiles from './screens/BrandProfiles'
 import Deliveries from './screens/Deliveries'
+import SettingsLayout from './screens/SettingsLayout'
 import DeliveryAsSent from './screens/DeliveryAsSent'
 import DeliveryDetail from './screens/DeliveryDetail'
 import RequireSession from './routes/RequireSession'
@@ -58,15 +59,18 @@ export default function App() {
         <Route path="/campaigns/:id" element={<CampaignDetail />} />
         <Route path="/campaigns/:id/variants/:variantId" element={<VariantEditor />} />
         <Route path="/monitoring" element={<Monitoring />} />
-        <Route path="/settings" element={<Settings />} />
+        {/* Settings and its parts as subpages, under one menu entry. */}
+        <Route path="/settings" element={<SettingsLayout />}>
+          <Route index element={<Settings />} />
+          <Route path="brand-profiles" element={<BrandProfiles />} />
+          <Route path="brand-profiles/:id" element={<BrandProfileDetail />} />
+        </Route>
         <Route path="/content" element={<Content />} />
         <Route path="/content/:id" element={<ContentDetail />} />
         <Route path="/audiences" element={<Audiences />} />
         <Route path="/audiences/:id" element={<AudienceDetail />} />
         <Route path="/recipients" element={<Recipients />} />
         <Route path="/recipients/:id" element={<RecipientDetail />} />
-        <Route path="/brand-profiles" element={<BrandProfiles />} />
-        <Route path="/brand-profiles/:id" element={<BrandProfileDetail />} />
         <Route path="/decision-slots" element={<DecisionSlots />} />
         <Route path="/decision-slots/:id" element={<DecisionSlotDetail />} />
         <Route path="/deliveries" element={<Deliveries />} />

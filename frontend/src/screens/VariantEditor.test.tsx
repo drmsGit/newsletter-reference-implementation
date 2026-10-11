@@ -339,7 +339,7 @@ describe('the brand profile', () => {
       missing: ['imprint_url'] }).handlers)
     expect(await screen.findByText(/Its brand profile "Summer" was deleted/)).toBeInTheDocument()
     expect(await screen.findByText(/This profile is incomplete: Imprint URL\./)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Fill it in' })).toHaveAttribute('href', '/brand-profiles/1')
+    expect(screen.getByRole('link', { name: 'Fill it in' })).toHaveAttribute('href', '/settings/brand-profiles/1')
   })
 })
 
