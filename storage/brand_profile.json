@@ -19,18 +19,94 @@
     "does not declare always uses its fallback. Module templates read every",
     "value as {{ profile.name }}.",
     "",
+    "The Header and Footer fields are what the header and footer modules show",
+    "(task-351). A links field holds one link per line: Label | https://address.",
+    "Every address (url, image, links) must be https.",
+    "",
     "Careful: adding a field with \"required\": true makes every existing profile",
     "incomplete, and sends using it are refused until someone fills it in."
   ],
   "fields": {
-    "colour_text": {"type": "colour", "label": "Text colour", "group": "Look"},
-    "colour_body_text": {"type": "colour", "label": "Body text colour", "group": "Look"},
-    "colour_button": {"type": "colour", "label": "Button colour", "group": "Look"},
-    "colour_button_text": {"type": "colour", "label": "Button text colour", "group": "Look"},
-    "colour_hero_background": {"type": "colour", "label": "Hero background", "group": "Look"},
-    "font_family": {"type": "font_family", "label": "Font", "group": "Look"},
-    "size_headline": {"type": "size", "label": "Headline size", "group": "Look"},
-    "size_body": {"type": "size", "label": "Body text size", "group": "Look"},
-    "radius_button": {"type": "size", "label": "Button corner radius", "group": "Look"}
+    "colour_text": {
+      "type": "colour",
+      "label": "Text colour",
+      "group": "Look"
+    },
+    "colour_body_text": {
+      "type": "colour",
+      "label": "Body text colour",
+      "group": "Look"
+    },
+    "colour_button": {
+      "type": "colour",
+      "label": "Button colour",
+      "group": "Look"
+    },
+    "colour_button_text": {
+      "type": "colour",
+      "label": "Button text colour",
+      "group": "Look"
+    },
+    "colour_hero_background": {
+      "type": "colour",
+      "label": "Hero background",
+      "group": "Look"
+    },
+    "font_family": {
+      "type": "font_family",
+      "label": "Font",
+      "group": "Look"
+    },
+    "size_headline": {
+      "type": "size",
+      "label": "Headline size",
+      "group": "Look"
+    },
+    "size_body": {
+      "type": "size",
+      "label": "Body text size",
+      "group": "Look"
+    },
+    "radius_button": {
+      "type": "size",
+      "label": "Button corner radius",
+      "group": "Look"
+    },
+    "logo": {
+      "type": "image",
+      "label": "Logo",
+      "group": "Header"
+    },
+    "logo_alt": {
+      "type": "text",
+      "label": "Logo alt text",
+      "group": "Header"
+    },
+    "logo_link": {
+      "type": "url",
+      "label": "Logo links to",
+      "group": "Header"
+    },
+    "menu_links": {
+      "type": "links",
+      "label": "Menu links",
+      "group": "Header"
+    },
+    "footer_links": {
+      "type": "links",
+      "label": "Footer links",
+      "group": "Footer"
+    },
+    "service_hotline": {
+      "type": "text",
+      "label": "Service hotline",
+      "group": "Footer"
+    },
+    "footer_text": {
+      "type": "text",
+      "label": "Footer text",
+      "group": "Footer",
+      "multiline": true
+    }
   }
 }

@@ -24,7 +24,9 @@ TRANSACTIONAL = "transactional"
 KINDS = (MARKETING, TRANSACTIONAL)
 
 #: ADR-194 point 2.
-FIELD_TYPES = frozenset({"colour", "font_family", "size", "image", "text", "url", "number"})
+#: `links` (task-351, ADR-194's fourth addendum of 2026-10-11): a list of links,
+#: one per line, "Label | https://address".
+FIELD_TYPES = frozenset({"colour", "font_family", "size", "image", "text", "url", "number", "links"})
 FIELD_KEYS = frozenset({"type", "label", "required", "group", "multiline"})
 #: Safe to refer to from brand.css and templates (task-354).
 NAME = re.compile(r"[a-z][a-z0-9_]*")

@@ -31,6 +31,21 @@ class UnpublishedContentError(Exception):
 
 
 _jinja = Environment(loader=BaseLoader(), autoescape=True)
+
+
+def parse_links(value) -> list[dict]:
+    """A profile's link list (field type `links`): one link per line,
+    "Label | https://address", in the order written; blank lines skipped.
+    Templates read it as `{% for link in profile.menu_links | links %}`."""
+    links = []
+    for line in str(value or "").splitlines():
+        label, _, url = line.partition("|")
+        if label.strip() and url.strip():
+            links.append({"label": label.strip(), "url": url.strip()})
+    return links
+
+
+_jinja.filters["links"] = parse_links
 _inliner = css_inline.CSSInliner()
 
 _BRAND_CSS_PATH = (

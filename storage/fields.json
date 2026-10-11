@@ -143,6 +143,14 @@
       "concept": "url",
       "channel": "email",
       "type": "url"
+    },
+    "footer_note": {
+      "label": "Note for this email",
+      "concept": "note",
+      "channel": "email",
+      "type": "richtext",
+      "size": "small",
+      "note": "Optional. Shown at the top of the footer, in this email only."
     }
   }
 }

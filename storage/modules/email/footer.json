@@ -1,0 +1,13 @@
+{
+  "label": "Footer",
+  "channel": "email",
+  "description": "The brand's footer links, service hotline and footer text, from the email's brand profile, with one optional note for this email above them. The legal details follow it on every email anyway. Decorative: never counted as the email's content.",
+  "cms": false,
+  "decorative": true,
+  "variables": [
+    {
+      "name": "footer_note",
+      "required": false
+    }
+  ]
+}

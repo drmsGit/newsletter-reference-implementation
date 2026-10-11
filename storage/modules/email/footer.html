@@ -1,0 +1,25 @@
+{#- The visible footer (task-351; ADR-194): one optional note written for this
+    email, then the brand profile's footer links, hotline and text. Each part
+    is left out while it is empty. The legal footer follows, appended by the
+    frame on every email (task-357). -#}
+{%- set links = profile.footer_links | links -%}
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+  <tr>
+    <td class="module-footer">
+      {%- if footer_note %}
+      <p class="module-footer-note">{{ footer_note }}</p>
+      {%- endif %}
+      {%- if links %}
+      <p class="module-footer-links">
+        {%- for link in links %}{% if not loop.first %} · {% endif %}<a href="{{ link.url }}">{{ link.label }}</a>{% endfor -%}
+      </p>
+      {%- endif %}
+      {%- if profile.service_hotline %}
+      <p class="module-footer-text">{{ profile.service_hotline }}</p>
+      {%- endif %}
+      {%- if profile.footer_text %}
+      <p class="module-footer-text">{{ profile.footer_text }}</p>
+      {%- endif %}
+    </td>
+  </tr>
+</table>

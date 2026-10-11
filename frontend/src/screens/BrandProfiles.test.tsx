@@ -24,6 +24,8 @@ const STRUCTURE = [
     multiline: false, core: true, required_for: ['marketing'] },
   { name: 'colour_primary', type: 'colour', label: 'Primary colour', group: 'Look',
     multiline: false, core: false, required_for: [] },
+  { name: 'menu_links', type: 'links', label: 'Menu links', group: 'Header',
+    multiline: false, core: false, required_for: [] },
 ]
 
 const summary = (over: Record<string, unknown>) => ({
@@ -110,6 +112,13 @@ describe('one profile', () => {
     expect(screen.getByText('Primary colour').parentElement).not.toHaveTextContent('(required to send)')
   })
 
+  it('takes a link list in a text box and says how to write it', async () => {
+    openDetail(detailServer().handlers)
+    const menu = await screen.findByLabelText(/^Menu links/)
+    expect(menu.tagName).toBe('TEXTAREA')
+    expect(screen.getByText(/One link per line, written Label \| https:\/\/address/)).toBeInTheDocument()
+  })
+
   it('saves every field together, with the version it read', async () => {
     const { writes, handlers } = detailServer()
     openDetail(handlers)
@@ -122,7 +131,7 @@ describe('one profile', () => {
     expect(await writes[0].json()).toEqual({
       name: 'Calm', language: 'en',
       field_values: { legal_company_name: 'Example GmbH', legal_address: '', imprint_url: 'https://example.test/imprint',
-        privacy_url: '', unsubscribe_text: '', colour_primary: '#1a5db0' },
+        privacy_url: '', unsubscribe_text: '', colour_primary: '#1a5db0', menu_links: '' },
     })
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
   })

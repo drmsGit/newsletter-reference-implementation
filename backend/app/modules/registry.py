@@ -125,6 +125,10 @@ class ModuleManifest:
     #: module manifest = fields and limits; channel = cardinality.
     has_template: bool = True
     variables: list[ModuleVariable] = field(default_factory=list)
+    #: Never an email's content (ADR-086's 2026-10-08 addendum; task-351): the
+    #: visible header and footer. An email holding only decorative modules and
+    #: the envelope is nothing to show.
+    decorative: bool = False
 
 
 FIELDS_PATH = MODULES_DIR.parent / "fields.json"
@@ -171,7 +175,7 @@ DEFINITION_ATTRIBUTES = frozenset({"label", "envelope", "concept", "size", "type
 #: The keys a module manifest may carry (task-273, the user's call to include
 #: the top level). `"cms "` misspelt would otherwise turn a catalogue module
 #: into a static one without a word.
-MANIFEST_KEYS = frozenset({"label", "channel", "description", "cms", "has_template", "variables"})
+MANIFEST_KEYS = frozenset({"label", "channel", "description", "cms", "has_template", "variables", "decorative"})
 
 
 def _refuse_unknown(keys, allowed: frozenset, where: str, json_path: Path) -> None:
@@ -313,6 +317,7 @@ def _load_manifest(json_path: Path, channel: str) -> ModuleManifest:
         description=data.get("description", ""),
         cms=data.get("cms", False),
         has_template=data.get("has_template", True),
+        decorative=bool(data.get("decorative", False)),
         variables=[
             _variable(v, json_path) for v in data.get("variables", [])
         ],

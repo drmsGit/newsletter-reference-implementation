@@ -1,0 +1,22 @@
+{#- The visible header (task-351; ADR-194): everything from the email's brand
+    profile, nothing of its own. Each part is left out while its field is
+    empty. Links carry the profile's UTM tags, added after rendering. -#}
+{%- set menu = profile.menu_links | links -%}
+{%- if profile.logo or menu %}
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+  <tr>
+    <td class="module-header">
+      {%- if profile.logo %}
+      {%- if profile.logo_link %}<a href="{{ profile.logo_link }}">{% endif -%}
+      <img class="module-header-logo" src="{{ profile.logo }}" alt="{{ profile.logo_alt or '' }}">
+      {%- if profile.logo_link %}</a>{% endif %}
+      {%- endif %}
+      {%- if menu %}
+      <p class="module-header-menu">
+        {%- for link in menu %}{% if not loop.first %} · {% endif %}<a href="{{ link.url }}">{{ link.label }}</a>{% endfor -%}
+      </p>
+      {%- endif %}
+    </td>
+  </tr>
+</table>
+{%- endif %}

@@ -225,6 +225,7 @@ const HINTS: Record<string, string> = {
   url: 'A full address starting with https://.',
   image: 'The full address of the image, starting with https://.',
   font_family: 'A font list with a safe fallback, for example Georgia, serif.',
+  links: 'One link per line, written Label | https://address, in the order they should appear.',
 }
 
 function ProfileInput({
@@ -254,7 +255,7 @@ function ProfileInput({
         {field.label}
         {required && <span className="muted"> (required to send)</span>}
       </Label>
-      {field.multiline ? (
+      {field.multiline || field.type === 'links' ? (
         <TextArea rows={3} />
       ) : (
         <Input type={field.type === 'url' || field.type === 'image' ? 'url' : field.type === 'number' ? 'number' : 'text'} />

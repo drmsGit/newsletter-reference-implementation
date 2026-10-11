@@ -261,16 +261,23 @@ def what_rendered(frame: dict, picks: list[dict]) -> tuple[bool, int]:
     Meaningful is any module but the envelope that produced output: typed-in
     content, a catalogue record, or a slot that found something for this
     person (`picks` holds only those). An empty slot, an unbound module and an
-    unknown one do not count, and neither does the envelope module — for
-    email the header, which holds only the subject and preheader; push has
-    none. There is no "decorative" marker because no decorative module exists
-    yet; one added later is given a manifest marker then.
+    unknown one do not count, and neither does the envelope module (for
+    email the subject and preheader; push has none), nor a module whose
+    manifest says `decorative`: the visible header and footer (task-351).
     """
     envelope = _frame_envelope(frame)
     picked = {p["module_id"] for p in picks}
     slots = sum(1 for entry in frame["modules"] if entry["kind"] == KIND_SLOT)
+
+    def decorative(entry: dict) -> bool:
+        # The visible header and footer (task-351): never content. Looked up
+        # by today's name, so a version-1 `header` is the envelope, not this.
+        manifest = get_manifest(frame["channel"], lookup_type(frame, entry))
+        return bool(manifest and manifest.decorative)
+
     meaningful = any(
         entry["module_type"] != envelope
+        and not decorative(entry)
         and (entry["kind"] in (KIND_CONTENT, KIND_STATIC)
              or (entry["kind"] == KIND_SLOT and entry["module_id"] in picked))
         for entry in frame["modules"]

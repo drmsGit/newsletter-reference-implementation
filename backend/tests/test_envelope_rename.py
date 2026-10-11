@@ -40,7 +40,9 @@ def _as_before_the_rename(frame):
 
 def test_the_envelope_module_is_called_envelope():
     assert envelope_module_type("email") == "envelope"
-    assert get_manifest("email", "header") is None, "the name is free for ADR-193's visible header"
+    # The freed name is the visible header since task-351: decorative, never the envelope.
+    header = get_manifest("email", "header")
+    assert header is not None and header.decorative and not any(v.envelope for v in header.variables)
 
 
 def test_a_new_frame_names_its_envelope_and_says_its_version(db, world):

@@ -294,7 +294,7 @@ def test_a_reset_records_the_fields_it_reverted_and_who_reset_them(db, world, pe
 def test_a_refused_write_is_not_audited(db, world):
     with machine([CAMPAIGNS_MANAGE]) as headers:
         response = api.post(f"/campaigns/variants/{world['variant'].id}/modules",
-                            json={"module_type": "header"}, headers=headers)
+                            json={"module_type": "no_such_module"}, headers=headers)
     assert response.status_code == 400
     assert db.query(AuditEventDB).filter(
         AuditEventDB.action == audit.MODULE_CREATED,

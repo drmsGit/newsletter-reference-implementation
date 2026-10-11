@@ -84,7 +84,9 @@ TEXT_MAX = 2000
 LANGUAGE = re.compile(r"[a-z]{2}(-[A-Z]{2})?")
 _COLOUR = re.compile(r"#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?")
 _SIZE = re.compile(r"\d+(\.\d+)?(px|em|rem|%)")
-_URL = re.compile(r"https?://\S+")
+#: https only (ADR-194's fourth addendum of 2026-10-11): many mail programs
+#: block or flag what an email loads or links over plain http.
+_URL = re.compile(r"https://\S+")
 #: A font list goes into CSS (brand.css, task-354): names, commas, quotes,
 #: hyphens and dots only, so a value can never close a rule.
 _FONT_FAMILY = re.compile(r"[A-Za-z0-9 ,'\"._-]+")
@@ -176,7 +178,12 @@ def _check(field_type: str, value):
     if field_type == "size" and not _SIZE.fullmatch(value):
         return "A size with its unit: px, em, rem or %, for example 16px.", value
     if field_type in ("url", "image") and not _URL.fullmatch(value):
-        return "A full web address starting with https:// or http://.", value
+        return "A full web address starting with https://.", value
+    if field_type == "links":
+        for line in value.splitlines():
+            label, bar, url = line.partition("|")
+            if line.strip() and not (bar and label.strip() and _URL.fullmatch(url.strip())):
+                return "One link per line, written Label | https://address.", value
     if field_type == "font_family" and not _FONT_FAMILY.fullmatch(value):
         return "Font names separated by commas, for example Georgia, serif.", value
     return None, value

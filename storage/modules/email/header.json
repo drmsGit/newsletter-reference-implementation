@@ -1,0 +1,8 @@
+{
+  "label": "Header",
+  "channel": "email",
+  "description": "The brand's logo and menu at the top of the email, from the email's brand profile (Settings, Brand profiles). No fields of its own: switching the profile switches it. Decorative: never counted as the email's content.",
+  "cms": false,
+  "decorative": true,
+  "variables": []
+}
