@@ -155,6 +155,9 @@ class ProcessDueResult(BaseModel):
 
     triggered: int
     send_instance_ids: list[int] = []
+    #: Due sends held for a person because they were above the calling
+    #: integration's unattended ceiling (task-341). Still scheduled.
+    held_send_instance_ids: list[int] = []
 
 
 class ReconstructedModule(BaseModel):

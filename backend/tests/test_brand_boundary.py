@@ -605,7 +605,7 @@ class TestASendCannotBeFiredFromAnotherBrand:
                     IntegrationCredentialDB,
                     IntegrationCredentialDB.integration_id == IntegrationDB.id,
                 ).filter(IntegrationCredentialDB.key_id == key_id).first()
-                ints.set_unattended_sending(db, integration.id, True)
+                ints.set_unattended_ceiling(db, integration.id, __import__('app.settings.service', fromlist=['x']).get_max_send_recipients(db))
 
                 response = client.post(
                     f"/delivery/send-instances/{send_id}/send", headers=headers)

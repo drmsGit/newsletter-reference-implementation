@@ -605,11 +605,14 @@ def _approval_required(request: Request, exc: ApprovalRequired):
                 summary = module.summarise(db, subject_id, brand_id=exc.brand_id)
             except Exception:  # pragma: no cover - a summary must not block
                 logger.warning("could not summarise %s", exc.action_key, exc_info=True)
+        # Held for its size, not its kind (task-341): said in the inbox line.
+        from app.delivery.router import held_summary
+
         try:
             held = approvals.request_approval(
                 db, exc.action_key,
                 payload=exc.payload,
-                summary=summary or (meta.label if meta else exc.action_key),
+                summary=held_summary(summary or (meta.label if meta else exc.action_key), exc.payload),
                 requested_by_type=ACTOR_INTEGRATION,
                 requested_by_id=exc.integration_id,
                 brand_id=exc.brand_id,

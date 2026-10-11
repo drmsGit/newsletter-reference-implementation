@@ -2453,8 +2453,8 @@ export interface paths {
         };
         get?: never;
         /**
-         * Allow or stop this integration sending without approval
-         * @description ADR-166 point 5. Switching it on removes the human from the loop for this integration's sends, which is why the change is logged.
+         * Set how many recipients this integration may send to without approval
+         * @description ADR-166 point 5 and its addenda: 0 means every send is held for a person; above the ceiling a send is held for its size. Raising it needs every grant the integration has; lowering it does not. Never above the company-wide cap (422). The change is logged.
          */
         put: operations["set_unattended_integrations__integration_id__unattended_put"];
         post?: never;
@@ -4729,8 +4729,8 @@ export interface components {
             description?: string | null;
             /** Is Active */
             is_active: boolean;
-            /** May Send Unattended */
-            may_send_unattended: boolean;
+            /** Unattended Ceiling */
+            unattended_ceiling: number;
             /**
              * Created At
              * Format: date-time
@@ -5459,6 +5459,11 @@ export interface components {
              * @default []
              */
             send_instance_ids: number[];
+            /**
+             * Held Send Instance Ids
+             * @default []
+             */
+            held_send_instance_ids: number[];
         };
         /**
          * ProcessExpiredResult
@@ -6544,8 +6549,8 @@ export interface components {
         };
         /** UnattendedRequest */
         UnattendedRequest: {
-            /** Allowed */
-            allowed: boolean;
+            /** Ceiling */
+            ceiling: number;
         };
         /** UnsentCampaign */
         UnsentCampaign: {

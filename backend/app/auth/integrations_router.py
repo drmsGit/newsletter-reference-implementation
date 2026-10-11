@@ -15,7 +15,7 @@ too, because the policy table answers `view` for every GET.
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.audit import service as audit
@@ -55,7 +55,9 @@ class IntegrationOut(BaseModel):
     name: str
     description: str | None = None
     is_active: bool
-    may_send_unattended: bool
+    #: How many recipients it may send to without a person; 0 means never
+    #: (ADR-166 addenda of 2026-10-09 and 2026-10-11).
+    unattended_ceiling: int
     created_at: datetime
     created_by_user_id: int | None = None
     live_keys: int
@@ -84,7 +86,8 @@ class GrantRequest(BaseModel):
 
 
 class UnattendedRequest(BaseModel):
-    allowed: bool
+    #: 0 means never; never above the company-wide cap.
+    ceiling: int = Field(ge=0)
 
 
 def _out(db: Session, integration: IntegrationDB) -> IntegrationOut:
@@ -100,7 +103,7 @@ def _out(db: Session, integration: IntegrationDB) -> IntegrationOut:
         name=integration.name,
         description=integration.description,
         is_active=integration.is_active,
-        may_send_unattended=integration.may_send_unattended,
+        unattended_ceiling=integration.unattended_ceiling,
         created_at=integration.created_at,
         created_by_user_id=integration.created_by_user_id,
         live_keys=sum(1 for c in credentials if c.revoked_at is None),
@@ -270,10 +273,12 @@ def remove_grant(
 @router.put(
     "/{integration_id}/unattended",
     response_model=IntegrationOut,
-    summary="Allow or stop this integration sending without approval",
+    summary="Set how many recipients this integration may send to without approval",
     description=(
-        "ADR-166 point 5. Switching it on removes the human from the loop for "
-        "this integration's sends, which is why the change is logged."
+        "ADR-166 point 5 and its addenda: 0 means every send is held for a "
+        "person; above the ceiling a send is held for its size. Raising it needs "
+        "every grant the integration has; lowering it does not. Never above the "
+        "company-wide cap (422). The change is logged."
     ),
 )
 def set_unattended(
@@ -281,14 +286,18 @@ def set_unattended(
     db: Session = Depends(get_db),
 ):
     integration = _get(db, integration_id)
+    before = ints.unattended_ceiling(integration)
     try:
         ints.set_unattended_by_person(
-            db, request_principal(request), integration_id, payload.allowed,
+            db, request_principal(request), integration_id, payload.ceiling,
             enforced=auth_is_enforced(request),
         )
     except ints.GrantForbidden as error:
         raise HTTPException(status_code=403, detail=str(error))
-    ints.record_change(request, db, audit.INTEGRATION_UNATTENDED_SET, integration_id, allowed=payload.allowed)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error))
+    ints.record_change(request, db, audit.INTEGRATION_UNATTENDED_SET, integration_id,
+                       **{"from": before, "to": payload.ceiling})
     db.refresh(integration)
     return _out(db, integration)
 

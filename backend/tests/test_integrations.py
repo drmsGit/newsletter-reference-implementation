@@ -302,12 +302,12 @@ class TestUnattendedSending:
     def test_it_defaults_to_requiring_approval(self, session, integration):
         """ADR-166 point 5: the most destructive capability in the system is
         not the one that defaults open."""
-        assert integration.may_send_unattended is False
+        assert integration.unattended_ceiling == 0
 
     def test_it_can_be_switched_on_deliberately(self, session, integration):
-        assert ints.set_unattended_sending(session, integration.id, True)
+        assert ints.set_unattended_ceiling(session, integration.id, 10)
         session.refresh(integration)
-        assert integration.may_send_unattended is True
+        assert integration.unattended_ceiling == 10
 
 
 class TestFailedAttemptsCannotBeFannedOut:

@@ -85,7 +85,7 @@ def test_a_credential_for_one_brand_cannot_fire_another_brands_sends(due, fired,
         session = SessionLocal()
         try:
             credential = session.query(IntegrationCredentialDB).filter_by(key_id=key_id).one()
-            ints.set_unattended_sending(session, credential.integration_id, True)
+            ints.set_unattended_ceiling(session, credential.integration_id, __import__('app.settings.service', fromlist=['x']).get_max_send_recipients(session))
         finally:
             session.close()
         response = api.post("/delivery/process-due", headers=headers)
@@ -115,7 +115,7 @@ def test_non_default_working_brand_fires_its_own_due_send(due, fired, default_br
         key_id = headers["Authorization"].split()[1].split(".")[0]
         with SessionLocal() as session:
             credential = session.query(IntegrationCredentialDB).filter_by(key_id=key_id).one()
-            ints.set_unattended_sending(session, credential.integration_id, True)
+            ints.set_unattended_ceiling(session, credential.integration_id, __import__('app.settings.service', fromlist=['x']).get_max_send_recipients(session))
         response = api.post("/delivery/process-due", headers=headers)
 
     assert response.status_code == 200, response.text

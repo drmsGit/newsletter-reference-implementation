@@ -226,11 +226,13 @@ class IntegrationDB(Base):
     # Deactivation is immediate and applies to every credential beneath it,
     # the same property ADR-151 §3 gives a revoked session.
     is_active = Column(Boolean, nullable=False, default=True)
-    # ADR-166 point 5. **Safe by default**: a machine-triggered send lands in
-    # ADR-142 §4's approval surface unless somebody deliberately said
-    # otherwise. Opt-out, explicit, and logged — the same posture as the mock
-    # provider default and the governed model list.
-    may_send_unattended = Column(Boolean, nullable=False, default=False)
+    # ADR-166 point 5, as its 2026-10-09 and 2026-10-11 addenda made it: how
+    # many recipients this integration may send to without a person. 0 means
+    # never — **safe by default**, a machine-triggered send lands in ADR-142
+    # §4's approval surface. Above the ceiling a send is held for its size.
+    # Bounded by the company-wide cap; raised only by someone holding every
+    # grant the integration has (task-341).
+    unattended_ceiling = Column(Integer, nullable=False, server_default="0", default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     # Who set it up, for the access list. NOT an ownership link: ADR-166
     # point 4 makes a credential independent of the person who issued it, so

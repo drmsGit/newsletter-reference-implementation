@@ -73,7 +73,7 @@ def _unattended(headers) -> int:
     key_id = headers["Authorization"].split()[1].split(".")[0]
     with SessionLocal() as session:
         credential = session.query(IntegrationCredentialDB).filter_by(key_id=key_id).one()
-        ints.set_unattended_sending(session, credential.integration_id, True)
+        ints.set_unattended_ceiling(session, credential.integration_id, __import__('app.settings.service', fromlist=['x']).get_max_send_recipients(session))
         return credential.integration_id
 
 

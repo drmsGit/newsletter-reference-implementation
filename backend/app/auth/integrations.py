@@ -52,7 +52,7 @@ def new_secret() -> str:
 
 def create_integration(
     db: Session, name: str, description: str | None = None,
-    created_by_user_id: int | None = None, may_send_unattended: bool = False,
+    created_by_user_id: int | None = None,
 ) -> IntegrationDB | None:
     label = (name or "").strip()
     if not label:
@@ -61,8 +61,9 @@ def create_integration(
         name=label,
         description=(description or "").strip() or None,
         created_by_user_id=created_by_user_id,
-        # ADR-166 point 5: safe by default, and the caller has to say otherwise.
-        may_send_unattended=bool(may_send_unattended),
+        # ADR-166 point 5: safe by default, a ceiling of 0; somebody has to
+        # raise it on purpose, and that is gated and logged.
+        unattended_ceiling=0,
     )
     db.add(integration)
     db.commit()
@@ -87,23 +88,33 @@ def deactivate_integration(db: Session, integration_id: int) -> bool:
     return True
 
 
-def set_unattended_sending(db: Session, integration_id: int, allowed: bool) -> bool:
-    """ADR-166 point 5. The switch itself is the control, so it is logged.
+#: What the screen suggests when unattended sending is switched on (task-341).
+SUGGESTED_UNATTENDED_CEILING = 100
 
-    "The integration where someone switched it off is by construction the one
-    with the least oversight. Logging the change is the whole control."
-    """
-    integration = db.query(IntegrationDB).filter(
-        IntegrationDB.id == integration_id
-    ).first()
+
+def unattended_ceiling(integration) -> int:
+    """How many recipients this integration may send to without a person
+    (ADR-166, addenda of 2026-10-09 and 2026-10-11). 0: never."""
+    return int(getattr(integration, "unattended_ceiling", 0) or 0)
+
+
+def set_unattended_ceiling(db: Session, integration_id: int, ceiling: int) -> bool:
+    """Set the ceiling, 0 to the company-wide cap (task-341). Raises
+    ValueError outside that range. The change is the control, so the caller
+    logs it (`record_change`)."""
+    from app.settings.service import get_max_send_recipients
+
+    cap = get_max_send_recipients(db)
+    if not isinstance(ceiling, int) or isinstance(ceiling, bool) or ceiling < 0:
+        raise ValueError("The ceiling is a whole number of recipients, 0 or more.")
+    if ceiling > cap:
+        raise ValueError(f"The ceiling cannot be above the company-wide cap of {cap} recipients.")
+    integration = db.query(IntegrationDB).filter(IntegrationDB.id == integration_id).first()
     if integration is None:
         return False
-    integration.may_send_unattended = bool(allowed)
+    integration.unattended_ceiling = ceiling
     db.commit()
-    logger.info(
-        "integration %s: unattended sending %s",
-        integration.id, "ENABLED" if allowed else "disabled",
-    )
+    logger.info("integration %s: unattended ceiling %s", integration.id, ceiling)
     return True
 
 
@@ -234,12 +245,16 @@ def issue_credential_by_person(
 
 
 def set_unattended_by_person(
-    db: Session, actor, integration_id: int, allowed: bool, *, enforced: bool = True,
+    db: Session, actor, integration_id: int, ceiling: int, *, enforced: bool = True,
 ) -> bool:
-    """Switching it ON is gated like issuing a key; switching it off never is."""
-    if allowed:
+    """Raising the ceiling is gated like issuing a key (it widens what the
+    integration does without a person); lowering it, to 0, never is."""
+    current = db.query(IntegrationDB).filter(IntegrationDB.id == integration_id).first()
+    if current is None:
+        return False
+    if ceiling > unattended_ceiling(current):
         require_holds_integration(db, actor, integration_id, enforced=enforced)
-    return set_unattended_sending(db, integration_id, allowed)
+    return set_unattended_ceiling(db, integration_id, ceiling)
 
 
 def revoke_grant_by_person(

@@ -3694,17 +3694,24 @@ def integration_set_unattended(
     with the least oversight. Logging the change is the whole control."
     """
     from app.auth import integrations as ints
+    from app.auth.db_models import IntegrationDB
+    from app.settings.service import get_max_send_recipients
 
+    # The frozen page keeps its switch (task-341): on sets the suggested
+    # ceiling (within the company cap), off sets 0. The JSON route sets any number.
+    current = db.query(IntegrationDB).filter(IntegrationDB.id == integration_id).first()
+    before = ints.unattended_ceiling(current) if current else 0
+    ceiling = min(ints.SUGGESTED_UNATTENDED_CEILING, get_max_send_recipients(db)) if allowed == "1" else 0
     try:
         changed = ints.set_unattended_by_person(
-            db, user_for_token(db, request.cookies.get(SESSION_COOKIE)), integration_id, allowed == "1", enforced=getattr(request.state, "auth_enforced", True),
+            db, user_for_token(db, request.cookies.get(SESSION_COOKIE)), integration_id, ceiling, enforced=getattr(request.state, "auth_enforced", True),
         )
-    except ints.GrantForbidden as error:
+    except (ints.GrantForbidden, ValueError) as error:
         return RedirectResponse(
             url="/ui/integrations?error=" + quote(str(error)), status_code=303)
     if changed:
         ints.record_change(request, db, audit.INTEGRATION_UNATTENDED_SET, integration_id,
-                           allowed=allowed == "1")
+                           **{"from": before, "to": ceiling})
     return RedirectResponse(url="/ui/integrations", status_code=303)
 
 

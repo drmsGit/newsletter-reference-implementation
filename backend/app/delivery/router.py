@@ -369,7 +369,17 @@ def process_due(request: Request, db: Session = Depends(get_db), brand_id: int =
     `send_send_instance` takes a row lock and refuses an instance already
     `sending` or `sent`, so two schedulers overlapping cannot double-send.
     """
-    triggered = process_due_scheduled_sends(db, brand_id=brand_id)
+    # An integration's sweep has its unattended ceiling (task-341): each due
+    # send above it is held for a person, on its own, and the rest fire.
+    from app.auth.dependencies import _machine_credential, request_principal
+    from app.auth.integrations import unattended_ceiling
+
+    integration = request_principal(request) if _machine_credential(request) else None
+    ceiling = unattended_ceiling(integration) if integration is not None else None
+    over: list[tuple[int, int]] = []
+    triggered = process_due_scheduled_sends(db, brand_id=brand_id, ceiling=ceiling, held=over)
+    held_ids = [_hold_for_size(db, send_id, size, ceiling, integration.id, brand_id)
+                for send_id, size in over]
     # One entry per send it fired, naming whoever drove the scheduler (task-340).
     for fired_id in triggered:
         audit.record_from_request(
@@ -379,7 +389,38 @@ def process_due(request: Request, db: Session = Depends(get_db), brand_id: int =
     return {
         "triggered": len(triggered),
         "send_instance_ids": [getattr(s, "id", s) for s in triggered],
+        "held_send_instance_ids": [send_id for send_id in held_ids if send_id is not None],
     }
+
+
+def _hold_for_size(db: Session, send_id: int, size: int, ceiling: int, integration_id: int,
+                   brand_id: int) -> int | None:
+    """Hold one due send for a person, as the fire route would (ADR-142 §4):
+    the same action, inbox and history. A send already held is left as it is."""
+    from app.approvals import service as approvals
+    from app.approvals.actions import send_fire
+    from app.audit.service import ACTOR_INTEGRATION
+
+    payload = {"send_instance_id": send_id, "held_for_size": {"recipients": size, "ceiling": ceiling}}
+    try:
+        approvals.request_approval(
+            db, "send.fire_send_instance", payload=payload,
+            summary=held_summary(send_fire.summarise(db, send_id, brand_id=brand_id), payload),
+            requested_by_type=ACTOR_INTEGRATION, requested_by_id=integration_id,
+            brand_id=brand_id, subject_id=send_id,
+        )
+    except approvals.DuplicateRequest:
+        db.rollback()
+    return send_id
+
+
+def held_summary(summary: str, payload: dict) -> str:
+    """The inbox line, saying when a send was held for its size (task-341)."""
+    size = (payload or {}).get("held_for_size")
+    if not size:
+        return summary
+    return (f"{summary} — held for its size: {size['recipients']} recipients, above this "
+            f"integration's unattended limit of {size['ceiling']}")
 
 
 @router.get(

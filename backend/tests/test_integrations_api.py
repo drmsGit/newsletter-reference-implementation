@@ -276,11 +276,11 @@ class TestUnattended:
         with signed_in_admin(db) as (admin, _t, csrf):
             h = {"X-CSRF-Token": csrf}
             integration = _create(admin, csrf)
-            assert integration["may_send_unattended"] is False
-            on = admin.put(f"/integrations/{integration['id']}/unattended", json={"allowed": True}, headers=h)
-            off = admin.put(f"/integrations/{integration['id']}/unattended", json={"allowed": False}, headers=h)
-        assert on.json()["may_send_unattended"] is True
-        assert off.json()["may_send_unattended"] is False
+            assert integration["unattended_ceiling"] == 0
+            on = admin.put(f"/integrations/{integration['id']}/unattended", json={"ceiling": 10}, headers=h)
+            off = admin.put(f"/integrations/{integration['id']}/unattended", json={"ceiling": 0}, headers=h)
+        assert on.json()["unattended_ceiling"] == 10
+        assert off.json()["unattended_ceiling"] == 0
 
 
 class TestNoEscalationThroughUse:
@@ -343,12 +343,12 @@ class TestNoEscalationThroughUse:
         integration, _other = foreign_powered
         with signed_in_admin(db) as (admin, _t, csrf):
             h = {"X-CSRF-Token": csrf}
-            on = admin.put(f"/integrations/{integration.id}/unattended", json={"allowed": True}, headers=h)
+            on = admin.put(f"/integrations/{integration.id}/unattended", json={"ceiling": 10}, headers=h)
             assert on.status_code == 403, on.text
             db.expire_all()
-            assert db.get(IntegrationDB, integration.id).may_send_unattended is False
+            assert db.get(IntegrationDB, integration.id).unattended_ceiling == 0
             # Taking power away is never gated.
-            off = admin.put(f"/integrations/{integration.id}/unattended", json={"allowed": False}, headers=h)
+            off = admin.put(f"/integrations/{integration.id}/unattended", json={"ceiling": 0}, headers=h)
             assert off.status_code == 200, off.text
 
     def test_another_brands_grant_cannot_be_removed(self, db, foreign_powered):
@@ -389,7 +389,7 @@ class TestEveryChangeIsAudited:
                        json={"permission": VIEW, "brand_id": default_brand.id}, headers=h)
             issued = admin.post(f"/integrations/{iid}/keys", json={"label": "k"}, headers=h).json()
             admin.post(f"/integrations/{iid}/keys/{issued['credential']['id']}/revoke", headers=h)
-            admin.put(f"/integrations/{iid}/unattended", json={"allowed": True}, headers=h)
+            admin.put(f"/integrations/{iid}/unattended", json={"ceiling": 10}, headers=h)
             admin.delete(f"/integrations/{iid}/grants/{VIEW}/{default_brand.id}", headers=h)
             admin.post(f"/integrations/{iid}/deactivate", headers=h)
 

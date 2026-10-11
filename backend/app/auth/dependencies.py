@@ -629,28 +629,70 @@ def enforce_api_policy(request: Request, db: Session = Depends(get_db)):
         # Platform-level, as above: the union, by name.
         raise NotAuthorised(permission)
 
-    # ADR-166 point 5. Reached only by a caller that is authenticated,
-    # authorised for this action on this brand, and has said which brand.
-    # Only an integration can be held for approval — a person firing a send is
-    # the approval. `may_send_unattended` does not exist on a user.
-    if credential and (
-        (permission == SENDS_EXECUTE and not integration.may_send_unattended)
-        or (request.method, template) in HELD_FOR_EVERY_INTEGRATION
-    ):
-        logger.info(
-            "api: holding %s %s for integration %s",
-            request.method, template, integration.id,
-        )
-        raise ApprovalRequired(
-            action_key=APPROVABLE_ROUTES.get(template),
+    # ADR-166 point 5, as its 2026-10-09 and 2026-10-11 addenda made it.
+    # Reached only by a caller that is authenticated, authorised for this
+    # action on this brand, and has said which brand. Only an integration can
+    # be held for approval — a person firing a send is the approval.
+    if credential:
+        held_for_size = None
+        hold = (request.method, template) in HELD_FOR_EVERY_INTEGRATION
+        if permission == SENDS_EXECUTE and not hold:
+            hold, held_for_size = _held_by_ceiling(db, request, template, integration, brand_id)
+        if hold:
+            logger.info(
+                "api: holding %s %s for integration %s",
+                request.method, template, integration.id,
+            )
             # Path parameters only. The JSON body has already been consumed by
             # the time a dependency runs, and re-reading it is its own problem.
-            payload=dict(request.scope.get("path_params") or {}),
-            integration_id=integration.id,
-            brand_id=brand_id,
-        )
+            payload = dict(request.scope.get("path_params") or {})
+            if held_for_size:
+                payload["held_for_size"] = held_for_size
+            raise ApprovalRequired(
+                action_key=APPROVABLE_ROUTES.get(template),
+                payload=payload,
+                integration_id=integration.id,
+                brand_id=brand_id,
+            )
 
     return integration
+
+
+def _held_by_ceiling(db: Session, request: Request, template: str, integration, brand_id) -> tuple[bool, dict | None]:
+    """Whether a `sends.execute` call by this integration is held, and if for
+    its size, `{recipients, ceiling}` for the inbox (task-341).
+
+    The ceiling is how many recipients it may send to without a person; 0
+    means every send is held. Firing one send compares the count as of now —
+    who would be mailed if it went out this moment. The batch route
+    (`process-due`) is let through: it decides send by send. A test send
+    mails one address, so it needs a ceiling of at least 1.
+    """
+    from app.auth.integrations import unattended_ceiling
+
+    ceiling = unattended_ceiling(integration)
+    if template == "/delivery/process-due":
+        return False, None
+    if template == "/delivery/send-test":
+        return ceiling < 1, None
+    if ceiling == 0:
+        return True, None
+    send_id = (request.scope.get("path_params") or {}).get("send_instance_id")
+    if send_id is None:
+        return False, None
+    from app.delivery.db_models import SendInstanceDB
+    from app.delivery.service import recipients_now
+
+    send = db.query(SendInstanceDB).filter(
+        SendInstanceDB.id == int(send_id), SendInstanceDB.brand_id == brand_id,
+    ).first()
+    if send is None:
+        # Not this brand's, or gone: the route refuses it as it always has.
+        return False, None
+    size = recipients_now(db, send)
+    if size > ceiling:
+        return True, {"recipients": size, "ceiling": ceiling}
+    return False, None
 
 
 API_CSRF_HEADER = "X-CSRF-Token"

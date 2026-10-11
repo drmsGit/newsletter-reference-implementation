@@ -190,6 +190,14 @@ def describe(db: Session, payload: dict, *, brand_id: int) -> ActionDescription:
         warnings.append(
             f"This will send for real through {send_instance.provider}."
         )
+    # Held for its size, not its kind (task-341; ADR-166 addendum 2026-10-11).
+    size = payload.get("held_for_size")
+    if size:
+        warnings.append(
+            f"Held for its size: it would mail {size['recipients']} recipients, above this "
+            f"integration's unattended limit of {size['ceiling']}. Below that it would have gone "
+            "out without a person."
+        )
     # ADR-195: the approver is the person who can still say no to a send that
     # skips the opt-in check, so it is said here, naming the profile.
     from app.recipients.consent import TRANSACTIONAL

@@ -62,8 +62,8 @@
                     {% if not integration.is_active %}
                     <span class="badge bg-secondary">Deactivated</span>
                     {% endif %}
-                    {% if integration.may_send_unattended %}
-                    <span class="badge bg-danger">Sends without approval</span>
+                    {% if integration.unattended_ceiling > 0 %}
+                    <span class="badge bg-danger">Sends without approval up to {{ integration.unattended_ceiling }} recipients</span>
                     {% else %}
                     <span class="badge bg-success">Sends need approval</span>
                     {% endif %}
@@ -77,9 +77,9 @@
                       action="/ui/integrations/{{ integration.id }}/unattended">
                     <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
                     <input type="hidden" name="allowed"
-                           value="{{ '0' if integration.may_send_unattended else '1' }}">
+                           value="{{ '0' if integration.unattended_ceiling > 0 else '1' }}">
                     <button type="submit" class="btn btn-sm btn-outline-secondary">
-                        {% if integration.may_send_unattended %}
+                        {% if integration.unattended_ceiling > 0 %}
                         Require approval for sends
                         {% else %}
                         Allow sending without approval

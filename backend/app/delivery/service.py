@@ -686,7 +686,27 @@ def reconcile_executions_to_audience(db: Session, send_instance: SendInstanceDB)
     return resolved_ids
 
 
-def process_due_scheduled_sends(db: Session, *, brand_id: int) -> list[int]:
+def recipients_now(db: Session, send_instance: SendInstanceDB) -> int:
+    """How many people this send would mail if it went out now (task-341):
+    its audience resolved again, read-only, with its purpose (ADR-195), or
+    the planned recipients of a send without an audience group. The number an
+    integration's unattended ceiling is compared with."""
+    if send_instance.audience_group_id:
+        from app.audience.service import resolve_audience
+
+        return len(resolve_audience(
+            db, send_instance.audience_group_id, channel=channel_of_send(db, send_instance),
+            purpose=_purpose_of_snapshot(db, send_instance.snapshot_id),
+        ))
+    return (db.query(DeliveryExecutionDB)
+            .filter(DeliveryExecutionDB.send_instance_id == send_instance.id,
+                    DeliveryExecutionDB.status == "created")
+            .count())
+
+
+def process_due_scheduled_sends(
+    db: Session, *, brand_id: int, ceiling: int | None = None, held: list | None = None,
+) -> list[int]:
     """Fire every scheduled send of this brand whose time has arrived. This is
     the operation a scheduler drives — a cron job, worker, or automation
     platform (n8n) calls it on an interval; the architecture just exposes the
@@ -697,7 +717,12 @@ def process_due_scheduled_sends(db: Session, *, brand_id: int) -> list[int]:
     route checked `sends.execute` in the caller's working brand only, so a
     credential for brand A fired brand B's mail. The working brand is carried
     in like everywhere else (ADR-172); a deployment with several brands calls
-    this once per brand, each call authorised where it lands."""
+    this once per brand, each call authorised where it lands.
+
+    `ceiling` is an integration's unattended ceiling when one drives the sweep
+    (task-341): a due send that would mail more is not fired but appended to
+    `held` as `(send_instance_id, recipients)`, for the route to hold for a
+    person, and stays scheduled. A person's sweep passes none."""
     due = (
         db.query(SendInstanceDB)
         .filter(
@@ -710,6 +735,12 @@ def process_due_scheduled_sends(db: Session, *, brand_id: int) -> list[int]:
     )
     triggered = []
     for send_instance in due:
+        if ceiling is not None:
+            size = recipients_now(db, send_instance)
+            if size > ceiling:
+                if held is not None:
+                    held.append((send_instance.id, size))
+                continue
         try:
             send_send_instance(
                 db, send_instance_id=send_instance.id,
