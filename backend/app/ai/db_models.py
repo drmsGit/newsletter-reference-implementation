@@ -69,4 +69,9 @@ class AIRunDB(Base):
     # was offered, rather than server-side session state.
     output_text = Column(Text, nullable=True)
     message = Column(Text, nullable=True)
+    # Who started the run (task-345; ADR-144 addenda 2026-10-09 and 2026-10-11):
+    # "user", "integration" or "system" (a sweep, no id). NULL on runs from
+    # before it was recorded, shown as "not recorded".
+    actor_type = Column(String(20), nullable=True)
+    actor_id = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

@@ -5,6 +5,7 @@ import {
   usePublishPrompt,
   useSaveAiProvider,
   useSaveSignals,
+  useSaveAiBudgetPeriod,
   useSaveSendCap,
   useSaveSessionLengths,
   useSaveSpendCap,
@@ -246,6 +247,34 @@ function Provider({ s }: { s: SettingsView }) {
         selected={provider}
         onChange={setProvider}
       />
+      <Outcome write={save} />
+    </Form>
+  )
+}
+
+/** How often the AI cap refills (task-345; ADR-144 addendum 2026-10-11). */
+const PERIODS = [
+  { id: 'month', name: 'Every month' },
+  { id: 'quarter', name: 'Every quarter' },
+  { id: 'year', name: 'Every year' },
+  { id: 'lifetime', name: 'Never (one budget for all time)' },
+]
+
+function BudgetPeriod({ s }: { s: SettingsView }) {
+  const save = useSaveAiBudgetPeriod()
+  const [period, setPeriod] = useState(s.ai_budget.period ?? 'month')
+  if (!s.may_manage) {
+    return (
+      <dl className="facts">
+        <dt>The token budget refills</dt>
+        <dd>{PERIODS.find((p) => p.id === s.ai_budget.period)?.name ?? s.ai_budget.period}</dd>
+      </dl>
+    )
+  }
+  return (
+    <Form label="Save budget period" saving={save.isPending} onSave={() => save.mutate(period)}>
+      <Choice label="The token budget refills" options={PERIODS} selected={period} onChange={setPeriod} />
+      <p className="muted">Periods start at midnight UTC on the first day.</p>
       <Outcome write={save} />
     </Form>
   )
@@ -523,7 +552,10 @@ function Sections({ s }: { s: SettingsView }) {
           <dt>Tokens used</dt>
           <dd>
             {budget.tokens_used.toLocaleString()} of {budget.cap.hard_stop_tokens.toLocaleString()}{' '}
-            ({budget.used_pct}%)
+            ({budget.used_pct}%){' '}
+            {budget.period_start
+              ? `since ${new Date(budget.period_start).toLocaleDateString(undefined, { timeZone: 'UTC' })}`
+              : 'in total'}
           </dd>
           <dt>Warning at</dt>
           <dd>{budget.cap.warn_tokens.toLocaleString()} tokens</dd>
@@ -534,6 +566,7 @@ function Sections({ s }: { s: SettingsView }) {
           </dd>
         </dl>
         <SpendCap s={s} />
+        <BudgetPeriod s={s} />
 
         {s.ai_tasks.map((task) => (
           <Task key={task.key} s={s} task={task} />

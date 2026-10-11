@@ -27,6 +27,8 @@ const SETTINGS = {
   ai_model: 'claude-opus-5',
   ai_model_from_env: true,
   ai_budget: {
+    period: 'month',
+    period_start: '2026-10-01T00:00:00Z',
     cap: { warn_tokens: 400000, hard_stop_tokens: 500000, budget_usd: 5 },
     tokens_used: 450000,
     spend: { usd: 4.25, unpriced_runs: 0 },
@@ -119,6 +121,19 @@ describe('editing settings', () => {
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
     expect(await sentBodies(fetchMock, 'PUT')).toEqual([{ max_send_recipients: 150 }])
     await waitFor(() => expect(reads).toBe(2))
+  })
+
+  it('sets how often the AI budget refills, and says since when the figures count', async () => {
+    const fetchMock = stubFetch({
+      'GET /settings': () => jsonResponse(MANAGER),
+      'PUT /settings/ai/budget-period': () => jsonResponse({ ...SETTINGS.ai_budget, period: 'quarter' }),
+    })
+    renderWithProviders(<Settings />)
+    expect(await screen.findByText(/since/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Every month/ }))
+    fireEvent.click(await screen.findByRole('option', { name: 'Every quarter' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save budget period' }))
+    await waitFor(async () => expect(await sentBodies(fetchMock, 'PUT')).toEqual([{ period: 'quarter' }]))
   })
 
   it('sets how long a sign-in lasts, saying the ranges', async () => {

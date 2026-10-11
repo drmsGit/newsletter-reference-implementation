@@ -83,7 +83,8 @@ def suggest_subject_for_variant(
         )
 
     try:
-        _options, run = subject_task.suggest(db, variant_id)
+        _options, run = subject_task.suggest(db, variant_id, actor_type=requested_by_type,
+                                             actor_id=requested_by_id)
     except subject_task.NothingToWorkFrom as refusal:
         # Refused before the call, so no tokens were spent and no run row was
         # written. The person is told what to fix rather than being handed the

@@ -15,6 +15,11 @@ from app.insight.signals import CONTRIBUTION_WEIGHTS, HALF_LIFE_DAYS
 SIGNAL_WEIGHTS = "signal_weights"
 HALF_LIFE_DAYS_KEY = "half_life_days"
 MAX_SEND_RECIPIENTS_KEY = "max_send_recipients"
+# The AI budget period (task-345; ADR-144 addenda 2026-10-09 and 2026-10-11):
+# the cap refills at midnight UTC on the 1st of each period.
+AI_BUDGET_PERIOD_KEY = "ai_budget_period"
+AI_BUDGET_PERIODS = ("month", "quarter", "year", "lifetime")
+DEFAULT_AI_BUDGET_PERIOD = "month"
 # Session lengths (task-342; ADR-151's 2026-10-09 and 2026-10-11 addenda).
 SESSION_ABSOLUTE_HOURS_KEY = "session_absolute_hours"
 SESSION_IDLE_MINUTES_KEY = "session_idle_minutes"
@@ -483,14 +488,29 @@ def choose_task_approval_mode(db: Session, task_key: str, mode: str) -> None:
     set_task_approval_mode(db, task_key, mode)
 
 
+def get_ai_budget_period(db: Session) -> str:
+    value = get_config(db, AI_BUDGET_PERIOD_KEY, None)
+    return value if value in AI_BUDGET_PERIODS else DEFAULT_AI_BUDGET_PERIOD
+
+
+def save_ai_budget_period(db: Session, period: str) -> None:
+    """How often the AI cap refills: month, quarter, year, or lifetime (never)."""
+    if period not in AI_BUDGET_PERIODS:
+        raise SettingsInvalid(f"The AI budget period is one of: {', '.join(AI_BUDGET_PERIODS)}.")
+    set_config(db, AI_BUDGET_PERIOD_KEY, period)
+
+
 def ai_budget_status(db: Session) -> dict:
     """The cap and where spend stands against it — computed once, for every
     screen, so no client re-derives "remaining" or "over the warning"."""
-    from app.ai.service import spend_to_date, tokens_used
+    from app.ai.service import period_start, spend_to_date, tokens_used
 
     cap = get_ai_spend_cap(db)
     used = tokens_used(db)
     return {
+        # The period the figures cover (task-345): they refill at its start.
+        "period": get_ai_budget_period(db),
+        "period_start": period_start(db),
         "cap": cap,
         "tokens_used": used,
         "spend": spend_to_date(db),

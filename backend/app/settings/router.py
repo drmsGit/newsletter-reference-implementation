@@ -23,7 +23,7 @@ from app.database import get_db
 from app.settings import service
 from app.settings.audited import audited_settings
 from app.settings.models import (
-    AIBudget, AITaskSettings, ApprovalModeChoice, ChannelSetting, DeliveryProviderSetting, ModelChoice,
+    AIBudget, AIBudgetPeriod, AITaskSettings, ApprovalModeChoice, ChannelSetting, DeliveryProviderSetting, ModelChoice,
     PromptPublish, PromptVersion, ProviderUpdate, SendCapUpdate, SessionLengths, Settings,
     SignalTuning, SpendCapUpdate, UnsubscribeOptions,
 )
@@ -194,6 +194,21 @@ def put_spend_cap(payload: SpendCapUpdate, request: Request, db: Session = Depen
     try:
         with audited_settings(request, db, "ai_spend_cap", [service.AI_SPEND_CAP_KEY]):
             service.save_ai_spend_cap(db, **payload.model_dump())
+    except service.SettingsInvalid as error:
+        raise _invalid(error)
+    return AIBudget(**service.ai_budget_status(db))
+
+
+@router.put(
+    "/ai/budget-period", response_model=AIBudget, dependencies=_PERSON,
+    summary="How often the AI token cap refills",
+    description=("month (the default), quarter, year or lifetime; periods start at midnight UTC "
+                 "(ADR-144 addendum 2026-10-11). Unknown values are refused (422)."),
+)
+def put_ai_budget_period(payload: AIBudgetPeriod, request: Request, db: Session = Depends(get_db)):
+    try:
+        with audited_settings(request, db, "ai_budget_period", [service.AI_BUDGET_PERIOD_KEY]):
+            service.save_ai_budget_period(db, payload.period)
     except service.SettingsInvalid as error:
         raise _invalid(error)
     return AIBudget(**service.ai_budget_status(db))

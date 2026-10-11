@@ -2613,6 +2613,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/ai/budget-period": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * How often the AI token cap refills
+         * @description month (the default), quarter, year or lifetime; periods start at midnight UTC (ADR-144 addendum 2026-10-11). Unknown values are refused (422).
+         */
+        put: operations["put_ai_budget_period_settings_ai_budget_period_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/ai/provider": {
         parameters: {
             query?: never;
@@ -2784,6 +2804,13 @@ export interface components {
     schemas: {
         /** AIBudget */
         AIBudget: {
+            /**
+             * Period
+             * @default month
+             */
+            period: string;
+            /** Period Start */
+            period_start?: string | null;
             cap: components["schemas"]["SpendCap"];
             /** Tokens Used */
             tokens_used: number;
@@ -2794,6 +2821,15 @@ export interface components {
             used_pct: number;
             /** Over Warn */
             over_warn: boolean;
+        };
+        /**
+         * AIBudgetPeriod
+         * @description How often the AI cap refills (task-345): month, quarter, year or lifetime.
+         *     Periods start at midnight UTC.
+         */
+        AIBudgetPeriod: {
+            /** Period */
+            period: string;
         };
         /** AITaskSettings */
         AITaskSettings: {
@@ -11812,6 +11848,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SpendCapUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AIBudget"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_ai_budget_period_settings_ai_budget_period_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AIBudgetPeriod"];
             };
         };
         responses: {

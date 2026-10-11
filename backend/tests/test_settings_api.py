@@ -319,6 +319,8 @@ class TestEverySettingsWriteIsAudited:
                 zip(("absolute_hours", "idle_minutes"), settings.get_session_lengths(db)))}),
             ("PUT", "/settings/unsubscribe"): ("unsubscribe", {"json": {"offer_everything": offer_everything}}),
             ("PUT", "/settings/ai/spend-cap"): ("ai_spend_cap", {"json": spend_json}),
+            ("PUT", "/settings/ai/budget-period"): ("ai_budget_period", {"json": {
+                "period": settings.get_ai_budget_period(db)}}),
             ("PUT", "/settings/ai/provider"): ("ai_provider", {"json": {"provider": provider}}),
             ("PUT", "/settings/ai/tasks/{task_key}/approval"):
                 ("ai_task_approval", {"json": {"mode": mode}}),

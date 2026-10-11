@@ -180,8 +180,10 @@ def option_notices(
     return notices
 
 
-def suggest(db: Session, variant_id: int, provider_name: str | None = None):
-    """Run the task for one variant. Returns (options, TaskRun)."""
+def suggest(db: Session, variant_id: int, provider_name: str | None = None,
+            *, actor_type: str | None = None, actor_id: int | None = None):
+    """Run the task for one variant. Returns (options, TaskRun). The actor is
+    recorded on the run (task-345)."""
     variant = db.query(VariantDB).filter(VariantDB.id == variant_id).first()
     if variant is None:
         return [], None
@@ -213,5 +215,7 @@ def suggest(db: Session, variant_id: int, provider_name: str | None = None):
         provider_name=provider_name,
         target_type="variant",
         target_id=variant_id,
+        actor_type=actor_type,
+        actor_id=actor_id,
     )
     return (parse_options(run.text) if run.ok else []), run

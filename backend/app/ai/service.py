@@ -14,6 +14,7 @@ The order matters and is the ADR, not a preference:
 """
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -86,17 +87,46 @@ def publish_prompt(db: Session, task_key: str, body: str) -> AIPromptDB:
     return row
 
 
+def now() -> datetime:
+    """The clock the budget period is read against (UTC)."""
+    return datetime.now(timezone.utc)
+
+
+def period_start(db: Session) -> datetime | None:
+    """When the current budget period began, at midnight UTC (task-345; ADR-144
+    addendum 2026-10-11): the 1st of this month, quarter or year. None for
+    "lifetime", which counts every run. A run counts in the period it was
+    recorded in, which is when the model answered."""
+    from app.settings.service import get_ai_budget_period
+
+    period = get_ai_budget_period(db)
+    current = now().astimezone(timezone.utc)
+    if period == "lifetime":
+        return None
+    if period == "year":
+        return datetime(current.year, 1, 1, tzinfo=timezone.utc)
+    if period == "quarter":
+        return datetime(current.year, 3 * ((current.month - 1) // 3) + 1, 1, tzinfo=timezone.utc)
+    return datetime(current.year, current.month, 1, tzinfo=timezone.utc)
+
+
+def _in_period(db: Session, query):
+    start = period_start(db)
+    return query if start is None else query.filter(AIRunDB.created_at >= start)
+
+
 def tokens_used(db: Session) -> int:
-    """Billable tokens spent so far — the ledger the cap is measured against.
+    """Billable tokens spent in the current budget period — the ledger the cap
+    is measured against (task-345: it refills each period; lifetime counts all).
 
     Free adapters are excluded. The cap exists to bound *spend*, and mock runs
     cost nothing, so counting them would let development and demo traffic
     consume a budget only the real model draws on — which is not a rounding
     error: after the first day of building, most rows in this table were mock.
     """
-    rows = db.query(
+    rows = _in_period(db, db.query(
         AIRunDB.provider, AIRunDB.input_tokens, AIRunDB.output_tokens
-    ).all()
+    )).all()
     return sum(
         (r.input_tokens or 0) + (r.output_tokens or 0)
         for r in rows
@@ -112,10 +142,11 @@ def spend_to_date(db: Session) -> dict:
     surfaced rather than folded in — a model with no published price here would
     otherwise quietly understate the total.
     """
-    rows = db.query(
+    # The current budget period, like the token ledger (task-345).
+    rows = _in_period(db, db.query(
         AIRunDB.provider, AIRunDB.model,
         AIRunDB.input_tokens, AIRunDB.output_tokens,
-    ).all()
+    )).all()
 
     total, unpriced = 0.0, 0
     for row in rows:
@@ -151,8 +182,13 @@ def run_task(
     model: str | None = None,
     target_type: str | None = None,
     target_id: int | None = None,
+    actor_type: str | None = None,
+    actor_id: int | None = None,
 ) -> TaskRun:
-    """Execute one AI task, enforcing the cap before spending anything."""
+    """Execute one AI task, enforcing the cap before spending anything.
+
+    `actor_type`/`actor_id`: who started it, recorded on the run (task-345):
+    a user, an integration, or "system" with no id."""
 
     provider_name = provider_name or get_ai_provider_name(db)
     # Which model THIS task runs on (ADR-144 §2). None means the deployment
@@ -166,7 +202,7 @@ def run_task(
 
     if prompt_row is None:
         run = _record(
-            db, task_key=task_key, provider=provider_name, status="blocked",
+            db, actor_type=actor_type, actor_id=actor_id, task_key=task_key, provider=provider_name, status="blocked",
             target_type=target_type, target_id=target_id,
             message="No published prompt for this task — publish one in Settings.",
         )
@@ -183,7 +219,7 @@ def run_task(
         # on an unverified number is not a gate. Refusing is the conservative
         # branch and it is also the honest one — nothing was spent finding out.
         run = _record(
-            db, task_key=task_key, prompt_id=prompt_row.id, provider=provider_name,
+            db, actor_type=actor_type, actor_id=actor_id, task_key=task_key, prompt_id=prompt_row.id, provider=provider_name,
             status="blocked", target_type=target_type, target_id=target_id,
             message=(
                 f"Refused before running: the cost of this run could not be "
@@ -200,7 +236,7 @@ def run_task(
 
     if worst_case > remaining:
         run = _record(
-            db, task_key=task_key, prompt_id=prompt_row.id, provider=provider_name,
+            db, actor_type=actor_type, actor_id=actor_id, task_key=task_key, prompt_id=prompt_row.id, provider=provider_name,
             status="blocked", target_type=target_type, target_id=target_id,
             message=(
                 f"Refused before running: worst case {worst_case} tokens exceeds the "
@@ -214,7 +250,7 @@ def run_task(
 
     if not result.success:
         run = _record(
-            db, task_key=task_key, prompt_id=prompt_row.id, provider=provider_name,
+            db, actor_type=actor_type, actor_id=actor_id, task_key=task_key, prompt_id=prompt_row.id, provider=provider_name,
             model=result.model, status="error", target_type=target_type,
             target_id=target_id, message=result.message,
         )
@@ -222,7 +258,8 @@ def run_task(
 
     usage = result.usage
     run = _record(
-        db, task_key=task_key, prompt_id=prompt_row.id, provider=provider_name,
+        db, actor_type=actor_type, actor_id=actor_id,
+        task_key=task_key, prompt_id=prompt_row.id, provider=provider_name,
         model=result.model, status="ok",
         input_tokens=usage.input_tokens if usage else 0,
         output_tokens=usage.output_tokens if usage else 0,

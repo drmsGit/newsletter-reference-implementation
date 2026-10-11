@@ -570,6 +570,13 @@ export function useSaveSessionLengths() {
   )
 }
 
+/** How often the AI cap refills (task-345): month, quarter, year or lifetime. */
+export function useSaveAiBudgetPeriod() {
+  return useSettingsWrite((period: string) =>
+    read(api.PUT('/settings/ai/budget-period', { body: { period } })),
+  )
+}
+
 export function useSaveSpendCap() {
   return useSettingsWrite(
     (cap: { warn_tokens: number; hard_stop_tokens: number; budget_usd: number }) =>

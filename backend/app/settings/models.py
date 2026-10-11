@@ -24,6 +24,10 @@ class Spend(BaseModel):
 
 
 class AIBudget(BaseModel):
+    #: month | quarter | year | lifetime (task-345); the figures cover it.
+    period: str = "month"
+    #: When it began, at midnight UTC; null for lifetime.
+    period_start: datetime | None = None
     cap: SpendCap
     tokens_used: int
     spend: Spend
@@ -114,6 +118,13 @@ class UnsubscribeOptions(BaseModel):
     company, beside the sending brand (ADR-191 point 4). Off by default."""
 
     offer_everything: bool
+
+
+class AIBudgetPeriod(BaseModel):
+    """How often the AI cap refills (task-345): month, quarter, year or lifetime.
+    Periods start at midnight UTC."""
+
+    period: str
 
 
 class SpendCapUpdate(BaseModel):
