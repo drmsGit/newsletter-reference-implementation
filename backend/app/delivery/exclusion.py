@@ -73,8 +73,10 @@ STAGE_AUDIENCE = "audience"
 REASON_LEFT_AUDIENCE = "no longer in the send's audience"
 #: The floor: nothing but the envelope rendered. Not a manager's choice.
 REASON_NOTHING_TO_SHOW = "nothing to show — no module produced content for this person"
-#: The send's "Don't send if no slot resolved": a signal about the rule.
-REASON_NO_PICK = "no personalised block found anything for this person"
+#: The send's switch for a fully dynamic variant: no content record at all,
+#: neither picked by a slot nor placed by hand (ADR-086 addendum 2026-10-11).
+REASON_NO_PICK = ("no content record for this person: no personalised block found anything "
+                  "and none is placed by hand")
 
 
 @dataclass(frozen=True)

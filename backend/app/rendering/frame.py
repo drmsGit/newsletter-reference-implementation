@@ -440,6 +440,12 @@ def slot_ids(frame: dict) -> list[int]:
     return [m["decision_slot_id"] for m in frame["modules"] if m["kind"] == KIND_SLOT]
 
 
+def hand_bound_ids(frame: dict) -> set[int]:
+    """The content records placed by hand in the frame's modules."""
+    return {m["content_record_id"] for m in frame["modules"]
+            if m["kind"] == KIND_CONTENT and m.get("content_record_id") is not None}
+
+
 def send_purpose(frame: dict | None) -> str:
     """The purpose a send of this frame records and is gated on (ADR-195):
     transactional when its frozen brand profile is, marketing otherwise. Read

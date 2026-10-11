@@ -55,7 +55,8 @@ class SendInstance(BaseModel):
     #: change to the send or any of its executions, set for "sending" sends.
     stranded: bool = False
     last_activity_at: datetime | None = None
-    # "Don't send if no slot resolved", chosen at plan time (task-228).
+    # "Don't send to someone who would get no content record", chosen at plan
+    # time (task-228; its meaning corrected in the ADR-086 addendum 2026-10-11).
     skip_without_resolution: bool = False
 
 
@@ -74,8 +75,10 @@ class SendPlanRequest(BaseModel):
     from_address: str | None = None
     # Omitted: a draft, fired later by hand. Given: status "scheduled".
     scheduled_at: datetime | None = None
-    # "Don't send if no slot resolved" (ADR-086 addendum 2026-10-08): skip a
-    # recipient whose personalised blocks all came up empty. Off by default.
+    # "Don't send to someone who would get no content record" (ADR-086
+    # addenda 2026-10-08 and 2026-10-11): skip a recipient for whom no
+    # content record shows — every personalised block came up empty and none
+    # is placed by hand. Off by default.
     skip_without_resolution: bool = False
 
 

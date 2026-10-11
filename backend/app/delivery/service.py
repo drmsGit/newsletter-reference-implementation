@@ -1143,13 +1143,14 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
     from app.decision.service import execute_decision_slot
 
     from app.decision.sets import latest_pick_set
-    from app.rendering.frame import render_frame, slot_ids, artifact_hash, what_rendered
+    from app.rendering.frame import render_frame, slot_ids, artifact_hash, hand_bound_ids, what_rendered
 
     # The frame's slots, not the variant's: a slot added after the snapshot is
     # not in what was approved (ADR-183).
     # In the frame's module order: a slot further down passes over what an
     # earlier slot already shows (ADR-084 addendum 2026-10-11, point 3).
     frame_slot_ids = list(slot_ids(snapshot.render_context))
+    hand_bound = hand_bound_ids(snapshot.render_context)
     decision_slots = sorted(
         db.query(DecisionSlotDB).filter(DecisionSlotDB.id.in_(frame_slot_ids)).all(),
         key=lambda slot: frame_slot_ids.index(slot.id),
@@ -1280,7 +1281,11 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
         # fall back to an older stored pick the decision has just refused
         # (task-320) — the stored resolutions stay as history.
         empty_slots: set[int] = set()
-        shown: set[int] = set()
+        # What this person already sees, which a slot passes over for its next
+        # picks: first every record placed by hand, wherever it sits — a
+        # person's pick outranks the engine's (ADR-176 addenda 2026-10-09 and
+        # 2026-10-11, task-220) — then each earlier slot's picks (task-109).
+        shown: set[int] = set(hand_bound)
         for slot in decision_slots:
             try:
                 if execute_decision_slot(db, slot.id, recipient_id=execution.recipient_id,
@@ -1334,10 +1339,15 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
         # 2026-10-08): skipped, not failed, and the send goes on for everyone
         # else. The floor always applies; the send's "Don't send if no slot
         # resolved" only where the variant had a slot to resolve.
+        # The switch is for a fully dynamic variant: with it on, a person is
+        # skipped only when no content record shows at all — no slot pick and
+        # none placed by hand. Typed-in modules are not content for it, or it
+        # would add nothing to the floor (ADR-086 addendum 2026-10-11).
         meaningful, slots = what_rendered(snapshot.render_context, picks)
         skipped = (
             REASON_NOTHING_TO_SHOW if not meaningful
-            else REASON_NO_PICK if send_instance.skip_without_resolution and slots and not picks
+            else REASON_NO_PICK
+            if send_instance.skip_without_resolution and slots and not picks and not hand_bound
             else None
         )
         if skipped:

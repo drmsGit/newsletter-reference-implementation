@@ -6,7 +6,7 @@ topic:
   - decision
   - rendering
 created: 2026-06-01
-modified: 2026-10-08
+modified: 2026-10-11
 source:
   - interview-2026-06-01
   - "[[Variant Editor - design interview]] Cluster 4, question 5, and gap 24 (2026-09-26)"
@@ -109,6 +109,53 @@ This also closes a gap on push. A push whose only slot found nothing went out as
 - `SendInstanceDB` gains a column, and the plan form, `SendPlanRequest` and the plan service gain a field. A migration is owed for the column.
 - `exclusion_reason` now carries values that the exclusion stack does not produce. Anything that reads the stage from it must accept `render`.
 - When a footer or divider module is added, the floor is wrong until that module gets its marker. A recipient who gets only header and footer would pass the floor. Adding such a module must therefore include the marker decision.
+
+## Addendum 2026-10-11 — the per-send switch means "no content record at all"
+
+**What prompted it.** task-220, which applies *human beats system* at send
+([[ADR-176 — A Negative Decision Outranks a Positive One]], addendum
+2026-10-11). Point 3 of the 2026-10-08 addendum above added the per-send
+option "Don't send if no slot resolved" (task-228, field
+`send_instances.skip_without_resolution`). As built, it skips a recipient when
+the variant has slots and none of them picked anything
+(`skip_without_resolution and slots and not picks` in the send loop of
+`backend/app/delivery/service.py`), whatever else the email carries. Since
+task-109 and task-220, a slot passes over records that are already shown,
+including records bound by hand
+([[ADR-084 — Decision Slots May Resolve One or Multiple Content Records]],
+addendum 2026-10-11). Read as built, the switch could then skip a recipient
+whose email holds a hand-picked record. The user corrected its meaning on
+2026-10-11:
+
+> *"this switch is in case the variant is fully dynamic content and wouldn't
+> show ANY CONTENT otherwise. THEN recipient should be skipped. If there's at
+> least one hand picked module with a record the email will be sent (with that
+> 1 content)."*
+
+Nothing here changes the Decision section above.
+
+**Decided.**
+
+- With the switch on, a recipient is skipped only when **no content record
+  shows at all**: no record bound by hand and no slot pick.
+- Typed-in modules, such as a call to action or a section heading, do not
+  count as content for the switch. If they did, the switch would add nothing to
+  the floor in point 2, which already skips a recipient when no module produced
+  output.
+- It still applies only where the variant has slots.
+- The switch is relabelled "Don't send to someone who would get no content
+  record". The wording may vary slightly; this is the meaning. Its reason
+  (`REASON_NO_PICK` in `backend/app/delivery/exclusion.py`) now says that no
+  content record shows: no personalised block found anything, and none is
+  placed by hand.
+- The field keeps its name, `skip_without_resolution`, for API compatibility.
+
+**Consequence.** A send planned with the switch on, whose variant has records
+bound by hand, now reaches recipients it previously skipped. That is the
+intended correction.
+
+No decision-log entry in `docs/playbook-strategy.md` stands behind this
+addendum. The source is the user's correction above, recorded with task-220.
 
 ## Related ADRs
 

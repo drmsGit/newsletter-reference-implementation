@@ -7,7 +7,7 @@ topic:
   - consent
   - delivery
 created: 2026-09-24
-modified: 2026-10-09
+modified: 2026-10-11
 source:
   - "Manager Workflow design interview (interview-prep, Cluster 4 Q2–Q4 and Cluster 5 Q2, closed 2026-09-24)"
   - "[[Variant Editor - design interview]] question 1.6, resolved 2026-09-25 (addendum 2026-10-09)"
@@ -336,6 +336,45 @@ natural reading is that the hand-bound record is skipped and the slot fills
 from further down its ranking. For point 3, a slot only stands aside when it
 runs out of candidates, which is the ordinary unresolved case, so the separate
 third case largely dissolves.
+
+## Addendum 2026-10-11 — open points 2 and 3 are settled while building task-220
+
+**What prompted it.** task-220, built on 2026-10-11. It depended on task-109,
+done the same day: a slot now shows up to 1–5 ranked picks, and a later slot
+passes over what an earlier slot shows
+([[ADR-084 — Decision Slots May Resolve One or Multiple Content Records]],
+addendum 2026-10-11, point 3). The 2026-10-09 addendum above left its open
+points 2 and 3 for task-220's final-design pass. The user settled them on
+2026-10-11. Nothing here changes the Decision section above.
+
+**Point 2: a slot with several picks, where one is bound by hand.** The
+hand-bound record is passed over, and the slot still fills up to its number
+from further down its ranking. This is the reading the 2026-10-09 addendum
+gave, and it is the same behaviour as task-109's rule between slots.
+
+**How it works.** At send, for each recipient, every record bound by hand
+anywhere in the variant (frame modules of kind content) is put in the "already
+shown" set before any slot resolves. Its position does not matter: human beats
+system regardless of order. Slots then resolve in module order and add their
+picks to the same set. In code this is the send loop's `shown` set in
+`backend/app/delivery/service.py`, passed as
+`execute_decision_slot(..., exclude=...)`. Two hand-bound modules holding the
+same record are still allowed ([[Variant Editor - design interview]] question
+1.6).
+
+**Point 3: how a slot that stood aside counts.** Answered by a correction of
+the per-send switch, recorded in
+[[ADR-086 — Decision Slots Fail Gracefully]]'s addendum of 2026-10-11 (the
+switch comes from task-228). A record picked by hand means the email has
+content, so it is sent. The switch now skips a recipient only when no content
+record shows at all. A slot that gave way to a hand-bound record therefore
+cannot be the reason a recipient is skipped.
+
+**Limitation.** Previews make no new picks. A preview without a recipient can
+still show a hand-bound record again in a global slot. The rule holds at send.
+
+No decision-log entry in `docs/playbook-strategy.md` stands behind this
+addendum.
 
 ## Related ADRs
 

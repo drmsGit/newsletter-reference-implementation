@@ -43,7 +43,7 @@ from app.snapshots.service import create_snapshot_for_variant
 
 TAG = f"rs{uuid.uuid4().hex[:6]}"
 NOTHING = "render: nothing to show — no module produced content for this person"
-NO_PICK = "render: no personalised block found anything for this person"
+NO_PICK = f"render: {exclusion.REASON_NO_PICK}"
 
 
 @pytest.fixture
