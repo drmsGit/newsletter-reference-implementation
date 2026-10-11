@@ -27,7 +27,9 @@ def setup_file(tmp_path, monkeypatch):
     return write
 
 
-CORE = ["legal_company_name", "legal_address", "imprint_url", "privacy_url", "unsubscribe_text"]
+CORE = ["legal_company_name", "legal_address", "imprint_url", "privacy_url", "unsubscribe_text",
+        # Optional link tags since task-354: core because the platform reads them by name.
+        "utm_source", "utm_medium", "utm_extra"]
 
 
 def test_the_core_is_there_without_a_file(setup_file):

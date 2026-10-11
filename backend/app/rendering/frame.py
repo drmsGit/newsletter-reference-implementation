@@ -178,7 +178,23 @@ def build_frame(db: Session, variant_id: int) -> dict:
     }
     if channel == "email":
         frame["brand_profile"] = _frozen_profile(db, variant)
+        # The tags every module link carries, frozen with the names they come
+        # from (task-354): a rename after the snapshot changes nothing sent.
+        from app.brand_profiles.theme import link_params
+        from app.campaigns.db_models import CampaignDB
+
+        campaign_name = db.query(CampaignDB.name).filter(CampaignDB.id == variant.campaign_id).scalar()
+        frame["link_params"] = link_params(frame["brand_profile"]["values"], campaign_name, variant.name)
     return frame
+
+
+def _frame_theme(frame: dict) -> dict:
+    """The look and tags a frame was frozen with; empty for frames made
+    before them, which then render as they were sent."""
+    return {
+        "values": (frame.get("brand_profile") or {}).get("values") or {},
+        "link_params": frame.get("link_params") or [],
+    }
 
 
 def _frozen_profile(db: Session, variant: VariantDB) -> dict:
@@ -286,6 +302,7 @@ def render_frame(
     from app.rendering.service import module_html, email_document, strip_rich_text
 
     channel = frame["channel"]
+    theme = _frame_theme(frame)
     recorded = {p["module_id"]: p for p in (picks or [])}
     made: list[dict] = []
     html_parts: list[str] = []
@@ -315,7 +332,7 @@ def render_frame(
 
         if channel == "email":
             if kind == KIND_UNKNOWN:
-                html_parts.append(module_html(channel, entry["module_type"], entry["module_id"], {}))
+                html_parts.append(module_html(channel, entry["module_type"], entry["module_id"], {}, theme=theme))
             elif variables is None:
                 html_parts.append(
                     f"<!-- module {entry['module_id']} ({entry['module_type']}): "
@@ -324,7 +341,7 @@ def render_frame(
             else:
                 html_parts.append(module_html(
                     channel, entry["module_type"], entry["module_id"], variables,
-                    content_id=content_id, template_type=lookup_type(frame, entry),
+                    content_id=content_id, template_type=lookup_type(frame, entry), theme=theme,
                 ))
         elif variables is not None and not fields:
             # A push carries one module's fields (ADR-160 point 2), stripped of
@@ -349,7 +366,7 @@ def render_frame(
         if unsubscribe:
             envelope["list_unsubscribe"] = unsubscribe["url"]
         artifact = RenderedArtifact(
-            role=ROLE_HTML, media_type="text/html", body=email_document(html_parts, footer),
+            role=ROLE_HTML, media_type="text/html", body=email_document(html_parts, footer, theme=theme),
             envelope=envelope,
         )
     else:

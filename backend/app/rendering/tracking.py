@@ -11,6 +11,7 @@ static call-to-action belong to no content and stay untagged, so a click on
 them credits nothing — ADR-182 point 3.
 """
 import re
+from html import unescape
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 #: The parameter a tracked link carries. Part of the contract with every
@@ -49,3 +50,26 @@ def content_id_from_url(url: str | None) -> int | None:
             except ValueError:
                 return None
     return None
+
+
+def with_params(url: str, params: list) -> str:
+    """`url` with each `[key, value]` added unless the link already has that
+    key: a link's own utm_source wins over the profile's (task-354)."""
+    parts = urlsplit(url)
+    query = parse_qsl(parts.query, keep_blank_values=True)
+    present = {k for k, _ in query}
+    query += [(k, v) for k, v in params if k not in present]
+    return urlunsplit(parts._replace(query=urlencode(query)))
+
+
+def tag_params(html: str, params: list) -> str:
+    """Every http(s) link in `html` with the profile's link parameters
+    (ADR-194, addendum 2026-10-11 (third)). Given only a module's HTML, never
+    the legal footer, so imprint, privacy and unsubscribe links stay as they
+    are. No parameters, no change: the HTML is returned untouched."""
+    if not params:
+        return html
+    # Unescaped first: a template writes `&` in an href as `&amp;`, which the
+    # query parser would read as part of a key. The inliner escapes the whole
+    # document again afterwards.
+    return _HREF.sub(lambda m: f'href="{with_params(unescape(m.group(1)), params)}"', html)

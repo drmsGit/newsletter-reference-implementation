@@ -14,6 +14,7 @@ from app.modules.registry import (
     ModuleManifest, envelope_module_type, get_manifest, get_template_html, required_when_shown,
 )
 from app.overrides.service import get_active_content_override
+from app.brand_profiles.theme import resolve_css
 
 RenderMode = Literal["preview", "send"]
 
@@ -155,9 +156,16 @@ def render_variant_html(
 
     rendered_modules = []
     resolutions_by_module_id: dict[int, DecisionResolutionDB] = {}
+    # The variant's brand profile as it is now (task-354): its look fills
+    # brand.css and the templates, its tags go on every module link. A
+    # snapshot freezes the same theme (frame.py), so preview and send agree.
+    from app.brand_profiles.theme import live_theme
+
+    theme = live_theme(db, variant)
 
     for module in modules:
-        html, resolution = render_module(db=db, module=module, channel=channel, recipient_id=recipient_id, mode=mode)
+        html, resolution = render_module(db=db, module=module, channel=channel, recipient_id=recipient_id,
+                                         mode=mode, theme=theme)
         rendered_modules.append(html)
         if resolution is not None:
             resolutions_by_module_id[module.id] = resolution
@@ -167,7 +175,7 @@ def render_variant_html(
     # markup lives with the field that produces it. Nothing is injected here.
     # `footer` is the legal footer a test send carries (task-357); a preview
     # passes none, so what the editor shows is unchanged.
-    final_html = email_document(rendered_modules, footer)
+    final_html = email_document(rendered_modules, footer, theme=theme)
 
     if collect_resolutions:
         return final_html, resolutions_by_module_id
@@ -180,6 +188,7 @@ def render_module(
     channel: str,
     recipient_id: int | None = None,
     mode: RenderMode = "preview",
+    theme: dict | None = None,
 ) -> tuple[str, DecisionResolutionDB | None]:
     """`channel` is passed down rather than looked up per module: the caller
     already has the variant, and a query per module to re-derive a value that
@@ -191,9 +200,11 @@ def render_module(
         return render_unknown_module(module), None
 
     if manifest.cms:
-        return render_cms_module(db=db, module=module, manifest=manifest, channel=channel, recipient_id=recipient_id, mode=mode)
+        return render_cms_module(db=db, module=module, manifest=manifest, channel=channel, recipient_id=recipient_id,
+                                 mode=mode, theme=theme)
 
-    return render_static_module(db=db, module=module, manifest=manifest, channel=channel, mode=mode), None
+    return render_static_module(db=db, module=module, manifest=manifest, channel=channel, mode=mode,
+                                theme=theme), None
 
 
 def envelope_fields_for_variant(
@@ -351,8 +362,14 @@ def module_html(
     content_id: int | None = None,
     *,
     template_type: str | None = None,
+    theme: dict | None = None,
 ) -> str:
     """One module's HTML from values already decided — the formatting half.
+
+    `theme` is `{"values", "link_params"}` from the brand profile (task-354):
+    the template gets the values as `profile` (for styles written as
+    attributes, MJML's way, ADR-131), and every link gets the parameters.
+    None renders as a frame made before profiles did.
 
     Shared by the live render (`render_cms_module`, `render_static_module`) and
     the frame render (`app.rendering.frame`), so a module looks the same
@@ -370,13 +387,22 @@ def module_html(
             f"<!-- unknown module type: {module_type} -->"
             f"</div>"
         )
-    rendered = _jinja.from_string(html_source).render(**apply_rich_text(variables, manifest))
+    theme = theme or {}
+    rendered = _jinja.from_string(html_source).render(
+        **{**apply_rich_text(variables, manifest), "profile": theme.get("values") or {}},
+    )
     if content_id is not None:
         # The link names its content (task-240, ADR-182): only here, inside a
         # content-bound module, so a non-content link credits nothing.
         from app.rendering.tracking import tag_links
 
         rendered = tag_links(rendered, content_id)
+    if theme.get("link_params"):
+        # Every module link, content or typed in; never the legal footer,
+        # which is not a module (ADR-194 addendum 2026-10-11 (third)).
+        from app.rendering.tracking import tag_params
+
+        rendered = tag_params(rendered, theme["link_params"])
     content_attr = f' data-content-id="{content_id}"' if content_id is not None else ""
     return (
         f'<div data-module-id="{module_id}" data-module-type="{module_type}"{content_attr}>\n'
@@ -385,7 +411,7 @@ def module_html(
     )
 
 
-def email_document(rendered_modules: list[str], footer: str = "") -> str:
+def email_document(rendered_modules: list[str], footer: str = "", *, theme: dict | None = None) -> str:
     """Wrap rendered modules into the inlined email document. Shared by the live
     and the frame render for the same reason as `module_html`.
 
@@ -399,7 +425,7 @@ def email_document(rendered_modules: list[str], footer: str = "") -> str:
   <head>
     <meta charset="utf-8">
     <title>Newsletter Preview</title>
-    <style>{_load_brand_css()}</style>
+    <style>{resolve_css(_load_brand_css(), (theme or {}).get("values"))}</style>
   </head>
   <body>
     {""}
@@ -443,6 +469,7 @@ def render_cms_module(
     channel: str,
     recipient_id: int | None = None,
     mode: RenderMode = "preview",
+    theme: dict | None = None,
 ) -> tuple[str, DecisionResolutionDB | None]:
     variables, content, decision_resolution = resolve_module_variables(
         db=db, module=module, manifest=manifest, recipient_id=recipient_id, mode=mode
@@ -457,7 +484,7 @@ def render_cms_module(
 
     return (
         module_html(channel, module.module_type, module.id, without_hidden(variables, module.hidden_fields),
-                    content_id=content["id"]),
+                    content_id=content["id"], theme=theme),
         decision_resolution,
     )
 
@@ -522,10 +549,12 @@ def render_static_module(
     manifest: ModuleManifest,
     channel: str,
     mode: RenderMode = "preview",
+    theme: dict | None = None,
 ) -> str:
     return module_html(
         channel, module.module_type, module.id,
         without_hidden(static_module_variables(db, module, manifest, mode=mode), module.hidden_fields),
+        theme=theme,
     )
 
 

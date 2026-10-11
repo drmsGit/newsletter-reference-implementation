@@ -51,6 +51,13 @@ CORE_FIELDS: tuple[ProfileField, ...] = (
     ProfileField("privacy_url", "url", "Privacy link", True, "Legal details", core=True),
     ProfileField("unsubscribe_text", "text", "Unsubscribe wording", True, "Unsubscribe", core=True,
                  marketing_only=True),
+    # Link tags (ADR-194 addendum 2026-10-11 (third)): core because the
+    # platform reads them by name, optional because tagging is the company's
+    # choice. No tags at all while utm_source is empty.
+    ProfileField("utm_source", "text", "UTM source", False, "Link tracking", core=True),
+    ProfileField("utm_medium", "text", "UTM medium", False, "Link tracking", core=True),
+    ProfileField("utm_extra", "text", "Further link parameters", False, "Link tracking",
+                 multiline=True, core=True),
 )
 _CORE = {f.name: f for f in CORE_FIELDS}
 

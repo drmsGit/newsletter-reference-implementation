@@ -85,6 +85,11 @@ LANGUAGE = re.compile(r"[a-z]{2}(-[A-Z]{2})?")
 _COLOUR = re.compile(r"#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?")
 _SIZE = re.compile(r"\d+(\.\d+)?(px|em|rem|%)")
 _URL = re.compile(r"https?://\S+")
+#: A font list goes into CSS (brand.css, task-354): names, commas, quotes,
+#: hyphens and dots only, so a value can never close a rule.
+_FONT_FAMILY = re.compile(r"[A-Za-z0-9 ,'\"._-]+")
+#: One further link parameter per line of utm_extra.
+_PARAM_LINE = re.compile(r"[A-Za-z0-9_.-]+=[^\s&=]*")
 
 
 class ProfileNotFound(LookupError):
@@ -138,6 +143,8 @@ def clean_values(values: dict) -> dict:
         if value is None or (isinstance(value, str) and not value.strip()):
             continue
         problem, value = _check(field.type, value)
+        if not problem and name == "utm_extra":
+            problem = _check_param_lines(value)
         if problem:
             errors.append((("field_values", name), problem))
         else:
@@ -170,7 +177,16 @@ def _check(field_type: str, value):
         return "A size with its unit: px, em, rem or %, for example 16px.", value
     if field_type in ("url", "image") and not _URL.fullmatch(value):
         return "A full web address starting with https:// or http://.", value
+    if field_type == "font_family" and not _FONT_FAMILY.fullmatch(value):
+        return "Font names separated by commas, for example Georgia, serif.", value
     return None, value
+
+
+def _check_param_lines(value: str) -> str | None:
+    for line in value.splitlines():
+        if line.strip() and not _PARAM_LINE.fullmatch(line.strip()):
+            return "One parameter per line, written as key=value, for example ref=newsletter."
+    return None
 
 
 def _check_header(name: str | None, language: str | None, kind: str | None) -> list:
