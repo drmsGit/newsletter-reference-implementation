@@ -536,6 +536,10 @@ class SessionBrand(BaseModel):
     #: False for a single-brand deployment, which is what lets the shell render
     #: no switcher at all — ADR-150 point 4.
     switchable: bool
+    #: The brand's logo from its default profile, or None (task-356; ADR-194
+    #: point 12, logo only: the app's palette and fonts do not follow the brand).
+    logo: str | None = None
+    logo_alt: str | None = None
 
 
 class BrandOption(BaseModel):

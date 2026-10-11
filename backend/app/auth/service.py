@@ -393,11 +393,20 @@ def current_brand_summary(db: Session, token: str | None) -> dict | None:
     brand = resolve_session_brand(db, token)
     if brand is None:
         return None
+    # The brand's logo, from its DEFAULT profile (ADR-194 point 12, narrowed
+    # by the user to the logo only: the app keeps one palette and its fonts).
+    # The names are the setup file's Header fields (task-351); an installation
+    # that declares no logo shows none.
+    from app.brand_profiles.service import default_profile
+
+    values = default_profile(db, brand.id).field_values or {}
     return {
         "id": brand.id,
         "key": brand.key,
         "name": brand.name,
         "switchable": len(brands_for_user(db, user_for_token(db, token))) > 1,
+        "logo": values.get("logo") or None,
+        "logo_alt": values.get("logo_alt") or None,
     }
 
 

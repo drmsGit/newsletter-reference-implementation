@@ -154,6 +154,14 @@ input[data-focus-visible] {
   font-weight: 600;
 }
 
+/* The working brand's logo (task-356): sized only; no brand colour or font. */
+.shell__logo {
+  display: block;
+  height: 24px;
+  width: auto;
+  max-width: 160px;
+}
+
 .shell__user {
   margin-left: auto;
   color: var(--brand-muted);

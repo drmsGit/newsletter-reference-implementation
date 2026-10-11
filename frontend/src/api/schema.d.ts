@@ -6118,6 +6118,10 @@ export interface components {
             name: string;
             /** Switchable */
             switchable: boolean;
+            /** Logo */
+            logo?: string | null;
+            /** Logo Alt */
+            logo_alt?: string | null;
         };
         /** SessionCodeRequest */
         SessionCodeRequest: {

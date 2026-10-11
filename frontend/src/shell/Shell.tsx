@@ -44,6 +44,19 @@ export default function Shell() {
     <div className="shell">
       <header className="shell__bar">
         <span className="shell__brand">{PRODUCT_NAME}</span>
+        {/*
+          The working brand's logo, from its default brand profile, so a manager
+          sees which brand they are in (task-356). Only the logo: the app keeps
+          one palette and its fonts whatever the brand (ADR-194 point 12, as
+          narrowed by the user).
+        */}
+        {session.data.brand?.logo && (
+          <img
+            className="shell__logo"
+            src={session.data.brand.logo}
+            alt={session.data.brand.logo_alt || `${session.data.brand.name} logo`}
+          />
+        )}
         <BrandSwitcher session={session.data} />
         <span className="shell__user">{session.data.user?.email}</span>
         <Button

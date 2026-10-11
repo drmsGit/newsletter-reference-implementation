@@ -3,7 +3,8 @@ import { screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import Shell from './Shell'
-import { jsonResponse, renderWithProviders, stubFetch } from '../test-utils'
+import { sessionQueryKey } from '../api/session'
+import { A_SESSION, jsonResponse, makeQueryClient, renderWithProviders, stubFetch } from '../test-utils'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -28,5 +29,33 @@ describe('the shell', () => {
     )
 
     expect(await screen.findByText('sign in')).toBeInTheDocument()
+  })
+
+  it("shows the working brand's logo from its default profile, and none without one", async () => {
+    // As RequireSession leaves it: the session already read.
+    const shellWith = (logo: string | null) => {
+      const client = makeQueryClient()
+      client.setQueryData(sessionQueryKey, {
+        ...A_SESSION,
+        brand: { ...A_SESSION.brand, logo, logo_alt: logo ? 'Acme shop' : null },
+      })
+      return renderWithProviders(
+        <Routes>
+          <Route path="/" element={<Shell />} />
+        </Routes>,
+        { client },
+      )
+    }
+    stubFetch({ 'GET /auth/session': () => jsonResponse(A_SESSION) })
+    const first = shellWith('https://cdn.example.test/acme.png')
+    expect(await screen.findByRole('img', { name: 'Acme shop' })).toHaveAttribute(
+      'src',
+      'https://cdn.example.test/acme.png',
+    )
+    first.unmount()
+
+    shellWith(null)
+    expect(await screen.findByText(A_SESSION.user.email)).toBeInTheDocument()
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
   })
 })
