@@ -1,6 +1,6 @@
 ---
 type: adr
-status: accepted
+status: superseded by ADR-194
 topic:
   - architecture
   - rendering
@@ -8,7 +8,7 @@ topic:
   - brand
   - modules
 created: 2026-10-10
-modified: 2026-10-10
+modified: 2026-10-11
 source:
   - "task-301 design session, decided by the user 2026-10-10, one question at a time"
 depends_on:
@@ -22,7 +22,7 @@ depends_on:
 ---
 
 ## Status
-Accepted
+Superseded by ADR-194
 
 ## Context
 
@@ -157,3 +157,6 @@ A preference center is a page where a recipient chooses which newsletters or cha
 - [[ADR-131 — Email Module Templates Use MJML as Source Format]] — the source format of the new modules.
 - [[ADR-183 — A Snapshot Freezes the Composition and Every Delivery Records What It Got]] — the frozen frame and the delivery record, which the legal set and the rename must respect.
 - [[ADR-163 — Per-Channel Consent and Addressability]] — purpose; transactional mail carries no unsubscribe line.
+
+### Superseded By
+- [[ADR-194 — Brand Profiles Carry an Email's Look, Texts and Legal Details]]

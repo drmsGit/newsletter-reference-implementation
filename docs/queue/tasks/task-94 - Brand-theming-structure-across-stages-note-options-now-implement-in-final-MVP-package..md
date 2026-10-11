@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
-updated_date: '2026-10-10 21:16'
+updated_date: '2026-10-11 08:42'
 labels:
   - backend
   - frontend
@@ -32,4 +32,8 @@ ordinal: 204700
 Migrated 2026-09-27 from `docs/backlog.md` line 264, section "Features", position 47 in that section (top = do next). The description is the original entry, verbatim.
 
 2026-10-10 (task-301, ADR-193, decided by the user): brand.css stays the one shared full-CSS stylesheet for email structure, but each brand profile now also carries colour and font values, applied on top of brand.css at render. That widens this task's email side from one file per installation to one file plus per-brand values. How they are applied is still open: email clients handle CSS custom properties poorly, so the values must be resolved at render or inlining.
+
+2026-10-11 (ADR-194, decided by the user): the manager app's look no longer gets a separate palette in Settings. It reads accent colour, logo and font from the working brand's default brand profile, with a contrast guard (task-356). Email styling is now brand.css filled from the brand profile's fields (task-354). What remains here is the overall theming structure across stages, if anything.
+
+2026-10-11, revised: only the working brand's LOGO comes from its default profile (task-356). The app's palette and fonts stay one per installation, per the design draft in docs/design/DESIGN.md.
 <!-- SECTION:NOTES:END -->

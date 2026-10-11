@@ -112,19 +112,24 @@ into each email when it is sent. It uses these classes: `.module-wrapper`,
 **Today no fixed content width is set** (`width: 100%`): the design should choose
 one. Around 600px is the common choice.
 
-**Decided and coming (ADR-193, 2026-10-10); the design should cover these:**
-- **A visible header module:** a logo, perhaps navigation.
-- **Footer modules:** links, special texts. A brand may have several, and a
-  manager picks one per email.
-- **A fixed legal footer line** at the bottom of every marketing email. It is
-  not a module, and no manager can remove it. It holds the unsubscribe link and
-  the brand's legal details: legal name, address, imprint and privacy links. It
-  is plain and small today (12px grey, centred). The design may style it but
-  not drop or hide any of it.
-- **Per-brand look:** each brand gets its own colour and font, and its own logo
-  in its header. Everything else is shared by every brand: the modules, their
-  structure, and the stylesheet. **So the design should say which of its values
-  are per brand (a "brand slot") and which are shared.**
+**Decided and coming (ADR-194, 2026-10-11, which replaced ADR-193); the design should cover these:**
+- **Brand profiles.** A brand has as many profiles as it needs (a flashy
+  marketing look, a calm transactional one, a dark Black Friday one), and each
+  email variant picks one. A profile carries the look (colours, fonts, sizes,
+  spacing, radius), images (the logo), texts (service hotline, footer texts,
+  unsubscribe wording, legal details) and links (menu links). **Which fields a
+  profile has is declared per installation in a setup file**, so the design
+  should name the fields it needs (for example two font sizes or four) and say
+  which of its values come from the profile and which are shared.
+- **A visible header module:** logo and menu links, from the email's profile.
+- **A footer module:** links, hotline and texts from the profile, plus one
+  optional free text per email. A manager places them or leaves them out.
+- **A fixed legal footer** at the bottom of every email (marketing,
+  transactional and tests). It is not a module, and no manager can remove it.
+  It holds the profile's legal details (legal name, address, imprint and
+  privacy links), and for marketing the unsubscribe line with the profile's
+  wording. It is plain and small today (12px grey, centred). The design may
+  style it but not drop or hide any of it.
 - **Decorative modules** (header, footer, later a section heading) are fine to
   design freely; they never count as an email's content.
 
@@ -160,15 +165,15 @@ one. Around 600px is the common choice.
 1. Every email design against the client limits above.
 2. Every screen mock-up against what that screen must contain.
 3. The tokens against the accessibility targets (contrast, focus).
-4. The brand slots against ADR-193 (colour, font and logo per brand; the rest
-   shared).
+4. The profile fields against ADR-194: what the design takes from a brand
+   profile, and what is shared by every email.
 5. Anything that changes a recorded decision is flagged for a decision first.
-   For example: task-94 decided one full-CSS file for email structure, and the
-   manager app's palette is meant to stay small.
+   For example: the manager app is one palette per installation, and only the
+   working brand's logo comes from its brand profile (ADR-194).
 
-Related: [[ADR-193 — An Email's Legal Footer Is Fixed, Its Visible Header and Footer Are Placed Modules]],
+Related: [[ADR-194 — Brand Profiles Carry an Email's Look, Texts and Legal Details]] (which replaced ADR-193),
 [[ADR-131 — Email Module Templates Use MJML as Source Format]],
 [[ADR-191 — Unsubscribe Is a Per-Message Token, a Confirm Page and One-Click]],
 [[ADR-173 — The Manager Client's Runtime Dependencies]], task-94 (theming),
-task-349 to task-351 (the header, footer and brand profile builds), task-112
+task-350, task-351 and task-354 to task-356 (the brand profile, header, footer and look builds), task-112
 (assets, for logos).

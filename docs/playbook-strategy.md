@@ -810,6 +810,19 @@ Each was decided by the user in its own question. The full narrative is under th
 
 Recorded in [[ADR-193 — An Email's Legal Footer Is Fixed, Its Visible Header and Footer Are Placed Modules]], with an addendum to ADR-191 (the fixed line is permanent, not a stopgap). Built in task-349, then task-350, then task-351; the preference center is task-348.
 
+### 2026-10-11 — Brand profiles: one choice per email carries its look, texts and legal details
+
+**Context:** the user pointed out that one company may need several looks (a flashy marketing one, a calm transactional one, a dark Black Friday one), with different menu links, hotlines, footer texts and tracking per look. The day before, ADR-193 had split this into legal-detail sets and per-brand colour and font. **Decided by the user, one question at a time:**
+1. **Brand profiles.** A brand has as many as it needs. The first is the default, profiles can be duplicated, and deleting one falls back to the default. A profile holds the look, images, texts, links and tracking.
+2. **The structure is the company's.** Which fields a profile has is declared in a setup file per installation (one company needs two font sizes, another four), around a fixed core of legal details and unsubscribe wording.
+3. **Chosen on the variant**, which allows A/B tests of designs. Frozen with the snapshot, so editing a profile never changes what was sent.
+4. **Legal details on every email.** The unsubscribe wording comes from the profile; the link and one-click header stay the platform's; a marketing profile must have the wording.
+5. **Marketing or transactional per profile.** A transactional profile skips the opt-in check, so it needs its own permission, is audited and is visibly labelled.
+6. **One profile per language. UTM tags on links from the profile.**
+7. **The manager app keeps one palette and its fonts**; only the working brand's logo comes from its profile. This was narrowed the same day after reading the design draft, so the draft's colour meanings (teal for the system, ochre for a person) hold.
+
+Recorded in [[ADR-194 — Brand Profiles Carry an Email's Look, Texts and Legal Details]], which supersedes ADR-193: the third supersession so far. Built in five slices: task-350, task-354, task-351, task-355 and task-356.
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*

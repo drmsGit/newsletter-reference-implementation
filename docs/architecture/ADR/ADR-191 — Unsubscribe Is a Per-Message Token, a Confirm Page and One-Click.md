@@ -8,7 +8,7 @@ topic:
   - deliverability
   - delivery
 created: 2026-10-09
-modified: 2026-10-10
+modified: 2026-10-11
 source:
   - "Decided by the user in chat, 2026-10-09, one question at a time (task-56)"
 depends_on:
@@ -162,6 +162,22 @@ Prompted by the task-301 design session. The user decided on 2026-10-10, and [[A
 
 **Nothing is built by this addendum.**
 
+## Addendum 2026-10-11 — the legal details and the line's wording come from the variant's brand profile
+
+Prompted by the task-350 design session on brand profiles. The user decided on 2026-10-11, and [[ADR-194 — Brand Profiles Carry an Email's Look, Texts and Legal Details]] records it. Decision points 5 and 7 above and the 2026-10-10 addendum are left as written. This addendum governs how they are to be read.
+
+**Where the legal details come from.** The 2026-10-10 addendum points to "ADR-193 point 2" for the brand's legal details. ADR-193 is now superseded by ADR-194. The legal details, and the unsubscribe line's wording, live in the brand profile chosen on the variant (ADR-194 points 4 and 10).
+
+**What ADR-194 keeps.**
+
+- **The link is the platform's per-recipient token link** (point 2), and **every marketing email keeps the one-click header** (point 5).
+- **A marketing profile must have unsubscribe text,** so the visible line can never be dropped from marketing mail. Point 5's guarantee holds.
+- **A transactional profile may leave the text empty,** and then no line is shown.
+
+**How point 7 now reads.** "Every word around unsubscribing in one file" still holds for the page and the confirmation, in `backend/app/subscriptions/texts.py`. The footer line's wording comes from profile data, one profile per language.
+
+**Nothing is built by this addendum.**
+
 ## Related ADRs
 
 ### Depends On
@@ -176,3 +192,4 @@ Prompted by the task-301 design session. The user decided on 2026-10-10, and [[A
 - [[ADR-152 — Secret and Credential Handling]]
 - [[ADR-161 — Channel Execution Shapes]] — the envelope carries the List-Unsubscribe URL as delivery metadata.
 - [[ADR-193 — An Email's Legal Footer Is Fixed, Its Visible Header and Footer Are Placed Modules]] — makes point 5's footer line permanent and extends it with the brand's legal details.
+- [[ADR-194 — Brand Profiles Carry an Email's Look, Texts and Legal Details]] — moves the legal details and the unsubscribe line's wording into the variant's brand profile, keeping the token link, the one-click header and the visible line on marketing mail.

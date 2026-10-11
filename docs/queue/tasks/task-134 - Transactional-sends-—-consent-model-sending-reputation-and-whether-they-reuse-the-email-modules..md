@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
-updated_date: '2026-09-27 14:29'
+updated_date: '2026-10-11 08:44'
 labels:
   - needs-adr
   - backend
@@ -37,4 +37,6 @@ ordinal: 301800
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 473, section "Needs ADR", position 18 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-11 (ADR-194 point 9): a brand profile is marked marketing (default) or transactional, and a variant using a transactional profile may go out without opt-in consent, guarded by a separate permission, audit and a visible label (built in task-355). ADR-194 decides WHERE that choice sits. The purpose vocabulary itself (what 'transactional' records as a consent purpose), the other exclusion stages and any sender streams stay here. task-355's final-design pass must be done together with this task's purpose model.
 <!-- SECTION:NOTES:END -->
