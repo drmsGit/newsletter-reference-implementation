@@ -172,10 +172,15 @@
                         <td class="small">
                             {% if credential.revoked_at %}
                             revoked
+                            {% elif credential.expires_at and credential.expires_at < now %}
+                            expired {{ credential.expires_at.strftime('%Y-%m-%d') }}
                             {% elif credential.last_used_at %}
                             used {{ credential.last_used_at.strftime('%Y-%m-%d %H:%M') }}
                             {% else %}
                             never used
+                            {% endif %}
+                            {% if credential.expires_at and not credential.revoked_at and credential.expires_at >= now %}
+                            · expires {{ credential.expires_at.strftime('%Y-%m-%d') }}
                             {% endif %}
                         </td>
                         <td class="text-end">

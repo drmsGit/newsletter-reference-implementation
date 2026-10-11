@@ -12,7 +12,7 @@ This module answers *who is calling*; the existing guard answers *may they*.
 
 import logging
 import secrets
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -237,11 +237,85 @@ def require_holds_integration(
 
 def issue_credential_by_person(
     db: Session, actor, integration_id: int, label: str | None = None,
-    *, enforced: bool = True,
+    *, enforced: bool = True, expires_in_days: int | None = None,
 ):
     """`issue_credential`, refused unless the actor holds all the integration may do."""
     require_holds_integration(db, actor, integration_id, enforced=enforced)
-    return issue_credential(db, integration_id, label=label)
+    return issue_credential(db, integration_id, label=label, expires_in_days=expires_in_days)
+
+
+# --- key expiry (task-344; ADR-166 second addenda of 2026-10-09 and 2026-10-11) ---
+
+#: A key's expiry is between one day and ten years from when it is set.
+EXPIRY_DAYS_RANGE = (1, 3650)
+#: A key expiring within this many days is marked in the list, and so is its
+#: integration. The only warning: no mail is sent (the user, 2026-10-11).
+EXPIRING_SOON_DAYS = 14
+
+
+def _expiry_for(days: int | None):
+    if days is None:
+        return None
+    low, high = EXPIRY_DAYS_RANGE
+    if isinstance(days, bool) or not isinstance(days, int) or not low <= days <= high:
+        raise ValueError(f"A key expires after {low} to {high} days, or never.")
+    return now() + timedelta(days=days)
+
+
+def is_live(credential) -> bool:
+    """Neither revoked nor expired."""
+    return credential.revoked_at is None and (credential.expires_at is None or credential.expires_at > now())
+
+
+def is_expiring_soon(credential) -> bool:
+    return (is_live(credential) and credential.expires_at is not None
+            and credential.expires_at <= now() + timedelta(days=EXPIRING_SOON_DAYS))
+
+
+def suggested_expiry_days(db: Session, integration_id: int) -> int | None:
+    """What the next key's form is pre-filled with: the days the newest key
+    was given (rotation keeps its rhythm unless someone changes it)."""
+    newest = (db.query(IntegrationCredentialDB)
+              .filter(IntegrationCredentialDB.integration_id == integration_id)
+              .order_by(IntegrationCredentialDB.created_at.desc(), IntegrationCredentialDB.id.desc())
+              .first())
+    return newest.expires_in_days if newest else None
+
+
+def set_credential_expiry(db: Session, integration_id: int, credential_id: int, days: int | None):
+    """Set a key's expiry to `days` from now, or remove it (None). Returns
+    `(old, new)` expiry, or None for a key not under this integration."""
+    credential = db.query(IntegrationCredentialDB).filter(
+        IntegrationCredentialDB.id == credential_id,
+        IntegrationCredentialDB.integration_id == integration_id,
+    ).first()
+    if credential is None:
+        return None
+    old, new = credential.expires_at, _expiry_for(days)
+    credential.expires_at, credential.expires_in_days = new, days
+    db.commit()
+    return old, new
+
+
+def set_credential_expiry_by_person(
+    db: Session, actor, integration_id: int, credential_id: int, days: int | None,
+    *, enforced: bool = True,
+):
+    """Bringing an expiry forward, or adding one, only takes power away and is
+    not gated, like revoking. Pushing it later or removing it hands out more
+    time, and is gated like issuing a key (ADR-166 addendum 2026-10-11, second)."""
+    credential = db.query(IntegrationCredentialDB).filter(
+        IntegrationCredentialDB.id == credential_id,
+        IntegrationCredentialDB.integration_id == integration_id,
+    ).first()
+    if credential is None:
+        return None
+    new = _expiry_for(days)
+    lengthens = (new is None and credential.expires_at is not None) or (
+        new is not None and credential.expires_at is not None and new > credential.expires_at)
+    if lengthens:
+        require_holds_integration(db, actor, integration_id, enforced=enforced)
+    return set_credential_expiry(db, integration_id, credential_id, days)
 
 
 def set_unattended_by_person(
@@ -284,7 +358,7 @@ def revoke_grant(db: Session, integration_id: int, permission: str, brand_id: in
 # --- credentials ------------------------------------------------------------
 
 def issue_credential(
-    db: Session, integration_id: int, label: str | None = None,
+    db: Session, integration_id: int, label: str | None = None, *, expires_in_days: int | None = None,
 ) -> tuple[IntegrationCredentialDB, str] | None:
     """Mint a key + secret. **The secret is returned once and never again.**
 
@@ -299,12 +373,15 @@ def issue_credential(
     if integration is None or not integration.is_active:
         return None
 
+    expires_at = _expiry_for(expires_in_days)   # refused before anything is written
     secret = new_secret()
     credential = IntegrationCredentialDB(
         integration_id=integration_id,
         key_id=new_key_id(),
         secret_hash=hash_secret(secret),
         label=(label or "").strip() or None,
+        expires_at=expires_at,
+        expires_in_days=expires_in_days,
     )
     db.add(credential)
     db.commit()
@@ -421,6 +498,10 @@ def authenticate(db: Session, key_id: str, secret: str) -> IntegrationDB | None:
     if credential is None:
         return None
     if credential.revoked_at is not None:
+        return None
+    # Expired is refused on the revoked path, with the same answer (ADR-166
+    # second addendum of 2026-10-09, point 3): the caller cannot tell them apart.
+    if credential.expires_at is not None and credential.expires_at <= now():
         return None
     if not secrets.compare_digest(credential.secret_hash, hash_secret(secret)):
         return None

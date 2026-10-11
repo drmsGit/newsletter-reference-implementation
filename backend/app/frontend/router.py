@@ -3509,6 +3509,7 @@ def _integration_rows(db: Session):
     from app.auth.db_models import (
         IntegrationCredentialDB, IntegrationDB, IntegrationGrantDB,
     )
+    from app.auth import integrations as ints
 
     rows = []
     for integration in db.query(IntegrationDB).order_by(IntegrationDB.id).all():
@@ -3522,13 +3523,15 @@ def _integration_rows(db: Session):
             "integration": integration,
             "credentials": credentials,
             "grants": grants,
-            "live_keys": sum(1 for c in credentials if c.revoked_at is None),
+            # Not revoked and not expired (task-344).
+            "live_keys": sum(1 for c in credentials if ints.is_live(c)),
         })
     return rows
 
 
 def _integrations_context(request: Request, db: Session, **extra):
     from app.auth.permissions import ALL_PERMISSIONS
+    from app.auth.service import now as auth_now
 
     context = {
         "rows": _integration_rows(db),
@@ -3536,6 +3539,8 @@ def _integrations_context(request: Request, db: Session, **extra):
         "brands": list_brands(db),
         "issued": None,
         "issued_for": None,
+        # For the key rows' "expired" / "expires" (task-344).
+        "now": auth_now(),
     }
     context.update(extra)
     return context

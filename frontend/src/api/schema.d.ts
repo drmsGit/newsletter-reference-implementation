@@ -2390,6 +2390,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/integrations/{integration_id}/keys/{credential_id}/expiry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set, move or remove a key's expiry
+         * @description Days from now, or null for never (task-344). Bringing it forward or adding one is open to integrations.manage; pushing it later or removing it needs every grant the integration has (403 otherwise), like issuing a key. Audited.
+         */
+        put: operations["set_key_expiry_integrations__integration_id__keys__credential_id__expiry_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/integrations/{integration_id}/keys/{credential_id}/revoke": {
         parameters: {
             query?: never;
@@ -4230,6 +4250,15 @@ export interface components {
             last_used_at?: string | null;
             /** Revoked At */
             revoked_at?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Expires In Days */
+            expires_in_days?: number | null;
+            /**
+             * Expiring Soon
+             * @default false
+             */
+            expiring_soon: boolean;
         };
         /**
          * CriteriaPreview
@@ -4760,6 +4789,13 @@ export interface components {
             created_by_user_id?: number | null;
             /** Live Keys */
             live_keys: number;
+            /**
+             * Expiring Soon
+             * @default false
+             */
+            expiring_soon: boolean;
+            /** Suggested Expiry Days */
+            suggested_expiry_days?: number | null;
             /** Grants */
             grants: components["schemas"]["GrantOut"][];
             /** Credentials */
@@ -4769,6 +4805,13 @@ export interface components {
         KeyCreate: {
             /** Label */
             label?: string | null;
+            /** Expires In Days */
+            expires_in_days?: number | null;
+        };
+        /** KeyExpiry */
+        KeyExpiry: {
+            /** Expires In Days */
+            expires_in_days?: number | null;
         };
         /** KeyIssued */
         KeyIssued: {
@@ -11372,6 +11415,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KeyIssued"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_key_expiry_integrations__integration_id__keys__credential_id__expiry_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integration_id: number;
+                credential_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeyExpiry"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationOut"];
                 };
             };
             /** @description Validation Error */

@@ -275,6 +275,11 @@ class IntegrationCredentialDB(Base):
     # point 3, inheriting ADR-151 §3): an integration that has started
     # misbehaving is exactly the case where waiting is unacceptable.
     revoked_at = Column(DateTime(timezone=True), nullable=True)
+    # Optional expiry, set in days when issued (task-344; ADR-166 second
+    # addenda of 2026-10-09 and 2026-10-11). Past it the key is refused like a
+    # revoked one. `expires_in_days` is kept to pre-fill the next key's form.
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    expires_in_days = Column(Integer, nullable=True)
 
 
 class IntegrationGrantDB(Base):

@@ -43,6 +43,12 @@ class CredentialOut(BaseModel):
     created_at: datetime
     last_used_at: datetime | None = None
     revoked_at: datetime | None = None
+    #: When it stops working, or None for never (task-344). Refused like a
+    #: revoked key once passed; the days it was set with pre-fill the next key.
+    expires_at: datetime | None = None
+    expires_in_days: int | None = None
+    #: Live and expiring within 14 days: the only warning there is.
+    expiring_soon: bool = False
 
 
 class GrantOut(BaseModel):
@@ -61,6 +67,10 @@ class IntegrationOut(BaseModel):
     created_at: datetime
     created_by_user_id: int | None = None
     live_keys: int
+    #: Some live key expires within 14 days (task-344).
+    expiring_soon: bool = False
+    #: The days the newest key was given, to pre-fill the next one.
+    suggested_expiry_days: int | None = None
     grants: list[GrantOut]
     credentials: list[CredentialOut]
 
@@ -72,6 +82,13 @@ class IntegrationCreate(BaseModel):
 
 class KeyCreate(BaseModel):
     label: str | None = None
+    #: Days until the key stops working, 1 to 3650; left out, never.
+    expires_in_days: int | None = None
+
+
+class KeyExpiry(BaseModel):
+    #: Days from now until the key stops working; null removes the expiry.
+    expires_in_days: int | None = None
 
 
 class KeyIssued(BaseModel):
@@ -106,15 +123,21 @@ def _out(db: Session, integration: IntegrationDB) -> IntegrationOut:
         unattended_ceiling=integration.unattended_ceiling,
         created_at=integration.created_at,
         created_by_user_id=integration.created_by_user_id,
-        live_keys=sum(1 for c in credentials if c.revoked_at is None),
+        # Not revoked AND not expired (task-344): an expired key is not live.
+        live_keys=sum(1 for c in credentials if ints.is_live(c)),
+        expiring_soon=any(ints.is_expiring_soon(c) for c in credentials),
+        suggested_expiry_days=ints.suggested_expiry_days(db, integration.id),
         grants=[GrantOut(permission=g.permission, brand_id=g.brand_id) for g in grants],
-        credentials=[
-            CredentialOut(
-                id=c.id, key_id=c.key_id, label=c.label, created_at=c.created_at,
-                last_used_at=c.last_used_at, revoked_at=c.revoked_at,
-            )
-            for c in credentials
-        ],
+        credentials=[_credential_out(c) for c in credentials],
+    )
+
+
+def _credential_out(c) -> CredentialOut:
+    return CredentialOut(
+        id=c.id, key_id=c.key_id, label=c.label, created_at=c.created_at,
+        last_used_at=c.last_used_at, revoked_at=c.revoked_at,
+        expires_at=c.expires_at, expires_in_days=c.expires_in_days,
+        expiring_soon=ints.is_expiring_soon(c),
     )
 
 
@@ -175,24 +198,58 @@ def issue_key(
         # hold all of it (ADR-166 addendum 2026-10-02).
         issued = ints.issue_credential_by_person(
             db, request_principal(request), integration_id, label=payload.label,
-            enforced=auth_is_enforced(request),
+            enforced=auth_is_enforced(request), expires_in_days=payload.expires_in_days,
         )
     except ints.GrantForbidden as error:
         raise HTTPException(status_code=403, detail=str(error))
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error))
     if issued is None:
         raise HTTPException(status_code=409, detail="That integration is deactivated.")
     credential, secret = issued
     ints.record_change(request, db, audit.INTEGRATION_KEY_ISSUED, integration_id,
-           key_id=credential.key_id, label=credential.label)
+           key_id=credential.key_id, label=credential.label,
+           expires_at=credential.expires_at.isoformat() if credential.expires_at else None)
     # A secret in a cacheable response is a secret in somebody's cache.
     response.headers["Cache-Control"] = "no-store"
     return KeyIssued(
-        credential=CredentialOut(
-            id=credential.id, key_id=credential.key_id, label=credential.label,
-            created_at=credential.created_at, last_used_at=None, revoked_at=None,
-        ),
+        credential=_credential_out(credential),
         secret_key=f"{credential.key_id}.{secret}",
     )
+
+
+@router.put(
+    "/{integration_id}/keys/{credential_id}/expiry",
+    response_model=IntegrationOut,
+    summary="Set, move or remove a key's expiry",
+    description=(
+        "Days from now, or null for never (task-344). Bringing it forward or adding "
+        "one is open to integrations.manage; pushing it later or removing it needs "
+        "every grant the integration has (403 otherwise), like issuing a key. Audited."
+    ),
+)
+def set_key_expiry(
+    integration_id: int, credential_id: int, payload: KeyExpiry, request: Request,
+    db: Session = Depends(get_db),
+):
+    integration = _get(db, integration_id)
+    try:
+        changed = ints.set_credential_expiry_by_person(
+            db, request_principal(request), integration_id, credential_id, payload.expires_in_days,
+            enforced=auth_is_enforced(request),
+        )
+    except ints.GrantForbidden as error:
+        raise HTTPException(status_code=403, detail=str(error))
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error))
+    if changed is None:
+        raise HTTPException(status_code=404, detail="That key does not exist.")
+    old, new = changed
+    ints.record_change(request, db, audit.INTEGRATION_KEY_EXPIRY_SET, integration_id,
+                       credential_id=credential_id,
+                       **{"from": old.isoformat() if old else None, "to": new.isoformat() if new else None})
+    db.refresh(integration)
+    return _out(db, integration)
 
 
 @router.post(
