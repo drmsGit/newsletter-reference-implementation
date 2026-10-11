@@ -373,6 +373,74 @@ This is Decision point 3's second half. Today's `.html` templates can use it now
 - **Which `brand.css` values a profile may change is limited to the declared field types.** Colour, size, font family and number are filled in; nothing else is.
 - **A new value in `brand.css` is fillable only once the setup file declares it.** Until then it always shows its fallback.
 
+## Addendum 2026-10-11 (fourth) — slice 3's final-design pass: the header and footer modules
+
+**Slice 3's final-design pass (queue task-351) settled how the visible header and footer modules are built.** The user decided points 1–3 on 2026-10-11, one question at a time. Points 4–8 are technical consequences settled in the same pass. Points 1–18 of the Decision are unchanged. Task-351's implementation plan holds the map of where each part lands.
+
+**1. Link lists are a new field type, `links`.**
+
+- **A `links` field is a text box with one link per line,** written as `Label | https://address`.
+- **It holds any number of links,** in the order written.
+- **It is checked on save.** Every line needs a label and an https address.
+- **This adds an eighth type** to the seven listed in point 1 of the first addendum above.
+
+**2. The shipped setup file declares the header and footer fields.**
+
+- **Group "Header":** logo (image), logo alt text (text), logo links to (url) and menu links (links).
+- **Group "Footer":** footer links (links), service hotline (text) and footer text (multi-line text).
+- **Task-351's plan names them** `logo`, `logo_alt`, `logo_link`, `menu_links`, `footer_links`, `service_hotline` and `footer_text`.
+- **An empty field leaves its part out of the email.**
+- **This adds to the look fields** of point 2 of the third addendum above.
+
+**3. https everywhere.**
+
+- **`url`, `image` and `links` fields refuse `http://` addresses.** That includes the core imprint and privacy links.
+- **Many mail programs block or flag images loaded over plain http.** Task-351's notes had asked for the logo to be https.
+- **A value already saved is refused only on its next save.**
+- **Frozen frames are not touched.**
+
+This extends Decision point 16, which named only the logo, to every address a profile holds.
+
+**4. The header and footer are modules.**
+
+- **They live in `storage/modules/email/header` and `footer`,** with `cms` false.
+- **A manager places them or leaves them out** (Decision point 14). They render from the email's brand profile (Decision point 7).
+- **The header has no fields of its own.**
+- **The footer has one optional per-email field, `footer_note`** (multi-line). It is shown before the profile's footer content.
+- **The fixed legal footer still follows,** appended by the frame.
+
+**5. Module manifests gain the key `decorative`, default false.**
+
+- **The nothing-to-show check skips decorative modules.** That is `what_rendered` (`backend/app/rendering/frame.py:257`), from the 2026-10-08 addendum of [[ADR-086 — Decision Slots Fail Gracefully]].
+- **An email holding only decorative modules and the envelope is skipped as nothing to show.**
+- **Both new modules are decorative.**
+
+This makes Decision point 15 concrete.
+
+**6. Their links carry the profile's UTM tags, never the click-attribution parameter.**
+
+- **The tags are those of point 3 of the third addendum above.**
+- **`nl_content` is never written on them.** They are not content ([[ADR-182 — A Click Credits Content Only When the Link Names It]] point 3).
+
+**7. A version-1 frame still reads its `header` module as the envelope.**
+
+- **The translation stays keyed on the frame version** (Decision point 17, task-349).
+- **The visible header exists only in frames of version 2 and later.**
+- **There is no frame-version bump.**
+
+**8. Templates read a link list through a template filter, `links`.**
+
+**What this pass settles.**
+
+- **"Where the footer module's per-email free text is stored"** from the open list of the first addendum above, and the matching Notes item: in the footer module, as its `footer_note` field.
+- **The decorative marker of Decision point 15:** a manifest key, default false, read by `what_rendered`.
+
+**Negative consequences of this pass.**
+
+- **A `links` box relies on a typed format.** A mistake shows only on save.
+- **https everywhere may refuse a company's existing http imprint link** on its next save.
+- **A footer's per-email note lives in the module.** It is not shared between emails.
+
 ## Related ADRs
 
 ### Supersedes
