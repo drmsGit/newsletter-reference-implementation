@@ -1,10 +1,11 @@
 ---
 id: TASK-220
 title: Nothing checks manual bindings against slot resolutions
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-09-27 14:20'
-updated_date: '2026-10-09 18:30'
+updated_date: '2026-10-11 20:06'
 labels:
   - backend
 dependencies:
@@ -30,6 +31,12 @@ Source: [[Variant Editor - design interview]] → What Cluster 1 produced, gap 6
 Depends on task-109: when a slot's pick is already bound by hand, the next pick comes from the ranked queue that task builds.
 <!-- SECTION:DESCRIPTION:END -->
 
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [x] #1 A slot passes over every record placed by hand in the variant, wherever it sits, and fills up to its number from further down
+- [x] #2 With the per-send switch on, a recipient is skipped only when no content record shows at all; one hand-picked record is enough to send; typed-in modules do not count
+<!-- AC:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -44,4 +51,12 @@ Logged 2026-09-27 from the "What Cluster N produced" sections of the two design 
 Line numbers re-checked: resolve_content_for_module is at backend/app/rendering/service.py:646.
 
 2026-10-09, decided by the user (interview review, VE-1.6): when a slot's pick for a recipient is already bound by hand in the variant, the slot takes its NEXT ranked pick (this task's original reading), not the interview's 'hide the module'. That makes task-109 a prerequisite. With no other candidate, the slot resolves nothing and ADR-086's unresolved-slot handling applies. Recorded in the ADR-176 2026-10-09 addendum. Open points 2 (max_results above 1) and 3 (counting) are readings for the final-design pass, not decisions.
+
+2026-10-11, final-design pass with the user. Open point 2 (several picks with a hand-bound record): the hand-bound record is passed over and the slot fills up to its number from further down, like task-109's slot-versus-slot rule. Open point 3 became a correction of the per-send switch: the user said it is for a fully dynamic variant that would show no content; with at least one hand-picked record the email is sent. So with the switch on, a recipient is skipped only when no content record shows at all (no slot pick, none by hand); typed-in modules do not count, or the switch would add nothing to the always-on floor. Recorded in the ADR-176 and ADR-086 addenda of 2026-10-11. Built: frame.hand_bound_ids seeds the send loop's shown set before slots resolve; the skip condition adds not hand_bound; REASON_NO_PICK and the Jinja label say no content record. Verified: tests/test_hand_beats_slot.py (4), 3 mutations killed; full pytest 1911 passed; CI green. No live browser check: the change is send-time behaviour covered by the tests, and the only visible change is the Jinja plan form's label. Commit 5a6645f.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+A record placed by hand now outranks a slot's pick of the same record: the slot passes over it and fills from further down. The per-send skip switch now means no content record at all, so one hand-picked record is enough to send (ADR-176 and ADR-086 addenda 2026-10-11). Verified by 4 new tests with all mutations killed, the full suite and CI.
+<!-- SECTION:FINAL_SUMMARY:END -->
