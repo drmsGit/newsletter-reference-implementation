@@ -812,17 +812,49 @@ def send_test_email(
     from app.rendering.service import UnpublishedContentError, render_variant_html
 
     to = to.strip()
+
+    # **Every email carries the sender's legal details (ADR-194), a test one
+    # too**: the variant's brand profile, or the brand's default without a
+    # variant. Unlike a render failure, an incomplete profile stops the test:
+    # a test of an email that may not be sent proves nothing about it. The
+    # unsubscribe wording is shown unlinked: a test has no token, and so no
+    # one-click header either (ADR-191, Negative).
+    from app.brand_profiles.service import missing, profile_of_variant
+    from app.brand_profiles.structure import profile_structure
+    from app.campaigns.service import get_variant
+    from app.rendering.service import legal_footer_html
+
+    variant_row = get_variant(db, variant_id, brand_id=brand_id) if variant_id is not None else None
+    profile = profile_of_variant(db, variant_row, brand_id) if variant_row is not None else None
+    if profile is None:
+        from app.brand_profiles.service import default_profile
+
+        profile = default_profile(db, brand_id)
+    if lacking := missing(profile):
+        labels = {f.name: f.label for f in profile_structure()}
+        return TestSendResult(
+            success=False, to=to, provider=provider,
+            message=(
+                f'Nothing was sent: the brand profile "{profile.name}" is missing '
+                f"{', '.join(labels.get(name, name) for name in lacking)}. Every email "
+                "carries the sender's legal details; fill them in under Settings, Brand profiles."
+            ),
+        )
+    footer = legal_footer_html(
+        {"language": profile.language, "values": dict(profile.field_values or {})},
+        unsubscribe_unlinked=True,
+    )
+
     fallback = (
         f"<h1>{subject}</h1>"
         "<p>Test email from the newsletter reference build.</p>"
+        f"{footer}"
     )
     render_note = None
     html = fallback
 
     if variant_id is not None:
-        from app.campaigns.service import get_variant
-
-        if get_variant(db, variant_id, brand_id=brand_id) is None:
+        if variant_row is None:
             render_note = (
                 f"Variant {variant_id} is not available here; sent a plain test "
                 "body instead."
@@ -830,7 +862,7 @@ def send_test_email(
         else:
             try:
                 html = render_variant_html(
-                    db, variant_id, recipient_id=recipient_id, mode="send",
+                    db, variant_id, recipient_id=recipient_id, mode="send", footer=footer,
                 )
             except UnpublishedContentError as error:
                 # **Caught ahead of the generic handler, for its message.**
@@ -958,6 +990,13 @@ def send_send_instance(
             "reaches the recipient with nothing in it, and the first party "
             "to notice is them."
         )
+    # Every email carries its brand profile's legal details (ADR-194): a frame
+    # without them, or with a required one empty, is refused here, before the
+    # claim, like missing content.
+    from app.rendering.frame import profile_refusal
+
+    if (refusal := profile_refusal(snapshot.render_context)) is not None:
+        raise ValueError(refusal)
 
     # Subject line comes from the variant (recipient-facing copy), not the
     # send_instance.name (an internal label). Fall back to the send_instance

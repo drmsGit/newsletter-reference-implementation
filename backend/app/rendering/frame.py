@@ -33,14 +33,20 @@ from app.overrides.service import get_active_content_override
 from app.rendering.renderers.base import ROLE_HTML, ROLE_PAYLOAD, RenderedArtifact
 
 #: Bumped when the frame's shape changes, so a reader can tell what it holds.
-FRAME_VERSION = 2
+FRAME_VERSION = 3
 #: Every version a reader understands. Version 2 (2026-10-10, task-349): the
 #: email envelope module is `envelope`; in a version-1 email frame it is
 #: `header`. Frozen frames are never rewritten — `module_html` writes the type
 #: into the HTML, so a rewrite would change what a sent email reconstructs to
 #: (ADR-183) — so readers translate instead, keyed on the version so a
 #: version-1 `header` can never be confused with ADR-193's visible `header`.
-FRAME_VERSIONS = (1, 2)
+#: Version 3 (2026-10-11, task-357): an email frame freezes its brand profile
+#: (`brand_profile`, ADR-194) and renders the legal footer from it. Frames
+#: below 3 keep the legacy unsubscribe line byte for byte, and are refused for
+#: sending (`profile_refusal`): they carry no legal details.
+FRAME_VERSIONS = (1, 2, 3)
+#: The first version whose email frames carry a brand profile.
+PROFILE_FRAME_VERSION = 3
 LEGACY_EMAIL_ENVELOPE = "header"
 
 KIND_CONTENT = "content"   # cms module bound to a content record
@@ -162,13 +168,31 @@ def build_frame(db: Session, variant_id: int) -> dict:
                 )
         entries.append(entry)
 
-    return {
+    frame = {
         "frame_version": FRAME_VERSION,
         "variant_id": variant_id,
         "channel": channel,
         "envelope": envelope_fields_for_variant(db, variant_id, channel),
         "templates_fingerprint": templates_fingerprint(channel),
         "modules": entries,
+    }
+    if channel == "email":
+        frame["brand_profile"] = _frozen_profile(db, variant)
+    return frame
+
+
+def _frozen_profile(db: Session, variant: VariantDB) -> dict:
+    """The variant's brand profile as it is now, or the brand's default when
+    it names none (ADR-194 points 4 and 7). Every value is frozen, so a later
+    edit to the profile reaches no email made from this frame."""
+    from app.brand_profiles.service import profile_of_variant
+    from app.campaigns.db_models import CampaignDB
+
+    brand_id = db.query(CampaignDB.brand_id).filter(CampaignDB.id == variant.campaign_id).scalar()
+    profile = profile_of_variant(db, variant, brand_id)
+    return {
+        "id": profile.id, "name": profile.name, "language": profile.language,
+        "kind": profile.kind, "values": dict(profile.field_values or {}),
     }
 
 
@@ -308,12 +332,21 @@ def render_frame(
             fields = strip_rich_text(variables, get_manifest(channel, entry["module_type"]))
 
     if channel == "email":
+        from app.rendering.service import legal_footer_html
         from app.subscriptions.texts import footer_html
 
         envelope = dict(frame.get("envelope") or {})
         footer = ""
-        if unsubscribe:
+        if frame.get("frame_version", 0) >= PROFILE_FRAME_VERSION and frame.get("brand_profile"):
+            # Every email from version 3 on: the profile's legal details, and
+            # for a marketing message the unsubscribe wording as its link.
+            footer = legal_footer_html(
+                frame["brand_profile"], unsubscribe["url"] if unsubscribe else None,
+            )
+        elif unsubscribe:
+            # Older frames: the line they were sent with, unchanged (ADR-183).
             footer = footer_html(unsubscribe["brand"], unsubscribe["url"])
+        if unsubscribe:
             envelope["list_unsubscribe"] = unsubscribe["url"]
         artifact = RenderedArtifact(
             role=ROLE_HTML, media_type="text/html", body=email_document(html_parts, footer),
@@ -346,6 +379,37 @@ def missing_required_in_frame(frame: dict) -> list[tuple[int, str, str]]:
             if not str(entry["variables"].get(name, "") or "").strip():
                 missing.append((entry["module_id"], entry["module_type"], name))
     return missing
+
+
+def profile_refusal(frame: dict) -> str | None:
+    """Why this frame may not be sent for its brand profile, or None
+    (ADR-194, addendum 2026-10-11 points 2, 5 and 6).
+
+    Every email carries the sender's legal details, so an email frame needs a
+    frozen profile with every required field. Asked of the frame, not the live
+    profile: the frame is what is sent, so filling the profile afterwards needs
+    a new snapshot, and the sentence says so. Push carries no footer.
+    """
+    from app.brand_profiles.structure import missing_fields, profile_structure
+
+    if frame.get("channel") != "email":
+        return None
+    profile = frame.get("brand_profile")
+    if frame.get("frame_version", 0) < PROFILE_FRAME_VERSION or not profile:
+        return (
+            "This send's snapshot was made before brand profiles, so it carries no legal "
+            "details and cannot be sent. Take a new snapshot."
+        )
+    missing = missing_fields(profile.get("kind") or "marketing", profile.get("values") or {})
+    if not missing:
+        return None
+    labels = {f.name: f.label for f in profile_structure()}
+    named = ", ".join(labels.get(name, name) for name in missing)
+    return (
+        f'The brand profile "{profile.get("name")}" is missing: {named}. Every email carries '
+        "the sender's legal details, so this send is refused. Fill them in under Settings, "
+        "Brand profiles, then take a new snapshot."
+    )
 
 
 def slot_ids(frame: dict) -> list[int]:

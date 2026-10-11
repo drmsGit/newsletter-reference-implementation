@@ -91,8 +91,13 @@ def test_a_frame_says_what_it_is(db, world):
 
 def test_parity_with_the_live_send_render(db, world):
     """ADR-063: the frame path and the live path give the same output."""
-    artifact, picks = render_frame(db, build_frame(db, world["variant"].id))
-    assert artifact.body == render_variant_html(db, world["variant"].id, mode="send")
+    from app.rendering.service import legal_footer_html
+
+    frame = build_frame(db, world["variant"].id)
+    artifact, picks = render_frame(db, frame)
+    # The same footer on both paths: the frame's legal footer (task-357).
+    footer = legal_footer_html(frame["brand_profile"])
+    assert artifact.body == render_variant_html(db, world["variant"].id, mode="send", footer=footer)
     assert [p["content_record_id"] for p in picks] == [world["picked"].id]
 
 

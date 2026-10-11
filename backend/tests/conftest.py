@@ -326,6 +326,16 @@ def default_brand(db):
     return auth.ensure_default_brand(db)
 
 
+#: Example legal details a test brand's default profile carries (task-357).
+COMPLETE_PROFILE = {
+    "legal_company_name": "Test Brand GmbH",
+    "legal_address": "Example Street 1\n10115 Example City",
+    "imprint_url": "https://example.test/imprint",
+    "privacy_url": "https://example.test/privacy",
+    "unsubscribe_text": "Unsubscribe",
+}
+
+
 @pytest.fixture
 def temp_brand(db):
     """A second brand, so "multi-brand" is an actual state and not a theory."""
@@ -345,6 +355,13 @@ def temp_brand(db):
         db.commit()
         db.refresh(brand)
         created.append(brand.id)
+        # A complete default profile, as the seed gives the default brand:
+        # every email carries legal details, and a send from an incomplete
+        # profile is refused (task-357). A test about that refusal empties it.
+        from app.brand_profiles.service import ensure_default_profile
+        profile = ensure_default_profile(db, brand.id)
+        profile.field_values = dict(COMPLETE_PROFILE)
+        db.commit()
         return brand
 
     yield make

@@ -158,6 +158,11 @@ def describe(db: Session, payload: dict, *, brand_id: int) -> ActionDescription:
                 "an empty field in front of a recipient, so this is refused "
                 "rather than warned about."
             )
+        # The legal-details check `send_send_instance` makes, in its words (ADR-194).
+        from app.rendering.frame import profile_refusal
+
+        if is_frame(snapshot.render_context) and (refusal := profile_refusal(snapshot.render_context)):
+            blocked_reason = refusal
 
     if send_instance.status in ("sending", "sent"):
         # Not a warning: `send_send_instance` refuses this outright, so

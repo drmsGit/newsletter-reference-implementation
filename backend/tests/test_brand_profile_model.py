@@ -62,12 +62,18 @@ def test_ensuring_the_default_twice_makes_one(db, made_brand):
     assert first.id == again.id and len(_profiles(db, brand.id)) == 1
 
 
-def test_a_brand_made_without_one_gets_it_when_asked(db, temp_brand):
-    """Rows built directly (fixtures, older code) still find a default."""
-    brand = temp_brand()
-    assert _profiles(db, brand.id) == []
-
-    assert profiles.default_profile(db, brand.id).is_default
+def test_a_brand_made_without_one_gets_it_when_asked(db):
+    """Rows built directly (older code) still find a default."""
+    brand = BrandDB(key=f"bare-{uuid.uuid4().hex[:8]}", name="Bare")
+    db.add(brand)
+    db.commit()
+    try:
+        assert _profiles(db, brand.id) == []
+        assert profiles.default_profile(db, brand.id).is_default
+    finally:
+        db.query(BrandProfileDB).filter(BrandProfileDB.brand_id == brand.id).delete()
+        db.query(BrandDB).filter(BrandDB.id == brand.id).delete()
+        db.commit()
 
 
 def test_the_database_refuses_a_second_default(db, made_brand):

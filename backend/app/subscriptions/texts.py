@@ -10,8 +10,15 @@ FOOTER_STYLE = "font-size:12px;color:#666666;text-align:center;margin:24px 0 0;"
 
 
 def footer_html(brand: str, url: str) -> str:
-    """The interim footer line (ADR-191 point 5), until task-301's designed
-    footer replaces it — which must keep the link."""
+    """The unsubscribe line of frames made before brand profiles (ADR-191
+    point 5). Since frame version 3 every email ends with the profile's legal
+    footer instead (`storage/modules/email/_legal_footer.html`, ADR-194).
+
+    **Never change this line, or `FOOTER_STYLE`.** Deliveries sent with it
+    rebuild to their stored hash only if it renders byte for byte as it did,
+    and this file is not in the template fingerprint: a change would break
+    `hash_matches` for every one of them while `templates_match` still said the
+    layout was unchanged (ADR-183; ADR-194 addenda of 2026-10-11)."""
     return (
         f'<p style="{FOOTER_STYLE}">You receive this from {escape(brand)}. '
         f'<a href="{escape(url)}">Unsubscribe</a>.</p>'

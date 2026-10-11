@@ -1,0 +1,19 @@
+{#- The legal footer every email carries (ADR-194; its 2026-10-11 addenda).
+    Not a module: no manifest, and no manager places or removes it. It lives
+    here, among the templates, so editing it shows in the template fingerprint
+    as a layout change (ADR-183) instead of silently breaking the hash of every
+    delivery sent with it. The Imprint and Privacy labels are built in per
+    language, German and English, English otherwise; they are not profile
+    fields. Values are escaped (the Jinja environment autoescapes). -#}
+{%- set de = (language or "")[:2] == "de" -%}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 0;">
+  <tr>
+    <td style="font-size:12px;line-height:18px;color:#666666;text-align:center;">
+      <p style="margin:0;">{{ legal_company_name }} · {{ legal_address | replace("\n", " · ") }}</p>
+      <p style="margin:4px 0 0;"><a href="{{ imprint_url }}">{{ "Impressum" if de else "Imprint" }}</a> · <a href="{{ privacy_url }}">{{ "Datenschutz" if de else "Privacy" }}</a></p>
+      {%- if unsubscribe_text and (unsubscribe_url or unsubscribe_unlinked) %}
+      <p style="margin:4px 0 0;">{% if unsubscribe_url %}<a href="{{ unsubscribe_url }}">{{ unsubscribe_text }}</a>{% else %}{{ unsubscribe_text }}{% endif %}</p>
+      {%- endif %}
+    </td>
+  </tr>
+</table>

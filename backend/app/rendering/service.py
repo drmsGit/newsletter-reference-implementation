@@ -112,6 +112,7 @@ def render_variant_html(
     recipient_id: int | None = None,
     mode: RenderMode = "preview",
     collect_resolutions: bool = False,
+    footer: str = "",
 ) -> str | tuple[str, dict[int, DecisionResolutionDB]]:
     # The variant's channel decides which manifests resolve — ADR-161 point 7:
     # a channel is "an attribute on the variant plus which manifests it
@@ -164,7 +165,9 @@ def render_variant_html(
     # The preheader — the hidden span clients read as the inbox preview — is
     # rendered by the `header` module's own template (ADR-162 point 1), so its
     # markup lives with the field that produces it. Nothing is injected here.
-    final_html = email_document(rendered_modules)
+    # `footer` is the legal footer a test send carries (task-357); a preview
+    # passes none, so what the editor shows is unchanged.
+    final_html = email_document(rendered_modules, footer)
 
     if collect_resolutions:
         return final_html, resolutions_by_module_id
@@ -405,6 +408,32 @@ def email_document(rendered_modules: list[str], footer: str = "") -> str:
   </body>
 </html>"""
     return _inliner.inline(raw_html)
+
+
+#: The legal footer's template (ADR-194, addendum 2026-10-11 (second)): in the
+#: channel's template folder so the fingerprint covers it, named with a leading
+#: underscore so the registry does not take it for a module.
+LEGAL_FOOTER_TEMPLATE = "_legal_footer.html"
+
+
+def legal_footer_html(
+    profile: dict, unsubscribe_url: str | None = None, *, unsubscribe_unlinked: bool = False,
+) -> str:
+    """The legal footer for a frozen profile (`{language, values, ...}`, as a
+    version-3 frame holds it): legal name and address, imprint and privacy
+    links, and the unsubscribe wording — linked to `unsubscribe_url`, shown
+    plain when `unsubscribe_unlinked` (a test send has no token), and left out
+    otherwise or when the profile has no wording."""
+    from app.modules.registry import MODULES_DIR
+
+    source = (MODULES_DIR / "email" / LEGAL_FOOTER_TEMPLATE).read_text()
+    values = profile.get("values") or {}
+    return _jinja.from_string(source).render(
+        **values,
+        language=profile.get("language") or "en",
+        unsubscribe_url=unsubscribe_url,
+        unsubscribe_unlinked=unsubscribe_unlinked,
+    ).strip()
 
 
 def render_cms_module(

@@ -358,6 +358,10 @@ def _discover() -> dict[tuple[str, str], ModuleManifest]:
             manifests[(channel, json_path.stem)] = manifest
 
         for html_path in channel_dir.glob("*.html"):
+            # A leading underscore marks a template that is not a module: the
+            # legal footer (ADR-194). It sits here for the fingerprint only.
+            if html_path.stem.startswith("_"):
+                continue
             if (channel, html_path.stem) not in manifests:
                 logger.warning("%s has no matching .json manifest — skipping", html_path.name)
 

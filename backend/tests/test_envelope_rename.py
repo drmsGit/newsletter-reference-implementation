@@ -45,7 +45,8 @@ def test_the_envelope_module_is_called_envelope():
 
 def test_a_new_frame_names_its_envelope_and_says_its_version(db, world):
     frame = _new_frame(db, world)
-    assert frame["frame_version"] == FRAME_VERSION == 2
+    # 3 since task-357 (brand profiles); the rename came with 2.
+    assert frame["frame_version"] == FRAME_VERSION == 3
     assert "header" not in {e["module_type"] for e in frame["modules"]}
 
 
@@ -56,7 +57,9 @@ def test_a_frame_from_before_the_rename_is_still_a_frame(db, world):
 def test_a_frame_from_before_the_rename_renders_as_it_was_sent(db, world):
     """Byte for byte, but for the module type it was frozen under."""
     frame = _new_frame(db, world)
-    new_html = render_frame(db, frame)[0].body
+    # Compared as version 2, the last before frames carried the legal footer
+    # (task-357): the rename is what this test is about.
+    new_html = render_frame(db, {**frame, "frame_version": 2})[0].body
     old_html = render_frame(db, _as_before_the_rename(frame))[0].body
     assert 'data-module-type="header"' in old_html and "Seen in the inbox only" in old_html
     assert old_html.replace('data-module-type="header"', 'data-module-type="envelope"') == new_html

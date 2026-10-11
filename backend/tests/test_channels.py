@@ -2878,7 +2878,7 @@ class TestTheTestSendIsAServiceNotARoute:
         assert bad.success is False
         assert bad.message
 
-    def test_another_brands_variant_falls_back_rather_than_rendering(self, db):
+    def test_another_brands_variant_falls_back_rather_than_rendering(self, db, foreign_brand):
         """The router looked the variant up by bare id, so this was a brand gap
         too — the same shape B15 had, and found the same way."""
         campaign = create_campaign(
@@ -2887,7 +2887,7 @@ class TestTheTestSendIsAServiceNotARoute:
         )
         try:
             result = self._send(
-                db, variant_id=campaign.variants[0].id, brand_id=999999,
+                db, variant_id=campaign.variants[0].id, brand_id=foreign_brand.id,
             )
             assert result.render_note, "another brand's variant was rendered"
             assert "not available here" in result.render_note
