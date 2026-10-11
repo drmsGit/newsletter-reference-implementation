@@ -6,13 +6,13 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
-updated_date: '2026-10-08 22:20'
+updated_date: '2026-10-11 20:44'
 labels:
   - backend
   - frontend
 dependencies: []
 type: feature
-ordinal: 206800
+ordinal: 200100
 ---
 
 ## Description
@@ -29,4 +29,6 @@ Migrated 2026-09-27 from `docs/backlog.md` line 210, section "Features", positio
 2026-10-08 queue cleanup (backlog-sequencer run 3, verified by hand, kept by the user's decision): the Jinja half of this entry is built. The hardcoded mock is gone, and the send plan takes a provider, defaulting to mock (backend/app/delivery/models.py:67, SendPlanRequest.provider). The campaign screen offers the choice (backend/app/templates/campaign_detail.html:624). The recipient cap the entry asked for exists: backend/app/settings/service.py:126 get_max_send_recipients, set through backend/app/settings/router.py:151-154, which is audited (task-245).
 
 What remains is a send screen in the React client. Only frontend/src/api/schema.d.ts knows the send-plan route, and no other task covers that screen. The Jinja UI is frozen, so this entry now stands for that screen. Its second reason still holds: the mock default and the cap are the blast-radius limit for AI-assisted development (called Mode C in this dated entry, now Development per the ADR-140 addendum of 2026-10-08), so the React screen must keep both.
+
+2026-10-11, the user set the November 2026 presentations as the focus (docs/business/PRESENTATIONS-2026-11.md). Moved to the head. Widened to the whole flow the demo shows in the React client: freeze a variant for approval (POST /snapshots/variants/{id}, which React never calls), approve, plan the send to an audience, send a test, fire the real send through Resend, and see the signal come back (clicks reaching the campaign's results section, task-58). The webhook needs a public URL for that last step (docs/how-to-webhooks-engagement.md).
 <!-- SECTION:NOTES:END -->

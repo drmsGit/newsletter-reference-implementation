@@ -4,13 +4,13 @@ title: 'Content subpages: categories and the category graph with content KPIs'
 status: To Do
 assignee: []
 created_date: '2026-10-11 10:01'
-updated_date: '2026-10-11 16:27'
+updated_date: '2026-10-11 20:44'
 labels:
   - frontend
   - backend
 dependencies: []
 type: feature
-ordinal: 209700
+ordinal: 200500
 ---
 
 ## Description
@@ -41,4 +41,6 @@ ordinal: 209700
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-11, from task-58's design pass (ADR-196 point 5): per-link and per-content click figures live on the content catalogue side, not in the campaign's results section. The user: links and content KPIs will be displayed on the content catalogue side. Clicks name their content only through event_data.content_record_id (tracked links).
+
+2026-10-11, the user set the November 2026 presentations as the focus (docs/business/PRESENTATIONS-2026-11.md): the category graph is on the demo list.
 <!-- SECTION:NOTES:END -->

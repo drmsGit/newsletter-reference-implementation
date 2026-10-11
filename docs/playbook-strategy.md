@@ -823,6 +823,14 @@ Recorded in [[ADR-193 — An Email's Legal Footer Is Fixed, Its Visible Header a
 
 Recorded in [[ADR-194 — Brand Profiles Carry an Email's Look, Texts and Legal Details]], which supersedes ADR-193: the third supersession so far. Built in five slices: task-350, task-354, task-351, task-355 and task-356.
 
+### 2026-10-11 — The focus is the November presentations; the own install waits for positioning and naming
+
+**Context:** the user plans talks in November 2026 with two agencies and one potential client's use case, with a live demo that shows how the platform actually works. The user also wants the product's own website, with its own install of the platform, as the first adopter and live proof — but not yet. The beta scope of 2026-08-22 had neither. **Decided by the user:**
+1. **The November presentations are the working focus.** The system need not be final; the flow it shows must be real and the screens it uses finished. The list, with its tasks, is [[PRESENTATIONS-2026-11]]; `BETA-SCOPE.md` is marked dated.
+2. **For both audiences:** the real end-to-end flow in the React client, images, MJML blocks and two brand profiles, salutations, the category graph, users, roles and keys in Settings, AI that drafts, categorises and translates content and prepares a variant from a topic, a decision on double opt-in, an answer on journeys, and a rough install and implementation sketch. **For the agencies:** licensing options.
+3. **The own project comes after name clearance and branding, and after the positioning statement and playbook strategy** — the user called the latter important. Only then the install (task-347 stays parked). What that install will take is logged in the same file, so it is visible now.
+4. **No "living" decisions** (picks recomputed in the background) until AI-driven slots make send-time decisions expensive.
+
 ## 6. Roadmap
 
 *Strategic, phase-level sequencing (Phase 1-4). For the granular, prioritized queue of specific bugs/features decided while working through the interview-prep review, see `docs/backlog.md` instead.*

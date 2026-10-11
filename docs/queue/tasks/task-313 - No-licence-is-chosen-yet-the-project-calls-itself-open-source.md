@@ -4,11 +4,12 @@ title: 'No licence is chosen, yet the project calls itself open-source'
 status: To Do
 assignee: []
 created_date: '2026-10-09 07:06'
+updated_date: '2026-10-11 20:44'
 labels:
   - docs
 dependencies: []
 type: decision
-ordinal: 207100
+ordinal: 201130
 ---
 
 ## Description
@@ -34,3 +35,9 @@ A business decision, recorded in `docs/business/decisions/`, not an ADR. Then ad
 - [ ] #1 A licence decision is recorded in docs/business/decisions/, covering code and docs
 - [ ] #2 LICENSE (and a docs licence note if the docs differ) exists, and README.md's licence section names it
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-11, the user set the November 2026 presentations as the focus (docs/business/PRESENTATIONS-2026-11.md): licensing options are what the agencies will ask about first.
+<!-- SECTION:NOTES:END -->

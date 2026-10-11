@@ -6,12 +6,13 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-11 19:10'
+updated_date: '2026-10-11 20:44'
 labels:
   - backend
   - frontend
 dependencies: []
 type: feature
-ordinal: 210300
+ordinal: 200400
 ---
 
 ## Description
@@ -66,3 +67,9 @@ The preview's recipient picker exists (`frontend/src/screens/Preview.tsx:183`) b
 - [ ] #3 Salutation Informal and Salutation Formal work in subject, preheader, module and content text and push, in preview and send
 - [ ] #4 What a recipient received is reconstructed exactly from the delivery record, without re-reading live recipient data
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-11, the user set the November 2026 presentations as the focus (docs/business/PRESENTATIONS-2026-11.md): salutations are on the demo list.
+<!-- SECTION:NOTES:END -->

@@ -4,12 +4,13 @@ title: 'Double opt-in has no entry point: nothing in the platform receives a sig
 status: To Do
 assignee: []
 created_date: '2026-10-09 11:26'
+updated_date: '2026-10-11 20:44'
 labels:
   - needs-adr
   - backend
 dependencies: []
 type: decision
-ordinal: 300190
+ordinal: 300010
 ---
 
 ## Description
@@ -28,3 +29,9 @@ ordinal: 300190
 
 Related: task-56 (unsubscribe, the other half), task-135 (suppression and the CRM relay), task-294 and task-119 (data-in).
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-11, the user set the November 2026 presentations as the focus (docs/business/PRESENTATIONS-2026-11.md): at least the decision on double opt-in is wanted before the presentations (the build is for the own project later). Moved to the head of the Needs-ADR range.
+<!-- SECTION:NOTES:END -->

@@ -1,5 +1,11 @@
 # Beta scope — what "first beta, shipped by end of 2026" means
 
+> **Dated (2026-10-11).** The working focus is now the November 2026
+> presentations to agencies and a potential client:
+> [[PRESENTATIONS-2026-11]]. This file stays as the record of the scope set
+> on 2026-08-22; its list of open gates and its view of the React client
+> are out of date (see `LAUNCH-GATES.md` for the gates).
+
 Written 2026-08-22. Answers the ambiguity between BRIEF.md's two readings of
 "beta," using `docs/business/LAUNCH-GATES.md`, `POSITIONING.md`,
 `ASSUMPTIONS.md`, `docs/playbook-strategy.md` §6, and `docs/backlog.md`.

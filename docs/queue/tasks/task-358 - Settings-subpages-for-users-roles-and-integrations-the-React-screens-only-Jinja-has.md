@@ -6,12 +6,13 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-11 10:01'
+updated_date: '2026-10-11 20:44'
 labels:
   - frontend
   - backend
 dependencies: []
 type: feature
-ordinal: 209600
+ordinal: 200600
 ---
 
 ## Description
@@ -38,3 +39,9 @@ ordinal: 209600
 - [ ] #2 Users and roles have people-only JSON routes reusing the auth service rules, audited
 - [ ] #3 An integration key's secret is shown once when issued and never again
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-11, the user set the November 2026 presentations as the focus (docs/business/PRESENTATIONS-2026-11.md): users, roles and integration keys in Settings are on the demo list.
+<!-- SECTION:NOTES:END -->

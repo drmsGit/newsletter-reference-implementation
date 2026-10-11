@@ -4,13 +4,13 @@ title: 'There is no asset or media management: no table, no upload route, no pic
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
-updated_date: '2026-10-10 21:16'
+updated_date: '2026-10-11 20:44'
 labels:
   - backend
   - frontend
 dependencies: []
 type: feature
-ordinal: 206500
+ordinal: 200200
 ---
 
 ## Description
@@ -55,4 +55,6 @@ Content image fields (image_url/image_alt in ContentRecordDB.content) require ma
 It describes the same gap from the content form's side; this task's 2026-09-27 design covers it. The logo for a visible header (task-301) is the next consumer.
 
 2026-10-10 (task-301, ADR-193): the visible email header's logo is an https URL in its content for now. When asset management lands, that field becomes an asset id, and the header logo is this task's first user.
+
+2026-10-11, the user set the November 2026 presentations as the focus (docs/business/PRESENTATIONS-2026-11.md): images, upload and picker, for both demo audiences.
 <!-- SECTION:NOTES:END -->

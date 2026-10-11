@@ -4,11 +4,12 @@ title: 'Progress indication while an AI task runs, plus double-submit protection
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
+updated_date: '2026-10-11 20:44'
 labels:
   - frontend
 dependencies: []
 type: feature
-ordinal: 205300
+ordinal: 200750
 ---
 
 ## Description
@@ -21,4 +22,6 @@ ordinal: 205300
 
 <!-- SECTION:NOTES:BEGIN -->
 Migrated 2026-09-27 from `docs/backlog.md` line 281, section "Features", position 53 in that section (top = do next). The description is the original entry, verbatim.
+
+2026-10-11, the user set the November 2026 presentations as the focus (docs/business/PRESENTATIONS-2026-11.md): wanted with the AI abilities the demo shows (task-367 to task-370), so a multi-second AI call never looks broken on stage.
 <!-- SECTION:NOTES:END -->
