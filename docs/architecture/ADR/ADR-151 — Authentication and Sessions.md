@@ -6,7 +6,7 @@ topic:
   - security
   - access
 created: 2026-08-02
-modified: 2026-10-09
+modified: 2026-10-11
 source:
   - "Security Chapter design interview, Part 2 (playbook-strategy.md Decision Log, 2026-08-02)"
 depends_on:
@@ -238,6 +238,50 @@ like other settings (`backend/app/settings/audited.py`).
 one place the repository departs from "numbers belong to the company" is
 recorded, with its reason, instead of being discovered by reading module
 constants.
+
+## Addendum 2026-10-11 — the session lengths' final-design pass
+
+Prompted by the final-design pass of task-342, decided by the user on 2026-10-11
+one question at a time. It closes the list the 2026-10-09 addendum above left to
+that pass in its points 1 and 3. Point 3 of the Decision and the 2026-10-09
+addendum stand as written. This addendum records the ranges and when a changed
+length takes effect.
+
+**1. The safe ranges.** The absolute session lifetime is 1 to 72 hours, default
+12. The idle timeout is 5 to 480 minutes, default 60, and never longer than the
+absolute lifetime. Five minutes stays well above the 60-second activity refresh
+(`TOUCH_INTERVAL` in `backend/app/auth/service.py`), so a short idle timeout
+still works. Seventy-two hours covers a long working weekend without letting a
+stolen session live for weeks. A value outside the range is refused when it is
+set, not silently clamped. A stored value is still clamped to the range when it is
+read, so one written by hand cannot step outside it.
+
+**2. Shortening applies at once; a longer lifetime applies only to new
+sessions.** Making either length shorter applies at once to everyone signed in:
+a session past the new limit ends on its next request. Tightening is usually
+why a company changes a length. Making the lifetime longer applies only to
+sessions started afterwards, so nobody's existing session is silently extended.
+A longer idle timeout applies at once. It can only keep people signed in longer
+between clicks, never past their lifetime.
+
+Technically, each session ends at the earlier of two times: the expiry stamped
+when it started, and its start time plus the current lifetime. Idle is checked
+against the current timeout on every request. The session cookie's lifetime
+follows the setting at sign-in.
+
+**3. Unchanged from the 2026-10-09 addendum.** The attack-resistance numbers
+(the sign-in code lifetime, the guesses per code and the code-request rate
+limits) stay code constants. A change to a session length is audited like other
+settings. It is a person's change, under `settings.manage`.
+
+**What it costs.**
+
+- **Every request reads the two settings.** That is one small query per request.
+- **Lengthening reaches only new sessions.** A longer lifetime shows fully only
+  once the old lifetime has passed since the change.
+
+**What it buys.** The lengths a works council or auditor requires can be set
+without a code change, and tightening them takes effect at once.
 
 ## Related ADRs
 
