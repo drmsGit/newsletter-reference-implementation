@@ -27,7 +27,8 @@ and any own install as later. It stays as the record of that scope.
 | Users, roles and integration keys in Settings | task-358 |
 | AI subject suggestion in React, then: (1) draft and categorise content, (2) translate content, (3) prepare a variant from a topic | task-367, task-368, task-369, task-370, with task-100 and the decision task-125 |
 | Realistic demo content, and a demo reset with believable results | task-71 |
-| The finished design on the React screens | task-372 |
+| A conventional, coherent design on the demo React screens; no bespoke-brand prerequisite | task-372 |
+| Neutral author-led reference identity and README, replacing Tarrow | task-377 |
 | A decision on double opt-in (at least the decision) | task-324 |
 | How journeys work: the answer to give | task-373 |
 | A rough sketch: how an installation and an implementation go | task-374 |
@@ -74,8 +75,7 @@ inside it. It is the live proof and the first real installation.
 1. Double opt-in: a public endpoint, the CRM, or both (task-324).
 2. AI suggestions alongside decision slots (task-125).
 3. Licensing options (task-313).
-4. The neutral working name the presentations run under, switched in
-   `product.json` before them (task-376).
+4. Neutral working title decided 2026-10-12: **Omnichannel Orchestration Reference**, introduced by Diede Slembrouck with “Building a communication system you control.” task-377 applies it to `product.json`, the README and current identity assets before the presentations. Final brand/clearance remains task-376.
 5. Whether the demo runs on a laptop or a hosted instance — a hosted one
    would be the first run of the install (task-347), which stays parked
    until positioning and naming are settled.
