@@ -1,6 +1,6 @@
 # Project Context
 
-This is Tarrow — a vendor-neutral reference architecture for email marketing systems.
+This is the Omnichannel Orchestration Reference — a vendor-neutral reference architecture for email marketing systems.
 
 ## ADR Location
 All architecture decisions are in `docs/architecture/ADR/`.

@@ -18,4 +18,4 @@ modified: 2026-06-05
 
 ## Related MOCs
 
-- [[MOC - Tarrow]]
+- [[MOC - Omnichannel Orchestration Reference]]

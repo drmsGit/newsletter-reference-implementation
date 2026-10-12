@@ -28,7 +28,7 @@ and any own install as later. It stays as the record of that scope.
 | AI subject suggestion in React, then: (1) draft and categorise content, (2) translate content, (3) prepare a variant from a topic | task-367, task-368, task-369, task-370, with task-100 and the decision task-125 |
 | Realistic demo content, and a demo reset with believable results | task-71 |
 | A conventional, coherent design on the demo React screens; no bespoke-brand prerequisite | task-372 |
-| Neutral author-led reference identity and README, replacing Tarrow | task-377 |
+| Neutral author-led reference identity and README, replacing the former working name | task-377 |
 | A decision on double opt-in (at least the decision) | task-324 |
 | How journeys work: the answer to give | task-373 |
 | A rough sketch: how an installation and an implementation go | task-374 |

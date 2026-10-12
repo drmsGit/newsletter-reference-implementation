@@ -11,9 +11,9 @@ modified: 2026-07-27
 # MOC - System Overview
 
 > **New here? Start on this page.** This is the code-level onboarding map for the
-> Tarrow backend — enough to take the codebase over: what each
+> Omnichannel Orchestration Reference backend — enough to take the codebase over: what each
 > module owns, how they connect, and *what to check when you change one thing*.
-> It sits next to the [[MOC - Tarrow]] (the *why* — ADRs) and
+> It sits next to the [[MOC - Omnichannel Orchestration Reference]] (the *why* — ADRs) and
 > [[MOC - Reference Implementation]] (what's built vs. deferred). This one is the
 > *how the code is wired* view.
 
@@ -185,6 +185,6 @@ each row: method, path, what it does. The Jinja templates it renders live in
   you change a function's internals, update the **docstring** — not these pages.
 
 ## Related
-- [[MOC - Tarrow]] — the ADR-backed *why*
+- [[MOC - Omnichannel Orchestration Reference]] — the ADR-backed *why*
 - [[MOC - Reference Implementation]] — implemented / partial / deferred status
 - [[MOC - Interview Prep Baseline]] — the review questions behind many decisions

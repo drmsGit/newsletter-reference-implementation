@@ -1,12 +1,12 @@
-# Tarrow
+# Omnichannel Orchestration Reference
 
 Open-source newsletter architecture MVP. Teachable and tailorable, not a fixed
 commercial product. Learnings feed the separate Condor use case.
 
 ## Where things live
 - **The product's name: `product.json`** (repo root) — the one source of truth.
-  Provisional (Tarrow, not legally cleared). Code reads it; never write the name
-  into code. Prose, file names and YAML carry it literally; rename with
+  For now a neutral working title (2026-10-12) until a brand is chosen; no brand is chosen or cleared. Code reads it; never write the
+  name into code. Prose, file names and YAML carry it literally; rename with
   `backend/scripts/rename_product.py` (`--dry-run` first). Dated records keep
   the names they were written with. See
   `docs/business/decisions/naming-brand-tarrow.md`.

@@ -1,11 +1,11 @@
 """The product's name has one source of truth: `product.json` (task-29).
 
-Decided with the user 2026-10-05: the name is **provisional** — Tarrow, not yet
+Decided with the user 2026-10-05: the name is **provisional** — Foxglove, not yet
 legally cleared — so a later rename must be quick. Everything that runs reads
 `product.json`; what cannot read a value (prose, file names, YAML) carries the
 name literally and `scripts/rename_product.py` rewrites it. Dated records keep
 the wording they were written with; living documents and code may not carry a
-retired name. Business decision: `docs/business/decisions/naming-brand-tarrow.md`.
+retired name. Business decision: `docs/business/decisions/naming-brand-foxglove.md`.
 """
 import json
 import re
@@ -82,11 +82,11 @@ class TestTheRenameScript:
     @pytest.fixture
     def repo(self, tmp_path):
         files = {
-            "product.json": json.dumps({"name": "Tarrow", "slug": "tarrow", "retired_names": ["Old Name"]}),
-            "README.md": "# Tarrow\n\nTarrow is used here. Tarrowish is not the name. [[MOC - Tarrow]]\n",
-            "docs/architecture/MOC/MOC - Tarrow.md": "# MOC - Tarrow\n- [[ADR-001 — Tarrow Boundaries]]\n",
-            "docs/architecture/ADR/ADR-001 — Tarrow Boundaries.md": "Tarrow, as written then. [[MOC - Tarrow]]\n",
-            "backend/x.py": 'PACKAGE = "tarrow"\nCOOKIE = "tarrow_session"\n',
+            "product.json": json.dumps({"name": "Foxglove", "slug": "foxglove", "retired_names": ["Old Name"]}),
+            "README.md": "# Foxglove\n\nFoxglove is used here. Foxgloveish is not the name. [[MOC - Foxglove]]\n",
+            "docs/architecture/MOC/MOC - Foxglove.md": "# MOC - Foxglove\n- [[ADR-001 — Foxglove Boundaries]]\n",
+            "docs/architecture/ADR/ADR-001 — Foxglove Boundaries.md": "Foxglove, as written then. [[MOC - Foxglove]]\n",
+            "backend/x.py": 'PACKAGE = "foxglove"\nCOOKIE = "foxglove_session"\n',
         }
         for name, text in files.items():
             (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
@@ -99,23 +99,23 @@ class TestTheRenameScript:
         rename_product.rename(repo, name="Corrigan", slug="corrigan")
 
         assert (repo / "README.md").read_text() == (
-            "# Corrigan\n\nCorrigan is used here. Tarrowish is not the name. [[MOC - Corrigan]]\n")
+            "# Corrigan\n\nCorrigan is used here. Foxgloveish is not the name. [[MOC - Corrigan]]\n")
         moc = repo / "docs/architecture/MOC/MOC - Corrigan.md"
-        assert not (repo / "docs/architecture/MOC/MOC - Tarrow.md").exists() and moc.exists()
+        assert not (repo / "docs/architecture/MOC/MOC - Foxglove.md").exists() and moc.exists()
         # An ADR title is permanent, so its link is left alone.
-        assert moc.read_text() == "# MOC - Corrigan\n- [[ADR-001 — Tarrow Boundaries]]\n"
+        assert moc.read_text() == "# MOC - Corrigan\n- [[ADR-001 — Foxglove Boundaries]]\n"
         # A dated record keeps its wording; only its link to the renamed note follows.
-        assert (repo / "docs/architecture/ADR/ADR-001 — Tarrow Boundaries.md").read_text() == (
-            "Tarrow, as written then. [[MOC - Corrigan]]\n")
+        assert (repo / "docs/architecture/ADR/ADR-001 — Foxglove Boundaries.md").read_text() == (
+            "Foxglove, as written then. [[MOC - Corrigan]]\n")
         # The slug as a whole word only: an identifier built at runtime is not touched.
-        assert (repo / "backend/x.py").read_text() == 'PACKAGE = "corrigan"\nCOOKIE = "tarrow_session"\n'
+        assert (repo / "backend/x.py").read_text() == 'PACKAGE = "corrigan"\nCOOKIE = "foxglove_session"\n'
         product = json.loads((repo / "product.json").read_text())
         assert (product["name"], product["slug"]) == ("Corrigan", "corrigan")
-        assert product["retired_names"] == ["Old Name", "Tarrow"]
+        assert product["retired_names"] == ["Old Name", "Foxglove"]
 
     def test_the_check_finds_a_retired_name_in_a_living_file_only(self, repo):
         (repo / "README.md").write_text("Old Name lives on. [[ADR-002 — Old Name Was Here]]\n")
-        (repo / "docs/architecture/ADR/ADR-001 — Tarrow Boundaries.md").write_text("Old Name, then.\n")
+        (repo / "docs/architecture/ADR/ADR-001 — Foxglove Boundaries.md").write_text("Old Name, then.\n")
         hits = rename_product.retired_name_hits(repo, ["Old Name"])
         assert hits == ["README.md:1: Old Name lives on. [[ADR-002 — Old Name Was Here]]"]
 

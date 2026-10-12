@@ -1,7 +1,7 @@
 """Rename the product: `product.json` is the one place the name is decided (task-29).
 
-The name is provisional (Tarrow, not yet legally cleared — see
-`docs/business/decisions/naming-brand-tarrow.md`), so renaming must be quick.
+The name is a neutral working title (2026-10-12) until a brand is chosen — see
+`docs/business/decisions/naming-brand-tarrow.md` — so renaming must be quick.
 Everything that runs reads `product.json` (`app/product.py`, `vite.config.ts`);
 this script rewrites what cannot read a value: prose, file names and YAML.
 
@@ -172,8 +172,8 @@ def rename(root: Path, *, name: str, slug: str, dry_run: bool = False) -> list[s
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--name", required=True, help="the new display name, e.g. Tarrow")
-    parser.add_argument("--slug", required=True, help="the new lowercase slug, e.g. tarrow")
+    parser.add_argument("--name", required=True, help="the new display name, e.g. Omnichannel Orchestration Reference")
+    parser.add_argument("--slug", required=True, help="the new lowercase slug, e.g. omnichannel-orchestration-reference")
     parser.add_argument("--dry-run", action="store_true", help="list what would change; change nothing")
     args = parser.parse_args()
     if not re.fullmatch(r"[a-z][a-z0-9-]*", args.slug):

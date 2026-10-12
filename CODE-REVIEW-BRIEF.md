@@ -1,4 +1,4 @@
-# Code review brief — Tarrow
+# Code review brief — Omnichannel Orchestration Reference
 
 **Prepared 2026-10-09** (replacing the brief of 2026-09-19). Read this before
 reviewing. It is short, and it will save you from reporting deliberate

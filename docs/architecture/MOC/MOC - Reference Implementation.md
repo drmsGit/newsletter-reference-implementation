@@ -2,7 +2,7 @@
 
 ## **Purpose**
 
-This note tracks the current implementation state of Tarrow.
+This note tracks the current implementation state of Omnichannel Orchestration Reference.
 
 See also:
 - [[MOC - System Overview]] — the **code-level onboarding map**: one page per module, the end-to-end flows, and an auto-generated dependency map ("how the code is wired, and what to check when you change one thing"). Start here to take the codebase over.

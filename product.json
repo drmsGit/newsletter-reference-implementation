@@ -1,11 +1,12 @@
 {
-  "name": "Tarrow",
-  "slug": "tarrow",
+  "name": "Omnichannel Orchestration Reference",
+  "slug": "omnichannel-orchestration-reference",
   "retired_names": [
     "Newsletter Reference Architecture",
     "Newsletter Reference Implementation",
     "Newsletter Architecture",
     "Newsletter Blueprint",
-    "Newsletter Manager"
+    "Newsletter Manager",
+    "Tarrow"
   ]
 }

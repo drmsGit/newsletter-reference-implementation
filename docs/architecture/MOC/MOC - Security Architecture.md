@@ -35,6 +35,6 @@ Who may act, how they prove it, what the system remembers about it, and what hap
 
 ## Related MOCs
 
-- [[MOC - Tarrow]]
+- [[MOC - Omnichannel Orchestration Reference]]
 - [[MOC - Data Foundation]]
 - [[MOC - AI Architecture]]

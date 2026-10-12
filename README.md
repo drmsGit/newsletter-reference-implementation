@@ -1,14 +1,22 @@
-# Tarrow
+# Omnichannel Orchestration Reference
 
-A vendor-neutral **reference architecture for newsletter and omni-channel
-content orchestration**: a playbook of architecture decisions plus a working
-reference implementation that proves them. It is meant to be read, taught from
-and tailored, not run as a finished product. The decisions are the deliverable;
-the code shows they hold up.
+**Building a communication system you control.**
+By Diede Slembrouck.
+
+An omnichannel orchestration reference — with a playbook, working code and a
+live newsletter (planned: the newsletter is not running yet).
+
+It is a vendor-neutral reference for orchestrating content across channels:
+a playbook of architecture decisions plus a working implementation that proves
+them. Email and push are built; the channel model is open to more (ADR-165).
+It is meant to be read, taught from and tailored, not run as a finished
+product. The decisions are the deliverable; the code shows they hold up.
 
 **Status: a local proof of concept.** It runs on a developer machine against a
 mock email provider by default. Installation, deployment and hosting are
-deliberately not started. The name is provisional.
+deliberately not started. "Omnichannel Orchestration Reference" is a neutral
+working title; the product has no brand yet, and no licence has been chosen
+(see below).
 
 ## What is here
 

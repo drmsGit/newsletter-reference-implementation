@@ -6,13 +6,13 @@ created: 2026-05-30
 modified: 2026-06-05
 ---
 
-# MOC - Tarrow
+# MOC - Omnichannel Orchestration Reference
 
-	# MOC - Tarrow
+	# MOC - Omnichannel Orchestration Reference
 
 ## Architecture Principles
 
-- [[Tarrow Design Principles]]
+- [[Omnichannel Orchestration Reference Design Principles]]
 
 ## Foundation
 
@@ -85,4 +85,4 @@ graph LR
 
 ## Principles
 
-- [[Tarrow Design Principles]]
+- [[Omnichannel Orchestration Reference Design Principles]]

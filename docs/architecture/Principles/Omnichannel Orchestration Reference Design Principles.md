@@ -11,7 +11,7 @@ source:
   - interview-2026-05-30
 ---
 
-# Tarrow Design Principles
+# Omnichannel Orchestration Reference Design Principles
 
 These principles were identified during the ADR interview but are not yet treated as standalone ADRs. They should be kept visible so they can later become ADRs, design rules or handbook chapters.
 

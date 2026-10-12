@@ -10,7 +10,7 @@ modified: 2026-07-27
 
 # audience
 
-> Part of [[MOC - System Overview]]. Architecture rationale: [[MOC - Tarrow]] (audience/segmentation).
+> Part of [[MOC - System Overview]]. Architecture rationale: [[MOC - Omnichannel Orchestration Reference]] (audience/segmentation).
 
 ## Purpose
 
