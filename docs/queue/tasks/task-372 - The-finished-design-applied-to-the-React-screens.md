@@ -4,7 +4,7 @@ title: The finished design applied to the React screens
 status: To Do
 assignee: []
 created_date: '2026-10-11 20:44'
-updated_date: '2026-10-12 19:57'
+updated_date: '2026-10-12 20:14'
 labels:
   - frontend
 dependencies: []
@@ -24,4 +24,6 @@ ordinal: 201100
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-12, Diede: the neutral author-led Omnichannel Orchestration Reference phase can use a conventional design system; do not invest heavily in bespoke branding. This narrows the meaning of finished design: readable standard typography/components and a coherent November demo flow, retaining comfortable/compact density, accessible focus/states and labelled system/human semantic cues. No prerequisite custom-a/rr logo work or new identity exploration. task-377 owns the neutral rename and current identity assets; this task still owns demo-screen styling. Existing design studies are reference material, not an adoption requirement.
+
+2026-10-12, from task-377: with the long working title, the shell header wraps the name to three lines at phone width and the header row overflows (the email address runs off screen). A layout matter for this task.
 <!-- SECTION:NOTES:END -->
