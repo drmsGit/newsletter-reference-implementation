@@ -279,6 +279,7 @@ def what_rendered(frame: dict, picks: list[dict]) -> tuple[bool, int]:
 def render_frame(
     db: Session, frame: dict, recipient_id: int | None = None, picks: list[dict] | None = None,
     *, empty_slots: frozenset[int] = frozenset(), unsubscribe: dict | None = None,
+    unsubscribe_unlinked: bool = False,
 ) -> tuple[RenderedArtifact, list[dict]]:
     """Lay a frame out for one recipient. Returns `(artifact, picks)`.
 
@@ -366,6 +367,9 @@ def render_frame(
             # for a marketing message the unsubscribe wording as its link.
             footer = legal_footer_html(
                 frame["brand_profile"], unsubscribe["url"] if unsubscribe else None,
+                # A test send has no token: the wording shows, unlinked
+                # (ADR-194; ADR-183 addendum 2026-10-12).
+                unsubscribe_unlinked=unsubscribe_unlinked and not unsubscribe,
             )
         elif unsubscribe:
             # Older frames: the line they were sent with, unchanged (ADR-183).

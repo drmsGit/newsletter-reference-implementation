@@ -32,6 +32,10 @@ def create_variant_snapshot(
         )
     except UnpublishedContentError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
+    except ValueError as exc:
+        # A variant that does not exist, or not in this brand (task-67).
+        # Answered 500 before: the service raises a bare ValueError.
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.get("/variants/{variant_id}", response_model=list[Snapshot])

@@ -7,6 +7,8 @@ from app.auth.dependencies import require_person, working_brand
 from app.pagination import Page, PageParams, page_params
 from app.database import get_db
 from app.delivery.models import (
+    PlannedTestRequest,
+    RecipientsNow,
     TestSendRequest,
     TestSendResponse,
     ProcessDueResult,
@@ -305,6 +307,69 @@ def send_test(
         "provider_message_id": sent.provider_message_id,
         "message": sent.message,
         "render_note": sent.render_note,
+    }
+
+
+@router.get(
+    "/send-instances/{send_instance_id}/recipients-now",
+    response_model=RecipientsNow,
+    summary="Who a send would go to if fired now",
+    description=(
+        "For the confirmation before firing (task-67): the recipients still to be mailed, "
+        "counted as the send will count them — the audience re-resolved, not the number "
+        "planned — with the cap, the provider and the sender."
+    ),
+)
+def get_recipients_now(
+    send_instance_id: int,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    from app.delivery.providers.factory import PROVIDER_LABELS, get_provider
+    from app.delivery.service import get_send_instance, recipients_now
+    from app.settings.service import get_max_send_recipients
+
+    send = get_send_instance(db, send_instance_id, brand_id=brand_id)
+    if send is None:
+        raise HTTPException(status_code=404, detail="Send instance not found")
+    name = send.provider or "mock"
+    return RecipientsNow(
+        send_instance_id=send.id, status=send.status, recipients=recipients_now(db, send),
+        cap=get_max_send_recipients(db), provider=name, provider_label=PROVIDER_LABELS.get(name, name),
+        reaches_real_inboxes=get_provider(name, from_address=send.from_address).reaches_real_inboxes,
+        from_address=send.from_address, scheduled_at=send.scheduled_at,
+    )
+
+
+@router.post(
+    "/send-instances/{send_instance_id}/test",
+    response_model=TestSendResponse,
+    summary="Mail one test of a planned send",
+    description=(
+        "The send's frozen email (its snapshot), as `recipient_id` would get it, with its own "
+        "subject marked [Test], through the provider and sender the send was planned with, to one "
+        "typed address. A test, not a delivery: no unsubscribe link, no tracking, nothing counted "
+        "(task-67; ADR-183 addendum 2026-10-12). 409 for a push send or a profile that may not send."
+    ),
+)
+def test_planned_send_route(
+    send_instance_id: int,
+    payload: PlannedTestRequest,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    from app.delivery.service import test_planned_send
+
+    try:
+        sent = test_planned_send(db, send_instance_id, to=payload.to, recipient_id=payload.recipient_id,
+                                 brand_id=brand_id)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error))
+    if sent is None:
+        raise HTTPException(status_code=404, detail="Send instance not found")
+    return {
+        "success": sent.success, "to": sent.to, "provider": sent.provider,
+        "provider_message_id": sent.provider_message_id, "message": sent.message, "render_note": None,
     }
 
 

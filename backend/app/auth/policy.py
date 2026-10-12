@@ -241,6 +241,8 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
 
     # Sending: preparing is not firing, the same split as the UI half.
     ("/delivery/send-instances/{send_instance_id}/send", SENDS_EXECUTE),
+    # A test of a planned send mails a real inbox too (task-67).
+    ("/delivery/send-instances/{send_instance_id}/test", SENDS_EXECUTE),
     # Fires every scheduled send that is due, so people receive mail because
     # of it. **Added above the broad prefix on 2026-09-19 after landing below
     # it** — `/delivery/process-due` matched `("/delivery/", SENDS_PLAN)` and

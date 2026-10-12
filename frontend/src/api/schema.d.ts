@@ -1252,6 +1252,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/delivery/send-instances/{send_instance_id}/recipients-now": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who a send would go to if fired now
+         * @description For the confirmation before firing (task-67): the recipients still to be mailed, counted as the send will count them — the audience re-resolved, not the number planned — with the cap, the provider and the sender.
+         */
+        get: operations["get_recipients_now_delivery_send_instances__send_instance_id__recipients_now_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/delivery/send-instances/{send_instance_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mail one test of a planned send
+         * @description The send's frozen email (its snapshot), as `recipient_id` would get it, with its own subject marked [Test], through the provider and sender the send was planned with, to one typed address. A test, not a delivery: no unsubscribe link, no tracking, nothing counted (task-67; ADR-183 addendum 2026-10-12). 409 for a push send or a profile that may not send.
+         */
+        post: operations["test_planned_send_route_delivery_send_instances__send_instance_id__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/delivery/send-instances/{send_instance_id}/release": {
         parameters: {
             query?: never;
@@ -5537,6 +5577,17 @@ export interface components {
             /** Outcome */
             outcome?: string | null;
         };
+        /**
+         * PlannedTestRequest
+         * @description A test of a planned send (task-67): the frozen email, as `recipient_id`
+         *     would get it, to one typed address.
+         */
+        PlannedTestRequest: {
+            /** To */
+            to: string;
+            /** Recipient Id */
+            recipient_id?: number | null;
+        };
         /** PreferenceUpdateResult */
         PreferenceUpdateResult: {
             /** Event Id */
@@ -5952,6 +6003,32 @@ export interface components {
             category_id: number;
             /** Score */
             score: number;
+        };
+        /**
+         * RecipientsNow
+         * @description What a send would go to if fired now (task-67; ADR-183 addendum
+         *     2026-10-12): who is still to be mailed, counted the way the send counts
+         *     them, against the company's cap.
+         */
+        RecipientsNow: {
+            /** Send Instance Id */
+            send_instance_id: number;
+            /** Status */
+            status: string;
+            /** Recipients */
+            recipients: number;
+            /** Cap */
+            cap: number;
+            /** Provider */
+            provider: string;
+            /** Provider Label */
+            provider_label: string;
+            /** Reaches Real Inboxes */
+            reaches_real_inboxes: boolean;
+            /** From Address */
+            from_address?: string | null;
+            /** Scheduled At */
+            scheduled_at?: string | null;
         };
         /** ReconstructedModule */
         ReconstructedModule: {
@@ -9509,6 +9586,72 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["TestSendRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestSendResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_recipients_now_delivery_send_instances__send_instance_id__recipients_now_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                send_instance_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecipientsNow"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_planned_send_route_delivery_send_instances__send_instance_id__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                send_instance_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlannedTestRequest"];
             };
         };
         responses: {

@@ -133,6 +133,30 @@ class TestSendRequest(BaseModel):
     recipient_id: int | None = None
 
 
+class PlannedTestRequest(BaseModel):
+    """A test of a planned send (task-67): the frozen email, as `recipient_id`
+    would get it, to one typed address."""
+
+    to: str = Field(min_length=3, max_length=320)
+    recipient_id: int | None = None
+
+
+class RecipientsNow(BaseModel):
+    """What a send would go to if fired now (task-67; ADR-183 addendum
+    2026-10-12): who is still to be mailed, counted the way the send counts
+    them, against the company's cap."""
+
+    send_instance_id: int
+    status: str
+    recipients: int
+    cap: int
+    provider: str
+    provider_label: str
+    reaches_real_inboxes: bool
+    from_address: str | None = None
+    scheduled_at: datetime | None = None
+
+
 class TestSendResponse(BaseModel):
     """What one test send did, as the API answers it.
 

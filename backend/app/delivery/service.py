@@ -947,6 +947,56 @@ def send_test_email(
     )
 
 
+#: What a test's subject starts with, so nobody mistakes it for the real send.
+TEST_SUBJECT_PREFIX = "[Test] "
+
+
+def test_planned_send(
+    db: Session, send_instance_id: int, *, to: str, recipient_id: int | None = None, brand_id: int,
+) -> TestSendResult | None:
+    """Mail one test of a planned send to one typed address (task-67; ADR-183
+    addendum 2026-10-12). None when the send is not this brand's.
+
+    **The frozen email, not the live variant.** It renders the send's own
+    snapshot — what was approved and is what goes out (ADR-183 point 2) — as
+    `recipient_id` would get it (their stored slot picks), with the snapshot's
+    subject marked as a test, through the provider and sender the send was
+    planned with. **Still a test, not a delivery:** no execution is made, so
+    no unsubscribe token, link or one-click header and no tracking (ADR-191);
+    the legal footer shows the wording unlinked (ADR-194). Raises ValueError
+    for what cannot be tested: a push send, a send without a frame, a brand
+    profile that may not send.
+    """
+    from app.rendering.frame import is_frame, profile_refusal, render_frame, send_purpose
+    from app.recipients.consent import MARKETING as _MARKETING
+
+    send_instance = get_send_instance(db, send_instance_id, brand_id=brand_id)
+    if send_instance is None:
+        return None
+    snapshot = db.get(SnapshotDB, send_instance.snapshot_id)
+    frame = snapshot.render_context if snapshot is not None else None
+    if not is_frame(frame):
+        raise ValueError("this send has no frozen email to test; freeze the variant again and plan a new send")
+    if frame.get("channel") != "email":
+        raise ValueError("a push send cannot be tested by email; its preview shows what it carries")
+    if refusal := profile_refusal(frame):
+        raise ValueError(refusal)
+
+    to = to.strip()
+    artifact, _ = render_frame(
+        db, frame, recipient_id=recipient_id,
+        unsubscribe_unlinked=send_purpose(frame) == _MARKETING,
+    )
+    artifact.envelope["subject"] = TEST_SUBJECT_PREFIX + (artifact.envelope.get("subject") or send_instance.name)
+    provider_name = send_instance.provider or "mock"
+    provider = get_provider(provider_name, from_address=send_instance.from_address, channel="email")
+    sent = provider.send(to, artifact)
+    return TestSendResult(
+        success=sent.success, to=to, provider=provider_name,
+        provider_message_id=sent.provider_message_id, message=sent.message,
+    )
+
+
 def send_send_instance(
     db: Session,
     send_instance_id: int,
