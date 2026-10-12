@@ -133,6 +133,14 @@ class TestSendRequest(BaseModel):
     recipient_id: int | None = None
 
 
+class FireResult(BaseModel):
+    """What firing a send did: sent, partial_failed, failed or no_recipients.
+    (An integration held for approval gets a 202 from the approval handler
+    instead, with its own body.)"""
+
+    status: str
+
+
 class PlannedTestRequest(BaseModel):
     """A test of a planned send (task-67): the frozen email, as `recipient_id`
     would get it, to one typed address."""

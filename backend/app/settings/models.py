@@ -70,6 +70,10 @@ class DeliveryProviderSetting(BaseModel):
     # ADR-182 point 4: false means clicks count for the email and credit no
     # category — the provider stays selectable.
     click_content_attribution: bool
+    # The send screen asks for a sender only where the provider uses one
+    # (task-67), prefilled with the deployment's default sender.
+    needs_from_address: bool = False
+    default_from_address: str | None = None
 
 
 class Settings(BaseModel):

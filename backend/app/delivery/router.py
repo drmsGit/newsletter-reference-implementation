@@ -7,6 +7,7 @@ from app.auth.dependencies import require_person, working_brand
 from app.pagination import Page, PageParams, page_params
 from app.database import get_db
 from app.delivery.models import (
+    FireResult,
     PlannedTestRequest,
     RecipientsNow,
     TestSendRequest,
@@ -220,6 +221,7 @@ def get_executions_for_send_instance(
 
 @router.post(
     "/send-instances/{send_instance_id}/send",
+    response_model=FireResult,
     summary="Fire a send instance",
     description=(
         "Run the send loop for a planned send: per recipient, resolve their decision "

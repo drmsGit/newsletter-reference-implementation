@@ -242,6 +242,83 @@ export function useDelivery(id: number) {
  * Release a send stranded in 'sending' (ADR-192): it becomes 'failed', so a
  * retry may run. People only; refused unless the send is stranded right now.
  */
+/*
+ * The send screen (task-67; ADR-183 addendum 2026-10-12): freeze a variant,
+ * plan its send, test it, and fire it. Every rule -- what may be sent, the cap,
+ * the legal details, who may fire -- is the server's; these only ask.
+ */
+
+/** Freeze a variant: the snapshot is what will go out (ADR-183). */
+export function useFreezeVariant(variantId: number) {
+  return useMutation({
+    mutationFn: () =>
+      read(api.POST('/snapshots/variants/{variant_id}', { params: { path: { variant_id: variantId } } })),
+  })
+}
+
+export type SendPlan = components['schemas']['SendPlanRequest']
+
+/** Plan a send of a frozen variant to an audience group. */
+export function usePlanSend(snapshotId: number | null) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (plan: SendPlan) =>
+      read(
+        api.POST('/delivery/snapshots/{snapshot_id}/send-instances', {
+          params: { path: { snapshot_id: snapshotId ?? 0 } },
+          body: plan,
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['deliveries'] }),
+  })
+}
+
+/** Mail one test of a planned send: the frozen email, as a chosen recipient. */
+export function useTestPlannedSend(sendId: number) {
+  return useMutation({
+    mutationFn: (body: { to: string; recipient_id?: number | null }) =>
+      read(
+        api.POST('/delivery/send-instances/{send_instance_id}/test', {
+          params: { path: { send_instance_id: sendId } },
+          body,
+        }),
+      ),
+  })
+}
+
+/** Who a send would go to if fired now: the count the confirmation shows. */
+export function useRecipientsNow(sendId: number | null) {
+  return useQuery({
+    queryKey: ['deliveries', sendId, 'recipients-now'],
+    enabled: sendId != null,
+    queryFn: () =>
+      read(
+        api.GET('/delivery/send-instances/{send_instance_id}/recipients-now', {
+          params: { path: { send_instance_id: sendId ?? 0 } },
+        }),
+      ),
+  })
+}
+
+/** Fire a planned send. A person firing is its approval (ADR-174). */
+export function useFireSend(sendId: number, campaignId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () =>
+      read(
+        api.POST('/delivery/send-instances/{send_instance_id}/send', {
+          params: { path: { send_instance_id: sendId } },
+        }),
+      ),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['deliveries'] }),
+        queryClient.invalidateQueries({ queryKey: keys.campaignResults(campaignId) }),
+        queryClient.invalidateQueries({ queryKey: keys.monitoring }),
+      ]),
+  })
+}
+
 export function useReleaseDelivery(id: number) {
   const queryClient = useQueryClient()
   return useMutation({

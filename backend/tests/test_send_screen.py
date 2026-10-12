@@ -173,3 +173,12 @@ def test_freezing_a_variant_that_does_not_exist_is_a_404(db):
     with signed_in(db) as (cookied, _token, csrf):
         response = cookied.post("/snapshots/variants/987654321", headers={"X-CSRF-Token": csrf})
     assert response.status_code == 404
+
+
+# --- what the screen offers ----------------------------------------------------------------
+
+def test_the_provider_list_says_who_needs_a_sender(db):
+    with signed_in(db) as (cookied, _token, _csrf):
+        providers = {p["name"]: p for p in cookied.get("/settings").json()["delivery_providers"]}
+    assert providers["mock"]["needs_from_address"] is False and providers["mock"]["default_from_address"] is None
+    assert providers["resend"]["needs_from_address"] is True and providers["resend"]["default_from_address"]

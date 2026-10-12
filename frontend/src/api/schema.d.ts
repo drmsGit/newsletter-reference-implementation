@@ -4722,6 +4722,13 @@ export interface components {
             channels: string[];
             /** Click Content Attribution */
             click_content_attribution: boolean;
+            /**
+             * Needs From Address
+             * @default false
+             */
+            needs_from_address: boolean;
+            /** Default From Address */
+            default_from_address?: string | null;
         };
         /** DescriptionRow */
         DescriptionRow: {
@@ -4847,6 +4854,16 @@ export interface components {
             id?: number | null;
             /** Name */
             name: string;
+        };
+        /**
+         * FireResult
+         * @description What firing a send did: sent, partial_failed, failed or no_recipients.
+         *     (An integration held for approval gets a 202 from the approval handler
+         *     instead, with its own body.)
+         */
+        FireResult: {
+            /** Status */
+            status: string;
         };
         /** GrantOut */
         GrantOut: {
@@ -9548,7 +9565,7 @@ export interface operations {
                      *       "status": "partial_failed"
                      *     }
                      */
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["FireResult"];
                 };
             };
             /** @description Already sending/sent, or a rerun audience exceeded the send cap. */

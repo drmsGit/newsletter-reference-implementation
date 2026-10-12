@@ -108,7 +108,8 @@ function Editor({
     <>
       <h1>{variant.name}</h1>
       <p className="muted">
-        {variant.channel} · {variant.status}
+        {variant.channel} · {variant.status} ·{' '}
+        <Link to={`/campaigns/${campaignId}/variants/${variant.id}/send`}>Send…</Link>
       </p>
       <Fence campaignId={campaignId} variantId={variant.id} fence={composed.fence} />
       <ProfileChoice campaignId={campaignId} composed={composed} reload={reload} />

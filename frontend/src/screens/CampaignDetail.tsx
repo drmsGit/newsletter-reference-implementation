@@ -172,7 +172,8 @@ function VariantSection({
       </dl>
 
       <p>
-        <Link to={`/campaigns/${campaignId}/variants/${variant.id}`}>Edit {variant.name}</Link>
+        <Link to={`/campaigns/${campaignId}/variants/${variant.id}`}>Edit {variant.name}</Link> ·{' '}
+        <Link to={`/campaigns/${campaignId}/variants/${variant.id}/send`}>Send {variant.name}…</Link>
       </p>
       <p>
         <Button

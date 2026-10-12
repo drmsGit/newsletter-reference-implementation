@@ -109,6 +109,12 @@ def read_settings(request: Request, db: Session = Depends(get_db)):
     )
 
 
+def _default_from_address() -> str:
+    from app.delivery.providers.resend import DEFAULT_FROM
+
+    return os.environ.get("RESEND_FROM") or DEFAULT_FROM
+
+
 def _delivery_providers() -> list[DeliveryProviderSetting]:
     """Each provider once, with the channels it carries and whether its clicks
     can name their content (task-240)."""
@@ -124,6 +130,10 @@ def _delivery_providers() -> list[DeliveryProviderSetting]:
         DeliveryProviderSetting(
             name=p["name"], label=p["label"], channels=p["channels"],
             click_content_attribution=p["click_content_attribution"],
+            needs_from_address=p["needs_from_address"],
+            # The address the adapter falls back to when a send names none:
+            # what the old send form prefilled (task-67).
+            default_from_address=(_default_from_address() if p["needs_from_address"] else None),
         )
         for p in found.values()
     ]
