@@ -65,6 +65,18 @@ export default function DeliveryDetail() {
         {delivery.data && (
           <>
             <h1>{delivery.data.name}</h1>
+            {(delivery.data.status === 'draft' || delivery.data.status === 'scheduled') &&
+              delivery.data.campaign_id != null &&
+              delivery.data.variant_id != null && (
+                <p>
+                  Not sent yet.{' '}
+                  <Link
+                    to={`/campaigns/${delivery.data.campaign_id}/variants/${delivery.data.variant_id}/send?send=${delivery.data.id}`}
+                  >
+                    Continue on the send screen
+                  </Link>
+                </p>
+              )}
             <dl className="facts">
               <dt>Status</dt>
               <dd>{delivery.data.status}</dd>

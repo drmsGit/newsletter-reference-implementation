@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import working_brand
 from app.database import get_db
 from app.rendering.service import UnpublishedContentError
-from app.snapshots.models import Snapshot
+from app.snapshots.models import Snapshot, VariantFramePreview
 from app.snapshots.service import (
     create_snapshot_for_variant,
     get_snapshot_html,
@@ -36,6 +36,37 @@ def create_variant_snapshot(
         # A variant that does not exist, or not in this brand (task-67).
         # Answered 500 before: the service raises a bare ValueError.
         raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.get(
+    "/variants/{variant_id}/preview",
+    response_model=VariantFramePreview,
+    summary="What the variant would send if frozen now",
+    description=(
+        "The frame planning would freeze now, laid out — built in memory and never stored "
+        "(ADR-183 addendum 2026-10-13). Email returns the HTML; push its fields. As `recipient_id` "
+        "would get it, or nobody in particular. 409 for unpublished content."
+    ),
+)
+def preview_variant_frame(
+    variant_id: int,
+    recipient_id: int | None = None,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    from app.delivery.service import frame_now, render_now
+
+    try:
+        frame = frame_now(db, variant_id, brand_id=brand_id)
+        if frame is None:
+            raise HTTPException(status_code=404, detail="Variant not found")
+        artifact = render_now(db, frame, recipient_id)
+    except UnpublishedContentError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    return VariantFramePreview(
+        channel=frame["channel"], subject=artifact.envelope.get("subject"),
+        preheader=artifact.envelope.get("preheader"), html=artifact.body, fields=artifact.fields or None,
+    )
 
 
 @router.get("/variants/{variant_id}", response_model=list[Snapshot])

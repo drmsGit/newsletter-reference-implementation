@@ -964,8 +964,8 @@ class TestRoutesThatMailAPersonAreNotDowngradedByAPrefix:
         "/delivery/send-instances/{send_instance_id}/send",
         "/delivery/process-due",
         "/delivery/send-test",
-        # A test of a planned send (task-67) mails one typed address.
-        "/delivery/send-instances/{send_instance_id}/test",
+        # A test of a variant (task-67) mails one typed address.
+        "/delivery/variants/{variant_id}/test",
     }
 
     def test_every_route_that_mails_a_person_is_priced_as_such(self):

@@ -108,6 +108,10 @@ class SendInstanceDetail(SendInstance):
     execution_count: int
     exclusions_by_stage: dict[str, int]
     audience_group_name: str | None = None
+    # The send's campaign and variant, so a planned send can be continued on
+    # its variant's send screen (task-67).
+    campaign_id: int | None = None
+    variant_id: int | None = None
 
 
 class SendInstanceCreate(BaseModel):
@@ -141,11 +145,14 @@ class FireResult(BaseModel):
     status: str
 
 
-class PlannedTestRequest(BaseModel):
-    """A test of a planned send (task-67): the frozen email, as `recipient_id`
-    would get it, to one typed address."""
+class VariantTestRequest(BaseModel):
+    """A test of a variant (task-67; ADR-183 addendum 2026-10-13): the email
+    as planning would freeze it now, as `recipient_id` would get it, through
+    `provider`, to one typed address."""
 
     to: str = Field(min_length=3, max_length=320)
+    provider: str = "mock"
+    from_address: str | None = None
     recipient_id: int | None = None
 
 

@@ -8,7 +8,7 @@ topic:
   - delivery
   - auditability
 created: 2026-10-02
-modified: 2026-10-12
+modified: 2026-10-13
 source:
   - "task-129 (needs-adr: snapshot storage strategy)"
   - "Code review finding P1-04 (reviewed snapshot does not prove content sent)"
@@ -122,6 +122,23 @@ They are not live data. A script the user runs drops them, together with the sen
 **Consequence.** Two test-send behaviours now exist side by side: the flow's, rendered from the frame, and the standalone page's, rendered from the live variant. This is the second render path of the Negative list, reaching test sends.
 
 **No decision-log entry.** `docs/playbook-strategy.md` has no entry for this decision. The reasoning comes from the 2026-10-12 session and task-67.
+
+## Addendum 2026-10-13 — planning freezes the variant, and a test renders the frame without storing it
+
+**Decided by the user on 2026-10-13, after trying the send screen built from the 2026-10-12 addendum (queue task-67), for the November 2026 presentations (`docs/business/PRESENTATIONS-2026-11.md`).** The Decision above is unchanged. This addendum amends points 1 and 3 of the 2026-10-12 addendum. Its point 2 (approval is unchanged, [[ADR-174 — Channel Readiness Is Asserted, Not Computed]]) and point 4 (the confirmation counts recipients as of now) stand.
+
+**What trying the screen showed.** The separate "Freeze this version" step stored a snapshot on every press, even when no send was ever planned. Leaving the screen, or pressing "Freeze again", left snapshot rows that will never be sent. The test came only after planning, so it looked missing. A send that had been planned could not be continued after leaving the screen. And the plan button was disabled without saying why (no audience chosen, or a date without a time), so the user's plans never reached the server.
+
+1. **No separate freeze step. The snapshot is created when the send is planned, in the same action, and only then.** Planning freezes the variant and plans the send together. If the plan is refused (an empty audience, over the recipient cap, a provider that cannot carry the channel), no snapshot is left behind. The screen's steps are now *what goes out*, *test* (optional), *plan* and *send*. This replaces point 1 of the 2026-10-12 addendum.
+2. **What goes out, and the test, render the frame as it would be frozen now. It is built in memory and never stored.** Both use the same frame building and rendering as a snapshot (`build_frame` and `render_frame` in `backend/app/rendering/frame.py`). What is shown is therefore what planning would freeze. A test can now come before planning. It goes to a typed address, renders as a chosen recipient, goes through a chosen provider (the mock by default), and has "[Test] " in front of its subject. It is still not a delivery: it creates no delivery execution and carries no unsubscribe link and no click tracking ([[ADR-191 — Unsubscribe Is a Per-Message Token, a Confirm Page and One-Click]]). The legal footer goes out as the test-send rule of [[ADR-194 — Brand Profiles Carry an Email's Look, Texts and Legal Details]] says. This replaces point 3 of the 2026-10-12 addendum.
+3. **Open sends of the variant are listed on the screen, so they can be continued.** Planned and scheduled sends are listed, so a started send is not lost by leaving the screen.
+4. **The plan action says what is missing** instead of being silently disabled. "At a time" is prefilled with a complete date and time.
+
+**Consequence.** If the variant is edited between a test and planning, the send carries the edit. Planning freezes whatever is current at that moment. This is no change from before: a freeze always took the variant as it was when it was made. From planning onward, point 2 of the Decision protects the frozen composition as before.
+
+**The older routes stay** for API clients and the frozen Jinja UI. These are creating a snapshot on its own (`POST /snapshots/variants/{variant_id}`) and planning from an existing snapshot (`POST /delivery/snapshots/{snapshot_id}/send-instances`). The test on a planned send added on 2026-10-12 (`POST /delivery/send-instances/{send_instance_id}/test`) is replaced by a test on the variant.
+
+**No decision-log entry.** `docs/playbook-strategy.md` has no entry for this decision. The reasoning comes from the 2026-10-13 session and task-67.
 
 ## Related ADRs
 

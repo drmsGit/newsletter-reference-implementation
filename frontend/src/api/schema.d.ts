@@ -1092,6 +1092,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/snapshots/variants/{variant_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the variant would send if frozen now
+         * @description The frame planning would freeze now, laid out — built in memory and never stored (ADR-183 addendum 2026-10-13). Email returns the HTML; push its fields. As `recipient_id` would get it, or nobody in particular. 409 for unpublished content.
+         */
+        get: operations["preview_variant_frame_snapshots_variants__variant_id__preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/snapshots/{snapshot_id}/html": {
         parameters: {
             query?: never;
@@ -1272,7 +1292,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/delivery/send-instances/{send_instance_id}/test": {
+    "/delivery/variants/{variant_id}/test": {
         parameters: {
             query?: never;
             header?: never;
@@ -1282,10 +1302,30 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Mail one test of a planned send
-         * @description The send's frozen email (its snapshot), as `recipient_id` would get it, with its own subject marked [Test], through the provider and sender the send was planned with, to one typed address. A test, not a delivery: no unsubscribe link, no tracking, nothing counted (task-67; ADR-183 addendum 2026-10-12). 409 for a push send or a profile that may not send.
+         * Mail one test of a variant, as it would be frozen now
+         * @description The variant's email as planning would freeze it now — built in memory, never stored — as `recipient_id` would get it, with its subject marked [Test], through the chosen provider, to one typed address. A test, not a delivery: no unsubscribe link, no tracking, nothing counted (task-67; ADR-183 addenda 2026-10-12 and 2026-10-13). 409 for a push variant, unpublished content or a brand profile that may not send.
          */
-        post: operations["test_planned_send_route_delivery_send_instances__send_instance_id__test_post"];
+        post: operations["test_variant_route_delivery_variants__variant_id__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/delivery/variants/{variant_id}/send-instances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Freeze a variant and plan its send, in one action
+         * @description Freezes the variant (its snapshot) and plans the send from it together, so a snapshot exists only for a send that was planned (ADR-183 addendum 2026-10-13). Refused like planning from a snapshot: 409 for an empty audience, one over the cap, a provider that cannot carry the channel, or unpublished content; 404 when the variant or audience is not in the working brand. A refused plan leaves no snapshot. **Not idempotent.**
+         */
+        post: operations["freeze_and_plan_route_delivery_variants__variant_id__send_instances_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5594,17 +5634,6 @@ export interface components {
             /** Outcome */
             outcome?: string | null;
         };
-        /**
-         * PlannedTestRequest
-         * @description A test of a planned send (task-67): the frozen email, as `recipient_id`
-         *     would get it, to one typed address.
-         */
-        PlannedTestRequest: {
-            /** To */
-            to: string;
-            /** Recipient Id */
-            recipient_id?: number | null;
-        };
         /** PreferenceUpdateResult */
         PreferenceUpdateResult: {
             /** Event Id */
@@ -6279,6 +6308,10 @@ export interface components {
             };
             /** Audience Group Name */
             audience_group_name?: string | null;
+            /** Campaign Id */
+            campaign_id?: number | null;
+            /** Variant Id */
+            variant_id?: number | null;
         };
         /**
          * SendInstanceListed
@@ -7003,6 +7036,25 @@ export interface components {
             /** Active */
             active: boolean;
         };
+        /**
+         * VariantFramePreview
+         * @description What a variant would send if frozen now (ADR-183 addendum 2026-10-13):
+         *     the subject and preheader, and the email's HTML or the push's fields.
+         */
+        VariantFramePreview: {
+            /** Channel */
+            channel: string;
+            /** Subject */
+            subject?: string | null;
+            /** Preheader */
+            preheader?: string | null;
+            /** Html */
+            html?: string | null;
+            /** Fields */
+            fields?: {
+                [key: string]: unknown;
+            } | null;
+        };
         /** VariantResults */
         VariantResults: {
             /** Recipients */
@@ -7040,6 +7092,25 @@ export interface components {
             name: string;
             /** Channel */
             channel: string;
+        };
+        /**
+         * VariantTestRequest
+         * @description A test of a variant (task-67; ADR-183 addendum 2026-10-13): the email
+         *     as planning would freeze it now, as `recipient_id` would get it, through
+         *     `provider`, to one typed address.
+         */
+        VariantTestRequest: {
+            /** To */
+            to: string;
+            /**
+             * Provider
+             * @default mock
+             */
+            provider: string;
+            /** From Address */
+            from_address?: string | null;
+            /** Recipient Id */
+            recipient_id?: number | null;
         };
         /** VariantUpdate */
         VariantUpdate: {
@@ -9274,6 +9345,39 @@ export interface operations {
             };
         };
     };
+    preview_variant_frame_snapshots_variants__variant_id__preview_get: {
+        parameters: {
+            query?: {
+                recipient_id?: number | null;
+            };
+            header?: never;
+            path: {
+                variant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VariantFramePreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_snapshot_html_file_snapshots__snapshot_id__html_get: {
         parameters: {
             query?: never;
@@ -9342,6 +9446,8 @@ export interface operations {
         parameters: {
             query?: {
                 status?: string | null;
+                /** @description Only this variant's sends (the send screen's continue). */
+                variant_id?: number | null;
                 /** @description Rows per page (1-200). */
                 limit?: number;
                 /** @description Rows to skip. */
@@ -9657,18 +9763,18 @@ export interface operations {
             };
         };
     };
-    test_planned_send_route_delivery_send_instances__send_instance_id__test_post: {
+    test_variant_route_delivery_variants__variant_id__test_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                send_instance_id: number;
+                variant_id: number;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PlannedTestRequest"];
+                "application/json": components["schemas"]["VariantTestRequest"];
             };
         };
         responses: {
@@ -9679,6 +9785,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TestSendResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    freeze_and_plan_route_delivery_variants__variant_id__send_instances_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                variant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendPlanRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SendInstance"];
                 };
             };
             /** @description Validation Error */

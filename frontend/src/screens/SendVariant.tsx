@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Button, Checkbox, Input, Label, TextField } from 'react-aria-components'
 import { Link, useParams, useSearchParams } from 'react-router'
 
@@ -7,11 +7,12 @@ import {
   useAudiencePreview,
   useComposition,
   useFireSend,
-  useFreezeVariant,
-  usePlanSend,
+  useFramePreview,
+  useOpenSends,
+  usePlanVariantSend,
   useRecipientsNow,
   useSettings,
-  useTestPlannedSend,
+  useTestVariant,
 } from '../api/resources'
 import { HttpError } from '../api/session'
 import Choice from '../components/Choice'
@@ -20,19 +21,20 @@ import ScreenState from '../components/ScreenState'
 import { formatDate } from './Campaigns'
 
 /**
- * Sending one variant, in four steps (task-67; ADR-183 addendum 2026-10-12).
+ * Sending one variant (task-67; ADR-183 addenda 2026-10-12 and 2026-10-13).
  *
- * 1. **Freeze**: the snapshot is what will go out, shown as it will be sent.
- * 2. **Plan**: to whom, through which provider, and when.
- * 3. **Test**: the frozen email to one address, as a chosen recipient would
- *    get it. A test, not a delivery: nothing is counted or tracked.
+ * 1. **What goes out**: the email as planning would freeze it now. Nothing is
+ *    stored by looking.
+ * 2. **Test** (optional, any time): that email to one address, as a chosen
+ *    recipient, through a chosen provider. Not a delivery; nothing stored.
+ * 3. **Plan**: freezing happens here, together with the plan, and only here,
+ *    so no frozen version is left behind that nobody sends.
  * 4. **Send**: the recipients as of now, and a button that says what it does.
  *
- * A person who may fire a send is its approval (ADR-174), so there is no
- * approval step here; sends fired by a CRM or n8n wait in the approvals inbox.
- * Where the screen is, is kept in the address (`?snapshot=`, `?send=`), so a
- * reload does not lose the frozen version or the planned send. Every rule --
- * the cap, the legal details, who may fire -- is the server's.
+ * Sends of this variant that are planned or scheduled are listed to continue,
+ * and the one being worked on is kept in the address (`?send=`). A person who
+ * may fire a send is its approval (ADR-174). Every rule -- the cap, the legal
+ * details, who may fire -- is the server's.
  */
 export default function SendVariant() {
   const params = useParams()
@@ -40,15 +42,12 @@ export default function SendVariant() {
   const variantId = Number(params.variantId)
   const composition = useComposition(campaignId)
   const [search, setSearch] = useSearchParams()
-  const snapshotId = search.get('snapshot') ? Number(search.get('snapshot')) : null
   const sendId = search.get('send') ? Number(search.get('send')) : null
 
-  function go(changes: Record<string, string | null>) {
+  function continueWith(id: number | null) {
     const next = new URLSearchParams(search)
-    for (const [key, value] of Object.entries(changes)) {
-      if (value === null) next.delete(key)
-      else next.set(key, value)
-    }
+    if (id == null) next.delete('send')
+    else next.set('send', String(id))
     setSearch(next)
   }
 
@@ -69,22 +68,19 @@ export default function SendVariant() {
                 <p className="muted">
                   {composition.data.campaign.name} · {variant.channel}
                 </p>
-                <FreezeStep
-                  variantId={variantId}
-                  channel={variant.channel}
-                  snapshotId={snapshotId}
-                  onFrozen={(id) => go({ snapshot: String(id), send: null })}
-                />
-                {snapshotId != null && sendId == null && (
+                {sendId == null && <OpenSends variantId={variantId} onContinue={continueWith} />}
+                <WhatGoesOut variantId={variantId} />
+                {variant.channel === 'email' && <TestStep variantId={variantId} channel={variant.channel} />}
+                {sendId == null ? (
                   <PlanStep
-                    snapshotId={snapshotId}
+                    variantId={variantId}
                     channel={variant.channel}
                     defaultName={composition.data.campaign.name}
-                    onPlanned={(id) => go({ send: String(id) })}
+                    onPlanned={continueWith}
                   />
+                ) : (
+                  <SendStep sendId={sendId} campaignId={campaignId} onAnother={() => continueWith(null)} />
                 )}
-                {sendId != null && variant.channel === 'email' && <TestStep sendId={sendId} />}
-                {sendId != null && <SendStep sendId={sendId} campaignId={campaignId} />}
               </>
             )
           })()}
@@ -98,93 +94,213 @@ function refused(error: unknown, action: string) {
   return `${(error instanceof HttpError && error.detail) || 'The server refused it.'}`
 }
 
-/** Step 1: freeze the variant, and show exactly what will go out. */
-function FreezeStep({
-  variantId,
-  channel,
-  snapshotId,
-  onFrozen,
-}: {
-  variantId: number
-  channel: string
-  snapshotId: number | null
-  onFrozen: (id: number) => void
-}) {
-  const freeze = useFreezeVariant(variantId)
+/** Sends of this variant that were planned and not sent yet. */
+function OpenSends({ variantId, onContinue }: { variantId: number; onContinue: (id: number) => void }) {
+  const open = useOpenSends(variantId)
+  if (!open.data || open.data.length === 0) return null
   return (
-    <section aria-labelledby="step-freeze">
-      <h2 id="step-freeze">1. Freeze this version</h2>
-      <p className="muted">
-        Freezing takes the variant as it is now. What you see below is what goes out; later edits need a new freeze.
-      </p>
-      <Button onPress={() => freeze.mutate(undefined, { onSuccess: (s) => onFrozen(s.id) })} isDisabled={freeze.isPending}>
-        {freeze.isPending ? 'Freezing…' : snapshotId == null ? 'Freeze this version' : 'Freeze again'}
-      </Button>
-      {freeze.error != null && <p role="alert">Not frozen: {refused(freeze.error, 'freeze it')}</p>}
-      {snapshotId != null &&
-        (channel === 'email' ? (
-          <iframe
-            title="The frozen email"
-            className="frozen-email"
-            src={`/snapshots/${snapshotId}/html`}
-            sandbox=""
-            style={{ width: '100%', height: 480, border: '1px solid currentColor' }}
-          />
+    <section aria-labelledby="open-sends">
+      <h2 id="open-sends">Planned and not sent yet</h2>
+      <ul>
+        {open.data.map((send) => (
+          <li key={send.id}>
+            {send.name} — {send.status === 'scheduled' && send.scheduled_at
+              ? `scheduled for ${formatDate(send.scheduled_at)}`
+              : `planned ${formatDate(send.created_at)}`}{' '}
+            <Button onPress={() => onContinue(send.id)}>Continue</Button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+/** Step 1: the email as planning would freeze it now; looking stores nothing. */
+function WhatGoesOut({ variantId }: { variantId: number }) {
+  const preview = useFramePreview(variantId)
+  return (
+    <section aria-labelledby="step-what">
+      <h2 id="step-what">1. What goes out</h2>
+      <p className="muted">As it would be frozen now. It is frozen when you plan the send.</p>
+      {preview.isError && <p role="alert">Cannot be sent yet: {refused(preview.error, 'see it')}</p>}
+      {preview.data &&
+        (preview.data.html ? (
+          <>
+            <p>
+              <strong>Subject:</strong> {preview.data.subject || '—'}
+            </p>
+            <iframe
+              title="What goes out"
+              srcDoc={preview.data.html}
+              sandbox=""
+              style={{ width: '100%', height: 480, border: '1px solid currentColor' }}
+            />
+          </>
         ) : (
-          <p className="muted" role="status">
-            Frozen (#{snapshotId}). A push is filled per recipient; the preview shows it for one person.
-          </p>
+          <dl className="facts">
+            {Object.entries(preview.data.fields ?? {}).map(([key, value]) => (
+              <div key={key} style={{ display: 'contents' }}>
+                <dt>{key}</dt>
+                <dd>{String(value) || '—'}</dd>
+              </div>
+            ))}
+          </dl>
         ))}
     </section>
   )
 }
 
-/** Step 2: to whom, through which provider, and when. */
+/** The providers that can carry this channel, with the sender field where one is used. */
+function ProviderFields({
+  channel,
+  provider,
+  setProvider,
+  sender,
+  setSender,
+}: {
+  channel: string
+  provider: string
+  setProvider: (name: string) => void
+  sender: string | null
+  setSender: (value: string) => void
+}) {
+  const settings = useSettings()
+  const providers = (settings.data?.delivery_providers ?? []).filter((p) => p.channels.includes(channel))
+  const chosen = providers.find((p) => p.name === provider)
+  return (
+    <>
+      <Choice
+        label="Provider"
+        options={providers.map((p) => ({ id: p.name, name: p.label }))}
+        selected={provider}
+        onChange={setProvider}
+      />
+      {chosen?.needs_from_address && (
+        <TextField value={sender ?? chosen.default_from_address ?? ''} onChange={setSender}>
+          <Label>Sender address</Label>
+          <Input />
+        </TextField>
+      )}
+    </>
+  )
+}
+
+/** The sender to send with: only for a provider that uses one. */
+function useSender(channel: string, provider: string, typed: string | null) {
+  const settings = useSettings()
+  const chosen = (settings.data?.delivery_providers ?? []).find(
+    (p) => p.name === provider && p.channels.includes(channel),
+  )
+  if (!chosen?.needs_from_address) return null
+  return (typed ?? chosen.default_from_address ?? '').trim() || null
+}
+
+/** Step 2: a test, any time: the email to one address; nothing is stored. */
+function TestStep({ variantId, channel }: { variantId: number; channel: string }) {
+  const test = useTestVariant(variantId)
+  const [to, setTo] = useState('')
+  const [as, setAs] = useState<PickedRecipient | null>(null)
+  const [provider, setProvider] = useState('mock')
+  const [sender, setSender] = useState<string | null>(null)
+  const from = useSender(channel, provider, sender)
+  return (
+    <section aria-labelledby="step-test">
+      <h2 id="step-test">2. Send a test (optional)</h2>
+      <p className="muted">
+        The email above with its subject marked [Test]. Not a delivery: no unsubscribe link, nothing counted or stored.
+      </p>
+      <TextField value={to} onChange={setTo} type="email">
+        <Label>Test address</Label>
+        <Input />
+      </TextField>
+      {as ? (
+        <p>
+          As {as.label} would get it.{' '}
+          <Button onPress={() => setAs(null)}>Show it as nobody in particular</Button>
+        </p>
+      ) : (
+        <RecipientPicker label="Show it as (optional)" onChoose={setAs} />
+      )}
+      <ProviderFields channel={channel} provider={provider} setProvider={setProvider} sender={sender} setSender={setSender} />
+      <Button
+        onPress={() => test.mutate({ to: to.trim(), provider, from_address: from, recipient_id: as?.id ?? null })}
+        isDisabled={test.isPending || !to.trim()}
+      >
+        {test.isPending ? 'Sending the test…' : 'Send a test'}
+      </Button>
+      {test.error != null && <p role="alert">No test sent: {refused(test.error, 'send a test')}</p>}
+      {test.data &&
+        (test.data.success ? (
+          <p role="status">
+            Test sent to {test.data.to} through {test.data.provider}.
+          </p>
+        ) : (
+          <p role="alert">No test sent: {test.data.message}</p>
+        ))}
+    </section>
+  )
+}
+
+/** A complete local date and time for a datetime-local field: tomorrow, 09:00. */
+function tomorrowAtNine() {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T09:00`
+}
+
+/** Step 3: to whom, through which provider, and when. Freezing happens here. */
 function PlanStep({
-  snapshotId,
+  variantId,
   channel,
   defaultName,
   onPlanned,
 }: {
-  snapshotId: number
+  variantId: number
   channel: string
   defaultName: string
   onPlanned: (id: number) => void
 }) {
   const groups = useAudienceGroups()
-  const settings = useSettings()
-  const plan = usePlanSend(snapshotId)
-  const providers = (settings.data?.delivery_providers ?? []).filter((p) => p.channels.includes(channel))
+  const plan = usePlanVariantSend(variantId)
   const [name, setName] = useState(defaultName)
   const [groupId, setGroupId] = useState('')
   const [provider, setProvider] = useState('mock')
-  const [from, setFrom] = useState<string | null>(null)
+  const [sender, setSender] = useState<string | null>(null)
   const [timing, setTiming] = useState('now')
   const [at, setAt] = useState('')
   const [skip, setSkip] = useState(false)
-  const chosen = providers.find((p) => p.name === provider)
-  const sender = from ?? chosen?.default_from_address ?? ''
+  const [missing, setMissing] = useState<string[]>([])
+  const from = useSender(channel, provider, sender)
+
+  function submit(event: FormEvent) {
+    event.preventDefault()
+    const lacking = [
+      !name.trim() && 'a name for the send',
+      !groupId && 'an audience',
+      timing === 'at' && Number.isNaN(new Date(at).getTime()) && 'a date and a time to send at',
+    ].filter((item): item is string => Boolean(item))
+    setMissing(lacking)
+    if (lacking.length > 0) return
+    plan.mutate(
+      {
+        name: name.trim(),
+        audience_group_id: Number(groupId),
+        provider,
+        from_address: from,
+        scheduled_at: timing === 'at' ? new Date(at).toISOString() : null,
+        skip_without_resolution: skip,
+      },
+      { onSuccess: (send) => onPlanned(send.id) },
+    )
+  }
 
   return (
     <section aria-labelledby="step-plan">
-      <h2 id="step-plan">2. Plan the send</h2>
-      <form
-        onSubmit={(event) => {
-          event.preventDefault()
-          plan.mutate(
-            {
-              name: name.trim(),
-              audience_group_id: Number(groupId),
-              provider,
-              from_address: chosen?.needs_from_address ? sender.trim() || null : null,
-              scheduled_at: timing === 'at' && at ? new Date(at).toISOString() : null,
-              skip_without_resolution: skip,
-            },
-            { onSuccess: (send) => onPlanned(send.id) },
-          )
-        }}
-      >
-        <TextField value={name} onChange={setName} isRequired>
+      <h2 id="step-plan">3. Plan the send</h2>
+      <p className="muted">Planning freezes the email as it is now; later edits need a new send.</p>
+      <form onSubmit={submit}>
+        <TextField value={name} onChange={setName}>
           <Label>Name of the send</Label>
           <Input />
         </TextField>
@@ -198,18 +314,7 @@ function PlanStep({
           onChange={setGroupId}
         />
         {groupId && <Reachable groupId={Number(groupId)} channel={channel} />}
-        <Choice
-          label="Provider"
-          options={providers.map((p) => ({ id: p.name, name: p.label }))}
-          selected={provider}
-          onChange={setProvider}
-        />
-        {chosen?.needs_from_address && (
-          <TextField value={sender} onChange={setFrom}>
-            <Label>Sender address</Label>
-            <Input />
-          </TextField>
-        )}
+        <ProviderFields channel={channel} provider={provider} setProvider={setProvider} sender={sender} setSender={setSender} />
         <Choice
           label="When"
           options={[
@@ -217,7 +322,10 @@ function PlanStep({
             { id: 'at', name: 'At a time' },
           ]}
           selected={timing}
-          onChange={setTiming}
+          onChange={(value) => {
+            setTiming(value)
+            if (value === 'at' && !at) setAt(tomorrowAtNine())
+          }}
         />
         {timing === 'at' && (
           <TextField value={at} onChange={setAt} type="datetime-local">
@@ -228,9 +336,10 @@ function PlanStep({
         <Checkbox isSelected={skip} onChange={setSkip}>
           Don't send to someone who would get no content record
         </Checkbox>
-        <Button type="submit" isDisabled={plan.isPending || !groupId || !name.trim() || (timing === 'at' && !at)}>
+        <Button type="submit" isDisabled={plan.isPending}>
           {plan.isPending ? 'Planning…' : 'Plan the send'}
         </Button>
+        {missing.length > 0 && <p role="alert">Still needed: {missing.join(', ')}.</p>}
         {plan.error != null && <p role="alert">Not planned: {refused(plan.error, 'plan a send')}</p>}
       </form>
     </section>
@@ -249,50 +358,8 @@ function Reachable({ groupId, channel }: { groupId: number; channel: string }) {
   )
 }
 
-/** Step 3: the frozen email to one address, as a chosen recipient would get it. */
-function TestStep({ sendId }: { sendId: number }) {
-  const test = useTestPlannedSend(sendId)
-  const [to, setTo] = useState('')
-  const [as, setAs] = useState<PickedRecipient | null>(null)
-  return (
-    <section aria-labelledby="step-test">
-      <h2 id="step-test">3. Send a test</h2>
-      <p className="muted">
-        The frozen email with its own subject marked [Test]. Not a delivery: no unsubscribe link, nothing counted.
-      </p>
-      <TextField value={to} onChange={setTo} type="email">
-        <Label>Test address</Label>
-        <Input />
-      </TextField>
-      {as ? (
-        <p>
-          As {as.label} would get it.{' '}
-          <Button onPress={() => setAs(null)}>Show it as nobody in particular</Button>
-        </p>
-      ) : (
-        <RecipientPicker label="Show it as (optional)" onChoose={setAs} />
-      )}
-      <Button
-        onPress={() => test.mutate({ to: to.trim(), recipient_id: as?.id ?? null })}
-        isDisabled={test.isPending || !to.trim()}
-      >
-        {test.isPending ? 'Sending the test…' : 'Send a test'}
-      </Button>
-      {test.error != null && <p role="alert">No test sent: {refused(test.error, 'send a test')}</p>}
-      {test.data &&
-        (test.data.success ? (
-          <p role="status">
-            Test sent to {test.data.to} through {test.data.provider}.
-          </p>
-        ) : (
-          <p role="alert">No test sent: {test.data.message}</p>
-        ))}
-    </section>
-  )
-}
-
 /** Step 4: the recipients as of now, and a button that says what it does. */
-function SendStep({ sendId, campaignId }: { sendId: number; campaignId: number }) {
+function SendStep({ sendId, campaignId, onAnother }: { sendId: number; campaignId: number; onAnother: () => void }) {
   const now = useRecipientsNow(sendId)
   const fire = useFireSend(sendId, campaignId)
   return (
@@ -305,7 +372,8 @@ function SendStep({ sendId, campaignId }: { sendId: number; campaignId: number }
             const links = (
               <p>
                 <Link to={`/deliveries/${sendId}`}>The delivery</Link> ·{' '}
-                <Link to={`/campaigns/${campaignId}`}>The campaign's results</Link>
+                <Link to={`/campaigns/${campaignId}`}>The campaign's results</Link> ·{' '}
+                <Button onPress={onAnother}>Plan another send</Button>
               </p>
             )
             if (fire.data)

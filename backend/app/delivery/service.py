@@ -245,7 +245,7 @@ def release_send_instance(db: Session, send_instance_id: int, *, brand_id: int) 
 
 def list_send_instances(
     db: Session, *, brand_id: int, limit: int = 50, offset: int = 0,
-    status: str | None = None,
+    status: str | None = None, variant_id: int | None = None,
 ):
     """Every send in one brand, newest first — the deliveries list (task-28).
     One ADR-185 page: the count uses the same filtered query as the rows.
@@ -260,6 +260,10 @@ def list_send_instances(
     query = db.query(SendInstanceDB).filter(SendInstanceDB.brand_id == brand_id)
     if status:
         query = query.filter(SendInstanceDB.status == status)
+    if variant_id is not None:
+        # One variant's sends, for the send screen's "continue" (task-67).
+        query = query.filter(SendInstanceDB.snapshot_id.in_(
+            db.query(SnapshotDB.id).filter(SnapshotDB.variant_id == variant_id)))
     from app.pagination import Page
 
     total = query.count()
@@ -274,7 +278,6 @@ def list_send_instances(
 
     from app.campaigns.db_models import CampaignDB
     from app.insight.db_models import EngagementEventDB
-    from app.snapshots.db_models import SnapshotDB
 
     ids = [r.id for r in records]
     sources = {
@@ -338,11 +341,19 @@ def send_instance_detail(
 
         group = db.get(AudienceGroupDB, record.audience_group_id)
         group_name = group.name if group is not None else None
+    origin = (
+        db.query(VariantDB.campaign_id, VariantDB.id)
+        .join(SnapshotDB, SnapshotDB.variant_id == VariantDB.id)
+        .filter(SnapshotDB.id == record.snapshot_id)
+        .first()
+    )
     return _with_stranded(SendInstanceDetail(
         **to_send_instance(record).model_dump(),
         execution_count=len(reasons),
         exclusions_by_stage=by_stage,
         audience_group_name=group_name,
+        campaign_id=origin[0] if origin else None,
+        variant_id=origin[1] if origin else None,
     ), record, _last_activity(db, [record]))
 
 
@@ -951,50 +962,79 @@ def send_test_email(
 TEST_SUBJECT_PREFIX = "[Test] "
 
 
-def test_planned_send(
-    db: Session, send_instance_id: int, *, to: str, recipient_id: int | None = None, brand_id: int,
-) -> TestSendResult | None:
-    """Mail one test of a planned send to one typed address (task-67; ADR-183
-    addendum 2026-10-12). None when the send is not this brand's.
+def frame_now(db: Session, variant_id: int, *, brand_id: int) -> dict | None:
+    """The variant's frame as freezing it would make it now — built in memory,
+    never stored (ADR-183 addendum 2026-10-13). None when the variant is not
+    this brand's. Raises UnpublishedContentError like a freeze does."""
+    from app.campaigns.service import get_variant
+    from app.rendering.frame import build_frame
 
-    **The frozen email, not the live variant.** It renders the send's own
-    snapshot — what was approved and is what goes out (ADR-183 point 2) — as
-    `recipient_id` would get it (their stored slot picks), with the snapshot's
-    subject marked as a test, through the provider and sender the send was
-    planned with. **Still a test, not a delivery:** no execution is made, so
-    no unsubscribe token, link or one-click header and no tracking (ADR-191);
-    the legal footer shows the wording unlinked (ADR-194). Raises ValueError
-    for what cannot be tested: a push send, a send without a frame, a brand
-    profile that may not send.
-    """
-    from app.rendering.frame import is_frame, profile_refusal, render_frame, send_purpose
-    from app.recipients.consent import MARKETING as _MARKETING
-
-    send_instance = get_send_instance(db, send_instance_id, brand_id=brand_id)
-    if send_instance is None:
+    if get_variant(db, variant_id, brand_id=brand_id) is None:
         return None
-    snapshot = db.get(SnapshotDB, send_instance.snapshot_id)
-    frame = snapshot.render_context if snapshot is not None else None
-    if not is_frame(frame):
-        raise ValueError("this send has no frozen email to test; freeze the variant again and plan a new send")
+    return build_frame(db, variant_id)
+
+
+def render_now(db: Session, frame: dict, recipient_id: int | None = None):
+    """Lay an unstored frame out as a test or preview shows it: no unsubscribe
+    token, so the legal wording shows unlinked on a marketing email (ADR-194)."""
+    from app.recipients.consent import MARKETING as _MARKETING
+    from app.rendering.frame import render_frame, send_purpose
+
+    artifact, _ = render_frame(
+        db, frame, recipient_id=recipient_id, unsubscribe_unlinked=send_purpose(frame) == _MARKETING,
+    )
+    return artifact
+
+
+def test_variant(
+    db: Session, variant_id: int, *, to: str, provider: str = "mock", from_address: str | None = None,
+    recipient_id: int | None = None, brand_id: int,
+) -> TestSendResult | None:
+    """Mail one test of a variant to one typed address (task-67; ADR-183
+    addenda 2026-10-12 and 2026-10-13). None when the variant is not this
+    brand's.
+
+    **The email as freezing it would make it now**, built in memory and never
+    stored, so a test can come before planning without leaving a snapshot
+    behind; as `recipient_id` would get it, with its subject marked as a test,
+    through the chosen provider. **A test, not a delivery:** no execution, no
+    unsubscribe token or link, no tracking (ADR-191). Raises ValueError for a
+    push variant or a brand profile that may not send.
+    """
+    from app.rendering.frame import profile_refusal
+
+    frame = frame_now(db, variant_id, brand_id=brand_id)
+    if frame is None:
+        return None
     if frame.get("channel") != "email":
-        raise ValueError("a push send cannot be tested by email; its preview shows what it carries")
+        raise ValueError("a push cannot be tested by email; the preview shows what it carries")
     if refusal := profile_refusal(frame):
         raise ValueError(refusal)
-
     to = to.strip()
-    artifact, _ = render_frame(
-        db, frame, recipient_id=recipient_id,
-        unsubscribe_unlinked=send_purpose(frame) == _MARKETING,
-    )
-    artifact.envelope["subject"] = TEST_SUBJECT_PREFIX + (artifact.envelope.get("subject") or send_instance.name)
-    provider_name = send_instance.provider or "mock"
-    provider = get_provider(provider_name, from_address=send_instance.from_address, channel="email")
-    sent = provider.send(to, artifact)
+    artifact = render_now(db, frame, recipient_id)
+    artifact.envelope["subject"] = TEST_SUBJECT_PREFIX + (artifact.envelope.get("subject") or "")
+    sent = get_provider(provider, from_address=from_address, channel="email").send(to, artifact)
     return TestSendResult(
-        success=sent.success, to=to, provider=provider_name,
+        success=sent.success, to=to, provider=provider,
         provider_message_id=sent.provider_message_id, message=sent.message,
     )
+
+
+def freeze_and_plan(db: Session, variant_id: int, *, brand_id: int, **plan) -> SendInstanceDB:
+    """Freeze the variant and plan its send, as one action (ADR-183 addendum
+    2026-10-13): the snapshot exists only for a send that was planned. A plan
+    the audience, the cap or the provider refuses takes its snapshot with it.
+    Raises what freezing and planning raise."""
+    from app.snapshots.service import create_snapshot_for_variant
+
+    snapshot = create_snapshot_for_variant(db, variant_id, brand_id=brand_id)
+    try:
+        return prepare_send_from_audience(db, snapshot_id=snapshot.id, brand_id=brand_id, **plan)
+    except Exception:
+        db.rollback()
+        db.query(SnapshotDB).filter(SnapshotDB.id == snapshot.id).delete(synchronize_session=False)
+        db.commit()
+        raise
 
 
 def send_send_instance(

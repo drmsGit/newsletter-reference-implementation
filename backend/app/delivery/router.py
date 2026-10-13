@@ -8,7 +8,7 @@ from app.pagination import Page, PageParams, page_params
 from app.database import get_db
 from app.delivery.models import (
     FireResult,
-    PlannedTestRequest,
+    VariantTestRequest,
     RecipientsNow,
     TestSendRequest,
     TestSendResponse,
@@ -151,6 +151,7 @@ def plan_send(
 def get_send_instances(
     params: PageParams = Depends(page_params),
     status: str | None = None,
+    variant_id: int | None = Query(None, description="Only this variant's sends (the send screen's continue)."),
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
@@ -161,7 +162,8 @@ def get_send_instances(
     (task-216); one screen answering both would answer neither well.
     """
     return list_send_instances(
-        db, brand_id=brand_id, limit=params.limit, offset=params.offset, status=status)
+        db, brand_id=brand_id, limit=params.limit, offset=params.offset, status=status,
+        variant_id=variant_id)
 
 
 @router.get(
@@ -344,35 +346,77 @@ def get_recipients_now(
 
 
 @router.post(
-    "/send-instances/{send_instance_id}/test",
+    "/variants/{variant_id}/test",
     response_model=TestSendResponse,
-    summary="Mail one test of a planned send",
+    summary="Mail one test of a variant, as it would be frozen now",
     description=(
-        "The send's frozen email (its snapshot), as `recipient_id` would get it, with its own "
-        "subject marked [Test], through the provider and sender the send was planned with, to one "
-        "typed address. A test, not a delivery: no unsubscribe link, no tracking, nothing counted "
-        "(task-67; ADR-183 addendum 2026-10-12). 409 for a push send or a profile that may not send."
+        "The variant's email as planning would freeze it now — built in memory, never stored — as "
+        "`recipient_id` would get it, with its subject marked [Test], through the chosen provider, to "
+        "one typed address. A test, not a delivery: no unsubscribe link, no tracking, nothing counted "
+        "(task-67; ADR-183 addenda 2026-10-12 and 2026-10-13). 409 for a push variant, unpublished "
+        "content or a brand profile that may not send."
     ),
 )
-def test_planned_send_route(
-    send_instance_id: int,
-    payload: PlannedTestRequest,
+def test_variant_route(
+    variant_id: int,
+    payload: VariantTestRequest,
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
-    from app.delivery.service import test_planned_send
+    from app.delivery.service import test_variant
+    from app.rendering.service import UnpublishedContentError
 
     try:
-        sent = test_planned_send(db, send_instance_id, to=payload.to, recipient_id=payload.recipient_id,
-                                 brand_id=brand_id)
-    except ValueError as error:
+        sent = test_variant(db, variant_id, to=payload.to, provider=payload.provider,
+                            from_address=(payload.from_address or "").strip() or None,
+                            recipient_id=payload.recipient_id, brand_id=brand_id)
+    except (ValueError, UnpublishedContentError) as error:
         raise HTTPException(status_code=409, detail=str(error))
     if sent is None:
-        raise HTTPException(status_code=404, detail="Send instance not found")
+        raise HTTPException(status_code=404, detail="Variant not found")
     return {
         "success": sent.success, "to": sent.to, "provider": sent.provider,
         "provider_message_id": sent.provider_message_id, "message": sent.message, "render_note": None,
     }
+
+
+@router.post(
+    "/variants/{variant_id}/send-instances",
+    response_model=SendInstance,
+    status_code=201,
+    summary="Freeze a variant and plan its send, in one action",
+    description=(
+        "Freezes the variant (its snapshot) and plans the send from it together, so a snapshot exists "
+        "only for a send that was planned (ADR-183 addendum 2026-10-13). Refused like planning from a "
+        "snapshot: 409 for an empty audience, one over the cap, a provider that cannot carry the "
+        "channel, or unpublished content; 404 when the variant or audience is not in the working "
+        "brand. A refused plan leaves no snapshot. **Not idempotent.**"
+    ),
+)
+def freeze_and_plan_route(
+    variant_id: int,
+    payload: SendPlanRequest,
+    db: Session = Depends(get_db),
+    brand_id: int = Depends(working_brand),
+):
+    from app.delivery.service import freeze_and_plan
+    from app.rendering.service import UnpublishedContentError
+
+    try:
+        return freeze_and_plan(
+            db, variant_id, brand_id=brand_id, name=payload.name,
+            audience_group_id=payload.audience_group_id, provider=payload.provider,
+            from_address=(payload.from_address or "").strip() or None,
+            scheduled_at=payload.scheduled_at, skip_without_resolution=payload.skip_without_resolution,
+        )
+    except NotInBrand as error:
+        raise HTTPException(status_code=404, detail=str(error))
+    except UnpublishedContentError as error:
+        raise HTTPException(status_code=409, detail=str(error))
+    except ValueError as error:
+        # The snapshot service names a variant outside the brand this way.
+        status = 404 if "does not exist" in str(error) else 409
+        raise HTTPException(status_code=status, detail=str(error))
 
 
 @router.post(

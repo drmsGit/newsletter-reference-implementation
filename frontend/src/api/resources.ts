@@ -248,24 +248,29 @@ export function useDelivery(id: number) {
  * the legal details, who may fire -- is the server's; these only ask.
  */
 
-/** Freeze a variant: the snapshot is what will go out (ADR-183). */
-export function useFreezeVariant(variantId: number) {
-  return useMutation({
-    mutationFn: () =>
-      read(api.POST('/snapshots/variants/{variant_id}', { params: { path: { variant_id: variantId } } })),
+/**
+ * What the variant would send if frozen now: built on the server and never
+ * stored (ADR-183 addendum 2026-10-13). Freezing happens only when a send is
+ * planned.
+ */
+export function useFramePreview(variantId: number) {
+  return useQuery({
+    queryKey: ['snapshots', 'preview', variantId],
+    queryFn: () =>
+      read(api.GET('/snapshots/variants/{variant_id}/preview', { params: { path: { variant_id: variantId } } })),
   })
 }
 
 export type SendPlan = components['schemas']['SendPlanRequest']
 
-/** Plan a send of a frozen variant to an audience group. */
-export function usePlanSend(snapshotId: number | null) {
+/** Freeze the variant and plan its send, in one action. */
+export function usePlanVariantSend(variantId: number) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (plan: SendPlan) =>
       read(
-        api.POST('/delivery/snapshots/{snapshot_id}/send-instances', {
-          params: { path: { snapshot_id: snapshotId ?? 0 } },
+        api.POST('/delivery/variants/{variant_id}/send-instances', {
+          params: { path: { variant_id: variantId } },
           body: plan,
         }),
       ),
@@ -273,16 +278,29 @@ export function usePlanSend(snapshotId: number | null) {
   })
 }
 
-/** Mail one test of a planned send: the frozen email, as a chosen recipient. */
-export function useTestPlannedSend(sendId: number) {
+/** Mail one test of the variant as it would be frozen now; nothing is stored. */
+export function useTestVariant(variantId: number) {
   return useMutation({
-    mutationFn: (body: { to: string; recipient_id?: number | null }) =>
+    mutationFn: (body: components['schemas']['VariantTestRequest']) =>
       read(
-        api.POST('/delivery/send-instances/{send_instance_id}/test', {
-          params: { path: { send_instance_id: sendId } },
+        api.POST('/delivery/variants/{variant_id}/test', {
+          params: { path: { variant_id: variantId } },
           body,
         }),
       ),
+  })
+}
+
+/** This variant's sends that can still be continued: planned or scheduled. */
+export function useOpenSends(variantId: number) {
+  return useQuery({
+    queryKey: ['deliveries', 'variant', variantId],
+    queryFn: async () => {
+      const page = await read(
+        api.GET('/delivery/send-instances', { params: { query: { variant_id: variantId, limit: PAGE_SIZE } } }),
+      )
+      return page.items.filter((s) => s.status === 'draft' || s.status === 'scheduled')
+    },
   })
 }
 

@@ -65,75 +65,157 @@ def mailed(monkeypatch):
     return seen
 
 
-def _test(cookied, csrf, send_id, **body):
-    return cookied.post(f"/delivery/send-instances/{send_id}/test", json={"to": "test@example.invalid", **body},
+def _test(cookied, csrf, variant_id, **body):
+    return cookied.post(f"/delivery/variants/{variant_id}/test",
+                        json={"to": "test@example.invalid", "provider": "mock", **body},
                         headers={"X-CSRF-Token": csrf})
 
 
-# --- the test send ----------------------------------------------------------------------
+def _snapshots(db, variant_id):
+    from app.snapshots.db_models import SnapshotDB
 
-def test_the_test_is_the_frozen_email_with_its_own_subject(db, world, planned, mailed):
-    variant, send = planned()
-    # Edited after freezing: the test must not show it.
-    module = db.query(ModuleInstanceDB).filter(ModuleInstanceDB.variant_id == variant.id,
-                                               ModuleInstanceDB.module_type == "cta").one()
-    module.module_data = {"label": "Changed after freezing", "url": "https://example.com"}
+    db.expire_all()
+    return db.query(SnapshotDB).filter(SnapshotDB.variant_id == variant_id).count()
+
+
+# --- what goes out, before anything is frozen (ADR-183 addendum 2026-10-13) -------------------
+
+def test_the_preview_is_the_email_as_it_would_be_frozen_and_stores_nothing(db, world):
+    variant = world["variant"]("email", static=True, slots=0)
+    with signed_in(db) as (cookied, _token, _csrf):
+        response = cookied.get(f"/snapshots/variants/{variant.id}/preview")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["channel"] == "email" and body["subject"] == "Hello"
+    assert "Go" in body["html"]
+    assert _snapshots(db, variant.id) == 0, "a preview freezes nothing"
+
+
+def test_the_preview_of_another_brands_variant_is_not_found(db, world, foreign_brand):
+    variant = world["variant"]("email", static=True, slots=0)
+    from app.campaigns.db_models import CampaignDB
+
+    campaign = db.get(CampaignDB, variant.campaign_id)
+    campaign.brand_id = foreign_brand.id
     db.commit()
+    try:
+        with signed_in(db) as (cookied, _token, _csrf):
+            assert cookied.get(f"/snapshots/variants/{variant.id}/preview").status_code == 404
+    finally:
+        campaign.brand_id = world["brand"].id
+        db.commit()
+
+
+# --- the test: any time, nothing stored ----------------------------------------------------------
+
+def test_a_test_is_the_email_as_it_would_be_frozen_with_its_own_subject(db, world, mailed):
+    variant = world["variant"]("email", static=True, slots=0)
     with signed_in(db) as (cookied, _token, csrf):
-        response = _test(cookied, csrf, send.id)
+        response = _test(cookied, csrf, variant.id)
     assert response.status_code == 200, response.text
     assert response.json()["success"] is True
     [(address, artifact)] = mailed
     assert address == "test@example.invalid"
     assert artifact.envelope["subject"] == "[Test] Hello"
-    assert "Changed after freezing" not in artifact.body and "Go" in artifact.body
+    assert "Go" in artifact.body
+    assert _snapshots(db, variant.id) == 0, "a test freezes nothing"
 
 
-def test_a_test_is_not_a_delivery(db, world, planned, mailed):
+def test_a_test_is_not_a_delivery(db, world, mailed):
     person = world["person"]()
-    _variant, send = planned(people=[person])
-    before = db.query(DeliveryExecutionDB).filter(DeliveryExecutionDB.send_instance_id == send.id).count()
+    variant = world["variant"]("email", static=True, slots=0)
     with signed_in(db) as (cookied, _token, csrf):
-        _test(cookied, csrf, send.id, recipient_id=person.id)
+        _test(cookied, csrf, variant.id, recipient_id=person.id)
     [(_address, artifact)] = mailed
     assert "/unsubscribe/" not in artifact.body, "a test has no token, so no link"
-    from app.snapshots.db_models import SnapshotDB
-
-    wording = db.get(SnapshotDB, send.snapshot_id).render_context["brand_profile"]["values"].get("unsubscribe_text")
-    assert wording and wording in artifact.body, "the wording still shows, unlinked (ADR-194)"
     assert "list_unsubscribe" not in artifact.envelope
+    from app.brand_profiles.service import default_profile
+
+    wording = (default_profile(db, world["brand"].id).field_values or {}).get("unsubscribe_text")
+    assert wording and wording in artifact.body, "the wording still shows, unlinked (ADR-194)"
     db.expire_all()
-    assert db.query(DeliveryExecutionDB).filter(DeliveryExecutionDB.send_instance_id == send.id).count() == before
-    assert db.get(SendInstanceDB, send.id).status == "draft"
+    assert db.query(DeliveryExecutionDB).filter(DeliveryExecutionDB.recipient_id == person.id).count() == 0
 
 
-def test_a_push_send_cannot_be_tested_by_email(db, world, planned, mailed):
-    _variant, send = planned("push")
+def test_a_push_cannot_be_tested_by_email(db, world, mailed):
+    variant = world["variant"]("push", static=False, slots=1)
     with signed_in(db) as (cookied, _token, csrf):
-        response = _test(cookied, csrf, send.id)
+        response = _test(cookied, csrf, variant.id)
     assert response.status_code == 409 and "push" in response.json()["detail"]
     assert mailed == []
 
 
-def test_another_brands_send_is_not_found(db, world, planned, foreign_brand):
-    _variant, send = planned()
-    send.brand_id = foreign_brand.id
-    db.commit()
-    try:
-        with signed_in(db) as (cookied, _token, csrf):
-            response = _test(cookied, csrf, send.id)
-        assert response.status_code == 404
-    finally:
-        send.brand_id = world["brand"].id
-        db.commit()
-
-
-def test_testing_needs_the_right_to_send(db, world, planned):
-    _variant, send = planned()
+def test_testing_needs_the_right_to_send(db, world):
+    variant = world["variant"]("email", static=True, slots=0)
     with machine([VIEW, SENDS_PLAN]) as headers:
-        response = api.post(f"/delivery/send-instances/{send.id}/test", json={"to": "x@example.invalid"},
-                            headers=headers)
+        response = api.post(f"/delivery/variants/{variant.id}/test",
+                            json={"to": "x@example.invalid", "provider": "mock"}, headers=headers)
     assert response.status_code == 403
+
+
+# --- planning freezes, and only planning -------------------------------------------------------
+
+def _group_of(db, world, people):
+    from app.audience.service import add_member, create_group
+
+    group = create_group(db, f"screen-{uuid.uuid4().hex[:6]}", brand_id=world["brand"].id)
+    world["made"]["groups"].append(group.id)
+    for person in people:
+        add_member(db, group.id, person.id, brand_id=world["brand"].id)
+    return group
+
+
+def _plan(cookied, csrf, variant_id, group_id, **extra):
+    return cookied.post(f"/delivery/variants/{variant_id}/send-instances",
+                        json={"name": "Screen send", "audience_group_id": group_id, "provider": "mock", **extra},
+                        headers={"X-CSRF-Token": csrf})
+
+
+def test_planning_freezes_the_variant_and_plans_the_send_in_one_go(db, world):
+    people = [world["person"]() for _ in range(2)]
+    variant = world["variant"]("email", static=True, slots=0)
+    group = _group_of(db, world, people)
+    with signed_in(db) as (cookied, _token, csrf):
+        response = _plan(cookied, csrf, variant.id, group.id)
+    assert response.status_code == 201, response.text
+    send = db.get(SendInstanceDB, response.json()["id"])
+    world["made"]["sends"].append(send.id)
+    world["made"]["snapshots"].append(send.snapshot_id)
+    assert _snapshots(db, variant.id) == 1
+    from app.snapshots.db_models import SnapshotDB
+
+    assert db.get(SnapshotDB, send.snapshot_id).variant_id == variant.id
+    assert send.status == "draft"
+
+
+def test_a_refused_plan_leaves_no_snapshot_behind(db, world):
+    variant = world["variant"]("email", static=True, slots=0)
+    empty = _group_of(db, world, [])
+    with signed_in(db) as (cookied, _token, csrf):
+        response = _plan(cookied, csrf, variant.id, empty.id)
+    assert response.status_code == 409, response.text
+    assert _snapshots(db, variant.id) == 0
+
+
+def test_another_brands_group_is_not_found_and_leaves_nothing(db, world, foreign_brand):
+    from app.audience.service import create_group
+
+    variant = world["variant"]("email", static=True, slots=0)
+    foreign = create_group(db, f"screen-f-{uuid.uuid4().hex[:6]}", brand_id=foreign_brand.id)
+    world["made"]["groups"].append(foreign.id)
+    with signed_in(db) as (cookied, _token, csrf):
+        response = _plan(cookied, csrf, variant.id, foreign.id)
+    assert response.status_code == 404
+    assert _snapshots(db, variant.id) == 0
+
+
+def test_the_open_sends_of_a_variant_can_be_listed(db, world, planned):
+    variant, send = planned()
+    _other_variant, other = planned()
+    with signed_in(db) as (cookied, _token, _csrf):
+        listed = cookied.get(f"/delivery/send-instances?variant_id={variant.id}").json()["items"]
+    ids = [s["id"] for s in listed]
+    assert send.id in ids and other.id not in ids
 
 
 # --- the confirmation --------------------------------------------------------------------
@@ -182,3 +264,10 @@ def test_the_provider_list_says_who_needs_a_sender(db):
         providers = {p["name"]: p for p in cookied.get("/settings").json()["delivery_providers"]}
     assert providers["mock"]["needs_from_address"] is False and providers["mock"]["default_from_address"] is None
     assert providers["resend"]["needs_from_address"] is True and providers["resend"]["default_from_address"]
+
+
+def test_a_sends_detail_names_its_campaign_and_variant(db, world, planned):
+    variant, send = planned()
+    with signed_in(db) as (cookied, _token, _csrf):
+        detail = cookied.get(f"/delivery/send-instances/{send.id}").json()
+    assert (detail["campaign_id"], detail["variant_id"]) == (variant.campaign_id, variant.id)
