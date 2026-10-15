@@ -310,11 +310,35 @@ export function useOpenSends(variantId: number) {
  */
 export type Asset = components['schemas']['Asset']
 
-/** The brand's images, newest first; `q` matches the name or the alt text. */
-export function useAssets(q = '') {
+/**
+ * A brand's images, newest first: the working brand's, or another brand the
+ * person holds a grant on. `q` matches the name or the alt text; `limit`
+ * grows as the person asks for more.
+ */
+export function useAssets(q = '', brand: number | null = null, limit = PAGE_SIZE) {
   return useQuery({
-    queryKey: ['assets', q],
-    queryFn: () => read(api.GET('/assets/', { params: { query: { q: q || undefined, limit: PAGE_SIZE } } })),
+    queryKey: ['assets', q, brand, limit],
+    queryFn: () =>
+      read(api.GET('/assets/', { params: { query: { q: q || undefined, brand: brand ?? undefined, limit } } })),
+  })
+}
+
+/** Another brand's image, copied into the working brand's library. */
+export function useCopyAsset() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => read(api.POST('/assets/{asset_id}/copy', { params: { path: { asset_id: id } } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['assets'] }),
+  })
+}
+
+/** Change an image's alt text, which every usage without its own inherits. */
+export function useDescribeAsset() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, alt_text }: { id: number; alt_text: string }) =>
+      read(api.PUT('/assets/{asset_id}/alt', { params: { path: { asset_id: id } }, body: { alt_text } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['assets'] }),
   })
 }
 

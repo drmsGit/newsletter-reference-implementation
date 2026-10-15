@@ -8,6 +8,8 @@ class Asset(BaseModel):
     `url` is where it is served, publicly (point 11)."""
 
     id: int
+    #: Whose library it is: the picker lists the brands a person may see.
+    brand_id: int
     name: str
     label: str
     product_id: str | None = None

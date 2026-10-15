@@ -2905,7 +2905,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The brand's images, newest first */
+        /** A brand's images, newest first */
         get: operations["list_assets_assets__get"];
         put?: never;
         /** Upload an image: JPEG, PNG, GIF or WebP, up to 5 MB */
@@ -2961,6 +2961,23 @@ export interface paths {
         /** Change an image's alt text */
         put: operations["describe_asset_assets__asset_id__alt_put"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assets/{asset_id}/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Copy another brand's image into the working brand's library */
+        post: operations["copy_asset_assets__asset_id__copy_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3076,6 +3093,8 @@ export interface components {
         Asset: {
             /** Id */
             id: number;
+            /** Brand Id */
+            brand_id: number;
             /** Name */
             name: string;
             /** Label */
@@ -12921,6 +12940,8 @@ export interface operations {
             query?: {
                 /** @description Find by name or alt text (part, any case). */
                 q?: string;
+                /** @description Another brand the person holds a grant on; default the working brand. */
+                brand?: number | null;
                 /** @description Rows per page (1-200). */
                 limit?: number;
                 /** @description Rows to skip. */
@@ -13068,6 +13089,37 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Asset"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    copy_asset_assets__asset_id__copy_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

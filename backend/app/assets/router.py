@@ -21,7 +21,7 @@ router = APIRouter(prefix="/assets", tags=["assets"])
 
 def to_asset(asset: AssetDB) -> Asset:
     return Asset(
-        id=asset.id, name=asset.name, label=asset.label, product_id=asset.product_id,
+        id=asset.id, brand_id=asset.brand_id, name=asset.name, label=asset.label, product_id=asset.product_id,
         media_type=asset.media_type, size_bytes=asset.size_bytes, width=asset.width, height=asset.height,
         alt_text=asset.alt_text, reference=f"asset:{asset.id}", url=public_url(asset.token),
         hidden=asset.hidden_at is not None, created_at=asset.created_at, updated_at=asset.updated_at,
@@ -42,13 +42,30 @@ async def _read(file: UploadFile) -> bytes:
     return data
 
 
-@router.get("/", response_model=Page[Asset], summary="The brand's images, newest first")
+def _may_see(request: Request, db: Session, brand_id: int) -> bool:
+    """Whether this person may see another brand's library: a grant there,
+    the same question the guard asks about the working brand (ADR-172)."""
+    from app.auth.permissions import VIEW
+    from app.auth.service import has_permission
+
+    return has_permission(db, getattr(request.state, "principal", None), VIEW, brand_id)
+
+
+@router.get("/", response_model=Page[Asset], summary="A brand's images, newest first")
 def list_assets(
+    request: Request,
     q: str = Query("", description="Find by name or alt text (part, any case)."),
+    brand: int | None = Query(None, description="Another brand the person holds a grant on; default the working brand."),
     params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
+    if brand is not None and brand != brand_id:
+        # Another brand's library: shown only where the person holds a grant,
+        # and answered like an empty brand otherwise (ADR-172 point 6).
+        if not _may_see(request, db, brand):
+            raise HTTPException(status_code=404, detail="Brand not found")
+        brand_id = brand
     query = service.find_assets(db, brand_id=brand_id, q=q)
     return page_of_query(query, params, AssetDB.created_at.desc(), AssetDB.id.desc(), convert=to_asset)
 
@@ -111,6 +128,22 @@ def describe_asset(
     asset = service.describe(db, _found(db, asset_id, brand_id), payload.alt_text)
     audit.record_from_request(request, db, audit.ASSET_DESCRIBED, subject_type="asset", subject_id=asset.id,
                               brand_id=brand_id, detail={"name": asset.name})
+    return to_asset(asset)
+
+
+@router.post("/{asset_id}/copy", response_model=Asset, status_code=201,
+             summary="Copy another brand's image into the working brand's library")
+def copy_asset(asset_id: int, request: Request, db: Session = Depends(get_db),
+               brand_id: int = Depends(working_brand)):
+    source = db.get(AssetDB, asset_id)
+    if source is None or not _may_see(request, db, source.brand_id):
+        raise HTTPException(status_code=404, detail="Image not found")
+    try:
+        asset = service.copy_into(db, source, brand_id=brand_id)
+    except service.AssetRefused as error:
+        raise HTTPException(status_code=409, detail=str(error))
+    audit.record_from_request(request, db, audit.ASSET_COPIED, subject_type="asset", subject_id=asset.id,
+                              brand_id=brand_id, detail={"name": asset.name, "from_asset": source.id})
     return to_asset(asset)
 
 

@@ -366,3 +366,84 @@ def test_the_live_render_frame_and_session_show_the_library_logo(db, logo_profil
         db.query(VariantDB).filter(VariantDB.id == variant.id).delete()
         db.query(CampaignDB).filter(CampaignDB.id == campaign.id).delete()
         db.commit()
+
+
+# --- across brands (decided with the user 2026-10-15) --------------------------------------------
+
+@pytest.fixture
+def foreign_image(db, foreign_brand, made, store):
+    """An image in the other brand's library, with its file in that brand's folder."""
+    from app.assets import service
+
+    asset = service.upload(db, brand_id=foreign_brand.id, data=gif(30, 40), label="Their logo",
+                           alt_text="Their alt")
+    made["assets"].append(asset.id)
+    return asset
+
+
+def test_a_person_with_both_brands_sees_and_copies_the_others_images(db, foreign_image, foreign_brand, made,
+                                                                   two_brand_person):
+    from app.auth.db_models import BrandDB
+
+    client, csrf = two_brand_person
+    listed = client.get("/assets/", params={"brand": foreign_brand.id}).json()["items"]
+    assert foreign_image.id in [a["id"] for a in listed]
+    response = client.post(f"/assets/{foreign_image.id}/copy", headers={"X-CSRF-Token": csrf})
+    assert response.status_code == 201, response.text
+    copy = response.json()
+    made["assets"].append(copy["id"])
+    working = db.get(AssetDB, copy["id"]).brand_id
+    assert working != foreign_brand.id and copy["id"] != foreign_image.id
+    assert (copy["label"], copy["alt_text"], copy["width"]) == ("Their logo", "Their alt", 30)
+    assert copy["name"].startswith(naming.clean(db.get(BrandDB, working).key) + "-")
+    assert copy["url"] != resolve.public_url(foreign_image.token), "its own file, its own address"
+    assert anonymous.get("/media/" + copy["url"].rsplit("/media/", 1)[1]).content == gif(30, 40)
+
+
+def _person(db, default_brand, other_brand=None):
+    """A manager with a grant on the default brand, and on `other_brand` if given."""
+    from app.auth import service as auth
+    from app.auth.db_models import RoleDB
+
+    user = auth.create_user(db, email=f"brands-{uuid.uuid4().hex[:8]}@example.invalid", role_key="manager",
+                            brand_id=default_brand.id)
+    if other_brand is not None:
+        role = db.query(RoleDB).filter(RoleDB.key == "manager").one()
+        auth.assign_role(db, user.id, role.id, brand_id=other_brand.id)
+    return user
+
+
+@pytest.fixture
+def one_brand_person(db, default_brand):
+    """A manager holding a grant on the default brand only."""
+    yield from _session_of(db, _person(db, default_brand))
+
+
+@pytest.fixture
+def two_brand_person(db, default_brand, foreign_brand):
+    """A manager holding grants on the default brand and the other one."""
+    yield from _session_of(db, _person(db, default_brand, foreign_brand))
+
+
+def _session_of(db, user):
+    from sqlalchemy import text
+
+    from app.auth import service as auth
+
+    token = auth.create_session(db, user)
+    client = TestClient(app, raise_server_exceptions=False)
+    client.cookies.set(auth.SESSION_COOKIE, token)
+    yield client, auth.csrf_token_for(token)
+    db.rollback()
+    for table in ("login_codes", "auth_sessions", "role_assignments"):
+        db.execute(text(f"DELETE FROM {table} WHERE user_id = :u"), {"u": user.id})
+    db.execute(text("DELETE FROM audit_events WHERE actor_id = :u"), {"u": user.id})
+    db.execute(text("DELETE FROM users WHERE id = :u"), {"u": user.id})
+    db.commit()
+
+
+def test_without_a_grant_on_the_other_brand_its_images_are_not_there(db, foreign_image, foreign_brand,
+                                                                     one_brand_person):
+    client, csrf = one_brand_person
+    assert client.get("/assets/", params={"brand": foreign_brand.id}).status_code == 404
+    assert client.post(f"/assets/{foreign_image.id}/copy", headers={"X-CSRF-Token": csrf}).status_code == 404

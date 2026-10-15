@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import ImageField from './ImageField'
-import { jsonResponse, page, renderWithProviders, stubFetch } from '../test-utils'
+import { A_SESSION, jsonResponse, page, renderWithProviders, stubFetch } from '../test-utils'
 
 /*
  * The upload, with its hook replaced: in the test environment a multipart
@@ -31,10 +31,11 @@ afterEach(() => vi.unstubAllGlobals())
 
 describe('uploading from an image field (task-112)', () => {
   it('sends the file, what it shows and its alt text, then uses the new image', async () => {
-    stubFetch({ 'GET /assets/': () => jsonResponse(page([])) } as never)
+    stubFetch({ 'GET /assets/': () => jsonResponse(page([])), 'GET /auth/session': () => jsonResponse(A_SESSION) } as never)
     const onChange = vi.fn()
     renderWithProviders(<ImageField label="Image" value="" onChange={onChange} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Choose or upload…' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Choose image…' }))
+    fireEvent.click(await screen.findByRole('tab', { name: 'Upload new' }))
     const file = new File([new Uint8Array([137, 80, 78, 71])], 'dunes.png', { type: 'image/png' })
     fireEvent.change(await screen.findByLabelText('Image file to upload'), { target: { files: [file] } })
     expect(screen.getByRole('button', { name: 'Upload and use' })).toBeDisabled()

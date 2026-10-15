@@ -117,3 +117,15 @@ def hide(db: Session, asset: AssetDB) -> AssetDB:
         db.commit()
         db.refresh(asset)
     return asset
+
+
+def copy_into(db: Session, source: AssetDB, *, brand_id: int) -> AssetDB:
+    """Another brand's image, copied into this brand's library (decided with
+    the user 2026-10-15): a new record and its own file in this brand's
+    folder, so each brand's emails depend only on its own folder. A later
+    replacement of the original does not reach the copy."""
+    data = get_store().get(brand_key(db, source.brand_id), source.token)
+    if data is None:
+        raise AssetRefused("the original file is missing")
+    return upload(db, brand_id=brand_id, data=data, label=source.label, alt_text=source.alt_text,
+                  product_id=source.product_id)
