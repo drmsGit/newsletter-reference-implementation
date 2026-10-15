@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
-updated_date: '2026-10-11 20:44'
+updated_date: '2026-10-15 21:10'
 labels:
   - backend
 dependencies: []
@@ -28,4 +28,6 @@ Migrated 2026-09-27 from `docs/backlog.md` line 218, section "Features", positio
 2026-10-08 queue cleanup (backlog-sequencer run 3, verified by hand): partly done. Realistic content exists as backend/scripts/seed_content_chatgpt.csv with its importer, backend/scripts/import_content_csv.py, and seed_content_prompt.md. The demo seed itself still writes placeholder bodies, at backend/scripts/seed_demo_data.py:146 ("An editorial piece about ... issue N"). Mode A in this dated entry is now called Assistive (ADR-140 addendum 2026-10-08).
 
 2026-10-11, the user set the November 2026 presentations as the focus (docs/business/PRESENTATIONS-2026-11.md). Also wanted: a demo reset that leaves believable results (deliveries, clicks, an unsubscribe), so the campaign's results section and the category graph have something to show.
+
+From task-371 (2026-10-15): the two demo brand profiles (one marketing, one transactional) named in task-371's title are done here, with the realistic seed. The seed records need real square images from the library (ADR-198 point 2): today they hold relative /static/img paths that do not load in the preview or an email.
 <!-- SECTION:NOTES:END -->
