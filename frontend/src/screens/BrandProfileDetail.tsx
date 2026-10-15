@@ -13,6 +13,7 @@ import {
   type ProfileField,
 } from '../api/resources'
 import { HttpError } from '../api/session'
+import ImageField from '../components/ImageField'
 import Choice from '../components/Choice'
 import { SaveState, fieldError } from '../components/EditorFields'
 import ScreenState from '../components/ScreenState'
@@ -257,7 +258,6 @@ const HINTS: Record<string, string> = {
   colour: 'A colour as #rgb or #rrggbb, for example #1a5db0.',
   size: 'With its unit, for example 16px.',
   url: 'A full address starting with https://.',
-  image: 'The full address of the image, starting with https://.',
   font_family: 'A font list with a safe fallback, for example Georgia, serif.',
   links: 'One link per line, written Label | https://address, in the order they should appear.',
 }
@@ -277,6 +277,13 @@ function ProfileInput({
   readOnly: boolean
   error: string | undefined
 }) {
+  if (field.type === 'image') {
+    // A library image or an https address (ADR-194 addendum 2026-10-15).
+    return (
+      <ImageField label={field.label} value={value} onChange={onChange} required={required} readOnly={readOnly}
+        error={error} />
+    )
+  }
   return (
     <TextField
       className="react-aria-TextField field"

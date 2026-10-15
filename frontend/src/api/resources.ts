@@ -304,6 +304,76 @@ export function useOpenSends(variantId: number) {
   })
 }
 
+/*
+ * A brand's image library (task-112; ADR-197). A field stores an image's
+ * `reference` (asset:<id>); the file is served publicly at its `url`.
+ */
+export type Asset = components['schemas']['Asset']
+
+/** The brand's images, newest first; `q` matches the name or the alt text. */
+export function useAssets(q = '') {
+  return useQuery({
+    queryKey: ['assets', q],
+    queryFn: () => read(api.GET('/assets/', { params: { query: { q: q || undefined, limit: PAGE_SIZE } } })),
+  })
+}
+
+/** One image, by id; `null` asks for nothing. */
+export function useAsset(id: number | null) {
+  return useQuery({
+    queryKey: ['assets', 'one', id],
+    enabled: id != null,
+    queryFn: () => read(api.GET('/assets/{asset_id}', { params: { path: { asset_id: id ?? 0 } } })),
+  })
+}
+
+function formOf(fields: Record<string, string | Blob | undefined>) {
+  const form = new FormData()
+  for (const [key, value] of Object.entries(fields)) if (value !== undefined) form.append(key, value)
+  return form
+}
+
+/** Upload an image: the server names it and checks what it is. */
+export function useUploadAsset() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (upload: { file: File; name: string; alt_text: string }) =>
+      read(
+        api.POST('/assets/', {
+          body: upload as never,
+          bodySerializer: () => formOf(upload),
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['assets'] }),
+  })
+}
+
+/** A new file for the same image: same address, so sent emails show it too. */
+export function useReplaceAsset(id: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (file: File) =>
+      read(
+        api.POST('/assets/{asset_id}/replace', {
+          params: { path: { asset_id: id } },
+          body: { file } as never,
+          bodySerializer: () => formOf({ file }),
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['assets'] }),
+  })
+}
+
+/** Take an image out of the picker; it is still served (ADR-197 point 4). */
+export function useHideAsset() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) =>
+      read(api.POST('/assets/{asset_id}/hide', { params: { path: { asset_id: id } } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['assets'] }),
+  })
+}
+
 /** Who a send would go to if fired now: the count the confirmation shows. */
 export function useRecipientsNow(sendId: number | null) {
   return useQuery({

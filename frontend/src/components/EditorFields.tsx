@@ -3,6 +3,7 @@ import { Button, Input, Label, Text, TextArea, TextField } from 'react-aria-comp
 
 import type { ModuleVariable } from '../api/resources'
 import { HttpError } from '../api/session'
+import ImageField from './ImageField'
 
 /**
  * A field that saves when it loses focus, and only when its value changed.
@@ -45,6 +46,11 @@ export function AutosaveField({
   const conflict = value !== base
   const label = field.label ?? field.name
   const multiline = field.type === 'richtext'
+
+  // An image is picked, not typed (task-112; ADR-197): a pick saves at once.
+  if (field.type === 'image') {
+    return <ImageField label={label} value={value} onChange={onSave} required={field.required} error={error} />
+  }
 
   return (
     <TextField
