@@ -82,5 +82,9 @@ def live_theme(db, variant) -> dict:
     campaign = db.query(CampaignDB).filter(CampaignDB.id == variant.campaign_id).first()
     if campaign is None:
         return {}
-    values = dict(profile_of_variant(db, variant, campaign.brand_id).field_values or {})
+    from app.assets.resolve import resolve_profile_values
+
+    # Library images become addresses here, as the frame freezes them (ADR-197).
+    values = resolve_profile_values(
+        db, dict(profile_of_variant(db, variant, campaign.brand_id).field_values or {}), campaign.brand_id)
     return {"values": values, "link_params": link_params(values, campaign.name, variant.name)}

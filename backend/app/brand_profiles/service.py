@@ -154,9 +154,12 @@ def get_profile(db: Session, profile_id: int, brand_id: int, *, lock: bool = Fal
     return profile
 
 
-def clean_values(values: dict) -> dict:
+def clean_values(values: dict, *, db: Session | None = None, brand_id: int | None = None) -> dict:
     """The values as stored: declared fields only, each of its type, empty ones
-    dropped. Raises `ProfileInvalid` naming every refused field at once."""
+    dropped. Raises `ProfileInvalid` naming every refused field at once.
+
+    An image field holds a library image of this brand (`asset:<id>`) or an
+    https address (ADR-194 addendum 2026-10-15; ADR-197 point 7)."""
     fields = {f.name: f for f in profile_structure()}
     errors, cleaned = [], {}
     for name, value in (values or {}).items():
@@ -166,7 +169,13 @@ def clean_values(values: dict) -> dict:
             continue
         if value is None or (isinstance(value, str) and not value.strip()):
             continue
-        problem, value = _check(field.type, value)
+        if field.type == "image" and isinstance(value, str) and value.strip().startswith("asset:"):
+            from app.assets.resolve import check as check_image
+
+            value = value.strip()
+            problem = check_image(db, value, brand_id) if db is not None else None
+        else:
+            problem, value = _check(field.type, value)
         if not problem and name == "utm_extra":
             problem = _check_param_lines(value)
         if problem:
@@ -251,7 +260,7 @@ def create_profile(db: Session, brand_id: int, *, name: str, language: str = "en
                    allow_transactional: bool = False) -> BrandProfileDB:
     errors = _check_header(name, language, kind)
     try:
-        values = clean_values(field_values or {})
+        values = clean_values(field_values or {}, db=db, brand_id=brand_id)
     except ProfileInvalid as invalid:
         errors += invalid.errors
     if errors:
@@ -280,7 +289,7 @@ def update_profile(db: Session, profile_id: int, brand_id: int, *, name: str,
 
     errors = _check_header(name, language, kind)
     try:
-        values = clean_values(field_values or {})
+        values = clean_values(field_values or {}, db=db, brand_id=brand_id)
     except ProfileInvalid as invalid:
         errors += invalid.errors
     if errors:

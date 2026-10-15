@@ -403,8 +403,10 @@ def current_brand_summary(db: Session, token: str | None) -> dict | None:
     # Looked up, never created: reading the session must not write.
     from app.brand_profiles.service import find_default_profile
 
+    from app.assets.resolve import resolve_profile_values
+
     profile = find_default_profile(db, brand.id)
-    values = (profile.field_values if profile else None) or {}
+    values = resolve_profile_values(db, dict((profile.field_values if profile else None) or {}), brand.id)
     return {
         "id": brand.id,
         "key": brand.key,

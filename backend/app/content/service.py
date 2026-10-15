@@ -302,6 +302,26 @@ def merge_content_fields(
     return merged
 
 
+class ContentImageInvalid(ValueError):
+    """An image field holding something that is not a library image of this
+    brand or an https address (ADR-197 point 7)."""
+
+
+def refuse_bad_images(db: Session, content: dict, brand_id: int, previous: dict | None = None) -> None:
+    """Raise ContentImageInvalid naming every image field that may not hold
+    its value. **Only a value that changes is judged**: a record stored before
+    this rule (the seed's relative addresses) must stay editable in its other
+    fields, and its image renders as it always did."""
+    from app.assets.resolve import check, content_image_fields
+
+    previous = previous or {}
+    problems = [f"{name}: {problem}" for name in content_image_fields()
+                if (content or {}).get(name) != previous.get(name)
+                and (problem := check(db, (content or {}).get(name), brand_id))]
+    if problems:
+        raise ContentImageInvalid("; ".join(problems))
+
+
 def update_content_record(
     db: Session,
     content_id: int,
@@ -322,6 +342,7 @@ def update_content_record(
     # The variant editor saves catalogue fields on blur (task-257): a stale
     # write is refused rather than overwriting somebody else's newer edit.
     refuse_stale(db, record, expected_updated_at, "content record")
+    refuse_bad_images(db, content, brand_id, record.content)
     record.title = title
     record.description = description
     record.content = without_empty_presence_fields(content)
@@ -578,6 +599,7 @@ def create_content(
     brand_id: int,
     description: str | None = None,
 ) -> ContentRecord:
+    refuse_bad_images(db, content, brand_id)
 
     record = ContentRecordDB(
         title=title,

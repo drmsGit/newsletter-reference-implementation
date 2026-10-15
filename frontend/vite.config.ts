@@ -40,6 +40,7 @@ const BACKEND = 'http://127.0.0.1:8000'
 const API_PREFIXES = [
   '/api',
   '/approvals',
+  '/assets',
   '/auth',
   '/brand-profiles',
   '/campaigns',
@@ -49,6 +50,7 @@ const API_PREFIXES = [
   '/docs',
   '/insight',
   '/integrations',
+  '/media',
   '/modules',
   '/openapi.json',
   '/overrides',

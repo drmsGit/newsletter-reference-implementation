@@ -27,7 +27,9 @@ KINDS = (MARKETING, TRANSACTIONAL)
 #: `links` (task-351, ADR-194's fourth addendum of 2026-10-11): a list of links,
 #: one per line, "Label | https://address".
 FIELD_TYPES = frozenset({"colour", "font_family", "size", "image", "text", "url", "number", "links"})
-FIELD_KEYS = frozenset({"type", "label", "required", "group", "multiline"})
+#: `alt` (ADR-194 addendum 2026-10-15): on an `image` field, the field that
+#: holds its alt text, which inherits the library image's alt when empty.
+FIELD_KEYS = frozenset({"type", "label", "required", "group", "multiline", "alt"})
 #: Safe to refer to from brand.css and templates (task-354).
 NAME = re.compile(r"[a-z][a-z0-9_]*")
 
@@ -40,6 +42,7 @@ class ProfileField:
     required: bool = False
     group: str = "General"
     multiline: bool = False
+    alt: str | None = None
     core: bool = False
     #: Required only on a marketing profile: the unsubscribe wording (ADR-191).
     marketing_only: bool = False
@@ -109,6 +112,7 @@ def _read() -> tuple[ProfileField, ...]:
         fields.append(ProfileField(
             name=name, type=spec["type"], label=spec["label"], required=bool(spec.get("required", False)),
             group=spec.get("group", "General"), multiline=bool(spec.get("multiline", False)),
+            alt=spec.get("alt") if spec["type"] == "image" else None,
         ))
     return tuple(fields)
 

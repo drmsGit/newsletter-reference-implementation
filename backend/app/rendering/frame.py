@@ -205,10 +205,14 @@ def _frozen_profile(db: Session, variant: VariantDB) -> dict:
     from app.campaigns.db_models import CampaignDB
 
     brand_id = db.query(CampaignDB.brand_id).filter(CampaignDB.id == variant.campaign_id).scalar()
+    from app.assets.resolve import resolve_profile_values
+
     profile = profile_of_variant(db, variant, brand_id)
     return {
         "id": profile.id, "name": profile.name, "language": profile.language,
-        "kind": profile.kind, "values": dict(profile.field_values or {}),
+        # Library images frozen as their addresses (ADR-197 point 12).
+        "kind": profile.kind,
+        "values": resolve_profile_values(db, dict(profile.field_values or {}), brand_id),
     }
 
 

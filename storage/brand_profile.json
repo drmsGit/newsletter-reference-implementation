@@ -74,6 +74,7 @@
     },
     "logo": {
       "type": "image",
+      "alt": "logo_alt",
       "label": "Logo",
       "group": "Header"
     },

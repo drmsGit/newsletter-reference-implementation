@@ -198,6 +198,9 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
     # A brand's profiles (ADR-194). Every write is also people-only, on the
     # router, for the reason settings are: the table cannot say "no machine".
     ("/brand-profiles", BRAND_PROFILES_MANAGE),
+    # A brand's image library (ADR-197). Uploading an image is part of making
+    # content; serving them is the public `/media/` router, outside this table.
+    ("/assets", CONTENT_MANAGE),
     ("/ui/users", USERS_MANAGE),
     ("/ui/roles", USERS_MANAGE),
 
@@ -368,6 +371,7 @@ HELD_FOR_EVERY_INTEGRATION: frozenset[tuple[str, str]] = frozenset({
 #: interesting state and an enum would flatten *why* — which is the only part
 #: worth reading.
 BRAND_OWNED: dict[str, str] = {
+    "/assets": "yes — `assets.brand_id`: a brand's image library (ADR-197).",
     "/campaigns": (
         "yes — `campaigns.brand_id`. Variants, modules, decision slots and "
         "resolutions carry none and are reached by joining back to it."

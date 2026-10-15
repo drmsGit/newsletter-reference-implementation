@@ -37,3 +37,6 @@ backend/openapi.json
 .agents/
 .codex/
 AGENTS.md
+
+# Uploaded library images (ADR-197): data, not source.
+storage/assets/

@@ -10,9 +10,9 @@
     "point on a length scale — a hero headline is the largest type and",
     "therefore the shortest text.",
     "",
-    "`type: url` on the image fields is honest about today: there is no asset",
-    "subsystem, so an image is a URL somebody typed. These become `asset` when",
-    "one exists.",
+    "`type: image` (ADR-197; ADR-177 addendum 2026-10-15): a library image,",
+    "written asset:<id>, or an https address. `alt` names the field holding its",
+    "alt text, which inherits the library image's alt when left empty.",
     "",
     "`label` is what a form calls the field, written once here (ADR-177 addendum",
     "2026-10-04, task-271): never built from concept and size, never declared in a",
@@ -75,10 +75,11 @@
       "type": "text"
     },
     "image_url": {
-      "label": "Image (URL)",
+      "label": "Image",
       "concept": "image",
       "channel": "email",
-      "type": "url"
+      "type": "image",
+      "alt": "image_alt"
     },
     "label": {
       "label": "Call-to-action text",
@@ -100,10 +101,10 @@
       "type": "text"
     },
     "push_image_url": {
-      "label": "Image URL",
+      "label": "Notification image",
       "concept": "push_image",
       "channel": "push",
-      "type": "url"
+      "type": "image"
     },
     "push_link": {
       "label": "Opens this link",

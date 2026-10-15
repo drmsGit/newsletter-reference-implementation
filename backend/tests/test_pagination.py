@@ -18,6 +18,7 @@ from main import app
 
 #: Lists whose length grows with use (ADR-185 point 1).
 PAGED = {
+    "/assets/",  # a brand's image library grows with every upload (task-112)
     "/approvals/",
     "/delivery/send-instances",
     "/campaigns/",

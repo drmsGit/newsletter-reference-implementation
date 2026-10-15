@@ -697,6 +697,29 @@ def resolve_renderable_content(
     content_version_id: int | None = None,
     mode: RenderMode = "preview",
 ) -> dict | None:
+    """The record's fields as rendering uses them: `_raw_renderable_content`,
+    with every library image (`asset:<id>`) made an absolute address and an
+    empty paired alt filled from the image (ADR-197 point 12). Every path into
+    rendering comes through here — live preview, frame, slot picks, push — so
+    the frame freezes the address, never the reference."""
+    content = _raw_renderable_content(db, content_record_id, content_version_id, mode)
+    if content is None:
+        return None
+    from app.assets.resolve import content_image_fields, resolve_images
+
+    pairs = content_image_fields()
+    if not any(isinstance(content.get(name), str) and content[name].startswith("asset:") for name in pairs):
+        return content
+    brand_id = db.query(ContentRecordDB.brand_id).filter(ContentRecordDB.id == content_record_id).scalar()
+    return resolve_images(db, content, pairs, brand_id)
+
+
+def _raw_renderable_content(
+    db: Session,
+    content_record_id: int,
+    content_version_id: int | None = None,
+    mode: RenderMode = "preview",
+) -> dict | None:
     """
     Returns the raw content fields as a flat dict keyed by their CMS field names.
     Template variables must match these names exactly — no mapping layer.

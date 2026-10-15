@@ -7,6 +7,7 @@ topic:
   - data-model
   - channels
 created: 2026-09-27
+modified: 2026-10-15
 source:
   - "[[Variant Editor - design interview]] Cluster 2, questions 2.4, 2.8 and 2.10, resolved 2026-09-26"
 depends_on:
@@ -263,6 +264,27 @@ A field may be both required and hideable, which is what makes "no headline"
 possible.
 
 Nothing above changes this record's Decision section.
+
+## Addendum 2026-10-15 — The image field type is `image`, not `asset`
+
+Prompted by [[ADR-197 — Images Are Brand Assets, Served Publicly From an Unguessable Path]] (queue task-112). Decided in ADR-197's final-design pass on 2026-10-15; not asked of the user. Nothing above changes this record's Decision section.
+
+**1. The type is named `image`.** Point 3 lists `asset` as a field type, and the header comment of `storage/fields.json` says the image fields "become `asset` when one exists". The type that arrives is `image` instead.
+
+- **It matches the brand-profile field type of the same name** (`FIELD_TYPES`, `backend/app/brand_profiles/structure.py:29`).
+- **An image field may also hold an outside https address** (ADR-197 point 7). `asset` would misdescribe it.
+
+So point 3's `type` row reads `text` · `url` · `image` · `richtext`.
+
+**2. `image_url` and `push_image_url` become type `image`.** Each holds `asset:<id>` or an https address. Rendering resolves both to an absolute URL (ADR-197 point 12).
+
+**3. An image field may name its paired alt field.** `image_url` declares `"alt": "image_alt"`. When that alt field is empty, rendering uses the asset's alt text (ADR-197 points 1 and 12). An outside address has no asset, so its alt field is used as it stands.
+
+| Attribute | Purpose |
+|---|---|
+| `alt` | on an `image` field only: the name of the field holding its alt text. Left empty, it inherits the library asset's alt text |
+
+This answers the Notes item "Also not settled here: assets".
 
 ## Related ADRs
 

@@ -9,7 +9,7 @@ topic:
   - modules
   - consent
 created: 2026-10-11
-modified: 2026-10-11
+modified: 2026-10-15
 source:
   - "task-350 design session on brand profiles, decided by the user 2026-10-11, one question at a time"
 depends_on:
@@ -466,6 +466,20 @@ It said the API "refuses `transactional` until queue task-355 builds point 9's g
 **What this settles.**
 
 - **"How a transactional send meets the exclusion stack"** from the Decision's open list and the first addendum's: ADR-195 points 1 and 2.
+
+## Addendum 2026-10-15 — widened by ADR-197
+
+**[[ADR-197 — Images Are Brand Assets, Served Publicly From an Unguessable Path]] (queue task-112) widens Decision point 16 without superseding it.** Its point 7 was decided with the user on 2026-10-15. Points 1–18 of the Decision are unchanged. Read point 16 together with this addendum.
+
+**1. A profile image field holds a library asset or an https address.**
+
+- **Point 16 says that when assets land, the logo field "holds an asset id".**
+- **It holds either a library asset, written `asset:<id>`, or an https address,** as content image fields do (ADR-197 points 7 and 12).
+- **The https-only rule still holds for addresses** (point 3 of the fourth addendum above).
+
+**2. `logo` names `logo_alt` as its alt field.** When the logo is a library asset and `logo_alt` is empty, the asset's alt text is used (ADR-197 point 1).
+
+**3. Both forms resolve to an absolute URL where the profile enters rendering.** The frame freezes that URL ([[ADR-183 — A Snapshot Freezes the Composition and Every Delivery Records What It Got]] point 4).
 
 ## Related ADRs
 

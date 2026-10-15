@@ -170,7 +170,9 @@ FIELD_ENTRY_KEYS = frozenset({"name", "required", "source", "hideable"})
 #: (ADR-177 point 3; its 2026-10-04 addendum for `label`, task-272 for
 #: `envelope`). Named apart from a typo only so the refusal can say where the
 #: key belongs.
-DEFINITION_ATTRIBUTES = frozenset({"label", "envelope", "concept", "size", "type", "note", "channel"})
+#: `alt` (ADR-177 addendum 2026-10-15): on an `image` field, the field that
+#: holds its alt text, which inherits the library image's alt when empty.
+DEFINITION_ATTRIBUTES = frozenset({"label", "envelope", "concept", "size", "type", "note", "channel", "alt"})
 
 #: The keys a module manifest may carry (task-273, the user's call to include
 #: the top level). `"cms "` misspelt would otherwise turn a catalogue module

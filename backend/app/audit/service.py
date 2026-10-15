@@ -139,6 +139,10 @@ BRAND_PROFILE_UPDATED = "brand_profile.updated"
 BRAND_PROFILE_DUPLICATED = "brand_profile.duplicated"
 BRAND_PROFILE_MADE_DEFAULT = "brand_profile.made_default"
 BRAND_PROFILE_DELETED = "brand_profile.deleted"
+ASSET_UPLOADED = "asset.uploaded"
+ASSET_REPLACED = "asset.replaced"
+ASSET_DESCRIBED = "asset.described"
+ASSET_HIDDEN = "asset.hidden"
 
 #: Every action name an entry may carry (task-52, ADR-153 addendum
 #: 2026-10-08). Collected from the constants above, so adding one is still one

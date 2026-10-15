@@ -135,6 +135,8 @@ from app.auth.integrations_router import router as integrations_router
 from app.settings.router import router as settings_router
 from app.brand_profiles.router import router as brand_profiles_router
 from app.subscriptions.router import router as unsubscribe_router
+from app.assets.router import router as assets_router
+from app.assets.public import router as media_router
 from app.auth.router import context_router
 
 from app.overrides.db_models import ContentOverrideDB
@@ -822,6 +824,7 @@ app.include_router(settings_router, dependencies=_api)
 # A brand's profiles (ADR-194): reads are `view`, writes are people only and
 # `brand_profiles.manage` in the working brand.
 app.include_router(brand_profiles_router, dependencies=_api)
+app.include_router(assets_router, dependencies=_api)
 
 # **Public, and deliberately outside both signed-in planes** (ADR-191): the
 # recipient's unsubscribe page. The token in its path is the only credential —
@@ -829,6 +832,9 @@ app.include_router(brand_profiles_router, dependencies=_api)
 # guard nor CSRF. `policy.py` classes the path as RECIPIENT_TOKEN, where an
 # auditor reading the table will find it.
 app.include_router(unsubscribe_router)
+# Library images, fetched by mail clients with no session (ADR-197 point 3):
+# the random token in the path is the protection, like the unsubscribe page's.
+app.include_router(media_router)
 
 
 # --- the manager client (ADR-170 point 1, ADR-168 point 3) ------------------

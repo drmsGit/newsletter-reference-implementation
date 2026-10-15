@@ -41,6 +41,7 @@ from app.content.models import (
     ContentPatch,
 )
 from app.content.service import (
+    ContentImageInvalid,
     catalogue_fields,
     merge_content_fields,
     get_content_record,
@@ -216,6 +217,8 @@ def update_content_record_by_id(
         )
     except StaleWrite as error:
         raise HTTPException(status_code=409, detail=str(error))
+    except ContentImageInvalid as error:
+        raise HTTPException(status_code=422, detail=str(error))
     if record is None:
         raise HTTPException(status_code=404, detail="Content record not found")
     _record_edit(request, db, record, before)
@@ -270,6 +273,8 @@ def patch_content_record(
         )
     except StaleWrite as error:
         raise HTTPException(status_code=409, detail=str(error))
+    except ContentImageInvalid as error:
+        raise HTTPException(status_code=422, detail=str(error))
     if record is None:
         raise HTTPException(status_code=404, detail="Content record not found")
     _record_edit(request, db, record, before)
@@ -346,13 +351,16 @@ def create_content_record(
     # true when launch gate 3 closed, and it was the half of task-39 most
     # likely to mislead — a reader told the routers are unguarded has a reason
     # to leave a brand bug alone.
-    record = create_content(
-        db=db,
-        title=payload.title,
-        content=payload.content,
-        brand_id=brand_id,
-        description=payload.description,
-    )
+    try:
+        record = create_content(
+            db=db,
+            title=payload.title,
+            content=payload.content,
+            brand_id=brand_id,
+            description=payload.description,
+        )
+    except ContentImageInvalid as error:
+        raise HTTPException(status_code=422, detail=str(error))
     _record_content_write(request, db, audit.CONTENT_CREATED, record.id,
                           {"title": record.title, "fields": sorted(record.content or {})})
     return record

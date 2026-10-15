@@ -1,0 +1,13 @@
+{
+  "_comment": [
+    "How an uploaded image is named (ADR-197 point 9). Decided at implementation,",
+    "per installation, like brand_profile.json; a changed template names new",
+    "uploads only. The name is searchable metadata, never the served path.",
+    "",
+    "Placeholders: {brand} the brand's permanent key, {date} upload day as yyyymmdd, {n} the running number that day",
+    "in this brand, {width} and {height} in pixels, {name} the typed name",
+    "(lowercased, spaces to hyphens, special characters spelled out or dropped),",
+    "{product_id} if given. The extension follows the file's real type."
+  ],
+  "name_template": "{brand}-{date}-{n}-{width}x{height}-{name}"
+}
