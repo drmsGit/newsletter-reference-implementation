@@ -1,10 +1,11 @@
 ---
 id: TASK-112
 title: 'There is no asset or media management: no table, no upload route, no picker.'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-09-27 13:57'
-updated_date: '2026-10-11 20:44'
+updated_date: '2026-10-15 19:29'
 labels:
   - backend
   - frontend
@@ -43,6 +44,13 @@ ordinal: 200200
   **The minimum that unblocks the composer** is upload, list, pick and serve, brand-scoped.
 <!-- SECTION:DESCRIPTION:END -->
 
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [x] #1 A brand's image library: upload (JPEG, PNG, GIF, WebP, up to 5 MB), search, replace in place, alt text, hide; nothing deleted
+- [x] #2 Images are served without a session from an unguessable path, from a folder per brand; names come from a setup-file template starting with the brand key
+- [x] #3 Content image fields and brand-profile images hold a library image or an https address, picked in the client; rendering resolves them and the frame freezes the address
+<!-- AC:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -57,4 +65,12 @@ It describes the same gap from the content form's side; this task's 2026-09-27 d
 2026-10-10 (task-301, ADR-193): the visible email header's logo is an https URL in its content for now. When asset management lands, that field becomes an asset id, and the header logo is this task's first user.
 
 2026-10-11, the user set the November 2026 presentations as the focus (docs/business/PRESENTATIONS-2026-11.md): images, upload and picker, for both demo audiences.
+
+2026-10-15, final-design pass with the user. Decided: picker for content images and brand logos; a field holds a library image or an https address; JPEG, PNG, GIF, WebP up to 5 MB, no SVG; the name template is a setup file (storage/assets.json); then, on the user's challenge, the brand key first in the name and a folder per brand under ASSETS_DIR (default storage/assets/, gitignored). Recorded in ADR-197 with addenda to ADR-177 (field type image, alt pairing) and ADR-194 (logo holds asset or address). Settled in the build and stated: running number per brand per day; a replacement keeps token and typed name and regenerates the date and size parts; alt pairing via an alt key; another brand's image refused on save and resolving to none; no un-hide yet; writes audited. Only a changed image value is judged on save, so the seed's relative addresses (/static/img/demo-N.jpg, which serve nothing) do not block other edits; they stay broken until task-71 replaces the demo content. Built: backend 3849d18 (app/assets: model, header reader without a new library, per-brand store, naming, service, guarded /assets routes, public /media/{token}; migrate_0050; resolution in resolve_renderable_content, live_theme, the frozen profile and the session logo); client 0fd3332 (ImageField in AutosaveField and the brand profile form). Verified: test_assets.py (32) with 9 backend mutations killed; ImageField tests (7) with 5 of 6 frontend mutations killed (the survivor, a trim on a URL input, is unobservable: the browser strips it); full pytest 1960, vitest 293, tsc, Ruff, eslint (8 old warnings); CI green on 0fd3332 (3849d18 was red only on the client types, committed with the frontend). Live: a real multipart upload from the browser produced default-20261015-1-240x120-scratch-task-112-groesse-and-logo.png in storage/assets/default/, served publicly as image/png; the scratch profile SCRATCH task-67 complete got it as its logo through the picker and stored asset:1. Multipart uploads cannot be built in the test environment, so the upload test replaces its hook.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+A brand image library now exists: upload, search, pick, replace, alt text and hide, files kept per brand and served publicly from an unguessable address, names generated with the brand key (ADR-197). Content images and the brand logo pick from it or take an https address; rendering resolves them and snapshots freeze the address. Verified by 39 tests with mutations checked, full suites, CI and a live upload and pick in the browser.
+<!-- SECTION:FINAL_SUMMARY:END -->
