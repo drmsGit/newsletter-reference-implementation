@@ -191,6 +191,29 @@ Only the picker leaves it out (point 4).
   - asset writes are audited ([[ADR-153 — Audit and Accountability]]).
 - **No decision-log entry.** `docs/playbook-strategy.md` §5 has no entry for this decision. Its only related line is the ADR-193 entry's "The logo is a web address for now, and an uploaded asset once asset management exists". The reasoning above comes from task-112 and task-117.
 
+## Addendum 2026-10-15 — another brand's image is used by copying it, and the picker is a pop-in
+
+Prompted by the first picker built for task-112 (commit `0fd3332`), reviewed with the user on 2026-10-15. Points 1 and 2 were decided with the user; point 3 is a pointer only. Nothing above changes this record's Decision section.
+
+**1. Another brand's image may be used, by copying it into the working brand's library.**
+
+- **The picker lists the images of every brand the person holds a grant on.** It has a brand choice, set to the working brand by default. `GET /assets/?brand=` answers 404 for a brand without a grant, exactly as for an absent one ([[ADR-172 — The Working Brand Is Resolved Once and Carried Into Every Query]] point 6).
+- **Using another brand's image copies it** (`POST /assets/{id}/copy`). The copy is a new record in the working brand. It gets a new generated name with the working brand's key (point 9) and its own file in the working brand's folder (point 10).
+- **So each brand's emails depend only on its own folder.** That is what point 10's folder per brand exists for: one brand's images can be backed up, moved or handed over alone.
+- **A later replacement of the original does not reach the copy.** Point 2's propagation stops at the brand boundary.
+- **This is the rule of [[ADR-013 — Content Reference Instead of Content Copy]]'s addendum of 2026-09-16, applied to images:** reference within a brand, copy across the boundary ([[ADR-150 — Tenancy and Access Model]]). The copy's audit entry names the asset it came from. That is where ADR-013's addendum puts a copy's provenance.
+- **This amends the Notes build note "an asset of another brand is refused on save and resolves to no image".** That still holds for a stored reference. The way to use another brand's image is the copy.
+
+**2. The picker is a pop-in, not part of the form.**
+The user, on the first version: it was not structured, and a bare file input under the image meant "replace" without saying so. *"We need to keep a proper list view system with the brands in mind."*
+
+- **In the form:** the image, its name and alt text, "Change image…" and "Remove".
+- **The pop-in has three tabs:** Library, Upload new and Web address (point 7).
+- **Library is a thumbnail grid, newest first,** with point 1's brand choice, an optional search and "Load more". A detail panel lets the person check an image before using it. Alt text, replace and hide sit behind "More".
+- **Browsing comes first, and search is optional.** The user doubts managers remember names. This loosens point 5's "search only": the generated names still make search workable, but search is no longer the only way in. There are still no folders and no tags.
+
+**3. Not built: keeping content records in step across brands.** The user noted it as a future how-to chapter. It is for companies that reuse one record in many brands and want the copies kept in step, in all fields or some. It is task-379. Nothing here decides it.
+
 ## Related ADRs
 
 ### Depends On
