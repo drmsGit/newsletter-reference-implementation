@@ -91,7 +91,7 @@ def _audit(request: Request, db: Session, action: str, profile_id: int, brand_id
 def read_structure():
     required = {kind: set(required_fields(kind)) for kind in KINDS}
     return [
-        ProfileFieldOut(name=f.name, type=f.type, label=f.label, group=f.group,
+        ProfileFieldOut(name=f.name, type=f.type, label=f.label, group=f.group, alt=f.alt,
                         multiline=f.multiline, core=f.core,
                         required_for=[kind for kind in KINDS if f.name in required[kind]])
         for f in profile_structure()

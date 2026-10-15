@@ -30,6 +30,10 @@ class ModuleVariableOut(BaseModel):
     source: str = "content"
     #: May a manager hide this field in this module (ADR-187 point 2)?
     hideable: bool = False
+    #: For an `image` field, the field that holds the alt text of a web
+    #: address; a form shows it with the address, not as a field of its own
+    #: (ADR-197 addendum 2026-10-15, the second).
+    alt: str | None = None
 
 
 class ModuleManifestOut(BaseModel):
@@ -43,6 +47,11 @@ class ModuleManifestOut(BaseModel):
     #: (`envelope_module_type`), exposed so a client never re-derives it by
     #: scanning every module's fields (ADR-177 point 8; task-221). Push has none.
     carries_envelope: bool = False
+    #: Two in a row share one 50:50 row (ADR-198 point 4): the Column. The
+    #: editor offers adding two at once.
+    pairs: bool = False
+    #: Still rendered where it is used, no longer offered (ADR-198 point 5).
+    retired: bool = False
     variables: list[ModuleVariableOut]
 
 
@@ -54,11 +63,13 @@ def _to_out(manifest: ModuleManifest) -> ModuleManifestOut:
         description=manifest.description,
         cms=manifest.cms,
         carries_envelope=envelope_module_type(manifest.channel) == manifest.name,
+        pairs=manifest.pairs,
+        retired=manifest.retired,
         variables=[
             ModuleVariableOut(
                 name=v.name, required=v.required, label=v.label, envelope=v.envelope,
                 type=v.type, size=v.size, note=v.note, concept=v.concept, source=v.source,
-                hideable=v.hideable,
+                hideable=v.hideable, alt=v.alt,
             )
             for v in manifest.variables
         ],

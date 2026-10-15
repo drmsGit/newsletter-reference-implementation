@@ -42,18 +42,27 @@ import { PAGE_SIZE } from './Pager'
  * brand's emails depend only on its own library.
  *
  * The field stores the image's reference (`asset:<id>`), never its address.
+ *
+ * Alt text (ADR-197 addendum 2026-10-15, the second): a library image always
+ * uses its own, changed in the library. Only a web address carries alt text
+ * of its own, typed with the address and saved to the paired field (`alt`);
+ * that field is never a form field of its own. `onChange` hands it back as the
+ * second argument, so the caller saves both in one write.
  */
 export default function ImageField({
   label,
   value,
   onChange,
+  alt,
   required = false,
   readOnly = false,
   error,
 }: {
   label: string
   value: string
-  onChange: (value: string) => void
+  onChange: (value: string, alt?: string) => void
+  /** The paired alt field's value, when the field has one. */
+  alt?: string
   required?: boolean
   readOnly?: boolean
   error?: string
@@ -83,8 +92,16 @@ export default function ImageField({
           <span role="alert">This image is not in the library any more.</span>
         ) : assetId == null && value ? (
           <>
-            <img src={value} alt="" className="image-field__thumb" />
-            <span className="muted">{value}</span>
+            <img src={value} alt={alt ?? ''} className="image-field__thumb" />
+            <span>
+              <span className="muted">{value}</span>
+              {alt !== undefined && (
+                <>
+                  <br />
+                  <span className="muted">{alt || 'No alt text'}</span>
+                </>
+              )}
+            </span>
           </>
         ) : (
           <span className="muted">No image.</span>
@@ -112,8 +129,10 @@ export default function ImageField({
             {({ close }) => (
               <Picker
                 current={value}
-                onUse={(chosen) => {
-                  onChange(chosen)
+                alt={alt}
+                onUse={(chosen, chosenAlt) => {
+                  if (chosenAlt === undefined) onChange(chosen)
+                  else onChange(chosen, chosenAlt)
                   close()
                 }}
                 onClose={close}
@@ -132,7 +151,17 @@ function refused(error: unknown) {
 }
 
 /** The pop-in: the library, or a new upload, or an outside address. */
-function Picker({ current, onUse, onClose }: { current: string; onUse: (value: string) => void; onClose: () => void }) {
+function Picker({
+  current,
+  alt,
+  onUse,
+  onClose,
+}: {
+  current: string
+  alt?: string
+  onUse: (value: string, alt?: string) => void
+  onClose: () => void
+}) {
   return (
     <>
       <div className="preview-head">
@@ -152,7 +181,12 @@ function Picker({ current, onUse, onClose }: { current: string; onUse: (value: s
           <Upload onUploaded={(asset) => onUse(asset.reference)} />
         </TabPanel>
         <TabPanel id="address">
-          <Address initial={current.startsWith('asset:') ? '' : current} onUse={onUse} />
+          <Address
+            initial={current.startsWith('asset:') ? '' : current}
+            initialAlt={current.startsWith('asset:') ? undefined : alt}
+            asksAlt={alt !== undefined}
+            onUse={onUse}
+          />
         </TabPanel>
       </Tabs>
     </>
@@ -289,7 +323,7 @@ function Detail({
             <Label>Alt text</Label>
             <Input />
             <Text slot="description" className="muted">
-              Used wherever the image is placed without its own description.
+              Used wherever this image is placed, in every email.
             </Text>
           </TextField>
           <Button onPress={() => describe.mutate({ id: asset.id, alt_text: alt })} isDisabled={alt === asset.alt_text}>
@@ -359,14 +393,27 @@ function Upload({ onUploaded }: { onUploaded: (asset: Asset) => void }) {
   )
 }
 
-/** An outside address, for images that live in a DAM or CDN. */
-function Address({ initial, onUse }: { initial: string; onUse: (value: string) => void }) {
+/** An outside address, for images that live in a DAM or CDN, with its alt
+ * text when the field keeps one: an address has no library entry to hold it. */
+function Address({
+  initial,
+  initialAlt,
+  asksAlt,
+  onUse,
+}: {
+  initial: string
+  initialAlt?: string
+  asksAlt: boolean
+  onUse: (value: string, alt?: string) => void
+}) {
   const [address, setAddress] = useState(initial)
+  const [alt, setAlt] = useState(initialAlt ?? '')
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault()
-        onUse(address.trim())
+        if (asksAlt) onUse(address.trim(), alt.trim())
+        else onUse(address.trim())
       }}
     >
       <TextField value={address} onChange={setAddress} type="url">
@@ -376,6 +423,15 @@ function Address({ initial, onUse }: { initial: string; onUse: (value: string) =
           A full address starting with https://, for images kept elsewhere.
         </Text>
       </TextField>
+      {asksAlt && (
+        <TextField value={alt} onChange={setAlt}>
+          <Label>Alt text</Label>
+          <Input />
+          <Text slot="description" className="muted">
+            What the image shows, for people who cannot see it.
+          </Text>
+        </TextField>
+      )}
       <Button type="submit" isDisabled={!address.trim()}>
         Use this address
       </Button>

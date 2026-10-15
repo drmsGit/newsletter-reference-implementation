@@ -214,6 +214,31 @@ The user, on the first version: it was not structured, and a bare file input und
 
 **3. Not built: keeping content records in step across brands.** The user noted it as a future how-to chapter. It is for companies that reuse one record in many brands and want the copies kept in step, in all fields or some. It is task-379. Nothing here decides it.
 
+## Addendum 2026-10-15 — a library image always uses its own alt text
+
+Decided with the user on 2026-10-15. This narrows point 1 and the last bullet of point 12. The Decision section is not edited.
+
+**1. A library image's alt text lives on the library image only.**
+
+- **A usage cannot override it.** A field that holds a library image always uses that image's own alt text.
+- **This drops point 1's "a usage may override it" for library images,** and with it point 1's accepted cost: `image_alt` no longer stays in the manifests "usually empty" in order to inherit.
+- **Point 12's last bullet no longer applies to library images.** Alt text is not inherited "when the paired field is empty". The library image's alt text is used whatever the paired field holds.
+- **Alt text is changed in the library,** behind "More" (previous addendum, point 2).
+
+**2. An image given as a web address keeps its alt text.**
+
+- **The Web address tab asks for it** (previous addendum, point 2).
+- **It is stored in the paired alt field** (`image_alt`, `logo_alt`). Point 7's "used as it stands" holds.
+- **The paired alt field no longer shows as a field of its own in forms.** It is filled in the pop-in, together with the address.
+
+**Consequences.**
+
+- **One place holds a library image's alt text.** Correcting it there corrects it for every later render.
+- **The reason for point 1's override is given up.** Alt text should convey purpose in context. The same library image now carries one description in every email.
+- **A library image without alt text renders without it.** No usage can make up for it.
+- **Alt values stored on usages that point to a library image are no longer used.** Whether they are cleared or kept is for the build. The header comment of `storage/fields.json` ("which inherits the library image's alt when left empty") is then out of date.
+- **The `alt` key that pairs an image field with its alt field stands** (the ADR-177 and ADR-194 addenda of 2026-10-15). So does [[ADR-187 — A Manager Hides Fields Per Module, and Required Means Required When Shown]] point 8: `image_alt` follows the image and is not hideable.
+
 ## Related ADRs
 
 ### Depends On

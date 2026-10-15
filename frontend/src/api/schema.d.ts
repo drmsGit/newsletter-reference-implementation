@@ -4280,6 +4280,8 @@ export interface components {
              * @default false
              */
             envelope: boolean;
+            /** Alt */
+            alt?: string | null;
         };
         /**
          * ContentListItem
@@ -5277,6 +5279,16 @@ export interface components {
              * @default false
              */
             carries_envelope: boolean;
+            /**
+             * Pairs
+             * @default false
+             */
+            pairs: boolean;
+            /**
+             * Retired
+             * @default false
+             */
+            retired: boolean;
             /** Variables */
             variables: components["schemas"]["ModuleVariableOut"][];
         };
@@ -5373,6 +5385,8 @@ export interface components {
              * @default false
              */
             hideable: boolean;
+            /** Alt */
+            alt?: string | null;
         };
         /**
          * MonitoredCampaign
@@ -5923,6 +5937,11 @@ export interface components {
              * @description One of the fields the platform itself relies on (ADR-194 point 3)
              */
             core: boolean;
+            /**
+             * Alt
+             * @description For an image: the field holding a web address's alt text, filled with the address, never shown on its own
+             */
+            alt?: string | null;
             /**
              * Required For
              * @description The profile kinds that cannot send without it: marketing, transactional

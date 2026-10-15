@@ -1,0 +1,14 @@
+<mjml>
+  <mj-head>
+    <mj-include path="./_attributes.mjml" />
+  </mj-head>
+  <mj-body width="600px">
+    <!-- Column (ADR-198 point 4): a lone column fills the left half. Two Column modules in a row render as _column_pair. -->
+    <mj-section>
+      <mj-column width="50%" vertical-align="top">
+        <mj-include path="./_column_content.mjml" />
+      </mj-column>
+      <mj-column width="50%"></mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

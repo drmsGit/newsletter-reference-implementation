@@ -1,0 +1,21 @@
+<mjml>
+  <mj-head>
+    <mj-include path="./_attributes.mjml" />
+  </mj-head>
+  <mj-body width="600px">
+    <!-- Two Column modules side by side, 50:50 (ADR-198 point 4); rendered with left and right. -->
+    <mj-section>
+      <mj-column width="50%" vertical-align="top">
+        <mj-raw>{% with side = left %}{% with image_url = side.image_url, image_alt = side.image_alt, headline_medium = side.headline_medium, body_medium = side.body_medium, button_label = side.button_label, button_url = side.button_url %}</mj-raw>
+        <mj-include path="./_column_content.mjml" />
+        <mj-raw>{% endwith %}{% endwith %}</mj-raw>
+      </mj-column>
+      <mj-raw><!-- pair: right --></mj-raw>
+      <mj-column width="50%" vertical-align="top">
+        <mj-raw>{% with side = right %}{% with image_url = side.image_url, image_alt = side.image_alt, headline_medium = side.headline_medium, body_medium = side.body_medium, button_label = side.button_label, button_url = side.button_url %}</mj-raw>
+        <mj-include path="./_column_content.mjml" />
+        <mj-raw>{% endwith %}{% endwith %}</mj-raw>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

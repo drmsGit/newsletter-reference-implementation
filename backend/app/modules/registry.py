@@ -109,6 +109,10 @@ class ModuleVariable:
     #: the field *may* be hidden; whether it is, is the module's choice in a
     #: variant.
     hideable: bool = False
+    #: For an `image` field, the field that holds the alt text of a web
+    #: address; a form shows it with the address, not as a field of its own
+    #: (ADR-197 addendum 2026-10-15, the second).
+    alt: str | None = None
 
 
 @dataclass
@@ -129,6 +133,18 @@ class ModuleManifest:
     #: visible header and footer. An email holding only decorative modules and
     #: the envelope is nothing to show.
     decorative: bool = False
+    #: No longer offered and refused when added, still rendered where it is
+    #: used (ADR-198 point 5): Single Stack. Deleted at the next full reset.
+    retired: bool = False
+    #: Two copies in a row render together as one 50:50 row through
+    #: `_<name>_pair.html`, given `left` and `right` (ADR-198 point 4): the
+    #: Column. Declared, so the renderer pairs what a manifest says pairs and
+    #: knows no module by name.
+    pairs: bool = False
+
+
+def pair_template_name(manifest: "ModuleManifest") -> str:
+    return f"_{manifest.name}_pair.html"
 
 
 FIELDS_PATH = MODULES_DIR.parent / "fields.json"
@@ -171,13 +187,15 @@ FIELD_ENTRY_KEYS = frozenset({"name", "required", "source", "hideable"})
 #: `envelope`). Named apart from a typo only so the refusal can say where the
 #: key belongs.
 #: `alt` (ADR-177 addendum 2026-10-15): on an `image` field, the field that
-#: holds its alt text, which inherits the library image's alt when empty.
+#: holds the alt text of an address; a library image uses its own (ADR-197
+#: addendum 2026-10-15, the second).
 DEFINITION_ATTRIBUTES = frozenset({"label", "envelope", "concept", "size", "type", "note", "channel", "alt"})
 
 #: The keys a module manifest may carry (task-273, the user's call to include
 #: the top level). `"cms "` misspelt would otherwise turn a catalogue module
 #: into a static one without a word.
-MANIFEST_KEYS = frozenset({"label", "channel", "description", "cms", "has_template", "variables", "decorative"})
+MANIFEST_KEYS = frozenset({"label", "channel", "description", "cms", "has_template", "variables", "decorative",
+                           "retired", "pairs"})
 
 
 def _refuse_unknown(keys, allowed: frozenset, where: str, json_path: Path) -> None:
@@ -227,6 +245,7 @@ def _variable(declared: dict, json_path: Path) -> ModuleVariable:
         channel=spec.get("channel"),
         source=_source(declared, json_path),
         hideable=_hideable(declared, json_path),
+        alt=spec.get("alt") if spec.get("type") == "image" else None,
     )
 
 
@@ -281,7 +300,11 @@ def _check_hideable_guards(manifest: "ModuleManifest", template_path: Path) -> N
             for child in node.else_:
                 walk(child, guarded)
             return
-        if isinstance(node, nodes.Name) and node.name in hideable and node.name not in guarded:
+        # A name assigned to (`{% with image_url = side.image_url %}`, the
+        # pair template's way of handing each side to the shared content) is
+        # not printed.
+        if (isinstance(node, nodes.Name) and node.ctx == "load"
+                and node.name in hideable and node.name not in guarded):
             unguarded.append((node.name, node.lineno))
         for child in node.iter_child_nodes():
             walk(child, guarded)
@@ -320,6 +343,8 @@ def _load_manifest(json_path: Path, channel: str) -> ModuleManifest:
         cms=data.get("cms", False),
         has_template=data.get("has_template", True),
         decorative=bool(data.get("decorative", False)),
+        retired=bool(data.get("retired", False)),
+        pairs=bool(data.get("pairs", False)),
         variables=[
             _variable(v, json_path) for v in data.get("variables", [])
         ],
@@ -327,6 +352,11 @@ def _load_manifest(json_path: Path, channel: str) -> ModuleManifest:
     template = json_path.with_suffix(".html")
     if not manifest.has_template or template.exists():
         _check_hideable_guards(manifest, template)
+    if manifest.pairs:
+        pair = json_path.parent / pair_template_name(manifest)
+        if not pair.exists():
+            raise ValueError(f"{json_path} pairs, but {pair.name} is missing beside it.")
+        _check_hideable_guards(manifest, pair)
     return manifest
 
 
@@ -405,15 +435,17 @@ def get_manifest(channel: str, name: str) -> ModuleManifest | None:
     return _REGISTRY.get((channel, name))
 
 
-def list_manifests(channel: str) -> list[ModuleManifest]:
-    """Every module this channel accepts — what the composer may offer.
+def list_manifests(channel: str, *, offered: bool = False) -> list[ModuleManifest]:
+    """Every module this channel accepts; with `offered`, only those a manager
+    may still add — what the composer may offer (retired ones left out, ADR-198
+    point 5).
 
     ADR-161 point 7: a channel is "an attribute on the variant plus **which
     manifests it accepts**". This is that second half, and it is why a manager
     composing an email is never offered a push module.
     """
     _ensure_fresh()
-    return [m for (c, _), m in _REGISTRY.items() if c == channel]
+    return [m for (c, _), m in _REGISTRY.items() if c == channel and not (offered and m.retired)]
 
 
 def required_when_shown(manifest: ModuleManifest, hidden=()) -> list[str]:

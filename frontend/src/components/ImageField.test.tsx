@@ -118,9 +118,34 @@ describe('an image field (task-112; ADR-197)', () => {
     const { onChange } = open('')
     const dialog = await openPicker()
     fireEvent.click(dialog.getByRole('tab', { name: 'Web address' }))
+    expect(dialog.queryByLabelText('Alt text')).not.toBeInTheDocument()
     fireEvent.change(await dialog.findByLabelText('Image address'), { target: { value: 'https://cdn.example.org/a.jpg' } })
     fireEvent.click(dialog.getByRole('button', { name: 'Use this address' }))
     expect(onChange).toHaveBeenCalledWith('https://cdn.example.org/a.jpg')
+  })
+
+  it('asks for alt text with an address when the field keeps one, and hands both back (ADR-197)', async () => {
+    const { handlers } = server()
+    stubFetch(handlers as never)
+    const onChange = vi.fn()
+    renderWithProviders(<ImageField label="Image" value="" alt="" onChange={onChange} />)
+    const dialog = await openPicker()
+    fireEvent.click(dialog.getByRole('tab', { name: 'Web address' }))
+    fireEvent.change(await dialog.findByLabelText('Image address'), { target: { value: 'https://cdn.example.org/a.jpg' } })
+    fireEvent.change(dialog.getByLabelText('Alt text'), { target: { value: 'A red door' } })
+    fireEvent.click(dialog.getByRole('button', { name: 'Use this address' }))
+    expect(onChange).toHaveBeenCalledWith('https://cdn.example.org/a.jpg', 'A red door')
+  })
+
+  it('never asks for alt text for a library image: it has its own', async () => {
+    const { handlers } = server()
+    stubFetch(handlers as never)
+    const onChange = vi.fn()
+    renderWithProviders(<ImageField label="Image" value="" alt="Old words" onChange={onChange} />)
+    const dialog = await openPicker()
+    fireEvent.click(await dialog.findByRole('button', { name: /Lighthouse/ }))
+    fireEvent.click(dialog.getByRole('button', { name: 'Use this image' }))
+    expect(onChange).toHaveBeenCalledWith('asset:9')
   })
 
   it('removes the image', async () => {
@@ -139,5 +164,20 @@ describe('an image field (task-112; ADR-197)', () => {
     fireEvent.click(await dialog.findByRole('button', { name: /Lighthouse/ }))
     fireEvent.click(dialog.getByRole('button', { name: 'Use this image' }))
     expect(onSave).toHaveBeenCalledWith('asset:9')
+  })
+
+  it('saves an address and its alt text in one write, the alt field never shown on its own', async () => {
+    stubFetch(server().handlers as never)
+    const onSave = vi.fn()
+    renderWithProviders(
+      <AutosaveField field={{ name: 'image_url', label: 'Image', type: 'image', alt: 'image_alt' }} value=""
+        alt="" onSave={onSave} error={undefined} />,
+    )
+    const dialog = await openPicker()
+    fireEvent.click(dialog.getByRole('tab', { name: 'Web address' }))
+    fireEvent.change(await dialog.findByLabelText('Image address'), { target: { value: 'https://cdn.example.org/a.jpg' } })
+    fireEvent.change(dialog.getByLabelText('Alt text'), { target: { value: 'A red door' } })
+    fireEvent.click(dialog.getByRole('button', { name: 'Use this address' }))
+    expect(onSave).toHaveBeenCalledWith('https://cdn.example.org/a.jpg', { image_alt: 'A red door' })
   })
 })

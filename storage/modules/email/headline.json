@@ -1,0 +1,13 @@
+{
+  "label": "Headline",
+  "channel": "email",
+  "description": "A heading (H2) typed into the block, to open a section (ADR-198). Not counted as the email's content: an email of headings alone has nothing to show.",
+  "cms": false,
+  "decorative": true,
+  "variables": [
+    {
+      "name": "heading",
+      "required": true
+    }
+  ]
+}

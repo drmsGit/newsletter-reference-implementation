@@ -30,6 +30,10 @@ const MANIFESTS = [
     name: 'hero', channel: 'email', label: 'Hero', description: '', cms: true,
     variables: [{ name: 'headline_hero', required: true, envelope: false, type: 'text' }],
   },
+  {
+    name: 'column', channel: 'email', label: 'Column', description: '', cms: true, pairs: true,
+    variables: [{ name: 'headline_medium', required: true, envelope: false, type: 'text' }],
+  },
 ]
 
 const T = (n: number) => `2026-10-03T10:00:0${n}.000000Z`
@@ -40,7 +44,7 @@ const T = (n: number) => `2026-10-03T10:00:0${n}.000000Z`
  * makes "two quick saves never refuse each other" a real assertion rather than
  * one the stub satisfies by agreeing with everything.
  */
-function server(overrides: { canAdd?: boolean } = {}) {
+function server(overrides: { canAdd?: boolean; accepted?: string[] } = {}) {
   let clock = 1
   const state = {
     variant: { id: 3, campaign_id: 1, channel: 'email', name: 'Variant A',
@@ -59,7 +63,7 @@ function server(overrides: { canAdd?: boolean } = {}) {
     campaign: { id: 1, name: 'Spring', status: 'draft', created_at: T(0), updated_at: T(0) },
     variants: [{
       variant: state.variant, module_limit: null, can_add_module: overrides.canAdd ?? true,
-      has_envelope: true, brand_profile: A_BRAND_PROFILE, accepted_module_types: ['cta', 'editorial', 'hero'],
+      has_envelope: true, brand_profile: A_BRAND_PROFILE, accepted_module_types: overrides.accepted ?? ['cta', 'editorial', 'hero'],
       modules: [...state.modules].sort((a, b) => a.position - b.position),
       envelope_modules: [], decision_slots: [],
     }],
@@ -288,6 +292,20 @@ describe('the module stack', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Add' }))
     await waitFor(() => expect(sent(fetchMock, 'POST')).toHaveLength(1))
     expect(await sent(fetchMock, 'POST')[0].json()).toEqual({ module_type: 'cta' })
+  })
+
+  it('adds two columns side by side as two Column modules (ADR-198 point 4)', async () => {
+    const { handlers } = server({ accepted: ['column', 'cta'] })
+    let next = 13
+    const fetchMock = open({
+      ...handlers,
+      'POST /campaigns/variants/3/modules': () => jsonResponse({ id: next++ }),
+    })
+    fireEvent.click(await screen.findByRole('button', { name: /Add a module/ }))
+    fireEvent.click(await screen.findByRole('option', { name: 'Two columns' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    await waitFor(() => expect(sent(fetchMock, 'POST')).toHaveLength(2))
+    for (const request of sent(fetchMock, 'POST')) expect(await request.json()).toEqual({ module_type: 'column' })
   })
 
   it('offers no add when the channel is full', async () => {

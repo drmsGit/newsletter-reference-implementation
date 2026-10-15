@@ -14,6 +14,8 @@ class ProfileFieldOut(BaseModel):
     group: str
     multiline: bool
     core: bool = Field(description="One of the fields the platform itself relies on (ADR-194 point 3)")
+    alt: str | None = Field(None, description="For an image: the field holding a web address's alt text, "
+                                              "filled with the address, never shown on its own")
     required_for: list[str] = Field(
         description="The profile kinds that cannot send without it: marketing, transactional")
 

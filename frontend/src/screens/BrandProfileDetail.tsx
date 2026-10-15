@@ -15,7 +15,7 @@ import {
 import { HttpError } from '../api/session'
 import ImageField from '../components/ImageField'
 import Choice from '../components/Choice'
-import { SaveState, fieldError } from '../components/EditorFields'
+import { SaveState, altFieldsOf, fieldError } from '../components/EditorFields'
 import ScreenState from '../components/ScreenState'
 import { BRAND_PROFILES, fieldLabels } from './BrandProfiles'
 
@@ -144,6 +144,9 @@ function ProfileForm({
   }
 
   const groups = [...new Set(fields.map((f) => f.group))]
+  // An image's alt field is filled with a web address in its pop-in (ADR-197
+  // addendum 2026-10-15, the second), never shown on its own.
+  const alts = altFieldsOf(fields)
 
   return (
     // noValidate: the server's per-field refusals are the rules, in its words;
@@ -224,13 +227,20 @@ function ProfileForm({
         <fieldset key={group}>
           <legend>{group}</legend>
           {fields
-            .filter((f) => f.group === group)
+            .filter((f) => f.group === group && !alts.has(f.name))
             .map((field) => (
               <ProfileInput
                 key={field.name}
                 field={field}
                 value={values[field.name] ?? ''}
-                onChange={(value) => setValues((current) => ({ ...current, [field.name]: value }))}
+                alt={field.alt ? (values[field.alt] ?? '') : undefined}
+                onChange={(value, alt) =>
+                  setValues((current) => ({
+                    ...current,
+                    [field.name]: value,
+                    ...(field.alt && alt !== undefined ? { [field.alt]: alt } : {}),
+                  }))
+                }
                 required={field.required_for.includes(profile.kind)}
                 readOnly={readOnly}
                 error={fieldError(save.error, field.name)}
@@ -265,6 +275,7 @@ const HINTS: Record<string, string> = {
 function ProfileInput({
   field,
   value,
+  alt,
   onChange,
   required,
   readOnly,
@@ -272,7 +283,8 @@ function ProfileInput({
 }: {
   field: ProfileField
   value: string
-  onChange: (value: string) => void
+  alt?: string
+  onChange: (value: string, alt?: string) => void
   required: boolean
   readOnly: boolean
   error: string | undefined
@@ -280,8 +292,8 @@ function ProfileInput({
   if (field.type === 'image') {
     // A library image or an https address (ADR-194 addendum 2026-10-15).
     return (
-      <ImageField label={field.label} value={value} onChange={onChange} required={required} readOnly={readOnly}
-        error={error} />
+      <ImageField label={field.label} value={value} alt={alt} onChange={onChange} required={required}
+        readOnly={readOnly} error={error} />
     )
   }
   return (

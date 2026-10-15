@@ -80,7 +80,8 @@ def test_well_formed_lists_and_https_addresses_are_kept():
 
 def test_header_and_footer_are_decorative_and_nothing_else_is():
     decorative = {m.name for m in list_manifests("email") if m.decorative}
-    assert decorative == {"header", "footer"}
+    # And the Headline block (ADR-198): a heading alone is nothing to show.
+    assert decorative == {"header", "footer", "headline"}
     assert [v.name for v in get_manifest("email", "header").variables] == []
     assert [v.name for v in get_manifest("email", "footer").variables] == ["footer_note"]
     assert not get_manifest("email", "footer").variables[0].required

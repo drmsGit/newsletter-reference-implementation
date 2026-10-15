@@ -1,14 +1,9 @@
 {
   "label": "Image Left",
   "channel": "email",
-  "description": "Image on the left, headline, body text and button on the right. Use for content where the visual supports the text.",
+  "description": "Square image on the left; headline, short text and a text link on the right, 50:50 (ADR-198).",
   "cms": true,
   "variables": [
-    {
-      "name": "section_heading",
-      "required": false,
-      "source": "module"
-    },
     {
       "name": "image_url",
       "required": false,

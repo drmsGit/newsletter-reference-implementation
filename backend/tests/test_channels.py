@@ -523,7 +523,7 @@ class TestAChannelOnlyOffersItsOwnModules:
             assert 'value="notification"' in page.text, (
                 "the push variant was not offered its own module"
             )
-            assert 'value="single_stack"' in page.text, (
+            assert 'value="img_left"' in page.text, (
                 "the email variant was not offered its own module"
             )
             # Both appear on the page because both variants are on it. What
@@ -626,7 +626,7 @@ class TestAModuleMustBelongToItsVariantsChannel:
             db, campaign_id=campaign.id, name=_name("push"), channel="push", brand_id=campaign.brand_id)
         with pytest.raises(ValueError, match="not a Push notification module"):
             create_module_for_variant(
-                db, variant_id=variant.id, module_type="single_stack", module_data={}, brand_id=brand_of_variant(db, variant.id))
+                db, variant_id=variant.id, module_type="img_left", module_data={}, brand_id=brand_of_variant(db, variant.id))
 
     def test_each_channel_still_accepts_its_own(self, db, campaign):
         """Without this, both tests above could pass by refusing everything."""
@@ -635,7 +635,7 @@ class TestAModuleMustBelongToItsVariantsChannel:
         push = create_variant_for_campaign(
             db, campaign_id=campaign.id, name=_name("push"), channel="push", brand_id=campaign.brand_id)
         assert create_module_for_variant(
-            db, variant_id=email.id, module_type="single_stack", module_data={}, brand_id=brand_of_variant(db, email.id)) is not None
+            db, variant_id=email.id, module_type="img_left", module_data={}, brand_id=brand_of_variant(db, email.id)) is not None
         assert create_module_for_variant(
             db, variant_id=push.id, module_type="notification", module_data={}, brand_id=brand_of_variant(db, push.id)) is not None
 
@@ -856,7 +856,7 @@ class TestAPushSnapshotLivesInTheRowNotOnDisk:
         email = create_variant_for_campaign(
             db, campaign_id=campaign.id, name=_name("email"), channel="email", brand_id=campaign.brand_id)
         create_module_for_variant(db, variant_id=email.id,
-                                  module_type="single_stack", content_record_id=record.id, brand_id=brand_of_variant(db, email.id))
+                                  module_type="img_left", content_record_id=record.id, brand_id=brand_of_variant(db, email.id))
 
         push_snap = create_snapshot_for_variant(
                 db, variant_id=push.id, brand_id=brand_of_variant(db, push.id))
@@ -2338,7 +2338,7 @@ class TestEnvelopeFieldsLiveInAModule:
         offered = [m.name for m in list_manifests("email")
                    if not any(v.envelope for v in m.variables)]
         assert "envelope" not in offered
-        assert "single_stack" in offered, "the real modules must still be offered"
+        assert "img_left" in offered, "the real modules must still be offered"
 
 
 class TestAChannelWithoutAnEnvelopeIsNotAskedForOne:
@@ -2922,7 +2922,7 @@ class TestATestSendShowsWhatWouldActuallyBeSent:
         variant_id = campaign.variants[0].id
         db.add(ModuleInstanceDB(
             variant_id=variant_id,
-            module_type="single_stack",
+            module_type="img_left",
             position=0,
             content_record_id=record.id,
         ))
@@ -3161,13 +3161,14 @@ class TestFieldDefinitionsAreTheOneHome:
         **That expected change has landed.** ADR-179's hero flip made `hero`
         a `cms: true` module on 2026-09-28, so `headline_hero` and
         `button_label_hero` joined `email` — added here deliberately, which is
-        what this test exists to force.
+        what this test exists to force. So did `body_long` on 2026-10-15, the
+        one new content field of the MJML block set (task-371, ADR-198 point 2).
         """
         from app.content.service import content_field_groups
 
         assert content_field_groups() == {
             "email": (
-                "body_medium", "button_label", "button_label_hero",
+                "body_long", "body_medium", "button_label", "button_label_hero",
                 "button_url", "headline_hero", "headline_medium",
                 "image_alt", "image_url",
             ),

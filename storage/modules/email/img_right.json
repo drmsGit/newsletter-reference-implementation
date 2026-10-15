@@ -1,14 +1,9 @@
 {
   "label": "Image Right",
   "channel": "email",
-  "description": "Headline, body text and button on the left, image on the right. Mirrors Image Left for visual variety.",
+  "description": "Square image on the right; headline, short text and a text link on the left, 50:50. On mobile the image still comes first (ADR-198).",
   "cms": true,
   "variables": [
-    {
-      "name": "section_heading",
-      "required": false,
-      "source": "module"
-    },
     {
       "name": "image_url",
       "required": false,

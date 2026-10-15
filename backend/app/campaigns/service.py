@@ -665,7 +665,7 @@ def _refuse_module_data(channel_key: str, module_type: str, module_data: dict | 
         raise ModuleDataInvalid(errors)
 
 
-def _refuse_module_type(channel_key: str, module_type: str) -> None:
+def _refuse_module_type(channel_key: str, module_type: str, current: str | None = None) -> None:
     """A module's type must be one its channel accepts, and not the envelope.
 
     ADR-161 point 7: a channel is "an attribute on the variant plus **which
@@ -691,6 +691,14 @@ def _refuse_module_type(channel_key: str, module_type: str) -> None:
         raise ValueError(
             f"'{module_type}' carries the subject and preheader. Set those on the "
             f"variant; it keeps the one {module_type} module itself."
+        )
+    # Retired (ADR-198 point 5): one already in a variant keeps rendering and
+    # may be edited as it is (`current`), but none is added or switched to.
+    manifest = get_manifest(channel_key, module_type)
+    if manifest.retired and module_type != current:
+        raise ValueError(
+            f"'{manifest.label}' is retired and can no longer be added. "
+            f"The ones already in emails keep working."
         )
 
 
@@ -753,7 +761,7 @@ def update_module(
         return None
     refuse_stale(db, module, expected_updated_at, "module")
     channel_key = db.get(VariantDB, module.variant_id).channel
-    _refuse_module_type(channel_key, module_type)
+    _refuse_module_type(channel_key, module_type, current=module.module_type)
     _refuse_module_data(channel_key, module_type, module_data)
     _refuse_foreign_binding(
         db, module.variant_id, content_record_id, decision_slot_id, brand_id=brand_id
@@ -1400,7 +1408,7 @@ def campaign_composition(db: Session, campaign_id: int, *, brand_id: int) -> dic
             "can_add_module": limit is None or len(modules) < limit,
             "has_envelope": envelope_module_type(variant.channel) is not None,
             "accepted_module_types": [
-                m.name for m in list_manifests(variant.channel)
+                m.name for m in list_manifests(variant.channel, offered=True)
                 if not any(v.envelope for v in m.variables)
             ],
             "modules": modules,

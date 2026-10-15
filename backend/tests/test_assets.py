@@ -241,7 +241,7 @@ def _record(db, made, brand_id, content):
     return record
 
 
-def test_rendering_turns_a_reference_into_an_address_and_inherits_the_alt(db, made, default_brand):
+def test_rendering_turns_a_reference_into_an_address_with_the_images_own_alt(db, made, default_brand):
     from app.rendering.service import resolve_renderable_content
 
     with signed_in(db) as (client, _token, csrf):
@@ -251,14 +251,17 @@ def test_rendering_turns_a_reference_into_an_address_and_inherits_the_alt(db, ma
     shown = resolve_renderable_content(db, plain.id)
     assert shown["image_url"] == asset["url"] and shown["image_url"].startswith("http")
     assert shown["image_alt"] == "A beach at noon"
-    assert resolve_renderable_content(db, typed.id)["image_alt"] == "Our shop", "the usage's own alt wins"
+    # ADR-197 addendum 2026-10-15 (the second): a usage cannot override it.
+    assert resolve_renderable_content(db, typed.id)["image_alt"] == "A beach at noon"
 
 
 def test_an_outside_address_is_left_as_it_is(db, made, default_brand):
     from app.rendering.service import resolve_renderable_content
 
-    record = _record(db, made, default_brand.id, {"image_url": "https://cdn.example.org/a.jpg"})
-    assert resolve_renderable_content(db, record.id)["image_url"] == "https://cdn.example.org/a.jpg"
+    record = _record(db, made, default_brand.id, {"image_url": "https://cdn.example.org/a.jpg", "image_alt": "Kept"})
+    shown = resolve_renderable_content(db, record.id)
+    assert shown["image_url"] == "https://cdn.example.org/a.jpg"
+    assert shown["image_alt"] == "Kept", "an address keeps the alt typed with it"
 
 
 @pytest.mark.parametrize("value, ok", [

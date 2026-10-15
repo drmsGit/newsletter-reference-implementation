@@ -116,6 +116,8 @@ jobs:
         run: npm run lint
       - name: Type check and build
         run: npm run build
+      - name: Email blocks compiled from their MJML (ADR-131 addendum 2026-10-15)
+        run: npm run build:modules -- --check
       - name: Tests
         run: npm test
       - name: Known vulnerabilities — what ships (blocking)

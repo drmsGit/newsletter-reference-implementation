@@ -8,6 +8,7 @@ topic:
   - governance
   - data-model
 created: 2026-09-27
+modified: 2026-10-15
 source:
   - "[[Variant Editor - design interview]] question 1.8 (resolved 2026-09-25) and question 2.9 (resolved 2026-09-26)"
 depends_on:
@@ -129,6 +130,16 @@ This is where machine ready parts from channel readiness. An integration may rem
 **3. The decision engine reads it,** together with channel readiness. A record is a slot candidate only if it is machine ready and marked ready for the slot's channel ([[ADR-174 — Channel Readiness Is Asserted, Not Computed]]'s addendum of 2026-10-05, point 2). Both strategies and the read-only candidate count now draw on one shared `candidate_query` (`backend/app/decision/strategies/base.py:176`), which today filters on `status == "active"` and the sending brand only (`base.py:203-209`); the line numbers in the fifth Negative are from before that query was shared.
 
 Nothing above changes this record's Decision section.
+
+## Addendum 2026-10-15 — the first use of a module-typed field is withdrawn
+
+Prompted by [[ADR-198 — The Email Block Set Is Seven Blocks, Square Images and Text Links]] (queue task-371). Nothing above changes this record's Decision section.
+
+- **The mechanism of the addendum of 2026-10-04 stands.** A catalogue-bound module may still declare a field with `source: "module"`, typed in the module itself.
+- **Its first use is withdrawn.** ADR-198 point 5 takes `section_heading` off the image blocks, and its Headline block takes the role. Existing values stay in `module_data` and no longer show.
+- **The retired Single Stack still carries it.** Its manifest, `storage/modules/email/single_stack.json`, keeps `section_heading` with `source: "module"`, and the block renders it unchanged (ADR-198's addendum of 2026-10-15, point 5). It is now the only manifest that declares `source: "module"`. The tests of the mechanism now use Single Stack.
+- **The concern behind the 2026-10-04 addendum is accepted as a cost.** That addendum kept the heading inside the module because a separate heading module "would float above nothing for exactly the recipients [[ADR-086 — Decision Slots Fail Gracefully]] protects". ADR-198's Headline block is such a separate module, and ADR-198 accepts this in its Negative: when a slot finds nothing, the module below is hidden and a Headline above it still shows.
+- **The Headline block is `cms: false`.** The fifth Note expected a section-heading module to be classified static by point 1's test.
 
 ## Related ADRs
 

@@ -1,0 +1,19 @@
+<mjml>
+  <mj-head>
+    <mj-include path="./_attributes.mjml" />
+  </mj-head>
+  <mj-body width="600px">
+    <!-- Single text (ADR-198): H3, long body text and a text link, top to bottom. -->
+    <mj-section>
+      <mj-column>
+        <mj-raw>{% if headline_medium %}</mj-raw>
+        <mj-text padding="0 0 8px 0"><h3 style="margin:0;font-size:20px;line-height:1.25;color:{{ profile.colour_text or '#1a1a1a' }}">{{ headline_medium }}</h3></mj-text>
+        <mj-raw>{% endif %}</mj-raw>
+        <mj-raw>{% if body_long %}</mj-raw>
+        <mj-text>{{ body_long }}</mj-text>
+        <mj-raw>{% endif %}</mj-raw>
+        <mj-include path="./_text_link.mjml" />
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

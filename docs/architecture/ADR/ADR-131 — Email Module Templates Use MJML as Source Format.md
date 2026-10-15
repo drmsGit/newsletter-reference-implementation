@@ -7,7 +7,7 @@ topic:
   - templates
   - frontend
 created: 2026-07-03
-modified: 2026-07-03
+modified: 2026-10-15
 depends_on:
   - "[[ADR-060 — Rendering as Independent Layer]]"
   - "[[ADR-061 — Snapshot Based Final Rendering]]"
@@ -54,6 +54,38 @@ Raw HTML templates remain permitted as an explicit escape hatch for layouts MJML
 The decision not to build a custom DSL was deliberate. MJML is a proven version of exactly the same idea — a declarative format that compiles to email-compatible HTML — with an existing compiler, tooling, and ecosystem. The cost of building and maintaining an equivalent from scratch outweighs any benefit of owning the full stack at this layer.
 
 Snapshot generation is always initiated from the frontend (send preparation flow), so Python receiving compiled HTML is architecturally consistent with ADR-061.
+
+## Addendum 2026-10-15 — blocks are compiled when they are written, not at send or preview
+
+Prompted by the first MJML blocks (queue task-371, [[ADR-198 — The Email Block Set Is Seven Blocks, Square Images and Text Links]]), and decided with the user on 2026-10-15. The Decision above says MJML compiles "in the Node/React frontend layer, triggered when a send is prepared or a preview is requested". This addendum changes when compilation happens. It does not change where: compilation stays in Node, the backend never runs MJML, and the escape hatch stands. The Decision section is not edited.
+
+**1. A block is compiled when it is written.**
+
+- **A block is authored as `storage/modules/email/<type>.mjml`,** with its Jinja placeholders in place.
+- **`npm run build:modules` in `frontend/` compiles it** to the `.html` template that the backend already renders.
+- **The compiler is the official `mjml` npm package,** pinned as a dev dependency. It is hash-locked in `frontend/package-lock.json`, as every frontend package is (`docs/implementation/npm.md`). [[ADR-189 — Python Dependencies Are Locked With Hashes]] is the same rule for Python.
+
+**2. The compiled files are committed, and CI checks them.**
+CI fails if a committed `.html` differs from what the pinned MJML produces from its `.mjml` ([[ADR-190 — Continuous Integration Blocks on Defects and Reports Style]]).
+
+**3. MJML never starts rendering differently on its own.** The user asked how the system would notice if MJML rendered differently after an update. The answer, recorded here:
+
+- **MJML is pinned.** It does not change by itself.
+- **An upgrade is a deliberate, reviewed change.** The version is bumped and every block is recompiled. The diff of every compiled template is visible in review.
+- **CI rejects a bump made without recompiling** (point 2).
+- **An email already sent is not touched.** It sits in the inbox as it went out. Its frame freezes the composition and the content, not the templates. [[ADR-183 — A Snapshot Freezes the Composition and Every Delivery Records What It Got]] point 4 does not version templates. A reconstruction after a recompile uses today's templates. The frame's templates fingerprint reports the change, and the hash check shows whether the output differs.
+
+**4. Hand-written HTML stays the escape hatch.** Editorial, the visible header, the footer and the envelope stay HTML for now.
+
+**5. The backend never runs MJML.** This is unchanged. It now holds without any Node step at send or preview time.
+
+**Consequences.**
+
+- **The Negative point "the Python backend cannot independently re-render a snapshot without a pre-compiled HTML artifact or a call to a Node compilation step" is resolved.** The compiled artifact is in the repository. The Notes' reliance on "snapshot generation is always initiated from the frontend" no longer carries the design.
+- **Preview and send render the same committed files.** There is no compile at either moment ([[ADR-063 — Rendering Parity Over Rendering Implementation]]).
+- **The order of [[ADR-187 — A Manager Hides Fields Per Module, and Required Means Required When Shown]] point 5 is reversed.** That point says a hidden field is blanked "before the MJML compile", and its example sends filled MJML to the compiler. Now the compile comes first and the values are filled later. A hidden field is still blanked when values are filled, and its `{% if %}` guard still removes it, but only if the guard survives the compile. ADR-187's load-time check reads the template the backend loads, so a guard the compiler dropped or moved is refused there. ADR-187's Decision is not edited.
+- **MJML does not know Jinja.** How Jinja's tags pass through the compiler intact is settled in the build.
+- **Changing a block needs Node and a build step.** Each block is two files in the repository, the `.mjml` source and its compiled `.html`.
 
 ## Related ADRs
 

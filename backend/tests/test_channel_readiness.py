@@ -106,7 +106,7 @@ class TestAPersonMarks:
         client, csrf, _ = person
         warning = client.put(f"/content/{record}/readiness/email", headers=csrf).json()["warning"]
         assert warning == ("Marked ready for Email, but no Email module can use it: "
-                           "Hero Banner needs Hero headline; Image Left, Image Right and Single Stack need Headline")
+                           "Column, Image Left, Image Right and Single Text need Headline; Hero Banner needs Hero headline")
 
     def test_an_unknown_channel_and_another_brands_record_are_not_found(self, record, person, foreign_api):
         client, csrf, _ = person

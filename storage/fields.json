@@ -11,8 +11,9 @@
     "therefore the shortest text.",
     "",
     "`type: image` (ADR-197; ADR-177 addendum 2026-10-15): a library image,",
-    "written asset:<id>, or an https address. `alt` names the field holding its",
-    "alt text, which inherits the library image's alt when left empty.",
+    "written asset:<id>, or an https address. `alt` names the field holding the",
+    "alt text of an address; a library image always uses its own (ADR-197",
+    "addendum 2026-10-15, the second).",
     "",
     "`label` is what a form calls the field, written once here (ADR-177 addendum",
     "2026-10-04, task-271): never built from concept and size, never declared in a",
@@ -22,14 +23,22 @@
   ],
   "fields": {
     "body_medium": {
-      "label": "Body text",
+      "label": "Body text (short)",
       "concept": "body",
       "channel": "email",
       "type": "richtext",
       "size": "medium"
     },
+    "body_long": {
+      "label": "Body text (long)",
+      "concept": "body",
+      "channel": "email",
+      "type": "richtext",
+      "size": "long",
+      "note": "The longer text of a record, for the Single text block (ADR-198 point 2). The short text goes in Body text (short)."
+    },
     "button_label": {
-      "label": "Button text",
+      "label": "Link text",
       "concept": "button_label",
       "channel": "email",
       "type": "text"
@@ -42,7 +51,7 @@
       "size": "hero"
     },
     "button_url": {
-      "label": "Button link",
+      "label": "Link",
       "concept": "button_url",
       "channel": "email",
       "type": "url"
@@ -152,6 +161,27 @@
       "type": "richtext",
       "size": "small",
       "note": "Optional. Shown at the top of the footer, in this email only."
+    },
+    "heading": {
+      "label": "Heading",
+      "concept": "heading",
+      "channel": "email",
+      "type": "text",
+      "size": "medium",
+      "note": "The Headline block's H2, typed into the block (ADR-198)."
+    },
+    "label_2": {
+      "label": "Second call-to-action text",
+      "concept": "label",
+      "channel": "email",
+      "type": "text",
+      "note": "Optional. With its link, the CTA shows two buttons side by side (ADR-198)."
+    },
+    "url_2": {
+      "label": "Second call-to-action link",
+      "concept": "url",
+      "channel": "email",
+      "type": "url"
     }
   }
 }

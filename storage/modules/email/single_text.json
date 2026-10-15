@@ -1,0 +1,27 @@
+{
+  "label": "Single Text",
+  "channel": "email",
+  "description": "Headline, the long body text and a text link, top to bottom (ADR-198).",
+  "cms": true,
+  "variables": [
+    {
+      "name": "headline_medium",
+      "required": true,
+      "hideable": true
+    },
+    {
+      "name": "body_long",
+      "required": false,
+      "hideable": true
+    },
+    {
+      "name": "button_label",
+      "required": false,
+      "hideable": true
+    },
+    {
+      "name": "button_url",
+      "required": false
+    }
+  ]
+}

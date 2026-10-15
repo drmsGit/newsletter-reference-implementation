@@ -1,0 +1,18 @@
+<mjml>
+  <mj-head>
+    <mj-include path="./_attributes.mjml" />
+  </mj-head>
+  <mj-body width="600px">
+    <!-- CTA (ADR-198): one real button, or two side by side when the second is given. -->
+    <mj-raw>{% if label_2 and url_2 %}</mj-raw>
+    <mj-section>
+      <mj-column width="50%"><mj-button href="{{ url }}">{{ label }}</mj-button></mj-column>
+      <mj-column width="50%"><mj-button href="{{ url_2 }}">{{ label_2 }}</mj-button></mj-column>
+    </mj-section>
+    <mj-raw>{% else %}</mj-raw>
+    <mj-section>
+      <mj-column><mj-button href="{{ url }}">{{ label }}</mj-button></mj-column>
+    </mj-section>
+    <mj-raw>{% endif %}</mj-raw>
+  </mj-body>
+</mjml>

@@ -55,8 +55,11 @@ def test_the_label_is_the_definitions_word_for_word():
     hero = {v["name"]: v["label"] for v in _get("/modules/hero", channel="email")["variables"]}
     assert hero == {
         "headline_hero": "Hero headline",
+        "image_url": "Image",
+        "image_alt": "Image description (alt text)",
         "button_label_hero": "Hero button text",
-        "button_url": "Button link",
+        # "Link" since 2026-10-15: it is a text link in most blocks (ADR-198).
+        "button_url": "Link",
     }
 
 
@@ -153,8 +156,10 @@ def test_content_fields_come_in_the_modules_declared_order():
     the route returned them sorted by name."""
     names = [f["name"] for f in _get("/content/fields")]
     assert names == [
-        "headline_hero", "button_label_hero",
-        "image_url", "image_alt", "headline_medium", "body_medium", "button_label",
+        # The hero took the square image on 2026-10-15 (ADR-198), and
+        # Single text brought body_long.
+        "headline_hero", "image_url", "image_alt", "button_label_hero",
+        "headline_medium", "body_long", "body_medium", "button_label",
         "button_url",
         "push_title", "push_body", "push_image_url", "push_link",
     ]

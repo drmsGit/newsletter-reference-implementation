@@ -22,7 +22,7 @@ def test_editing_a_manual_binding_after_approval_does_not_change_slot_exclusions
     [slot] = _slots(db, variant)
     _configure(db, slot, [category], 2)
     create_module_for_variant(
-        db, variant_id=variant.id, module_type="single_stack",
+        db, variant_id=variant.id, module_type="img_left",
         content_record_id=a, brand_id=world["brand"].id,
     )
     snapshot = create_snapshot_for_variant(db, variant.id, brand_id=world["brand"].id)

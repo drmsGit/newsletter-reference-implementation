@@ -1,4 +1,5 @@
 import re
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -181,7 +182,8 @@ def render_variant_html(
     for module in modules:
         html, resolution = render_module(db=db, module=module, channel=channel, recipient_id=recipient_id,
                                          mode=mode, theme=theme)
-        rendered_modules.append(html)
+        # A slot showing several picks hands back one part per pick (task-109).
+        rendered_modules.extend(html if isinstance(html, list) else [html])
         if resolution is not None:
             resolutions_by_module_id[module.id] = resolution
 
@@ -204,7 +206,7 @@ def render_module(
     recipient_id: int | None = None,
     mode: RenderMode = "preview",
     theme: dict | None = None,
-) -> tuple[str, DecisionResolutionDB | None]:
+) -> "tuple[str | Half | list[str | Half], DecisionResolutionDB | None]":
     """`channel` is passed down rather than looked up per module: the caller
     already has the variant, and a query per module to re-derive a value that
     cannot differ within one variant is the kind of thing that is invisible
@@ -431,25 +433,137 @@ def module_html(
     )
 
 
-def email_document(rendered_modules: list[str], footer: str = "", *, theme: dict | None = None) -> str:
+@dataclass(frozen=True)
+class Half:
+    """One copy of a module whose manifest `pairs` (the Column, ADR-198
+    point 4), held unrendered until `email_document` knows its neighbour: two
+    in a row become one 50:50 row, a lone one fills the left half."""
+    channel: str
+    module_type: str
+    module_id: int
+    variables: dict
+    content_id: int | None = None
+    template_type: str | None = None
+    theme: dict | None = None
+
+    def alone(self) -> str:
+        return module_html(self.channel, self.module_type, self.module_id, self.variables, self.content_id,
+                           template_type=self.template_type, theme=self.theme)
+
+
+def module_part(
+    channel: str, module_type: str, module_id: int, variables: dict, content_id: int | None = None,
+    *, template_type: str | None = None, theme: dict | None = None,
+) -> "str | Half":
+    """`module_html`, or a `Half` for a module that pairs: what the live and
+    the frame render hand to `email_document`."""
+    manifest = get_manifest(channel, template_type or module_type)
+    if manifest is not None and manifest.pairs:
+        return Half(channel, module_type, module_id, variables, content_id, template_type, theme)
+    return module_html(channel, module_type, module_id, variables, content_id,
+                       template_type=template_type, theme=theme)
+
+
+#: Between the two sides of a pair, so each side's links are tagged with its
+#: own record (ADR-182): the two columns are one section, not two modules.
+_PAIR_SPLIT = "<!-- pair: right -->"
+
+
+def _pair_html(left: Half, right: Half) -> str:
+    from app.modules.registry import MODULES_DIR, pair_template_name
+    from app.rendering.tracking import tag_links, tag_params
+
+    manifest = get_manifest(left.channel, left.template_type or left.module_type)
+    source = (MODULES_DIR / left.channel / pair_template_name(manifest)).read_text()
+    theme = left.theme or {}
+    rendered = _jinja.from_string(source).render(
+        left=apply_rich_text(left.variables, manifest), right=apply_rich_text(right.variables, manifest),
+        profile=theme.get("values") or {},
+    )
+    sides = rendered.split(_PAIR_SPLIT)
+    if len(sides) != 2:
+        raise ValueError(f"{pair_template_name(manifest)} must hold {_PAIR_SPLIT} once, between its sides.")
+    sides = [tag_links(html, half.content_id) if half.content_id is not None else html
+             for html, half in zip(sides, (left, right))]
+    rendered = f"{sides[0]}{_PAIR_SPLIT}{sides[1]}"
+    if theme.get("link_params"):
+        rendered = tag_params(rendered, theme["link_params"])
+
+    def wrap(half: Half, inner: str) -> str:
+        content_attr = f' data-content-id="{half.content_id}"' if half.content_id is not None else ""
+        return f'<div data-module-id="{half.module_id}" data-module-type="{half.module_type}"{content_attr}>\n{inner}\n</div>'
+
+    return wrap(left, wrap(right, rendered))
+
+
+def lay_out(parts: list) -> list[str]:
+    """The parts as HTML, each two `Half`s in a row rendered as one pair: the
+    first with the second, the third with the fourth, and an odd one alone.
+    A slot that found nothing leaves only a comment, which does not break a
+    row, so its neighbours still pair (ADR-198 point 4; ADR-086)."""
+    out: list[str] = []
+    waiting: Half | None = None
+    held: list[str] = []
+    for part in parts:
+        if isinstance(part, Half):
+            if waiting is None:
+                waiting = part
+            else:
+                out.extend(held)
+                out.append(_pair_html(waiting, part))
+                waiting, held = None, []
+        elif waiting is not None and part.lstrip().startswith("<!--"):
+            held.append(part)
+        else:
+            if waiting is not None:
+                out.append(waiting.alone())
+                out.extend(held)
+                waiting, held = None, []
+            out.append(part)
+    if waiting is not None:
+        out.append(waiting.alone())
+        out.extend(held)
+    return out
+
+
+#: The MJML blocks' responsive rules (ADR-131 addendum 2026-10-15), compiled
+#: by `npm run build:modules`. In the head only when an MJML block is in the
+#: body, so a document of the hand-written modules stays byte for byte what it
+#: was (ADR-183).
+MJML_HEAD_TEMPLATE = "_mjml_head.html"
+_MJML_MARKUP = re.compile(r'class="[^"]*\bmj-')
+
+
+def _mjml_head(body: str) -> str:
+    if not _MJML_MARKUP.search(body):
+        return ""
+    from app.modules.registry import MODULES_DIR
+
+    path = MODULES_DIR / "email" / MJML_HEAD_TEMPLATE
+    return "\n    " + _jinja.from_string(path.read_text()).render().strip() if path.exists() else ""
+
+
+def email_document(rendered_modules: list, footer: str = "", *, theme: dict | None = None) -> str:
     """Wrap rendered modules into the inlined email document. Shared by the live
     and the frame render for the same reason as `module_html`.
 
     `footer` is the unsubscribe line a sent marketing email carries (ADR-191
-    point 5); a preview has none. **Without one the document is byte-for-byte
+    point 5); a preview has none. `rendered_modules` may hold `Half`s, which
+    `lay_out` pairs. **Without a footer the document is byte-for-byte
     what it always was**, so every delivery record written before ADR-191
     still reconstructs to its stored hash (ADR-183).
     """
+    body = "".join(lay_out(rendered_modules))
     raw_html = f"""<!doctype html>
 <html>
   <head>
     <meta charset="utf-8">
     <title>Newsletter Preview</title>
-    <style>{resolve_css(_load_brand_css(), (theme or {}).get("values"))}</style>
+    <style>{resolve_css(_load_brand_css(), (theme or {}).get("values"))}</style>{_mjml_head(body)}
   </head>
   <body>
     {""}
-    {"".join(rendered_modules)}{f"""
+    {body}{f"""
     {footer}""" if footer else ""}
   </body>
 </html>"""
@@ -490,7 +604,7 @@ def render_cms_module(
     recipient_id: int | None = None,
     mode: RenderMode = "preview",
     theme: dict | None = None,
-) -> tuple[str, DecisionResolutionDB | None]:
+) -> "tuple[str | Half | list[str | Half], DecisionResolutionDB | None]":
     if module.decision_slot_id is not None:
         # A slot shows up to its "show up to", first pick first: the module
         # repeats once per pick, each copy with its own content id (ADR-084
@@ -500,12 +614,12 @@ def render_cms_module(
             return (f"<!-- module {module.id} ({module.module_type}): no content resolved, slot hidden -->",
                     None)
         return (
-            "\n".join(
-                module_html(channel, module.module_type, module.id,
+            [
+                module_part(channel, module.module_type, module.id,
                             without_hidden(fill_variables(module, manifest, content), module.hidden_fields),
                             content_id=content["id"], theme=theme)
                 for content, _resolution in picked
-            ),
+            ],
             picked[0][1],
         )
 
@@ -521,7 +635,7 @@ def render_cms_module(
         )
 
     return (
-        module_html(channel, module.module_type, module.id, without_hidden(variables, module.hidden_fields),
+        module_part(channel, module.module_type, module.id, without_hidden(variables, module.hidden_fields),
                     content_id=content["id"], theme=theme),
         decision_resolution,
     )
@@ -588,8 +702,8 @@ def render_static_module(
     channel: str,
     mode: RenderMode = "preview",
     theme: dict | None = None,
-) -> str:
-    return module_html(
+) -> "str | Half":
+    return module_part(
         channel, module.module_type, module.id,
         without_hidden(static_module_variables(db, module, manifest, mode=mode), module.hidden_fields),
         theme=theme,

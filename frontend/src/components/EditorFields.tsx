@@ -26,12 +26,16 @@ export function AutosaveField({
   value,
   onSave,
   onLeave,
+  alt,
   error,
 }: {
   // A module's field, or a record's (`ContentField`): what a form needs of either.
-  field: Pick<ModuleVariable, 'name' | 'label' | 'type' | 'note'> & { required?: boolean }
+  field: Pick<ModuleVariable, 'name' | 'label' | 'type' | 'note'> & { required?: boolean; alt?: string | null }
   value: string
-  onSave: (value: string) => void
+  /** `also` carries the image's paired alt field, saved in the same write. */
+  onSave: (value: string, also?: Record<string, string>) => void
+  /** An image field's paired alt value (see `altFieldsOf`). */
+  alt?: string
   onLeave?: (draft: string, next: Element | null) => boolean
   error: string | undefined
 }) {
@@ -49,7 +53,19 @@ export function AutosaveField({
 
   // An image is picked, not typed (task-112; ADR-197): a pick saves at once.
   if (field.type === 'image') {
-    return <ImageField label={label} value={value} onChange={onSave} required={field.required} error={error} />
+    const altName = field.alt
+    return (
+      <ImageField
+        label={label}
+        value={value}
+        alt={altName ? (alt ?? '') : undefined}
+        onChange={(next, nextAlt) =>
+          altName && nextAlt !== undefined ? onSave(next, { [altName]: nextAlt }) : onSave(next)
+        }
+        required={field.required}
+        error={error}
+      />
+    )
   }
 
   return (
@@ -111,6 +127,15 @@ export function AutosaveField({
       )}
     </TextField>
   )
+}
+
+/**
+ * The fields that hold an image's alt text (ADR-197 addendum 2026-10-15, the
+ * second): filled with a web address in the image's pop-in, never shown as a
+ * form field of their own.
+ */
+export function altFieldsOf(fields: { alt?: string | null }[]): Set<string> {
+  return new Set(fields.flatMap((f) => (f.alt ? [f.alt] : [])))
 }
 
 export function fieldError(error: unknown, name: string): string | undefined {

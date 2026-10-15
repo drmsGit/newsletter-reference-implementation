@@ -160,7 +160,9 @@ def world(db):
 
 
 def _button_style(body: str) -> str:
-    start = body.index('class="module-button"')
+    """The CTA's button: since task-371 an MJML button, styled by attributes
+    from the profile rather than by a brand.css class (ADR-198)."""
+    start = body.index('href="https://shop.test/sale')
     tag_start = body.rindex("<a", 0, start)
     return body[tag_start:body.index(">", start)]
 

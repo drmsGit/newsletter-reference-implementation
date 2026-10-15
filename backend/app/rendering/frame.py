@@ -302,7 +302,7 @@ def render_frame(
     (ADR-191 point 5; the envelope is the artifact's delivery metadata, ADR-161
     point 1). Email only; a preview passes none.
     """
-    from app.rendering.service import module_html, email_document, strip_rich_text
+    from app.rendering.service import email_document, module_html, module_part, strip_rich_text
 
     channel = frame["channel"]
     theme = _frame_theme(frame)
@@ -349,7 +349,9 @@ def render_frame(
                 )
             else:
                 for variables, content_id in copies:
-                    html_parts.append(module_html(
+                    # A Column is held as a `Half` until `email_document`
+                    # pairs it with its neighbour (ADR-198 point 4).
+                    html_parts.append(module_part(
                         channel, entry["module_type"], entry["module_id"], variables,
                         content_id=content_id, template_type=lookup_type(frame, entry), theme=theme,
                     ))

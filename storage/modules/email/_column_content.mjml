@@ -1,0 +1,10 @@
+<mj-raw>{% if image_url %}</mj-raw>
+<mj-image src="{{ image_url }}" alt="{{ image_alt }}" />
+<mj-raw>{% endif %}</mj-raw>
+<mj-raw>{% if headline_medium %}</mj-raw>
+<mj-text padding="0 0 8px 0"><h3 style="margin:0;font-size:20px;line-height:1.25;color:{{ profile.colour_text or '#1a1a1a' }}">{{ headline_medium }}</h3></mj-text>
+<mj-raw>{% endif %}</mj-raw>
+<mj-raw>{% if body_medium %}</mj-raw>
+<mj-text>{{ body_medium }}</mj-text>
+<mj-raw>{% endif %}</mj-raw>
+<mj-include path="./_text_link.mjml" />

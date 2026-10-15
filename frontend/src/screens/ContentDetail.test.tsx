@@ -197,6 +197,29 @@ describe('writing a record (task-279)', () => {
     await waitFor(() => expect(screen.getByLabelText('Hero headline')).toHaveValue('Lisbon'))
   })
 
+  it("never shows an image's alt field on its own, and saves it with an address (ADR-197)", async () => {
+    const { handlers, writes } = server()
+    open({
+      ...handlers,
+      'GET /content/fields': () => jsonResponse([
+        { name: 'image_url', label: 'Image', type: 'image', channel: 'email', alt: 'image_alt' },
+        { name: 'image_alt', label: 'Image description (alt text)', type: 'text', channel: 'email' },
+      ]),
+    })
+    const group = await screen.findByRole('group', { name: 'Image' })
+    expect(screen.queryByLabelText(/Image description/)).not.toBeInTheDocument()
+    fireEvent.click(within(group).getByRole('button', { name: 'Choose image…' }))
+    const dialog = within(await screen.findByRole('dialog'))
+    fireEvent.click(dialog.getByRole('tab', { name: 'Web address' }))
+    fireEvent.change(await dialog.findByLabelText('Image address'), { target: { value: 'https://cdn.example.org/a.jpg' } })
+    fireEvent.change(dialog.getByLabelText('Alt text'), { target: { value: 'A red door' } })
+    fireEvent.click(dialog.getByRole('button', { name: 'Use this address' }))
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect(await writes[0].json()).toEqual({
+      content: { image_url: 'https://cdn.example.org/a.jpg', image_alt: 'A red door' }, groups: ['email'],
+    })
+  })
+
   it('lists channels as sections, fields in declared order, and undefined keys read-only', async () => {
     const { handlers } = server()
     open(handlers)

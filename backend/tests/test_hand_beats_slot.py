@@ -22,7 +22,7 @@ world = fixtures.world
 
 
 def _bind(db, world, variant, record_id):
-    create_module_for_variant(db, variant_id=variant.id, module_type="single_stack",
+    create_module_for_variant(db, variant_id=variant.id, module_type="img_left",
                               content_record_id=record_id, brand_id=world["brand"].id)
 
 

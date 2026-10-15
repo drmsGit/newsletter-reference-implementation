@@ -352,6 +352,9 @@ function Stack({
   )
 }
 
+/** The suffix of the "two at once" choice for a module that pairs. */
+const TWO = ':two'
+
 function AddModule({
   campaignId,
   composed,
@@ -366,11 +369,16 @@ function AddModule({
   const add = useAddModule(campaignId)
   // Only what the channel accepts, as the server says (envelope types are
   // already left out of `accepted_module_types`).
-  const options = composed.accepted_module_types.map((type) => ({
-    id: type,
-    name: byName.get(type)?.label ?? type,
-  }))
+  // A module that pairs (the Column, ADR-198 point 4) is also offered two at
+  // once, side by side: "Two columns".
+  const options = composed.accepted_module_types.flatMap((type) => {
+    const manifest = byName.get(type)
+    const one = { id: type, name: manifest?.label ?? type }
+    return manifest?.pairs ? [one, { id: `${type}${TWO}`, name: `Two ${one.name.toLowerCase()}s` }] : [one]
+  })
   const [type, setType] = useState(options[0]?.id ?? '')
+  const two = type.endsWith(TWO)
+  const moduleType = two ? type.slice(0, -TWO.length) : type
 
   if (!composed.can_add_module) {
     return (
@@ -385,12 +393,11 @@ function AddModule({
       <Choice label="Add a module" options={options} selected={type} onChange={setType} />
       <Button
         isDisabled={!type || add.isPending}
-        onPress={() =>
-          add.mutate(
-            { variantId: composed.variant.id, moduleType: type },
-            { onSuccess: (created) => onAdded(created.id) },
-          )
-        }
+        onPress={async () => {
+          const created = await add.mutateAsync({ variantId: composed.variant.id, moduleType }).catch(() => null)
+          if (created && two) await add.mutateAsync({ variantId: composed.variant.id, moduleType }).catch(() => null)
+          if (created) onAdded(created.id)
+        }}
       >
         Add
       </Button>

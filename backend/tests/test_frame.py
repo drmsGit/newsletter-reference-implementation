@@ -58,7 +58,7 @@ def world(db):
                               content_record_id=fixed.id, brand_id=brand.id)
     slot = create_decision_slot_for_variant(db, variant_id=variant.id, name="slot",
                                             brand_id=brand.id)
-    create_module_for_variant(db, variant_id=variant.id, module_type="single_stack",
+    create_module_for_variant(db, variant_id=variant.id, module_type="img_left",
                               decision_slot_id=slot.id, brand_id=brand.id)
     db.add(DecisionResolutionDB(decision_slot_id=slot.id, content_record_id=picked.id))
     db.commit()

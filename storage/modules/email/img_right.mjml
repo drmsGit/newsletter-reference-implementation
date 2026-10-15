@@ -1,0 +1,24 @@
+<mjml>
+  <mj-head>
+    <mj-include path="./_attributes.mjml" />
+  </mj-head>
+  <mj-body width="600px">
+    <!-- Image right (ADR-198): square image right, H3, short text and a text link beside it, 50:50. The image is first in the source, so on mobile it stacks first. -->
+    <mj-section direction="rtl">
+      <mj-column width="50%" vertical-align="top">
+        <mj-raw>{% if image_url %}</mj-raw>
+        <mj-image src="{{ image_url }}" alt="{{ image_alt }}" padding="0" />
+        <mj-raw>{% endif %}</mj-raw>
+      </mj-column>
+      <mj-column width="50%" vertical-align="top">
+        <mj-raw>{% if headline_medium %}</mj-raw>
+        <mj-text padding="0 0 8px 0"><h3 style="margin:0;font-size:20px;line-height:1.25;color:{{ profile.colour_text or '#1a1a1a' }}">{{ headline_medium }}</h3></mj-text>
+        <mj-raw>{% endif %}</mj-raw>
+        <mj-raw>{% if body_medium %}</mj-raw>
+        <mj-text>{{ body_medium }}</mj-text>
+        <mj-raw>{% endif %}</mj-raw>
+        <mj-include path="./_text_link.mjml" />
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

@@ -1,0 +1,23 @@
+<mjml>
+  <mj-head>
+    <mj-include path="./_attributes.mjml" />
+  </mj-head>
+  <mj-body width="600px">
+    <!-- Hero (ADR-198): big headline and a real button left, square image right. direction="rtl" keeps the image first in the source, so on mobile it stacks first. -->
+    <mj-section direction="rtl" background-color="{{ profile.colour_hero_background or '#f4f4f4' }}" padding="24px 0">
+      <mj-column width="50%" vertical-align="middle">
+        <mj-raw>{% if image_url %}</mj-raw>
+        <mj-image src="{{ image_url }}" alt="{{ image_alt }}" padding="0" />
+        <mj-raw>{% endif %}</mj-raw>
+      </mj-column>
+      <mj-column width="50%" vertical-align="middle">
+        <mj-raw>{% if headline_hero %}</mj-raw>
+        <mj-text padding="0 0 16px 0"><h1 style="margin:0;font-size:{{ profile.size_headline or '32px' }};line-height:1.15;color:{{ profile.colour_text or '#1a1a1a' }}">{{ headline_hero }}</h1></mj-text>
+        <mj-raw>{% endif %}</mj-raw>
+        <mj-raw>{% if button_label_hero and button_url %}</mj-raw>
+        <mj-button href="{{ button_url }}">{{ button_label_hero }}</mj-button>
+        <mj-raw>{% endif %}</mj-raw>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

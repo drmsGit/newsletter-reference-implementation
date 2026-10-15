@@ -21,7 +21,7 @@ import {
 import CategoryChoice from '../components/CategoryChoice'
 import Choice from '../components/Choice'
 import { HttpError } from '../api/session'
-import { AutosaveField, SaveState, fieldError } from '../components/EditorFields'
+import { AutosaveField, SaveState, altFieldsOf, fieldError } from '../components/EditorFields'
 import PublishState from '../components/PublishState'
 import ScreenState from '../components/ScreenState'
 import { STAGE_LABEL } from './Monitoring'
@@ -95,6 +95,9 @@ function RecordPage({
   // Keys no definition names: shown, never hidden, but not editable here —
   // PATCH writes by channel group, and these are in none.
   const undefinedKeys = Object.keys(content).filter((key) => !defined.has(key)).sort()
+  // Filled with a web address in the image's pop-in (ADR-197 addendum
+  // 2026-10-15, the second), never a field of its own.
+  const alts = altFieldsOf(fields)
 
   return (
     <>
@@ -129,14 +132,17 @@ function RecordPage({
           </summary>
           {channel !== 'other' && <ReadyFor record={record} channel={channel} />}
           {fields
-            .filter((f) => (f.channel ?? 'other') === channel)
+            .filter((f) => (f.channel ?? 'other') === channel && !alts.has(f.name))
             .map((field) => (
               <AutosaveField
                 key={field.name}
                 field={field}
                 value={typeof content[field.name] === 'string' ? (content[field.name] as string) : ''}
+                alt={field.alt && typeof content[field.alt] === 'string' ? (content[field.alt] as string) : ''}
                 // Only this channel's fields may be cleared by this save (B19).
-                onSave={(value) => save.mutate({ content: { [field.name]: value }, groups: [channel] })}
+                onSave={(value, also) =>
+                  save.mutate({ content: { [field.name]: value, ...also }, groups: [channel] })
+                }
                 error={fieldError(save.error, field.name)}
               />
             ))}

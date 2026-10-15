@@ -101,7 +101,7 @@ def world(db, monkeypatch):
         for _ in range(slots):
             slot = create_decision_slot_for_variant(db, variant_id=v.id, name=f"{TAG}-slot", brand_id=brand.id)
             made["slots"].append(slot.id)
-            create_module_for_variant(db, variant_id=v.id, module_type="single_stack" if channel == "email" else "notification",
+            create_module_for_variant(db, variant_id=v.id, module_type="img_left" if channel == "email" else "notification",
                                       decision_slot_id=slot.id, brand_id=brand.id)
         db.commit()
         return v

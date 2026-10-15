@@ -8,6 +8,7 @@ topic:
   - rendering
   - frontend
 created: 2026-10-05
+modified: 2026-10-15
 source:
   - "Design interview with the user, 2026-10-05, one question at a time (task-218)"
   - "[[Manager Workflow - design interview]] Cluster 3, question 3b: the user's brief for the editor"
@@ -180,6 +181,34 @@ The value stays in the record, the override or the module's own text. Showing th
   - **The frame keeps no value for a hidden field.** It records the hidden list, and the only values it freezes are those of shown fields. A hidden value stays in its source (point 7).
 - **Not ADR-086.** [[ADR-086 — Decision Slots Fail Gracefully]] hides a whole slot automatically when it resolves to nothing. This record hides one field because a person chose to. The two do not interact. A slot module with hidden fields that resolves to nothing is still hidden as a whole by ADR-086.
 - **Preview parity.** Point 7's "the preview shows it exactly as it will be sent" is the obligation [[ADR-063 — Rendering Parity Over Rendering Implementation]] already places on preview and final rendering. Blanking at the filling step, on both the live path and the frame path, is what keeps them the same.
+
+## Addendum 2026-10-15 — blocks compile first, and the new blocks' hideable fields
+
+Prompted by the first MJML blocks ([[ADR-198 — The Email Block Set Is Seven Blocks, Square Images and Text Links]], queue task-371) and by [[ADR-131 — Email Module Templates Use MJML as Source Format]]'s addendum of 2026-10-15. Nothing above changes this record's Decision section.
+
+**1. Point 5's order is reversed.** Point 5 says a hidden field is removed "before the MJML compile", and its MJML example sends filled MJML to the compiler. Blocks are now compiled when they are written (ADR-131's addendum of 2026-10-15), so the compile comes first and the values are filled in later.
+
+- **A hidden field is still blanked when the values are filled in,** and its `{% if %}` guard still removes it.
+- **The guard must survive the compile.** The load-time guard check reads the compiled template the backend loads, so a guard the compiler dropped or moved is refused there.
+- **For a module that pairs, the check reads its `_<name>_pair.html` too** (ADR-198's addendum of 2026-10-15, point 4).
+- **Only loaded names are checked.** A name bound by `{% with %}` is an assignment, not a print.
+- **The rule for template authors is unchanged.** Point 5's MJML example still shows the guard; it no longer shows when the compile happens. The Note "MJML is the decided source format but is not built" no longer holds.
+
+**2. Point 8's table, for ADR-198's blocks.**
+
+| Module | Hideable | Not hideable |
+|---|---|---|
+| Hero | `headline_hero`, `image_url`, `button_label_hero` | `image_alt`, `button_url` |
+| Image left, Image right, Column | `image_url`, `headline_medium`, `body_medium`, `button_label` | `image_alt`, `button_url` |
+| Single text | `headline_medium`, `body_long`, `button_label` | `button_url` |
+| CTA, Headline, Editorial | none | all |
+| Envelope | none | all |
+| Single Stack (retired) | as in point 8 | as in point 8 |
+
+- **`image_alt` follows the image and is not hideable,** as point 8 says.
+- **The Hero gains `image_url`,** because ADR-198 gives it a square image.
+- **`section_heading` leaves the image blocks** (ADR-198 point 5). Only the retired Single Stack keeps it.
+- **Hidden fields apply to each Column of a pair separately.**
 
 ## Related ADRs
 

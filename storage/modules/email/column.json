@@ -1,0 +1,37 @@
+{
+  "label": "Column",
+  "channel": "email",
+  "description": "Half a row: square image, headline, short text and a text link, one record each. Two Columns in a row share it 50:50; a lone one fills the left half (ADR-198 point 4).",
+  "cms": true,
+  "pairs": true,
+  "variables": [
+    {
+      "name": "image_url",
+      "required": false,
+      "hideable": true
+    },
+    {
+      "name": "image_alt",
+      "required": false
+    },
+    {
+      "name": "headline_medium",
+      "required": true,
+      "hideable": true
+    },
+    {
+      "name": "body_medium",
+      "required": false,
+      "hideable": true
+    },
+    {
+      "name": "button_label",
+      "required": false,
+      "hideable": true
+    },
+    {
+      "name": "button_url",
+      "required": false
+    }
+  ]
+}

@@ -28,7 +28,8 @@ KINDS = (MARKETING, TRANSACTIONAL)
 #: one per line, "Label | https://address".
 FIELD_TYPES = frozenset({"colour", "font_family", "size", "image", "text", "url", "number", "links"})
 #: `alt` (ADR-194 addendum 2026-10-15): on an `image` field, the field that
-#: holds its alt text, which inherits the library image's alt when empty.
+#: holds the alt text of an address; a library image uses its own (ADR-197
+#: addendum 2026-10-15, the second).
 FIELD_KEYS = frozenset({"type", "label", "required", "group", "multiline", "alt"})
 #: Safe to refer to from brand.css and templates (task-354).
 NAME = re.compile(r"[a-z][a-z0-9_]*")

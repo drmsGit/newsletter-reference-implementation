@@ -1,18 +1,142 @@
-{# Typed in the module, not the content (ADR-179 addendum 2026-10-04); renders only with the module. #}
-{% if section_heading %}<p class="module-section-heading">{{ section_heading }}</p>{% endif %}
-<table width="100%" cellpadding="0" cellspacing="0" role="presentation" class="module-wrapper">
-  <tr>
-    {% if image_url %}
-    <td width="40%" class="module-image-cell">
-      <img src="{{ image_url }}" alt="{{ image_alt }}" class="module-image" />
-    </td>
-    {% endif %}
-    <td class="module-content-cell">
-      {% if headline_medium %}<h2 class="module-headline">{{ headline_medium }}</h2>{% endif %}
-      {% if body_medium %}<p class="module-body">{{ body_medium }}</p>{% endif %}
-      {% if button_label and button_url %}
-      <a href="{{ button_url }}" class="module-button">{{ button_label }}</a>
-      {% endif %}
-    </td>
-  </tr>
-</table>
+{# Generated from img_left.mjml by npm run build:modules (frontend/). Do not edit: edit the .mjml. #}
+<!-- Image left (ADR-198): square image left, H3, short text and a text link beside it, 50:50. The image is first in the source, so on mobile it stacks first. -->
+      
+      <!--[if mso | IE]><table align="center" border="0" cellpadding="0" cellspacing="0" class="" role="presentation" style="width:600px;" width="600" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+    
+      
+      <div  style="margin:0px auto;max-width:600px;">
+        
+        <table
+           align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;"
+        >
+          <tbody>
+            <tr>
+              <td
+                 style="direction:ltr;font-size:0px;padding:16px 0;text-align:center;"
+              >
+                <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:top;width:300px;" ><![endif]-->
+            
+      <div
+         class="mj-column-per-50 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
+      >
+        
+      <table
+         border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%"
+      >
+        <tbody>
+          <tr>
+            <td  style="vertical-align:top;padding:0 12px;">
+              
+      <table
+         border="0" cellpadding="0" cellspacing="0" role="presentation" style="" width="100%"
+      >
+        <tbody>
+          {% if image_url %}
+              <tr>
+                <td
+                   align="left" style="font-size:0px;padding:0;word-break:break-word;"
+                >
+                  
+      <table
+         border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;border-spacing:0px;"
+      >
+        <tbody>
+          <tr>
+            <td  style="width:276px;">
+              
+      <img
+         alt="{{ image_alt }}" src="{{ image_url }}" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;font-size:13px;" width="276" height="auto"
+      />
+    
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    
+                </td>
+              </tr>
+            {% endif %}
+        </tbody>
+      </table>
+    
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    
+      </div>
+    
+          <!--[if mso | IE]></td><td class="" style="vertical-align:top;width:300px;" ><![endif]-->
+            
+      <div
+         class="mj-column-per-50 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:top;width:100%;"
+      >
+        
+      <table
+         border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%"
+      >
+        <tbody>
+          <tr>
+            <td  style="vertical-align:top;padding:0 12px;">
+              
+      <table
+         border="0" cellpadding="0" cellspacing="0" role="presentation" style="" width="100%"
+      >
+        <tbody>
+          {% if headline_medium %}
+              <tr>
+                <td
+                   align="left" style="font-size:0px;padding:0 0 8px 0;word-break:break-word;"
+                >
+                  
+      <div
+         style="font-family:{{ profile.font_family or 'Arial, Helvetica, sans-serif' }};font-size:{{ profile.size_body or '16px' }};line-height:1.6;text-align:left;color:{{ profile.colour_body_text or '#444444' }};"
+      ><h3 style="margin:0;font-size:20px;line-height:1.25;color:{{ profile.colour_text or '#1a1a1a' }}">{{ headline_medium }}</h3></div>
+    
+                </td>
+              </tr>
+            {% endif %}{% if body_medium %}
+              <tr>
+                <td
+                   align="left" style="font-size:0px;padding:0 0 12px 0;word-break:break-word;"
+                >
+                  
+      <div
+         style="font-family:{{ profile.font_family or 'Arial, Helvetica, sans-serif' }};font-size:{{ profile.size_body or '16px' }};line-height:1.6;text-align:left;color:{{ profile.colour_body_text or '#444444' }};"
+      >{{ body_medium }}</div>
+    
+                </td>
+              </tr>
+            {% endif %}{% if button_label and button_url %}
+              <tr>
+                <td
+                   align="left" style="font-size:0px;padding:4px 0 0 0;word-break:break-word;"
+                >
+                  
+      <div
+         style="font-family:{{ profile.font_family or 'Arial, Helvetica, sans-serif' }};font-size:{{ profile.size_body or '16px' }};line-height:1.6;text-align:left;color:{{ profile.colour_body_text or '#444444' }};"
+      ><a href="{{ button_url }}" class="text-link" style="color:{{ profile.colour_text or '#1a1a1a' }};text-decoration:underline;font-weight:600">{{ button_label }}&nbsp;&rarr;</a></div>
+    
+                </td>
+              </tr>
+            {% endif %}
+        </tbody>
+      </table>
+    
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    
+      </div>
+    
+          <!--[if mso | IE]></td></tr></table><![endif]-->
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        
+      </div>
+    
+      
+      <!--[if mso | IE]></td></tr></table><![endif]-->

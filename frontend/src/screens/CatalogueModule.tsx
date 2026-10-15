@@ -19,7 +19,7 @@ import {
 import CategoryChoice from '../components/CategoryChoice'
 import PublishState from '../components/PublishState'
 import Choice from '../components/Choice'
-import { AutosaveField, SaveState, fieldError } from '../components/EditorFields'
+import { AutosaveField, SaveState, altFieldsOf, fieldError } from '../components/EditorFields'
 import ScreenState from '../components/ScreenState'
 import { useShortcut } from '../shortcuts/Shortcuts'
 import SlotSettings from './SlotSettings'
@@ -117,7 +117,10 @@ function CatalogueFields({
   const overrides = (module.active_override?.field_overrides ?? {}) as Record<string, unknown>
   // Content fields only: a field typed in the module is the module's own,
   // edited below and never overridden (ADR-179's 2026-10-04 addendum).
-  const fields = manifest.variables.filter((v) => !v.envelope && v.source !== 'module')
+  // An image's alt field is not one of them: it is filled with a web
+  // address in the image's pop-in (ADR-197 addendum 2026-10-15, the second).
+  const alts = altFieldsOf(manifest.variables)
+  const fields = manifest.variables.filter((v) => !v.envelope && v.source !== 'module' && !alts.has(v.name))
   const [confirmReset, setConfirmReset] = useState(false)
   const [rebinding, setRebinding] = useState(false)
   const hide = useHide(campaignId, module, manifest)
@@ -157,6 +160,7 @@ function CatalogueFields({
                   module={module}
                   field={field}
                   catalogue={record.data.content[field.name]}
+                  catalogueAlt={field.alt ? record.data.content[field.alt] : undefined}
                   overrides={overrides}
                   setOverride={setOverride}
                   saveField={saveField}
@@ -450,6 +454,7 @@ function CatalogueField({
   module,
   field,
   catalogue,
+  catalogueAlt,
   overrides,
   setOverride,
   saveField,
@@ -458,6 +463,7 @@ function CatalogueField({
   module: ComposedModule
   field: ModuleManifest['variables'][number]
   catalogue: unknown
+  catalogueAlt?: unknown
   overrides: Record<string, unknown>
   setOverride: ReturnType<typeof useSetOverride>
   saveField: ReturnType<typeof useSaveCatalogueField>
@@ -528,9 +534,10 @@ function CatalogueField({
       <AutosaveField
         field={{ ...field, label: overridden ? `${label} — overridden here` : label }}
         value={overridden ? (typeof own === 'string' ? own : '') : catalogueText}
+        alt={altText(field.alt, overrides, catalogueAlt)}
         // AutosaveField saves only a changed value, so an untouched catalogue
-        // value never becomes an override.
-        onSave={(next) => setOverride.mutate({ id: module.id, set: { [field.name]: next } })}
+        // value never becomes an override. An address's alt is overridden with it.
+        onSave={(next, also) => setOverride.mutate({ id: module.id, set: { [field.name]: next, ...also } })}
         // Typing that leaves the field for its own "Change in catalogue"
         // was meant for the catalogue: it goes there, and no override is
         // written on the way (task-261).
@@ -552,6 +559,13 @@ function CatalogueField({
       {changeInCatalogue}
     </div>
   )
+}
+
+/** An image's alt text as this module shows it: overridden here, or the catalogue's. */
+function altText(name: string | null | undefined, overrides: Record<string, unknown>, catalogue: unknown): string {
+  if (!name) return ''
+  const value = name in overrides ? overrides[name] : catalogue
+  return typeof value === 'string' ? value : ''
 }
 
 /**

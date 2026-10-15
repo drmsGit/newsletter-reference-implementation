@@ -1,7 +1,7 @@
 {
   "label": "Call to Action",
   "channel": "email",
-  "description": "A single button link. Use at the end of a section to drive a specific action. Not connected to CMS — fill in label and URL manually.",
+  "description": "A real button, or two side by side when the second text and link are given (ADR-198). Not connected to the catalogue — type the texts and links in.",
   "cms": false,
   "variables": [
     {
@@ -11,6 +11,14 @@
     {
       "name": "url",
       "required": true
+    },
+    {
+      "name": "label_2",
+      "required": false
+    },
+    {
+      "name": "url_2",
+      "required": false
     }
   ]
 }

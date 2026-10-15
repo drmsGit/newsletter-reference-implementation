@@ -1,10 +1,144 @@
-<table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-  <tr>
-    <td class="module-hero">
-      {% if headline_hero %}<h1 class="module-headline">{{ headline_hero }}</h1>{% endif %}
-      {% if button_label_hero and button_url %}
-      <a class="module-button" href="{{ button_url }}">{{ button_label_hero }}</a>
-      {% endif %}
-    </td>
-  </tr>
-</table>
+{# Generated from hero.mjml by npm run build:modules (frontend/). Do not edit: edit the .mjml. #}
+<!-- Hero (ADR-198): big headline and a real button left, square image right. direction="rtl" keeps the image first in the source, so on mobile it stacks first. -->
+      
+      <!--[if mso | IE]><table align="center" border="0" cellpadding="0" cellspacing="0" class="" role="presentation" style="width:600px;" width="600" bgcolor="{{ profile.colour_hero_background or '#f4f4f4' }}" ><tr><td style="line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]-->
+    
+      
+      <div  style="background:{{ profile.colour_hero_background or '#f4f4f4' }};background-color:{{ profile.colour_hero_background or '#f4f4f4' }};margin:0px auto;max-width:600px;">
+        
+        <table
+           align="center" border="0" cellpadding="0" cellspacing="0" role="presentation" style="background:{{ profile.colour_hero_background or '#f4f4f4' }};background-color:{{ profile.colour_hero_background or '#f4f4f4' }};width:100%;"
+        >
+          <tbody>
+            <tr>
+              <td
+                 style="direction:rtl;font-size:0px;padding:24px 0;text-align:center;"
+              >
+                <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0"><tr><td class="" style="vertical-align:middle;width:300px;" ><![endif]-->
+            
+      <div
+         class="mj-column-per-50 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:middle;width:100%;"
+      >
+        
+      <table
+         border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%"
+      >
+        <tbody>
+          <tr>
+            <td  style="vertical-align:middle;padding:0 12px;">
+              
+      <table
+         border="0" cellpadding="0" cellspacing="0" role="presentation" style="" width="100%"
+      >
+        <tbody>
+          {% if image_url %}
+              <tr>
+                <td
+                   align="left" style="font-size:0px;padding:0;word-break:break-word;"
+                >
+                  
+      <table
+         border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;border-spacing:0px;"
+      >
+        <tbody>
+          <tr>
+            <td  style="width:276px;">
+              
+      <img
+         alt="{{ image_alt }}" src="{{ image_url }}" style="border:0;display:block;outline:none;text-decoration:none;height:auto;width:100%;font-size:13px;" width="276" height="auto"
+      />
+    
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    
+                </td>
+              </tr>
+            {% endif %}
+        </tbody>
+      </table>
+    
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    
+      </div>
+    
+          <!--[if mso | IE]></td><td class="" style="vertical-align:middle;width:300px;" ><![endif]-->
+            
+      <div
+         class="mj-column-per-50 mj-outlook-group-fix" style="font-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:middle;width:100%;"
+      >
+        
+      <table
+         border="0" cellpadding="0" cellspacing="0" role="presentation" width="100%"
+      >
+        <tbody>
+          <tr>
+            <td  style="vertical-align:middle;padding:0 12px;">
+              
+      <table
+         border="0" cellpadding="0" cellspacing="0" role="presentation" style="" width="100%"
+      >
+        <tbody>
+          {% if headline_hero %}
+              <tr>
+                <td
+                   align="left" style="font-size:0px;padding:0 0 16px 0;word-break:break-word;"
+                >
+                  
+      <div
+         style="font-family:{{ profile.font_family or 'Arial, Helvetica, sans-serif' }};font-size:{{ profile.size_body or '16px' }};line-height:1.6;text-align:left;color:{{ profile.colour_body_text or '#444444' }};"
+      ><h1 style="margin:0;font-size:{{ profile.size_headline or '32px' }};line-height:1.15;color:{{ profile.colour_text or '#1a1a1a' }}">{{ headline_hero }}</h1></div>
+    
+                </td>
+              </tr>
+            {% endif %}{% if button_label_hero and button_url %}
+              <tr>
+                <td
+                   align="left" style="font-size:0px;padding:8px 0 0 0;word-break:break-word;"
+                >
+                  
+      <table
+         border="0" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:separate;line-height:100%;"
+      >
+        <tbody>
+          <tr>
+            <td
+               align="center" bgcolor="{{ profile.colour_button or '#1a1a1a' }}" role="presentation" style="border:none;border-radius:4px;cursor:auto;mso-padding-alt:12px 24px;background:{{ profile.colour_button or '#1a1a1a' }};" valign="middle"
+            >
+              <a
+                 href="{{ button_url }}" style="display:inline-block;background:{{ profile.colour_button or '#1a1a1a' }};color:{{ profile.colour_button_text or '#ffffff' }};font-family:{{ profile.font_family or 'Arial, Helvetica, sans-serif' }};font-size:15px;font-weight:600;line-height:120%;margin:0;text-decoration:none;text-transform:none;padding:12px 24px;mso-padding-alt:0px;border-radius:4px;" target="_blank"
+              >
+                {{ button_label_hero }}
+              </a>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    
+                </td>
+              </tr>
+            {% endif %}
+        </tbody>
+      </table>
+    
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    
+      </div>
+    
+          <!--[if mso | IE]></td></tr></table><![endif]-->
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        
+      </div>
+    
+      
+      <!--[if mso | IE]></td></tr></table><![endif]-->

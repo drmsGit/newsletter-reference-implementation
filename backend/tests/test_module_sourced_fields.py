@@ -6,6 +6,10 @@ nothing, so it cannot be a separate heading module. ADR-179's 2026-10-04
 addendum: a manifest marks such a field `source: "module"`; the module's
 other fields still come from the content or the slot's pick. The field is the
 module's own: never overridden, never a catalogue field.
+
+Since 2026-10-15 (task-371, ADR-198 point 5) the heading has left the image
+blocks for the Headline block; the retired Single Stack still carries it, so
+the mechanism is tested on that one, which keeps rendering where it is used.
 """
 import uuid
 
@@ -43,11 +47,11 @@ def world(db, default_brand):
     db.add_all([picked, nothing]); db.flush()
     db.add(DecisionResolutionDB(decision_slot_id=picked.id, recipient_id=None,
                                 content_record_id=record.id, reason="r", score=1))
-    on_record = ModuleInstanceDB(variant_id=variant.id, module_type="img_left", position=1,
+    on_record = ModuleInstanceDB(variant_id=variant.id, module_type="single_stack", position=1,
                                  content_record_id=record.id, module_data={"section_heading": ON_RECORD})
-    on_pick = ModuleInstanceDB(variant_id=variant.id, module_type="img_left", position=2,
+    on_pick = ModuleInstanceDB(variant_id=variant.id, module_type="single_stack", position=2,
                                decision_slot_id=picked.id, module_data={"section_heading": SHOWN})
-    on_nothing = ModuleInstanceDB(variant_id=variant.id, module_type="img_left", position=3,
+    on_nothing = ModuleInstanceDB(variant_id=variant.id, module_type="single_stack", position=3,
                                   decision_slot_id=nothing.id, module_data={"section_heading": HIDDEN})
     db.add_all([on_record, on_pick, on_nothing]); db.commit()
     yield {"variant": variant, "on_record": on_record}
@@ -70,8 +74,8 @@ def world(db, default_brand):
 def test_the_manifest_says_which_fields_are_typed_in_the_module():
     with machine([VIEW]) as headers:
         manifests = client.get("/modules", params={"channel": "email"}, headers=headers).json()
-    img_left = next(m for m in manifests if m["name"] == "img_left")
-    source = {v["name"]: v["source"] for v in img_left["variables"]}
+    stack = next(m for m in manifests if m["name"] == "single_stack")
+    source = {v["name"]: v["source"] for v in stack["variables"]}
     assert source["section_heading"] == "module"
     assert source["headline_medium"] == "content"
 
@@ -94,9 +98,9 @@ def test_a_module_typed_field_is_never_overridden(db, world):
 def test_a_catalogue_module_stores_only_its_module_typed_fields(world):
     url = f"/campaigns/modules/{world['on_record'].id}"
     with editor() as headers:
-        ok = client.put(url, json={"module_type": "img_left", "content_record_id": None,
+        ok = client.put(url, json={"module_type": "single_stack", "content_record_id": None,
                                    "module_data": {"section_heading": "New"}}, headers=headers)
-        refused = client.put(url, json={"module_type": "img_left",
+        refused = client.put(url, json={"module_type": "single_stack",
                                         "module_data": {"headline_medium": "Typed over the catalogue"}},
                              headers=headers)
     assert ok.status_code == 200, ok.text

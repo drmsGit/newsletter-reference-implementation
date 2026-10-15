@@ -21,6 +21,10 @@ class ContentField(BaseModel):
     note: str | None = None
     channel: str | None = None
     envelope: bool = False
+    #: For an `image` field, the field that holds the alt text of a web
+    #: address; a form shows it with the address, not as a field of its own
+    #: (ADR-197 addendum 2026-10-15, the second).
+    alt: str | None = None
 
 
 class ContentRecord(BaseModel):

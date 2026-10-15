@@ -5,7 +5,8 @@ address, or nothing. Rendering needs an absolute address a mail client can
 fetch, so `asset:<id>` becomes `PUBLIC_BASE_URL/media/<token>` where content
 and profiles enter rendering — the live preview, the frame and every pick then
 hold a plain URL, and the frame keeps it, so the as-sent rebuild stays exact
-(ADR-183). An empty alt field paired with the image inherits the image's alt.
+(ADR-183). The alt field paired with a library image takes the image's own alt
+(ADR-197 addendum 2026-10-15, the second).
 
 Another brand's image never resolves: it renders as no image, and saving such
 a reference is refused (`check`).
@@ -45,7 +46,10 @@ def asset_of(db: Session, value, brand_id: int | None):
 
 
 def resolve_images(db: Session, values: dict, pairs: dict[str, str | None], brand_id: int | None) -> dict:
-    """`values` with every `asset:<id>` in an image field made an address."""
+    """`values` with every `asset:<id>` in an image field made an address,
+    and its paired alt field the library image's own alt text: a library image
+    always uses its own, whatever the usage holds (ADR-197 addendum 2026-10-15,
+    the second). An address keeps the alt typed with it."""
     if not any(isinstance(values.get(name), str) and values[name].startswith("asset:") for name in pairs):
         return values
     resolved = dict(values)
@@ -55,8 +59,8 @@ def resolve_images(db: Session, values: dict, pairs: dict[str, str | None], bran
             continue
         asset = asset_of(db, value, brand_id)
         resolved[name] = public_url(asset.token) if asset is not None else ""
-        if asset is not None and alt and not (resolved.get(alt) or "").strip():
-            resolved[alt] = asset.alt_text
+        if alt:
+            resolved[alt] = asset.alt_text if asset is not None else ""
     return resolved
 
 
