@@ -146,6 +146,7 @@ class TestPermissions:
 
     def test_deactivated_user_holds_nothing(self, db, temp_user):
         user = temp_user(role_key=ADMIN)
+        temp_user(role_key=ADMIN)  # ADR-150: someone must retain administration.
         auth.set_active(db, user.id, False)
         assert auth.permissions_for(db, user, auth.ALL_BRANDS) == set()
 
