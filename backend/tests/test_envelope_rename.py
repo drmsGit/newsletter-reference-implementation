@@ -47,8 +47,9 @@ def test_the_envelope_module_is_called_envelope():
 
 def test_a_new_frame_names_its_envelope_and_says_its_version(db, world):
     frame = _new_frame(db, world)
-    # 3 since task-357 (brand profiles); the rename came with 2.
-    assert frame["frame_version"] == FRAME_VERSION == 3
+    # 4 since task-365 (frozen expression entries), 3 since task-357 (brand
+    # profiles); the rename came with 2.
+    assert frame["frame_version"] == FRAME_VERSION == 4
     assert "header" not in {e["module_type"] for e in frame["modules"]}
 
 

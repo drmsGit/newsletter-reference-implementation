@@ -130,6 +130,7 @@ def render_variant_html(
     mode: RenderMode = "preview",
     collect_resolutions: bool = False,
     footer: str = "",
+    personal=None,
 ) -> str | tuple[str, dict[int, DecisionResolutionDB]]:
     # The variant's channel decides which manifests resolve — ADR-161 point 7:
     # a channel is "an attribute on the variant plus which manifests it
@@ -178,10 +179,15 @@ def render_variant_html(
     from app.brand_profiles.theme import live_theme
 
     theme = live_theme(db, variant)
+    # The recipient's entries, as they are now (ADR-199): fallbacks for nobody.
+    if personal is None:
+        from app.expressions.substitute import live_personal
+
+        personal = live_personal(db, variant_id, recipient_id)
 
     for module in modules:
         html, resolution = render_module(db=db, module=module, channel=channel, recipient_id=recipient_id,
-                                         mode=mode, theme=theme)
+                                         mode=mode, theme=theme, personal=personal)
         # A slot showing several picks hands back one part per pick (task-109).
         rendered_modules.extend(html if isinstance(html, list) else [html])
         if resolution is not None:
@@ -206,6 +212,7 @@ def render_module(
     recipient_id: int | None = None,
     mode: RenderMode = "preview",
     theme: dict | None = None,
+    personal=None,
 ) -> "tuple[str | Half | list[str | Half], DecisionResolutionDB | None]":
     """`channel` is passed down rather than looked up per module: the caller
     already has the variant, and a query per module to re-derive a value that
@@ -218,10 +225,10 @@ def render_module(
 
     if manifest.cms:
         return render_cms_module(db=db, module=module, manifest=manifest, channel=channel, recipient_id=recipient_id,
-                                 mode=mode, theme=theme)
+                                 mode=mode, theme=theme, personal=personal)
 
     return render_static_module(db=db, module=module, manifest=manifest, channel=channel, mode=mode,
-                                theme=theme), None
+                                theme=theme, personal=personal), None
 
 
 def envelope_fields_for_variant(
@@ -385,6 +392,7 @@ def module_html(
     *,
     template_type: str | None = None,
     theme: dict | None = None,
+    personal=None,
 ) -> str:
     """One module's HTML from values already decided — the formatting half.
 
@@ -410,9 +418,12 @@ def module_html(
             f"</div>"
         )
     theme = theme or {}
-    rendered = _jinja.from_string(html_source).render(
-        **{**apply_rich_text(variables, manifest), "profile": theme.get("values") or {}},
-    )
+    values = apply_rich_text(variables, manifest)
+    if personal is not None:
+        # The recipient's entries, after escaping and formatting, never
+        # through Jinja (ADR-199; app/expressions/substitute.py).
+        values = personal.fields(values, manifest)
+    rendered = _jinja.from_string(html_source).render(**{**values, "profile": theme.get("values") or {}})
     if content_id is not None:
         # The link names its content (task-240, ADR-182): only here, inside a
         # content-bound module, so a non-content link credits nothing.
@@ -445,23 +456,24 @@ class Half:
     content_id: int | None = None
     template_type: str | None = None
     theme: dict | None = None
+    personal: object = None
 
     def alone(self) -> str:
         return module_html(self.channel, self.module_type, self.module_id, self.variables, self.content_id,
-                           template_type=self.template_type, theme=self.theme)
+                           template_type=self.template_type, theme=self.theme, personal=self.personal)
 
 
 def module_part(
     channel: str, module_type: str, module_id: int, variables: dict, content_id: int | None = None,
-    *, template_type: str | None = None, theme: dict | None = None,
+    *, template_type: str | None = None, theme: dict | None = None, personal=None,
 ) -> "str | Half":
     """`module_html`, or a `Half` for a module that pairs: what the live and
     the frame render hand to `email_document`."""
     manifest = get_manifest(channel, template_type or module_type)
     if manifest is not None and manifest.pairs:
-        return Half(channel, module_type, module_id, variables, content_id, template_type, theme)
+        return Half(channel, module_type, module_id, variables, content_id, template_type, theme, personal)
     return module_html(channel, module_type, module_id, variables, content_id,
-                       template_type=template_type, theme=theme)
+                       template_type=template_type, theme=theme, personal=personal)
 
 
 #: Between the two sides of a pair, so each side's links are tagged with its
@@ -476,10 +488,11 @@ def _pair_html(left: Half, right: Half) -> str:
     manifest = get_manifest(left.channel, left.template_type or left.module_type)
     source = (MODULES_DIR / left.channel / pair_template_name(manifest)).read_text()
     theme = left.theme or {}
-    rendered = _jinja.from_string(source).render(
-        left=apply_rich_text(left.variables, manifest), right=apply_rich_text(right.variables, manifest),
-        profile=theme.get("values") or {},
-    )
+    def side(half: Half) -> dict:
+        values = apply_rich_text(half.variables, manifest)
+        return half.personal.fields(values, manifest) if half.personal is not None else values
+
+    rendered = _jinja.from_string(source).render(left=side(left), right=side(right), profile=theme.get("values") or {})
     sides = rendered.split(_PAIR_SPLIT)
     if len(sides) != 2:
         raise ValueError(f"{pair_template_name(manifest)} must hold {_PAIR_SPLIT} once, between its sides.")
@@ -604,6 +617,7 @@ def render_cms_module(
     recipient_id: int | None = None,
     mode: RenderMode = "preview",
     theme: dict | None = None,
+    personal=None,
 ) -> "tuple[str | Half | list[str | Half], DecisionResolutionDB | None]":
     if module.decision_slot_id is not None:
         # A slot shows up to its "show up to", first pick first: the module
@@ -617,7 +631,7 @@ def render_cms_module(
             [
                 module_part(channel, module.module_type, module.id,
                             without_hidden(fill_variables(module, manifest, content), module.hidden_fields),
-                            content_id=content["id"], theme=theme)
+                            content_id=content["id"], theme=theme, personal=personal)
                 for content, _resolution in picked
             ],
             picked[0][1],
@@ -636,7 +650,7 @@ def render_cms_module(
 
     return (
         module_part(channel, module.module_type, module.id, without_hidden(variables, module.hidden_fields),
-                    content_id=content["id"], theme=theme),
+                    content_id=content["id"], theme=theme, personal=personal),
         decision_resolution,
     )
 
@@ -702,11 +716,12 @@ def render_static_module(
     channel: str,
     mode: RenderMode = "preview",
     theme: dict | None = None,
+    personal=None,
 ) -> "str | Half":
     return module_part(
         channel, module.module_type, module.id,
         without_hidden(static_module_variables(db, module, manifest, mode=mode), module.hidden_fields),
-        theme=theme,
+        theme=theme, personal=personal,
     )
 
 

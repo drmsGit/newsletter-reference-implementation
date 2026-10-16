@@ -77,6 +77,9 @@ REASON_NOTHING_TO_SHOW = "nothing to show — no module produced content for thi
 #: neither picked by a slot nor placed by hand (ADR-086 addendum 2026-10-11).
 REASON_NO_PICK = ("no content record for this person: no personalised block found anything "
                   "and none is placed by hand")
+#: Their slot pick's content uses an entry the frame holds no text for in the
+#: message's language (ADR-199): excluded rather than sent with {{name}} in it.
+REASON_PERSONAL_MISSING = "personalisation without a text in this message's language"
 
 
 @dataclass(frozen=True)

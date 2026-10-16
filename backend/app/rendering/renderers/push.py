@@ -90,7 +90,11 @@ class PushRenderer(ChannelRenderer):
             # happens not to use the field email formats.
             from app.rendering.service import strip_rich_text
 
-            fields.update(strip_rich_text(variables, manifest))
+            # The recipient's entries, into the plain fields (ADR-199).
+            from app.expressions.substitute import live_personal
+
+            fields.update(live_personal(db, variant_id, recipient_id).fields(
+                strip_rich_text(variables, manifest), manifest))
             break
 
         return RenderedArtifact(

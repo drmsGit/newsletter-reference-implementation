@@ -70,7 +70,7 @@ def world(db):
 
 def test_a_frame_freezes_the_variants_profile(db, world):
     frame = build_frame(db, world["variant"].id)
-    assert frame["frame_version"] == 3
+    assert frame["frame_version"] >= 3, "a profile is frozen from version 3 on"
     frozen = frame["brand_profile"]
     assert (frozen["id"], frozen["name"], frozen["language"], frozen["kind"]) == (
         world["profile"].id, world["profile"].name, "en", "marketing")

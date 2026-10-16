@@ -10,8 +10,8 @@ from app.delivery.models import DeliveryExecution, SendInstance, SendInstanceDet
 
 from app.campaigns.db_models import VariantDB
 from app.delivery.exclusion import (
-    REASON_LEFT_AUDIENCE, REASON_NO_PICK, REASON_NOTHING_TO_SHOW, STAGE_AUDIENCE, STAGE_RENDER,
-    run_exclusion_stack,
+    REASON_LEFT_AUDIENCE, REASON_NO_PICK, REASON_NOTHING_TO_SHOW, REASON_PERSONAL_MISSING, STAGE_AUDIENCE,
+    STAGE_RENDER, run_exclusion_stack,
 )
 from app.delivery.providers.factory import get_provider, providers_for_channel
 from app.recipients.consent import DEFAULT_CHANNEL, MARKETING, ConsentDenied
@@ -1001,14 +1001,14 @@ def test_variant(
     unsubscribe token or link, no tracking (ADR-191). Raises ValueError for a
     push variant or a brand profile that may not send.
     """
-    from app.rendering.frame import profile_refusal
+    from app.rendering.frame import expression_refusal, profile_refusal
 
     frame = frame_now(db, variant_id, brand_id=brand_id)
     if frame is None:
         return None
     if frame.get("channel") != "email":
         raise ValueError("a push cannot be tested by email; the preview shows what it carries")
-    if refusal := profile_refusal(frame):
+    if refusal := profile_refusal(frame) or expression_refusal(frame):
         raise ValueError(refusal)
     to = to.strip()
     artifact = render_now(db, frame, recipient_id)
@@ -1125,9 +1125,12 @@ def send_send_instance(
     # Every email carries its brand profile's legal details (ADR-194): a frame
     # without them, or with a required one empty, is refused here, before the
     # claim, like missing content.
-    from app.rendering.frame import profile_refusal
+    from app.rendering.frame import expression_refusal, profile_refusal
 
     if (refusal := profile_refusal(snapshot.render_context)) is not None:
+        raise ValueError(refusal)
+    # Its texts use an entry with no text in the message's language (ADR-199).
+    if (refusal := expression_refusal(snapshot.render_context)) is not None:
         raise ValueError(refusal)
 
     # Subject line comes from the variant (recipient-facing copy), not the
@@ -1438,6 +1441,10 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
             REASON_NOTHING_TO_SHOW if not meaningful
             else REASON_NO_PICK
             if send_instance.skip_without_resolution and slots and not picks and not hand_bound
+            # A pick's content used an entry the frame has no text for
+            # (ADR-199): never sent with {{name}} in it.
+            else f"{REASON_PERSONAL_MISSING}: " + ", ".join("{{" + n + "}}" for n in artifact.personal_missing)
+            if artifact.personal_missing
             else None
         )
         if skipped:
@@ -1514,6 +1521,10 @@ def _deliver_claimed(db: Session, send_instance, snapshot, variant, subject, pro
             }
             if unsubscribe:
                 execution.delivery_record["unsubscribe"] = unsubscribe
+            # The recipient's entries as they read (ADR-199, ADR-183 point 7):
+            # a rebuild uses these and never this person's data as it is now.
+            if artifact.personal:
+                execution.delivery_record["personal"] = artifact.personal
             execution.artifact_hash = artifact_hash(artifact)
 
         # Commit after each execution — if provider.send() raises mid-batch,
@@ -1598,7 +1609,10 @@ def reconstruct_delivery(db: Session, execution_id: int, *, brand_id: int) -> di
 
     artifact, _ = render_frame(db, frame, recipient_id=execution.recipient_id,
                                picks=record.get("picks") or [],
-                               unsubscribe=record.get("unsubscribe"))
+                               unsubscribe=record.get("unsubscribe"),
+                               # What their entries read when sent (ADR-199),
+                               # never what the recipient reads like today.
+                               personal=record.get("personal") or {})
     # The same fallback the send applied, so the two hashes are comparable.
     if artifact.body is not None and not artifact.envelope.get("subject"):
         artifact.envelope["subject"] = send_instance.name

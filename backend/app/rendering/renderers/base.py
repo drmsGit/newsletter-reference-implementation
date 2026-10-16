@@ -63,6 +63,13 @@ class RenderedArtifact:
     #: Idempotency-Key header, 24 hours). Delivery metadata, not content: not
     #: part of `artifact_hash`, so reconstruction is unaffected.
     idempotency_key: str | None = None
+    #: The recipient's entries this render used, {name: text} (ADR-199): what
+    #: the delivery record keeps, so a rebuild never re-reads the recipient.
+    #: Not part of `artifact_hash`: the text it produced is.
+    personal: dict | None = None
+    #: Entries a text used that the frame holds no text for in the message's
+    #: language: a send excludes that recipient rather than print {{name}}.
+    personal_missing: list = field(default_factory=list)
 
     @classmethod
     def email(cls, html: str, subject: str | None = None) -> "RenderedArtifact":

@@ -23,14 +23,18 @@ class EmailRenderer(ChannelRenderer):
     ) -> RenderedArtifact:
         # Imported here rather than at module scope: the service imports this
         # package's registry, so a top-level import would close the loop.
+        from app.expressions.substitute import live_personal
         from app.rendering.service import render_variant_html
 
+        # One set of entries for body and subject (ADR-199).
+        personal = live_personal(db, variant_id, recipient_id)
         html, resolutions = render_variant_html(
             db=db,
             variant_id=variant_id,
             recipient_id=recipient_id,
             mode=mode,
             collect_resolutions=True,
+            personal=personal,
         )
         # From the modules' manifests (ADR-162 point 1), not from variant
         # columns: the variant has had none since migration 0012, and this
@@ -38,7 +42,8 @@ class EmailRenderer(ChannelRenderer):
         # the columns were dropped.
         from app.rendering.service import envelope_fields_for_variant
 
-        envelope = envelope_fields_for_variant(db, variant_id, self.channel)
+        envelope = {name: personal.text(value) if isinstance(value, str) else value
+                    for name, value in envelope_fields_for_variant(db, variant_id, self.channel).items()}
 
         return RenderedArtifact(
             role=ROLE_HTML,

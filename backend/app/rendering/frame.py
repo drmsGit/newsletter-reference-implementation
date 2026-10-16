@@ -33,7 +33,7 @@ from app.overrides.service import get_active_content_override
 from app.rendering.renderers.base import ROLE_HTML, ROLE_PAYLOAD, RenderedArtifact
 
 #: Bumped when the frame's shape changes, so a reader can tell what it holds.
-FRAME_VERSION = 3
+FRAME_VERSION = 4
 #: Every version a reader understands. Version 2 (2026-10-10, task-349): the
 #: email envelope module is `envelope`; in a version-1 email frame it is
 #: `header`. Frozen frames are never rewritten — `module_html` writes the type
@@ -44,7 +44,11 @@ FRAME_VERSION = 3
 #: (`brand_profile`, ADR-194) and renders the legal footer from it. Frames
 #: below 3 keep the legacy unsubscribe line byte for byte, and are refused for
 #: sending (`profile_refusal`): they carry no legal details.
-FRAME_VERSIONS = (1, 2, 3)
+#: Version 4 (2026-10-16, task-365): every frame freezes the message's language
+#: and the brand's expression entries in it (`expressions`, ADR-199), and each
+#: recipient's values are resolved from those at send. Frames below 4 render
+#: without substitution, as they were sent.
+FRAME_VERSIONS = (1, 2, 3, 4)
 #: The first version whose email frames carry a brand profile.
 PROFILE_FRAME_VERSION = 3
 LEGACY_EMAIL_ENVELOPE = "header"
@@ -176,6 +180,11 @@ def build_frame(db: Session, variant_id: int) -> dict:
         "templates_fingerprint": templates_fingerprint(channel),
         "modules": entries,
     }
+    # The entries in the message's language, frozen (ADR-199): a later edit
+    # or deletion reaches no email made from this frame.
+    from app.expressions.substitute import frozen_entries
+
+    frame["expressions"] = frozen_entries(db, variant)
     if channel == "email":
         frame["brand_profile"] = _frozen_profile(db, variant)
         # The tags every module link carries, frozen with the names they come
@@ -283,7 +292,7 @@ def what_rendered(frame: dict, picks: list[dict]) -> tuple[bool, int]:
 def render_frame(
     db: Session, frame: dict, recipient_id: int | None = None, picks: list[dict] | None = None,
     *, empty_slots: frozenset[int] = frozenset(), unsubscribe: dict | None = None,
-    unsubscribe_unlinked: bool = False,
+    unsubscribe_unlinked: bool = False, personal: dict | None = None,
 ) -> tuple[RenderedArtifact, list[dict]]:
     """Lay a frame out for one recipient. Returns `(artifact, picks)`.
 
@@ -301,11 +310,17 @@ def render_frame(
     envelope, where the provider turns it into the List-Unsubscribe headers
     (ADR-191 point 5; the envelope is the artifact's delivery metadata, ADR-161
     point 1). Email only; a preview passes none.
+
+    `personal` — the values a delivery record kept (ADR-199) — rebuilds what
+    was sent without reading the recipient again; without it, the recipient's
+    values are resolved now from the frame's frozen entries.
     """
+    from app.expressions.substitute import frame_personal
     from app.rendering.service import email_document, module_html, module_part, strip_rich_text
 
     channel = frame["channel"]
     theme = _frame_theme(frame)
+    entries = frame_personal(db, frame, recipient_id, recorded=personal)
     # Recorded picks by module, in their order: a slot shows up to five, and
     # a pick recorded before ranks existed is a set of one (task-109).
     recorded: dict[int, list[dict]] = {}
@@ -341,7 +356,8 @@ def render_frame(
 
         if channel == "email":
             if kind == KIND_UNKNOWN:
-                html_parts.append(module_html(channel, entry["module_type"], entry["module_id"], {}, theme=theme))
+                html_parts.append(module_html(channel, entry["module_type"], entry["module_id"], {}, theme=theme,
+                                              personal=entries))
             elif not copies:
                 html_parts.append(
                     f"<!-- module {entry['module_id']} ({entry['module_type']}): "
@@ -354,19 +370,23 @@ def render_frame(
                     html_parts.append(module_part(
                         channel, entry["module_type"], entry["module_id"], variables,
                         content_id=content_id, template_type=lookup_type(frame, entry), theme=theme,
+                        personal=entries,
                     ))
         elif copies and not fields:
             # A push carries one module's fields (ADR-160 point 2), stripped of
             # rich-text markup an operating system would show literally. A
             # push slot shows one pick; should more ever be recorded, the
             # first is the one.
-            fields = strip_rich_text(copies[0][0], get_manifest(channel, entry["module_type"]))
+            manifest = get_manifest(channel, entry["module_type"])
+            fields = strip_rich_text(copies[0][0], manifest)
+            if entries is not None:
+                fields = entries.fields(fields, manifest)
 
     if channel == "email":
         from app.rendering.service import legal_footer_html
         from app.subscriptions.texts import footer_html
 
-        envelope = dict(frame.get("envelope") or {})
+        envelope = _personal_envelope(frame, entries)
         footer = ""
         if frame.get("frame_version", 0) >= PROFILE_FRAME_VERSION and frame.get("brand_profile"):
             # Every email from version 3 on: the profile's legal details, and
@@ -389,9 +409,45 @@ def render_frame(
     else:
         artifact = RenderedArtifact(
             role=ROLE_PAYLOAD, media_type="application/json", fields=fields,
-            envelope=dict(frame.get("envelope") or {}),
+            envelope=_personal_envelope(frame, entries),
         )
+    if entries is not None:
+        # What this recipient's texts used, for the delivery record, and what
+        # they used that the frame holds no text for (ADR-199).
+        artifact.personal = entries.recorded()
+        artifact.personal_missing = sorted(entries.missing)
     return artifact, made
+
+
+def _personal_envelope(frame: dict, entries) -> dict:
+    """The frozen envelope, with the recipient's entries in its texts: the
+    subject and preheader (ADR-199). Unchanged for frames before version 4."""
+    envelope = dict(frame.get("envelope") or {})
+    if entries is None:
+        return envelope
+    return {name: entries.text(value) if isinstance(value, str) else value for name, value in envelope.items()}
+
+
+def expression_refusal(frame: dict) -> str | None:
+    """Why this frame may not be sent or tested, or None (ADR-199): its own
+    texts use an entry with no text in the message's language. Like
+    `profile_refusal`, before anything goes out. A slot's pick is not known
+    here; a recipient whose pick uses such an entry is excluded at send."""
+    from app.expressions.rules import tokens
+
+    frozen = frame.get("expressions")
+    if frame.get("frame_version", 0) < 4 or frozen is None:
+        return None
+    texts = [value for value in (frame.get("envelope") or {}).values() if isinstance(value, str)]
+    for entry in frame.get("modules", []):
+        texts += [value for value in (entry.get("variables") or {}).values() if isinstance(value, str)]
+    used = sorted({name for text in texts for name in tokens(text)})
+    missing = [name for name in used if name not in (frozen.get("entries") or {})]
+    if not missing:
+        return None
+    names = ", ".join("{{" + name + "}}" for name in missing)
+    return (f"This message is in {frozen.get('language')}, and {names} has no text in that language "
+            "(Settings, Personalisation). Add it, then plan the send again.")
 
 
 def missing_required_in_frame(frame: dict) -> list[tuple[int, str, str]]:
