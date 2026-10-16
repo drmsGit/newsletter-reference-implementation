@@ -7,7 +7,7 @@ topic:
   - access
   - governance
 created: 2026-08-02
-modified: 2026-10-09
+modified: 2026-10-16
 source:
   - "Security Chapter design interview, Part 1 (playbook-strategy.md Decision Log, 2026-08-02)"
 depends_on:
@@ -675,6 +675,102 @@ by the brand page and by review.
 **Nothing in this record's Decision changes.** Point 4 stands as written. It is true of
 running the product, and this addendum records that it says nothing about extending
 it. The sixth `### Positive` bullet is read the same way.
+
+## Addendum 2026-10-16 — administering people, roles and brands from the client
+
+Prompted by task-358, which gives user, role and brand administration a JSON API
+and Settings subpages in the React client of
+[[ADR-170 — The Manager Client Is a Plain React SPA, Not Next.js]]. Until now
+they existed only in the Jinja UI. The user decided it on 2026-10-16, one
+question at a time. **This does not touch the Decision.** Points 5 and 6 stand:
+roles are rows, and a grant is one `(user × role × brand)` row. What this records
+is how those rows are administered from the client, and two rules that hold
+wherever they are administered. The code facts below were checked on 2026-10-16.
+
+**1. Nobody can lock the installation out of its own administration.** Three acts
+are refused, each with the reason:
+
+- deactivating yourself;
+- any deactivation, any grant revoked, or any role's permissions replaced, that
+  would leave no active person holding `users.manage`.
+
+The guards live in the auth service, in `set_active`, `revoke_assignment` and
+`set_role_permissions` (`backend/app/auth/service.py`, with `user_managers` and
+`AccessLockout`). So the Jinja forms get them too, and not only the new routes:
+both now write through `backend/app/auth/admin.py`. **This changes prior
+behaviour.** Until today the Jinja pages had no such guard. An installation in
+which nobody holds `users.manage` (access control never set up) is left as it is.
+
+Two other writes already could not lock anyone out, which is why they are not in
+the list. `delete_role` refuses a built-in role and a role somebody still holds.
+`delete_brand` refuses the default brand, and refuses any brand that still has
+rows belonging to it, role assignments included (`brand_holders()`).
+
+**2. Every administration write is audited** ([[ADR-153 — Audit and Accountability]]).
+The actions already recorded are kept: `user.role_granted`, `user.role_revoked`,
+`user.deactivated`, `user.reactivated` and `brand.created`. The writes the Jinja
+forms never logged gain an entry: `user.created`, `role.created`,
+`role.permissions_set`, `role.deleted`, `brand.renamed` and `brand.deleted`
+(`backend/app/audit/service.py`). Like the guards, this is a rule about the
+write, not about which screen made it: the Jinja forms log them too.
+
+**3. The JSON routes sit under `/auth/users`, `/auth/roles`, `/auth/brands` and
+`/auth/permissions`**, in `backend/app/auth/admin_router.py`.
+`/auth/permissions` is the read-only catalogue of keys, each marked
+platform-level or brand-scoped as the 2026-09-15 addendum and its 2026-09-20
+correction classify them. The rules are:
+
+- **People only.** A machine credential is refused, using `require_person_with` in
+  `backend/app/auth/dependencies.py`, the guard the settings and integration
+  routes already use (this record's second 2026-10-02 addendum, point 2;
+  [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]], addendum
+  2026-10-02).
+- **`users.manage` for reads as well as writes**, set once at the router. This is
+  not a tightening. The Jinja access list and role grid have always needed
+  `users.manage` to read. It does differ from settings, where reading is `view`
+  (point 3 of the second 2026-10-02 addendum), and the difference is kept.
+- **One copy of each rule.** The routes and the Jinja forms call the same functions
+  (`backend/app/auth/admin.py`, over the service), so a refusal reads the same on
+  both planes.
+- **Policy entries.** `WRITE_POLICY` in `backend/app/auth/policy.py` gains entries
+  for `/auth/users`, `/auth/roles` and `/auth/brands`. Without them the writes
+  would resolve to `UNMAPPED` and be refused (point 5).
+
+**4. Settings gains four subpages: Users, Roles, Integrations and Brands.** They
+are parts of Settings, not areas of their own, by the user's ruling of 2026-10-11
+("a setting part, not an area"), the one already applied to brand profiles.
+Brands are created with a key and a name, and can be renamed. The key stays
+permanent. A brand can be deleted, after the client asks once, except that the
+delete is refused while anything belongs to the brand, as `delete_brand` already
+refuses it.
+
+**5. The access-control switch stays out of the React client.** Switching
+enforcement on or off is a development switch. Turning access control off is not
+something a manager screen should offer. It stays on the Jinja page
+(`POST /ui/users/enforcement`), where it is today.
+
+**6. A grant always names a brand, and the client shows the brand only when there
+is a choice.** `RoleAssignmentDB.brand_id` is NOT NULL, so every grant is a role
+on a brand. The client shows "role on brand", and offers the brand choice, only
+when the installation has more than one brand. The Jinja page already did this.
+It is point 4's promise kept on the new screen: a single-brand company never
+sees the brand.
+
+**Consequences.**
+
+- **Positive.** An installation can no longer be locked out of its own
+  administration by one form submission, from either UI. The audit trail now
+  covers every change to the access model, including role permissions, which
+  decide what everyone holding the role may do. Each rule exists once, so the two
+  UIs cannot drift apart while both exist.
+- **Negative.** The last person holding `users.manage` cannot step down, or have
+  that permission removed from their role, until somebody else holds it. Handing
+  administration over now takes two steps. The access-control switch keeps the
+  Jinja page alive for this one control. Retiring the Jinja UI (task-312) must
+  decide where the switch goes, or keep that one page.
+
+**Nothing in this record's Decision changes.** Points 5 and 6 and the
+classification of permissions are untouched.
 
 ## Related ADRs
 

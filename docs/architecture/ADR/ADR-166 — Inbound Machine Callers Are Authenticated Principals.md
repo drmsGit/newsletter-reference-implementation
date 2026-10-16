@@ -8,7 +8,7 @@ topic:
   - automation
   - governance
 created: 2026-09-13
-modified: 2026-10-11
+modified: 2026-10-16
 source:
   - "Machine authentication design interview (2026-09-13)"
 depends_on:
@@ -730,6 +730,44 @@ have counted as live.
 including the ceiling of the first 2026-10-11 addendum. The second 2026-10-09
 addendum's open list is answered here, not rewritten there. Nothing here changes
 the Decision section above.
+
+## Addendum 2026-10-16 — the key secret in the client
+
+Prompted by task-358, which brings integration management into the React client of
+[[ADR-170 — The Manager Client Is a Plain React SPA, Not Next.js]] as a Settings
+subpage. The user decided it on 2026-10-16. **This does not touch the Decision.**
+Point 3's shown-once rule stands. So does point 3 of the 2026-10-02 addendum: the
+issue-credential route returns the secret once, in the response body, with
+`Cache-Control: no-store`, and never in a URL. This addendum says how the client
+handles the secret once it has it. It applies the user's note of 2026-10-09 that
+task-358 records: copy once, never revealed again.
+
+**1. The secret is shown once, in a dialog.** The dialog has a Copy button and a
+sentence saying this is the only time the secret is shown.
+
+**2. Closing the dialog drops the secret from the browser's memory as well.** The
+secret is never put in the query cache or in the URL: `useIssueKey` hands it to the
+dialog's own state (`frontend/src/screens/IntegrationDetail.tsx`), which clears it
+on close. `no-store` keeps the response out of HTTP caches, but it says nothing
+about the client's own state, which is why this is stated separately.
+
+**3. Afterwards the key shows without its secret.** The key appears by its id, its
+label, when it was issued, its last use and its expiry, marked when it expires
+soon. The age and expiry display of the second 2026-10-09 addendum (point 4), and
+the 14-day mark of the second 2026-10-11 addendum (point 2), are unchanged.
+
+**4. Issuing asks for a label and an optional expiry in days**, pre-filled from the
+integration's suggestion, as the second 2026-10-11 addendum describes.
+
+**Consequences.**
+
+- **Positive.** The shown-once rule holds in the browser as well as on the wire.
+  The secret is not left in a cache or in the URL after the person has copied it.
+- **Negative.** Closing the dialog before copying loses the secret for good. The
+  only remedy is to issue another key and revoke the unused one, which is what
+  point 3 intends, but it costs a step.
+
+**Unchanged:** points 1 through 8, the build-notes and the earlier addenda.
 
 ## Related ADRs
 

@@ -1861,3 +1861,133 @@ export function useDeleteBrandProfile(id: number) {
     },
   })
 }
+
+// --- administration: people, roles, brands, integrations (task-358) --------
+
+export type Person = components['schemas']['Person']
+export type Role = components['schemas']['Role']
+export type Permission = components['schemas']['Permission']
+export type AdminBrand = components['schemas']['Brand']
+export type Integration = components['schemas']['IntegrationOut']
+export type IssuedKey = components['schemas']['KeyIssued']
+
+const ADMIN = ['admin'] as const
+const INTEGRATIONS = ['integrations'] as const
+
+export function usePeople() {
+  return useQuery({ queryKey: [...ADMIN, 'people'], queryFn: () => read(api.GET('/auth/users')) })
+}
+export function useRoles() {
+  return useQuery({ queryKey: [...ADMIN, 'roles'], queryFn: () => read(api.GET('/auth/roles')) })
+}
+export function usePermissionCatalogue() {
+  return useQuery({ queryKey: [...ADMIN, 'permissions'], queryFn: () => read(api.GET('/auth/permissions')), staleTime: Infinity })
+}
+export function useAdminBrands() {
+  return useQuery({ queryKey: [...ADMIN, 'brands'], queryFn: () => read(api.GET('/auth/brands')) })
+}
+
+/** Every administration write refreshes administration as a whole: a grant changes people and roles' holders. */
+function useAdminWrite<A, R>(call: (args: A) => Promise<R>, also: readonly string[][] = []) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: call,
+    onSuccess: () =>
+      Promise.all([ADMIN, ...also].map((queryKey) => queryClient.invalidateQueries({ queryKey: [...queryKey] }))),
+  })
+}
+
+export function useCreatePerson() {
+  return useAdminWrite((body: { email: string; display_name: string; is_external: boolean; role_key: string; brand_id?: number }) =>
+    read(api.POST('/auth/users', { body })),
+  )
+}
+export function useSetPersonActive(id: number) {
+  return useAdminWrite((active: boolean) =>
+    read(api.POST('/auth/users/{user_id}/active', { params: { path: { user_id: id } }, body: { active } })),
+  )
+}
+export function useAddGrant(id: number) {
+  return useAdminWrite((body: { role_id: number; brand_id?: number }) =>
+    read(api.POST('/auth/users/{user_id}/grants', { params: { path: { user_id: id } }, body })),
+  )
+}
+export function useRemoveGrant(id: number) {
+  return useAdminWrite((grantId: number) =>
+    read(api.DELETE('/auth/users/{user_id}/grants/{grant_id}', { params: { path: { user_id: id, grant_id: grantId } } })),
+  )
+}
+export function useCreateRole() {
+  return useAdminWrite((body: { key: string; name: string; copy_from?: number }) => read(api.POST('/auth/roles', { body })))
+}
+export function useSetRolePermissions(id: number) {
+  return useAdminWrite((permissions: string[]) =>
+    read(api.PUT('/auth/roles/{role_id}/permissions', { params: { path: { role_id: id } }, body: { permissions } })),
+  )
+}
+export function useDeleteRole(id: number) {
+  return useAdminWrite(() => read(api.DELETE('/auth/roles/{role_id}', { params: { path: { role_id: id } } })))
+}
+export function useCreateBrand() {
+  return useAdminWrite((body: { key: string; name: string }) => read(api.POST('/auth/brands', { body })), [['session']])
+}
+export function useRenameBrand() {
+  return useAdminWrite(
+    ({ id, name }: { id: number; name: string }) =>
+      read(api.PATCH('/auth/brands/{brand_id}', { params: { path: { brand_id: id } }, body: { name } })),
+    [['session']],
+  )
+}
+export function useDeleteBrand() {
+  return useAdminWrite((id: number) => read(api.DELETE('/auth/brands/{brand_id}', { params: { path: { brand_id: id } } })), [['session']])
+}
+
+export function useIntegrations() {
+  return useQuery({ queryKey: [...INTEGRATIONS], queryFn: () => read(api.GET('/integrations')) })
+}
+function useIntegrationWrite<A, R>(call: (args: A) => Promise<R>) {
+  const queryClient = useQueryClient()
+  return useMutation({ mutationFn: call, onSuccess: () => queryClient.invalidateQueries({ queryKey: [...INTEGRATIONS] }) })
+}
+export function useCreateIntegration() {
+  return useIntegrationWrite((body: { name: string; description?: string }) => read(api.POST('/integrations', { body })))
+}
+/**
+ * Issue a key. The secret comes back in this response only (ADR-166 point 3)
+ * and is handed to the caller, never written to the query cache: the dialog
+ * that shows it is the only place it lives (ADR-166 addendum 2026-10-16).
+ */
+export function useIssueKey(id: number) {
+  return useIntegrationWrite((body: { label?: string; expires_in_days?: number | null }) =>
+    read(api.POST('/integrations/{integration_id}/keys', { params: { path: { integration_id: id } }, body })),
+  )
+}
+export function useRevokeKey(id: number) {
+  return useIntegrationWrite((credentialId: number) =>
+    read(api.POST('/integrations/{integration_id}/keys/{credential_id}/revoke', {
+      params: { path: { integration_id: id, credential_id: credentialId } },
+    })),
+  )
+}
+export function useAddIntegrationGrant(id: number) {
+  return useIntegrationWrite((body: { permission: string; brand_id: number }) =>
+    read(api.POST('/integrations/{integration_id}/grants', { params: { path: { integration_id: id } }, body })),
+  )
+}
+export function useRemoveIntegrationGrant(id: number) {
+  return useIntegrationWrite(({ permission, brand_id }: { permission: string; brand_id: number }) =>
+    read(api.DELETE('/integrations/{integration_id}/grants/{permission}/{brand_id}', {
+      params: { path: { integration_id: id, permission, brand_id } },
+    })),
+  )
+}
+export function useSetUnattended(id: number) {
+  return useIntegrationWrite((ceiling: number) =>
+    read(api.PUT('/integrations/{integration_id}/unattended', { params: { path: { integration_id: id } }, body: { ceiling } })),
+  )
+}
+export function useDeactivateIntegration(id: number) {
+  return useIntegrationWrite(() =>
+    read(api.POST('/integrations/{integration_id}/deactivate', { params: { path: { integration_id: id } } })),
+  )
+}

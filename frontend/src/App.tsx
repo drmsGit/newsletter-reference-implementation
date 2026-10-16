@@ -21,6 +21,13 @@ import ContentLayout from './screens/ContentLayout'
 import Categories from './screens/Categories'
 import CategoryGraph from './screens/CategoryGraph'
 import CategoryDetail from './screens/CategoryDetail'
+import People from './screens/People'
+import PersonDetail from './screens/PersonDetail'
+import Roles from './screens/Roles'
+import RoleDetail from './screens/RoleDetail'
+import Integrations from './screens/Integrations'
+import IntegrationDetail from './screens/IntegrationDetail'
+import Brands from './screens/Brands'
 import Personalisation, { PersonalisationEntry } from './screens/Personalisation'
 import BrandProfiles from './screens/BrandProfiles'
 import Deliveries from './screens/Deliveries'
@@ -73,6 +80,13 @@ export default function App() {
           <Route path="brand-profiles/:id" element={<BrandProfileDetail />} />
           <Route path="personalisation" element={<Personalisation />} />
           <Route path="personalisation/:id" element={<PersonalisationEntry />} />
+          <Route path="users" element={<People />} />
+          <Route path="users/:id" element={<PersonDetail />} />
+          <Route path="roles" element={<Roles />} />
+          <Route path="roles/:id" element={<RoleDetail />} />
+          <Route path="integrations" element={<Integrations />} />
+          <Route path="integrations/:id" element={<IntegrationDetail />} />
+          <Route path="brands" element={<Brands />} />
         </Route>
         {/* Content and its parts as subpages (task-359), like Settings. */}
         <Route path="/content" element={<ContentLayout />}>
