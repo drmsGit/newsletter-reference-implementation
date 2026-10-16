@@ -24,6 +24,7 @@ from app.content.models import (
     ContentDuplicate,
     ContentDuplicateTarget,
     ContentAssignment,
+    ContentPerformance,
     ContentUsage,
     ContentCampaign,
     Category,
@@ -765,6 +766,32 @@ def get_content_usage(
     if usage is None:
         raise HTTPException(status_code=404, detail="Content record not found")
     return usage
+
+
+@router.get(
+    "/{content_id}/performance",
+    response_model=ContentPerformance,
+    summary="How the record did: deliveries, clicks and its share of clicks, overall and per campaign",
+    description="Counted per delivery, all time, on read (ADR-196 addendum 2026-10-16). The click "
+                "share is its clicks over all clicks in the deliveries that carried it.",
+)
+def get_content_performance(
+    content_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.content.kpis import content_figures
+    from app.content.service import get_content_record
+
+    if get_content_record(db, content_id, brand_id=brand_id) is None:
+        raise HTTPException(status_code=404, detail="Content record not found")
+    overall, per_campaign, names = content_figures(db, brand_id, [content_id], by_campaign=True)
+    empty = {"deliveries": 0, "picked": 0, "clicks": 0, "unique_clickers": 0, "clicks_in_deliveries": 0,
+             "click_share": None}
+    campaigns = sorted((per_campaign.get(content_id) or {}).items(), key=lambda item: -item[1]["deliveries"])
+    return {
+        "overall": overall.get(content_id, empty),
+        "by_campaign": [{"campaign_id": cid, "campaign_name": names.get(cid, f"Campaign {cid}"), "figures": f}
+                        for cid, f in campaigns],
+    }
 
 
 @router.delete(

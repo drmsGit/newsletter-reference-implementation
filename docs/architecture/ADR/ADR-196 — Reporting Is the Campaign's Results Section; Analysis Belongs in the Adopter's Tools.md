@@ -9,7 +9,7 @@ topic:
   - consent
   - campaign
 created: 2026-10-11
-modified: 2026-10-11
+modified: 2026-10-16
 source:
   - "task-58 final-design pass, decided by the user 2026-10-11; absorbs task-360"
 depends_on:
@@ -148,6 +148,42 @@ Accepted
   - **task-359:** content and category KPIs, where per-link figures belong (point 5).
   - **task-85:** the DWH export boundary for signal contributions (point 8), and one of the two prunes that will shrink computed figures.
   - **task-136:** the general retention policy, which must decide whether aggregates are kept before pruning.
+
+## Addendum 2026-10-16 — a content record's figures
+
+**Decided by the user on 2026-10-16, one question at a time, in the final-design pass of queue task-359.** Point 5 placed per-link and per-content figures on the content catalogue side and left their shape open. This addendum gives them a shape. The Decision above is unchanged, and nothing is added to the campaign's Results section.
+
+1. **A content record's figures use the definitions of the campaign's Results section** (`backend/app/campaigns/results.py`).
+   - **Per record, all time, computed on read.** Nothing new is stored, as in point 7.
+   - **Counted per delivery, not per person,** as the Results section counts.
+   - **Deliveries that carried it:** sent delivery executions whose frozen frame held the record as a content module, or whose recorded slot picks hold it ([[ADR-183 — A Snapshot Freezes the Composition and Every Delivery Records What It Got]]). Of those, how many carried it through a slot pick.
+   - **Total clicks:** the click events on its links.
+   - **Unique clickers:** the deliveries with at least one click on it.
+   - **A click names its content through `event_data.content_record_id`,** written from a tracked link ([[ADR-182 — A Click Credits Content Only When the Link Names It]]). A click that names no record counts for no record.
+2. **The rate is a click share, not a click rate.**
+   - **The share is the record's clicks divided by all clicks in the deliveries that carried it.**
+   - **It answers "when it is in an email, does it pull the clicks?"** The user rejected a rate over deliveries because it "would result in very low numbers". The share also does not penalise a record used in few emails.
+   - **It is shown overall and per campaign the record appeared in.**
+   - **It differs on purpose from the campaign's click rate.** Point 4 makes that rate unique clickers over sent. The share is total clicks over total clicks, with no sent or delivered denominator, so the two do not measure the same thing and are named differently.
+3. **No opens.** Point 5's rule holds until task-353 decides.
+4. **Where the figures are shown.**
+   - **A Performance section on the record's page,** overall and per campaign.
+   - **The same figures as columns wherever a category lists its records:** the category detail and the category graph's side panel.
+   - **The graph itself shows per-category totals.**
+   - **Nothing is added to the campaign's Results section.** Point 1's one campaign view is unchanged.
+5. **Deeper analysis stays in the adopter's tools,** as points 1 and 8 have it.
+
+**What follows from it.**
+
+- **A share needs clicks to mean anything.** When the deliveries that carried a record drew no clicks, its share is shown empty.
+- **Clicks on links that name no record count in the denominator.** These are untracked links and the legal footer's links. A record's share is therefore its part of all the clicks those emails drew, not of the content clicks only.
+- **The figures carry the campaign figures' retention caveat.** They are computed on read, so they shrink once retention pruning arrives (task-136), and an erasure shifts them as the Negative consequences above describe.
+
+**Notes on this addendum.**
+
+- **Not a supersession.** Point 5 decided where per-content figures belong. This addendum decides what they are, and edits no Decision.
+- **A record's clicks fall within the deliveries that carried it.** `sent_content_ids` in `backend/app/delivery/service.py` already reads what a delivery carried: the frame's content modules plus that recipient's picks. `process_provider_webhook_event` in `backend/app/providers/service.py` drops a named `content_record_id` the delivery did not carry, so no click can name a record outside its deliveries.
+- **No decision-log entry for this pass.** `docs/playbook-strategy.md` §5 has none dated 2026-10-16. The reasoning is from task-359's final-design plan and the user's answers of 2026-10-16.
 
 ## Related ADRs
 

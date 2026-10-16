@@ -22,6 +22,7 @@ import CategoryChoice from '../components/CategoryChoice'
 import Choice from '../components/Choice'
 import { HttpError } from '../api/session'
 import { AutosaveField, SaveState, altFieldsOf, fieldError } from '../components/EditorFields'
+import { Performance } from '../components/ContentFigures'
 import PublishState from '../components/PublishState'
 import ScreenState from '../components/ScreenState'
 import { STAGE_LABEL } from './Monitoring'
@@ -166,6 +167,7 @@ function RecordPage({
       )}
       <SaveState mutation={save} reload={reload} what="the record" />
 
+      <Performance recordId={record.id} />
       <Categories recordId={record.id} />
       <Versions recordId={record.id} fields={fields} />
       <UsedIn recordId={record.id} />

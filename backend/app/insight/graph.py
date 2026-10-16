@@ -215,6 +215,10 @@ def category_detail(db: Session, category_id: int, *, brand_id: int) -> dict | N
                 ContentRecordDB.brand_id == brand_id)
         .order_by(ContentCategoryAssignmentDB.score.desc()).all()
     )
+    # Each record's figures (task-359; ADR-196 addendum 2026-10-16).
+    from app.content.kpis import content_figures
+
+    figures = content_figures(db, brand_id, [cid for cid, _, _ in content]) if content else {}
     audience = {rid for (rid,) in db.execute(brand_audience(brand_id)).all()}
     ranked = sorted(
         ((rid, score) for rid, score in operational_signals_for_category(db, category_id).items()
@@ -235,7 +239,7 @@ def category_detail(db: Session, category_id: int, *, brand_id: int) -> dict | N
         "category": {"id": category.id, "name": category.name, "type": category.type},
         "parents": [{"id": c.id, "name": c.name, "type": c.type, "relation_id": rid} for c, rid in parents],
         "children": [{"id": c.id, "name": c.name, "type": c.type, "relation_id": rid} for c, rid in children],
-        "assigned_content": [{"content_id": cid, "title": title, "score": score}
+        "assigned_content": [{"content_id": cid, "title": title, "score": score, "figures": figures.get(cid)}
                              for cid, title, score in content],
         "top_recipients": [{"recipient_id": rid, "external_id": external.get(rid), "score": round(score, 1)}
                            for rid, score in ranked],

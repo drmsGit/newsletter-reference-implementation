@@ -1165,6 +1165,16 @@ export function useCampaignsUsing(recordId: number) {
   })
 }
 
+export type ContentFigures = components['schemas']['ContentFigures']
+
+/** How a record did, overall and per campaign (task-359; ADR-196 addendum 2026-10-16). */
+export function useContentPerformance(recordId: number) {
+  return useQuery({
+    queryKey: [...keys.contentRecord(recordId), 'performance'],
+    queryFn: () => read(api.GET('/content/{content_id}/performance', { params: { path: { content_id: recordId } } })),
+  })
+}
+
 export function useContentReach(recordId: number | null | undefined) {
   return useQuery({
     queryKey: [...keys.contentRecord(recordId ?? 0), 'unsent-campaigns'],

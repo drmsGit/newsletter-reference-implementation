@@ -496,6 +496,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/content/{content_id}/performance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How the record did: deliveries, clicks and its share of clicks, overall and per campaign
+         * @description Counted per delivery, all time, on read (ADR-196 addendum 2026-10-16). The click share is its clicks over all clicks in the deliveries that carried it.
+         */
+        get: operations["get_content_performance_content__content_id__performance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/content/category-relations/{relation_id}": {
         parameters: {
             query?: never;
@@ -3712,6 +3732,14 @@ export interface components {
              */
             overrides_not_carried: number;
         };
+        /** CampaignFigures */
+        CampaignFigures: {
+            /** Campaign Id */
+            campaign_id: number;
+            /** Campaign Name */
+            campaign_name: string;
+            figures: components["schemas"]["ContentFigures"];
+        };
         /**
          * CampaignResults
          * @description The campaign page's results section. Empty until a send has gone out.
@@ -3783,6 +3811,7 @@ export interface components {
             title: string;
             /** Score */
             score?: number | null;
+            figures?: components["schemas"]["ContentFigures"] | null;
         };
         /** CategoryCreate */
         CategoryCreate: {
@@ -4326,6 +4355,43 @@ export interface components {
             alt?: string | null;
         };
         /**
+         * ContentFigures
+         * @description A record's figures (task-359; ADR-196 addendum 2026-10-16), counted per
+         *     delivery, all time: the campaign results' definitions, per record.
+         */
+        ContentFigures: {
+            /**
+             * Deliveries
+             * @description Sent deliveries that carried the record
+             */
+            deliveries: number;
+            /**
+             * Picked
+             * @description Of those, how many carried it through a slot pick
+             */
+            picked: number;
+            /**
+             * Clicks
+             * @description Clicks on its links
+             */
+            clicks: number;
+            /**
+             * Unique Clickers
+             * @description Deliveries with at least one click on it
+             */
+            unique_clickers: number;
+            /**
+             * Clicks In Deliveries
+             * @description All clicks in the deliveries that carried it
+             */
+            clicks_in_deliveries: number;
+            /**
+             * Click Share
+             * @description clicks / clicks_in_deliveries; None while those have none
+             */
+            click_share: number | null;
+        };
+        /**
          * ContentListItem
          * @description One row of `GET /content/`, with what the bind picker's "not published
          *     yet" notice needs (task-268, task-263 decision 6).
@@ -4446,6 +4512,12 @@ export interface components {
              * @default []
              */
             groups: string[];
+        };
+        /** ContentPerformance */
+        ContentPerformance: {
+            overall: components["schemas"]["ContentFigures"];
+            /** By Campaign */
+            by_campaign: components["schemas"]["CampaignFigures"][];
         };
         /**
          * ContentReach
@@ -8471,6 +8543,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContentUsage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_content_performance_content__content_id__performance_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                content_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentPerformance"];
                 };
             };
             /** @description Validation Error */

@@ -1660,7 +1660,6 @@ def sent_content_ids(db: Session, execution: DeliveryExecutionDB) -> set[int] | 
     what `render_frame` laid out for them, so a click naming anything else names
     content they were never sent.
     """
-    from app.rendering.frame import KIND_CONTENT
     from app.snapshots.db_models import SnapshotDB
 
     record = execution.delivery_record
@@ -1669,9 +1668,19 @@ def sent_content_ids(db: Session, execution: DeliveryExecutionDB) -> set[int] | 
     snapshot = db.get(SnapshotDB, record.get("snapshot_id"))
     if snapshot is None or not snapshot.render_context:
         return None
-    ids = {
-        m["content_record_id"] for m in snapshot.render_context.get("modules", [])
+    placed, picked = carried_content(snapshot.render_context, record)
+    return placed | picked
+
+
+def carried_content(frame: dict, record: dict) -> tuple[set[int], set[int]]:
+    """(placed, picked): the content records a delivery carried, as the
+    frame's content-bound modules and as this recipient's slot picks. The one
+    definition click attribution and a record's figures share (task-359)."""
+    from app.rendering.frame import KIND_CONTENT
+
+    placed = {
+        m["content_record_id"] for m in (frame or {}).get("modules", [])
         if m.get("kind") == KIND_CONTENT and m.get("content_record_id") is not None
     }
-    ids |= {p["content_record_id"] for p in record.get("picks") or [] if p.get("content_record_id")}
-    return ids
+    picked = {p["content_record_id"] for p in (record or {}).get("picks") or [] if p.get("content_record_id")}
+    return placed, picked

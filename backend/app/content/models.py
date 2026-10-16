@@ -233,6 +233,29 @@ class ContentUsage(BaseModel):
     signals: list[ContentSignal]
 
 
+class ContentFigures(BaseModel):
+    """A record's figures (task-359; ADR-196 addendum 2026-10-16), counted per
+    delivery, all time: the campaign results' definitions, per record."""
+
+    deliveries: int = Field(description="Sent deliveries that carried the record")
+    picked: int = Field(description="Of those, how many carried it through a slot pick")
+    clicks: int = Field(description="Clicks on its links")
+    unique_clickers: int = Field(description="Deliveries with at least one click on it")
+    clicks_in_deliveries: int = Field(description="All clicks in the deliveries that carried it")
+    click_share: float | None = Field(description="clicks / clicks_in_deliveries; None while those have none")
+
+
+class CampaignFigures(BaseModel):
+    campaign_id: int
+    campaign_name: str
+    figures: ContentFigures
+
+
+class ContentPerformance(BaseModel):
+    overall: ContentFigures
+    by_campaign: list[CampaignFigures]
+
+
 class UnsentCampaign(BaseModel):
     id: int
     name: str

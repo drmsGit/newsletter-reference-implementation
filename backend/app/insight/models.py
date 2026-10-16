@@ -3,6 +3,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from app.content.models import ContentFigures
+
 
 class EngagementEvent(BaseModel):
     id: int
@@ -95,6 +97,9 @@ class CategoryContent(BaseModel):
     content_id: int
     title: str
     score: float | None = None
+    #: The record's figures (task-359; ADR-196 addendum 2026-10-16), so a
+    #: category's records compare at a glance.
+    figures: "ContentFigures | None" = None
 
 
 class CategoryRecipient(BaseModel):
