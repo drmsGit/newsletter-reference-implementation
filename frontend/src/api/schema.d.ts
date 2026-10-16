@@ -5083,6 +5083,13 @@ export interface components {
             /** Status */
             status: string;
         };
+        /**
+         * Gender
+         * @description What personalisation can address (task-365, ADR-199). A CRM maps its
+         *     own values onto these; anything else is refused with the allowed list.
+         * @enum {string}
+         */
+        Gender: "female" | "male" | "diverse";
         /** GrantOut */
         GrantOut: {
             /** Permission */
@@ -6035,6 +6042,11 @@ export interface components {
             attributes?: {
                 [key: string]: unknown;
             } | null;
+            gender?: components["schemas"]["Gender"] | null;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
             /** Status */
             status: string;
             /** @default pending */
@@ -6162,6 +6174,11 @@ export interface components {
             attributes?: {
                 [key: string]: unknown;
             } | null;
+            gender?: components["schemas"]["Gender"] | null;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
             /**
              * Status
              * @default active

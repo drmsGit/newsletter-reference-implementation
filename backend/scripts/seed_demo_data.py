@@ -198,6 +198,15 @@ def seed(extended: bool = False):
         # --- 40 recipients + manual preference contributions ------------
         first = ["Anna", "Jan", "Sophie", "Lars", "Mia", "Tom", "Nora", "Paul", "Lea", "Finn",
                  "Emma", "Noah", "Julia", "Ben", "Clara", "Max", "Ida", "Leon", "Marie", "Elias"]
+        # Personalisation reads these (task-365, ADR-199). Every fourth has
+        # no gender and every seventh no last name, so the formal salutation's
+        # fallback shows up in the demo too.
+        gender_of = {"Anna": "female", "Jan": "male", "Sophie": "female", "Lars": "male", "Mia": "female",
+                     "Tom": "male", "Nora": "female", "Paul": "male", "Lea": "female", "Finn": "male",
+                     "Emma": "female", "Noah": "male", "Julia": "female", "Ben": "male", "Clara": "female",
+                     "Max": "male", "Ida": "female", "Leon": "male", "Marie": "female", "Elias": "male"}
+        last = ["Müller", "Schmidt", "de Vries", "Martin", "Weber", "Jansen", "Fischer", "Dubois", "Wagner",
+                "Becker", "Bakker", "Laurent"]
         langs = ["de", "de", "de", "nl", "fr", "en"]
         recipients = []
         addresses_by_external_id: dict[str, str] = {}
@@ -206,7 +215,12 @@ def seed(extended: bool = False):
             r = RecipientDB(
                 external_id=f"demo-{i:03d}",
                 language=random.choice(langs),
-                attributes={"firstname": name},
+                attributes={},
+                first_name=name,
+                # By index, not random.choice: drawing from the shared random
+                # stream would shift every later pick of the seed.
+                last_name=None if i % 7 == 0 else last[i % len(last)],
+                gender=None if i % 4 == 0 else gender_of[name],
                 status="active",
             )
             db.add(r)

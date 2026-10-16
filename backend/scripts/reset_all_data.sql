@@ -110,10 +110,11 @@ JOIN categories cat ON cat.name = v.category_name;
 
 -- No email column: an address is a row in recipient_addresses (ADR-163
 -- point 2), written below.
-INSERT INTO recipients (external_id, language, attributes, status) VALUES
-    ('r-001', 'de', '{"firstname": "Anna",   "lastname": "Müller",   "preferred_airport": "HAM"}', 'active'),
-    ('r-002', 'nl', '{"firstname": "Jan",    "lastname": "de Vries", "preferred_airport": "AMS"}', 'active'),
-    ('r-003', 'fr', '{"firstname": "Sophie", "lastname": "Martin",    "preferred_airport": "CDG"}', 'active');
+-- first_name, last_name and gender are columns since task-365 (ADR-199).
+INSERT INTO recipients (external_id, language, attributes, first_name, last_name, gender, status) VALUES
+    ('r-001', 'de', '{"preferred_airport": "HAM"}', 'Anna',   'Müller',   'female', 'active'),
+    ('r-002', 'nl', '{"preferred_airport": "AMS"}', 'Jan',    'de Vries', 'male',   'active'),
+    ('r-003', 'fr', '{"preferred_airport": "CDG"}', 'Sophie', 'Martin',   'female', 'active');
 
 -- Consent is an append-only event per (recipient, channel, purpose), latest
 -- wins (ADR-163 point 1) — not a column. Seed recipients are opted_in on

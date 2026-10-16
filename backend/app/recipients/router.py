@@ -20,6 +20,7 @@ from app.recipients.models import (
     RecipientPreferenceCreate,
 )
 from app.recipients.service import (
+    PERSONAL_FIELDS,
     create_recipient,
     detect_consent_drift,
     get_recipient_by_external_id,
@@ -107,6 +108,11 @@ def create_recipient_record(
             status=payload.status,
             consent_status=payload.consent_status.value,
             actor=actor_of(request),     # who, if consent changes (task-340)
+            # Only the personal fields the payload sends (task-365): left out
+            # means kept, so a sync that does not know them never wipes them.
+            personal={name: (value.value if hasattr(value, "value") else value)
+                      for name, value in payload.model_dump(include=set(PERSONAL_FIELDS)).items()
+                      if name in payload.model_fields_set},
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))

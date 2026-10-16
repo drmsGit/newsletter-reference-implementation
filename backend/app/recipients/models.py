@@ -2,7 +2,16 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class Gender(str, Enum):
+    """What personalisation can address (task-365, ADR-199). A CRM maps its
+    own values onto these; anything else is refused with the allowed list."""
+
+    female = "female"
+    male = "male"
+    diverse = "diverse"
 
 
 class ConsentStatus(str, Enum):
@@ -50,6 +59,9 @@ class Recipient(BaseModel):
     email: str
     language: str | None = None
     attributes: dict[str, Any] | None = None
+    gender: Gender | None = None
+    first_name: str | None = None
+    last_name: str | None = None
     status: str
     # **Renamed from `consent_status`, which was the defect.** It is the
     # (email, marketing) cell and always was — but called "the" consent status
@@ -84,6 +96,12 @@ class RecipientCreate(BaseModel):
     channel: str = "email"
     language: str | None = None
     attributes: dict[str, Any] | None = None
+    # What personalisation reads (task-365, ADR-199). Left out, a field keeps
+    # what it holds, so a sync that does not know them never wipes them; sent
+    # as null, it is cleared. Any gender but these three is refused.
+    gender: Gender | None = None
+    first_name: str | None = Field(None, max_length=255)
+    last_name: str | None = Field(None, max_length=255)
     status: str = "active"
     consent_status: ConsentStatus = ConsentStatus.pending
 

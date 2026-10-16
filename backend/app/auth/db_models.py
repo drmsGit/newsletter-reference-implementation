@@ -36,6 +36,10 @@ class BrandDB(Base):
     key = Column(String(50), nullable=False, unique=True)
     name = Column(String(200), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    # When this brand's expression dictionary was first used and the starters
+    # were copied in (task-365, ADR-199); never reset, so deleting every entry
+    # does not bring them back.
+    expressions_started_at = Column(DateTime(timezone=True), nullable=True)
 
 
 class UserDB(Base):

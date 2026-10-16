@@ -215,6 +215,9 @@ def to_recipients(db: Session, records: list[RecipientDB], brand_id: int) -> lis
             email=emails.get(record.id, ""),
             language=record.language,
             attributes=record.attributes,
+            gender=record.gender,
+            first_name=record.first_name,
+            last_name=record.last_name,
             status=record.status,
             email_consent_status=consents.get(record.id, ConsentStatus.pending.value),
             addresses=[
@@ -237,6 +240,29 @@ def to_recipients(db: Session, records: list[RecipientDB], brand_id: int) -> lis
     ]
 
 
+#: The recipient fields personalisation reads (task-365, ADR-199), the names
+#: an expression case may test and use.
+PERSONAL_FIELDS = ("gender", "first_name", "last_name")
+GENDERS = ("female", "male", "diverse")
+
+
+def validate_personal_fields(personal: dict | None) -> dict:
+    """The personal fields to write, cleaned: text trimmed and empty as None,
+    gender one of GENDERS. Raises ValueError naming what is wrong."""
+    cleaned = {}
+    for name, value in (personal or {}).items():
+        if name not in PERSONAL_FIELDS:
+            raise ValueError(f"{name!r} is not a personal field; they are {', '.join(PERSONAL_FIELDS)}.")
+        if value is not None and not isinstance(value, str):
+            raise ValueError(f"{name} must be text.")
+        value = (value or "").strip() or None
+        if name == "gender" and value is not None and value not in GENDERS:
+            raise ValueError(f"gender {value!r} is not one of {', '.join(GENDERS)} (or empty). "
+                             "Map the CRM's values onto these.")
+        cleaned[name] = value
+    return cleaned
+
+
 def create_recipient(
     db: Session,
     brand_id: int,
@@ -249,6 +275,7 @@ def create_recipient(
     consent_status: str = ConsentStatus.pending.value,
     *,
     actor: tuple[str, int | None] | None = None,
+    personal: dict | None = None,
 ) -> Recipient:
     """Upserts keyed on external_id — a repeat CRM sync updates in place
     rather than hitting the unique constraint with a blind insert.
@@ -269,6 +296,7 @@ def create_recipient(
     for partial failure that nothing is asking for yet.
     """
     validate_recipient_attributes(attributes)
+    personal = validate_personal_fields(personal)
 
     recipient = (
         db.query(RecipientDB)
@@ -283,6 +311,9 @@ def create_recipient(
     recipient.language = language
     recipient.attributes = attributes
     recipient.status = status
+    # Only what was sent (task-365): a field left out keeps its value.
+    for name, value in personal.items():
+        setattr(recipient, name, value)
 
     db.flush()
 

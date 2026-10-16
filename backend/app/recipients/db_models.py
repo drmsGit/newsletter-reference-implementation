@@ -15,6 +15,12 @@ class RecipientDB(Base):
     # most-recently-verified.
     language = Column(String(20), nullable=True)
     attributes = Column(JSON, nullable=True)
+    # The fields personalisation reads (task-365, ADR-199): real columns, not
+    # attributes, so the API can check them. gender is female, male, diverse
+    # or empty; the CRM maps its own values onto these.
+    gender = Column(String(20), nullable=True)
+    first_name = Column(String(255), nullable=True)
+    last_name = Column(String(255), nullable=True)
     status = Column(String(50), nullable=False, default="active")
     # Consent is no longer a column here. It is an append-only event per
     # (recipient, channel, purpose), latest wins — see ConsentEventDB and
