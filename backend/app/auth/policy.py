@@ -205,6 +205,11 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
     # content; serving them is the public `/media/` router, outside this table.
     ("/assets", CONTENT_MANAGE),
     ("/ui/users", USERS_MANAGE),
+    # The same administration over JSON (task-358): people only and
+    # users.manage for reads too, on the router (`app/auth/admin_router.py`).
+    ("/auth/users", USERS_MANAGE),
+    ("/auth/roles", USERS_MANAGE),
+    ("/auth/brands", USERS_MANAGE),
     ("/ui/roles", USERS_MANAGE),
 
     # === the JSON API (ADR-166) ===========================================
@@ -458,7 +463,9 @@ BRAND_OWNED: dict[str, str] = {
         "sessions and role assignments, which are platform-level. The brand "
         "here is the session's working CONTEXT, which is the thing ADR-172 "
         "point 1 separated from authorisation. A route that sets the context "
-        "cannot itself be scoped by it."
+        "cannot itself be scoped by it. The administration routes beside them "
+        "(`/auth/users`, `/auth/roles`, `/auth/brands`, `/auth/permissions`, "
+        "task-358) are platform-level too: people, roles and brands themselves."
     ),
     "/brand-profiles": (
         "yes — `brand_profiles.brand_id`. A variant may only use a profile of "

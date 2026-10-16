@@ -66,6 +66,13 @@ FIXED = {
     "/delivery/snapshots/{snapshot_id}/send-instances",
     # Declared in storage/brand_profile.json: fixed by configuration.
     "/brand-profiles/structure",
+    # Administration (task-358): the permission catalogue is fixed by code;
+    # roles, brands and staff accounts are an installation's own, in the tens,
+    # not recipients.
+    "/auth/permissions",
+    "/auth/roles",
+    "/auth/brands",
+    "/auth/users",
 }
 
 #: Lists that grow with use and are not yet paged. Empty since task-88 closed;

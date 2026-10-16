@@ -37,6 +37,8 @@ from app.auth.service import (
     set_role_permissions, user_for_token, verify_login_code,
 )
 from app.audit import service as audit
+from app.auth import admin
+from app.auth.service import AccessLockout
 from app.database import get_db
 from app.settings.service import set_config
 
@@ -243,8 +245,14 @@ def users_page(
     )
 
 
+def _back(url: str, error: Exception) -> RedirectResponse:
+    """A refused administration write, said on the page it came from."""
+    return RedirectResponse(url=f"{url}?error={quote(str(error))}", status_code=303)
+
+
 @router.post("/ui/users")
 def user_create(
+    request: Request,
     email: str = Form(...),
     display_name: str = Form(""),
     role_key: str = Form("viewer"),
@@ -256,10 +264,11 @@ def user_create(
     # Optional so a single-brand deployment never renders the field (ADR-150
     # point 4). `create_user` falls back to the default brand when it is None,
     # which in that case is the only brand there is — not a guess.
-    create_user(
-        db, email=email, display_name=display_name,
-        is_external=bool(is_external), role_key=role_key, brand_id=brand_id,
-    )
+    try:
+        admin.create_user(request, db, email=email, display_name=display_name,
+                          is_external=bool(is_external), role_key=role_key, brand_id=brand_id)
+    except admin.AdminRefused as error:
+        return _back("/ui/users", error)
     return RedirectResponse(url="/ui/users", status_code=303)
 
 
@@ -271,13 +280,10 @@ def user_set_active(
     db: Session = Depends(get_db),
     _user=Depends(require_permission(USERS_MANAGE)),
 ):
-    became_active = active == "1"
-    set_active(db, user_id, became_active)
-    audit.record_from_request(
-        request, db,
-        audit.USER_REACTIVATED if became_active else audit.USER_DEACTIVATED,
-        subject_type="user", subject_id=user_id,
-    )
+    try:
+        admin.set_active(request, db, user_id, active == "1", actor_user_id=getattr(_user, "id", None))
+    except (admin.AdminNotFound, AccessLockout) as error:
+        return _back("/ui/users", error)
     return RedirectResponse(url="/ui/users", status_code=303)
 
 
@@ -293,13 +299,10 @@ def user_assign_role(
     # A grant is (user × role × brand) — ADR-150 point 6. Dropping the brand
     # here is what made every grant land on the default brand however many
     # brands existed, so the switcher could never appear at all.
-    assign_role(db, user_id, role_id, brand_id=brand_id)
-    audit.record_from_request(
-        request, db, audit.ROLE_GRANTED,
-        subject_type="user", subject_id=user_id,
-        brand_id=brand_id,
-        detail={"role_id": role_id},
-    )
+    try:
+        admin.grant_role(request, db, user_id, role_id, brand_id)
+    except admin.AdminNotFound as error:
+        return _back("/ui/users", error)
     return RedirectResponse(url="/ui/users", status_code=303)
 
 
@@ -319,43 +322,40 @@ def brand_create(
     assignments. A seventeenth permission key would need an ADR amendment, and
     ADR-150 point 5's rule is that a key names a code path.
     """
-    brand = create_brand(db, key=key, name=name)
-    if brand is None:
-        return RedirectResponse(
-            url="/ui/users?error=" + quote("That brand key is already taken, or the name is empty."),
-            status_code=303,
-        )
-    audit.record_from_request(
-        request, db, audit.BRAND_CREATED,
-        subject_type="brand", subject_id=brand.id,
-        # The brand the action CREATED, not the one the actor was working in —
-        # otherwise every brand creation reads as an event in brand 1.
-        brand_id=brand.id,
-        detail={"key": brand.key, "name": brand.name},
-    )
+    try:
+        admin.create_brand(request, db, key=key, name=name)
+    except admin.AdminRefused as error:
+        return _back("/ui/users", error)
     return RedirectResponse(url="/ui/users", status_code=303)
 
 
 @router.post("/ui/brands/{brand_id}/rename")
 def brand_rename(
+    request: Request,
     brand_id: int,
     name: str = Form(...),
     db: Session = Depends(get_db),
     _user=Depends(require_permission(USERS_MANAGE)),
 ):
-    rename_brand(db, brand_id, name)
+    try:
+        admin.rename_brand(request, db, brand_id, name)
+    except admin.AdminRefused as error:
+        return _back("/ui/users", error)
     return RedirectResponse(url="/ui/users", status_code=303)
 
 
 @router.post("/ui/brands/{brand_id}/delete")
 def brand_delete(
+    request: Request,
     brand_id: int,
     db: Session = Depends(get_db),
     _user=Depends(require_permission(USERS_MANAGE)),
 ):
-    error = delete_brand(db, brand_id)
-    suffix = "?error=" + quote(error) if error else ""
-    return RedirectResponse(url=f"/ui/users{suffix}", status_code=303)
+    try:
+        admin.delete_brand(request, db, brand_id)
+    except admin.AdminRefused as error:
+        return _back("/ui/users", error)
+    return RedirectResponse(url="/ui/users", status_code=303)
 
 
 @router.post("/ui/users/assignments/{assignment_id}/remove")
@@ -365,27 +365,10 @@ def user_revoke_assignment(
     db: Session = Depends(get_db),
     _user=Depends(require_permission(USERS_MANAGE)),
 ):
-    # Read the grant BEFORE revoking it — afterwards the row is gone and the
-    # entry could only say "some assignment was removed", which is not an
-    # accountability record. ADR-153 point 5 keeps this to internal ids.
-    grant = (
-        db.query(RoleAssignmentDB)
-        .filter(RoleAssignmentDB.id == assignment_id)
-        .first()
-    )
-    detail = (
-        {"role_id": grant.role_id, "brand_id": grant.brand_id}
-        if grant is not None else None
-    )
-    subject_id = grant.user_id if grant is not None else None
-
-    revoke_assignment(db, assignment_id)
-    audit.record_from_request(
-        request, db, audit.ROLE_REVOKED,
-        subject_type="user", subject_id=subject_id,
-        brand_id=grant.brand_id if grant is not None else None,
-        detail=detail,
-    )
+    try:
+        admin.revoke_grant(request, db, assignment_id)
+    except (admin.AdminNotFound, AccessLockout) as error:
+        return _back("/ui/users", error)
     return RedirectResponse(url="/ui/users", status_code=303)
 
 
@@ -410,6 +393,7 @@ def roles_page(
 
 @router.post("/ui/roles")
 def role_create(
+    request: Request,
     key: str = Form(...),
     name: str = Form(""),
     copy_from: str = Form(""),
@@ -418,11 +402,10 @@ def role_create(
 ):
     """Create a role, optionally copying an existing one as the starting set."""
     source = int(copy_from) if (copy_from or "").isdigit() else None
-    if create_role(db, key=key, name=name, copy_from_role_id=source) is None:
-        return RedirectResponse(
-            url="/ui/roles?error=That+role+key+is+already+in+use+or+invalid.",
-            status_code=303,
-        )
+    try:
+        admin.create_role(request, db, key=key, name=name, copy_from=source)
+    except admin.AdminRefused as error:
+        return _back("/ui/roles", error)
     return RedirectResponse(url="/ui/roles", status_code=303)
 
 
@@ -436,19 +419,25 @@ async def role_set_permissions(
     """Save one role's permissions. Marks it customised, so the shipped preset
     stops overwriting it at startup."""
     form = await request.form()
-    set_role_permissions(db, role_id, form.getlist("permissions"))
+    try:
+        admin.set_permissions(request, db, role_id, form.getlist("permissions"))
+    except (admin.AdminNotFound, AccessLockout) as error:
+        return _back("/ui/roles", error)
     return RedirectResponse(url="/ui/roles", status_code=303)
 
 
 @router.post("/ui/roles/{role_id}/delete")
 def role_delete(
+    request: Request,
     role_id: int,
     db: Session = Depends(get_db),
     _user=Depends(require_permission(USERS_MANAGE)),
 ):
-    error = delete_role(db, role_id)
-    suffix = f"?error={quote(error)}" if error else ""
-    return RedirectResponse(url=f"/ui/roles{suffix}", status_code=303)
+    try:
+        admin.delete_role(request, db, role_id)
+    except admin.AdminRefused as error:
+        return _back("/ui/roles", error)
+    return RedirectResponse(url="/ui/roles", status_code=303)
 
 
 @router.post("/ui/users/enforcement")

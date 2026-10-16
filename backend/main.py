@@ -137,6 +137,7 @@ from app.brand_profiles.router import router as brand_profiles_router
 from app.subscriptions.router import router as unsubscribe_router
 from app.assets.router import router as assets_router
 from app.expressions.router import router as expressions_router
+from app.auth.admin_router import router as admin_router
 from app.assets.public import router as media_router
 from app.auth.router import context_router
 
@@ -833,6 +834,8 @@ app.include_router(assets_router, dependencies=_api)
 # A brand's expression dictionary (ADR-199): reads `view`, writes people only
 # and `brand_profiles.manage`.
 app.include_router(expressions_router, dependencies=_api)
+# People, roles and brands (task-358): people only, users.manage for reads too.
+app.include_router(admin_router, dependencies=_api)
 
 # **Public, and deliberately outside both signed-in planes** (ADR-191): the
 # recipient's unsubscribe page. The token in its path is the only credential —

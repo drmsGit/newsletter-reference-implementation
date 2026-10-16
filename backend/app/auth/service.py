@@ -32,7 +32,7 @@ from app.auth.db_models import (
     LoginCodeRequestDB, RoleAssignmentDB, RoleDB, RolePermissionDB, SessionDB,
     UserDB,
 )
-from app.auth.permissions import ALL_PERMISSIONS, BUILTIN_ROLES, IMPLIED, ADMIN
+from app.auth.permissions import ALL_PERMISSIONS, BUILTIN_ROLES, IMPLIED, ADMIN, USERS_MANAGE
 
 logger = logging.getLogger(__name__)
 
@@ -1181,16 +1181,53 @@ def create_user(
     return user
 
 
-def set_active(db: Session, user_id: int, active: bool) -> UserDB | None:
+class AccessLockout(ValueError):
+    """A change that would lock people out of administering access (ADR-150
+    addendum 2026-10-16): deactivating yourself, or leaving no active person
+    who holds users.manage. Refused with the reason, wherever it is asked for."""
+
+
+def user_managers(db: Session, *, without_user: int | None = None, without_assignment: int | None = None,
+                  role_change: tuple[int, set[str]] | None = None) -> set[int]:
+    """The active people who hold users.manage — or would, after one change:
+    a user gone, a grant gone, or a role's permissions replaced."""
+    roles = {role_id for (role_id,) in db.query(RolePermissionDB.role_id)
+             .filter(RolePermissionDB.permission == USERS_MANAGE)}
+    if role_change is not None:
+        role_id, permissions = role_change
+        roles = roles | {role_id} if USERS_MANAGE in permissions else roles - {role_id}
+    if not roles:
+        return set()
+    rows = (db.query(RoleAssignmentDB.id, RoleAssignmentDB.user_id)
+            .join(UserDB, UserDB.id == RoleAssignmentDB.user_id)
+            .filter(UserDB.is_active.is_(True), RoleAssignmentDB.role_id.in_(roles)))
+    return {user_id for assignment_id, user_id in rows
+            if user_id != without_user and assignment_id != without_assignment}
+
+
+def _refuse_lockout(db: Session, before: bool, after: set[int]) -> None:
+    """Refuse a change after which nobody can manage users, when somebody could
+    before. An installation with nobody (access control never set up) is left
+    as it is."""
+    if before and not after:
+        raise AccessLockout("That would leave nobody who can manage users. Give someone else that right first.")
+
+
+def set_active(db: Session, user_id: int, active: bool, *, actor_user_id: int | None = None) -> UserDB | None:
     """Deactivating revokes live sessions immediately — that is the point.
 
     ADR-151 §5: nothing tells the system when an external operator leaves the
     agency, so deactivation is the whole offboarding control and it has to bite
-    now rather than at next expiry.
+    now rather than at next expiry. Refused (AccessLockout) for yourself, and
+    for the last active person who can manage users.
     """
     user = db.query(UserDB).filter(UserDB.id == user_id).first()
     if user is None:
         return None
+    if not active:
+        if actor_user_id is not None and actor_user_id == user_id:
+            raise AccessLockout("You cannot deactivate yourself. Ask another person who manages users.")
+        _refuse_lockout(db, bool(user_managers(db)), user_managers(db, without_user=user_id))
     user.is_active = active
     db.commit()
     if not active:
@@ -1228,6 +1265,9 @@ def revoke_assignment(db: Session, assignment_id: int) -> bool:
     checked against the new permissions anyway. Deactivation is the control
     that ends a session (ADR-151 §5).
     """
+    grant = db.query(RoleAssignmentDB).filter(RoleAssignmentDB.id == assignment_id).first()
+    if grant is not None:
+        _refuse_lockout(db, bool(user_managers(db)), user_managers(db, without_assignment=assignment_id))
     removed = db.query(RoleAssignmentDB).filter(
         RoleAssignmentDB.id == assignment_id
     ).delete()
@@ -1276,6 +1316,7 @@ def set_role_permissions(db: Session, role_id: int, permissions: list[str]) -> R
         return None
 
     wanted = {p for p in (permissions or []) if p in ALL_PERMISSIONS} | IMPLIED
+    _refuse_lockout(db, bool(user_managers(db)), user_managers(db, role_change=(role_id, wanted)))
     db.query(RolePermissionDB).filter(RolePermissionDB.role_id == role_id).delete()
     for permission in sorted(wanted):
         db.add(RolePermissionDB(role_id=role_id, permission=permission))

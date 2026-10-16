@@ -46,6 +46,14 @@ ROLE_REVOKED = "user.role_revoked"
 USER_DEACTIVATED = "user.deactivated"
 USER_REACTIVATED = "user.reactivated"
 BRAND_CREATED = "brand.created"
+# task-358 (ADR-150 addendum 2026-10-16): the administration writes the Jinja
+# forms never logged.
+USER_CREATED = "user.created"
+ROLE_CREATED = "role.created"
+ROLE_PERMISSIONS_SET = "role.permissions_set"
+ROLE_DELETED = "role.deleted"
+BRAND_RENAMED = "brand.renamed"
+BRAND_DELETED = "brand.deleted"
 # Brand step 3. The audit log is how "where did this come from?" is answered —
 # deliberately instead of a `copied_from_id` column, so the answer cannot go
 # stale when the source is renamed, re-pointed or deleted. Same reasoning as
