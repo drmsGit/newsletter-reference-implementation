@@ -72,7 +72,7 @@ function Keys({ integration }: { integration: Integration }) {
         </ul>
       )}
       {integration.is_active && (
-        <p className="inline-form">
+        <div className="inline-form">
           <TextField value={label} onChange={setLabel}>
             <Label>New key's label</Label>
             <Input />
@@ -90,7 +90,7 @@ function Keys({ integration }: { integration: Integration }) {
           >
             Issue a key
           </Button>
-        </p>
+        </div>
       )}
       {(issue.error ?? revoke.error) != null && <p role="alert">Not done: {refused(issue.error ?? revoke.error)}</p>}
       <ModalOverlay isOpen={secret != null} onOpenChange={(open) => !open && setSecret(null)} className="preview-overlay">
@@ -188,14 +188,14 @@ function Unattended({ integration }: { integration: Integration }) {
         A send it fires to at most this many recipients goes out at once; a bigger one waits for a person in
         Approvals. 0: every send waits.
       </p>
-      <p className="inline-form">
+      <div className="inline-form">
         <TextField value={ceiling} onChange={setCeiling} type="number">
           <Label>Recipients per send, unattended</Label>
           <Input />
         </TextField>
         <Button isDisabled={ceiling === String(integration.unattended_ceiling) || ceiling === '' || set.isPending}
           onPress={() => set.mutate(Number(ceiling))}>Save</Button>
-      </p>
+      </div>
       {set.error != null && <p role="alert">Not saved: {refused(set.error)}</p>}
     </section>
   )

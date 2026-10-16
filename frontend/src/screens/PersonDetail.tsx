@@ -62,7 +62,7 @@ function Page({ person }: { person: Person }) {
             ))}
           </ul>
         )}
-        <p className="inline-form">
+        <div className="inline-form">
           <Choice label="Give a role" options={(roles.data ?? []).map((r) => ({ id: String(r.id), name: r.name }))}
             selected={role} onChange={setRole} placeholder="Choose a role" />
           {multiBrand && (
@@ -74,7 +74,7 @@ function Page({ person }: { person: Person }) {
               { onSuccess: () => setRole('') })}>
             Give
           </Button>
-        </p>
+        </div>
       </section>
 
       <section aria-labelledby="person-account">

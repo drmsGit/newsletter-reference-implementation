@@ -137,7 +137,7 @@ function Relations({ detail }: { detail: Detail }) {
       <h2 id="category-relations">Where it sits</h2>
       <h3>Under</h3>
       {list(detail.parents, 'Under')}
-      <p className="inline-form">
+      <div className="inline-form">
         <Choice label="Put it under" options={others} selected={parent} onChange={setParent}
           placeholder="Choose a category" />
         <Button
@@ -146,10 +146,10 @@ function Relations({ detail }: { detail: Detail }) {
         >
           Add
         </Button>
-      </p>
+      </div>
       <h3>Subcategories</h3>
       {list(detail.children, 'Subcategories')}
-      <p className="inline-form">
+      <div className="inline-form">
         <Choice label="Add a subcategory" options={others} selected={child} onChange={setChild}
           placeholder="Choose a category" />
         <Button
@@ -158,7 +158,7 @@ function Relations({ detail }: { detail: Detail }) {
         >
           Add
         </Button>
-      </p>
+      </div>
       {error != null && <p role="alert">Not changed: {refusal(error)}</p>}
     </section>
   )
