@@ -88,6 +88,16 @@ def _validate_field_overrides(manifest, module: ModuleInstanceDB, field_override
         )
 
 
+def _refuse_texts(db: Session, manifest, field_overrides: dict, brand_id: int, previous: dict | None = None) -> None:
+    """An override's texts name only the brand's entries, never in a link (ADR-199)."""
+    from app.expressions.checks import kinds_of, text_problems
+
+    kinds, alts = kinds_of(manifest)
+    problems = text_problems(db, brand_id, field_overrides, kinds, alts=alts, previous=previous)
+    if problems:
+        raise ValueError("; ".join(f"{field}: {why}" for field, why in problems))
+
+
 def override_audit_detail(override) -> dict:
     """What an override.created / override.reset entry records (task-252),
     the same on both planes: the module, and the fields with their values.
@@ -118,6 +128,7 @@ def create_content_override(
             "(e.g. a shorter headline for this send)"
         )
     _validate_field_overrides(manifest, module, data.field_overrides)
+    _refuse_texts(db, manifest, data.field_overrides, brand_id)
 
     if data.system_content_record_id is not None:
         _validate_content_record_exists(db, "system_content_record_id", data.system_content_record_id)
@@ -186,6 +197,9 @@ def set_override_fields(
     manifest = _overrideable_manifest(db, module)
     if field_overrides:
         _validate_field_overrides(manifest, module, field_overrides)
+        current = get_active_content_override(db, module.id)
+        _refuse_texts(db, manifest, field_overrides, brand_id,
+                      previous=current.field_overrides if current else None)
 
     active = (
         db.query(ContentOverrideDB)

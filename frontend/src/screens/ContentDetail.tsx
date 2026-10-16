@@ -139,6 +139,7 @@ function RecordPage({
                 field={field}
                 value={typeof content[field.name] === 'string' ? (content[field.name] as string) : ''}
                 alt={field.alt && typeof content[field.alt] === 'string' ? (content[field.alt] as string) : ''}
+                personalise
                 // Only this channel's fields may be cleared by this save (B19).
                 onSave={(value, also) =>
                   save.mutate({ content: { [field.name]: value, ...also }, groups: [channel] })

@@ -128,6 +128,15 @@ def _module_data_refused(error: ModuleDataInvalid) -> HTTPException:
     ])
 
 
+def _envelope_refused(error: ModuleDataInvalid) -> HTTPException:
+    """A subject or preheader naming an entry the brand lacks, or a recipient
+    field directly (ADR-199): a 422 on that field, as module data is."""
+    return HTTPException(status_code=422, detail=[
+        {"loc": ["body", "envelope", field], "msg": message, "type": "value_error"}
+        for field, message in error.errors
+    ])
+
+
 @router.get("/", response_model=Page[Campaign])
 def get_campaigns(
     q: str | None = Query(None, description="Find by name (part, any case)."),
@@ -268,6 +277,8 @@ def create_campaign_variant(
         # 400, not 404: the campaign is right there and the request is
         # well-formed — the channel is switched off (ADR-160 point 8).
         raise HTTPException(status_code=400, detail=str(error))
+    except ModuleDataInvalid as error:
+        raise _envelope_refused(error)
     except ValueError as error:
         raise HTTPException(status_code=404, detail=str(error))
     audit.record_from_request(
@@ -627,6 +638,8 @@ def update_variant_record(
         raise _stale(error)
     except ProfileNotFound as error:
         raise _profile_refused(error)
+    except ModuleDataInvalid as error:
+        raise _envelope_refused(error)
     if updated is None:
         raise HTTPException(status_code=404, detail="Variant not found")
     audit.record_from_request(

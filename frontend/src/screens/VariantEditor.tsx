@@ -246,6 +246,7 @@ function Envelope({
           field={field}
           value={variant.envelope[field.name] ?? ''}
           onSave={(value) => saveField(field.name, value)}
+          personalise
           error={fieldError(save.error, field.name)}
         />
       ))}
@@ -463,6 +464,7 @@ function ModuleFields({
           onSave={(value) =>
             save.mutate({ id: module.id, changes: { [field.name]: value.trim() ? value : null } })
           }
+          personalise
           error={fieldError(save.error, field.name)}
         />
       ))}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Button, Input, Label, Text, TextArea, TextField } from 'react-aria-components'
+import { Button, Input, Label, Menu, MenuItem, MenuTrigger, Popover, Text, TextArea, TextField } from 'react-aria-components'
 
-import type { ModuleVariable } from '../api/resources'
+import { useExpressions, type ModuleVariable } from '../api/resources'
 import { HttpError } from '../api/session'
 import ImageField from './ImageField'
 
@@ -27,6 +27,7 @@ export function AutosaveField({
   onSave,
   onLeave,
   alt,
+  personalise = false,
   error,
 }: {
   // A module's field, or a record's (`ContentField`): what a form needs of either.
@@ -36,6 +37,9 @@ export function AutosaveField({
   onSave: (value: string, also?: Record<string, string>) => void
   /** An image field's paired alt value (see `altFieldsOf`). */
   alt?: string
+  /** Offer the brand's entries ("Personalise…", ADR-199): only on texts
+   * that take them, never a link, an image or a title. */
+  personalise?: boolean
   onLeave?: (draft: string, next: Element | null) => boolean
   error: string | undefined
 }) {
@@ -50,6 +54,10 @@ export function AutosaveField({
   const conflict = value !== base
   const label = field.label ?? field.name
   const multiline = field.type === 'richtext'
+  // Where the caret was, so an entry goes in there rather than at the end.
+  const [caret, setCaret] = useState<number | null>(null)
+  const remember = (event: { currentTarget: HTMLInputElement | HTMLTextAreaElement }) =>
+    setCaret(event.currentTarget.selectionStart)
 
   // An image is picked, not typed (task-112; ADR-197): a pick saves at once.
   if (field.type === 'image') {
@@ -68,7 +76,7 @@ export function AutosaveField({
     )
   }
 
-  return (
+  const text = (
     <TextField
       className="react-aria-TextField field"
       value={draft}
@@ -85,7 +93,12 @@ export function AutosaveField({
         {label}
         {field.required && <span className="muted"> (required)</span>}
       </Label>
-      {multiline ? <TextArea rows={4} /> : <Input type={field.type === 'url' ? 'url' : 'text'} />}
+      {multiline ? (
+        <TextArea rows={4} onSelect={remember} onKeyUp={remember} />
+      ) : (
+        <Input type={field.type === 'url' ? 'url' : 'text'} onSelect={remember} onKeyUp={remember} />
+      )}
+
       {multiline && (
         // VE 2.5: raw markdown, no toolbar, and the syntax said where it is typed.
         <Text slot="description" className="muted">
@@ -126,6 +139,44 @@ export function AutosaveField({
         </p>
       )}
     </TextField>
+  )
+  if (!personalise || field.type === 'url' || conflict) return text
+  return (
+    <>
+      {text}
+      {/* An entry goes in at the caret and is saved at once, like a picked
+          image: the press took the focus, so no blur will save it. */}
+      <Personalise
+        onInsert={(token) => {
+          const at = caret ?? draft.length
+          const next = draft.slice(0, at) + token + draft.slice(at)
+          setDraft(next)
+          setCaret(at + token.length)
+          onSave(next)
+        }}
+      />
+    </>
+  )
+}
+
+/** "Personalise…": the brand's entries, by label, to put into a text. */
+function Personalise({ onInsert }: { onInsert: (token: string) => void }) {
+  const dictionary = useExpressions()
+  const entries = dictionary.data?.items ?? []
+  if (entries.length === 0) return null
+  return (
+    <MenuTrigger>
+      <Button className="personalise">Personalise…</Button>
+      <Popover>
+        <Menu aria-label="Insert a personalisation" onAction={(name) => onInsert(`{{${String(name)}}}`)}>
+          {entries.map((entry) => (
+            <MenuItem key={entry.name} id={entry.name} textValue={entry.label}>
+              {entry.label} <span className="muted">{`{{${entry.name}}}`}</span>
+            </MenuItem>
+          ))}
+        </Menu>
+      </Popover>
+    </MenuTrigger>
   )
 }
 

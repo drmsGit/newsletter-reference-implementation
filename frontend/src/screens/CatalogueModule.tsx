@@ -535,6 +535,7 @@ function CatalogueField({
         field={{ ...field, label: overridden ? `${label} — overridden here` : label }}
         value={overridden ? (typeof own === 'string' ? own : '') : catalogueText}
         alt={altText(field.alt, overrides, catalogueAlt)}
+        personalise
         // AutosaveField saves only a changed value, so an untouched catalogue
         // value never becomes an override. An address's alt is overridden with it.
         onSave={(next, also) => setOverride.mutate({ id: module.id, set: { [field.name]: next, ...also } })}
@@ -678,6 +679,7 @@ function ModuleOwnFields({
         <AutosaveField
           key={field.name}
           field={field}
+          personalise
           value={typeof data[field.name] === 'string' ? (data[field.name] as string) : ''}
           onSave={(value) => save.mutate({ id: module.id, changes: { [field.name]: value.trim() ? value : null } })}
           error={fieldError(save.error, field.name)}

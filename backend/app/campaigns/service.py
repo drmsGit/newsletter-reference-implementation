@@ -527,6 +527,16 @@ def set_envelope_fields(
                 db.flush()
         return
 
+    # The subject and preheader take the brand's entries (ADR-199): only
+    # names its dictionary has. A refusal names the field.
+    from app.expressions.checks import kinds_of, text_problems
+
+    kinds, _ = kinds_of(manifest)
+    problems = text_problems(db, brand_id, data, kinds, previous=existing.module_data if existing else None)
+    if problems:
+        # The module-data refusal, so a route answers it per field (422).
+        raise ModuleDataInvalid(problems)
+
     if existing is None:
         db.add(ModuleInstanceDB(
             variant_id=variant_id,
@@ -576,7 +586,7 @@ def create_module_for_variant(
 
     # (1) The module must belong to this channel, and not be its envelope.
     _refuse_module_type(variant.channel, module_type)
-    _refuse_module_data(variant.channel, module_type, module_data)
+    _refuse_module_data(variant.channel, module_type, module_data, db=db, brand_id=brand_id)
 
     # (2) Cardinality — ADR-161 point 7's one genuinely channel-level fact, and
     # what keeps ADR-160 point 2's promise that push is "one ModuleInstanceDB"
@@ -634,7 +644,9 @@ class ModuleDataInvalid(ValueError):
         super().__init__("; ".join(f"{field}: {message}" for field, message in errors))
 
 
-def _refuse_module_data(channel_key: str, module_type: str, module_data: dict | None) -> None:
+def _refuse_module_data(channel_key: str, module_type: str, module_data: dict | None, *,
+                        db: Session | None = None, brand_id: int | None = None,
+                        previous: dict | None = None) -> None:
     """`module_data` holds only the manifest's fields, each as text or empty.
 
     The same rule overrides apply to their keys (`overrides/service.py`), now
@@ -661,6 +673,12 @@ def _refuse_module_data(channel_key: str, module_type: str, module_data: dict | 
             errors.append((field, f"'{module_type}' has no field '{field}'"))
         elif value is not None and not isinstance(value, str):
             errors.append((field, f"'{field}' must be text, not {type(value).__name__}"))
+    if not errors and db is not None and brand_id is not None:
+        # Entries named in it must be the brand's, never in a link (ADR-199).
+        from app.expressions.checks import kinds_of, text_problems
+
+        kinds, alts = kinds_of(manifest)
+        errors = text_problems(db, brand_id, module_data, kinds, alts=alts, previous=previous)
     if errors:
         raise ModuleDataInvalid(errors)
 
@@ -762,7 +780,8 @@ def update_module(
     refuse_stale(db, module, expected_updated_at, "module")
     channel_key = db.get(VariantDB, module.variant_id).channel
     _refuse_module_type(channel_key, module_type, current=module.module_type)
-    _refuse_module_data(channel_key, module_type, module_data)
+    _refuse_module_data(channel_key, module_type, module_data, db=db, brand_id=brand_id,
+                        previous=module.module_data if module_type == module.module_type else None)
     _refuse_foreign_binding(
         db, module.variant_id, content_record_id, decision_slot_id, brand_id=brand_id
     )

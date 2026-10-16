@@ -322,6 +322,21 @@ def refuse_bad_images(db: Session, content: dict, brand_id: int, previous: dict 
         raise ContentImageInvalid("; ".join(problems))
 
 
+class ContentTextInvalid(ContentImageInvalid):
+    """A text naming an entry the brand's dictionary lacks, or one in a link
+    (ADR-199). A subclass so it is answered where an image refusal is: both are
+    a field that may not hold what it was given (422)."""
+
+
+def refuse_bad_texts(db: Session, content: dict, brand_id: int, previous: dict | None = None) -> None:
+    from app.expressions.checks import content_kinds, text_problems
+
+    kinds, alts = content_kinds()
+    problems = text_problems(db, brand_id, content, kinds, alts=alts, previous=previous)
+    if problems:
+        raise ContentTextInvalid("; ".join(f"{field}: {why}" for field, why in problems))
+
+
 def update_content_record(
     db: Session,
     content_id: int,
@@ -343,6 +358,7 @@ def update_content_record(
     # write is refused rather than overwriting somebody else's newer edit.
     refuse_stale(db, record, expected_updated_at, "content record")
     refuse_bad_images(db, content, brand_id, record.content)
+    refuse_bad_texts(db, content, brand_id, record.content)
     record.title = title
     record.description = description
     record.content = without_empty_presence_fields(content)
@@ -600,6 +616,7 @@ def create_content(
     description: str | None = None,
 ) -> ContentRecord:
     refuse_bad_images(db, content, brand_id)
+    refuse_bad_texts(db, content, brand_id)
 
     record = ContentRecordDB(
         title=title,
