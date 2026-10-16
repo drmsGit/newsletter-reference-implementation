@@ -403,13 +403,13 @@ describe('AI subject and preheader suggestions (task-367)', () => {
     })
     fireEvent.click(await screen.findByRole('button', { name: 'Suggest with AI' }))
     const busy = await screen.findByRole('button', { name: 'Asking the model…' })
-    expect(busy).toBeDisabled()
+    expect(busy).toHaveAttribute('aria-disabled', 'true')
     fireEvent.click(busy)
     expect(sent(fetchMock, 'POST')).toHaveLength(1)
     runs = [RUN]
     await act(async () => answer(jsonResponse({ outcome: 'inline', message: null, ai_run_id: 70, pending_action_id: null })))
     expect(await screen.findByText('Lisbon awaits')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Suggest with AI' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Suggest with AI' })).not.toHaveAttribute('aria-disabled')
   })
 
   it('says why a request was refused, in words', async () => {

@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 
 import { useSuggestSubject, useSuggestions, type SuggestionRun } from '../api/resources'
 import { HttpError } from '../api/session'
+import AIButton from '../components/AIButton'
 
 export type SuggestionOption = SuggestionRun['options'][number]
 
@@ -31,9 +32,9 @@ export default function SubjectSuggestions({
 
   return (
     <section className="suggestions" aria-label="AI suggestions">
-      <Button onPress={() => suggest.mutate()} isDisabled={suggest.isPending}>
-        {suggest.isPending ? 'Asking the model…' : 'Suggest with AI'}
-      </Button>
+      <AIButton onPress={() => suggest.mutate()} pending={suggest.isPending}>
+        Suggest with AI
+      </AIButton>
       {suggest.error && (
         <p role="alert">
           {suggest.error instanceof HttpError && suggest.error.detail
