@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 13:57'
-updated_date: '2026-10-09 19:09'
+updated_date: '2026-10-16 14:47'
 labels:
   - needs-adr
   - backend
@@ -33,4 +33,6 @@ Migrated 2026-09-27 from `docs/backlog.md` line 489, section "Needs ADR", positi
 2026-10-01, from task-33: integration_auth_failures needs a retention period, and nothing prunes it. Deferred here by the user's decision because ADR-153 leaves the audit/evidence retention question to this item. Urgency is low: since task-33 the table grows linearly in time and in the number of sources (one row per real credential plus one shared UNKNOWN_KEY bucket, per client per hour), no longer per attempt. The login rate-limit counters, by contrast, are pruned on write to their longest window, because they are rate limits rather than evidence.
 
 2026-10-09 (business interview BF-SUB1, decided by the user; ADR-191 2026-10-09 addendum): every marketing mail carries an unsubscribe link whose token resolves through its delivery execution and brand rows (backend/app/subscriptions/service.py around :52-62). Any retention clean-up of delivery records must keep that lookup working for a minimum period; the period is to be set here.
+
+2026-10-16, from task-365 (the user: "when erasure is designed, ask that question again"). An open question to put to the user when erasure is designed, before deciding anything: since ADR-199 each delivery record keeps the personalised texts a recipient got (delivery_executions.delivery_record, key "personal", e.g. "Dear Ms Müller,"). Under ADR-154 point 2's default the executions are deleted with the person, which covers it. But should a company that takes the documented variation and keeps id-keyed activity be required to clear these values too? A sentence saying so was drafted into ADR-154's 2026-10-16 addendum and removed as undecided. See backend/app/privacy/README.md for what erasure must reach.
 <!-- SECTION:NOTES:END -->

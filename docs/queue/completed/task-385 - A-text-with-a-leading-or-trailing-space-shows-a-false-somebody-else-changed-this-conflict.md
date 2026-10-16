@@ -3,9 +3,11 @@ id: TASK-385
 title: >-
   A text with a leading or trailing space shows a false
   somebody-else-changed-this conflict
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-10-16 14:09'
+updated_date: '2026-10-16 14:55'
 labels:
   - frontend
 dependencies: []
@@ -27,6 +29,18 @@ Fix to decide in its final-design pass: treat a stored value that equals the dra
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Typing a text with surrounding spaces and leaving the field shows no conflict
-- [ ] #2 A real change by someone else while typing still shows the conflict
+- [x] #1 Typing a text with surrounding spaces and leaving the field shows no conflict
+- [x] #2 A real change by someone else while typing still shows the conflict
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Fixed 2026-10-16 (commit 1cf951f) in AutosaveField (frontend/src/components/EditorFields.tsx): a returned value equal to the draft apart from surrounding spaces is the field's own save. Chosen over trimming in the client because the server already decides what it keeps (the envelope trims, content keeps some text as written) and the field only has to recognise its own text. Test frontend/src/components/EditorFields.trim.test.tsx: a trimming store takes the text back without a conflict, a real overwrite still shows it; failed first. Mutations: ignoring the trim and taking every value as ours, both caught; trimming only the draft is equivalent while every trimming store returns trimmed text. Live check on the scratch variant: a changed subject typed with surrounding spaces saves with no conflict and the field shows it as stored. vitest 319, pytest 2063, tsc, eslint; CI green on 1cf951f.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+A text typed with surrounding spaces no longer shows a false somebody-else-changed-this conflict: the field recognises its own trimmed save, while a real change by someone else still shows. Verified by a failing-first test, mutation checks, a live check and CI on 1cf951f.
+<!-- SECTION:FINAL_SUMMARY:END -->
