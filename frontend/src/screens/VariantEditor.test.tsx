@@ -73,6 +73,7 @@ function server(overrides: { canAdd?: boolean; accepted?: string[] } = {}) {
   const handlers = {
     'GET /campaigns/1/composition': () => jsonResponse(composition()),
     'GET /modules': () => jsonResponse(MANIFESTS),
+    'GET /campaigns/variants/3/suggestions': () => jsonResponse([]),
     'PUT /campaigns/modules/11': async (request: Request) => {
       puts.push(request.clone())
       const module = state.modules[0]
@@ -368,3 +369,86 @@ describe('the brand profile', () => {
 
 // `act` is imported for React's sake in some environments; keep the linter quiet.
 void act
+
+const RUN = {
+  run_id: 70, status: 'ok', created_at: T(0), provider: 'mock', model: 'mock-1', prompt_version: 2,
+  input_tokens: 100, output_tokens: 20, reply: '', message: null, pending_action_id: null,
+  notices: ['Only two options came back.'],
+  options: [{ subject: 'Lisbon awaits', preheader: 'Three days of sun' }, { subject: 'Pack light', preheader: '' }],
+}
+
+describe('AI subject and preheader suggestions (task-367)', () => {
+  it('shows the newest run, and "Use this" saves subject and preheader together, naming the run', async () => {
+    const { handlers, puts } = server()
+    open({ ...handlers, 'GET /campaigns/variants/3/suggestions': () => jsonResponse([RUN, { ...RUN, run_id: 60 }]) })
+    const list = await screen.findByRole('list', { name: 'Suggested subjects' })
+    expect(screen.getByText('Only two options came back.')).toBeInTheDocument()
+    expect(screen.getByText(/120 tokens/)).toBeInTheDocument()
+    fireEvent.click(within(list).getByRole('button', { name: 'Use "Lisbon awaits"' }))
+    await waitFor(() => expect(puts).toHaveLength(1))
+    expect(puts[0].headers.get('If-Match')).toBe(T(1))
+    expect(await puts[0].json()).toEqual({
+      name: 'Variant A', envelope: { subject: 'Lisbon awaits', preheader: 'Three days of sun' }, applied_suggestion_run_id: 70,
+    })
+  })
+
+  it('asks once while the model works, then shows what it answered', async () => {
+    const { handlers } = server()
+    let runs: unknown[] = []
+    let answer: (r: Response) => void = () => {}
+    const fetchMock = open({
+      ...handlers,
+      'GET /campaigns/variants/3/suggestions': () => jsonResponse(runs),
+      'POST /campaigns/variants/3/suggest-subject': () => new Promise<Response>((resolve) => (answer = resolve)),
+    })
+    fireEvent.click(await screen.findByRole('button', { name: 'Suggest with AI' }))
+    const busy = await screen.findByRole('button', { name: 'Asking the model…' })
+    expect(busy).toBeDisabled()
+    fireEvent.click(busy)
+    expect(sent(fetchMock, 'POST')).toHaveLength(1)
+    runs = [RUN]
+    await act(async () => answer(jsonResponse({ outcome: 'inline', message: null, ai_run_id: 70, pending_action_id: null })))
+    expect(await screen.findByText('Lisbon awaits')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Suggest with AI' })).toBeEnabled()
+  })
+
+  it('says why a request was refused, in words', async () => {
+    const { handlers } = server()
+    open({
+      ...handlers,
+      'POST /campaigns/variants/3/suggest-subject': () =>
+        jsonResponse({ detail: { reason: 'nothing_to_work_from', message: 'Add some content first.' } }, 409),
+    })
+    fireEvent.click(await screen.findByRole('button', { name: 'Suggest with AI' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Add some content first.')
+  })
+
+  it('sends a held request to Approvals', async () => {
+    const { handlers } = server()
+    open({
+      ...handlers,
+      'POST /campaigns/variants/3/suggest-subject': () =>
+        jsonResponse({ outcome: 'held', message: null, ai_run_id: 70, pending_action_id: 9 }),
+    })
+    fireEvent.click(await screen.findByRole('button', { name: 'Suggest with AI' }))
+    expect(await screen.findByRole('link', { name: 'Open it in Approvals' })).toHaveAttribute('href', '/approvals/9')
+  })
+
+  it('offers no "Use this" on a run waiting for approval', async () => {
+    const { handlers } = server()
+    open({ ...handlers, 'GET /campaigns/variants/3/suggestions': () => jsonResponse([{ ...RUN, pending_action_id: 9 }]) })
+    const list = await screen.findByRole('list', { name: 'Suggested subjects' })
+    expect(within(list).queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Open it in Approvals' })).toHaveAttribute('href', '/approvals/9')
+  })
+
+  it('shows what the model said when no option could be read', async () => {
+    const { handlers } = server()
+    open({
+      ...handlers,
+      'GET /campaigns/variants/3/suggestions': () =>
+        jsonResponse([{ ...RUN, options: [], notices: [], reply: 'I would have to invent the details.' }]),
+    })
+    expect(await screen.findByText('I would have to invent the details.')).toBeInTheDocument()
+  })
+})

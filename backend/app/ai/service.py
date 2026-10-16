@@ -373,9 +373,20 @@ def suggestions_for_variant(db: Session, variant_id: int, *, brand_id: int) -> l
 
     if get_variant(db, variant_id, brand_id=brand_id) is None:
         return None
+    from app.approvals.actions import ai_subject_apply
+    from app.approvals.db_models import PendingActionDB
+
+    runs = runs_for_target(db, "variant", variant_id)
+    # A held run's options are taken in Approvals, not beside the editor
+    # (task-367): the Jinja page sends a held run there and never offers it
+    # "Use this", and an editor that did would step round the approval.
+    held = dict(db.query(PendingActionDB.subject_id, PendingActionDB.id).filter(
+        PendingActionDB.action_key == ai_subject_apply.META.key,
+        PendingActionDB.subject_type == ai_subject_apply.META.subject_type,
+        PendingActionDB.subject_id.in_([run.id for run in runs])).order_by(PendingActionDB.id))
     versions = {}
     result = []
-    for run in runs_for_target(db, "variant", variant_id):
+    for run in runs:
         options = subject_task.parse_options(run.output_text or "") if run.status == "ok" else []
         if run.prompt_id is not None and run.prompt_id not in versions:
             prompt = db.get(AIPromptDB, run.prompt_id)
@@ -396,5 +407,6 @@ def suggestions_for_variant(db: Session, variant_id: int, *, brand_id: int) -> l
             # gives (the Jinja page's reasoning).
             "reply": (run.output_text or "").strip(),
             "message": run.message,
+            "pending_action_id": held.get(run.id),
         })
     return result

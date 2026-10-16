@@ -30,6 +30,10 @@ export class HttpError extends Error {
   /** Build one from a status and whatever the body's `detail` was. */
   static from(status: number, detail: unknown): HttpError {
     if (typeof detail === 'string') return new HttpError(status, detail)
+    // A refusal that says why in words: `{reason, message}` (the AI suggestion
+    // route's 409, task-367).
+    const message = (detail as { message?: unknown } | null)?.message
+    if (typeof message === 'string') return new HttpError(status, message)
     if (!Array.isArray(detail)) return new HttpError(status)
     const fields: Record<string, string> = {}
     const messages: string[] = []

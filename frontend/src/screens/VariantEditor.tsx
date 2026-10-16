@@ -21,6 +21,7 @@ import { AutosaveField, SaveState, fieldError } from '../components/EditorFields
 import ScreenState from '../components/ScreenState'
 import CatalogueModule from './CatalogueModule'
 import Fence from './Fence'
+import SubjectSuggestions, { type SuggestionOption } from './SubjectSuggestions'
 import PreviewBar from './Preview'
 import { ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
 import { BRAND_PROFILES, fieldLabels } from './BrandProfiles'
@@ -238,6 +239,19 @@ function Envelope({
     save.mutate({ id: variant.id, changes: { envelope: { ...variant.envelope, [name]: value.trim() || null } } })
   }
 
+  // Subject and preheader together, in one save, and the entry names the run
+  // the copy came from (task-367). The option's keys are the envelope's own
+  // field names, as the Jinja page's "Use this" posts them.
+  function takeOption(option: SuggestionOption, runId: number) {
+    save.mutate({
+      id: variant.id,
+      changes: {
+        envelope: { ...variant.envelope, subject: option.subject, preheader: option.preheader || null },
+        applied_suggestion_run_id: runId,
+      },
+    })
+  }
+
   return (
     <section className="envelope" aria-label="Envelope">
       {fields.map((field) => (
@@ -250,6 +264,9 @@ function Envelope({
           error={fieldError(save.error, field.name)}
         />
       ))}
+      {carrier && (
+        <SubjectSuggestions variantId={variant.id} onUse={takeOption} using={save.isPending} />
+      )}
       <SaveState mutation={save} reload={reload} what="the variant" />
     </section>
   )

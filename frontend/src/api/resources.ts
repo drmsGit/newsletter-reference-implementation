@@ -992,6 +992,33 @@ function useComposerWrite<TArgs extends { id: number }, TEntity, TResult>(
  * Change some of a variant's name, subject and preheader. The PUT replaces all
  * three, so the ones not changed are sent as the cache holds them now.
  */
+// --- AI subject and preheader suggestions (task-367; ADR-141 §3) -----------
+
+export type SuggestionRun = components['schemas']['SuggestionRun']
+
+/** Every suggestion run for a variant, newest first: what the editor shows under its envelope. */
+export function useSuggestions(variantId: number) {
+  return useQuery({
+    queryKey: ['variants', variantId, 'suggestions'],
+    queryFn: () =>
+      read(api.GET('/campaigns/variants/{variant_id}/suggestions', { params: { path: { variant_id: variantId } } })),
+  })
+}
+
+/** Ask the model. It answers at once (`inline`), or the request waits in Approvals (`held`). */
+export function useSuggestSubject(variantId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () =>
+      read(api.POST('/campaigns/variants/{variant_id}/suggest-subject', { params: { path: { variant_id: variantId } } })),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['variants', variantId, 'suggestions'] }),
+        queryClient.invalidateQueries({ queryKey: keys.approvals }),
+      ]),
+  })
+}
+
 export function useSaveVariant(campaignId: number) {
   return useComposerWrite(
     campaignId,
@@ -1005,7 +1032,12 @@ export function useSaveVariant(campaignId: number) {
         changes,
       }: {
         id: number
-        changes: { name?: string; envelope?: Record<string, string | null>; brand_profile_id?: number }
+        changes: {
+          name?: string
+          envelope?: Record<string, string | null>
+          brand_profile_id?: number
+          applied_suggestion_run_id?: number
+        }
       },
       variant,
     ) =>

@@ -51,6 +51,10 @@ class VariantUpdate(BaseModel):
     # One of the working brand's profiles; left out, the profile stays as it
     # is. Picking one clears the fallback notice.
     brand_profile_id: int | None = None
+    # The AI suggestion run this envelope was taken from (task-367): said in
+    # the audit entry, as the Jinja page's "applied suggestion" is. Only a run
+    # of this variant counts.
+    applied_suggestion_run_id: int | None = None
 
 
 class Campaign(BaseModel):
@@ -400,6 +404,10 @@ class SuggestionRun(BaseModel):
     notices: list[str]
     reply: str
     message: str | None = None
+    pending_action_id: int | None = Field(
+        default=None,
+        description="The approval this run waits on (or went through): its options are taken there, not in the editor",
+    )
 
 
 class DecisionSlotListed(BaseModel):

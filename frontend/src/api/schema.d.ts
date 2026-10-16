@@ -7592,6 +7592,11 @@ export interface components {
             reply: string;
             /** Message */
             message?: string | null;
+            /**
+             * Pending Action Id
+             * @description The approval this run waits on (or went through): its options are taken there, not in the editor
+             */
+            pending_action_id?: number | null;
         };
         /**
          * TestSendRequest
@@ -7920,6 +7925,8 @@ export interface components {
             } | null;
             /** Brand Profile Id */
             brand_profile_id?: number | null;
+            /** Applied Suggestion Run Id */
+            applied_suggestion_run_id?: number | null;
         };
     };
     responses: never;

@@ -128,6 +128,19 @@ def _module_data_refused(error: ModuleDataInvalid) -> HTTPException:
     ])
 
 
+def _applied_suggestion(db: Session, run_id: int | None, variant_id: int) -> dict:
+    """Where the envelope came from, when a person took an AI suggestion
+    (task-367; ADR-141 §3): only a run of this variant is named."""
+    if run_id is None:
+        return {}
+    from app.ai.db_models import AIRunDB
+
+    run = db.get(AIRunDB, run_id)
+    if run is None or run.target_type != "variant" or run.target_id != variant_id:
+        return {}
+    return {"applied_suggestion": True, "ai_run_id": run_id}
+
+
 def _envelope_refused(error: ModuleDataInvalid) -> HTTPException:
     """A subject or preheader naming an entry the brand lacks, or a recipient
     field directly (ADR-199): a 422 on that field, as module data is."""
@@ -648,7 +661,8 @@ def update_variant_record(
                 "brand_profile_id": updated.brand_profile_id,
                 # Said in the entry (ADR-195): choosing a transactional profile
                 # sends this variant without the opt-in check.
-                "brand_profile_kind": _profile_kind(db, updated.brand_profile_id)},
+                "brand_profile_kind": _profile_kind(db, updated.brand_profile_id),
+                **_applied_suggestion(db, payload.applied_suggestion_run_id, variant_id)},
     )
     fence.touch(db, request, variant_id=variant_id)
     return updated
