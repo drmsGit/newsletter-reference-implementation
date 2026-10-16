@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router'
 
@@ -26,6 +26,5 @@ it('lets an integration manager choose grants without user administration (task-
     { route: '/settings/integrations/5' },
   )
   expect(await screen.findByRole('heading', { name: 'Managed CRM' })).toBeInTheDocument()
-  fireEvent.click(await screen.findByRole('button', { name: /Choose a permission/ }))
-  expect(await screen.findByRole('option', { name: 'content.manage' })).toBeInTheDocument()
+  expect(await screen.findByRole('checkbox', { name: 'content.manage' })).toBeInTheDocument()
 })
