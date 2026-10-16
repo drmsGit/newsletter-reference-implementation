@@ -192,6 +192,11 @@
         <p class="text-muted small">{{ task.meta.description }}</p>
 
         {# ---- applied directly, or held for review (playbook 2026-07-31) ---- #}
+        {% if not task.meta.held_form %}
+        {# ADR-140 addendum 2026-10-16: nothing to hold, so no switch. #}
+        <p class="small mb-3">No approval step: its output only appears where a
+            person takes it themselves, so there is nothing to hold.</p>
+        {% else %}
         <form method="post" action="/ui/settings/ai-task-approval" class="mb-3">
             <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
             <input type="hidden" name="task_key" value="{{ task.meta.key }}">
@@ -219,6 +224,7 @@
                 is written until a human picks an option.
             </div>
         </form>
+        {% endif %}
 
         {# ---- which model runs it (ADR-144 §2) ---- #}
         <form method="post" action="/ui/settings/ai-task-model" class="mb-3">

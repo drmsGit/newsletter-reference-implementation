@@ -359,6 +359,18 @@ def run_for_campaign(db: Session, run_id: int, campaign_id: int) -> AIRunDB | No
     )
 
 
+def applied_run(db: Session, run_id: int | None, *, task_key: str, target_type: str, target_id: int) -> dict:
+    """What an audit entry says when a person took an AI proposal (task-367,
+    task-368): the run is named only when it is this task's run on this very
+    thing, so a stray or borrowed id names nothing."""
+    if run_id is None:
+        return {}
+    run = db.get(AIRunDB, run_id)
+    if run is None or (run.task_key, run.target_type, run.target_id) != (task_key, target_type, target_id):
+        return {}
+    return {"applied_suggestion": True, "ai_run_id": run_id}
+
+
 def suggestions_for_variant(db: Session, variant_id: int, *, brand_id: int) -> list[dict] | None:
     """Every subject/preheader suggestion run for one variant, read back (C7).
 

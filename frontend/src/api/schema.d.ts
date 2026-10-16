@@ -415,6 +415,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/content/{content_id}/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every AI draft of this record, newest first
+         * @description With the record's current text and scores beside each proposal (task-368).
+         */
+        get: operations["get_content_drafts_content__content_id__drafts_get"];
+        put?: never;
+        /**
+         * Ask the model to draft this record's text fields and propose its categories
+         * @description task-368 (ADR-141 addendum 2026-10-16). Nothing is written to the record: the proposal is read back from `GET /content/{id}/drafts` and a person takes what they want through the ordinary writes. The source is sent to the model and never stored. Refused on the field at fault (422), before anything is spent, for an empty or over-long source or channels with no text fields.
+         */
+        post: operations["draft_content_record_content__content_id__drafts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/content/{content_id}/readiness/{channel}": {
         parameters: {
             query?: never;
@@ -3324,6 +3348,12 @@ export interface components {
             model?: string | null;
             /** Approval Mode */
             approval_mode: string;
+            /**
+             * Held Form
+             * @description False: no approval step; the output appears only where a person takes it
+             * @default true
+             */
+            held_form: boolean;
         };
         /** Active */
         Active: {
@@ -4533,6 +4563,8 @@ export interface components {
              * @default 10
              */
             score: number;
+            /** Applied Suggestion Run Id */
+            applied_suggestion_run_id?: number | null;
         };
         /**
          * ContentCategoryAssignmentScore
@@ -4542,6 +4574,8 @@ export interface components {
         ContentCategoryAssignmentScore: {
             /** Score */
             score: number;
+            /** Applied Suggestion Run Id */
+            applied_suggestion_run_id?: number | null;
         };
         /** ContentCreate */
         ContentCreate: {
@@ -4553,6 +4587,67 @@ export interface components {
             content: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * ContentDraft
+         * @description One AI draft run for a record, read back (task-368).
+         */
+        ContentDraft: {
+            /** Run Id */
+            run_id: number;
+            /** Status */
+            status: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Provider */
+            provider: string;
+            /** Model */
+            model?: string | null;
+            /** Prompt Version */
+            prompt_version?: number | null;
+            /** Input Tokens */
+            input_tokens: number;
+            /** Output Tokens */
+            output_tokens: number;
+            /** Fields */
+            fields: components["schemas"]["DraftedField"][];
+            /** Categories */
+            categories: components["schemas"]["ProposedCategory"][];
+            /** Notices */
+            notices: string[];
+            /** Reply */
+            reply: string;
+            /** Message */
+            message?: string | null;
+        };
+        /**
+         * ContentDraftRequest
+         * @description What the AI drafts from (task-368; ADR-141 addendum 2026-10-16). The
+         *     source goes to the model and is never stored.
+         */
+        ContentDraftRequest: {
+            /**
+             * Source
+             * @description Pasted text or a brief; at most 12,000 characters
+             */
+            source: string;
+            /**
+             * Channels
+             * @description The channels whose text fields are drafted
+             */
+            channels: string[];
+        };
+        /** ContentDraftStarted */
+        ContentDraftStarted: {
+            /** Ai Run Id */
+            ai_run_id: number;
+            /** Status */
+            status: string;
+            /** Message */
+            message?: string | null;
         };
         /** ContentDuplicate */
         ContentDuplicate: {
@@ -4763,6 +4858,8 @@ export interface components {
              * @default []
              */
             groups: string[];
+            /** Applied Suggestion Run Id */
+            applied_suggestion_run_id?: number | null;
         };
         /** ContentPerformance */
         ContentPerformance: {
@@ -5319,6 +5416,19 @@ export interface components {
             label: string;
             /** Value */
             value: string;
+        };
+        /** DraftedField */
+        DraftedField: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Channel */
+            channel?: string | null;
+            /** Text */
+            text: string;
+            /** Current */
+            current: string;
         };
         /**
          * DuplicationOptions
@@ -6512,6 +6622,21 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /** ProposedCategory */
+        ProposedCategory: {
+            /** Category Id */
+            category_id: number;
+            /** Name */
+            name: string;
+            /** Score */
+            score: number;
+            /** Reason */
+            reason: string;
+            /** Assigned Score */
+            assigned_score?: number | null;
+            /** Assignment Id */
+            assignment_id?: number | null;
         };
         /** ProviderEventCreate */
         ProviderEventCreate: {
@@ -8761,6 +8886,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContentAssignment"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_content_drafts_content__content_id__drafts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                content_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentDraft"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    draft_content_record_content__content_id__drafts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                content_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContentDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentDraftStarted"];
                 };
             };
             /** @description Validation Error */

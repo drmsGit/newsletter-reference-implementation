@@ -34,10 +34,17 @@ def _discover() -> dict[str, tuple[TaskMeta, object]]:
     for _, module_name, _ in pkgutil.iter_modules([str(package_dir)]):
         full_name = f"app.ai.tasks.{module_name}"
         try:
-            if full_name in sys.modules:
-                module = importlib.reload(sys.modules[full_name])
-            else:
+            loaded = sys.modules.get(full_name)
+            if loaded is None:
                 module = importlib.import_module(full_name)
+            elif isinstance(getattr(loaded, "META", None), TaskMeta):
+                # Only a task is reloaded, to pick up an edit. Reloading `base`
+                # made a new TaskMeta class, so every task checked before this
+                # module reloaded itself failed the isinstance below and was
+                # dropped: a task file sorting before "registry" never appeared.
+                module = importlib.reload(loaded)
+            else:
+                module = loaded
         except Exception:
             # One broken task file must not take the registry down with it —
             # the same tolerance the other four registries apply, and for the

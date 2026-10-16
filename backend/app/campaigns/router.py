@@ -130,15 +130,10 @@ def _module_data_refused(error: ModuleDataInvalid) -> HTTPException:
 
 def _applied_suggestion(db: Session, run_id: int | None, variant_id: int) -> dict:
     """Where the envelope came from, when a person took an AI suggestion
-    (task-367; ADR-141 §3): only a run of this variant is named."""
-    if run_id is None:
-        return {}
-    from app.ai.db_models import AIRunDB
+    (task-367; ADR-141 §3): only a subject run of this variant is named."""
+    from app.ai.service import applied_run
 
-    run = db.get(AIRunDB, run_id)
-    if run is None or run.target_type != "variant" or run.target_id != variant_id:
-        return {}
-    return {"applied_suggestion": True, "ai_run_id": run_id}
+    return applied_run(db, run_id, task_key="subject_preheader", target_type="variant", target_id=variant_id)
 
 
 def _envelope_refused(error: ModuleDataInvalid) -> HTTPException:

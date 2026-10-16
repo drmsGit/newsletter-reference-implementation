@@ -82,6 +82,7 @@ def read_settings(request: Request, db: Session = Depends(get_db)):
             ],
             model=service.get_task_model(db, meta.key),
             approval_mode=service.get_task_approval_mode(db, meta.key),
+            held_form=meta.held_form,
         ))
     return Settings(
         signals=SignalTuning(
@@ -243,6 +244,8 @@ def put_approval_mode(
     try:
         with audited_settings(request, db, "ai_task_approval", [service.AI_TASK_APPROVAL_KEY]):
             service.choose_task_approval_mode(db, task_key, payload.mode)
+    except service.NoHeldForm as error:
+        raise HTTPException(status_code=422, detail=str(error))
     except service.SettingsInvalid as error:
         raise HTTPException(status_code=404, detail=str(error))
     return ApprovalModeChoice(mode=service.get_task_approval_mode(db, task_key))

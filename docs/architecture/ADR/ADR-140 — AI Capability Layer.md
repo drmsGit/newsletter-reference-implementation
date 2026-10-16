@@ -6,7 +6,7 @@ topic:
   - ai
   - governance
 created: 2026-07-31
-modified: 2026-10-08
+modified: 2026-10-16
 source:
   - "AI Layer design interview (interview-prep, 2026-07-27 – 31), Cluster 1"
 depends_on:
@@ -222,6 +222,45 @@ ambiguous.
 Built the same day, under task-97: the three files joined `DATED`, living files
 were reworded, and the guard test runs in the suite. Nothing here changes the
 Decision section above.
+
+## Addendum 2026-10-16 — A task may have no held form
+
+Prompted by the final-design pass of task-368 ("AI drafts a content record from
+a source and proposes its categories"), decided by the user on 2026-10-16, one
+question at a time. Point 3 stands for every task whose output can be held. This
+addendum covers a task whose output cannot.
+
+**What was found.** Point 3 assumes that any task's output can be held for an
+approver. The content draft task ([[ADR-141 — In-App Assistive AI Actions]],
+addendum of the same date) has nothing to hold. Its output only ever appears in
+a panel where a person takes it themselves, and taking it is that person's act.
+
+**1. A task may declare that it has no held form.** The task declaration says
+so. Settings shows that statement in place of the auto-apply / require-approval
+switch, and the server refuses `require_approval` for that task, with a reason.
+Every existing task keeps the switch; the subject/preheader task still honours
+it.
+
+**2. `content_draft` is the first such task.** Building a held form for it later
+is a new decision, not a setting.
+
+**Why.** The user chose not to build an approval path for drafts. A draft never
+publishes and never reaches recipients without further human acts: publishing,
+readiness ([[ADR-174 — Channel Readiness Is Asserted, Not Computed]]) and machine
+ready ([[ADR-179 — What Enters the Catalogue, and What a Machine May Take From It]]).
+A second approval layer in front of those would add clicks, not safety. This is
+the reasoning of the Context above, which rejects routing every AI action
+through approval.
+
+**Consequences.**
+
+- **Positive.** Settings no longer offers a switch that could not do anything
+  for such a task, and the server cannot be told otherwise.
+- **Negative.** A company that wants every AI output approved cannot have that
+  for drafts without a new decision. For drafts, the guarantee rests on the
+  human acts that follow and on the audit of point 5.
+
+Nothing here changes the Decision section above. Point 3 stands as written.
 
 ## Related ADRs
 

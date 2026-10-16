@@ -16,6 +16,9 @@ from app.pagination import Page, PageParams, page_of_list, page_params
 from app.database import get_db
 from app.content.db_models import CategoryDB
 from app.content.models import (
+    ContentDraft,
+    ContentDraftRequest,
+    ContentDraftStarted,
     ContentField,
     ContentListItem,
     ContentRecord,
@@ -196,16 +199,26 @@ def get_content_record_by_id(
             "machine_ready": bool(record.machine_ready), "readiness": readiness_of(db, record)}
 
 
-def _record_edit(request, db, record, before: dict) -> None:
+def _record_edit(request, db, record, before: dict, run_id: int | None = None) -> None:
     """The audit entry for a catalogue edit (task-257, ADR-153 point 4): which
     record, and which fields the edit changed — not every key sent (task-275,
-    `content.service.edited_fields`)."""
+    `content.service.edited_fields`) — and the AI draft it came from, if any."""
     from app.content.service import edited_fields
 
     audit.record_from_request(
         request, db, audit.CONTENT_UPDATED, subject_type="content", subject_id=record.id,
-        detail={"title": record.title, "fields": edited_fields(before, record)},
+        detail={"title": record.title, "fields": edited_fields(before, record),
+                **_from_draft(db, run_id, record.id)},
     )
+
+
+def _from_draft(db: Session, run_id: int | None, content_id: int) -> dict:
+    """Names the AI draft run a person took this from (task-368), only when it
+    is this record's draft run."""
+    from app.ai.service import applied_run
+    from app.ai.tasks.content_draft import TASK_KEY
+
+    return applied_run(db, run_id, task_key=TASK_KEY, target_type="content", target_id=content_id)
 
 
 def _record_content_write(request, db, action: str, content_id: int, detail: dict) -> None:
@@ -308,7 +321,7 @@ def patch_content_record(
         raise HTTPException(status_code=422, detail=str(error))
     if record is None:
         raise HTTPException(status_code=404, detail="Content record not found")
-    _record_edit(request, db, record, before)
+    _record_edit(request, db, record, before, payload.applied_suggestion_run_id)
     return record
 
 
@@ -444,7 +457,8 @@ def assign_category(
     from app.content.service import assignment_summary
 
     _record_content_write(request, db, audit.CONTENT_CATEGORY_ASSIGNED, content_id,
-                          assignment_summary(db, assignment))
+                          {**assignment_summary(db, assignment),
+                           **_from_draft(db, payload.applied_suggestion_run_id, content_id)})
 
     return ContentCategoryAssignment(
         id=assignment.id,
@@ -639,6 +653,55 @@ def get_content_assignments(
     return rows
 
 
+@router.post(
+    "/{content_id}/drafts",
+    response_model=ContentDraftStarted,
+    summary="Ask the model to draft this record's text fields and propose its categories",
+    description=(
+        "task-368 (ADR-141 addendum 2026-10-16). Nothing is written to the record: the "
+        "proposal is read back from `GET /content/{id}/drafts` and a person takes what "
+        "they want through the ordinary writes. The source is sent to the model and never "
+        "stored. Refused on the field at fault (422), before anything is spent, for an "
+        "empty or over-long source or channels with no text fields."
+    ),
+)
+def draft_content_record(
+    content_id: int, payload: ContentDraftRequest, request: Request,
+    db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.ai.tasks import content_draft
+    from app.auth.db_models import IntegrationDB
+
+    if get_content_record(db, content_id, brand_id=brand_id) is None:
+        raise HTTPException(status_code=404, detail="Content record not found")
+    try:
+        content_draft.check_request(payload.source, payload.channels)
+    except content_draft.DraftInvalid as error:
+        # The shape FastAPI gives a validation error, so a client shows it on the field.
+        raise HTTPException(status_code=422, detail=[{"loc": ["body", error.field], "msg": str(error),
+                                                      "type": "value_error"}])
+    principal = request_principal(request)
+    actor = ("integration" if isinstance(principal, IntegrationDB) else "user") if principal else None
+    run = content_draft.draft(db, content_id, payload.source, payload.channels,
+                              actor_type=actor, actor_id=principal.id if principal else None)
+    return ContentDraftStarted(ai_run_id=run.run_id, status="ok" if run.ok else "refused", message=run.message)
+
+
+@router.get(
+    "/{content_id}/drafts",
+    response_model=list[ContentDraft],
+    summary="Every AI draft of this record, newest first",
+    description="With the record's current text and scores beside each proposal (task-368).",
+)
+def get_content_drafts(content_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
+    from app.ai.tasks.content_draft import drafts_for_record
+
+    record = get_content_record(db, content_id, brand_id=brand_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Content record not found")
+    return drafts_for_record(db, record, brand_id=brand_id)
+
+
 def _is_integration(request: Request) -> bool:
     from app.auth.db_models import IntegrationDB
 
@@ -763,6 +826,7 @@ def change_assignment_score(
         _record_content_write(request, db, audit.CONTENT_CATEGORY_SCORE_CHANGED, content_id, {
             "category_id": after["category_id"], "category": after["category"],
             "from": before["score"], "to": after["score"],
+            **_from_draft(db, payload.applied_suggestion_run_id, content_id),
         })
     return ContentCategoryAssignment(
         id=assignment_id, content_id=content_id,

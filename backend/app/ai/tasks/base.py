@@ -42,3 +42,9 @@ class TaskMeta:
     #: pre-call gate rather than a mid-run kill (ADR-144 §5).
     max_output_tokens: int
     settings_fields: list[TaskSetting] = field(default_factory=list)
+    #: Whether the output can be held for an approver (ADR-140 §3). False for
+    #: a task whose output only ever appears where a person takes it
+    #: themselves, so nothing is there to hold: Settings says so instead of
+    #: offering the switch, and the server refuses `require_approval` for it
+    #: (ADR-140 addendum 2026-10-16).
+    held_form: bool = True

@@ -7,7 +7,7 @@ topic:
   - governance
   - content
 created: 2026-07-31
-modified: 2026-07-31
+modified: 2026-10-16
 source:
   - "AI Layer design interview (interview-prep, 2026-07-27 – 31), Cluster 2"
 depends_on:
@@ -150,6 +150,83 @@ re-decided here.
   layer's AI-governance ADRs (ADR-080/081/082) rather than inventing new governance.
 - **Status.** Decided in the design interview; implementation is the first AI build.
   Accepted as a design decision, not as shipped code.
+
+## Addendum 2026-10-16 — The content draft task: a record drafted from a pasted source, and its categories proposed
+
+Prompted by the final-design pass of task-368 ("AI drafts a content record from
+a source and proposes its categories"), decided by the user on 2026-10-16, one
+question at a time. Points 1–6 stand. This addendum adds one task under point
+1's contract.
+
+**Why it is a new task file.** Point 1's anti-proliferation rule allows a new
+task file only for a new output type or landing place. This task is both: its
+output type is "draft record", already named in point 1's list, and it lands on
+a content record, which no earlier task writes. Its id is `content_draft`.
+
+**1. Where it runs.** On a content record's own page, for a record that already
+exists: a person created it with a title. The run belongs to that record (its
+target is the content record), so a proposal is read back after a reload and the
+audit names the record.
+
+**2. What it reads.** Text the manager pastes or types, such as an article or a
+brief. The server never fetches a web address for this task. Fetching a URL
+server-side is undecided; no ADR covers it, and it needs its own decision. The
+source is capped at 12,000 characters, and the box says so, so that one paste
+cannot consume the budget. The pre-call gate of
+[[ADR-144 — AI Data and Model Governance]] point 5 still applies. The source is
+sent to the model provider and is not stored on the run. Only the model's output
+is stored ([[ADR-140 — AI Capability Layer]] point 5).
+
+**3. Personal data.** ADR-144 point 4 keeps raw personal data away from the model
+by default. The panel tells the manager to paste content, not anyone's personal
+details, because the text goes to the model provider. There is no pattern
+detection: a press release's contact address would trip it. Personalisation stays
+with dictionary entries
+([[ADR-199 — Inline Personalisation Is a Brand's Expression Dictionary, Substituted After Escaping]];
+ADR-144 addendum 2026-10-16). Drafted text goes through the ordinary record save
+and its checks.
+
+**4. Which fields.** Every text field (text and rich text) of the channels the
+manager ticks. The fields are read from the field definitions (`fields.json`,
+[[ADR-177 — A Field Is Defined Once, Required Per Module]]), and their labels and
+notes go to the model as guidance, so a new text field is drafted without code.
+Links, images and image descriptions are never drafted: the model cannot see an
+image or know the right address. A link the model writes into rich text is
+reduced to its label.
+
+**5. Taking the fields.** The panel lists each drafted field with its text,
+ticked. A field that already has text shows both versions, unticked. "Use ticked
+fields" saves them in one ordinary edit, and the audit entry names the run. This
+does not publish the record or mark it ready.
+
+**6. Categories.** Proposals come from the existing categories only
+([[ADR-080 — Human-governed Taxonomy Before AI Selection]]). The vocabulary is
+global ([[ADR-150 — Tenancy and Access Model]], addendum 2026-09-15). Each
+proposal carries a whole-number score from 1 to 10 (ADR-080 addendum 2026-10-04),
+which the manager can change before taking it, and the model's one-line reason
+(point 4: reasons are shown). A category already on the record shows its current
+and proposed score, unticked. A name the model invents that is not in the
+vocabulary is dropped, and the panel says so. "Assign ticked" makes them ordinary
+assignments, and the audit names the run.
+
+**7. No approval step.** The task has no held form (ADR-140 addendum of the same
+date), so point 4's approval inbox has nothing to hold. Point 5 holds: the record
+stays unpublished. The difference is that the model's text reaches the record
+only when a person takes it, not by direct write. Publishing, readiness
+([[ADR-174 — Channel Readiness Is Asserted, Not Computed]]) and machine ready
+([[ADR-179 — What Enters the Catalogue, and What a Machine May Take From It]])
+stay separate human acts.
+
+**Consequences.**
+
+- **Positive.** A new text field is drafted without code. The source is not kept.
+  Nothing reaches the record's fields, its categories or any recipient without a
+  person's act, and every taken field or category names the run that proposed it.
+- **Negative.** Without a URL fetch, the manager copies the text in. Nothing
+  detects personal data in the paste; the panel's instruction is the only guard.
+  Links and images stay the manager's work.
+
+Nothing here changes the Decision section above.
 
 ## Related ADRs
 

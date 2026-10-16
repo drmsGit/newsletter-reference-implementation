@@ -112,6 +112,9 @@ class ContentPatch(BaseModel):
     content: dict[str, Any] = {}
     #: Names from `content.service.content_field_groups()` — "email", "push".
     groups: list[str] = []
+    #: The AI draft run these fields were taken from (task-368): the audit
+    #: entry names it when it is this record's draft run.
+    applied_suggestion_run_id: int | None = None
 
 
 class ContentStatusUpdate(BaseModel):
@@ -152,6 +155,8 @@ SCORE_MIN, SCORE_MAX = 1, 10
 class ContentCategoryAssignmentCreate(BaseModel):
     category_id: int
     score: int = Field(10, ge=SCORE_MIN, le=SCORE_MAX)
+    #: Taken from an AI draft run (task-368); named in the audit entry.
+    applied_suggestion_run_id: int | None = None
 
 
 class ContentCategoryAssignmentScore(BaseModel):
@@ -159,6 +164,60 @@ class ContentCategoryAssignmentScore(BaseModel):
     drops out of the category the way remove-and-re-add made it."""
 
     score: int = Field(ge=SCORE_MIN, le=SCORE_MAX)
+    applied_suggestion_run_id: int | None = None
+
+
+class ContentDraftRequest(BaseModel):
+    """What the AI drafts from (task-368; ADR-141 addendum 2026-10-16). The
+    source goes to the model and is never stored."""
+
+    source: str = Field(description="Pasted text or a brief; at most 12,000 characters")
+    channels: list[str] = Field(description="The channels whose text fields are drafted")
+
+
+class ContentDraftStarted(BaseModel):
+    ai_run_id: int
+    status: str
+    message: str | None = None
+
+
+class DraftedField(BaseModel):
+    name: str
+    label: str
+    channel: str | None = None
+    text: str
+    #: What the record holds in this field now; "" when empty.
+    current: str
+
+
+class ProposedCategory(BaseModel):
+    category_id: int
+    name: str
+    score: int
+    reason: str
+    #: The record's own score for it, when it is already assigned.
+    assigned_score: float | None = None
+    assignment_id: int | None = None
+
+
+class ContentDraft(BaseModel):
+    """One AI draft run for a record, read back (task-368)."""
+
+    run_id: int
+    status: str
+    created_at: datetime
+    provider: str
+    model: str | None = None
+    prompt_version: int | None = None
+    input_tokens: int
+    output_tokens: int
+    fields: list[DraftedField]
+    categories: list[ProposedCategory]
+    #: What a manager must know before taking any of it (what was left out,
+    #: a truncated reply).
+    notices: list[str]
+    reply: str
+    message: str | None = None
 
 
 class ContentVersion(BaseModel):

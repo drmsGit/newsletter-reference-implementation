@@ -481,10 +481,19 @@ def choose_task_model(db: Session, task_key: str, model: str | None) -> None:
     set_task_model(db, task_key, model)
 
 
+class NoHeldForm(SettingsInvalid):
+    """This task's output cannot be held for approval (ADR-140 addendum 2026-10-16)."""
+
+
 def choose_task_approval_mode(db: Session, task_key: str, mode: str) -> None:
-    require_known_task(task_key)
+    meta = require_known_task(task_key)
     if mode not in APPROVAL_MODES:
         raise SettingsInvalid(f"{mode!r} is not an approval mode: {', '.join(APPROVAL_MODES)}.")
+    if mode == REQUIRE_APPROVAL and not meta.held_form:
+        raise NoHeldForm(
+            f"{meta.label} has no approval step: its output only appears where a person "
+            "takes it themselves, so there is nothing to hold."
+        )
     set_task_approval_mode(db, task_key, mode)
 
 

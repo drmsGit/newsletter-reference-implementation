@@ -54,6 +54,7 @@ class AITaskSettings(BaseModel):
     # None means the deployment default model (ADR-144 §2).
     model: str | None = None
     approval_mode: str
+    held_form: bool = Field(True, description="False: no approval step; the output appears only where a person takes it")
 
 
 class ChannelSetting(BaseModel):

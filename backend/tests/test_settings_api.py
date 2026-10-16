@@ -57,8 +57,10 @@ def restore_config(db):
 
 @pytest.fixture
 def task_key():
-    tasks = list_tasks()
-    assert tasks, "no AI task is registered"
+    # One that can be held, so the approval round trip has a switch to turn
+    # (a task may have no held form: ADR-140 addendum 2026-10-16).
+    tasks = [t for t in list_tasks() if t.held_form]
+    assert tasks, "no AI task with an approval step is registered"
     return tasks[0].key
 
 

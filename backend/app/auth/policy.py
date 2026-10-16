@@ -109,6 +109,10 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
     # in this table and nothing enforces it — a narrow entry that drifts below
     # its prefix is silently downgraded, and the test below pins this pair.
     ("/campaigns/variants/{variant_id}/suggest-subject", AI_RUN),
+    # A POST here starts a content draft (task-368): it spends on the model and
+    # writes nothing to the record, so it is ai.run, not the broad `/content`
+    # entry's content.manage. The GET (the read-back) is view, as every GET is.
+    ("/content/{content_id}/drafts", AI_RUN),
     # Creates an audience group; it is filed under campaigns only by URL.
     ("/ui/campaigns/{campaign_id}/suggest-audience", AUDIENCES_MANAGE),
     # Overriding a system pick is its own act, not a campaign edit (ADR-166
