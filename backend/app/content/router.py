@@ -14,6 +14,7 @@ from app.campaigns.service import StaleWrite
 from app.auth.service import actor_label
 from app.pagination import Page, PageParams, page_of_list, page_params
 from app.database import get_db
+from app.content.db_models import CategoryDB
 from app.content.models import (
     ContentField,
     ContentListItem,
@@ -28,6 +29,7 @@ from app.content.models import (
     ContentUsage,
     ContentCampaign,
     Category,
+    CategoryChange,
     CategoryCreate,
     CategoryRelation,
     CategoryRelationCreate,
@@ -118,16 +120,44 @@ def get_category_relations(db: Session = Depends(get_db)):
 @router.delete("/categories/{category_id}")
 def delete_category_record(
     category_id: int,
+    request: Request,
     force: bool = False,
     db: Session = Depends(get_db),
 ):
+    category = db.get(CategoryDB, category_id)
     try:
         deleted = delete_category(db, category_id, force=force)
     except HasRelationsError as error:
         raise HTTPException(status_code=409, detail={"message": str(error), "counts": error.counts})
     if not deleted:
         raise HTTPException(status_code=404, detail="Category not found")
+    _category_audit(request, db, audit.CATEGORY_DELETED, category_id,
+                    {"name": category.name if category else None, "forced": force})
     return {"status": "deleted"}
+
+
+def _category_audit(request, db, action: str, category_id: int, detail: dict) -> None:
+    """The shared taxonomy's writes (task-359), on the working brand's log."""
+    audit.record_from_request(request, db, action, subject_type="category", subject_id=category_id, detail=detail)
+
+
+@router.patch("/categories/{category_id}", response_model=Category,
+              summary="Rename a category or change its type",
+              description="Categories are shared by every brand (ADR-150): the change reaches all of them.")
+def change_category_record(category_id: int, payload: CategoryChange, request: Request,
+                           db: Session = Depends(get_db)):
+    from app.content.service import change_category
+
+    try:
+        result = change_category(db, category_id, name=payload.name, type=payload.type)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error))
+    if result is None:
+        raise HTTPException(status_code=404, detail="Category not found")
+    category, changed = result
+    if changed:
+        _category_audit(request, db, audit.CATEGORY_CHANGED, category_id, changed)
+    return category
 
 
 @router.get("/fields", response_model=list[ContentField])
@@ -369,13 +399,15 @@ def create_content_record(
 @router.post("/categories", response_model=Category)
 def create_category_record(
     payload: CategoryCreate,
+    request: Request,
     db: Session = Depends(get_db),
 ):
-    return create_category(
-        db=db,
-        name=payload.name,
-        type=payload.type,
-    )
+    try:
+        category = create_category(db=db, name=payload.name, type=payload.type)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error))
+    _category_audit(request, db, audit.CATEGORY_CREATED, category.id, {"name": category.name, "type": category.type})
+    return category
 
 
 @router.post("/{content_id}/categories", response_model=ContentCategoryAssignment)
@@ -467,10 +499,11 @@ def get_content_versions(
 @router.post("/category-relations", response_model=CategoryRelation)
 def create_category_relation_record(
     payload: CategoryRelationCreate,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     try:
-        return create_category_relation(
+        relation = create_category_relation(
             db=db,
             parent_category_id=payload.parent_category_id,
             child_category_id=payload.child_category_id,
@@ -478,6 +511,9 @@ def create_category_relation_record(
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
+    _category_audit(request, db, audit.CATEGORY_RELATION_ADDED, payload.child_category_id,
+                    {"parent_category_id": payload.parent_category_id, "relation_id": relation.id})
+    return relation
 
 
 @router.get(
@@ -800,11 +836,16 @@ def get_content_performance(
     summary="Remove a link between two categories",
     description="The taxonomy is shared by every brand (ADR-150), so this is not brand-scoped.",
 )
-def delete_category_relation_route(relation_id: int, db: Session = Depends(get_db)):
+def delete_category_relation_route(relation_id: int, request: Request, db: Session = Depends(get_db)):
+    from app.content.db_models import CategoryRelationDB
     from app.content.service import delete_category_relation
 
+    relation = db.get(CategoryRelationDB, relation_id)
+    pair = (relation.parent_category_id, relation.child_category_id) if relation else None
     if not delete_category_relation(db, relation_id):
         raise HTTPException(status_code=404, detail="Category relation not found")
+    _category_audit(request, db, audit.CATEGORY_RELATION_REMOVED, pair[1],
+                    {"parent_category_id": pair[0], "relation_id": relation_id})
 
 
 @router.get(

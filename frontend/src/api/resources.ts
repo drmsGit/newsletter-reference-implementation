@@ -1496,6 +1496,60 @@ export function useCategoryRelations() {
   })
 }
 
+// --- the taxonomy's own pages (task-359) ------------------------------------
+
+export type CategoryDetail = components['schemas']['CategoryDetail']
+
+/** One category for the working brand: relations, this brand's records with their figures, its signal. */
+export function useCategoryDetail(id: number) {
+  return useQuery({
+    queryKey: ['content', 'categories', id],
+    queryFn: () => read(api.GET('/insight/categories/{category_id}', { params: { path: { category_id: id } } })),
+  })
+}
+
+/** Every category write changes the shared taxonomy: refresh all of it. */
+function useTaxonomyWrite<A, R>(call: (args: A) => Promise<R>) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: call,
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['content', 'categories'] }),
+        queryClient.invalidateQueries({ queryKey: ['content', 'category-relations'] }),
+        queryClient.invalidateQueries({ queryKey: ['insight'] }),
+      ]),
+  })
+}
+
+export function useCreateCategory() {
+  return useTaxonomyWrite((body: { name: string; type: string }) => read(api.POST('/content/categories', { body })))
+}
+
+export function useChangeCategory(id: number) {
+  return useTaxonomyWrite((body: { name?: string; type?: string }) =>
+    read(api.PATCH('/content/categories/{category_id}', { params: { path: { category_id: id } }, body })),
+  )
+}
+
+export function useDeleteCategory(id: number) {
+  return useTaxonomyWrite((force: boolean) =>
+    read(api.DELETE('/content/categories/{category_id}', { params: { path: { category_id: id }, query: { force } } })),
+  )
+}
+
+export function useAddCategoryRelation() {
+  return useTaxonomyWrite((body: { parent_category_id: number; child_category_id: number }) =>
+    read(api.POST('/content/category-relations', { body: { ...body, relation_type: 'parent_child' } })),
+  )
+}
+
+export function useRemoveCategoryRelation() {
+  return useTaxonomyWrite((relationId: number) =>
+    read(api.DELETE('/content/category-relations/{relation_id}', { params: { path: { relation_id: relationId } } })),
+  )
+}
+
 /** How many records the bind picker lists at once; narrowing finds the rest. */
 export const PICKER_SIZE = 20
 

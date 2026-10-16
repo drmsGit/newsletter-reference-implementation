@@ -15,20 +15,25 @@ import {
  *
  * An option's `indent` nests it visually under the one before it (a category
  * under its parent); typing a letter still finds it by its name.
+ *
+ * Nothing chosen shows `placeholder`, in the client's language rather than
+ * React Aria's default, which follows the browser's ("Element wählen").
  */
 export default function Choice({
   label,
   options,
   selected,
   onChange,
+  placeholder = 'Choose…',
 }: {
   label: string
   options: { id: string; name: string; indent?: number }[]
   selected: string
   onChange: (id: string) => void
+  placeholder?: string
 }) {
   return (
-    <Select selectedKey={selected} onSelectionChange={(key) => onChange(String(key))}>
+    <Select selectedKey={selected} onSelectionChange={(key) => onChange(String(key))} placeholder={placeholder}>
       <Label>{label}</Label>
       <Button>
         <SelectValue />

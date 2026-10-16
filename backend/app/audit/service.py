@@ -97,6 +97,13 @@ CONTENT_STATUS_CHANGED = "content.status_changed"
 CONTENT_DELETED = "content.deleted"
 CONTENT_CATEGORY_ASSIGNED = "content.category_assigned"
 CONTENT_CATEGORY_UNASSIGNED = "content.category_unassigned"
+# task-359: the shared taxonomy's own writes. Categories belong to no brand
+# (ADR-150), so the entry is the working brand's, where the person acted.
+CATEGORY_CREATED = "category.created"
+CATEGORY_CHANGED = "category.changed"
+CATEGORY_DELETED = "category.deleted"
+CATEGORY_RELATION_ADDED = "category.relation_added"
+CATEGORY_RELATION_REMOVED = "category.relation_removed"
 # task-278: a score changed in place (ADR-080's 2026-10-04 addendum).
 CONTENT_CATEGORY_SCORE_CHANGED = "content.category_score_changed"
 # task-283: readiness per channel and machine ready (ADR-174, ADR-179 addenda

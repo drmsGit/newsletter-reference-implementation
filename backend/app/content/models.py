@@ -129,6 +129,13 @@ class CategoryCreate(BaseModel):
     type: str = "main"
 
 
+class CategoryChange(BaseModel):
+    """Rename a category or change its type; what is left out stays."""
+
+    name: str | None = None
+    type: str | None = None
+
+
 class ContentCategoryAssignment(BaseModel):
     id: int
     content_id: int

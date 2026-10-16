@@ -632,14 +632,31 @@ def create_content(
 
     return to_content_record(record)
 
+#: What a category is: a main one, or a sub one that sits under others.
+CATEGORY_TYPES = ("main", "sub")
+
+
+def _category_name(name) -> str:
+    name = (name or "").strip() if isinstance(name, str) else ""
+    if not name or len(name) > 255:
+        raise ValueError("A category needs a name of up to 255 characters.")
+    return name
+
+
+def _category_type(type) -> str:
+    if type not in CATEGORY_TYPES:
+        raise ValueError(f"A category is {' or '.join(CATEGORY_TYPES)}.")
+    return type
+
+
 def create_category(
     db: Session,
     name: str,
     type: str = "main",
 ) -> Category:
     category = CategoryDB(
-        name=name,
-        type=type,
+        name=_category_name(name),
+        type=_category_type(type),
     )
 
     db.add(category)
@@ -693,6 +710,26 @@ def _would_create_cycle(db: Session, parent_category_id: int, child_category_id:
         stack.extend(row[0] for row in children)
 
     return False
+
+
+def change_category(db: Session, category_id: int, *, name: str | None = None,
+                    type: str | None = None) -> tuple[Category, dict] | None:
+    """Rename a category or change its type (task-359). The taxonomy is shared
+    by every brand (ADR-150), so a change reaches all of them, as a delete
+    always has. Returns the category and what changed, or None."""
+    category = db.get(CategoryDB, category_id)
+    if category is None:
+        return None
+    changed = {}
+    if name is not None and (new := _category_name(name)) != category.name:
+        changed["name"] = {"from": category.name, "to": new}
+        category.name = new
+    if type is not None and (new := _category_type(type)) != category.type:
+        changed["type"] = {"from": category.type, "to": new}
+        category.type = new
+    db.commit()
+    db.refresh(category)
+    return Category(id=category.id, name=category.name, type=category.type), changed
 
 
 def create_category_relation(

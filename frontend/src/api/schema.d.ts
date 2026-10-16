@@ -169,7 +169,11 @@ export interface paths {
         delete: operations["delete_category_record_content_categories__category_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Rename a category or change its type
+         * @description Categories are shared by every brand (ADR-150): the change reaches all of them.
+         */
+        patch: operations["change_category_record_content_categories__category_id__patch"];
         trace?: never;
     };
     "/content/fields": {
@@ -3802,6 +3806,16 @@ export interface components {
              * @default main
              */
             type: string;
+        };
+        /**
+         * CategoryChange
+         * @description Rename a category or change its type; what is left out stays.
+         */
+        CategoryChange: {
+            /** Name */
+            name?: string | null;
+            /** Type */
+            type?: string | null;
         };
         /** CategoryContent */
         CategoryContent: {
@@ -7865,6 +7879,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_category_record_content_categories__category_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Category"];
                 };
             };
             /** @description Validation Error */

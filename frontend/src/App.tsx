@@ -17,6 +17,9 @@ import VariantEditor from './screens/VariantEditor'
 import SendVariant from './screens/SendVariant'
 import Settings from './screens/Settings'
 import BrandProfileDetail from './screens/BrandProfileDetail'
+import ContentLayout from './screens/ContentLayout'
+import Categories from './screens/Categories'
+import CategoryDetail from './screens/CategoryDetail'
 import Personalisation, { PersonalisationEntry } from './screens/Personalisation'
 import BrandProfiles from './screens/BrandProfiles'
 import Deliveries from './screens/Deliveries'
@@ -70,8 +73,13 @@ export default function App() {
           <Route path="personalisation" element={<Personalisation />} />
           <Route path="personalisation/:id" element={<PersonalisationEntry />} />
         </Route>
-        <Route path="/content" element={<Content />} />
-        <Route path="/content/:id" element={<ContentDetail />} />
+        {/* Content and its parts as subpages (task-359), like Settings. */}
+        <Route path="/content" element={<ContentLayout />}>
+          <Route index element={<Content />} />
+          <Route path="categories" element={<Categories />} />
+          <Route path="categories/:id" element={<CategoryDetail />} />
+          <Route path=":id" element={<ContentDetail />} />
+        </Route>
         <Route path="/audiences" element={<Audiences />} />
         <Route path="/audiences/:id" element={<AudienceDetail />} />
         <Route path="/recipients" element={<Recipients />} />
