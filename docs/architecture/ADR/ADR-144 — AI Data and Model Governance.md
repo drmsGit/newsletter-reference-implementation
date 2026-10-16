@@ -7,7 +7,7 @@ topic:
   - governance
   - privacy
 created: 2026-07-31
-modified: 2026-10-11
+modified: 2026-10-16
 source:
   - "AI Layer design interview (interview-prep, 2026-07-27 – 31), Cluster 5"
 depends_on:
@@ -299,6 +299,25 @@ it cites. They are stated here so the build reads them in one place.
 **Nothing in this record's Decision changes.** Point 5 stands as written and is read as
 the 2026-10-09 addendum reads it.
 
+## Addendum 2026-10-16 — an AI personalises through dictionary entries
+
+Prompted by [[ADR-199 — Inline Personalisation Is a Brand's Expression Dictionary, Substituted After Escaping]],
+accepted and built on 2026-10-16 (queue task-365). Point 4's example no longer holds as written.
+
+**Point 4 shows an AI writing `{{first_name}}` straight into a text.** Since ADR-199, a
+text holds dictionary entries only (its point 9). A recipient field such as
+`{{first_name}}` appears only inside an entry's case texts. So an AI personalises
+through entries such as `{{salutation_informal}}`. A raw recipient field in an
+AI-applied subject is refused on save, like any other text that carries one.
+
+**The privacy property of point 4 holds unchanged.** The model still sees a token, not
+a person's value. The platform fills the value locally: it resolves each recipient's
+entries before rendering, and the delivery record keeps the values used (ADR-199
+point 11).
+
+**Nothing in this record's Decision changes.** Point 4 stands as written. Its
+`{{first_name}}` is read as an example of a token, and today's token is an entry name.
+
 ## Related ADRs
 
 ### Depends On
@@ -310,3 +329,6 @@ the 2026-10-09 addendum reads it.
 
 ### Enables
 - [[ADR-141 — In-App Assistive AI Actions]]
+
+### Referenced By
+- [[ADR-199 — Inline Personalisation Is a Brand's Expression Dictionary, Substituted After Escaping]]

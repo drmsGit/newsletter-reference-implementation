@@ -208,6 +208,41 @@ Erasure is not built ([[ADR-154 — Erasure and Retention]], Notes, 2026-09-14).
   - [[ADR-121 — Minimal Recipient Model]] lists neither gender nor names. The three columns are business fields synced from the CRM ([[ADR-120 — CRM as Customer Source of Truth]], [[ADR-126 — Maintain Local Recipient Projection]]).
 - **No decision-log entry.** `docs/playbook-strategy.md` §5 has no entry for the 2026-10-11 or 2026-10-16 sessions. Its 2026-10-11 entry on the November presentations lists "salutations" among the demo items. Its entry "Addresses in the platform (G1)" ends "Where a salutation's data comes from stays deferred"; point 2 answers it for the three fields: the recipients API, fed by the CRM. The reasoning here comes from task-365's Description and Implementation Plan.
 
+## Addendum 2026-10-16 — decided in the build
+
+**These were decided by the implementer during the build of task-365, not by the user.** The build is commits a843dba, 30e39af, dab8906 and 6edc8f8, all of 2026-10-16. The user had said to proceed and has not reviewed these points one by one. The Decision above is unchanged. Points 1 and 2 answer the two open points under "Not decided here, and not put to the user" in the Notes. Point 3 settles the Notes' token spelling. The rest records the shape the build took.
+
+1. **Alt text takes no entries.** An image's alt text describes the image, not the reader.
+   - Substitution skips alt fields (`Personal.fields` in `backend/app/expressions/substitute.py`).
+   - A token in an alt field is refused on save, as it is in url and image fields.
+   - Point 9's "all text" therefore excludes alt text, although alt fields are `text` fields.
+2. **An entry the frozen frame does not hold excludes the recipient.** This covers a slot pick whose content uses an entry created after the freeze, or one without a text in the message language.
+   - That recipient is excluded with the reason "personalisation without a text in this message's language: {{name}}" (`REASON_PERSONAL_MISSING` in `backend/app/delivery/exclusion.py`).
+   - A text is never sent with `{{name}}` still in it.
+   - The frame's own texts are covered by the refusal before sending (`expression_refusal` in `backend/app/rendering/frame.py`), point 12's first bullet.
+3. **Token spelling inside case texts is `{{first_name}}` and `{{last_name}}`,** matching the columns.
+   - Gender is tested, never printed.
+   - A fallback prints no recipient field.
+   - An entry's name may not be a recipient field's name.
+4. **Save checks judge only a changed value** (`backend/app/expressions/checks.py`), as image checks do. A text stored earlier stays editable in its other fields.
+   - They run on module fields, the envelope, content records and overrides.
+   - A refused subject or preheader is answered 422 on its field by the variant routes. The live check found that these routes had answered 500 on update and 404 on create.
+5. **The starters are copied in a short session of their own, with the brand row locked.** The caller's transaction is untouched, and two first uses at once copy them only once. Rendering reads the dictionary without starting it, so a send never writes to it.
+6. **The frame and the delivery record have this shape.**
+   - Frame version 4 holds `expressions: {language, entries}`.
+   - Readers key on `frame_version`. Below 4 there is no substitution, even if a frame holds the key.
+   - The delivery record's key is `personal`: `{name: text}` of the entries used.
+   - The artifact carries `personal` and `personal_missing`. Neither is part of the artifact hash. The text they produced is.
+7. **The recipients API upsert writes `gender`, `first_name` and `last_name` only when the payload sends them.** A field left out is kept; null clears it. This differs from `language` and `attributes`, which the upsert writes wholesale. Migration 0051 (`backend/scripts/migrate_0051_personalisation.sql`) copied existing `firstname` and `lastname` attributes into the columns.
+8. **The "Personalise…" button is opt-in per field.**
+   - It appears on texts that take entries: subject, preheader, module and content text, overrides and push.
+   - It never appears on titles, names or links.
+   - It inserts at the caret and saves at once.
+
+**The addenda the Notes asked for were added on the same date.** [[ADR-144 — AI Data and Model Governance]], [[ADR-183 — A Snapshot Freezes the Composition and Every Delivery Records What It Got]] and [[ADR-154 — Erasure and Retention]] each carry an addendum of 2026-10-16 that points here.
+
+**No decision-log entry.** `docs/playbook-strategy.md` has no entry for these points. They come from the build of task-365.
+
 ## Related ADRs
 
 ### Depends On

@@ -7,7 +7,7 @@ topic:
   - security
   - governance
 created: 2026-08-02
-modified: 2026-09-14
+modified: 2026-10-16
 source:
   - "Security Chapter design interview, Part 2 (playbook-strategy.md Decision Log, 2026-08-02)"
 depends_on:
@@ -81,6 +81,32 @@ Where a person has been erased, a minimal consent record is kept: internal ident
 - The audit log may outlive the personal data it references. That is coherent rather than contradictory precisely because of point 1: what survives is an identifier and an action, not a person.
 - **Implementation status, 2026-09-14:** **Nothing in this record is built.** There is no erasure operation anywhere in `backend/` — no route, service function or script removes a person and the data keyed to them; the recipients router exposes no delete route at all, and the only delete routes in the system are for content, categories, module instances and audience groups. There is likewise no retention or prune mechanism for person-scoped data: the single prune in the codebase is `_prune_login_requests` (`backend/app/auth/service.py`), which trims rate-limit counter rows. Point 1's precondition does hold — delivery executions, engagement events and signal contributions key on `recipient_id` and carry no contact details, and since [[ADR-163 — Per-Channel Consent and Addressability]] consent is an append-only `ConsentEventDB` row carrying identifier, timestamp, source and what was granted, which is the minimised shape point 6 asks for even though nothing prunes to it. Point 5's target exists and is unreached: `SnapshotDB` persists per-recipient rendered HTML to a file (`html_location`). The `### Negative` item above is still accurate — snapshot handling remains blocked behind the undecided storage strategy.
 
+## Addendum 2026-10-16 — point 5's merged personal data is now the delivery record
+
+Prompted by [[ADR-199 — Inline Personalisation Is a Brand's Expression Dictionary, Substituted After Escaping]],
+accepted and built on 2026-10-16 (queue task-365). Point 5 and the 2026-09-14 Note name a target that has
+since moved.
+
+**The 2026-09-14 Note's target no longer exists.** It names per-recipient HTML that `SnapshotDB` writes to a
+file (`html_location`). [[ADR-183 — A Snapshot Freezes the Composition and Every Delivery Records What It Got]]
+point 5 dropped snapshot files on 2026-10-02: a snapshot is a frame stored in its row, and no rendered HTML is
+written. ADR-183 is also the storage strategy that the `### Negative` item calls undecided.
+
+**The delivery record is the target now.** Since ADR-199, each delivery record
+(`delivery_executions.delivery_record`, key `personal`) keeps the resolved personal values a recipient got.
+An example is a formal salutation with the recipient's last name. These are point 5's "merged personal
+data". A reconstruction reads them, never the recipient as they are now. So erasing the recipient row alone
+leaves them in every delivery record, and an erasure has to reach that key. Under point 2's default the
+delivery executions are removed with the person, which covers it.
+
+**The recipient row gains three personal fields.** Since ADR-199, `gender`, `first_name` and `last_name` are
+columns on the recipient. They are identity, and point 2's default removes them with it.
+
+**Erasure itself is still not built.** The 2026-09-14 Note's "Nothing in this record is built" still holds.
+`backend/app/privacy/README.md` records what erasure must reach, including this key.
+
+**Nothing in this record's Decision changes.**
+
 ## Related ADRs
 
 ### Depends On
@@ -88,3 +114,7 @@ Where a person has been erased, a minimal consent record is kept: internal ident
 - [[ADR-054 — Use Internal Recipient Identifiers]]
 - [[ADR-132 — Signal Layer Implementation Event-Sourced Contributions with Decay-on-Read]]
 - [[ADR-153 — Audit and Accountability]]
+
+### Referenced By
+- [[ADR-183 — A Snapshot Freezes the Composition and Every Delivery Records What It Got]]
+- [[ADR-199 — Inline Personalisation Is a Brand's Expression Dictionary, Substituted After Escaping]]

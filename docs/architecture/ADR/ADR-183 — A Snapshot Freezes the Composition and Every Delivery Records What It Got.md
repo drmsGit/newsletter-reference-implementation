@@ -8,7 +8,7 @@ topic:
   - delivery
   - auditability
 created: 2026-10-02
-modified: 2026-10-13
+modified: 2026-10-16
 source:
   - "task-129 (needs-adr: snapshot storage strategy)"
   - "Code review finding P1-04 (reviewed snapshot does not prove content sent)"
@@ -140,6 +140,24 @@ They are not live data. A script the user runs drops them, together with the sen
 
 **No decision-log entry.** `docs/playbook-strategy.md` has no entry for this decision. The reasoning comes from the 2026-10-13 session and task-67.
 
+## Addendum 2026-10-16 — the merge context is decided in ADR-199
+
+Prompted by [[ADR-199 — Inline Personalisation Is a Brand's Expression Dictionary, Substituted After Escaping]],
+accepted and built on 2026-10-16 (queue task-365). Point 7 left the merge context undecided until recipient
+substitution existed. It exists now, and ADR-199 decides the merge context.
+
+- **Frame version 4 freezes the dictionary entries in the message language** (`expressions: {language, entries}`). The message language is that of the variant's brand profile.
+- **The delivery record keeps the resolved values each recipient got,** under the key `personal`, as `{name: text}` of the entries used. This is point 3's record gaining the merge context, as point 7 required.
+- **A reconstruction uses those recorded values, never live recipient data.** A change to the recipient's name or to the dictionary does not change what a reconstruction shows.
+- **Frames before version 4 render without substitution.** Deliveries sent before the change reconstruct as before.
+- **Point 3's hash is unchanged.** The artifact carries the values used, but they are not hashed separately. The rendered text they produced is part of the hashed artifact set, so point 4's comparison still covers them.
+
+The 2026-10-12 addendum's point 3 expected a test send to show the recipient's salutation "later". Under ADR-199 point 13, a test send uses its chosen recipient's values, or the fallbacks.
+
+Point 7's second bullet, on retention and erasure of delivery records, stays open. Since ADR-199 the delivery record holds resolved personal values, so the erasure of [[ADR-154 — Erasure and Retention]] has to reach it. That record's addendum of 2026-10-16 says so.
+
+**Nothing in this record's Decision changes.**
+
 ## Related ADRs
 
 ### Depends On
@@ -158,3 +176,4 @@ They are not live data. A script the user runs drops them, together with the sen
 - [[ADR-154 — Erasure and Retention]]
 - [[ADR-163 — Per-Channel Consent and Addressability]]
 - [[ADR-176 — A Negative Decision Outranks a Positive One]]
+- [[ADR-199 — Inline Personalisation Is a Brand's Expression Dictionary, Substituted After Escaping]]
