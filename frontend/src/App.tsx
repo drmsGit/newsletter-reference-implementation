@@ -19,6 +19,7 @@ import Settings from './screens/Settings'
 import BrandProfileDetail from './screens/BrandProfileDetail'
 import ContentLayout from './screens/ContentLayout'
 import Categories from './screens/Categories'
+import CategoryGraph from './screens/CategoryGraph'
 import CategoryDetail from './screens/CategoryDetail'
 import Personalisation, { PersonalisationEntry } from './screens/Personalisation'
 import BrandProfiles from './screens/BrandProfiles'
@@ -78,6 +79,7 @@ export default function App() {
           <Route index element={<Content />} />
           <Route path="categories" element={<Categories />} />
           <Route path="categories/:id" element={<CategoryDetail />} />
+          <Route path="graph" element={<CategoryGraph />} />
           <Route path=":id" element={<ContentDetail />} />
         </Route>
         <Route path="/audiences" element={<Audiences />} />

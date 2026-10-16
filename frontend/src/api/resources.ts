@@ -1522,6 +1522,13 @@ function useTaxonomyWrite<A, R>(call: (args: A) => Promise<R>) {
   })
 }
 
+export type CategoryGraph = components['schemas']['CategoryGraph']
+
+/** The category graph for the working brand: nodes with their figures, and edges. Layout is the client's. */
+export function useCategoryGraph() {
+  return useQuery({ queryKey: ['insight', 'category-graph'], queryFn: () => read(api.GET('/insight/category-graph')) })
+}
+
 export function useCreateCategory() {
   return useTaxonomyWrite((body: { name: string; type: string }) => read(api.POST('/content/categories', { body })))
 }

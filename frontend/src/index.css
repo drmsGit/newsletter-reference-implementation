@@ -814,3 +814,19 @@ kbd {
 .react-aria-Tab[data-focus-visible] {
   outline: 2px solid currentColor;
 }
+
+/* The category graph (task-359): plain SVG, no library (ADR-173). Layout
+   later; this is only what makes it readable. */
+.graph-view { display: grid; grid-template-columns: minmax(0, 2fr) minmax(16rem, 1fr); gap: calc(var(--brand-space) * 2); }
+.graph-view > .react-aria-Table, .graph-view > table, .graph-view > div:last-child { grid-column: 1 / -1; }
+.graph-drawing { width: 100%; height: auto; border: 1px solid var(--brand-line); border-radius: var(--brand-radius); }
+.graph-edge--relation { stroke: var(--brand-fg); stroke-opacity: 0.6; }
+.graph-edge--cooccurrence { stroke: var(--brand-line); }
+.graph-node { cursor: pointer; }
+.graph-node circle { fill: #8a8a8a; stroke: var(--brand-bg); stroke-width: 2; }
+.graph-node--up circle { fill: #198754; }
+.graph-node--down circle { fill: var(--brand-danger); }
+.graph-node--selected circle, .graph-node:focus-visible circle { stroke: var(--brand-accent); stroke-width: 4; }
+.graph-node:focus { outline: none; }
+.graph-node text { font-size: 13px; fill: var(--brand-fg); }
+@media (max-width: 720px) { .graph-view { grid-template-columns: minmax(0, 1fr); } }
