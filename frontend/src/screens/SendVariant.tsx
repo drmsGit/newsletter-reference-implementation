@@ -358,6 +358,27 @@ function Reachable({ groupId, channel }: { groupId: number; channel: string }) {
   )
 }
 
+/**
+ * What a send's outcome says, the same right after "Send" and on a page opened
+ * later: "Sent" only when it was (task-323's contract, task-382). The server's
+ * outcomes are sent, partial_failed, failed and no_recipients (`FireResult`);
+ * any other status is named as it is.
+ */
+function outcome(status: string): string {
+  switch (status) {
+    case 'sent':
+      return 'Sent.'
+    case 'partial_failed':
+      return 'Partly sent: some recipients failed.'
+    case 'failed':
+      return 'Not sent: the send failed.'
+    case 'no_recipients':
+      return 'Nothing sent: nobody was eligible.'
+    default:
+      return `This send is ${status.replace('_', ' ')}.`
+  }
+}
+
 /** Step 4: the recipients as of now, and a button that says what it does. */
 function SendStep({ sendId, campaignId, onAnother }: { sendId: number; campaignId: number; onAnother: () => void }) {
   const now = useRecipientsNow(sendId)
@@ -376,17 +397,11 @@ function SendStep({ sendId, campaignId, onAnother }: { sendId: number; campaignI
                 <Button onPress={onAnother}>Plan another send</Button>
               </p>
             )
-            if (fire.data)
+            const done = fire.data?.status ?? (n.status !== 'draft' && n.status !== 'scheduled' ? n.status : null)
+            if (done)
               return (
                 <>
-                  <p role="status">Sent: {fire.data.status.replace('_', ' ')}.</p>
-                  {links}
-                </>
-              )
-            if (n.status !== 'draft' && n.status !== 'scheduled')
-              return (
-                <>
-                  <p role="status">This send is {n.status.replace('_', ' ')}.</p>
+                  <p role="status">{outcome(done)}</p>
                   {links}
                 </>
               )

@@ -176,7 +176,7 @@ describe('sending a variant (task-67; ADR-183 addendum 2026-10-13)', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Send to 3' }))
     await waitFor(() => expect(writes).toHaveLength(1))
     expect(new URL(writes[0].url).pathname).toBe('/delivery/send-instances/9/send')
-    expect(await screen.findByText('Sent: sent.')).toBeInTheDocument()
+    expect(await screen.findByText('Sent.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: "The campaign's results" })).toHaveAttribute('href', '/campaigns/1')
   })
 
