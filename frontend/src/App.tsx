@@ -17,6 +17,7 @@ import VariantEditor from './screens/VariantEditor'
 import SendVariant from './screens/SendVariant'
 import Settings from './screens/Settings'
 import BrandProfileDetail from './screens/BrandProfileDetail'
+import Personalisation, { PersonalisationEntry } from './screens/Personalisation'
 import BrandProfiles from './screens/BrandProfiles'
 import Deliveries from './screens/Deliveries'
 import SettingsLayout from './screens/SettingsLayout'
@@ -66,6 +67,8 @@ export default function App() {
           <Route index element={<Settings />} />
           <Route path="brand-profiles" element={<BrandProfiles />} />
           <Route path="brand-profiles/:id" element={<BrandProfileDetail />} />
+          <Route path="personalisation" element={<Personalisation />} />
+          <Route path="personalisation/:id" element={<PersonalisationEntry />} />
         </Route>
         <Route path="/content" element={<Content />} />
         <Route path="/content/:id" element={<ContentDetail />} />

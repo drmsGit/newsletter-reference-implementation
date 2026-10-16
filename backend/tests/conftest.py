@@ -399,6 +399,9 @@ def temp_brand(db):
         db.query(RoleAssignmentDB).filter(RoleAssignmentDB.brand_id == brand_id).delete()
         db.query(SessionDB).filter(SessionDB.brand_id == brand_id).update({"brand_id": None})
         db.query(BrandProfileDB).filter(BrandProfileDB.brand_id == brand_id).delete()
+        # A brand's expression dictionary (task-365), started on first use.
+        from app.expressions.db_models import ExpressionEntryDB
+        db.query(ExpressionEntryDB).filter(ExpressionEntryDB.brand_id == brand_id).delete()
         db.query(BrandDB).filter(BrandDB.id == brand_id).delete()
     db.commit()
 

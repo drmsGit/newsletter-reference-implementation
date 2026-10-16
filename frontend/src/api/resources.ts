@@ -59,6 +59,7 @@ export const keys = {
   brandProfiles: ['brand-profiles'] as const,
   brandProfile: (id: number) => ['brand-profiles', id] as const,
   brandProfileStructure: ['brand-profile-structure'] as const,
+  expressions: ['expressions'] as const,
 }
 
 /**
@@ -1610,6 +1611,45 @@ export function useUnblock(campaignId: number) {
     mutationFn: (variantId: number) =>
       read(api.DELETE('/campaigns/variants/{variant_id}/fence', { params: { path: { variant_id: variantId } } })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.composition(campaignId) }),
+  })
+}
+
+// --- the expression dictionary (task-365, ADR-199) --------------------------
+
+export type ExpressionEntry = components['schemas']['ExpressionEntry']
+export type ExpressionLanguage = components['schemas']['ExpressionLanguage']
+export type ExpressionCase = components['schemas']['ExpressionCase']
+
+/** The working brand's dictionary: what Settings edits and the Personalise picker offers. */
+export function useExpressions() {
+  return useQuery({ queryKey: keys.expressions, queryFn: () => read(api.GET('/expressions')) })
+}
+
+export function useCreateExpression() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { name: string; label: string; languages: Record<string, ExpressionLanguage> }) =>
+      read(api.POST('/expressions', { body })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.expressions }),
+  })
+}
+
+export function useSaveExpression(id: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    scope: { id: `expression-${id}` },
+    mutationFn: ({ version, ...body }: { version: string; label: string; languages: Record<string, ExpressionLanguage> }) =>
+      read(api.PUT('/expressions/{entry_id}', { params: { path: { entry_id: id }, header: { 'If-Match': version } }, body })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.expressions }),
+  })
+}
+
+export function useDeleteExpression(id: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (version: string) =>
+      read(api.DELETE('/expressions/{entry_id}', { params: { path: { entry_id: id }, header: { 'If-Match': version } } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.expressions }),
   })
 }
 

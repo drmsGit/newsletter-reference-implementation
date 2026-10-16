@@ -136,6 +136,7 @@ from app.settings.router import router as settings_router
 from app.brand_profiles.router import router as brand_profiles_router
 from app.subscriptions.router import router as unsubscribe_router
 from app.assets.router import router as assets_router
+from app.expressions.router import router as expressions_router
 from app.assets.public import router as media_router
 from app.auth.router import context_router
 
@@ -345,6 +346,10 @@ with SessionLocal() as db:
     from app.brand_profiles.structure import assert_structure_loads
 
     assert_structure_loads()
+    # And the expression starters (task-365, ADR-199).
+    from app.expressions.starters import assert_starters_load
+
+    assert_starters_load()
 
     # task-20: a channel whose manifest does not parse is skipped — unless
     # variants already use it, where skipping turns one typo into a failure on
@@ -825,6 +830,9 @@ app.include_router(settings_router, dependencies=_api)
 # `brand_profiles.manage` in the working brand.
 app.include_router(brand_profiles_router, dependencies=_api)
 app.include_router(assets_router, dependencies=_api)
+# A brand's expression dictionary (ADR-199): reads `view`, writes people only
+# and `brand_profiles.manage`.
+app.include_router(expressions_router, dependencies=_api)
 
 # **Public, and deliberately outside both signed-in planes** (ADR-191): the
 # recipient's unsubscribe page. The token in its path is the only credential —

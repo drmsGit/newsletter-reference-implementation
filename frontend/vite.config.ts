@@ -43,6 +43,7 @@ const API_PREFIXES = [
   '/assets',
   '/auth',
   '/brand-profiles',
+  '/expressions',
   '/campaigns',
   '/content',
   '/decision',

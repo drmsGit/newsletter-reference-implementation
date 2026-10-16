@@ -1,0 +1,47 @@
+{
+  "_comment": [
+    "Starter entries for a brand's expression dictionary — task-365, ADR-199.",
+    "Copied into a brand the first time its dictionary is used; after that",
+    "the brand owns its copy and edits it under Settings, Personalisation.",
+    "Changing this file later changes only brands that have not started yet.",
+    "",
+    "Per language: cases, tried in order, then the fallback. A case tests one",
+    "recipient field (gender, first_name, last_name): filled, empty, or",
+    "equals a value; gender is female, male or diverse. A case applies only",
+    "when every field its text prints is filled; the fallback prints none."
+  ],
+  "entries": {
+    "salutation_informal": {
+      "label": "Salutation informal",
+      "languages": {
+        "de": {
+          "cases": [{"field": "first_name", "is": "filled", "text": "Hallo {{first_name}},"}],
+          "fallback": "Hallo,"
+        },
+        "en": {
+          "cases": [{"field": "first_name", "is": "filled", "text": "Hi {{first_name}},"}],
+          "fallback": "Hi,"
+        }
+      }
+    },
+    "salutation_formal": {
+      "label": "Salutation formal",
+      "languages": {
+        "de": {
+          "cases": [
+            {"field": "gender", "is": "equals", "value": "female", "text": "Sehr geehrte Frau {{last_name}},"},
+            {"field": "gender", "is": "equals", "value": "male", "text": "Sehr geehrter Herr {{last_name}},"}
+          ],
+          "fallback": "Sehr geehrte Damen und Herren,"
+        },
+        "en": {
+          "cases": [
+            {"field": "gender", "is": "equals", "value": "female", "text": "Dear Ms {{last_name}},"},
+            {"field": "gender", "is": "equals", "value": "male", "text": "Dear Mr {{last_name}},"}
+          ],
+          "fallback": "Dear Sir or Madam,"
+        }
+      }
+    }
+  }
+}

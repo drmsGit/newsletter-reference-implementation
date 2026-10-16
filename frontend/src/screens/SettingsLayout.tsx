@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router'
 
 import { BRAND_PROFILES } from './BrandProfiles'
+import { PERSONALISATION } from './Personalisation'
 
 /**
  * Settings and its parts (user, 2026-10-11): one menu entry, with its parts
@@ -11,6 +12,7 @@ const PARTS = [
   // `end`: General is only /settings itself, not every page below it.
   { to: '/settings', label: 'General', end: true },
   { to: BRAND_PROFILES, label: 'Brand profiles', end: false },
+  { to: PERSONALISATION, label: 'Personalisation', end: false },
 ]
 
 export default function SettingsLayout() {

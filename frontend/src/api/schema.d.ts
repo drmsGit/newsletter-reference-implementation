@@ -3001,6 +3001,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/expressions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The brand's expression dictionary */
+        get: operations["read_dictionary_expressions_get"];
+        put?: never;
+        /** Add an entry; its name is fixed from now on */
+        post: operations["create_entry_expressions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/expressions/{entry_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change an entry's label and cases
+         * @description States the entry's updated_at in If-Match; a stale one is refused with 409.
+         */
+        put: operations["update_entry_expressions__entry_id__put"];
+        post?: never;
+        /**
+         * Delete an entry no text uses
+         * @description Refused with 409, naming where, while a text still uses it.
+         */
+        delete: operations["delete_entry_expressions__entry_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5056,6 +5098,97 @@ export interface components {
             execution_id: number;
             /** Events */
             events: components["schemas"]["TraceEvent"][];
+        };
+        /**
+         * ExpressionCase
+         * @description One case: when `field` `is` filled, empty, or equals `value`, `text`.
+         */
+        ExpressionCase: {
+            /**
+             * Field
+             * @description gender, first_name or last_name
+             */
+            field: string;
+            /**
+             * Is
+             * @description filled, empty or equals
+             */
+            is: string;
+            /**
+             * Value
+             * @description For equals only; gender is female, male or diverse
+             */
+            value?: string | null;
+            /**
+             * Text
+             * @description May print {{first_name}} and {{last_name}}
+             */
+            text: string;
+        };
+        /** ExpressionDictionary */
+        ExpressionDictionary: {
+            /** Items */
+            items: components["schemas"]["ExpressionEntry"][];
+            /**
+             * May Manage
+             * @description Whether this person may change the dictionary
+             */
+            may_manage: boolean;
+        };
+        /** ExpressionEntry */
+        ExpressionEntry: {
+            /** Id */
+            id: number;
+            /**
+             * Name
+             * @description What a text writes between {{ and }}; fixed once created
+             */
+            name: string;
+            /** Label */
+            label: string;
+            /** Languages */
+            languages: {
+                [key: string]: components["schemas"]["ExpressionLanguage"];
+            };
+            /**
+             * Updated At
+             * Format: date-time
+             * @description The version token for If-Match
+             */
+            updated_at: string;
+        };
+        /** ExpressionEntryCreate */
+        ExpressionEntryCreate: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Languages */
+            languages: {
+                [key: string]: components["schemas"]["ExpressionLanguage"];
+            };
+        };
+        /** ExpressionEntryUpdate */
+        ExpressionEntryUpdate: {
+            /** Label */
+            label: string;
+            /** Languages */
+            languages: {
+                [key: string]: components["schemas"]["ExpressionLanguage"];
+            };
+        };
+        /** ExpressionLanguage */
+        ExpressionLanguage: {
+            /**
+             * Cases
+             * @default []
+             */
+            cases: components["schemas"]["ExpressionCase"][];
+            /**
+             * Fallback
+             * @description For recipients no case fits; prints no recipient field
+             */
+            fallback: string;
         };
         /** FilterAction */
         FilterAction: {
@@ -13193,6 +13326,129 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Asset"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_dictionary_expressions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpressionDictionary"];
+                };
+            };
+        };
+    };
+    create_entry_expressions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpressionEntryCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpressionEntry"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_entry_expressions__entry_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
+            path: {
+                entry_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpressionEntryUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpressionEntry"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_entry_expressions__entry_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description The `updated_at` this write is based on. When it no longer matches, the write is refused with 409 and nothing changes. Omit it to write unchecked. */
+                "If-Match"?: string | null;
+            };
+            path: {
+                entry_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

@@ -144,6 +144,11 @@ ASSET_REPLACED = "asset.replaced"
 ASSET_DESCRIBED = "asset.described"
 ASSET_HIDDEN = "asset.hidden"
 ASSET_COPIED = "asset.copied"
+# ADR-199, task-365: a brand's expression dictionary. The detail names the
+# entry, never a recipient's value.
+EXPRESSION_CREATED = "expression.created"
+EXPRESSION_UPDATED = "expression.updated"
+EXPRESSION_DELETED = "expression.deleted"
 
 #: Every action name an entry may carry (task-52, ADR-153 addendum
 #: 2026-10-08). Collected from the constants above, so adding one is still one
