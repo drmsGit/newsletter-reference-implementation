@@ -1,9 +1,11 @@
 ---
 id: TASK-384
 title: Bring in Codex's ranked Column delivery test
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-10-16 11:31'
+updated_date: '2026-10-16 13:00'
 labels:
   - backend
 dependencies: []
@@ -25,5 +27,17 @@ Handling note from the user (2026-10-16), for the demo and the how-to rather tha
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 test_column_slot_delivery.py is on main and the suite passes
+- [x] #1 test_column_slot_delivery.py is on main and the suite passes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Brought in 2026-10-16 (commit 5c1a52a), unchanged from tests-branch commit ef0e62e (identical to the version read on 2026-10-16). Passes on main; Ruff clean. Two mutations caught: Columns never paired; the right side crediting the left record. pytest 1991 passed; CI green on 5c1a52a.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Codex's ranked Column delivery test is on main, unchanged; it passes and catches unpaired Columns and wrong-side attribution. pytest 1991, CI green on 5c1a52a.
+<!-- SECTION:FINAL_SUMMARY:END -->
