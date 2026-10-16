@@ -4,6 +4,7 @@ title: AI prepares a variant from a topic
 status: To Do
 assignee: []
 created_date: '2026-10-11 20:44'
+updated_date: '2026-10-16 18:34'
 labels:
   - backend
   - frontend
@@ -19,3 +20,9 @@ ordinal: 201000
 
 **Design questions for its final-design pass.** Whether it proposes hand-bound records, slot configuration, or both; how it uses the catalogue (only ready, published records, as `candidate_query` does); what it writes and how the proposal is shown; budget (ADR-144). Builds on the subject suggestion in React and on realistic demo content (task-71).
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-16 (task-100): the button that starts this model call is frontend/src/components/AIButton.tsx, which already waits visibly and asks once; do not hand-roll a pending state. The server-side guard against two runs at once is task-387.
+<!-- SECTION:NOTES:END -->

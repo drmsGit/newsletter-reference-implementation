@@ -4,6 +4,7 @@ title: AI drafts a content record from a source and proposes its categories
 status: To Do
 assignee: []
 created_date: '2026-10-11 20:44'
+updated_date: '2026-10-16 18:34'
 labels:
   - backend
   - frontend
@@ -19,3 +20,9 @@ ordinal: 200800
 
 **Design questions for its final-design pass.** Which fields it fills (fields.json concepts); whether the proposal uses existing categories only (ADR-080 suggests yes); how the proposal shows its reasons; the prompt and its budget (ADR-144). task-95 (AI taxonomy recommendations) is related but about the taxonomy itself, not one record.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-16 (task-100): the button that starts this model call is frontend/src/components/AIButton.tsx, which already waits visibly and asks once; do not hand-roll a pending state. The server-side guard against two runs at once is task-387.
+<!-- SECTION:NOTES:END -->
