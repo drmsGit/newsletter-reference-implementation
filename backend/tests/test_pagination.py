@@ -70,6 +70,7 @@ FIXED = {
     # roles, brands and staff accounts are an installation's own, in the tens,
     # not recipients.
     "/auth/permissions",
+    "/integrations/permissions",
     "/auth/roles",
     "/auth/brands",
     "/auth/users",

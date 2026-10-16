@@ -14,6 +14,7 @@ too, because the policy table answers `view` for every GET.
 """
 from datetime import datetime
 
+from app.auth.admin_router import Permission
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -161,6 +162,20 @@ def _get(db: Session, integration_id: int) -> IntegrationDB:
 )
 def list_integrations(db: Session = Depends(get_db)):
     return [_out(db, i) for i in db.query(IntegrationDB).order_by(IntegrationDB.id).all()]
+
+
+@router.get(
+    "/permissions",
+    response_model=list[Permission],
+    summary="What an integration can be allowed to do",
+    description="The permission catalogue, for the grant checklist (task-386): readable with "
+                "`integrations.manage`, so choosing grants needs no user administration.",
+)
+def list_grantable_permissions():
+    from app.auth.permissions import ALL_PERMISSIONS, is_brand_scoped
+
+    return [Permission(key=key, description=text, brand_scoped=is_brand_scoped(key))
+            for key, text in ALL_PERMISSIONS.items()]
 
 
 @router.post("", response_model=IntegrationOut, status_code=201, summary="Create an integration")

@@ -8,7 +8,7 @@ import People from './People'
 import PersonDetail from './PersonDetail'
 import RoleDetail from './RoleDetail'
 import Roles from './Roles'
-import { jsonResponse, renderWithProviders, stubFetch } from '../test-utils'
+import { A_SESSION, jsonResponse, renderWithProviders, stubFetch } from '../test-utils'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -39,6 +39,8 @@ function server(extra: Record<string, (r: Request) => Response> = {}) {
     'GET /auth/roles': () => jsonResponse(ROLES),
     'GET /auth/permissions': () => jsonResponse(CATALOGUE),
     'GET /integrations': () => jsonResponse([INTEGRATION]),
+    'GET /integrations/permissions': () => jsonResponse(CATALOGUE),
+    'GET /auth/session': () => jsonResponse(A_SESSION),
     'POST /auth/users/2/active': write({ ...person(2), is_active: false }),
     'PUT /auth/roles/2/permissions': write(ROLES[0]),
     'PATCH /auth/brands/2': write({ ...BRANDS[1], name: 'Beta Shop' }),

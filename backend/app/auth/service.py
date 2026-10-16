@@ -24,6 +24,7 @@ from typing import NamedTuple
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.product import PRODUCT_SLUG
@@ -1205,6 +1206,18 @@ def user_managers(db: Session, *, without_user: int | None = None, without_assig
             if user_id != without_user and assignment_id != without_assignment}
 
 
+#: One key for every change that could leave nobody able to manage users.
+_ACCESS_LOCK = 150_150
+
+
+def _lock_access(db: Session) -> None:
+    """Take turns (task-386): two overlapping removals of the last two
+    managers would each see the other still there and both pass. Held until
+    the change commits, so the next one checks against it. Postgres only;
+    nothing else runs this platform."""
+    db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": _ACCESS_LOCK})
+
+
 def _refuse_lockout(db: Session, before: bool, after: set[int]) -> None:
     """Refuse a change after which nobody can manage users, when somebody could
     before. An installation with nobody (access control never set up) is left
@@ -1227,6 +1240,7 @@ def set_active(db: Session, user_id: int, active: bool, *, actor_user_id: int | 
     if not active:
         if actor_user_id is not None and actor_user_id == user_id:
             raise AccessLockout("You cannot deactivate yourself. Ask another person who manages users.")
+        _lock_access(db)
         _refuse_lockout(db, bool(user_managers(db)), user_managers(db, without_user=user_id))
     user.is_active = active
     db.commit()
@@ -1267,6 +1281,7 @@ def revoke_assignment(db: Session, assignment_id: int) -> bool:
     """
     grant = db.query(RoleAssignmentDB).filter(RoleAssignmentDB.id == assignment_id).first()
     if grant is not None:
+        _lock_access(db)
         _refuse_lockout(db, bool(user_managers(db)), user_managers(db, without_assignment=assignment_id))
     removed = db.query(RoleAssignmentDB).filter(
         RoleAssignmentDB.id == assignment_id
@@ -1316,6 +1331,7 @@ def set_role_permissions(db: Session, role_id: int, permissions: list[str]) -> R
         return None
 
     wanted = {p for p in (permissions or []) if p in ALL_PERMISSIONS} | IMPLIED
+    _lock_access(db)
     _refuse_lockout(db, bool(user_managers(db)), user_managers(db, role_change=(role_id, wanted)))
     db.query(RolePermissionDB).filter(RolePermissionDB.role_id == role_id).delete()
     for permission in sorted(wanted):

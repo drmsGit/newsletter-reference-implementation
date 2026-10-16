@@ -3,9 +3,10 @@ import { Button, Checkbox, Dialog, Heading, Input, Label, Modal, ModalOverlay, T
 import { Link, useParams } from 'react-router'
 
 import {
-  useAddIntegrationGrant, useAdminBrands, useDeactivateIntegration, useIntegrations, useIssueKey,
-  usePermissionCatalogue, useRemoveIntegrationGrant, useRevokeKey, useSetUnattended, type Integration,
+  useAddIntegrationGrant, useDeactivateIntegration, useGrantablePermissions, useIntegrations, useIssueKey,
+  useRemoveIntegrationGrant, useRevokeKey, useSetUnattended, type Integration,
 } from '../api/resources'
+import { useSession } from '../api/session'
 import ScreenState from '../components/ScreenState'
 import { formatDate } from './Campaigns'
 import { refused } from './People'
@@ -45,13 +46,13 @@ function Page({ integration }: { integration: Integration }) {
 }
 
 function Keys({ integration }: { integration: Integration }) {
-  const issue = useIssueKey(integration.id)
+  // The secret lives here and only here: never in a client cache or the URL,
+  // and gone when the dialog closes (ADR-166 addendum 2026-10-16).
+  const [secret, setSecret] = useState<string | null>(null)
+  const issue = useIssueKey(integration.id, setSecret)
   const revoke = useRevokeKey(integration.id)
   const [label, setLabel] = useState('')
   const [days, setDays] = useState(integration.suggested_expiry_days ? String(integration.suggested_expiry_days) : '')
-  // The secret lives here and only here: never in the query cache or the URL,
-  // and gone when the dialog closes (ADR-166 addendum 2026-10-16).
-  const [secret, setSecret] = useState<string | null>(null)
   const live = integration.credentials.filter((c) => !c.revoked_at)
   return (
     <section aria-labelledby="integration-keys">
@@ -84,7 +85,7 @@ function Keys({ integration }: { integration: Integration }) {
             isDisabled={issue.isPending}
             onPress={() =>
               issue.mutate({ label: label.trim() || undefined, expires_in_days: days.trim() ? Number(days) : null },
-                { onSuccess: (issued) => { setSecret(issued.secret_key); setLabel('') } })
+                { onSuccess: () => setLabel('') })
             }
           >
             Issue a key
@@ -120,12 +121,16 @@ function Keys({ integration }: { integration: Integration }) {
  * hold themselves (ADR-166).
  */
 function Grants({ integration }: { integration: Integration }) {
-  const catalogue = usePermissionCatalogue()
-  const brands = useAdminBrands()
+  // Neither from the user-administration routes, which need users.manage: the
+  // catalogue from the integrations API, the brands from the person's own
+  // session — they can only allow what they hold, on brands they hold it on
+  // (task-386; ADR-166).
+  const catalogue = useGrantablePermissions()
+  const session = useSession()
   const add = useAddIntegrationGrant(integration.id)
   const remove = useRemoveIntegrationGrant(integration.id)
   const granted = new Set(integration.grants.map((g) => `${g.permission}@${g.brand_id}`))
-  const columns = brands.data ?? []
+  const columns = session.data?.brands ?? []
   const several = columns.length > 1
   const busy = add.isPending || remove.isPending
   const toggle = (permission: string, brand_id: number, on: boolean) =>

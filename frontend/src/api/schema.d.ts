@@ -2494,6 +2494,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/integrations/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What an integration can be allowed to do
+         * @description The permission catalogue, for the grant checklist (task-386): readable with `integrations.manage`, so choosing grants needs no user administration.
+         */
+        get: operations["list_grantable_permissions_integrations_permissions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/integrations/{integration_id}/keys": {
         parameters: {
             query?: never;
@@ -12719,6 +12739,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_grantable_permissions_integrations_permissions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Permission"][];
                 };
             };
         };

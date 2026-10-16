@@ -1954,13 +1954,21 @@ export function useCreateIntegration() {
 }
 /**
  * Issue a key. The secret comes back in this response only (ADR-166 point 3)
- * and is handed to the caller, never written to the query cache: the dialog
- * that shows it is the only place it lives (ADR-166 addendum 2026-10-16).
+ * and goes straight to `onSecret`, the dialog's own state: the mutation's
+ * result is the credential without it, so no client cache ever holds it
+ * (ADR-166 addendum 2026-10-16; task-386 — TanStack keeps a mutation's result).
  */
-export function useIssueKey(id: number) {
-  return useIntegrationWrite((body: { label?: string; expires_in_days?: number | null }) =>
-    read(api.POST('/integrations/{integration_id}/keys', { params: { path: { integration_id: id } }, body })),
-  )
+export function useIssueKey(id: number, onSecret: (secret: string) => void) {
+  return useIntegrationWrite(async (body: { label?: string; expires_in_days?: number | null }) => {
+    const issued = await read(api.POST('/integrations/{integration_id}/keys', { params: { path: { integration_id: id } }, body }))
+    onSecret(issued.secret_key)
+    return issued.credential
+  })
+}
+
+/** The permissions an integration can be given: readable with integrations.manage, no user administration needed (task-386). */
+export function useGrantablePermissions() {
+  return useQuery({ queryKey: [...INTEGRATIONS, 'permissions'], queryFn: () => read(api.GET('/integrations/permissions')), staleTime: Infinity })
 }
 export function useRevokeKey(id: number) {
   return useIntegrationWrite((credentialId: number) =>

@@ -195,3 +195,14 @@ def test_deactivating_and_revoking_both_ask_who_would_be_left(db, monkeypatch):
         db.expire_all()
         assert db.get(UserDB, target["id"]).is_active is True
         assert db.get(RoleAssignmentDB, grant_id) is not None
+
+
+def test_integration_managers_read_the_grant_catalogue_without_user_administration(db):
+    """task-386: the checklist's permissions come from the integrations API."""
+    from app.auth.permissions import INTEGRATIONS_MANAGE
+
+    with person_with(db, [VIEW, INTEGRATIONS_MANAGE]) as (client, _headers):
+        response = client.get("/integrations/permissions")
+        assert client.get("/auth/permissions").status_code == 403
+    assert response.status_code == 200
+    assert any(p["key"] == "content.manage" and p["brand_scoped"] for p in response.json())
