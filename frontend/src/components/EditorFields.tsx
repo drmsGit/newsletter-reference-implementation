@@ -47,7 +47,10 @@ export function AutosaveField({
   // The stored value the draft started from. Adjusted during render, not in
   // an effect, so a refresh never paints the wrong text for a frame.
   const [base, setBase] = useState(value)
-  if (value !== base && (draft === base || draft === value)) {
+  // The store trims what it keeps (the envelope, content fields), so our own
+  // save can come back without the spaces we typed around it: that is ours,
+  // not somebody else's change (task-385).
+  if (value !== base && (draft === base || draft === value || draft.trim() === value.trim())) {
     setDraft(value)
     setBase(value)
   }
