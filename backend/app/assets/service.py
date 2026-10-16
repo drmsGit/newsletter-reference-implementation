@@ -90,8 +90,13 @@ def find_assets(db: Session, *, brand_id: int, q: str = ""):
 
 
 def replace(db: Session, asset: AssetDB, data: bytes) -> AssetDB:
-    """A new file for the same image (point 3): same token, so the same address."""
+    """A new file for the same image (point 3): same token, so the same address.
+
+    The image's row is locked while the file is written (task-383), so two
+    replacements of one image take turns: the stored file and the row's size,
+    dimensions and name always come from the same one."""
     media_type, width, height = _check(data)
+    asset = db.query(AssetDB).filter(AssetDB.id == asset.id).with_for_update().populate_existing().one()
     key = brand_key(db, asset.brand_id)
     get_store().put(key, asset.token, data)
     asset.media_type, asset.size_bytes, asset.width, asset.height = media_type, len(data), width, height

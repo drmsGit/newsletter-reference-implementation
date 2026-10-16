@@ -10,6 +10,7 @@ backed up, moved or handed over on their own.
 """
 import os
 import re
+import uuid
 from pathlib import Path
 
 DEFAULT_DIR = Path(__file__).resolve().parents[3] / "storage" / "assets"
@@ -30,9 +31,16 @@ class LocalAssetStore:
     def put(self, brand_key: str, token: str, data: bytes) -> None:
         path = self._path(brand_key, token)
         path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = path.with_suffix(".part")
-        temporary.write_bytes(data)
-        temporary.replace(path)  # a replacement is never seen half-written
+        # Its own temporary file per write, in the same folder so the rename
+        # stays atomic: two overlapping writes of one image never share one
+        # (task-383), and a replacement is never seen half-written.
+        temporary = path.with_name(f"{path.name}.{uuid.uuid4().hex}.part")
+        try:
+            temporary.write_bytes(data)
+            temporary.replace(path)
+        except BaseException:
+            temporary.unlink(missing_ok=True)
+            raise
 
     def get(self, brand_key: str, token: str) -> bytes | None:
         path = self._path(brand_key, token)
