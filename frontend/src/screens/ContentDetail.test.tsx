@@ -87,6 +87,7 @@ function server(options: {
       jsonResponse(page(options.campaigns ?? [], { total: options.total ?? (options.campaigns ?? []).length })),
     'GET /content/42/unsent-campaigns': () => jsonResponse({ count: options.reach ?? 3, campaigns: [] }),
     'GET /content/42/versions': () => jsonResponse(options.versions ?? []),
+    'GET /content/42/drafts': () => jsonResponse([]),
     'GET /content/42/duplicate-targets': () =>
       jsonResponse([{ id: 1, name: 'Acme', crossing: false }, { id: 2, name: 'Beta', crossing: true }]),
     'PATCH /content/42': async (request: Request) => {
@@ -119,6 +120,7 @@ function server(options: {
     'GET /content/77/campaigns': () => jsonResponse(page([])),
     'GET /content/77/unsent-campaigns': () => jsonResponse({ count: 0, campaigns: [] }),
     'GET /content/77/versions': () => jsonResponse([]),
+    'GET /content/77/drafts': () => jsonResponse([]),
     'GET /content/77/duplicate-targets': () => jsonResponse([]),
     'GET /content/77/assignments': () => jsonResponse([]),
     'GET /content/categories': () => jsonResponse(categories),

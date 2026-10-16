@@ -49,6 +49,7 @@ const SETTINGS = {
       ],
       model: null,
       approval_mode: 'require_approval',
+      held_form: true,
     },
   ],
   governed_models: ['claude-opus-5'],
@@ -209,6 +210,18 @@ describe('editing settings', () => {
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
     // "the default" is sent as null, which points the task back at the deployment default.
     expect(await sentBodies(fetchMock, 'PUT')).toEqual([{ model: null }])
+  })
+})
+
+describe('a task with no approval step (ADR-140 addendum 2026-10-16)', () => {
+  it('says so in place of the switch, even to someone who may manage', async () => {
+    const draft = { ...SETTINGS.ai_tasks[0], key: 'content_draft', label: 'Content draft', held_form: false,
+      approval_mode: 'auto_apply' }
+    stubFetch({ 'GET /settings': () => jsonResponse({ ...SETTINGS, may_manage: true, ai_tasks: [draft, SETTINGS.ai_tasks[0]] }) })
+    renderWithProviders(<Settings />)
+    expect(await screen.findByText(/no approval step/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Output of Content draft/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Output of Subject & preheader/ })).toBeInTheDocument()
   })
 })
 

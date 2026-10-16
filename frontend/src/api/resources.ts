@@ -1255,7 +1255,13 @@ export function useSaveContentRecord(recordId: number) {
   const key = keys.contentRecord(recordId)
   return useMutation({
     scope: { id: 'composer-content' },
-    mutationFn: (body: { title?: string; description?: string; content?: Record<string, unknown>; groups?: string[] }) =>
+    mutationFn: (body: {
+      title?: string
+      description?: string
+      content?: Record<string, unknown>
+      groups?: string[]
+      applied_suggestion_run_id?: number
+    }) =>
       read(
         api.PATCH('/content/{content_id}', {
           params: {
@@ -1294,6 +1300,28 @@ export function useContentAssignments(recordId: number) {
   })
 }
 
+// --- AI content drafts (task-368; ADR-141 addendum 2026-10-16) -------------
+
+export type ContentDraft = components['schemas']['ContentDraft']
+
+/** Every AI draft of a record, newest first, with the record's current text and scores beside it. */
+export function useContentDrafts(recordId: number) {
+  return useQuery({
+    queryKey: [...keys.contentRecord(recordId), 'drafts'],
+    queryFn: () => read(api.GET('/content/{content_id}/drafts', { params: { path: { content_id: recordId } } })),
+  })
+}
+
+/** Ask the model for a draft. Nothing is written to the record; the draft is read back. */
+export function useDraftContent(recordId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { source: string; channels: string[] }) =>
+      read(api.POST('/content/{content_id}/drafts', { params: { path: { content_id: recordId } }, body })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [...keys.contentRecord(recordId), 'drafts'] }),
+  })
+}
+
 /**
  * Assign, re-score or remove a record's category (task-280; ADR-080's
  * 2026-10-04 addendum: 1-10, changed in place). Each re-reads the record's
@@ -1304,6 +1332,8 @@ export function useEditAssignments(recordId: number) {
   const refresh = () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: [...keys.contentRecord(recordId), 'assignments'] }),
+      // A draft shows each proposed category's score on the record now.
+      queryClient.invalidateQueries({ queryKey: [...keys.contentRecord(recordId), 'drafts'] }),
       queryClient.invalidateQueries({ queryKey: [...keys.content, 'page'] }),
       queryClient.invalidateQueries({ queryKey: [...keys.content, 'picker'] }),
     ])
@@ -1312,17 +1342,20 @@ export function useEditAssignments(recordId: number) {
     scope: { id: `assignments-${recordId}` },
     mutationFn: (
       change:
-        | { kind: 'assign'; categoryId: number; score: number }
-        | { kind: 'score'; assignmentId: number; score: number }
+        | { kind: 'assign'; categoryId: number; score: number; runId?: number }
+        | { kind: 'score'; assignmentId: number; score: number; runId?: number }
         | { kind: 'remove'; assignmentId: number },
     ) => {
+      // `runId`: taken from an AI draft (task-368), named in the audit entry.
       if (change.kind === 'assign')
         return read(api.POST('/content/{content_id}/categories', {
-          params: { path }, body: { category_id: change.categoryId, score: change.score },
+          params: { path },
+          body: { category_id: change.categoryId, score: change.score, applied_suggestion_run_id: change.runId },
         }))
       if (change.kind === 'score')
         return read(api.PATCH('/content/{content_id}/assignments/{assignment_id}', {
-          params: { path: { ...path, assignment_id: change.assignmentId } }, body: { score: change.score },
+          params: { path: { ...path, assignment_id: change.assignmentId } },
+          body: { score: change.score, applied_suggestion_run_id: change.runId },
         }))
       return read(api.DELETE('/content/{content_id}/assignments/{assignment_id}', {
         params: { path: { ...path, assignment_id: change.assignmentId } },

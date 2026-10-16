@@ -26,6 +26,8 @@ import { Performance } from '../components/ContentFigures'
 import PublishState from '../components/PublishState'
 import ScreenState from '../components/ScreenState'
 import { STAGE_LABEL } from './Monitoring'
+import ContentDraft from './ContentDraft'
+import { SCORES } from './scores'
 
 type ContentField = NonNullable<ReturnType<typeof useContentFields>['data']>[number]
 
@@ -125,6 +127,8 @@ function RecordPage({
           error={fieldError(save.error, 'description')}
         />
       </section>
+
+      <ContentDraft recordId={record.id} fields={fields} />
 
       {channels.map((channel) => (
         <details key={channel} open className="record-channel">
@@ -296,8 +300,6 @@ function MachineReady({ record }: { record: ContentRecordDetail }) {
     </div>
   )
 }
-
-const SCORES = Array.from({ length: 10 }, (_, index) => ({ id: String(index + 1), name: String(index + 1) }))
 
 /**
  * A record's categories (decision 5, ADR-080's 2026-10-04 addendum): each

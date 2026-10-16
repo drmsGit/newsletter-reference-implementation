@@ -317,7 +317,14 @@ function Task({ s, task }: { s: SettingsView; task: SettingsView['ai_tasks'][num
         </dl>
       )}
 
-      {s.may_manage ? (
+      {!task.held_form ? (
+        // Nothing to hold: the output only appears where a person takes it
+        // themselves (ADR-140 addendum 2026-10-16), so no switch is offered.
+        <dl className="facts">
+          <dt>Output</dt>
+          <dd>no approval step — it only appears where a person takes it themselves</dd>
+        </dl>
+      ) : s.may_manage ? (
         <Form
           label="Save output mode"
           saving={approval.isPending}
