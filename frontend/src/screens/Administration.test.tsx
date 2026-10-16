@@ -7,6 +7,7 @@ import IntegrationDetail from './IntegrationDetail'
 import People from './People'
 import PersonDetail from './PersonDetail'
 import RoleDetail from './RoleDetail'
+import Roles from './Roles'
 import { jsonResponse, renderWithProviders, stubFetch } from '../test-utils'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -52,6 +53,7 @@ function open(route: string) {
     <Routes>
       <Route path="/settings/users" element={<People />} />
       <Route path="/settings/users/:id" element={<PersonDetail />} />
+      <Route path="/settings/roles" element={<Roles />} />
       <Route path="/settings/roles/:id" element={<RoleDetail />} />
       <Route path="/settings/brands" element={<Brands />} />
       <Route path="/settings/integrations/:id" element={<IntegrationDetail />} />
@@ -96,6 +98,29 @@ describe('the administration subpages (task-358)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save permissions' }))
     await waitFor(() => expect(writes).toHaveLength(1))
     expect((await writes[0].json()).permissions.sort()).toEqual(['campaigns.manage', 'content.manage', 'view'])
+  })
+
+  it('names each role as a link to its page', async () => {
+    server()
+    open('/settings/roles')
+    expect(await screen.findByRole('link', { name: 'Manager' })).toHaveAttribute('href', '/settings/roles/2')
+  })
+
+  it("ticks an integration's permissions per brand, each saved at once", async () => {
+    const writes = server({
+      'GET /integrations': () => jsonResponse([{ ...INTEGRATION, grants: [{ permission: 'campaigns.manage', brand_id: 1 }] }]),
+      'POST /integrations/5/grants': (r) => (writes.push(r.clone()), jsonResponse({}, 201)),
+      'DELETE /integrations/5/grants/campaigns.manage/1': (r) => (writes.push(r.clone()), new Response(null, { status: 204 })),
+    })
+    open('/settings/integrations/5')
+    const granted = await screen.findByRole('checkbox', { name: 'campaigns.manage on Acme' })
+    expect(granted).toBeChecked()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'content.manage on Beta' }))
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect(await writes[0].json()).toEqual({ permission: 'content.manage', brand_id: 2 })
+    fireEvent.click(granted)
+    await waitFor(() => expect(writes).toHaveLength(2))
+    expect(writes[1].method).toBe('DELETE')
   })
 
   it('renames a brand', async () => {

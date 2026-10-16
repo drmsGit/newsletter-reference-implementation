@@ -490,24 +490,58 @@ input[data-focus-visible] {
   margin: var(--brand-space) 0;
 }
 
-.categories .react-aria-Checkbox {
+/* Every checkbox, everywhere: React Aria's Checkbox draws no box of its own,
+   so without this a checkbox showed only its text (found 2026-10-16 on the
+   role editor; the send screen's and slot settings' checkboxes had the same
+   gap). Until then it was styled inside the category picker only. */
+.react-aria-Checkbox {
   display: flex;
   gap: var(--brand-space);
-  align-items: center;
+  align-items: flex-start;
+  cursor: pointer;
 }
 
-.categories .react-aria-Checkbox::before {
+.react-aria-Checkbox::before {
   content: "";
+  flex: none;
   width: 1em;
   height: 1em;
-  border: 1px solid var(--brand-line);
+  margin-top: 0.15em;
+  border: 1px solid var(--brand-muted);
   border-radius: 2px;
+  background: var(--brand-bg);
 }
 
-.categories .react-aria-Checkbox[data-selected]::before {
+.react-aria-Checkbox[data-selected]::before {
   background: var(--brand-accent);
   border-color: var(--brand-accent);
+  box-shadow: inset 0 0 0 2px var(--brand-bg);
 }
+
+.react-aria-Checkbox[data-focus-visible]::before {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 2px;
+}
+
+.react-aria-Checkbox[data-disabled] {
+  cursor: default;
+  color: var(--brand-muted);
+}
+
+.permission-group {
+  display: grid;
+  gap: calc(var(--brand-space) / 2);
+  margin: calc(var(--brand-space) * 2) 0;
+}
+
+.permission-group > .react-aria-Label {
+  font-weight: 600;
+}
+
+.grant-grid { border-collapse: collapse; }
+.grant-grid th, .grant-grid td { padding: calc(var(--brand-space) / 2) var(--brand-space); text-align: left; vertical-align: top; }
+.grant-grid tbody tr { border-top: 1px solid var(--brand-line); }
+.grant-grid tbody th { font-weight: normal; }
 
 /*
  * The preview (task-265): a collapsed bar on the editor, and an overlay with

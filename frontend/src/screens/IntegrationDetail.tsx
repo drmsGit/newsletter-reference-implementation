@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import { Button, Dialog, Heading, Input, Label, Modal, ModalOverlay, TextField } from 'react-aria-components'
+import { Button, Checkbox, Dialog, Heading, Input, Label, Modal, ModalOverlay, TextField } from 'react-aria-components'
 import { Link, useParams } from 'react-router'
 
 import {
   useAddIntegrationGrant, useAdminBrands, useDeactivateIntegration, useIntegrations, useIssueKey,
   usePermissionCatalogue, useRemoveIntegrationGrant, useRevokeKey, useSetUnattended, type Integration,
 } from '../api/resources'
-import Choice from '../components/Choice'
 import ScreenState from '../components/ScreenState'
 import { formatDate } from './Campaigns'
 import { refused } from './People'
@@ -114,40 +113,61 @@ function Keys({ integration }: { integration: Integration }) {
   )
 }
 
+/**
+ * What the integration may do: every permission as a row, a checkbox per
+ * brand (one column when there is one brand). Ticking or unticking saves that
+ * one grant at once; the server still refuses a grant the person does not
+ * hold themselves (ADR-166).
+ */
 function Grants({ integration }: { integration: Integration }) {
   const catalogue = usePermissionCatalogue()
   const brands = useAdminBrands()
   const add = useAddIntegrationGrant(integration.id)
   const remove = useRemoveIntegrationGrant(integration.id)
-  const [permission, setPermission] = useState('')
-  const [brand, setBrand] = useState('')
-  const brandName = new Map((brands.data ?? []).map((b) => [b.id, b.name]))
-  const defaultBrand = brands.data?.[0]?.id
+  const granted = new Set(integration.grants.map((g) => `${g.permission}@${g.brand_id}`))
+  const columns = brands.data ?? []
+  const several = columns.length > 1
+  const busy = add.isPending || remove.isPending
+  const toggle = (permission: string, brand_id: number, on: boolean) =>
+    (on ? add : remove).mutate({ permission, brand_id })
   return (
     <section aria-labelledby="integration-grants">
       <h2 id="integration-grants">What it may do</h2>
-      {integration.grants.length === 0 ? (
-        <p className="muted">Nothing yet: its keys can authenticate but may do nothing.</p>
-      ) : (
-        <ul aria-label="Grants">
-          {integration.grants.map((g) => (
-            <li key={`${g.permission}-${g.brand_id}`}>
-              <code>{g.permission}</code> on {brandName.get(g.brand_id) ?? `brand ${g.brand_id}`}{' '}
-              <Button onPress={() => remove.mutate(g)}>Remove</Button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <p className="inline-form">
-        <Choice label="Allow" options={(catalogue.data ?? []).map((p) => ({ id: p.key, name: p.key }))} selected={permission}
-          onChange={setPermission} placeholder="Choose a permission" />
-        <Choice label="On brand" options={(brands.data ?? []).map((b) => ({ id: String(b.id), name: b.name }))}
-          selected={brand} onChange={setBrand} placeholder="Choose a brand" />
-        <Button isDisabled={!permission || !(brand || defaultBrand) || add.isPending}
-          onPress={() => add.mutate({ permission, brand_id: Number(brand || defaultBrand) }, { onSuccess: () => setPermission('') })}>
-          Allow
-        </Button>
+      <p className="muted">
+        Tick what its keys may do{several ? ', per brand' : ''}. Each tick is saved at once. You can only allow what you
+        may do yourself.
       </p>
+      <ScreenState query={catalogue}>
+        <table className="grant-grid">
+          <thead>
+            <tr>
+              <th scope="col">Permission</th>
+              {several ? columns.map((b) => <th key={b.id} scope="col">{b.name}</th>) : <th scope="col">Allowed</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {(catalogue.data ?? []).map((p) => (
+              <tr key={p.key}>
+                <th scope="row">
+                  <code>{p.key}</code>
+                  <br />
+                  <span className="muted">{p.description}</span>
+                </th>
+                {columns.map((b) => (
+                  <td key={b.id}>
+                    <Checkbox
+                      aria-label={several ? `${p.key} on ${b.name}` : p.key}
+                      isSelected={granted.has(`${p.key}@${b.id}`)}
+                      isDisabled={busy || !integration.is_active}
+                      onChange={(on) => toggle(p.key, b.id, on)}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </ScreenState>
       {(add.error ?? remove.error) != null && <p role="alert">Not changed: {refused(add.error ?? remove.error)}</p>}
     </section>
   )

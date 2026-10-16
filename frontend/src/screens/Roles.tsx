@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Button, Input, Label, TextField } from 'react-aria-components'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 
 import { useCreateRole, useRoles, type Role } from '../api/resources'
 import Choice from '../components/Choice'
@@ -11,7 +11,8 @@ import { refused } from './People'
 export const ROLES = '/settings/roles'
 
 const COLUMNS: DataColumn<Role>[] = [
-  { key: 'name', header: 'Role', isRowHeader: true, render: (r) => r.name },
+  // A link, as a person's name is: the list shows that a role opens.
+  { key: 'name', header: 'Role', isRowHeader: true, render: (r) => <Link to={`${ROLES}/${r.id}`}>{r.name}</Link> },
   { key: 'kind', header: 'Kind', render: (r) => (r.is_builtin ? (r.is_customised ? 'Shipped, edited' : 'Shipped') : 'Your own') },
   { key: 'permissions', header: 'Permissions', render: (r) => String(r.permissions.length) },
   { key: 'holders', header: 'Held by', render: (r) => `${r.holders} ${r.holders === 1 ? 'person' : 'people'}` },
