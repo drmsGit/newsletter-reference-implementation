@@ -5,6 +5,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 
 import App from './App'
 import { createQueryClient } from './api/queryClient'
+import InterfaceLanguage from './components/InterfaceLanguage'
 import './index.css'
 
 const queryClient = createQueryClient()
@@ -22,7 +23,9 @@ createRoot(root).render(
         rather than an edit to every route.
       */}
       <BrowserRouter basename="/manager">
-        <App />
+        <InterfaceLanguage>
+          <App />
+        </InterfaceLanguage>
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>,
