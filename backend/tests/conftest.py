@@ -26,7 +26,10 @@ imported content, live campaigns, accumulated engagement signals — so a suite
 that truncates it is worse than the problem it solves.
 """
 
+import atexit
 import os
+import shutil
+import tempfile
 from urllib.parse import urlsplit, urlunsplit
 
 import pytest
@@ -148,6 +151,18 @@ _refuse_the_dev_database(TEST_DATABASE_URL)
 _ensure_database_exists(TEST_DATABASE_URL)
 _start_from_an_empty_schema(TEST_DATABASE_URL)
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+
+# --- and image files to a folder of the suite's own --------------------------
+#: Found 2026-10-17: without this the suite wrote to and deleted from the dev
+#: installation's `storage/assets/` (the asset store reads `ASSETS_DIR` at each
+#: call and falls back to that folder). The demo reset test's clean-up removes
+#: each brand's image folder, and the test database's brand keys are the dev
+#: ones, so a run of the suite deleted the dev demo's images. Always a fresh
+#: temporary folder, whatever `ASSETS_DIR` says: a shell export or a `.env`
+#: entry could name the real one, and `load_dotenv` does not override this.
+TEST_ASSETS_DIR = tempfile.mkdtemp(prefix="newsletter-test-assets-")
+os.environ["ASSETS_DIR"] = TEST_ASSETS_DIR
+atexit.register(shutil.rmtree, TEST_ASSETS_DIR, ignore_errors=True)
 
 
 def _record_as_built_from_the_models() -> None:
