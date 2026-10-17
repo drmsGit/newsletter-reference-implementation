@@ -94,6 +94,15 @@ describe('the settings screen', () => {
     expect(within(container).queryAllByRole('button')).toHaveLength(0)
   })
 
+  it('shows every fact as a shared fact row, inset as the fields beside it (task-392 item 11)', async () => {
+    stubFetch({ 'GET /settings': () => jsonResponse(SETTINGS) })
+    const { container } = renderWithProviders(<Settings />)
+    await screen.findByText('200')
+    const terms = [...container.querySelectorAll('dt')]
+    expect(terms.length).toBeGreaterThan(5)
+    for (const term of terms) expect(term.parentElement).toHaveClass('fact')
+  })
+
   it('warns when the server says the AI warning threshold is crossed', async () => {
     stubFetch({ 'GET /settings': () => jsonResponse(SETTINGS) })
     renderWithProviders(<Settings />)

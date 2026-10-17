@@ -1703,11 +1703,6 @@ fieldset.detail-section > legend + * { clear: both; }
 .live-prompt pre { white-space: pre-wrap; margin: 8px 0 0; font-size: 12px; line-height: 18px; }
 .card-rows > form.card-rows > div > .react-aria-TextField textarea { width: 100%; }
 .card-rows .fact-list { padding: 0; }
-/* Label and value pairs written as plain dt/dd, in a card: the facts' grid. */
-dl.facts-compat { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 8px 16px; margin: 0; align-items: baseline; }
-dl.facts-compat > dt { font-size: 12px; line-height: 16px; color: var(--brand-muted); }
-dl.facts-compat > dd { margin: 0; overflow-wrap: anywhere; }
-dl.facts-compat > div { display: contents; }
 
 /* A link that is a button (Edit, Send): the button's look, the link's meaning. */
 a.btn-link {

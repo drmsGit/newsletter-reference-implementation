@@ -15,6 +15,7 @@ import {
 import Choice from '../components/Choice'
 import DataTable from '../components/DataTable'
 import DetailSection from '../components/DetailSection'
+import Fact from '../components/Fact'
 import { Form, Outcome } from '../components/SettingsForm'
 import ScreenState from '../components/ScreenState'
 import { AI_PROMPTS } from './AiPrompts'
@@ -94,9 +95,8 @@ function SendCap({ s }: { s: SettingsView }) {
   const [invalid, setInvalid] = useState(false)
   if (!s.may_manage) {
     return (
-      <dl className="fact-list facts-compat">
-        <dt>Most recipients one send may reach</dt>
-        <dd>{s.max_send_recipients}</dd>
+      <dl className="fact-list">
+        <Fact label="Most recipients one send may reach">{s.max_send_recipients}</Fact>
       </dl>
     )
   }
@@ -130,11 +130,9 @@ function SessionLengths({ s }: { s: SettingsView }) {
   const [invalid, setInvalid] = useState(false)
   if (!s.may_manage) {
     return (
-      <dl className="fact-list facts-compat">
-        <dt>A sign-in lasts at most</dt>
-        <dd>{s.session_absolute_hours} hours</dd>
-        <dt>Signed out after no activity for</dt>
-        <dd>{s.session_idle_minutes} minutes</dd>
+      <dl className="fact-list">
+        <Fact label="A sign-in lasts at most">{s.session_absolute_hours} hours</Fact>
+        <Fact label="Signed out after no activity for">{s.session_idle_minutes} minutes</Fact>
       </dl>
     )
   }
@@ -202,9 +200,8 @@ function Provider({ s }: { s: SettingsView }) {
   const [provider, setProvider] = useState(s.ai_provider)
   if (!s.may_manage) {
     return (
-      <dl className="fact-list facts-compat">
-        <dt>Provider</dt>
-        <dd>{s.ai_provider}</dd>
+      <dl className="fact-list">
+        <Fact label="Provider">{s.ai_provider}</Fact>
       </dl>
     )
   }
@@ -234,9 +231,8 @@ function BudgetPeriod({ s }: { s: SettingsView }) {
   const [period, setPeriod] = useState(s.ai_budget.period ?? 'month')
   if (!s.may_manage) {
     return (
-      <dl className="fact-list facts-compat">
-        <dt>The token budget refills</dt>
-        <dd>{PERIODS.find((p) => p.id === s.ai_budget.period)?.name ?? s.ai_budget.period}</dd>
+      <dl className="fact-list">
+        <Fact label="The token budget refills">{PERIODS.find((p) => p.id === s.ai_budget.period)?.name ?? s.ai_budget.period}</Fact>
       </dl>
     )
   }
@@ -329,12 +325,11 @@ function Sections({ s }: { s: SettingsView }) {
     <>
       <DetailSection id="sending" title="Sending">
         <SendCap s={s} />
-        <dl className="fact-list facts-compat">
+        <dl className="fact-list">
           {s.channels.map((c) => (
-            <div key={c.name} style={{ display: 'contents' }}>
-              <dt>Channel: {c.name}</dt>
-              <dd>{c.available ? 'available' : 'switched off'}</dd>
-            </div>
+            <Fact key={c.name} label={`Channel: ${c.name}`}>
+              {c.available ? 'available' : 'switched off'}
+            </Fact>
           ))}
         </dl>
         <DataTable
@@ -383,30 +378,25 @@ function Sections({ s }: { s: SettingsView }) {
           <p role="alert">AI use has passed the warning threshold ({budget.used_pct}% of the cap).</p>
         )}
         <Provider s={s} />
-        <dl className="fact-list facts-compat">
-          <dt>Default model</dt>
-          <dd>
+        <dl className="fact-list">
+          <Fact label="Default model">
             {s.ai_model}
             {s.ai_model_from_env ? ' (set by the deployment)' : ''}
-          </dd>
+          </Fact>
           {/* A yes/no only. The key itself is never sent to a browser (ADR-152). */}
-          <dt>API key configured</dt>
-          <dd>{s.ai_key_present ? 'yes' : 'no'}</dd>
-          <dt>Tokens used</dt>
-          <dd>
+          <Fact label="API key configured">{s.ai_key_present ? 'yes' : 'no'}</Fact>
+          <Fact label="Tokens used">
             {budget.tokens_used.toLocaleString()} of {budget.cap.hard_stop_tokens.toLocaleString()}{' '}
             ({budget.used_pct}%){' '}
             {budget.period_start
               ? `since ${new Date(budget.period_start).toLocaleDateString(undefined, { timeZone: 'UTC' })}`
               : 'in total'}
-          </dd>
-          <dt>Warning at</dt>
-          <dd>{budget.cap.warn_tokens.toLocaleString()} tokens</dd>
-          <dt>Spent</dt>
-          <dd>
+          </Fact>
+          <Fact label="Warning at">{budget.cap.warn_tokens.toLocaleString()} tokens</Fact>
+          <Fact label="Spent">
             ${budget.spend.usd.toFixed(2)} of a ${budget.cap.budget_usd.toFixed(2)} budget
             {budget.spend.unpriced_runs > 0 ? ` (${budget.spend.unpriced_runs} runs unpriced)` : ''}
-          </dd>
+          </Fact>
         </dl>
         <SpendCap s={s} />
         <BudgetPeriod s={s} />
