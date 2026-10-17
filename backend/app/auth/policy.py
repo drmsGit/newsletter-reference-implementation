@@ -109,6 +109,9 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
     # in this table and nothing enforces it — a narrow entry that drifts below
     # its prefix is silently downgraded, and the test below pins this pair.
     ("/campaigns/variants/{variant_id}/suggest-subject", AI_RUN),
+    # A topic proposal (task-370) spends on the model and writes nothing; the
+    # build that follows is an ordinary campaign edit under `/campaigns`.
+    ("/campaigns/variants/{variant_id}/topic-proposals", AI_RUN),
     # A POST here starts a content draft (task-368): it spends on the model and
     # writes nothing to the record, so it is ai.run, not the broad `/content`
     # entry's content.manage. The GET (the read-back) is view, as every GET is.

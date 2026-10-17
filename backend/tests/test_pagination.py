@@ -60,6 +60,7 @@ FIXED = {
     "/campaigns/variants/{variant_id}/modules",
     "/campaigns/variants/{variant_id}/decision-slots",
     "/campaigns/variants/{variant_id}/suggestions",
+    "/campaigns/variants/{variant_id}/topic-proposals",
     "/content/{content_id}/drafts",
     "/content/{content_id}/retranslations",
     "/api/audience-groups/{group_id}/blocks",

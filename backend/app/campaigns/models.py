@@ -410,6 +410,65 @@ class SuggestionRun(BaseModel):
     )
 
 
+class TopicRequest(BaseModel):
+    """What the variant is about (task-370); sent to the model, not stored."""
+
+    topic: str = Field(description="At most 500 characters")
+
+
+class ProposedRecord(BaseModel):
+    record_id: int
+    title: str
+    reason: str
+
+
+class ProposedSlot(BaseModel):
+    category_ids: list[int]
+    categories: list[str]
+    reason: str
+
+
+class TopicProposal(BaseModel):
+    """One proposal for an empty variant, read back (task-370; ADR-141 addendum 2026-10-17)."""
+
+    run_id: int
+    status: str
+    created_at: datetime
+    provider: str
+    model: str | None = None
+    prompt_version: int | None = None
+    input_tokens: int
+    output_tokens: int
+    #: How many records the model chose among (the newest takeable ones).
+    offered: int
+    hero: ProposedRecord | None = None
+    editorial: str
+    blocks: list[ProposedRecord]
+    slot: ProposedSlot | None = None
+    subject: str
+    preheader: str
+    notices: list[str]
+    reply: str
+    message: str | None = None
+
+
+class BuildFromProposal(BaseModel):
+    """The ticked parts of one proposal. Left out (null), a part is taken as proposed."""
+
+    run_id: int
+    hero: bool = True
+    #: The editorial text as edited; "" leaves the block out; null takes the proposal's.
+    editorial: str | None = None
+    #: The ticked blocks' record ids, in order; null takes all proposed.
+    blocks: list[int] | None = None
+    slot: bool = True
+    envelope: bool = True
+
+
+class BuiltFromProposal(BaseModel):
+    built: int
+
+
 class DecisionSlotListed(BaseModel):
     """A decision slot in the brand, with what it has done (task-50, B21)."""
 

@@ -839,6 +839,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/campaigns/variants/{variant_id}/topic-proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every topic proposal for this variant, newest first */
+        get: operations["get_topic_proposals_campaigns_variants__variant_id__topic_proposals_get"];
+        put?: never;
+        /**
+         * Ask the model to propose an empty email variant's stack from a topic
+         * @description task-370 (ADR-141 addendum 2026-10-17). Nothing is written to the variant: the proposal is read back from the GET and a person builds what they tick. Refused before anything is spent: 422 on `topic` when it is empty or over 500 characters; 409 for a variant that is not email or already has content blocks, or when too little content a machine may take exists.
+         */
+        post: operations["propose_variant_from_topic_campaigns_variants__variant_id__topic_proposals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/variants/{variant_id}/build-from-proposal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Build the ticked parts of a topic proposal into the empty variant
+         * @description ADR-141 addendum 2026-10-17 point 5: hero, editorial, alternating image blocks, the slot's block (up to three picks), subject and preheader, each through the ordinary write and audited naming the run. Everything is checked first, so a refusal builds nothing: 404 for another variant's run, 409 when the variant is no longer empty or a record is no longer one a machine may take, 422 for a block the proposal does not hold.
+         */
+        post: operations["build_variant_from_proposal_campaigns_variants__variant_id__build_from_proposal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/campaigns/variants/{variant_id}/decision-slots": {
         parameters: {
             query?: never;
@@ -3905,6 +3946,38 @@ export interface components {
             /** Brand Id */
             brand_id: number;
         };
+        /**
+         * BuildFromProposal
+         * @description The ticked parts of one proposal. Left out (null), a part is taken as proposed.
+         */
+        BuildFromProposal: {
+            /** Run Id */
+            run_id: number;
+            /**
+             * Hero
+             * @default true
+             */
+            hero: boolean;
+            /** Editorial */
+            editorial?: string | null;
+            /** Blocks */
+            blocks?: number[] | null;
+            /**
+             * Slot
+             * @default true
+             */
+            slot: boolean;
+            /**
+             * Envelope
+             * @default true
+             */
+            envelope: boolean;
+        };
+        /** BuiltFromProposal */
+        BuiltFromProposal: {
+            /** Built */
+            built: number;
+        };
         /** BulkAddByCriteria */
         BulkAddByCriteria: {
             /** Language */
@@ -6717,6 +6790,24 @@ export interface components {
             /** Assignment Id */
             assignment_id?: number | null;
         };
+        /** ProposedRecord */
+        ProposedRecord: {
+            /** Record Id */
+            record_id: number;
+            /** Title */
+            title: string;
+            /** Reason */
+            reason: string;
+        };
+        /** ProposedSlot */
+        ProposedSlot: {
+            /** Category Ids */
+            category_ids: number[];
+            /** Categories */
+            categories: string[];
+            /** Reason */
+            reason: string;
+        };
         /** ProviderEventCreate */
         ProviderEventCreate: {
             /** Provider */
@@ -7852,6 +7943,60 @@ export interface components {
             message?: string | null;
             /** Render Note */
             render_note?: string | null;
+        };
+        /**
+         * TopicProposal
+         * @description One proposal for an empty variant, read back (task-370; ADR-141 addendum 2026-10-17).
+         */
+        TopicProposal: {
+            /** Run Id */
+            run_id: number;
+            /** Status */
+            status: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Provider */
+            provider: string;
+            /** Model */
+            model?: string | null;
+            /** Prompt Version */
+            prompt_version?: number | null;
+            /** Input Tokens */
+            input_tokens: number;
+            /** Output Tokens */
+            output_tokens: number;
+            /** Offered */
+            offered: number;
+            hero?: components["schemas"]["ProposedRecord"] | null;
+            /** Editorial */
+            editorial: string;
+            /** Blocks */
+            blocks: components["schemas"]["ProposedRecord"][];
+            slot?: components["schemas"]["ProposedSlot"] | null;
+            /** Subject */
+            subject: string;
+            /** Preheader */
+            preheader: string;
+            /** Notices */
+            notices: string[];
+            /** Reply */
+            reply: string;
+            /** Message */
+            message?: string | null;
+        };
+        /**
+         * TopicRequest
+         * @description What the variant is about (task-370); sent to the model, not stored.
+         */
+        TopicRequest: {
+            /**
+             * Topic
+             * @description At most 500 characters
+             */
+            topic: string;
         };
         /** TraceContribution */
         TraceContribution: {
@@ -9909,6 +10054,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubjectSuggestionResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_topic_proposals_campaigns_variants__variant_id__topic_proposals_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                variant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TopicProposal"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    propose_variant_from_topic_campaigns_variants__variant_id__topic_proposals_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                variant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TopicRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectSuggestionResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    build_variant_from_proposal_campaigns_variants__variant_id__build_from_proposal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                variant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BuildFromProposal"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BuiltFromProposal"];
                 };
             };
             /** @description Validation Error */

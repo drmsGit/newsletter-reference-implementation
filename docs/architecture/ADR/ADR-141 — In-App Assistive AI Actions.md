@@ -7,7 +7,7 @@ topic:
   - governance
   - content
 created: 2026-07-31
-modified: 2026-10-16
+modified: 2026-10-17
 source:
   - "AI Layer design interview (interview-prep, 2026-07-27 – 31), Cluster 2"
 depends_on:
@@ -225,6 +225,101 @@ stay separate human acts.
 - **Negative.** Without a URL fetch, the manager copies the text in. Nothing
   detects personal data in the paste; the panel's instruction is the only guard.
   Links and images stay the manager's work.
+
+Nothing here changes the Decision section above.
+
+## Addendum 2026-10-17 — The variant-from-a-topic task: a stack proposed, reviewed, then built
+
+Prompted by the final-design pass of task-370 ("AI prepares a variant from a
+topic"), decided by the user on 2026-10-17, one question at a time. Points 1–6
+and the 2026-10-16 addendum stand. This addendum adds one more task under point
+1's contract.
+
+**Why it is a new task file.** Point 1's anti-proliferation rule allows a new
+task file only for a new output type or landing place. This task is both: its
+output type is a variant's stack of blocks together with its envelope, and it
+lands on a variant. Its id is `variant_from_topic`.
+
+**1. Where it runs.** In the variant editor, for an email variant that has no
+content blocks yet: nothing but its envelope, its visible header and its footer.
+Nothing existing is replaced or merged. Push variants are not offered it. A push
+is one notification block
+([[ADR-084 — Decision Slots May Resolve One or Multiple Content Records]],
+addendum of 2026-10-11, point 2), with no hero and no editorial.
+
+**2. What it reads.**
+
+- **A topic the manager types.** It is sent to the model and is not stored on
+  the run. Only the model's output is stored
+  ([[ADR-140 — AI Capability Layer]] point 5).
+- **The records it may choose from.** They are exactly the records a decision
+  slot may take today: published with the fields the block needs, ready for
+  email, machine ready, and in the variant's message language or with no
+  language set. This is the rule of `candidate_query`
+  (`backend/app/decision/strategies/base.py`):
+  [[ADR-200 — A Content Record Has a Language, and a Translation Is a Linked Record]]
+  point 2, with the message language of
+  [[ADR-199 — Inline Personalisation Is a Brand's Expression Dictionary, Substituted After Escaping]]
+  point 4;
+  [[ADR-179 — What Enters the Catalogue, and What a Machine May Take From It]],
+  addendum of 2026-10-05; and
+  [[ADR-081 — AI Ranks Within Governed Candidate Sets]]. The 60 most recently
+  created of them go to the model, each with its title, description, category
+  names and the blocks it can fill. The panel says the choice was made among
+  the 60 most recently created.
+- **The existing categories.**
+
+**3. The stack's shape is fixed by the scaffold, not chosen by the model**, so
+the look stays the brand's. The blocks come from the set of
+[[ADR-198 — The Email Block Set Is Seven Blocks, Square Images and Text Links]],
+in this order:
+
+1. A Hero bound to a record.
+2. An editorial block whose text the model writes for this email. Editorial is
+   not catalogue-bound (ADR-179); it is hand-typed copy for one send (ADR-198
+   point 1).
+3. Two to four records in Image left and Image right blocks, alternating.
+4. When the model judges that one reader-chosen block fits better than another
+   fixed record, one block drawing from a decision slot. It continues the Image
+   left and Image right alternation after the records. The model may leave it
+   out. The model chooses only the slot's categories, from those that fit. The
+   slot always shows up to three picks. That number is fixed by the scaffold,
+   within the range of ADR-084's addendum of 2026-10-11, point 2.
+
+The model also writes a subject and a preheader for the envelope.
+
+**4. What is dropped, and said.** The panel drops each of the following and
+says so: a record the model names that is outside the set it was given; a
+record used a second time; a record placed in a block it cannot fill; a
+category that is not in the vocabulary
+([[ADR-080 — Human-governed Taxonomy Before AI Selection]]).
+
+**5. Review, then build.** One preview shows the proposal in order: the hero's
+record; the editorial text, editable there; each block's record with the
+model's one-line reason (point 4: reasons are shown); the slot's categories;
+the subject and preheader. Each block has a tick to leave it out. "Build the
+variant" creates the ticked blocks and writes the envelope in one step, and the
+audit names the run. Afterwards everything is edited in the editor as usual.
+
+**6. No approval step.** The task has no held form (ADR-140, addenda of
+2026-10-16 and 2026-10-17), so point 4's approval inbox has nothing to hold.
+The model's output reaches the variant only when a person builds it, and a
+variant is sent only by a person's later acts.
+
+**7. Spend and personal data.** One model call per proposal, with a declared
+output ceiling ([[ADR-144 — AI Data and Model Governance]] point 5). No
+recipient data reaches the model (ADR-144 point 4). It sees the topic, the
+records' own content and the categories.
+
+**Consequences.**
+
+- **Positive.** A manager gets a reviewed starting stack in one step, built only
+  from content a machine may already take. The brand's layout is kept, because
+  the shape belongs to the scaffold.
+- **Negative.** The model sees only the 60 most recently created eligible
+  records, so an older record that fits is not suggested. The fixed shape suits
+  a newsletter edition, not every email. A record not marked machine ready is
+  never suggested, even though a person reviews every block.
 
 Nothing here changes the Decision section above.
 

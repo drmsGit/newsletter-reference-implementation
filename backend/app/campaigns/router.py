@@ -10,6 +10,10 @@ from app.brand_profiles.service import ProfileNotFound
 from app.campaigns import duplication, fence
 from app.campaigns.db_models import CampaignDB
 from app.campaigns.models import (
+    BuildFromProposal,
+    BuiltFromProposal,
+    TopicProposal,
+    TopicRequest,
     Campaign,
     CampaignDuplicate,
     CampaignDuplicated,
@@ -494,6 +498,88 @@ def suggest_subject_for_variant_record(
         "ai_run_id": result.run_id,
         "pending_action_id": result.pending_action_id,
     }
+
+
+@router.post(
+    "/variants/{variant_id}/topic-proposals",
+    response_model=SubjectSuggestionResult,
+    summary="Ask the model to propose an empty email variant's stack from a topic",
+    description=(
+        "task-370 (ADR-141 addendum 2026-10-17). Nothing is written to the variant: the proposal is read "
+        "back from the GET and a person builds what they tick. Refused before anything is spent: 422 on "
+        "`topic` when it is empty or over 500 characters; 409 for a variant that is not email or already "
+        "has content blocks, or when too little content a machine may take exists."
+    ),
+)
+def propose_variant_from_topic(
+    variant_id: int, payload: TopicRequest, request: Request,
+    db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.ai.tasks import variant_from_topic
+    from app.auth.db_models import IntegrationDB
+    from app.campaigns.service import get_variant
+
+    variant = get_variant(db, variant_id, brand_id=brand_id)
+    if variant is None:
+        raise HTTPException(status_code=404, detail=f"Variant {variant_id} not found")
+    principal = request_principal(request)
+    actor = ("integration" if isinstance(principal, IntegrationDB) else "user") if principal else None
+    try:
+        run = variant_from_topic.propose(db, variant, payload.topic, brand_id=brand_id, actor_type=actor,
+                                         actor_id=principal.id if principal else None)
+    except variant_from_topic.ProposalRefused as error:
+        if error.field:
+            raise HTTPException(status_code=422, detail=[{"loc": ["body", error.field], "msg": str(error),
+                                                          "type": "value_error"}])
+        raise HTTPException(status_code=409, detail=str(error))
+    return {"outcome": "inline" if run.ok else "refused", "message": run.message, "ai_run_id": run.run_id,
+            "pending_action_id": None}
+
+
+@router.get(
+    "/variants/{variant_id}/topic-proposals",
+    response_model=list[TopicProposal],
+    summary="Every topic proposal for this variant, newest first",
+)
+def get_topic_proposals(variant_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand)):
+    from app.ai.tasks.variant_from_topic import proposals_for_variant
+    from app.campaigns.service import get_variant
+
+    variant = get_variant(db, variant_id, brand_id=brand_id)
+    if variant is None:
+        raise HTTPException(status_code=404, detail=f"Variant {variant_id} not found")
+    return proposals_for_variant(db, variant)
+
+
+@router.post(
+    "/variants/{variant_id}/build-from-proposal",
+    response_model=BuiltFromProposal,
+    summary="Build the ticked parts of a topic proposal into the empty variant",
+    description=(
+        "ADR-141 addendum 2026-10-17 point 5: hero, editorial, alternating image blocks, the slot's block "
+        "(up to three picks), subject and preheader, each through the ordinary write and audited naming the "
+        "run. Everything is checked first, so a refusal builds nothing: 404 for another variant's run, 409 "
+        "when the variant is no longer empty or a record is no longer one a machine may take, 422 for a "
+        "block the proposal does not hold."
+    ),
+)
+def build_variant_from_proposal(
+    variant_id: int, payload: BuildFromProposal, request: Request,
+    db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.campaigns import from_topic
+    from app.campaigns.service import get_variant
+
+    fence.guard(db, request, variant_id=variant_id)
+    variant = get_variant(db, variant_id, brand_id=brand_id)
+    if variant is None:
+        raise HTTPException(status_code=404, detail=f"Variant {variant_id} not found")
+    try:
+        built = from_topic.build(db, request, variant, payload, brand_id=brand_id)
+    except ModuleDataInvalid as error:
+        raise _envelope_refused(error)
+    fence.touch(db, request, variant_id=variant_id)
+    return BuiltFromProposal(built=built)
 
 
 @router.get("/variants/{variant_id}/decision-slots", response_model=list[DecisionSlot])

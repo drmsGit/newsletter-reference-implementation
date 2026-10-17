@@ -206,6 +206,48 @@ def sending_brand_id(db, slot) -> int:
     return brand_id
 
 
+def takeable(db, *, brand_id: int, channel: str, language: str, needed=()) -> list:
+    """The conditions on `ContentRecordDB` for a record a machine may take for
+    `channel` in `language`: what a slot draws on (`candidate_query`) and what
+    the variant-from-a-topic task may suggest (ADR-141 addendum 2026-10-17),
+    kept in one place so the two cannot drift. `needed` are the fields its
+    latest published version must fill.
+    """
+    from sqlalchemy import exists, func, or_
+
+    from app.content.db_models import ContentChannelReadinessDB, ContentRecordDB, ContentVersionDB
+
+    latest = (
+        db.query(func.max(ContentVersionDB.version_number))
+        .filter(ContentVersionDB.content_record_id == ContentRecordDB.id)
+        .correlate(ContentRecordDB).scalar_subquery()
+    )
+    published_and_complete = exists().where(
+        ContentVersionDB.content_record_id == ContentRecordDB.id,
+        ContentVersionDB.version_number == latest,
+        # Filled = holds something besides whitespace, as the readiness
+        # warning and the send check read it; a JSON null or a missing key
+        # gives NULL here, which is not filled either.
+        *(ContentVersionDB.content[name].as_string().op("~")(r"\S") for name in needed),
+    )
+    return [
+        ContentRecordDB.status == "active",
+        # ADR-150 point 8: a decision slot resolves ONLY the sending
+        # brand's content. Safe by construction — widening it is the
+        # configurable filter point 10 defers, not this default. A slot
+        # whose campaign chain is broken never gets here: `sending_brand_id`
+        # raises rather than handing this filter None (task-18).
+        ContentRecordDB.brand_id == brand_id,
+        ContentRecordDB.machine_ready.is_(True),
+        exists().where(ContentChannelReadinessDB.content_id == ContentRecordDB.id,
+                       ContentChannelReadinessDB.channel == channel),
+        published_and_complete,
+        # ADR-200 point 2: in the variant's message language (its brand
+        # profile's, ADR-199 point 4), or with no language set.
+        or_(ContentRecordDB.language.is_(None), ContentRecordDB.language == language),
+    ]
+
+
 def candidate_query(db, slot, *, brand_id: int):
     """The rows a slot chooses between: `(record, category score, category id)`
     for the brand's active content, narrowed to the slot's `category_ids` when
@@ -231,12 +273,8 @@ def candidate_query(db, slot, *, brand_id: int):
     argument because each strategy also scopes its version lookup with it and
     the two must agree.
     """
-    from sqlalchemy import exists, func, or_
-
     from app.campaigns.db_models import ModuleInstanceDB, VariantDB
-    from app.content.db_models import (
-        ContentCategoryAssignmentDB, ContentChannelReadinessDB, ContentRecordDB, ContentVersionDB,
-    )
+    from app.content.db_models import ContentCategoryAssignmentDB, ContentRecordDB
     from app.content.service import fields_a_record_must_fill
     from app.modules.registry import get_manifest
 
@@ -251,20 +289,6 @@ def candidate_query(db, slot, *, brand_id: int):
         ModuleInstanceDB.decision_slot_id == slot.id)
     needed = sorted({name for t, hidden in bound if (m := get_manifest(channel, t))
                      for name in fields_a_record_must_fill(m, hidden)})
-    latest = (
-        db.query(func.max(ContentVersionDB.version_number))
-        .filter(ContentVersionDB.content_record_id == ContentRecordDB.id)
-        .correlate(ContentRecordDB).scalar_subquery()
-    )
-    published_and_complete = exists().where(
-        ContentVersionDB.content_record_id == ContentRecordDB.id,
-        ContentVersionDB.version_number == latest,
-        # Filled = holds something besides whitespace, as the readiness
-        # warning and the send check read it; a JSON null or a missing key
-        # gives NULL here, which is not filled either.
-        *(ContentVersionDB.content[name].as_string().op("~")(r"\S") for name in needed),
-    )
-
     query = (
         db.query(
             ContentRecordDB,
@@ -275,20 +299,7 @@ def candidate_query(db, slot, *, brand_id: int):
             ContentCategoryAssignmentDB,
             ContentRecordDB.id == ContentCategoryAssignmentDB.content_id,
         )
-        .filter(ContentRecordDB.status == "active")
-        # ADR-150 point 8: a decision slot resolves ONLY the sending
-        # brand's content. Safe by construction — widening it is the
-        # configurable filter point 10 defers, not this default. A slot
-        # whose campaign chain is broken never gets here: `sending_brand_id`
-        # raises rather than handing this filter None (task-18).
-        .filter(ContentRecordDB.brand_id == brand_id)
-        .filter(ContentRecordDB.machine_ready.is_(True))
-        .filter(exists().where(ContentChannelReadinessDB.content_id == ContentRecordDB.id,
-                               ContentChannelReadinessDB.channel == channel))
-        .filter(published_and_complete)
-        # ADR-200 point 2: in the variant's message language (its brand
-        # profile's, ADR-199 point 4), or with no language set.
-        .filter(or_(ContentRecordDB.language.is_(None), ContentRecordDB.language == language))
+        .filter(*takeable(db, brand_id=brand_id, channel=channel, language=language, needed=needed))
     )
     category_ids = (slot.candidate_filter or {}).get("category_ids", [])
     if category_ids:
