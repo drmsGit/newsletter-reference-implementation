@@ -4,7 +4,7 @@ title: The finished design applied to the React screens
 status: To Do
 assignee: []
 created_date: '2026-10-11 20:44'
-updated_date: '2026-10-12 20:14'
+updated_date: '2026-10-17 08:12'
 labels:
   - frontend
 dependencies: []
@@ -26,4 +26,14 @@ ordinal: 201100
 2026-10-12, Diede: the neutral author-led Omnichannel Orchestration Reference phase can use a conventional design system; do not invest heavily in bespoke branding. This narrows the meaning of finished design: readable standard typography/components and a coherent November demo flow, retaining comfortable/compact density, accessible focus/states and labelled system/human semantic cues. No prerequisite custom-a/rr logo work or new identity exploration. task-377 owns the neutral rename and current identity assets; this task still owns demo-screen styling. Existing design studies are reference material, not an adoption requirement.
 
 2026-10-12, from task-377: with the long working title, the shell header wraps the name to three lines at phone width and the header row overflows (the email address runs off screen). A layout matter for this task.
+
+2026-10-17, Diede (design session): the finished design is in docs/design/ and is ready to build from. Nothing of it is built in React: the first attempt of 2026-10-12 was rewound on purpose, and frontend/ has no design changes. Start at docs/design/HANDOFF.md (where everything is, what is decided, what the repo already holds that the design must not change, what the first attempt taught us, the open decisions, and section 11, the gaps against this task). Then look at the images, docs/design/renders/ (index: docs/design/renders/README.md), with the canvas page Three columns open beside the code: https://claude.ai/artifact/HEESqGiNZKeWaqT2d5DatL (private to Diede). A copy of every board and of the component stylesheet is in docs/design/canvas-v2/.
+
+What is drawn. The shell (three columns, collapsible navigation, the person's colour avatar), the foundation, the component library, approvals in full (renders 01 to 12), and every screen of this task's demo flow (renders 20 to 43): campaigns; the variant editor with its record picker and slot settings; the preview sheet; the send steps; content with its record page, categories and the image sheet; deliveries with a stranded send and one recipient's message as sent; decision slots; audiences; recipients; monitoring; the decision history; settings (general, brand profile, users, integrations); sign-in. The palette is Linen, Petrol and Pale Pink, the type is the system font, tokens are docs/design/tokens.css.
+
+What is not drawn: Settings Personalisation, Roles and Brands (same pattern as Users and Brand profiles); the category graph; the dialogs (New record, New audience, Suggest from a campaign, Paste people, New brand profile, the new-key dialog, keyboard shortcuts); the Upload new and Web address tabs of the image sheet; dark and increased contrast for the screens 20 to 43 (the tokens carry both, nothing was rendered); empty, loading, error and forbidden states beyond the shared ones; narrow and phone widths.
+
+Read these before building. (1) The boards are layout proposals drawn from what the React screens contain today; they never decide behaviour, and where a board and the code or an ADR disagree the code wins (HANDOFF section 10). The names, figures and dates in them are invented. (2) Eight layout choices need Diede's yes and are open decisions 13 to 20 in HANDOFF section 9: the editor with the navigation collapsed; Monitoring and the decision history as one column of table (a wide-table exception to the three-column rule); the results table split in two; the preview as a sheet; the send steps with the planned sends listed beside them; the audience arithmetic as a section; settings with a list under the sub-menu; the Records, Categories, Graph switch. (3) The system and human cue has only a draft (a neutral chip with a glyph and a word on each module row, render 21), not an approved design; open decision 11. (4) Density has no control drawn (open decision 1). (5) Several screens are still Jinja; HANDOFF section 8 says where the logic may have to change before the pattern fits, and a change of behaviour is a decision to record first, not a style change.
+
+Not done by the design session, left for this task: density, dark-mode switch, the phone layout (proposal: below 800 px the navigation stacks above the screen and starts collapsed), the icon set that replaces the placeholders, which browsers are supported.
 <!-- SECTION:NOTES:END -->
