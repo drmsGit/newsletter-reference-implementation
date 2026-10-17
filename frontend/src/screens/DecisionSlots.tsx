@@ -1,7 +1,8 @@
 import { GridList, GridListItem } from 'react-aria-components'
-import { Outlet, useLocation, useMatch, useNavigate } from 'react-router'
+import { useLocation, useMatch, useNavigate } from 'react-router'
 
 import { useDecisionSlots } from '../api/resources'
+import DetailOutlet from '../components/DetailOutlet'
 import Pager, { useOffset } from '../components/Pager'
 import ScreenState from '../components/ScreenState'
 
@@ -72,7 +73,7 @@ export function DecisionSlotsSplit() {
         <DecisionSlots />
       </section>
       <section className="col-detail">
-        <Outlet />
+        <DetailOutlet />
       </section>
     </div>
   )

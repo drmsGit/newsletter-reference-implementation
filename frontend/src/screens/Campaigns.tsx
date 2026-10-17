@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Button, Dialog, GridList, GridListItem, Heading, Modal, ModalOverlay } from 'react-aria-components'
-import { Outlet, useLocation, useMatch, useNavigate } from 'react-router'
+import { useLocation, useMatch, useNavigate } from 'react-router'
 
 import { useCampaigns, useCreateCampaign } from '../api/resources'
+import DetailOutlet from '../components/DetailOutlet'
 import NameAndChannel from '../components/NameAndChannel'
 import Pager, { useOffset } from '../components/Pager'
 import { SearchBox, useSearch } from '../components/RecipientSearch'
@@ -121,7 +122,7 @@ export function CampaignsSplit() {
         <Campaigns />
       </section>
       <section className="col-detail">
-        <Outlet />
+        <DetailOutlet />
       </section>
     </div>
   )

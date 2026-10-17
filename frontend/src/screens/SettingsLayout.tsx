@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
-import { NavLink, Outlet } from 'react-router'
+import { NavLink } from 'react-router'
 
+import DetailOutlet from '../components/DetailOutlet'
 import { AI_PROMPTS } from './AiPrompts'
 import { BRAND_PROFILES } from './BrandProfiles'
 import { BRANDS } from './Brands'
@@ -63,7 +64,7 @@ export function SettingsSplit({ list, label }: { list: ReactNode; label: string 
         {list}
       </section>
       <section className="col-detail">
-        <Outlet />
+        <DetailOutlet />
       </section>
     </div>
   )

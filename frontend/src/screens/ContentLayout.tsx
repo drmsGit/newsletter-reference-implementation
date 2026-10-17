@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
-import { NavLink, Outlet } from 'react-router'
+import { NavLink } from 'react-router'
 
 import BackTo from '../components/BackTo'
+import DetailOutlet from '../components/DetailOutlet'
 
 /**
  * Content and its parts as subpages under one menu entry (task-359), by the
@@ -50,7 +51,7 @@ export function ContentSplit({ list, label }: { list: ReactNode; label: string }
         {list}
       </section>
       <section className="col-detail">
-        <Outlet />
+        <DetailOutlet />
       </section>
     </div>
   )

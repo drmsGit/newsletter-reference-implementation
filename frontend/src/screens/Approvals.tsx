@@ -1,6 +1,6 @@
 import { AlertTriangle, History } from 'lucide-react'
 import { GridList, GridListItem } from 'react-aria-components'
-import { Link, Outlet, useLocation, useMatch, useNavigate, useSearchParams } from 'react-router'
+import { Link, useLocation, useMatch, useNavigate, useSearchParams } from 'react-router'
 
 import {
   useApprovalFilterOptions,
@@ -10,6 +10,7 @@ import {
 } from '../api/resources'
 import BackTo from '../components/BackTo'
 import Choice from '../components/Choice'
+import DetailOutlet from '../components/DetailOutlet'
 import Pager, { PAGE_SIZE, useOffset } from '../components/Pager'
 import DataTable, { type DataColumn } from '../components/DataTable'
 import ScreenState from '../components/ScreenState'
@@ -294,7 +295,7 @@ export function ApprovalsSplit() {
         <Approvals />
       </section>
       <section className="col-detail">
-        <Outlet />
+        <DetailOutlet />
       </section>
     </div>
   )

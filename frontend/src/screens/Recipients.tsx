@@ -1,7 +1,8 @@
 import { GridList, GridListItem } from 'react-aria-components'
-import { Outlet, useMatch, useNavigate, useSearchParams } from 'react-router'
+import { useMatch, useNavigate, useSearchParams } from 'react-router'
 
 import { useRecipients } from '../api/resources'
+import DetailOutlet from '../components/DetailOutlet'
 import Pager, { useOffset } from '../components/Pager'
 import { SearchBox, useSearch } from '../components/RecipientSearch'
 import ScreenState from '../components/ScreenState'
@@ -79,7 +80,7 @@ export function RecipientsSplit() {
         <Recipients />
       </section>
       <section className="col-detail">
-        <Outlet />
+        <DetailOutlet />
       </section>
     </div>
   )

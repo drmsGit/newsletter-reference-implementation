@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { GridList, GridListItem, Label, TextArea, TextField } from 'react-aria-components'
-import { Outlet, useMatch, useNavigate, useParams } from 'react-router'
+import { useMatch, useNavigate, useParams } from 'react-router'
 
 import {
   usePublishPrompt,
@@ -11,6 +11,7 @@ import {
 } from '../api/resources'
 import BackTo from '../components/BackTo'
 import Choice from '../components/Choice'
+import DetailOutlet from '../components/DetailOutlet'
 import DetailSection from '../components/DetailSection'
 import Fact from '../components/Fact'
 import ScreenState from '../components/ScreenState'
@@ -124,7 +125,7 @@ export function AiPromptsSplit() {
         <AiPrompts />
       </section>
       <section className="col-detail">
-        <Outlet />
+        <DetailOutlet />
       </section>
     </div>
   )
