@@ -1,9 +1,9 @@
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router'
 
 import DecisionSlotDetail from './DecisionSlotDetail'
-import DecisionSlots from './DecisionSlots'
+import DecisionSlots, { DecisionSlotsSplit, NoSlotOpen } from './DecisionSlots'
 import { jsonResponse, page, renderWithProviders, stubFetch } from '../test-utils'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -89,6 +89,34 @@ describe('the decision slot list', () => {
     expect(screen.getByText('recipient_top_score')).toBeInTheDocument()
     fireEvent.click(screen.getByText('Top pick'))
     expect(await screen.findByText('slot screen')).toBeInTheDocument()
+  })
+})
+
+describe('the slots beside the open one (task-372)', () => {
+  it('opens a slot beside the list, on the same page, and marks it as the one open', async () => {
+    const fetchMock = stubFetch({
+      'GET /campaigns/decision-slots': () => jsonResponse(page([LISTED])),
+      'GET /campaigns/decision-slots/5/stats': () => jsonResponse(STATS),
+      'GET /campaigns/decision-slots/5/candidates': () => jsonResponse(CANDIDATES),
+    })
+    renderWithProviders(
+      <Routes>
+        <Route element={<DecisionSlotsSplit />}>
+          <Route path="/decision-slots" element={<NoSlotOpen />} />
+          <Route path="/decision-slots/:id" element={<DecisionSlotDetail />} />
+        </Route>
+      </Routes>,
+      { route: '/decision-slots?offset=50' },
+    )
+    expect(screen.getByText('Select a slot to see what it picks.')).toBeInTheDocument()
+    fireEvent.click(await screen.findByText('Top pick'))
+    expect(await screen.findByRole('heading', { name: 'Top pick', level: 2 })).toBeInTheDocument()
+    const row = within(screen.getByRole('grid', { name: 'Decision slots' })).getByRole('row', { name: /Top pick/ })
+    expect(row).toHaveAttribute('aria-selected', 'true')
+    const reads = fetchMock.mock.calls
+      .map(([r]) => new URL((r as Request).url))
+      .filter((u) => u.pathname === '/campaigns/decision-slots')
+    expect(reads.every((u) => u.searchParams.get('offset') === '50')).toBe(true)
   })
 })
 

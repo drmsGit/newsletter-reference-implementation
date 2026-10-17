@@ -10,7 +10,7 @@ import Content from './screens/Content'
 import RecipientDetail from './screens/RecipientDetail'
 import Recipients from './screens/Recipients'
 import DecisionSlotDetail from './screens/DecisionSlotDetail'
-import DecisionSlots from './screens/DecisionSlots'
+import { DecisionSlotsSplit, NoSlotOpen } from './screens/DecisionSlots'
 import ContentDetail from './screens/ContentDetail'
 import Monitoring from './screens/Monitoring'
 import VariantEditor from './screens/VariantEditor'
@@ -114,8 +114,10 @@ export default function App() {
         <Route path="/audiences/:id" element={<AudienceDetail />} />
         <Route path="/recipients" element={<Recipients />} />
         <Route path="/recipients/:id" element={<RecipientDetail />} />
-        <Route path="/decision-slots" element={<DecisionSlots />} />
-        <Route path="/decision-slots/:id" element={<DecisionSlotDetail />} />
+        <Route element={<DecisionSlotsSplit />}>
+          <Route path="/decision-slots" element={<NoSlotOpen />} />
+          <Route path="/decision-slots/:id" element={<DecisionSlotDetail />} />
+        </Route>
         <Route path="/deliveries" element={<Deliveries />} />
         <Route path="/deliveries/:id" element={<DeliveryDetail />} />
         <Route
