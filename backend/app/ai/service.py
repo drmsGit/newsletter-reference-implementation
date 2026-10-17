@@ -14,9 +14,9 @@ The order matters and is the ADR, not a preference:
 """
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from app.ai.adapters.base import TokenCountUnavailable
@@ -127,7 +127,9 @@ def tokens_used(db: Session) -> int:
     """
     rows = _in_period(db, db.query(
         AIRunDB.provider, AIRunDB.input_tokens, AIRunDB.output_tokens
-    )).all()
+    # A running run counts with the worst case it holds (ADR-144 addendum
+    # 2026-10-17), unless it is stale: then it holds nothing.
+    ).filter(~((AIRunDB.status == RUNNING) & (AIRunDB.created_at < _stale_cutoff())))).all()
     return sum(
         (r.input_tokens or 0) + (r.output_tokens or 0)
         for r in rows
@@ -147,7 +149,8 @@ def spend_to_date(db: Session) -> dict:
     rows = _in_period(db, db.query(
         AIRunDB.provider, AIRunDB.model,
         AIRunDB.input_tokens, AIRunDB.output_tokens,
-    )).all()
+    # Spent means finished: a running run's tokens are its worst case, not a cost.
+    ).filter(AIRunDB.status != RUNNING)).all()
 
     total, unpriced = 0.0, 0
     for row in rows:
@@ -163,6 +166,45 @@ def spend_to_date(db: Session) -> dict:
         total += cost
 
     return {"usd": total, "unpriced_runs": unpriced}
+
+
+#: A run recorded before its call (ADR-144 addendum 2026-10-17): its input
+#: and output tokens hold the worst case until it finishes.
+RUNNING = "running"
+
+#: A run still running after this is taken as dead: a real call takes seconds.
+STALE_AFTER = timedelta(minutes=10)
+
+#: The advisory lock the budget check and the claim share, briefly — never
+#: across the model call. Any fixed number; this one names the ADR.
+_RUN_LOCK = 144_387
+
+
+class RunInFlight(Exception):
+    """A run of this task for this very thing is still running: refused at
+    once, nothing spent, nothing recorded (ADR-144 addendum 2026-10-17)."""
+
+
+def _stale_cutoff() -> datetime:
+    return datetime.now(timezone.utc) - STALE_AFTER
+
+
+def _expire_stale(db: Session) -> None:
+    db.query(AIRunDB).filter(AIRunDB.status == RUNNING, AIRunDB.created_at < _stale_cutoff()).update({
+        "status": "error", "input_tokens": 0, "output_tokens": 0,
+        "message": ("It never finished: still running after 10 minutes, so it was given up. "
+                    "Nothing is known to have been spent."),
+    }, synchronize_session=False)
+
+
+def _refuse_in_flight(db: Session, task_key: str, target_type: str | None, target_id: int | None) -> None:
+    if target_id is None:
+        return
+    if db.query(AIRunDB.id).filter(
+            AIRunDB.task_key == task_key, AIRunDB.target_type == target_type, AIRunDB.target_id == target_id,
+            AIRunDB.status == RUNNING, AIRunDB.created_at >= _stale_cutoff()).first():
+        db.commit()  # ends the transaction, and with it the lock when one is held
+        raise RunInFlight("A run of this is already being written; it appears here when done.")
 
 
 def _record(db: Session, **kwargs) -> AIRunDB:
@@ -217,6 +259,10 @@ def run_task(
         )
         return TaskRun(ok=False, run_id=run.id, message=run.message)
 
+    # A duplicate is refused before the provider is asked anything, counting
+    # tokens included; the check under the lock below is the one that holds.
+    _refuse_in_flight(db, task_key, target_type, target_id)
+
     provider = get_ai_provider(provider_name, model=model)
 
     # --- the pre-call gate (ADR-144 §5) ---------------------------------
@@ -238,6 +284,12 @@ def run_task(
         return TaskRun(ok=False, run_id=run.id, message=run.message)
 
     worst_case = input_tokens + max_output_tokens
+    # The check and the claim under one lock, so the cap holds under any
+    # concurrency and one run per task and thing (ADR-144 addendum
+    # 2026-10-17). Released by the commit that records either.
+    db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": _RUN_LOCK})
+    _expire_stale(db)
+    _refuse_in_flight(db, task_key, target_type, target_id)
     used = tokens_used(db)
     # Clamped: once the cap is already exceeded the shortfall is not meaningful,
     # and "-677 remaining" reads as a bug rather than a limit.
@@ -255,24 +307,35 @@ def run_task(
         )
         return TaskRun(ok=False, run_id=run.id, message=run.message)
 
-    result = provider.generate(rendered_prompt, max_output_tokens, system)
+    # Recorded as running, holding the worst case, before the call.
+    run = _record(
+        db, actor_type=actor_type, actor_id=actor_id, task_key=task_key, prompt_id=prompt_row.id,
+        provider=provider_name, status=RUNNING, target_type=target_type, target_id=target_id,
+        input_tokens=input_tokens, output_tokens=max_output_tokens,
+    )
+
+    def finish(**fields) -> None:
+        # Stamped now: a run counts in the period it is recorded in (addendum 2026-10-11).
+        db.query(AIRunDB).filter(AIRunDB.id == run.id).update(
+            {**fields, "created_at": func.clock_timestamp()}, synchronize_session=False)
+        db.commit()
+        db.refresh(run)
+
+    try:
+        result = provider.generate(rendered_prompt, max_output_tokens, system)
+    except Exception as error:
+        finish(status="error", input_tokens=0, output_tokens=0, message=f"The call failed: {error}")
+        raise
 
     if not result.success:
-        run = _record(
-            db, actor_type=actor_type, actor_id=actor_id, task_key=task_key, prompt_id=prompt_row.id, provider=provider_name,
-            model=result.model, status="error", target_type=target_type,
-            target_id=target_id, message=result.message,
-        )
+        finish(status="error", model=result.model, input_tokens=0, output_tokens=0, message=result.message)
         return TaskRun(ok=False, run_id=run.id, message=result.message)
 
     usage = result.usage
-    run = _record(
-        db, actor_type=actor_type, actor_id=actor_id,
-        task_key=task_key, prompt_id=prompt_row.id, provider=provider_name,
-        model=result.model, status="ok",
+    finish(
+        status="ok", model=result.model,
         input_tokens=usage.input_tokens if usage else 0,
         output_tokens=usage.output_tokens if usage else 0,
-        target_type=target_type, target_id=target_id,
         output_text=result.text,
         # A truncated result is still returned to the caller (ADR-144: showing a
         # partial is not the same as committing it), but the audit says so.
@@ -311,8 +374,9 @@ def runs_for_target(
         .filter(
             # This task's runs only: other tasks point at the same thing (a
             # topic proposal at a variant, task-370), and their output is not
-            # this task's to read.
+            # this task's to read. A running run is no result yet.
             AIRunDB.task_key == task_key,
+            AIRunDB.status != RUNNING,
             AIRunDB.target_type == target_type,
             AIRunDB.target_id == target_id,
         )

@@ -156,6 +156,7 @@ from app.approvals.db_models import PendingActionDB
 from app.approvals.service import pending_count as pending_approval_count
 from app.settings.db_models import AppConfigDB
 
+from app.ai.service import RunInFlight
 from app.auth.db_models import (
     BrandDB, LoginCodeDB, RoleAssignmentDB, RoleDB, RolePermissionDB, SessionDB, UserDB,
 )
@@ -528,6 +529,14 @@ def _api_csrf_failed(request: Request, exc: ApiCsrfFailed):
         )},
         status_code=403,
     )
+
+
+@app.exception_handler(RunInFlight)
+def _run_in_flight(request: Request, exc: RunInFlight):
+    """The same AI task is already running for this thing (ADR-144 addendum
+    2026-10-17): 409 with the reason, nothing spent. The subject suggestion
+    turns it into its own refused outcome, Jinja route included."""
+    return JSONResponse({"detail": str(exc)}, status_code=409)
 
 
 @app.exception_handler(ApprovalRequired)

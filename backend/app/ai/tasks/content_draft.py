@@ -217,8 +217,11 @@ def drafts_for_record(db: Session, record, *, brand_id: int) -> list[dict]:
     labels = {f["name"]: f for f in catalogue_fields()}
     stored = record.content or {}
     assigned = {a["category_id"]: a for a in content_assignments(db, record.id, brand_id=brand_id) or []}
+    from app.ai.service import RUNNING
+
+    # A running run is no result yet (ADR-144 addendum 2026-10-17).
     runs = (db.query(AIRunDB).filter(AIRunDB.task_key == TASK_KEY, AIRunDB.target_type == "content",
-                                     AIRunDB.target_id == record.id)
+                                     AIRunDB.target_id == record.id, AIRunDB.status != RUNNING)
             .order_by(AIRunDB.created_at.desc(), AIRunDB.id.desc()).limit(25).all())
     versions = {p.id: p.version for p in db.query(AIPromptDB).filter(
         AIPromptDB.id.in_({r.prompt_id for r in runs if r.prompt_id}))}

@@ -155,7 +155,9 @@ def retranslations(db: Session, record: ContentRecordDB) -> list[dict]:
     labels = content_translate.field_labels()
     runs = (db.query(AIRunDB).filter(AIRunDB.task_key == content_translate.TASK_KEY,
                                      AIRunDB.target_type == "content", AIRunDB.target_id == record.id,
-                                     AIRunDB.input_snapshot.isnot(None))
+                                     AIRunDB.input_snapshot.isnot(None),
+                                     # A running run is no result yet (ADR-144 addendum 2026-10-17).
+                                     AIRunDB.status != "running")
             .order_by(AIRunDB.created_at.desc(), AIRunDB.id.desc()).limit(25).all())
     versions = {p.id: p.version for p in db.query(AIPromptDB).filter(
         AIPromptDB.id.in_({r.prompt_id for r in runs if r.prompt_id}))}

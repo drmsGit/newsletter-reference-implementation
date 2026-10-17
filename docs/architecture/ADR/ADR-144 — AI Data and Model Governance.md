@@ -7,7 +7,7 @@ topic:
   - governance
   - privacy
 created: 2026-07-31
-modified: 2026-10-16
+modified: 2026-10-17
 source:
   - "AI Layer design interview (interview-prep, 2026-07-27 – 31), Cluster 5"
 depends_on:
@@ -317,6 +317,94 @@ point 11).
 
 **Nothing in this record's Decision changes.** Point 4 stands as written. Its
 `{{first_name}}` is read as an example of a token, and today's token is an entry name.
+
+## Addendum 2026-10-17 — The cap holds under concurrency, and one run per task and target
+
+Prompted by the final-design pass of task-387 ("The server refuses a second paid AI run
+for the same thing while one is still running"). The user decided it on 2026-10-17, one
+question at a time. Point 5 and the addenda above stand as written. This addendum makes
+point 5's pre-call gate hold when requests arrive at the same time, and adds one rule:
+a task runs at most once at a time for the same target.
+
+**Point 5's gate did not hold under concurrency.** Point 5 has the platform *"refuse to
+start any task whose worst-case wouldn't fit under the remaining cap"*. `run_task` in
+`backend/app/ai/service.py` read the tokens used (`tokens_used`, `:119-135`; the gate at
+`:222-256`), then called the model (`:258`), and recorded the run only after the model
+answered (`:269`). Two things followed. Both were checked in the code on 2026-10-17.
+
+- Two requests for the same task on the same thing both ran, and both were paid. Two
+  tabs open on one variant, a retried request or a script is enough to cause it.
+- Two calls on different things could both pass the cap at its edge. Each saw the same
+  remaining budget, because neither had recorded its tokens yet.
+
+task-100 made the AI button in the React client send one request at a time
+(`frontend/src/components/AIButton.tsx`). That protects one button in one tab. It does
+nothing for a second tab, a retry or a script. Every Mode-A action of
+[[ADR-141 — In-App Assistive AI Actions]] goes through `run_task`, so the rule below is
+made there once and not per task.
+
+**The decision.**
+
+**1. A run is recorded as running before the model is called.** The running run holds
+its worst case against the budget: the counted input plus the task's declared output
+ceiling, the figure point 5 already computes. When the run finishes, its real tokens
+replace the worst case, and it is stamped then. So it still counts in the period it is
+recorded in, as point 2 of the 2026-10-11 addendum has it. The budget check and the
+recording of the running run happen together under one lock. The lock is held briefly
+and never across the model call. So the cap holds however many requests arrive at once.
+
+**2. A second request for the same task and target is refused while the first runs.**
+While a run of a task is running for a thing, such as a variant or a record, a second
+request for the same task and the same thing is refused at once. The refusal gives its
+reason in words: the result is already being written and appears here when done.
+Nothing is spent, and no run is recorded for the refusal. The first run's result appears
+for everyone when it lands.
+
+**3. A run still running after 10 minutes is treated as failed.** It is recorded as an
+error that says the run never finished and that nothing is known to have been spent.
+From then on it no longer blocks its task and target, and it no longer holds budget. A
+real call takes seconds. Because the run was recorded before the call, a run that never
+finishes still leaves a row in the audit of [[ADR-140 — AI Capability Layer]] point 5.
+
+**4. A running run is not a result.** The panels that read a task's runs back skip it
+(`runs_for_target`). The money spent, the USD figure reported beside the token ledger
+(`spend_to_date`), counts finished runs only.
+
+**What this changes in the 2026-10-11 addendum.** Its point 2 says a run is recorded
+when the model answers, and that nothing new is stored. A run's row now exists from
+before the call, in a running state, and that state is new. Its time is still set when
+it finishes, so the rule that a run counts in the period it is recorded in holds
+unchanged.
+
+**A run in flight across a period reset.** A running run holds its worst case in the
+period it started in. Once it finishes, it is stamped then and counts in the period it
+finished in. So across a period reset, the new period does not see a run still in
+flight from the old one until it finishes.
+
+**Relation to the open contention question.** The 2026-08-02 AI-layer review, logged in
+[[playbook-strategy]], promoted the cap's concurrency race to a general contention-model
+question. That question is task-124, which still needs an ADR. This addendum settles one
+narrow case of it: concurrent requests for paid AI runs. task-124 stays open and is not
+decided here.
+
+**Options not taken.** Making the second request wait and receive the first run's
+result was not adopted. The user rejected it because it holds a request open for someone
+else's call.
+
+**What it costs.**
+
+- **Positive:** a second tab or a retried request no longer pays for a duplicate run.
+  The cap is a real ceiling, also when requests arrive at the same time.
+- **Negative:** a server that dies mid-call blocks that task and target, and holds that
+  budget, for up to 10 minutes. Two different requests for the same task on the same
+  thing are serialised. For example, two translations of one original into different
+  languages cannot run at once: the second is refused until the first finishes. And a
+  run that dies mid-call is recorded as nothing known spent; if the provider billed it
+  anyway, the ledger counts too little until a person reconciles it with the provider's
+  bill.
+
+**Nothing in this record's Decision changes.** Point 5 stands as written. This addendum
+makes its pre-call gate hold under concurrency. It does not change what the gate checks.
 
 ## Related ADRs
 

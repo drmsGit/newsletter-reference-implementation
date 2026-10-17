@@ -56,7 +56,9 @@ class AIRunDB(Base):
     prompt_id = Column(Integer, ForeignKey("ai_prompts.id"), nullable=True)
     provider = Column(String(50), nullable=False)
     model = Column(String(100), nullable=True)
-    # "ok" | "blocked" | "error" — blocked means the pre-call gate refused it.
+    # "ok" | "blocked" | "error" | "running" — blocked means the pre-call gate
+    # refused it; running is recorded before the call, holding its worst case
+    # in the token columns until it finishes (ADR-144 addendum 2026-10-17).
     status = Column(String(20), nullable=False)
     input_tokens = Column(Integer, nullable=False, default=0)
     output_tokens = Column(Integer, nullable=False, default=0)

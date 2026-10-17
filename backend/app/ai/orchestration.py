@@ -82,9 +82,15 @@ def suggest_subject_for_variant(
             ),
         )
 
+    from app.ai.service import RunInFlight
+
     try:
         _options, run = subject_task.suggest(db, variant_id, actor_type=requested_by_type,
                                              actor_id=requested_by_id)
+    except RunInFlight as busy:
+        # Another tab or request is already asking (ADR-144 addendum
+        # 2026-10-17): refused at once, nothing spent.
+        return SuggestionResult(outcome="refused", message=str(busy))
     except subject_task.NothingToWorkFrom as refusal:
         # Refused before the call, so no tokens were spent and no run row was
         # written. The person is told what to fix rather than being handed the
