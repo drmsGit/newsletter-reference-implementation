@@ -26,6 +26,7 @@ export default function Choice({
   onChange,
   placeholder = 'Choose…',
   pulldown = false,
+  labelHidden = false,
 }: {
   label: string
   options: { id: string; name: string; indent?: number }[]
@@ -35,6 +36,8 @@ export default function Choice({
   /** A list's filter (task-372): the label sits inside the control ("Action All"),
    * still the control's accessible name. */
   pulldown?: boolean
+  /** The label is said, not shown: a card's title already names the choice (task-372). */
+  labelHidden?: boolean
 }) {
   return (
     <Select
@@ -43,7 +46,7 @@ export default function Choice({
       onSelectionChange={(key) => onChange(String(key))}
       placeholder={placeholder}
     >
-      <Label className={pulldown ? 'sr-only' : undefined}>{label}</Label>
+      <Label className={pulldown || labelHidden ? 'sr-only' : undefined}>{label}</Label>
       <Button>
         {pulldown && (
           <span className="pd-label" aria-hidden="true">

@@ -145,7 +145,8 @@ export function AutosaveField({
   )
   if (!personalise || field.type === 'url' || conflict) return text
   return (
-    <>
+    // One row: the field, with Personalise… at its top right (render 21).
+    <div className="field-personalise">
       {text}
       {/* An entry goes in at the caret and is saved at once, like a picked
           image: the press took the focus, so no blur will save it. */}
@@ -158,7 +159,7 @@ export function AutosaveField({
           onSave(next)
         }}
       />
-    </>
+    </div>
   )
 }
 
@@ -169,7 +170,7 @@ function Personalise({ onInsert }: { onInsert: (token: string) => void }) {
   if (entries.length === 0) return null
   return (
     <MenuTrigger>
-      <Button className="personalise">Personalise…</Button>
+      <Button className="personalise btn-plain btn-sm">Personalise…</Button>
       <Popover>
         <Menu aria-label="Insert a personalisation" onAction={(name) => onInsert(`{{${String(name)}}}`)}>
           {entries.map((entry) => (

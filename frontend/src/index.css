@@ -643,49 +643,86 @@ table tbody tr:last-child td { border-bottom: 0; }
 }
 
 /*
- * The variant editor (task-255): the module stack beside the selected
- * module's fields (Variant Editor interview 2.1), the envelope above both.
+ * The variant editor (task-255; v2, task-372 render 21): the module stack is
+ * column 2, the envelope, profile and the selected module's fields column 3.
  */
-.editor {
-  display: grid;
-  grid-template-columns: minmax(24rem, 1fr) 2fr;
-  gap: calc(var(--brand-space) * 3);
-  align-items: start;
-}
-
-.envelope,
-.editor__fields {
-  display: grid;
-  gap: calc(var(--brand-space) * 2);
-  max-width: 40rem;
-}
-
-.envelope {
-  margin-bottom: calc(var(--brand-space) * 3);
-}
-
-.stack {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 calc(var(--brand-space) * 2);
-  display: grid;
-  gap: var(--brand-space);
-}
-
+.stack { list-style: none; margin: 0; }
 .stack__item {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: start;
+  gap: 2px;
+  padding: 4px 4px 4px 0;
+  border-radius: var(--brand-radius-panel);
+}
+.stack__item + .stack__item::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 1px;
+  background: var(--brand-line);
+}
+.stack__item:hover { background: var(--brand-surface-2); }
+.stack__item[aria-current] { background: var(--brand-selected); }
+.stack__item:hover::before, .stack__item:hover + .stack__item::before,
+.stack__item[aria-current]::before, .stack__item[aria-current] + .stack__item::before { display: none; }
+.shell button.stack__select {
+  height: auto;
+  padding: 6px 12px;
   display: flex;
-  gap: calc(var(--brand-space) / 2);
-  align-items: center;
-}
-
-.stack__item[aria-current] .stack__select {
-  border-color: var(--brand-accent);
-}
-
-.stack__select {
-  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 4px;
   text-align: left;
+  white-space: normal;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  min-width: 0;
 }
+.stack__source { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; font-weight: 400; min-width: 0; }
+.stack__item > button:not(.stack__select) { margin-top: 4px; }
+.stack__confirm { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 6px; }
+.chip-source { font-weight: 500; }
+
+.list-foot--add { display: block; padding: 12px; }
+.list-foot--add .add-module { flex-wrap: nowrap; }
+.list-foot--add .add-module .react-aria-Select { flex: 1; min-width: 0; }
+.list-foot--add .add-module > button { align-self: flex-end; }
+.list-foot--add > .muted { margin: 0; }
+
+.back-link { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; text-decoration: none; margin-bottom: 4px; }
+.back-link:hover { text-decoration: underline; }
+
+/* The details head with something at its right (the preview's line and button). */
+.detail-head--bar { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.detail-head--bar .preview-bar { display: flex; align-items: center; gap: 10px; margin: 0; padding: 0; border: 0; background: transparent; }
+
+/* A card of rows, a line between each (ui.css .group): fields, notices, actions. */
+.card-rows > * { margin: 0; padding: 12px 16px; position: relative; }
+.card-rows > * + *::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 0;
+  height: 1px;
+  background: var(--brand-line);
+}
+.card-rows .react-aria-TextField, .card-rows .react-aria-Select { margin-bottom: 0; }
+.card-rows > .field-personalise { padding-right: 16px; }
+.field-personalise > .react-aria-TextField { margin: 0; }
+.field-personalise > .personalise { position: absolute; top: 8px; right: 16px; }
+.card-rows > .module-own-fields, .card-rows > .slot-settings, .card-rows > .categories { display: grid; gap: 12px; }
+.bound-to { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.slot-instead { display: flex; flex-direction: column; gap: 8px; }
+.slot-instead > p { margin: 0; }
+.card-rows .bind__filters > .react-aria-TextField { flex: 1 1 100%; }
+.card-rows .bind__filters { align-items: center; }
 
 .add-module,
 .create-form {

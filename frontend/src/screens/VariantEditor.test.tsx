@@ -118,12 +118,25 @@ async function edit(label: string, value: string) {
 }
 
 describe('the variant editor', () => {
+  it('marks a module a decision slot fills as the slot, by its name (task-372, decision 11)', async () => {
+    const { state, handlers } = server()
+    // The hero is filled per recipient: the system picks, not a person.
+    Object.assign(state.modules[1], {
+      content_record_id: null, content_record_title: null, decision_slot_id: 5, decision_slot_name: 'Feature pick',
+    })
+    open(handlers)
+    const stack = await screen.findByRole('list')
+    expect(within(stack).getByRole('button', { name: 'Hero · Slot “Feature pick”' })).toBeInTheDocument()
+  })
+
   it('shows the envelope, the module stack, and the first module\'s fields', async () => {
     open(server().handlers)
     expect(await screen.findByLabelText(/^Subject/)).toHaveValue('Spring')
     const stack = screen.getByRole('list')
     expect(within(stack).getByRole('button', { name: /^Call to action ·/ })).toBeInTheDocument()
-    expect(within(stack).getByRole("button", { name: /Hero · “Lisbon”/ })).toBeInTheDocument()
+    // The system and human cue (task-372, decision 11): how each module's content is chosen.
+    expect(within(stack).getByRole('button', { name: 'Hero · Record “Lisbon”' })).toBeInTheDocument()
+    expect(within(stack).getByRole('button', { name: 'Call to action · Typed in' })).toBeInTheDocument()
     expect(screen.getByLabelText(/^Button label/)).toHaveValue('Go')
   })
 

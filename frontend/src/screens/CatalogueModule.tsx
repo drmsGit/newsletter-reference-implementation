@@ -129,9 +129,10 @@ function CatalogueFields({
     <ScreenState query={record}>
       {record.data && (
         <>
-          <p>
-            Fields from{' '}
-            <Link to={`/content/${recordId}`}>“{record.data.title}”</Link>.{' '}
+          <p className="bound-to">
+            <span>
+              Fields from <Link to={`/content/${recordId}`}>“{record.data.title}”</Link>.
+            </span>{' '}
             <Button onPress={() => setRebinding(!rebinding)}>
               {rebinding ? 'Keep this record' : 'Use another record'}
             </Button>
@@ -596,12 +597,14 @@ function SlotBound({
       <ModuleOwnFields campaignId={campaignId} module={module} manifest={manifest} />
       <HiddenFieldsGroup campaignId={campaignId} module={module} manifest={manifest} reload={reload} />
       <SlotSettings campaignId={campaignId} slotId={slotId} channel={channel} />
-      <p className="muted">
-        A slot is never overridden: one pinned value would replace every personal pick.
-      </p>
-      <Button onPress={() => setRebinding(!rebinding)}>
-        {rebinding ? 'Keep the slot' : 'Use one content record instead'}
-      </Button>
+      <div className="slot-instead">
+        <p className="muted">
+          A slot is never overridden: one pinned value would replace every personal pick.
+        </p>
+        <Button onPress={() => setRebinding(!rebinding)}>
+          {rebinding ? 'Keep the slot' : 'Use one content record instead'}
+        </Button>
+      </div>
       {rebinding && (
         <BindRecord
           campaignId={campaignId}
