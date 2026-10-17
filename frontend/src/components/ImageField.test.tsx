@@ -68,7 +68,7 @@ describe('an image field (task-112; ADR-197)', () => {
     expect(screen.getByRole('img', { name: 'A beach at noon' })).toHaveAttribute('src', 'http://localhost:8000/media/token7')
     expect(screen.getByRole('button', { name: 'Change image…' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Remove' })).toBeInTheDocument()
-    expect(screen.queryByLabelText(/Replace the file/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Replace the file/ })).not.toBeInTheDocument()
   })
 
   it('opens as a sheet, its title and Close on the bar (task-392 item 14; render 43)', async () => {
@@ -107,6 +107,9 @@ describe('an image field (task-112; ADR-197)', () => {
     const dialog = await openPicker()
     fireEvent.click(await dialog.findByRole('button', { name: /Lighthouse/ }))
     fireEvent.click(dialog.getByText('More: alt text, replace, hide'))
+    // Replacing opens the chooser from the app's own button, not the browser's control (task-392 item 20).
+    expect(dialog.getByRole('button', { name: /Replace the file/ })).toBeInTheDocument()
+    expect(document.querySelector('.image-library__more input[type="file"]')).not.toBeVisible()
     fireEvent.change(dialog.getByLabelText('Alt text'), { target: { value: 'Lighthouse at dusk' } })
     fireEvent.click(dialog.getByRole('button', { name: 'Save alt text' }))
     await waitFor(() => expect(writes).toHaveLength(1))

@@ -37,7 +37,14 @@ describe('uploading from an image field (task-112)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Choose image…' }))
     fireEvent.click(await screen.findByRole('tab', { name: 'Upload new' }))
     const file = new File([new Uint8Array([137, 80, 78, 71])], 'dunes.png', { type: 'image/png' })
-    fireEvent.change(await screen.findByLabelText('Image file to upload'), { target: { files: [file] } })
+    // The app's own button opens the chooser; the browser's control is never shown (task-392 item 20).
+    await screen.findByRole('button', { name: 'Choose a file…' })
+    expect(screen.getByText('No file chosen')).toBeInTheDocument()
+    const native = document.querySelector('.image-upload input[type="file"]') as HTMLInputElement
+    expect(native).not.toBeVisible()
+    expect(native).toHaveAttribute('accept', 'image/jpeg,image/png,image/gif,image/webp')
+    fireEvent.change(native, { target: { files: [file] } })
+    expect(screen.getByText('dunes.png')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Upload and use' })).toBeDisabled()
     fireEvent.change(screen.getByLabelText(/What it shows/), { target: { value: ' Dunes ' } })
     fireEvent.change(screen.getByLabelText('Alt text'), { target: { value: 'Dunes at dusk' } })

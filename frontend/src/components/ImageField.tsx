@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   Button,
   Dialog,
+  FileTrigger,
   Heading,
   Input,
   Label,
@@ -333,17 +334,17 @@ function Detail({
           <Button onPress={() => describe.mutate({ id: asset.id, alt_text: alt })} isDisabled={alt === asset.alt_text}>
             Save alt text
           </Button>
-          <p>
-            <input
-              type="file"
-              aria-label="Replace the file (everywhere it is used, sent emails too)"
-              accept="image/jpeg,image/png,image/gif,image/webp"
-              onChange={(event) => {
-                const file = event.target.files?.[0]
+          <p className="file-choice">
+            <FileTrigger
+              acceptedFileTypes={IMAGE_TYPES}
+              onSelect={(files) => {
+                const file = files?.[0]
                 if (file) replace.mutate(file)
               }}
-            />{' '}
-            <span className="muted">Replace the file: everywhere it is used, sent emails too.</span>
+            >
+              <Button isDisabled={replace.isPending}>{replace.isPending ? 'Replacing…' : 'Replace the file…'}</Button>
+            </FileTrigger>
+            <span className="muted">Everywhere it is used, sent emails too.</span>
           </p>
           <Button onPress={() => hide.mutate(asset.id, { onSuccess: onHidden })}>Hide from the library</Button>
           {(describe.error ?? replace.error ?? hide.error) != null && (
@@ -354,6 +355,9 @@ function Detail({
     </div>
   )
 }
+
+/** The image files the library takes. */
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 
 /** A new image: the file, what it shows, and its alt text. */
 function Upload({ onUploaded }: { onUploaded: (asset: Asset) => void }) {
@@ -369,15 +373,15 @@ function Upload({ onUploaded }: { onUploaded: (asset: Asset) => void }) {
         if (file) upload.mutate({ file, name: name.trim(), alt_text: alt.trim() }, { onSuccess: onUploaded })
       }}
     >
-      <p>
-        <input
-          type="file"
-          aria-label="Image file to upload"
-          accept="image/jpeg,image/png,image/gif,image/webp"
-          onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-        />{' '}
-        <span className="muted">JPEG, PNG, GIF or WebP, up to 5 MB.</span>
+      {/* The app's own button opens the browser's chooser, and the chosen
+          file is named beside it (task-392 item 20): no native control. */}
+      <p className="file-choice">
+        <FileTrigger acceptedFileTypes={IMAGE_TYPES} onSelect={(files) => setFile(files?.[0] ?? null)}>
+          <Button>Choose a file…</Button>
+        </FileTrigger>
+        {file ? <span>{file.name}</span> : <span className="muted">No file chosen</span>}
       </p>
+      <p className="muted">JPEG, PNG, GIF or WebP, up to 5 MB.</p>
       <TextField value={name} onChange={setName}>
         <Label>What it shows</Label>
         <Input />
