@@ -167,10 +167,13 @@ def _button_style(body: str) -> str:
     return body[tag_start:body.index(">", start)]
 
 
-def _style_of(body: str, css_class: str) -> str:
-    start = body.index(f'class="{css_class}"')
-    tag_start = body.rindex("<", 0, start)
-    return body[tag_start:body.index(">", start)]
+def _editorial_text_style(body: str) -> str:
+    """The style of the editorial's text: the div an MJML text block wraps it
+    in, inside the cell marked module-editorial (task: editorial as MJML,
+    2026-10-17). It carries the shared text attributes the profile sets."""
+    start = body.index('class="module-editorial"')
+    div = body.index("<div", start)
+    return body[div:body.index(">", div)]
 
 
 def test_two_profiles_give_two_looks_from_one_variant(db, world):
@@ -184,8 +187,8 @@ def test_two_profiles_give_two_looks_from_one_variant(db, world):
     themed = render_frame(db, build_frame(db, world["variant"].id))[0].body
     assert "#1a1a1a" in _button_style(plain), "an empty field keeps today's look"
     assert "#ff0000" in _button_style(themed)
-    assert "16px" in _style_of(plain, "module-body") and "#444444" in _style_of(plain, "module-body")
-    assert "18px" in _style_of(themed, "module-body") and "#00aa00" in _style_of(themed, "module-body")
+    assert "16px" in _editorial_text_style(plain) and "#444444" in _editorial_text_style(plain)
+    assert "18px" in _editorial_text_style(themed) and "#00aa00" in _editorial_text_style(themed)
     assert "var(" not in plain and "var(" not in themed
 
 

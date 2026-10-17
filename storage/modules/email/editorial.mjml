@@ -1,0 +1,13 @@
+<mjml>
+  <mj-head>
+    <mj-include path="./_attributes.mjml" />
+  </mj-head>
+  <mj-body width="600px">
+    <!-- Editorial (ADR-179): body copy written for this email, set as the text blocks set theirs (the shared mj-text attributes). -->
+    <mj-section>
+      <mj-column>
+        <mj-text css-class="module-editorial">{{ text }}</mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>
