@@ -150,7 +150,8 @@ def read_all(content_dir: Path) -> Read:
     """Every batch-*.csv, in name order. The English rows go last, so their
     originals exist when they are linked."""
     out = Read()
-    for path in sorted(content_dir.glob("batch-*.csv")) + sorted(content_dir.glob("english*.csv")):
+    # Any name ending in batch-<N>.csv (a chat download may prefix it), then English.
+    for path in sorted(content_dir.glob("*batch-*.csv")) + sorted(content_dir.glob("*english*.csv")):
         one = read_csv(path)
         out.rows += one.rows
         out.problems += one.problems

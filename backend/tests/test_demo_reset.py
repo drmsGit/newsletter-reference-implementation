@@ -195,3 +195,8 @@ def test_a_full_run_builds_grathaus_and_keeps_people_and_settings(tmp_path):
 
         random.seed(42)
         seed_demo_data.seed()
+
+
+def test_a_prefixed_batch_name_from_a_download_is_read(tmp_path):
+    _write(tmp_path / "grathaus-outdoor-batch-1.csv", [_row()])
+    assert len(catalogue.read_all(tmp_path).rows) == 1
