@@ -1,7 +1,7 @@
 import { Route, Routes } from 'react-router'
 
 import ApprovalDetail from './screens/ApprovalDetail'
-import Approvals from './screens/Approvals'
+import Approvals, { ApprovalsSplit, NoRequestOpen } from './screens/Approvals'
 import AudienceDetail from './screens/AudienceDetail'
 import Audiences from './screens/Audiences'
 import CampaignDetail from './screens/CampaignDetail'
@@ -62,12 +62,16 @@ export default function App() {
           and it is the screen that answers "is anything waiting for me" --
           which is what a manager opens this client to find out.
         */}
-        <Route path="/" element={<Approvals />} />
-        <Route path="/approvals" element={<Approvals />} />
+        {/* The list beside the open request (task-372): one layout, the
+            request in the address as before. */}
+        <Route element={<ApprovalsSplit />}>
+          <Route path="/" element={<NoRequestOpen />} />
+          <Route path="/approvals" element={<NoRequestOpen />} />
+          <Route path="/approvals/:id" element={<ApprovalDetail />} />
+        </Route>
         {/* Static before dynamic is how React Router ranks these anyway; listed
-            first so the reader sees "history" is not an approval id. */}
+            apart so the reader sees "history" is not an approval id. */}
         <Route path="/approvals/history" element={<Approvals mode="history" />} />
-        <Route path="/approvals/:id" element={<ApprovalDetail />} />
         <Route path="/campaigns" element={<Campaigns />} />
         <Route path="/campaigns/:id" element={<CampaignDetail />} />
         <Route path="/campaigns/:id/variants/:variantId" element={<VariantEditor />} />

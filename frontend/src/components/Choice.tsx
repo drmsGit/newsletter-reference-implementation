@@ -25,17 +25,31 @@ export default function Choice({
   selected,
   onChange,
   placeholder = 'Choose…',
+  pulldown = false,
 }: {
   label: string
   options: { id: string; name: string; indent?: number }[]
   selected: string
   onChange: (id: string) => void
   placeholder?: string
+  /** A list's filter (task-372): the label sits inside the control ("Action All"),
+   * still the control's accessible name. */
+  pulldown?: boolean
 }) {
   return (
-    <Select selectedKey={selected} onSelectionChange={(key) => onChange(String(key))} placeholder={placeholder}>
-      <Label>{label}</Label>
+    <Select
+      className={pulldown ? 'react-aria-Select pulldown' : undefined}
+      selectedKey={selected}
+      onSelectionChange={(key) => onChange(String(key))}
+      placeholder={placeholder}
+    >
+      <Label className={pulldown ? 'sr-only' : undefined}>{label}</Label>
       <Button>
+        {pulldown && (
+          <span className="pd-label" aria-hidden="true">
+            {label}
+          </span>
+        )}
         <SelectValue />
       </Button>
       <Popover>

@@ -1,9 +1,9 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Route, Routes } from 'react-router'
+import { Route, Routes, useLocation } from 'react-router'
 
 import ApprovalDetail from './ApprovalDetail'
-import Approvals from './Approvals'
+import Approvals, { ApprovalsSplit, NoRequestOpen } from './Approvals'
 import { jsonResponse, page, renderWithProviders, stubFetch } from '../test-utils'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -406,5 +406,42 @@ describe('the pager', () => {
     expect(await screen.findByText('101–120 of 120')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Older' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Newer' })).not.toBeDisabled()
+  })
+})
+
+describe('the inbox beside the open request (task-372)', () => {
+  function Where() {
+    const location = useLocation()
+    return <p data-testid="where">{location.pathname + location.search}</p>
+  }
+
+  it('keeps the filters when a request opens, and marks the open row for assistive technology', async () => {
+    stubFetch({
+      'GET /approvals/': () => jsonResponse(page([A_ROW, { ...A_ROW, id: 8, label: 'Fire a send' }])),
+      'GET /approvals/filter-options': () => jsonResponse({ actions: [], requesters: [] }),
+      'GET /approvals/7': () => jsonResponse({ ...A_ROW, payload: {}, rows: [], may_decide: false, blocked_reason: null,
+        describe_error: null, warnings: [], options: null }),
+    })
+    renderWithProviders(
+      <>
+        <Routes>
+          <Route element={<ApprovalsSplit />}>
+            <Route path="/approvals" element={<NoRequestOpen />} />
+            <Route path="/approvals/:id" element={<ApprovalDetail />} />
+          </Route>
+        </Routes>
+        <Where />
+      </>,
+      { route: '/approvals?action=ai_subject_apply' },
+    )
+    expect(await screen.findByText('Select a request to review it.')).toBeInTheDocument()
+    const row = (await screen.findByText('Apply a suggested subject')).closest('[role="row"]') as HTMLElement
+    fireEvent.click(within(row).getByText('Apply a suggested subject'))
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/approvals/7?action=ai_subject_apply'))
+    await waitFor(() => expect(row).toHaveAttribute('aria-selected', 'true'))
+    // Pressing the open row again keeps it open.
+    fireEvent.click(within(row).getByText('Apply a suggested subject'))
+    expect(screen.getByTestId('where')).toHaveTextContent('/approvals/7?action=ai_subject_apply')
+    expect(row).toHaveAttribute('aria-selected', 'true')
   })
 })

@@ -1235,3 +1235,240 @@ kbd {
 .graph-node:focus { outline: none; }
 .graph-node text { font-size: 13px; fill: var(--brand-fg); }
 @media (max-width: 720px) { .graph-view { grid-template-columns: minmax(0, 1fr); } }
+
+/* --- the three-column screen: list and details (HANDOFF section 3) ---------- */
+
+/* A screen laid out as list plus details runs full height, each column
+   scrolling on its own; the page itself does not scroll. */
+.shell__main:has(> .split) { padding: 0; }
+.split {
+  display: flex;
+  height: 100vh;
+  min-width: 0;
+}
+.col-list {
+  flex: 0 1 380px;
+  min-width: 300px;
+  background: var(--brand-surface);
+  border-right: 1px solid var(--brand-line);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.col-list > :not(.list-foot) { flex-shrink: 0; }
+.col-detail {
+  flex: 999 1 480px;
+  min-width: 0;
+  background: var(--brand-bg);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+/* Column 2: the title, its count and the filters on the list's own surface,
+   no rule between them and the list; the foot holds paging and history. */
+.list-head { padding: 20px 20px 8px; }
+.list-head h1 { margin: 0; }
+.list-count { margin: 0; font-size: 12px; line-height: 16px; color: var(--brand-muted); }
+.col-list .filters { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 8px 12px; margin: 0; align-items: center; }
+.col-list .react-aria-GridList,
+.col-list .list-empty { flex: 1 1 auto; overflow-y: auto; }
+.list-empty { padding: 12px 20px; margin: 0; }
+
+.item-list { padding: 0 8px 8px; outline: none; display: flex; flex-direction: column; }
+.item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: var(--brand-radius-panel);
+  color: var(--brand-fg);
+  cursor: pointer;
+  outline: none;
+}
+.item + .item::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 1px;
+  background: var(--brand-line);
+}
+.item[data-hovered] { background: var(--brand-surface-2); }
+.item[data-selected] { background: var(--brand-selected); }
+.item[data-selected]::before,
+.item[data-selected] + .item::before,
+.item[data-hovered]::before,
+.item[data-hovered] + .item::before { display: none; }
+.item[data-focus-visible] { outline: 2px solid var(--brand-focus); outline-offset: -2px; }
+.item-title { font-weight: 600; }
+.item-summary { color: var(--brand-fg); }
+.item-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--brand-muted);
+}
+.item-flag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--brand-human);
+}
+
+.list-foot {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+  padding: 8px 12px 8px 11px;
+  border-top: 1px solid var(--brand-line);
+  background: var(--brand-surface);
+  min-height: 44px;
+}
+.list-foot__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  text-decoration: none;
+  padding-left: 9px;
+}
+.list-foot__link:hover { text-decoration: underline; }
+.list-foot .pager { margin: 0; gap: 4px; }
+.list-foot .pager button { background: transparent; border-color: transparent; box-shadow: none; color: var(--brand-accent); }
+.list-foot .pager button[data-disabled] { color: var(--brand-muted); background: transparent; }
+.list-foot .pager .muted { font-size: 12px; }
+
+/* A list filter: the label inside the control ("Action All"). */
+.pulldown > button {
+  min-width: 0;
+  padding: 0 8px 0 11px;
+  border-color: var(--brand-line);
+  box-shadow: var(--brand-shadow);
+}
+.pulldown .pd-label { color: var(--brand-muted); font-weight: 400; margin-right: 4px; }
+.pulldown .react-aria-SelectValue { font-weight: 500; }
+
+/* Column 3: the linen ground from the very top; groups are white cards; the
+   action group docked at the bottom on the same ground, with a fade. */
+.detail { display: flex; flex-direction: column; min-height: 100%; }
+.detail-scroll { flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+.detail-head { padding: 0 16px; }
+.detail-head h2 { margin: 0 0 4px; }
+.detail-head p { margin: 0; }
+.detail-placeholder { padding: 40px; margin: 0; }
+
+.group {
+  background: var(--brand-surface);
+  border: 1px solid var(--brand-line);
+  border-radius: var(--brand-radius-panel);
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+.group-title { margin: 0 0 6px; padding: 0 16px; font-size: 15px; line-height: 20px; font-weight: 600; }
+.group-list { list-style: none; }
+.group-row { position: relative; padding: 10px 16px; }
+.group-row + .group-row::before,
+.fact + .fact::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 0;
+  height: 1px;
+  background: var(--brand-line);
+}
+.group-body { padding: 16px; }
+.group-body > :last-child { margin-bottom: 0; }
+
+.fact-list { display: block; }
+.fact {
+  position: relative;
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 0 16px;
+  align-items: baseline;
+  padding: 8px 16px;
+}
+.fact dt { margin: 0; font-size: 12px; line-height: 16px; color: var(--brand-muted); }
+.fact dd { margin: 0; font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere; }
+
+.notice { display: flex; align-items: flex-start; gap: 10px; }
+.notice-icon { flex: none; margin-top: 2px; color: var(--brand-human); }
+.notice-alert {
+  border-radius: var(--brand-radius-panel);
+  background: var(--brand-danger-bg);
+  color: var(--brand-danger);
+  padding: 12px 16px;
+  margin: 0;
+}
+.quiet { padding: 0 16px; margin: 0; }
+
+.decide {
+  position: sticky;
+  bottom: 0;
+  background: var(--brand-bg);
+  padding: 0 24px 20px;
+}
+.decide::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -24px;
+  height: 24px;
+  background: linear-gradient(to bottom, transparent, var(--brand-bg));
+  pointer-events: none;
+}
+.btnrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
+
+/* Below about 1,100 px the details wrap under the list; at phone width one
+   column at a time (HANDOFF section 3). */
+@media (max-width: 1100px) {
+  .split { flex-direction: column; height: auto; }
+  .col-list { flex: none; min-width: 0; border-right: 0; border-bottom: 1px solid var(--brand-line); max-height: 60vh; }
+  .col-detail { overflow: visible; }
+  .decide { position: static; }
+}
+
+/* Option lists (ui.css .opt): each choice a row with its own circle, the
+   chosen one in the selected tint with the accent border. React Aria draws
+   no circle of its own. */
+.react-aria-RadioGroup,
+.react-aria-CheckboxGroup { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.react-aria-Radio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--brand-line);
+  border-radius: 8px;
+  background: var(--brand-surface);
+  cursor: pointer;
+  outline: none;
+}
+.react-aria-Radio::before {
+  content: "";
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--brand-line-strong);
+  background: var(--brand-surface);
+}
+.react-aria-Radio[data-hovered] { background: var(--brand-surface-2); }
+.react-aria-Radio[data-selected] { border-color: var(--brand-accent); background: var(--brand-selected); }
+.react-aria-Radio[data-selected]::before { border: 4px solid var(--brand-accent); }
+.react-aria-Radio[data-focus-visible] { outline: 2px solid var(--brand-focus); outline-offset: 2px; }
+.react-aria-Radio[data-disabled] { color: var(--brand-muted); cursor: not-allowed; }
