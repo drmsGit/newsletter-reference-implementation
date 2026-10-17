@@ -1,0 +1,41 @@
+---
+id: doc-29
+title: Regression tests — integration checklist contract — source 79f3a7a
+type: other
+created_date: '2026-10-16 17:06'
+updated_date: '2026-10-16 17:54'
+---
+Source commit covered: 79f3a7a6d5a2d52296d5555cd1841584bc2852ba (task-358 follow-up), reviewed individually after c7b5fa14e52ee586b2857f0a3e0eb03c57339597. No history rewrite; previous checked source remains an ancestor.
+Tests-branch batch commit: 836cad5be589a4ee46496861a5a23ba65cf89717. Previous tip: 1c7459604e8e89b134f38bf9a8e3d792aafd5549, published and verified.
+Modified file: frontend/src/screens/IntegrationDetail.permissions.test.tsx only. It now requires the content.manage checkbox instead of the superseded permission-menu option. Same invariant under ADR-150/166: a person allowed to manage integrations must be able to choose integration grants without users.manage. Backend boundary assertion stays strict: GET /integrations 200; protected people administration catalogue and brands 403. Task-358 context, not task-315 through task-323.
+
+The source commit globally styles React Aria checkboxes, changes integration grants to a per-brand checklist and links role names. Its added Administration tests cover brand-specific add/remove request payloads and role navigation. Reviewed the full four-file diff. No unrelated tests added. Checklist still loads /auth/permissions and /auth/brands, requiring users.manage: the adapted strict case fails because no content.manage checkbox is offered. The previously published synthetic-secret test also still fails: closing the issued-key dialog leaves secret_key in mutation cache data. The backend lock-out race from doc-28 remains unresolved; this commit changes no backend code, tests, API schema or auth instructions, so the backend suite was not rerun here. See doc-28 for its exact ad9bf293 results; those must not be presented as a new backend run at 79f3a7a.
+
+Exact validation snapshot: /Users/diedeslembrouck/.codex/worktrees/regression-admin-checklist/newsletter-reference-implementation, detached at 79f3a7a6d5a2d52296d5555cd1841584bc2852ba. Only the two published frontend regression files copied in; permission test adapted here. Shared dependencies used read-only through a node_modules symlink. All HTTP intercepted by existing stubFetch fixtures, no database, real email, real provider or credential used. No .env read. No shared checkout source edits.
+
+Commands from snapshot/frontend:
+- node node_modules/vitest/vitest.mjs run: 342 passed, 2 failed, exit 1, 7.37 seconds. Full suite includes the two new source tests passing and exactly the two strict integration regressions failing. Log: /private/tmp/regression-admin-checklist-frontend.log.
+- node node_modules/vitest/vitest.mjs run src/screens/IntegrationDetail.permissions.test.tsx src/screens/IntegrationDetail.secret.test.tsx: 2 failed, exit 1, 1.70 seconds; both confirmed product defects, log /private/tmp/regression-admin-checklist-target.log.
+- node node_modules/eslint/bin/eslint.js src/screens/IntegrationDetail.secret.test.tsx src/screens/IntegrationDetail.permissions.test.tsx: exit 0.
+- node node_modules/typescript/bin/tsc -b: exit 0.
+No remaining infrastructure failure. Actual rendered checkbox styling and browser interaction remain unverified. No passing-suite or coverage-sufficiency claim: known product defects remain and the tests have no skip, xfail or weakened assertions.
+
+Persistent codex/regression-tests retains production base 28aa4e88f4846768a18fd81b66949f959cd3b38a, all prior test batches, and no merged production changes. Validation above is against the exact new source, not the older tests-branch base. The adaptation only changes a permitted frontend test file. Prior d8fc2c0, 1c74596 and this adaptation await integration with the relevant production changes and fixes; do not integrate failing cases into main alone.
+Origin push: succeeded. Explicit refs/heads/codex/regression-tests:refs/heads/codex/regression-tests push; git ls-remote verified 836cad5be589a4ee46496861a5a23ba65cf89717. Normal commit hooks were not bypassed. This pre-stage note lives only in the primary repository and is excluded from the tests branch.
+
+Integration verification — 2026-10-16 watcher wake
+Source 8d815266db0f40d6c0d1599cfef3202dc1f4c321 (task-386) integrates the published regression batches with the fixes. Reviewed chronologically, followed by completion-only a112a829b8eafcc9b4b23fa5824b6dedc0f7e8de; that second commit needs no tests. No history rewrite from prior cursor 79f3a7a. The last-manager guard now serializes the read/check/write via a transaction-scoped PostgreSQL advisory lock; the key mutation returns only the credential and hands the secret directly to dialog state; the checklist reads /integrations/permissions and the person's session brands. The new catalogue retains the router-wide person + integrations.manage guard, while users.manage admin routes stay protected.
+
+Validation at exact 8d815266, in /Users/diedeslembrouck/.codex/worktrees/regression-admin-fixed/newsletter-reference-implementation. No source or test files edited. Fresh disposable database app_test_newsletter_reference_implementation_3190ed; no TEST_DATABASE_URL override, backend/.env absent, PYTHON_DOTENV_DISABLED=1. Existing mock providers and real-vendor refusal guard active; backend runs serialized. Frontend requests intercepted by existing fixtures. Dependencies used without installation changes.
+Commands from backend, with PYTHON_DOTENV_DISABLED=1 /Users/diedeslembrouck/Projects/newsletter-reference-implementation/backend/venv/bin/python:
+- -m pytest tests/test_admin_lockout_concurrency.py tests/test_admin_routes.py tests/test_content_figure_delivery_scope.py -q: 21 passed, exit 0, 7.98s; /private/tmp/regression-admin-fixed-target.log.
+- -m pytest tests -q: 2095 passed, 10 existing skips, exit 0, 94.29s; /private/tmp/regression-admin-fixed-backend-full.log. No new skipped or weakened regression assertions.
+Commands from frontend:
+- node node_modules/vitest/vitest.mjs run src/screens/IntegrationDetail.secret.test.tsx src/screens/IntegrationDetail.permissions.test.tsx src/screens/Administration.test.tsx: 11 passed, exit 0; /private/tmp/regression-admin-fixed-client-target.log.
+- node node_modules/vitest/vitest.mjs run: 344 passed, exit 0; /private/tmp/regression-admin-fixed-client-full.log.
+- node node_modules/typescript/bin/tsc -b: exit 0.
+- node node_modules/eslint/bin/eslint.js src/api/resources.ts src/screens/IntegrationDetail.tsx src/screens/IntegrationDetail.secret.test.tsx src/screens/IntegrationDetail.permissions.test.tsx src/screens/Administration.test.tsx: exit 0.
+From snapshot root: venv/bin/ruff check --no-cache backend/app/auth/service.py backend/app/auth/integrations_router.py backend/tests/test_admin_lockout_concurrency.py backend/tests/test_admin_routes.py backend/tests/test_auth.py backend/tests/test_pagination.py backend/tests/test_content_figure_delivery_scope.py: exit 0. git diff --check: exit 0.
+Contract: dotenv-disabled Python set DATABASE_URL=tests.checkout_database.test_database_url(), imported main.app and exported app.openapi() to /private/tmp/regression-admin-fixed-openapi.json, exit 0. From frontend, node node_modules/openapi-typescript/bin/cli.js /private/tmp/regression-admin-fixed-openapi.json -o /private/tmp/regression-admin-fixed-schema.d.ts, then diff -u src/api/schema.d.ts /private/tmp/regression-admin-fixed-schema.d.ts: exit 0, identical. No tracked schema rewritten.
+
+The three previously reported task-358 defects are now fixed under task-386 and their strict regressions pass. The backend concurrency and KPI test files are byte-for-byte identical to the published batches; the two client tests only add the new catalogue/session response fixtures and explanatory headers, retaining the assertions. Existing checks suffice for these fixes; no additional test gap requiring a new batch found. No new test commit or push this wake. Earlier published branch history preserved; the branch's older production base was not used for these results. No pending integration remains for d8fc2c0, 1c74596 or 836cad5. No infrastructure blocker; live browser styling and external CI were not independently verified. Prior failure/publication evidence above remains historical.

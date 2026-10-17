@@ -1,11 +1,11 @@
 ---
 id: TASK-372
 title: The finished design applied to the React screens
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-11 20:44'
-updated_date: '2026-10-17 13:25'
+updated_date: '2026-10-17 13:31'
 labels:
   - frontend
 dependencies: []
@@ -90,3 +90,11 @@ Next: decision slots (render 32) and the preview sheet (24, decision 16 decided)
 
 2026-10-17, step 14c built and pushed: users, roles and integrations as drill-ins; brands beside the Settings menu like General (a list of forms with nothing to open; not drawn). Settings is done. Next and last: sign-in (renders 41, 42).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The finished design (docs/design, v2) applied to every React screen, in one commit per step from aded12e to 97e2e76: the tokens and global controls; the shell (navigation column, icon rail, initials avatar); approvals; campaigns; the variant editor with the system and human cue; content as a drill-in; decision slots; the preview sheet; sending a variant; deliveries; audiences; recipients; monitoring and the decision history as wide tables; settings as a drill-in with AI prompts as its own part; sign-in. Open decisions 11, 13, 14, 15, 17, 18, 20 and 23 were asked and answered on the way and are recorded in the notes.
+
+Verified per step: the full client gates (vitest, tsc, eslint, build), new tests for each behaviour the layout touched, each mutation-checked, and a live look in the browser pane on scratch data at 1,440 px (light, dark and narrow where they apply). Found and fixed on the way: Codex doc-33 (a choice or reason carried to the next request in the split; tests landed with the fix), a categories list that never redrew when its links loaded, search and page parameters shared between a list and its details on one address (audiences), and a sign-in form that could not be submitted again after one wrong code. Not built here, by decision: search boxes on lists the server does not search (TASK-390), dragging in the preview sheet (TASK-391). Five layout details left open moved to TASK-392.
+<!-- SECTION:FINAL_SUMMARY:END -->
