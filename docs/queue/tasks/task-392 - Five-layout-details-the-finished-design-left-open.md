@@ -4,7 +4,7 @@ title: Small details the finished design left open
 status: To Do
 assignee: []
 created_date: '2026-10-17 13:31'
-updated_date: '2026-10-17 19:00'
+updated_date: '2026-10-17 19:10'
 labels:
   - frontend
 dependencies: []
@@ -53,7 +53,7 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 The category graph uses v2 tokens for its circles, after a choice of which tokens carry rising and falling
-- [ ] #2 Slot settings categories are option rows as in render 23
+- [x] #2 Slot settings categories are option rows as in render 23
 - [ ] #3 A catalogue field's hide switch and Change in catalogue share one line as in render 21
 - [ ] #4 Performance on the record page uses fact rows
 - [x] #5 The Duplicate button and its pulldown share a baseline
@@ -105,4 +105,6 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 2026-10-17: item 20 (UX-24) fixed: ImageField's Upload and the More section's replace use FileTrigger (IMAGE_TYPES, same accept list); Upload names the chosen file beside Choose a file…, or No file chosen; .file-choice in index.css. Tests in ImageField.upload.test.tsx and ImageField.test.tsx (the form's absence check now looks for the Replace button, not a label), mutation-checked twice. Live: the native input is display none, the button calls its click, nothing was uploaded.
 
 2026-10-17: item 21 (UX-28) fixed: AutosaveField's field type picks size, and rowsFor gives size long ten rows, the rest four (EditorFields.tsx). Test EditorFields.size.test.tsx, mutation-checked. Live on record 156: Body text (long) 10 rows, 194 px; Body text (short) 4 rows, 86 px.
+
+2026-10-17: item 2 fixed: .react-aria-CheckboxGroup > .react-aria-Checkbox are option rows (index.css, after the radio rows), .option-pair puts few short choices side by side (the draft's channels, render 27). The groups in SlotSettings, AudienceRules and ContentDraft (three) had className categories only, which drops React Aria's default class, so they name react-aria-CheckboxGroup too. RoleDetail's permission-group is left as it is: Roles is undrawn (HANDOFF:309). CSS only, no unit test possible. Live: slot Für Sie ausgewählt (Familienherbst): 26 full-width 36 px rows, the four ticked tinted with the accent border, Tab puts the ring on the row, ticks unchanged; record 156: Email and Push side by side, 351 px each.
 <!-- SECTION:NOTES:END -->
