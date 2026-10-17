@@ -6,7 +6,7 @@ topic:
   - ai
   - governance
 created: 2026-07-31
-modified: 2026-10-16
+modified: 2026-10-17
 source:
   - "AI Layer design interview (interview-prep, 2026-07-27 – 31), Cluster 1"
 depends_on:
@@ -259,6 +259,46 @@ through approval.
 - **Negative.** A company that wants every AI output approved cannot have that
   for drafts without a new decision. For drafts, the guarantee rests on the
   human acts that follow and on the audit of point 5.
+
+Nothing here changes the Decision section above. Point 3 stands as written.
+
+## Addendum 2026-10-17 — A task that writes a new record may also have no held form
+
+Prompted by the final-design pass of task-369 ("AI translates a content record
+into another language"), decided by the user on 2026-10-17, one question at a
+time. Point 3 and the 2026-10-16 addendum stand. This addendum widens what that
+addendum's point 1 covers.
+
+**What was found.** The 2026-10-16 addendum's point 1 covers a task whose
+"output only ever appears where a person takes it themselves". The content
+translation task
+([[ADR-200 — A Content Record Has a Language, and a Translation Is a Linked Record]])
+writes its first output into a new record, not into a panel.
+
+**1. Point 1 of the 2026-10-16 addendum also covers a task whose output is
+written into a new record that starts unpublished, not ready and not machine
+ready.** The acts that let such a record reach a recipient remain a person's:
+publishing, readiness
+([[ADR-174 — Channel Readiness Is Asserted, Not Computed]]) and machine ready
+([[ADR-179 — What Enters the Catalogue, and What a Machine May Take From It]]).
+This is the 2026-10-16 addendum's own reasoning: an approval in front of those
+acts would add clicks, not safety.
+
+**2. The content translation task is the first such task** (task-369, ADR-200
+point 7).
+
+**3. A Translate again proposal is taken with ticks, as before.** It appears
+where a person takes it field by field, as the content draft does
+([[ADR-141 — In-App Assistive AI Actions]], addendum of 2026-10-16, point 5), so
+it is the case the 2026-10-16 addendum already covers.
+
+**Consequences.**
+
+- **Positive.** A translation adds no entry to the approval inbox, and the
+  record it writes reaches no recipient without a person's acts.
+- **Negative.** The first translation is written into the new record before a
+  person has read it. Until someone reviews it, the guarantee rests on the
+  human acts that follow and on the audit of point 5, as for drafts.
 
 Nothing here changes the Decision section above. Point 3 stands as written.
 

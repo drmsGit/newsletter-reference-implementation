@@ -439,6 +439,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/content/{content_id}/translations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Translate this record into another of the brand's languages, as a new linked record
+         * @description task-369 (ADR-200). Needs `content.manage` as well as `ai.run`: it creates a record. The new record holds the translated title, description and text fields, the links, images and categories copied, and starts unpublished, not ready and not machine ready. Refused before anything is spent (422 on `language`) when the record has no language of its own, or the target is its own or none of the brand's profile languages; 409 when that translation exists already or the record is itself a translation, or when the model gave nothing usable (nothing is created).
+         */
+        post: operations["translate_content_record_content__content_id__translations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/content/{content_id}/retranslations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every fresh translation proposed on this translation, newest first */
+        get: operations["get_content_retranslations_content__content_id__retranslations_get"];
+        put?: never;
+        /**
+         * Ask for a fresh translation of this translation's original, as a proposal
+         * @description ADR-200 point 5. Nothing is written: the proposal is read back and taken with ticks.
+         */
+        post: operations["retranslate_content_record_content__content_id__retranslations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/content/{content_id}/readiness/{channel}": {
         parameters: {
             query?: never;
@@ -4765,6 +4806,8 @@ export interface components {
             status: string;
             /** Updated At */
             updated_at?: string | null;
+            /** Language */
+            language?: string | null;
             /** Latest Version Number */
             latest_version_number?: number | null;
             /**
@@ -4860,6 +4903,8 @@ export interface components {
             groups: string[];
             /** Applied Suggestion Run Id */
             applied_suggestion_run_id?: number | null;
+            /** Language */
+            language?: string | null;
         };
         /** ContentPerformance */
         ContentPerformance: {
@@ -4898,6 +4943,8 @@ export interface components {
             status: string;
             /** Updated At */
             updated_at?: string | null;
+            /** Language */
+            language?: string | null;
         };
         /**
          * ContentRecordDetail
@@ -4926,6 +4973,8 @@ export interface components {
             status: string;
             /** Updated At */
             updated_at?: string | null;
+            /** Language */
+            language?: string | null;
             /** Latest Version Number */
             latest_version_number?: number | null;
             /** Unpublished Changes */
@@ -4940,6 +4989,24 @@ export interface components {
              * @default []
              */
             readiness: components["schemas"]["ChannelReadiness"][];
+            /**
+             * Language Choices
+             * @default []
+             */
+            language_choices: string[];
+            /** Language Locked */
+            language_locked?: string | null;
+            original?: components["schemas"]["LinkedRecord"] | null;
+            /**
+             * Translations
+             * @default []
+             */
+            translations: components["schemas"]["LinkedRecord"][];
+            /**
+             * Original Changed
+             * @default []
+             */
+            original_changed: string[];
         };
         /** ContentResolutionUse */
         ContentResolutionUse: {
@@ -5760,6 +5827,18 @@ export interface components {
             credential: components["schemas"]["CredentialOut"];
             /** Secret Key */
             secret_key: string;
+        };
+        /**
+         * LinkedRecord
+         * @description An original or a translation of a record (ADR-200).
+         */
+        LinkedRecord: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Language */
+            language?: string | null;
         };
         /** MachineReady */
         MachineReady: {
@@ -7803,6 +7882,23 @@ export interface components {
             /** Contributions */
             contributions: components["schemas"]["TraceContribution"][];
         };
+        /** TranslationMade */
+        TranslationMade: {
+            /** Record Id */
+            record_id: number;
+            /** Ai Run Id */
+            ai_run_id: number;
+            /** Notices */
+            notices: string[];
+        };
+        /**
+         * TranslationRequest
+         * @description Into which of the brand's profile languages (ADR-200 point 3).
+         */
+        TranslationRequest: {
+            /** Language */
+            language: string;
+        };
         /** UnattendedRequest */
         UnattendedRequest: {
             /** Ceiling */
@@ -8944,6 +9040,103 @@ export interface operations {
                 "application/json": components["schemas"]["ContentDraftRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentDraftStarted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    translate_content_record_content__content_id__translations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                content_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TranslationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranslationMade"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_content_retranslations_content__content_id__retranslations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                content_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentDraft"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retranslate_content_record_content__content_id__retranslations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                content_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

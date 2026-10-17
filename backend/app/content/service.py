@@ -41,6 +41,7 @@ def to_content_record(record: ContentRecordDB) -> ContentRecord:
         content=record.content or {},
         status=record.status,
         updated_at=record.updated_at,
+        language=record.language,
     )
 
 

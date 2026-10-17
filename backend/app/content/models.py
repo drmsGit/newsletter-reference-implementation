@@ -35,6 +35,8 @@ class ContentRecord(BaseModel):
     status: str = "active"
     # The version token a write states in If-Match (task-257).
     updated_at: datetime | None = None
+    #: ADR-200 point 1: one of the brand's profile languages, or None (not set).
+    language: str | None = None
 
 
 class ChannelReadiness(BaseModel):
@@ -67,6 +69,14 @@ class ContentListItem(ContentRecord):
     ready_for: list[str] = []
 
 
+class LinkedRecord(BaseModel):
+    """An original or a translation of a record (ADR-200)."""
+
+    id: int
+    title: str
+    language: str | None = None
+
+
 class ContentRecordDetail(ContentRecord):
     """One record, with whether a send would use what it says now (task-257).
 
@@ -84,6 +94,16 @@ class ContentRecordDetail(ContentRecord):
     machine_ready: bool = False
     #: The channels a person marked it ready for, each with its warning (ADR-174).
     readiness: list[ChannelReadiness] = []
+    #: ADR-200: the languages it may have (its brand's profile languages)...
+    language_choices: list[str] = []
+    #: ...and, while it is linked, why its language stays (point 1).
+    language_locked: str | None = None
+    #: The original it translates, None for an original or once that is deleted.
+    original: LinkedRecord | None = None
+    #: Its translations, when it is an original.
+    translations: list[LinkedRecord] = []
+    #: A translation's fields whose original text changed since (point 5).
+    original_changed: list[str] = []
 
 
 class ContentCreate(BaseModel):
@@ -115,6 +135,8 @@ class ContentPatch(BaseModel):
     #: The AI draft run these fields were taken from (task-368): the audit
     #: entry names it when it is this record's draft run.
     applied_suggestion_run_id: int | None = None
+    #: ADR-200 point 1: set, or cleared with null; left out, it stays.
+    language: str | None = None
 
 
 class ContentStatusUpdate(BaseModel):
@@ -173,6 +195,19 @@ class ContentDraftRequest(BaseModel):
 
     source: str = Field(description="Pasted text or a brief; at most 12,000 characters")
     channels: list[str] = Field(description="The channels whose text fields are drafted")
+
+
+class TranslationRequest(BaseModel):
+    """Into which of the brand's profile languages (ADR-200 point 3)."""
+
+    language: str
+
+
+class TranslationMade(BaseModel):
+    record_id: int
+    ai_run_id: int
+    #: What the manager must know: fields kept in the original's words.
+    notices: list[str]
 
 
 class ContentDraftStarted(BaseModel):

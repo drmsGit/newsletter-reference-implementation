@@ -113,6 +113,10 @@ WRITE_POLICY: tuple[tuple[str, str], ...] = (
     # writes nothing to the record, so it is ai.run, not the broad `/content`
     # entry's content.manage. The GET (the read-back) is view, as every GET is.
     ("/content/{content_id}/drafts", AI_RUN),
+    # Translating (task-369, ADR-200) spends on the model too. Creating the new
+    # record also needs content.manage, which the route checks itself.
+    ("/content/{content_id}/translations", AI_RUN),
+    ("/content/{content_id}/retranslations", AI_RUN),
     # Creates an audience group; it is filed under campaigns only by URL.
     ("/ui/campaigns/{campaign_id}/suggest-audience", AUDIENCES_MANAGE),
     # Overriding a system pick is its own act, not a campaign edit (ADR-166

@@ -14,8 +14,10 @@ from app.campaigns.service import StaleWrite
 from app.auth.service import actor_label
 from app.pagination import Page, PageParams, page_of_list, page_params
 from app.database import get_db
-from app.content.db_models import CategoryDB
+from app.content.db_models import CategoryDB, ContentRecordDB
 from app.content.models import (
+    TranslationMade,
+    TranslationRequest,
     ContentDraft,
     ContentDraftRequest,
     ContentDraftStarted,
@@ -193,13 +195,31 @@ def get_content_record_by_id(
         raise HTTPException(status_code=404, detail="Content record not found")
     from app.content.service import readiness_of
 
+    from app.content import translation
+
     latest, unpublished = publish_state(db, record)
+    original = db.get(ContentRecordDB, record.translation_of_id) if record.translation_of_id else None
     return {**to_content_record(record).model_dump(),
             "latest_version_number": latest, "unpublished_changes": unpublished,
-            "machine_ready": bool(record.machine_ready), "readiness": readiness_of(db, record)}
+            "machine_ready": bool(record.machine_ready), "readiness": readiness_of(db, record),
+            # ADR-200: its language, what it may be, and what it is linked to.
+            "language_choices": translation.brand_languages(db, record.brand_id),
+            "language_locked": translation.language_lock(db, record),
+            "original": _linked(original) if original else None,
+            "translations": [_linked(t) for t in translation.translations_of(db, record.id)],
+            "original_changed": translation.original_changed(db, record)}
 
 
-def _record_edit(request, db, record, before: dict, run_id: int | None = None) -> None:
+def _linked(record) -> dict:
+    return {"id": record.id, "title": record.title, "language": record.language}
+
+
+def _field_refused(field: str, message: str) -> HTTPException:
+    """A refusal in the shape FastAPI gives a validation error, so a client shows it on the field."""
+    return HTTPException(status_code=422, detail=[{"loc": ["body", field], "msg": message, "type": "value_error"}])
+
+
+def _record_edit(request, db, record, before: dict, run_id: int | None = None, extra: dict | None = None) -> None:
     """The audit entry for a catalogue edit (task-257, ADR-153 point 4): which
     record, and which fields the edit changed — not every key sent (task-275,
     `content.service.edited_fields`) — and the AI draft it came from, if any."""
@@ -208,17 +228,20 @@ def _record_edit(request, db, record, before: dict, run_id: int | None = None) -
     audit.record_from_request(
         request, db, audit.CONTENT_UPDATED, subject_type="content", subject_id=record.id,
         detail={"title": record.title, "fields": edited_fields(before, record),
-                **_from_draft(db, run_id, record.id)},
+                **_from_draft(db, run_id, record.id), **(extra or {})},
     )
 
 
 def _from_draft(db: Session, run_id: int | None, content_id: int) -> dict:
-    """Names the AI draft run a person took this from (task-368), only when it
-    is this record's draft run."""
+    """Names the AI run a person took this from — a draft (task-368) or a
+    fresh translation (task-369) — only when it is this record's own run."""
     from app.ai.service import applied_run
-    from app.ai.tasks.content_draft import TASK_KEY
+    from app.ai.tasks import content_draft, content_translate
 
-    return applied_run(db, run_id, task_key=TASK_KEY, target_type="content", target_id=content_id)
+    # A draft (task-368) or a fresh translation proposed on it (task-369).
+    return (applied_run(db, run_id, task_key=content_draft.TASK_KEY, target_type="content", target_id=content_id)
+            or applied_run(db, run_id, task_key=content_translate.TASK_KEY, target_type="content",
+                           target_id=content_id))
 
 
 def _record_content_write(request, db, action: str, content_id: int, detail: dict) -> None:
@@ -293,9 +316,19 @@ def patch_content_record(
     """
     from app.content.service import edit_snapshot
 
+    from app.content import translation
+
     existing = get_content_record(db, content_id, brand_id=brand_id)
     if existing is None:
         raise HTTPException(status_code=404, detail="Content record not found")
+    # Left out, the language stays; null clears it (ADR-200 point 1).
+    language_named = "language" in payload.model_fields_set
+    old_language = existing.language
+    if language_named:
+        try:
+            translation.check_language(db, existing, payload.language)
+        except translation.TranslationRefused as error:
+            raise _field_refused(error.field, str(error))
     before = edit_snapshot(existing)
     try:
         merged = merge_content_fields(
@@ -321,8 +354,17 @@ def patch_content_record(
         raise HTTPException(status_code=422, detail=str(error))
     if record is None:
         raise HTTPException(status_code=404, detail="Content record not found")
-    _record_edit(request, db, record, before, payload.applied_suggestion_run_id)
-    return record
+    extra = {}
+    row = db.get(ContentRecordDB, record.id)
+    if language_named and payload.language != old_language:
+        row.language = payload.language
+        db.commit()
+        extra = {"language": {"from": old_language, "to": payload.language}}
+    _record_edit(request, db, record, before, payload.applied_suggestion_run_id, extra)
+    taken = [*payload.content] + [name for name in ("title", "description") if getattr(payload, name) is not None]
+    translation.record_taken(db, row, payload.applied_suggestion_run_id, taken)
+    db.refresh(row)
+    return to_content_record(row)
 
 
 @router.put("/{content_id}/status", response_model=ContentRecord)
@@ -677,9 +719,7 @@ def draft_content_record(
     try:
         content_draft.check_request(payload.source, payload.channels)
     except content_draft.DraftInvalid as error:
-        # The shape FastAPI gives a validation error, so a client shows it on the field.
-        raise HTTPException(status_code=422, detail=[{"loc": ["body", error.field], "msg": str(error),
-                                                      "type": "value_error"}])
+        raise _field_refused(error.field, str(error))
     principal = request_principal(request)
     actor = ("integration" if isinstance(principal, IntegrationDB) else "user") if principal else None
     run = content_draft.draft(db, content_id, payload.source, payload.channels,
@@ -700,6 +740,95 @@ def get_content_drafts(content_id: int, db: Session = Depends(get_db), brand_id:
     if record is None:
         raise HTTPException(status_code=404, detail="Content record not found")
     return drafts_for_record(db, record, brand_id=brand_id)
+
+
+def _actor(request: Request) -> tuple[str | None, int | None]:
+    from app.auth.db_models import IntegrationDB
+
+    principal = request_principal(request)
+    if principal is None:
+        return None, None
+    return ("integration" if isinstance(principal, IntegrationDB) else "user"), principal.id
+
+
+@router.post(
+    "/{content_id}/translations",
+    response_model=TranslationMade,
+    status_code=201,
+    summary="Translate this record into another of the brand's languages, as a new linked record",
+    description=(
+        "task-369 (ADR-200). Needs `content.manage` as well as `ai.run`: it creates a record. The "
+        "new record holds the translated title, description and text fields, the links, images and "
+        "categories copied, and starts unpublished, not ready and not machine ready. Refused before "
+        "anything is spent (422 on `language`) when the record has no language of its own, or the "
+        "target is its own or none of the brand's profile languages; 409 when that translation "
+        "exists already or the record is itself a translation, or when the model gave nothing usable "
+        "(nothing is created)."
+    ),
+)
+def translate_content_record(
+    content_id: int, payload: TranslationRequest, request: Request,
+    db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.auth.service import has_permission
+    from app.content import translation
+
+    original = get_content_record(db, content_id, brand_id=brand_id)
+    if original is None:
+        raise HTTPException(status_code=404, detail="Content record not found")
+    if auth_is_enforced(request) and not has_permission(db, request_principal(request), CONTENT_MANAGE,
+                                                        brand_id=brand_id):
+        raise HTTPException(status_code=403, detail="Translating creates a record, which needs content.manage.")
+    actor_type, actor_id = _actor(request)
+    try:
+        record, run_id, notices = translation.create_translation(
+            db, original, payload.language, actor_type=actor_type, actor_id=actor_id)
+    except translation.TranslationRefused as error:
+        raise _field_refused(error.field, str(error))
+    except (translation.TranslationExists, translation.TranslationFailed) as error:
+        raise HTTPException(status_code=409, detail=str(error))
+    _record_content_write(request, db, audit.CONTENT_CREATED, record.id, {
+        "title": record.title, "fields": sorted(record.content or {}), "translation_of": original.id,
+        "language": record.language, "applied_suggestion": True, "ai_run_id": run_id})
+    return TranslationMade(record_id=record.id, ai_run_id=run_id, notices=notices)
+
+
+@router.post(
+    "/{content_id}/retranslations",
+    response_model=ContentDraftStarted,
+    summary="Ask for a fresh translation of this translation's original, as a proposal",
+    description="ADR-200 point 5. Nothing is written: the proposal is read back and taken with ticks.",
+)
+def retranslate_content_record(
+    content_id: int, request: Request, db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.content import translation
+
+    record = get_content_record(db, content_id, brand_id=brand_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Content record not found")
+    actor_type, actor_id = _actor(request)
+    try:
+        run = translation.retranslate(db, record, actor_type=actor_type, actor_id=actor_id)
+    except translation.TranslationRefused as error:
+        raise _field_refused(error.field, str(error))
+    return ContentDraftStarted(ai_run_id=run.run_id, status="ok" if run.ok else "refused", message=run.message)
+
+
+@router.get(
+    "/{content_id}/retranslations",
+    response_model=list[ContentDraft],
+    summary="Every fresh translation proposed on this translation, newest first",
+)
+def get_content_retranslations(
+    content_id: int, db: Session = Depends(get_db), brand_id: int = Depends(working_brand),
+):
+    from app.content import translation
+
+    record = get_content_record(db, content_id, brand_id=brand_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Content record not found")
+    return translation.retranslations(db, record)
 
 
 def _is_integration(request: Request) -> bool:

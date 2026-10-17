@@ -231,7 +231,7 @@ def candidate_query(db, slot, *, brand_id: int):
     argument because each strategy also scopes its version lookup with it and
     the two must agree.
     """
-    from sqlalchemy import exists, func
+    from sqlalchemy import exists, func, or_
 
     from app.campaigns.db_models import ModuleInstanceDB, VariantDB
     from app.content.db_models import (
@@ -240,7 +240,11 @@ def candidate_query(db, slot, *, brand_id: int):
     from app.content.service import fields_a_record_must_fill
     from app.modules.registry import get_manifest
 
-    channel = db.query(VariantDB.channel).filter(VariantDB.id == slot.variant_id).scalar()
+    from app.expressions.substitute import message_language
+
+    variant = db.get(VariantDB, slot.variant_id)
+    channel = variant.channel
+    language = message_language(db, variant)[1]
     # Required when shown (ADR-187 point 6): a field the module hides need not
     # be filled, so each bound module's hidden list is part of what it needs.
     bound = db.query(ModuleInstanceDB.module_type, ModuleInstanceDB.hidden_fields).filter(
@@ -282,6 +286,9 @@ def candidate_query(db, slot, *, brand_id: int):
         .filter(exists().where(ContentChannelReadinessDB.content_id == ContentRecordDB.id,
                                ContentChannelReadinessDB.channel == channel))
         .filter(published_and_complete)
+        # ADR-200 point 2: in the variant's message language (its brand
+        # profile's, ADR-199 point 4), or with no language set.
+        .filter(or_(ContentRecordDB.language.is_(None), ContentRecordDB.language == language))
     )
     category_ids = (slot.candidate_filter or {}).get("category_ids", [])
     if category_ids:

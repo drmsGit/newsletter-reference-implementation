@@ -1,4 +1,4 @@
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, UniqueConstraint, func, text
 
 from app.database import Base
 
@@ -19,6 +19,7 @@ class ExpressionEntryDB(Base):
     brand_id = Column(Integer, ForeignKey("brands.id"), nullable=False, index=True)
     name = Column(String(64), nullable=False)
     label = Column(String(200), nullable=False)
-    languages = Column(JSON, nullable=False, default=dict)
+    # The database default as migration 0051 declares it, so the schema check agrees.
+    languages = Column(JSON, nullable=False, default=dict, server_default=text("'{}'::json"))
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

@@ -18,6 +18,7 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
+    JSON,
     ForeignKey,
     Integer,
     String,
@@ -69,6 +70,10 @@ class AIRunDB(Base):
     # was offered, rather than server-side session state.
     output_text = Column(Text, nullable=True)
     message = Column(Text, nullable=True)
+    # What the run read of the platform's own content, when a later write needs
+    # it: a translation run's original text, per field (ADR-200 point 5,
+    # migration 0052). Never a pasted source, which is not kept.
+    input_snapshot = Column(JSON, nullable=True)
     # Who started the run (task-345; ADR-144 addenda 2026-10-09 and 2026-10-11):
     # "user", "integration" or "system" (a sweep, no id). NULL on runs from
     # before it was recorded, shown as "not recorded".

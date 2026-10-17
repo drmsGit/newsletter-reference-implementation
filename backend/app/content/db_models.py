@@ -28,6 +28,21 @@ class ContentRecordDB(Base):
     #: its 2026-10-05 addendum: set by a person only, false for a new record
     #: (fail closed). Migration 0032 set every record existing then to true.
     machine_ready = Column(Boolean, nullable=False, default=False, server_default=false())
+    #: ADR-200 point 1 (migration 0052): one of the brand's profile languages,
+    #: or None — not set, so eligible in every language.
+    language = Column(String(20), nullable=True)
+    #: The original this record translates (ADR-200 point 3); unlinked, not
+    #: deleted, when the original goes (point 6).
+    translation_of_id = Column(Integer, ForeignKey("content_records.id", ondelete="SET NULL"), nullable=True)
+    #: Per field, the original's text this record's text was translated from
+    #: (point 5), so a changed original shows field by field.
+    translated_from = Column(JSON, nullable=True)
+
+    __table_args__ = (
+        # One translation per original per language (ADR-200 point 3).
+        Index("uq_content_translation_language", "translation_of_id", "language", unique=True,
+              postgresql_where=(translation_of_id.isnot(None))),
+    )
 
 
 class ContentChannelReadinessDB(Base):
