@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-11 20:44'
-updated_date: '2026-10-17 13:01'
+updated_date: '2026-10-17 13:05'
 labels:
   - frontend
 dependencies: []
@@ -83,4 +83,6 @@ Next: decision slots (render 32) and the preview sheet (24, decision 16 decided)
 2026-10-17, Diede: decision 18, who a send reaches is a section after the people added by hand, as drawn. Step 11 built and pushed. The audience page now names its own state apart from the list beside it: ?people= for the hand-added people page and ?who= for the recipient search (the list has ?offset= and ?q=). An old link with ?q= for an audience's recipient search now sets the list's search instead. Next: recipients (render 38), then monitoring and the decision history (39, 40; decision 14 to ask), settings (33 to 36, 44; decision 23 to confirm) and sign-in (41, 42).
 
 2026-10-17, step 12 built and pushed: recipients as list and details (render 38), no open decision. Next: monitoring and the decision history (renders 39, 40), with open decision 14 (one wide table in place of list and details) to ask first; then settings (33 to 36, 44; decision 23 to confirm) and sign-in (41, 42).
+
+2026-10-17, Diede: decision 14, Monitoring and the decision history stay one wide table each, as drawn. Step 13 built and pushed. Rejected stays a neutral chip (as on the request page since step 3), where render 40 draws it red. Next: settings (renders 33 to 36, 44), with decision 23 (the provider and limits stay in General, AI prompts a list of records) to confirm; then sign-in (41, 42).
 <!-- SECTION:NOTES:END -->
