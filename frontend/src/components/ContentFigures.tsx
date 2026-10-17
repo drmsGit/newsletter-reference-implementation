@@ -1,5 +1,6 @@
 import { useContentPerformance, type ContentFigures } from '../api/resources'
 import DataTable, { type DataColumn } from './DataTable'
+import DetailSection from './DetailSection'
 import ScreenState from './ScreenState'
 
 /**
@@ -35,8 +36,7 @@ export function Performance({ recordId }: { recordId: number }) {
   const performance = useContentPerformance(recordId)
   const overall = performance.data?.overall
   return (
-    <section aria-labelledby="record-performance-heading">
-      <h2 id="record-performance-heading">Performance</h2>
+    <DetailSection id="record-performance-heading" title="Performance">
       <ScreenState query={performance}>
         {overall && overall.deliveries === 0 ? (
           <p className="muted">No email or push that carried this record has been sent yet.</p>
@@ -72,6 +72,6 @@ export function Performance({ recordId }: { recordId: number }) {
           )
         )}
       </ScreenState>
-    </section>
+    </DetailSection>
   )
 }

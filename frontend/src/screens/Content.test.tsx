@@ -22,11 +22,11 @@ function open({ refuse }: { refuse?: number } = {}, { shortcuts = false } = {}) 
   } as never)
   const routes = (
     <Routes>
-      <Route path="/content" element={<Content />} />
+      <Route path="/content/records" element={<Content />} />
       <Route path="/content/:id" element={<h1>Record page</h1>} />
     </Routes>
   )
-  renderWithProviders(shortcuts ? <ShortcutsProvider>{routes}</ShortcutsProvider> : routes, { route: '/content' })
+  renderWithProviders(shortcuts ? <ShortcutsProvider>{routes}</ShortcutsProvider> : routes, { route: '/content/records' })
   return writes
 }
 

@@ -48,6 +48,7 @@ export default function CategoryChoice({
   label = 'Category',
   noneLabel = 'Any category',
   exclude,
+  pulldown = false,
 }: {
   selected: number | null
   onChange: (id: number | null) => void
@@ -56,6 +57,8 @@ export default function CategoryChoice({
   noneLabel?: string
   /** Categories not to offer, e.g. those a record already has (task-280). */
   exclude?: ReadonlySet<number>
+  /** A list's filter, the label inside the control (task-372). */
+  pulldown?: boolean
 }) {
   const categories = useCategories()
   const relations = useCategoryRelations()
@@ -65,6 +68,7 @@ export default function CategoryChoice({
   return (
     <Choice
       label={label}
+      pulldown={pulldown}
       options={[
         { id: 'any', name: noneLabel },
         ...tree.map(({ category, depth }) => ({ id: String(category.id), name: category.name, indent: depth })),

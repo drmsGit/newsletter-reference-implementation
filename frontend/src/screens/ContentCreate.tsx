@@ -18,7 +18,7 @@ export default function ContentCreate() {
   useShortcut('n', 'New content record', () => setOpen(true))
   return (
     <>
-      <Button onPress={() => setOpen(true)}>
+      <Button className="btn-primary" onPress={() => setOpen(true)}>
         New record <ShortcutHint keys="n" />
       </Button>
       <ModalOverlay isOpen={open} onOpenChange={setOpen} isDismissable className="preview-overlay">

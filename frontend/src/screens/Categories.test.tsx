@@ -63,13 +63,38 @@ describe('the category pages (task-359)', () => {
     open('/content/categories')
     const table = await screen.findByRole('grid', { name: 'Categories' })
     const family = within(table).getByText('Family').closest('[role="row"]') as HTMLElement
-    expect(within(family).getByText('Beach')).toBeInTheDocument()
+    expect(family).toHaveTextContent('Sub · under Beach')
+    expect(family).toHaveTextContent('0 subcategories')
+  })
+
+  it('fills in where each sits when the links arrive after the categories (task-372)', async () => {
+    const { handlers } = server()
+    stubFetch({
+      ...handlers,
+      // The list caches each row's rendering: a row drawn before the links
+      // came must still be redrawn with them.
+      'GET /content/category-relations': () =>
+        new Promise<Response>((resolve) => setTimeout(() => resolve(jsonResponse(RELATIONS)), 30)),
+    } as never)
+    renderWithProviders(
+      <Routes>
+        <Route path="/content/categories" element={<Categories />} />
+      </Routes>,
+      { route: '/content/categories' },
+    )
+    const table = await screen.findByRole('grid', { name: 'Categories' })
+    const row = (name: string) => within(table).getByText(name).closest('[role="row"]') as HTMLElement
+    await waitFor(() => expect(row('Family')).toHaveTextContent('Sub · under Beach'))
+    expect(row('Beach')).toHaveTextContent('1 subcategory')
   })
 
   it('creates a category of a type', async () => {
     const writes = open('/content/categories')
-    fireEvent.change(await screen.findByLabelText('New category'), { target: { value: 'Wellness' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    // "New category" opens a dialog (task-372, decision 22).
+    fireEvent.click(await screen.findByRole('button', { name: 'New category' }))
+    const dialog = await screen.findByRole('dialog', { name: 'New category' })
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'New category' }), { target: { value: 'Wellness' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }))
     await waitFor(() => expect(writes).toHaveLength(1))
     expect(await writes[0].json()).toEqual({ name: 'Wellness', type: 'main' })
   })

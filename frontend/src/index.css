@@ -1520,6 +1520,58 @@ kbd {
 .group-body .create-form > .react-aria-Select { flex: 1 1 12rem; }
 .group-body .create-form > .btnrow { margin: 0; }
 
+/* --- content (renders 27, 28; decision 20, a drill-in) ----------------------- */
+
+/* A part's menu in column 2 (Settings and Content): rows, the open one tinted. */
+.menu .item-list { list-style: none; margin: 0; }
+.menu-item {
+  position: relative;
+  display: block;
+  padding: 10px 12px;
+  border-radius: var(--brand-radius-panel);
+  color: var(--brand-fg);
+  font-weight: 600;
+  text-decoration: none;
+}
+.menu li + li .menu-item::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 1px;
+  background: var(--brand-line);
+}
+.menu-item:hover { background: var(--brand-surface-2); }
+.menu-item[aria-current] { background: var(--brand-selected); }
+.menu li:has(.menu-item:hover) + li .menu-item::before,
+.menu-item:hover::before,
+.menu li:has(.menu-item[aria-current]) + li .menu-item::before,
+.menu-item[aria-current]::before { display: none; }
+
+.list-head__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.list-head__row h1 { margin: 0; }
+.list-note { margin: 6px 0 0; font-size: 12px; line-height: 16px; }
+
+/* Inside a card of rows: a nested form's fields are rows too; a table, a fact
+   list and a list of links run to the card's edges. */
+.card-rows > form.card-rows { padding: 0; }
+.card-rows > .react-aria-Table, .card-rows > .fact-list { padding: 0; }
+.card-rows .inline-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.card-rows .inline-form .react-aria-Select { flex: 1 1 12rem; }
+.card-rows .row-title { margin: 0 0 6px; font-size: 13px; line-height: 18px; font-weight: 600; }
+.link-list { list-style: none; margin: 0; padding: 0; }
+.link-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; }
+.field-note { margin: 4px 0 0; font-size: 12px; line-height: 16px; }
+.status-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.group:empty { display: none; }
+.card-rows > .readiness > p { margin: 4px 0 0; }
+.card-rows > .readiness > span.muted { display: block; margin-top: 4px; font-size: 12px; line-height: 16px; }
+.card-rows > ul { list-style: none; }
+.card-rows > .assignments, .card-rows > .versions, .card-rows > .used-in { padding: 12px 16px; margin: 0; }
+.card-rows .assignment { align-items: flex-end; }
+.card-rows .assignment__name { flex: 1; font-weight: 600; align-self: center; }
+
 /* A link that is a button (Edit, Send): the button's look, the link's meaning. */
 a.btn-link {
   display: inline-flex;

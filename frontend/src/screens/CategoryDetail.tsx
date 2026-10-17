@@ -15,6 +15,8 @@ import { HttpError } from '../api/session'
 import Choice from '../components/Choice'
 import { figureColumns } from '../components/ContentFigures'
 import DataTable, { type DataColumn } from '../components/DataTable'
+import DetailSection from '../components/DetailSection'
+import Fact from '../components/Fact'
 import ScreenState from '../components/ScreenState'
 import { CATEGORIES, TYPES, refusal } from './Categories'
 
@@ -35,9 +37,14 @@ export default function CategoryDetail() {
   const { id } = useParams()
   const detail = useCategoryDetail(Number(id))
   return (
-    <ScreenState query={detail}>
-      {detail.data && <Page key={detail.data.category.id} detail={detail.data} />}
-    </ScreenState>
+    // Column 3 of the categories (task-372, render 28); the list sits beside it.
+    <div className="detail">
+      <div className="detail-scroll">
+        <ScreenState query={detail}>
+          {detail.data && <Page key={detail.data.category.id} detail={detail.data} />}
+        </ScreenState>
+      </div>
+    </div>
   )
 }
 
@@ -45,33 +52,29 @@ export function Page({ detail }: { detail: Detail }) {
   const { category } = detail
   return (
     <>
-      <p>
-        <Link to={CATEGORIES}>← Categories</Link>
-      </p>
-      <h1>{category.name}</h1>
+      <div className="detail-head">
+        <h2>{category.name}</h2>
+      </div>
       <Rename id={category.id} name={category.name} type={category.type} />
       <Relations detail={detail} />
-      <section aria-labelledby="category-records">
-        <h2 id="category-records">This brand's records in it</h2>
+      <DetailSection id="category-records" title="This brand's records in it">
         <DataTable
           label="Records in this category"
           columns={RECORD_COLUMNS}
           items={detail.assigned_content.map((r) => ({ ...r, id: r.content_id }))}
           emptyMessage="No record of this brand is in this category."
         />
-      </section>
-      <section aria-labelledby="category-signal">
-        <h2 id="category-signal">Signal</h2>
-        <dl className="facts">
-          <dt>Updates to interests</dt>
-          <dd>{detail.impact.update_count}</dd>
-          <dt>Total</dt>
-          <dd>{detail.impact.total_delta}</dd>
-          <dt>Average</dt>
-          <dd>{detail.impact.avg_delta}</dd>
+      </DetailSection>
+      <DetailSection id="category-signal" title="Signal">
+        <dl className="fact-list">
+          <Fact label="Updates to interests">{detail.impact.update_count}</Fact>
+          <Fact label="Total">{detail.impact.total_delta}</Fact>
+          <Fact label="Average">{detail.impact.avg_delta}</Fact>
         </dl>
-      </section>
-      <Delete id={category.id} name={category.name} />
+      </DetailSection>
+      <DetailSection id="category-delete" title="Delete">
+        <Delete id={category.id} name={category.name} />
+      </DetailSection>
     </>
   )
 }
@@ -82,25 +85,31 @@ function Rename({ id, name: current, type: currentType }: { id: number; name: st
   const [type, setType] = useState(currentType)
   const unchanged = name.trim() === current && type === currentType
   return (
-    <form
-      className="inline-form"
-      aria-label="Name and type"
-      onSubmit={(event) => {
-        event.preventDefault()
-        change.mutate({ name: name.trim(), type })
-      }}
-    >
-      <TextField value={name} onChange={setName}>
-        <Label>Name</Label>
-        <Input />
-      </TextField>
-      <Choice label="Type" options={TYPES} selected={type} onChange={setType} />
-      <Button type="submit" isDisabled={unchanged || !name.trim() || change.isPending}>
-        Save
-      </Button>
-      <span className="muted"> Shared by every brand: a new name shows everywhere.</span>
-      {change.error != null && <p role="alert">Not saved: {refusal(change.error)}</p>}
-    </form>
+    <DetailSection id="category-name" title="Name and type">
+      <form
+        className="card-rows"
+        aria-label="Name and type"
+        onSubmit={(event) => {
+          event.preventDefault()
+          change.mutate({ name: name.trim(), type })
+        }}
+      >
+        <TextField value={name} onChange={setName}>
+          <Label>Name</Label>
+          <Input />
+        </TextField>
+        <div>
+          <Choice label="Type" options={TYPES} selected={type} onChange={setType} />
+          <p className="muted field-note">Shared by every brand: a new name shows everywhere.</p>
+        </div>
+        <div>
+          <Button type="submit" isDisabled={unchanged || !name.trim() || change.isPending}>
+            Save
+          </Button>
+        </div>
+        {change.error != null && <p role="alert">Not saved: {refusal(change.error)}</p>}
+      </form>
+    </DetailSection>
   )
 }
 
@@ -122,21 +131,24 @@ function Relations({ detail }: { detail: Detail }) {
     items.length === 0 ? (
       <p className="muted">None.</p>
     ) : (
-      <ul aria-label={label}>
+      <ul aria-label={label} className="link-list">
         {items.map((c) => (
           <li key={c.id}>
             <Link to={`${CATEGORIES}/${c.id}`}>{c.name}</Link>{' '}
-            <Button onPress={() => c.relation_id != null && remove.mutate(c.relation_id)}>Remove link</Button>
+            <Button className="btn-plain btn-sm" onPress={() => c.relation_id != null && remove.mutate(c.relation_id)}>
+              Remove link
+            </Button>
           </li>
         ))}
       </ul>
     )
 
   return (
-    <section aria-labelledby="category-relations">
-      <h2 id="category-relations">Where it sits</h2>
-      <h3>Under</h3>
-      {list(detail.parents, 'Under')}
+    <DetailSection id="category-relations" title="Where it sits">
+      <div>
+        <h4 className="row-title">Under</h4>
+        {list(detail.parents, 'Under')}
+      </div>
       <div className="inline-form">
         <Choice label="Put it under" options={others} selected={parent} onChange={setParent}
           placeholder="Choose a category" />
@@ -147,8 +159,10 @@ function Relations({ detail }: { detail: Detail }) {
           Add
         </Button>
       </div>
-      <h3>Subcategories</h3>
-      {list(detail.children, 'Subcategories')}
+      <div>
+        <h4 className="row-title">Subcategories</h4>
+        {list(detail.children, 'Subcategories')}
+      </div>
       <div className="inline-form">
         <Choice label="Add a subcategory" options={others} selected={child} onChange={setChild}
           placeholder="Choose a category" />
@@ -160,7 +174,7 @@ function Relations({ detail }: { detail: Detail }) {
         </Button>
       </div>
       {error != null && <p role="alert">Not changed: {refusal(error)}</p>}
-    </section>
+    </DetailSection>
   )
 }
 
@@ -171,7 +185,14 @@ function Delete({ id, name }: { id: number; name: string }) {
   const [asking, setAsking] = useState(false)
   const blocked = remove.error instanceof HttpError && remove.error.status === 409
   const done = { onSuccess: () => navigate(CATEGORIES) }
-  if (!asking) return <Button onPress={() => setAsking(true)}>Delete category…</Button>
+  if (!asking)
+    return (
+      <div>
+        <Button className="btn-destructive" onPress={() => setAsking(true)}>
+          Delete category…
+        </Button>
+      </div>
+    )
   return (
     <div role="group" aria-label={`Delete ${name}?`}>
       {blocked ? (

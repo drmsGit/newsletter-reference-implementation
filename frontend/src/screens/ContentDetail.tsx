@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { Button, Switch } from 'react-aria-components'
 import { Link, useNavigate, useParams } from 'react-router'
 
@@ -20,6 +21,7 @@ import {
 } from '../api/resources'
 import CategoryChoice from '../components/CategoryChoice'
 import Choice from '../components/Choice'
+import DetailSection from '../components/DetailSection'
 import { HttpError } from '../api/session'
 import { AutosaveField, SaveState, altFieldsOf, fieldError } from '../components/EditorFields'
 import { Performance } from '../components/ContentFigures'
@@ -57,29 +59,29 @@ export default function ContentDetail() {
   const [generation, setGeneration] = useState(0)
 
   return (
-    <>
-      <p>
-        <Link to="/content">← Content</Link>
-      </p>
-      <ScreenState query={record}>
-        {record.data && (
-          <RecordPage
-            // "Load their version" remounts the page, so every field starts
-            // from what is stored. A field keeps its draft while its stored
-            // value is unchanged, and after a refused save the value often is
-            // unchanged (somebody else edited another field): the refused text
-            // would stay on screen looking saved.
-            key={generation}
-            record={record.data}
-            fields={fields.data ?? []}
-            reload={() => {
-              setGeneration((n) => n + 1)
-              record.refetch()
-            }}
-          />
-        )}
-      </ScreenState>
-    </>
+    // Column 3 of the records (task-372, render 27); the list sits beside it.
+    <div className="detail">
+      <div className="detail-scroll">
+        <ScreenState query={record}>
+          {record.data && (
+            <RecordPage
+              // "Load their version" remounts the page, so every field starts
+              // from what is stored. A field keeps its draft while its stored
+              // value is unchanged, and after a refused save the value often is
+              // unchanged (somebody else edited another field): the refused text
+              // would stay on screen looking saved.
+              key={generation}
+              record={record.data}
+              fields={fields.data ?? []}
+              reload={() => {
+                setGeneration((n) => n + 1)
+                record.refetch()
+              }}
+            />
+          )}
+        </ScreenState>
+      </div>
+    </div>
   )
 }
 
@@ -105,16 +107,17 @@ function RecordPage({
 
   return (
     <>
-      <h1>{record.title}</h1>
+      <div className="detail-head">
+        <h2>{record.title}</h2>
+      </div>
       <StatusAndDuplicate record={record} />
 
-      <div className="record-notices">
+      <div className="group card-rows record-notices">
         <PublishState recordId={record.id} detail={record} />
         <ReachLine recordId={record.id} />
       </div>
 
-      <section aria-labelledby="record-details-heading">
-        <h2 id="record-details-heading">Details</h2>
+      <DetailSection id="record-details-heading" title="Details">
         <AutosaveField
           field={{ name: 'title', label: 'Title', type: 'text', required: true }}
           value={record.title}
@@ -128,39 +131,41 @@ function RecordPage({
           error={fieldError(save.error, 'description')}
         />
         <LanguageChoice record={record} />
-      </section>
+      </DetailSection>
 
       <ContentDraft recordId={record.id} fields={fields} />
       <Translations record={record} fields={fields} />
 
       {channels.map((channel) => (
-        <details key={channel} open className="record-channel">
+        <details key={channel} open className="record-channel results">
           <summary>
-            <h2>{channel.charAt(0).toUpperCase() + channel.slice(1)}</h2>
+            <ChevronDown size={16} strokeWidth={1.75} aria-hidden="true" className="results-chevron" />
+            <h3>{channel.charAt(0).toUpperCase() + channel.slice(1)}</h3>
           </summary>
-          {channel !== 'other' && <ReadyFor record={record} channel={channel} />}
-          {fields
-            .filter((f) => (f.channel ?? 'other') === channel && !alts.has(f.name))
-            .map((field) => (
-              <AutosaveField
-                key={field.name}
-                field={field}
-                value={typeof content[field.name] === 'string' ? (content[field.name] as string) : ''}
-                alt={field.alt && typeof content[field.alt] === 'string' ? (content[field.alt] as string) : ''}
-                personalise
-                // Only this channel's fields may be cleared by this save (B19).
-                onSave={(value, also) =>
-                  save.mutate({ content: { [field.name]: value, ...also }, groups: [channel] })
-                }
-                error={fieldError(save.error, field.name)}
-              />
-            ))}
+          <div className="group card-rows">
+            {channel !== 'other' && <ReadyFor record={record} channel={channel} />}
+            {fields
+              .filter((f) => (f.channel ?? 'other') === channel && !alts.has(f.name))
+              .map((field) => (
+                <AutosaveField
+                  key={field.name}
+                  field={field}
+                  value={typeof content[field.name] === 'string' ? (content[field.name] as string) : ''}
+                  alt={field.alt && typeof content[field.alt] === 'string' ? (content[field.alt] as string) : ''}
+                  personalise
+                  // Only this channel's fields may be cleared by this save (B19).
+                  onSave={(value, also) =>
+                    save.mutate({ content: { [field.name]: value, ...also }, groups: [channel] })
+                  }
+                  error={fieldError(save.error, field.name)}
+                />
+              ))}
+          </div>
         </details>
       ))}
 
       {undefinedKeys.length > 0 && (
-        <section aria-labelledby="record-other-heading">
-          <h2 id="record-other-heading">Other stored values</h2>
+        <DetailSection id="record-other-heading" title="Other stored values">
           <p className="muted">No field definition names these, so they are shown but not edited here.</p>
           <dl className="facts">
             {undefinedKeys.map((key) => (
@@ -170,7 +175,7 @@ function RecordPage({
               </div>
             ))}
           </dl>
-        </section>
+        </DetailSection>
       )}
       <SaveState mutation={save} reload={reload} what="the record" />
 
@@ -210,17 +215,21 @@ function StatusAndDuplicate({ record }: { record: ContentRecordDetail }) {
   const chosen = target ?? (options[0] ? String(options[0].id) : null)
 
   return (
-    <div className="record-actions">
-      <span className="muted">{active ? 'Active' : 'Inactive'}</span>{' '}
-      <Button
-        isDisabled={status.isPending}
-        onPress={() => status.mutate(active ? 'inactive' : 'active')}
-      >
-        {active ? 'Deactivate' : 'Reactivate'}
-      </Button>
-      {!active && (
-        <span className="muted"> Inactive records are not offered by the picker or chosen by a slot.</span>
-      )}
+    <div className="group card-rows record-actions">
+      <div className="status-row">
+        <span>
+          <strong>{active ? 'Active' : 'Inactive'}</strong>
+          {!active && (
+            <span className="muted"> Inactive records are not offered by the picker or chosen by a slot.</span>
+          )}
+        </span>
+        <Button
+          isDisabled={status.isPending}
+          onPress={() => status.mutate(active ? 'inactive' : 'active')}
+        >
+          {active ? 'Deactivate' : 'Reactivate'}
+        </Button>
+      </div>
       <SaveState mutation={status} what="the record" />
       <MachineReady record={record} />
       {options.length > 0 && chosen && (
@@ -320,8 +329,7 @@ function Categories({ recordId }: { recordId: number }) {
   const assigned = new Set((assignments.data ?? []).map((a) => a.category_id))
 
   return (
-    <section aria-labelledby="categories-heading">
-      <h2 id="categories-heading">Categories</h2>
+    <DetailSection id="categories-heading" title="Categories">
       <p className="muted">
         Categories build each recipient&apos;s interest profile. For finding content, facets will follow.
       </p>
@@ -382,7 +390,7 @@ function Categories({ recordId }: { recordId: number }) {
         // refused score arrives as a field error SaveState would not show.
         <p role="alert">Not saved: {edit.error instanceof HttpError ? edit.error.detail : 'the change failed.'}</p>
       )}
-    </section>
+    </DetailSection>
   )
 }
 
@@ -391,8 +399,7 @@ function Versions({ recordId, fields }: { recordId: number; fields: ContentField
   const versions = useContentVersions(recordId)
   const labelOf = new Map(fields.map((f) => [f.name, f.label ?? f.name]))
   return (
-    <section aria-labelledby="versions-heading">
-      <h2 id="versions-heading">Published versions</h2>
+    <DetailSection id="versions-heading" title="Published versions">
       <ScreenState query={versions}>
         {versions.data && versions.data.length === 0 ? (
           <p className="muted">Nothing published yet.</p>
@@ -423,7 +430,7 @@ function Versions({ recordId, fields }: { recordId: number; fields: ContentField
           </ul>
         )}
       </ScreenState>
-    </section>
+    </DetailSection>
   )
 }
 
@@ -437,8 +444,7 @@ function Versions({ recordId, fields }: { recordId: number; fields: ContentField
 function UsedIn({ recordId }: { recordId: number }) {
   const used = useCampaignsUsing(recordId)
   return (
-    <section aria-labelledby="used-in-heading">
-      <h2 id="used-in-heading">Used in</h2>
+    <DetailSection id="used-in-heading" title="Used in">
       <ScreenState query={used}>
         {used.data && used.data.items.length === 0 ? (
           <p className="muted">No campaign has a module bound to this record.</p>
@@ -467,6 +473,6 @@ function UsedIn({ recordId }: { recordId: number }) {
         )}
         <p className="muted">A decision slot that may pick this record when it sends is not listed.</p>
       </ScreenState>
-    </section>
+    </DetailSection>
   )
 }

@@ -62,7 +62,7 @@ describe('filtering content by category (task-270)', () => {
     const fetchMock = stubFetch({ 'GET /content/': () => jsonResponse(page([])), ...CATEGORY_ROUTES })
     renderWithProviders(
       <Routes>
-        <Route path="/content" element={<Content />} />
+        <Route path="/content/records" element={<Content />} />
       </Routes>,
       { route },
     )
@@ -70,7 +70,7 @@ describe('filtering content by category (task-270)', () => {
   }
 
   it('sends the category held in the URL', async () => {
-    const fetchMock = contentAt('/content?category=8')
+    const fetchMock = contentAt('/content/records?category=8')
     await waitFor(() => expect(lastQuery(fetchMock, '/content/').get('category_id')).toBe('8'))
     expect(await screen.findByRole('button', { name: /Beach/ })).toBeInTheDocument()
     // Search reaches the description too since task-268, and says so.
@@ -78,7 +78,7 @@ describe('filtering content by category (task-270)', () => {
   })
 
   it('sends a chosen category and starts from the first page', async () => {
-    const fetchMock = contentAt('/content?offset=50')
+    const fetchMock = contentAt('/content/records?offset=50')
     await waitFor(() => expect(lastQuery(fetchMock, '/content/').get('offset')).toBe('50'))
     fireEvent.click(screen.getByRole('button', { name: /Any category/ }))
     fireEvent.click(await screen.findByRole('option', { name: 'Beach' }))
@@ -87,13 +87,13 @@ describe('filtering content by category (task-270)', () => {
   })
 
   it('says no record matches, not that the brand has none, when a filter empties the list', async () => {
-    contentAt('/content?category=8')
+    contentAt('/content/records?category=8')
     expect(await screen.findByText('No content matches these filters.')).toBeInTheDocument()
     expect(screen.queryByText('No content in this brand yet.')).not.toBeInTheDocument()
   })
 
   it('drops the category for "Any category"', async () => {
-    const fetchMock = contentAt('/content?category=8')
+    const fetchMock = contentAt('/content/records?category=8')
     fireEvent.click(await screen.findByRole('button', { name: /Beach/ }))
     fireEvent.click(await screen.findByRole('option', { name: 'Any category' }))
     await waitFor(() => expect(lastQuery(fetchMock, '/content/').has('category_id')).toBe(false))
@@ -105,9 +105,9 @@ describe('filtering content by status', () => {
     const fetchMock = stubFetch({ 'GET /content/': () => jsonResponse(page([])), ...CATEGORY_ROUTES })
     renderWithProviders(
       <Routes>
-        <Route path="/content" element={<Content />} />
+        <Route path="/content/records" element={<Content />} />
       </Routes>,
-      { route: '/content?status=inactive' },
+      { route: '/content/records?status=inactive' },
     )
     await waitFor(() => expect(lastQuery(fetchMock, '/content/').get('status')).toBe('inactive'))
   })
@@ -118,7 +118,7 @@ describe('filtering content by readiness (task-286)', () => {
     const fetchMock = stubFetch({ 'GET /content/': () => jsonResponse(page([])), ...CATEGORY_ROUTES })
     renderWithProviders(
       <Routes>
-        <Route path="/content" element={<Content />} />
+        <Route path="/content/records" element={<Content />} />
       </Routes>,
       { route },
     )
@@ -126,22 +126,22 @@ describe('filtering content by readiness (task-286)', () => {
   }
 
   it('sends the channel held in the URL', async () => {
-    const fetchMock = contentAt('/content?ready=push')
+    const fetchMock = contentAt('/content/records?ready=push')
     await waitFor(() => expect(lastQuery(fetchMock, '/content/').get('ready_for')).toBe('push'))
     expect(await screen.findByRole('button', { name: /Push/ })).toBeInTheDocument()
   })
 
   it('offers each channel the fields name, sends a chosen one from the first page, and drops it for Any', async () => {
-    const fetchMock = contentAt('/content?offset=50')
+    const fetchMock = contentAt('/content/records?offset=50')
     await waitFor(() => expect(lastQuery(fetchMock, '/content/').get('offset')).toBe('50'))
-    fireEvent.click(await screen.findByRole('button', { name: /Ready for any channel/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Any channel/ }))
     const options = await screen.findAllByRole('option')
-    expect(options.map((o) => o.textContent)).toEqual(['Ready for any channel', 'Email', 'Push'])
+    expect(options.map((o) => o.textContent)).toEqual(['Any channel', 'Email', 'Push'])
     fireEvent.click(screen.getByRole('option', { name: 'Email' }))
     await waitFor(() => expect(lastQuery(fetchMock, '/content/').get('ready_for')).toBe('email'))
     expect(lastQuery(fetchMock, '/content/').get('offset')).toBe('0')
     fireEvent.click(await screen.findByRole('button', { name: /Email/ }))
-    fireEvent.click(await screen.findByRole('option', { name: 'Ready for any channel' }))
+    fireEvent.click(await screen.findByRole('option', { name: 'Any channel' }))
     await waitFor(() => expect(lastQuery(fetchMock, '/content/').has('ready_for')).toBe(false))
   })
 })

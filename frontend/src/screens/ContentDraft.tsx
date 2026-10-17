@@ -12,6 +12,7 @@ import type { components } from '../api/schema'
 import { HttpError } from '../api/session'
 import AIButton from '../components/AIButton'
 import Choice from '../components/Choice'
+import DetailSection from '../components/DetailSection'
 import { SCORES } from './scores'
 
 type ContentField = components['schemas']['ContentField']
@@ -42,8 +43,7 @@ export default function ContentDraft({ recordId, fields }: { recordId: number; f
   const latest = drafts.data?.[0]
 
   return (
-    <section aria-labelledby="draft-heading" className="content-draft">
-      <h2 id="draft-heading">Draft with AI</h2>
+    <DetailSection id="draft-heading" title="Draft with AI" className="content-draft">
       <TextField value={source} onChange={setSource} isInvalid={!!refused?.fields.source}>
         <Label>Source</Label>
         <TextArea rows={6} />
@@ -74,7 +74,7 @@ export default function ContentDraft({ recordId, fields }: { recordId: number; f
         <p role="alert">{refused?.detail ?? 'The draft could not be asked for.'}</p>
       )}
       {latest && <Proposal key={latest.run_id} recordId={recordId} draft={latest} />}
-    </section>
+    </DetailSection>
   )
 }
 

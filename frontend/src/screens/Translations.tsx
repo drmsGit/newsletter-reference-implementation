@@ -12,6 +12,7 @@ import { HttpError } from '../api/session'
 import type { components } from '../api/schema'
 import AIButton from '../components/AIButton'
 import Choice from '../components/Choice'
+import DetailSection from '../components/DetailSection'
 import { Proposal } from './ContentDraft'
 
 type ContentField = components['schemas']['ContentField']
@@ -75,10 +76,9 @@ export function LanguageChoice({ record }: { record: ContentRecordDetail }) {
  */
 export default function Translations({ record, fields }: { record: ContentRecordDetail; fields: ContentField[] }) {
   return (
-    <section aria-labelledby="translations-heading">
-      <h2 id="translations-heading">Translations</h2>
+    <DetailSection id="translations-heading" title="Translations">
       {record.original ? <OfAnOriginal record={record} fields={fields} /> : <AnOriginal record={record} />}
-    </section>
+    </DetailSection>
   )
 }
 

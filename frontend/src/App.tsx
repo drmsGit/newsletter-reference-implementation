@@ -17,7 +17,7 @@ import VariantEditor from './screens/VariantEditor'
 import SendVariant from './screens/SendVariant'
 import Settings from './screens/Settings'
 import BrandProfileDetail from './screens/BrandProfileDetail'
-import ContentLayout from './screens/ContentLayout'
+import { ContentMenu, ContentSplit, GraphPage, NothingOpen, RECORDS } from './screens/ContentLayout'
 import Categories from './screens/Categories'
 import CategoryGraph from './screens/CategoryGraph'
 import CategoryDetail from './screens/CategoryDetail'
@@ -95,13 +95,21 @@ export default function App() {
           <Route path="brands" element={<Brands />} />
         </Route>
         {/* Content and its parts as subpages (task-359), like Settings. */}
-        <Route path="/content" element={<ContentLayout />}>
-          <Route index element={<Content />} />
-          <Route path="categories" element={<Categories />} />
-          <Route path="categories/:id" element={<CategoryDetail />} />
-          <Route path="graph" element={<CategoryGraph />} />
-          <Route path=":id" element={<ContentDetail />} />
+        {/* A drill-in (task-372, decision 20): the parts, then a part's list
+            beside what is open; the graph full width. A record keeps its
+            address, /content/:id, with the records beside it. */}
+        <Route path="/content" element={<ContentSplit label="Content parts" list={<ContentMenu />} />}>
+          <Route index element={<NothingOpen text="Choose records, categories or the graph." />} />
         </Route>
+        <Route element={<ContentSplit label="Records" list={<Content />} />}>
+          <Route path={RECORDS} element={<NothingOpen text="Select a record to see it." />} />
+          <Route path="/content/:id" element={<ContentDetail />} />
+        </Route>
+        <Route element={<ContentSplit label="Categories" list={<Categories />} />}>
+          <Route path="/content/categories" element={<NothingOpen text="Select a category to see it." />} />
+          <Route path="/content/categories/:id" element={<CategoryDetail />} />
+        </Route>
+        <Route path="/content/graph" element={<GraphPage><CategoryGraph /></GraphPage>} />
         <Route path="/audiences" element={<Audiences />} />
         <Route path="/audiences/:id" element={<AudienceDetail />} />
         <Route path="/recipients" element={<Recipients />} />

@@ -1,24 +1,20 @@
-import { useNavigate, useSearchParams } from 'react-router'
+import { GridList, GridListItem } from 'react-aria-components'
+import { useLocation, useMatch, useNavigate, useSearchParams } from 'react-router'
 
-import { useContentFields, useContentList, type ContentRecord } from '../api/resources'
+import { useContentFields, useContentList } from '../api/resources'
+import BackTo from '../components/BackTo'
 import CategoryChoice from '../components/CategoryChoice'
-import DataTable, { type DataColumn } from '../components/DataTable'
 import Choice from '../components/Choice'
 import Pager, { useOffset } from '../components/Pager'
 import { SearchBox, useSearch } from '../components/RecipientSearch'
 import ScreenState from '../components/ScreenState'
 import ContentCreate from './ContentCreate'
 
-const columns: DataColumn<ContentRecord>[] = [
-  { key: 'title', header: 'Title', isRowHeader: true, render: (r) => r.title },
-  { key: 'status', header: 'Status', render: (r) => r.status ?? '—' },
-  {
-    key: 'description',
-    header: 'Description',
-    render: (r) => r.description || <span className="muted">—</span>,
-  },
-]
-
+/**
+ * The records: column 2 of Content's drill-in (task-372, render 27). A row
+ * opens the record beside the list, keeping the search and filters in the
+ * address; the open record is the list's single selection.
+ */
 export default function Content() {
   const [params, setParams] = useSearchParams()
   // Content's own status vocabulary (`CONTENT_STATUSES`); the server refuses others.
@@ -34,6 +30,10 @@ export default function Content() {
   const content = useContentList(useOffset(), search, status || undefined, category, ready)
   const filtered = Boolean(search || status || category || ready)
   const navigate = useNavigate()
+  const location = useLocation()
+  // `/content/records` matches the pattern too: only a number is a record.
+  const openId = Number(useMatch('/content/:id')?.params.id)
+  const open = Number.isInteger(openId) ? openId : undefined
 
   function setFilter(key: string, value: string | null) {
     const next = new URLSearchParams(params)
@@ -45,12 +45,18 @@ export default function Content() {
 
   return (
     <>
-      <h1>Content</h1>
-      <ContentCreate />
+      <div className="list-head">
+        <BackTo to="/content" label="Content" />
+        <div className="list-head__row">
+          <h1>Records</h1>
+          <ContentCreate />
+        </div>
+      </div>
+      <SearchBox label="Find content by title or description" compact />
       <div className="filters">
-        <SearchBox label="Find content by title or description" />
         <Choice
           label="Status"
+          pulldown
           options={[
             { id: 'any', name: 'Any status' },
             { id: 'active', name: 'Active' },
@@ -59,11 +65,16 @@ export default function Content() {
           selected={status || 'any'}
           onChange={(v) => setFilter('status', v === 'any' ? null : v)}
         />
-        <CategoryChoice selected={category} onChange={(id) => setFilter('category', id == null ? null : String(id))} />
+        <CategoryChoice
+          pulldown
+          selected={category}
+          onChange={(id) => setFilter('category', id == null ? null : String(id))}
+        />
         <Choice
           label="Ready for"
+          pulldown
           options={[
-            { id: 'any', name: 'Ready for any channel' },
+            { id: 'any', name: 'Any channel' },
             ...channels.map((c) => ({ id: c, name: c.charAt(0).toUpperCase() + c.slice(1) })),
           ]}
           selected={ready && channels.includes(ready) ? ready : 'any'}
@@ -71,16 +82,39 @@ export default function Content() {
         />
       </div>
       <ScreenState query={content}>
-        <DataTable
-          label="Content records"
-          columns={columns}
+        <GridList
+          aria-label="Content records"
+          className="react-aria-GridList item-list"
           items={content.data?.items ?? []}
-          // With a filter set, an empty page says nothing about the brand.
-          emptyMessage={filtered ? 'No content matches these filters.' : 'No content in this brand yet.'}
-          onRowAction={(r) => navigate(`/content/${r.id}`)}
-        />
-        <Pager page={content.data} />
+          selectionMode="single"
+          selectionBehavior="replace"
+          selectedKeys={open !== undefined ? [open] : []}
+          onSelectionChange={(keys) => {
+            const [key] = keys === 'all' ? [] : [...keys]
+            if (key !== undefined && Number(key) !== open)
+              navigate({ pathname: `/content/${key}`, search: location.search })
+          }}
+          renderEmptyState={() => (
+            // With a filter set, an empty page says nothing about the brand.
+            <p className="list-empty muted">
+              {filtered ? 'No content matches these filters.' : 'No content in this brand yet.'}
+            </p>
+          )}
+        >
+          {(r) => (
+            <GridListItem id={r.id} textValue={r.title} className="react-aria-GridListItem item">
+              <span className="item-title">{r.title}</span>
+              <span className="item-summary">{r.description || <span className="muted">—</span>}</span>
+              <span className="item-meta">
+                <span>{r.status ?? '—'}</span>
+              </span>
+            </GridListItem>
+          )}
+        </GridList>
       </ScreenState>
+      <div className="list-foot list-foot--end">
+        <Pager page={content.data} />
+      </div>
     </>
   )
 }
