@@ -222,9 +222,14 @@ Quote every field with straight double quotes. Raw CSV only.
 
 ## The images
 
-Square (1:1), 1024 × 1024, saved as JPEG (about 150–300 KB each, so the set
-stays near 10 MB in the repository). Photographic, natural light, the southern
-German Alps and foothills. **No text, no logos, no brand marks, no recognisable
+Square (1:1), **600 × 600**, JPEG (about 60–120 KB each, the set about 4 MB).
+Every block shows the square in a 50% column of the 600 px email: about 300 px
+on a desktop screen, and full phone width (about 340–390 px) when the columns
+stack. 600 px is sharp on 2× screens in both; 300 px would look soft on most.
+Image tools usually give 1024 px; shrink the folder on a Mac with:
+`sips -Z 600 -s format jpeg -s formatOptions 80 backend/scripts/demo/images/*.jpg`
+
+Photographic, natural light, the southern German Alps and foothills. **No text, no logos, no brand marks, no recognisable
 faces** (people from behind, at a distance or cropped). Save each as
 `backend/scripts/demo/images/<key>.jpg`.
 
