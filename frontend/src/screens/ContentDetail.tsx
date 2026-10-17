@@ -69,8 +69,11 @@ export default function ContentDetail() {
               // from what is stored. A field keeps its draft while its stored
               // value is unchanged, and after a refused save the value often is
               // unchanged (somebody else edited another field): the refused text
-              // would stay on screen looking saved.
-              key={generation}
+              // would stay on screen looking saved. Keyed by the record too:
+              // beside the list the page stays mounted from one record to the
+              // next, and a draft, a refusal or an AI brief belongs to the
+              // record it was made on (Codex doc-34).
+              key={`${record.data.id}:${generation}`}
               record={record.data}
               fields={fields.data ?? []}
               reload={() => {

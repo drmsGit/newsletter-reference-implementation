@@ -95,7 +95,13 @@ export default function SendVariant() {
                       onPlanned={continueWith}
                     />
                   ) : (
-                    <SendStep sendId={sendId} campaignId={campaignId} onAnother={() => continueWith(null)} />
+                    // Keyed by the send: one send's outcome is not the next one's (doc-34).
+                    <SendStep
+                      key={sendId}
+                      sendId={sendId}
+                      campaignId={campaignId}
+                      onAnother={() => continueWith(null)}
+                    />
                   )}
                 </>
               ))}
