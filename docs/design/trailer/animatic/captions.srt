@@ -1,0 +1,278 @@
+1
+00:00:01,200 --> 00:00:02,210
+One campaign.
+
+2
+00:00:02,260 --> 00:00:05,050
+A hundred and twenty-three readers.
+
+3
+00:00:05,100 --> 00:00:08,060
+Three hundred and sixty-nine choices.
+
+4
+00:00:08,110 --> 00:00:10,980
+Could you say why each one was made?
+
+5
+00:00:14,600 --> 00:00:18,240
+Most companies end up
+choosing between two things.
+
+6
+00:00:18,290 --> 00:00:21,340
+A tool that's easy, until they outgrow it.
+
+7
+00:00:21,390 --> 00:00:26,580
+And a system that's powerful, until
+they try to change it, or leave it.
+
+8
+00:00:30,600 --> 00:00:35,890
+But AI has changed what a company,
+or its agency, can build for itself.
+
+9
+00:00:35,940 --> 00:00:40,930
+So what if it kept the core, its
+content, its campaigns, its rules,
+
+10
+00:00:40,980 --> 00:00:46,040
+its consent, and everything around
+it were a part you could replace?
+
+11
+00:00:50,600 --> 00:00:53,920
+A CRM, a shop, a warehouse,
+an analytics tool:
+
+12
+00:00:53,970 --> 00:00:57,220
+other systems reach the
+core through the API,
+
+13
+00:00:57,270 --> 00:01:00,590
+each with its own key
+and its own permissions.
+
+14
+00:01:05,500 --> 00:01:09,560
+This is a reference for building a
+communication system you control.
+
+15
+00:01:14,600 --> 00:01:16,920
+A manager starts with content.
+
+16
+00:01:16,970 --> 00:01:21,900
+Written once, kept in one place,
+and scored by what it's about.
+
+17
+00:01:22,600 --> 00:01:25,950
+A campaign doesn't copy
+it; it points to it.
+
+18
+00:01:26,000 --> 00:01:30,350
+When one headline has to
+change, only that email changes.
+
+19
+00:01:32,600 --> 00:01:35,590
+Now one email with a slot in the middle.
+
+20
+00:01:35,640 --> 00:01:40,690
+The slot picks for each reader,
+from content a person marked ready.
+
+21
+00:01:40,740 --> 00:01:44,420
+Same email, three readers,
+three different picks.
+
+22
+00:01:44,470 --> 00:01:46,860
+And every pick can be explained.
+
+23
+00:01:52,800 --> 00:01:54,770
+AI can suggest and draft.
+
+24
+00:02:00,000 --> 00:02:02,090
+A person decides what goes out.
+
+25
+00:02:08,300 --> 00:02:12,450
+Even when a machine asks to
+send, someone has to say yes.
+
+26
+00:02:14,600 --> 00:02:17,860
+Before anything leaves,
+the system plans the send,
+
+27
+00:02:17,910 --> 00:02:22,300
+shows how many people it can reach,
+and freezes what they will get.
+
+28
+00:02:24,600 --> 00:02:27,010
+Afterwards, open any reader's message:
+
+29
+00:02:27,060 --> 00:02:31,140
+the content they received, and
+the reason each piece was picked.
+
+30
+00:02:36,600 --> 00:02:39,910
+Their clicks come back as
+signals that fade with time,
+
+31
+00:02:39,960 --> 00:02:41,400
+and shape the next pick.
+
+32
+00:02:44,600 --> 00:02:48,450
+Behind the screens, a
+developer keeps it growing,
+
+33
+00:02:48,500 --> 00:02:51,000
+by hand or with an AI assistant.
+
+34
+00:02:51,050 --> 00:02:52,840
+Not by asking a vendor.
+
+35
+00:02:52,890 --> 00:02:54,190
+By adding a file.
+
+36
+00:02:56,600 --> 00:02:58,090
+A new content block:
+
+37
+00:02:58,140 --> 00:03:00,080
+a manifest and a template.
+
+38
+00:03:00,130 --> 00:03:02,000
+It appears in the editor.
+
+39
+00:03:08,600 --> 00:03:10,930
+A new way to decide who sees what:
+
+40
+00:03:10,980 --> 00:03:14,000
+one file, written by
+whoever knows the data.
+
+41
+00:03:20,600 --> 00:03:21,510
+A new AI task.
+
+42
+00:03:21,560 --> 00:03:28,350
+The developer defines what it may read and return;
+the wording of the prompt belongs to the manager.
+
+43
+00:03:32,600 --> 00:03:36,680
+Even the delivery provider
+is a part, not a foundation.
+
+44
+00:03:36,730 --> 00:03:39,320
+Email or push, any sending service:
+
+45
+00:03:39,370 --> 00:03:43,680
+a file and a few lines, and
+the company changes who sends,
+
+46
+00:03:43,730 --> 00:03:45,780
+without touching a campaign.
+
+47
+00:03:48,600 --> 00:03:50,600
+The reason stays with the code.
+
+48
+00:03:50,650 --> 00:03:53,310
+Files point to the decisions behind them,
+
+49
+00:03:53,360 --> 00:03:57,810
+including the rules for working with
+AI, all in the same repository.
+
+50
+00:04:00,600 --> 00:04:01,480
+One campaign:
+
+51
+00:04:01,530 --> 00:04:05,610
+an email for some readers, a
+push notification for others,
+
+52
+00:04:05,660 --> 00:04:07,600
+each shaped for its channel.
+
+53
+00:04:12,300 --> 00:04:13,290
+Audiences.
+
+54
+00:04:13,340 --> 00:04:14,020
+Brands.
+
+55
+00:04:14,070 --> 00:04:14,650
+Roles.
+
+56
+00:04:14,700 --> 00:04:15,480
+Consent.
+
+57
+00:04:15,530 --> 00:04:18,090
+A record of who did what.
+
+58
+00:04:18,140 --> 00:04:21,630
+All in one place, all of it yours.
+
+59
+00:04:22,400 --> 00:04:23,970
+See what it does.
+
+60
+00:04:24,020 --> 00:04:26,060
+Change it with a file.
+
+61
+00:04:26,110 --> 00:04:27,390
+Keep the core.
+
+62
+00:04:28,800 --> 00:04:31,930
+Building a communication
+system you control.
+
+63
+00:04:31,980 --> 00:04:34,320
+Always adapting to your business.
