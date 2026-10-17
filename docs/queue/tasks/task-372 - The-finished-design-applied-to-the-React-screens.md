@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-11 20:44'
-updated_date: '2026-10-17 12:24'
+updated_date: '2026-10-17 12:37'
 labels:
   - frontend
 dependencies: []
@@ -65,4 +65,10 @@ Next: the variant editor (render 21 to 23), with open decisions 13 (drawn with t
 Step 5 built and pushed, 19240a1: the variant editor as stack (column 2) and details (column 3), the chip on each stack row, the row named as one line ("Hero · Record “Lisbon”"). Renders 22 and 23 still draw drag handles and "Drag a row to reorder it"; not built, per the correction above (the stack keeps arrows and Alt+Arrow). Left for later: the slot's categories are plain checkboxes, not render 23's option rows; inside a catalogue field, "Change X in catalogue" and the hide switch stay stacked below the field rather than sharing a line as drawn.
 
 Next: content (render 27 and 28), with open decision 20 (the Records, Categories, Graph switch) to ask first.
+
+2026-10-17, Diede: decision 20, Content is a drill-in like Settings (decision 19): column 2 shows Records, Categories and Graph; choosing a part shows its list with a way back, and the graph full width. The first part keeps the name Records.
+
+Step 6 built and pushed, d47bb8f. The records list moved to /content/records; a record keeps /content/:id with the list beside it; /content shows the parts, so g t now lands on them. Found live and fixed: the categories list kept "0 subcategories" when the links loaded after the categories (React Aria caches rows by item; dependencies added, test with late links). Left for later: the graph keeps its old green and red circles (it is not drawn); the record page's Performance figures are the old label and value grid, not fact rows; the duplicate row's button sits slightly above the select.
+
+Next: decision slots (render 32) and the preview sheet (24, decision 16 decided), then the send steps (25, 26; decision 17 to ask).
 <!-- SECTION:NOTES:END -->
