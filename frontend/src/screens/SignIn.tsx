@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { AlertCircle } from 'lucide-react'
 import { Button, FieldError, Form, Input, Label, TextField } from 'react-aria-components'
 import { Navigate, useNavigate } from 'react-router'
 
@@ -36,6 +37,7 @@ export default function SignIn() {
 
       {!codeRequested ? (
         <Form
+          className="signin-card"
           onSubmit={(event) => {
             event.preventDefault()
             requestCode.mutate(email, { onSuccess: () => setCodeRequested(true) })
@@ -46,12 +48,13 @@ export default function SignIn() {
             <Input autoFocus autoComplete="email" />
             <FieldError />
           </TextField>
-          <Button type="submit" isDisabled={requestCode.isPending}>
+          <Button type="submit" className="btn-lg" isDisabled={requestCode.isPending}>
             {requestCode.isPending ? 'Sending…' : 'Send me a code'}
           </Button>
         </Form>
       ) : (
         <Form
+          className="signin-card"
           onSubmit={(event) => {
             event.preventDefault()
             /**
@@ -86,20 +89,32 @@ export default function SignIn() {
             If that address belongs to an active account, a sign-in code is on its
             way. Enter it below.
           </p>
-          <TextField name="code" isRequired value={code} onChange={setCode}>
+          {/* Marked on the field while the refusal shows (render 42), so the
+              field itself says it, not only the line under it. As a mark only
+              ("aria"): with the browser's own validation it would block the
+              form, and one mistyped code would leave no way to sign in. */}
+          <TextField
+            name="code"
+            isRequired
+            value={code}
+            onChange={setCode}
+            isInvalid={verifyCode.isError}
+            validationBehavior="aria"
+          >
             <Label>Sign-in code</Label>
             <Input autoFocus inputMode="numeric" autoComplete="one-time-code" />
             <FieldError />
           </TextField>
-          <Button type="submit" isDisabled={verifyCode.isPending}>
-            {verifyCode.isPending ? 'Checking…' : 'Sign in'}
-          </Button>
           {verifyCode.isError && (
             <p role="alert" className="error">
+              <AlertCircle size={13} strokeWidth={2} aria-hidden="true" />
               That code is not valid or has expired.
             </p>
           )}
-          <Button type="button" onPress={() => setCodeRequested(false)}>
+          <Button type="submit" className="btn-lg" isDisabled={verifyCode.isPending}>
+            {verifyCode.isPending ? 'Checking…' : 'Sign in'}
+          </Button>
+          <Button type="button" className="btn-plain signin-other" onPress={() => setCodeRequested(false)}>
             Use a different address
           </Button>
         </Form>

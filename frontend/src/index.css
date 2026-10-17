@@ -354,15 +354,42 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--brand-accent);
    announced at once, but not in the danger colour (render 31). */
 .group.notice[role="alert"] { color: var(--brand-fg); }
 
+/* Sign-in (renders 41, 42): the product's name over one white card, centred
+   on the ground; the action full width. */
 .signin {
-  max-width: 24rem;
-  margin: calc(var(--brand-space) * 8) auto;
-  padding: 0 calc(var(--brand-space) * 2);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: var(--brand-bg);
 }
-
+.signin h1 { text-align: center; max-width: 22rem; margin: 0 0 20px; }
+.signin-card {
+  width: min(24rem, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  background: var(--brand-surface);
+  border: 1px solid var(--brand-line);
+  border-radius: var(--brand-radius-panel);
+}
+.signin-card > p { margin: 0; }
+.signin-card .react-aria-TextField { margin: 0; }
+.signin-card button { align-self: stretch; }
+.signin-card button.signin-other { align-self: center; }
 .signin .error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -6px 0 0;
+  font-size: 12px;
+  line-height: 16px;
   color: var(--brand-danger);
 }
+.react-aria-TextField[data-invalid] input { border-color: var(--brand-danger); }
 
 /* --- the shell: column 1 and the screen beside it (HANDOFF section 3) ------- */
 

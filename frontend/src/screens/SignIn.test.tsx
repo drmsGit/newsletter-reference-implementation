@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { Route, Routes } from 'react-router'
@@ -61,6 +61,46 @@ describe('signing in', () => {
 
     expect(screen.getByText(/if that address belongs to an active account/i)).toBeInTheDocument()
     expect(screen.queryByText(/no such account|not found|unknown address/i)).not.toBeInTheDocument()
+  })
+
+  it('says a refused code is not valid, on the field too (task-372)', async () => {
+    stubFetch({
+      'GET /auth/session': () => jsonResponse({ detail: 'Authentication required' }, 401),
+      'POST /auth/session/request': () => jsonResponse({ status: 'code_requested', detail: '' }, 202),
+      'POST /auth/session/verify': () => jsonResponse({ detail: 'Invalid or expired code' }, 401),
+    })
+    renderWithProviders(<SignIn />)
+    fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'manager@example.invalid' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send me a code' }))
+    const field = await screen.findByLabelText('Sign-in code')
+    expect(field).not.toHaveAttribute('aria-invalid')
+    fireEvent.change(field, { target: { value: '123456' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('That code is not valid or has expired.')
+    expect(screen.getByLabelText('Sign-in code')).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('still sends a second code after a refused one', async () => {
+    // Found live 2026-10-17: marking the field invalid must not block the form,
+    // or one mistyped code leaves no way to sign in but a reload.
+    const tried: string[] = []
+    stubFetch({
+      'GET /auth/session': () => jsonResponse({ detail: 'Authentication required' }, 401),
+      'POST /auth/session/request': () => jsonResponse({ status: 'code_requested', detail: '' }, 202),
+      'POST /auth/session/verify': async (request: Request) => {
+        tried.push((await request.json()).code)
+        return jsonResponse({ detail: 'Invalid or expired code' }, 401)
+      },
+    } as never)
+    renderWithProviders(<SignIn />)
+    fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'manager@example.invalid' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send me a code' }))
+    fireEvent.change(await screen.findByLabelText('Sign-in code'), { target: { value: '000000' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await screen.findByRole('alert')
+    fireEvent.change(screen.getByLabelText('Sign-in code'), { target: { value: '123456' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await waitFor(() => expect(tried).toEqual(['000000', '123456']))
   })
 
   it('leaves the sign-in screen once the code is accepted', async () => {
