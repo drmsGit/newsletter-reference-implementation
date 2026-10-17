@@ -78,12 +78,21 @@ export default function ContentDraft({ recordId, fields }: { recordId: number; f
   )
 }
 
-/** One draft, with its own ticks: keyed by run, so a new draft starts afresh. */
-function Proposal({ recordId, draft }: { recordId: number; draft: Draft }) {
+/**
+ * One draft, with its own ticks: keyed by run, so a new draft starts afresh.
+ * Also takes a fresh translation (task-369), which has fields only and starts
+ * with the fields whose original changed ticked.
+ */
+export function Proposal({ recordId, draft, ticked }: { recordId: number; draft: Draft; ticked?: string[] }) {
   const save = useSaveContentRecord(recordId)
   const edit = useEditAssignments(recordId)
-  // A field that already has text, or a category already on the record, starts unticked.
-  const [fieldTicks, setFieldTicks] = useState(draft.fields.filter((f) => !f.current).map((f) => f.name))
+  // A field that already has text, or a category already on the record, starts
+  // unticked — unless the caller names the fields to start with (a fresh
+  // translation: those whose original changed).
+  const [fieldTicks, setFieldTicks] = useState(
+    ticked ? draft.fields.filter((f) => ticked.includes(f.name)).map((f) => f.name)
+      : draft.fields.filter((f) => !f.current).map((f) => f.name),
+  )
   const [categoryTicks, setCategoryTicks] = useState(
     draft.categories.filter((c) => c.assigned_score == null).map((c) => String(c.category_id)),
   )
@@ -96,10 +105,16 @@ function Proposal({ recordId, draft }: { recordId: number; draft: Draft }) {
 
   function takeFields() {
     const taken = draft.fields.filter((f) => fieldTicks.includes(f.name))
+    // A translation proposes the title and description too, which are the
+    // record's own, not content fields.
+    const own = (name: string) => taken.find((f) => f.name === name)?.text
+    const fields = taken.filter((f) => f.name !== 'title' && f.name !== 'description')
     save.mutate(
       {
-        content: Object.fromEntries(taken.map((f) => [f.name, f.text])),
-        groups: [...new Set(taken.map((f) => f.channel).filter((c): c is string => !!c))],
+        ...(own('title') !== undefined && { title: own('title') }),
+        ...(own('description') !== undefined && { description: own('description') }),
+        content: Object.fromEntries(fields.map((f) => [f.name, f.text])),
+        groups: [...new Set(fields.map((f) => f.channel).filter((c): c is string => !!c))],
         applied_suggestion_run_id: draft.run_id,
       },
       { onSuccess: () => setDone(`${taken.length} field${taken.length === 1 ? '' : 's'} saved.`) },

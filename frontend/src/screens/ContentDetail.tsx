@@ -27,6 +27,7 @@ import PublishState from '../components/PublishState'
 import ScreenState from '../components/ScreenState'
 import { STAGE_LABEL } from './Monitoring'
 import ContentDraft from './ContentDraft'
+import Translations, { LanguageChoice } from './Translations'
 import { SCORES } from './scores'
 
 type ContentField = NonNullable<ReturnType<typeof useContentFields>['data']>[number]
@@ -126,9 +127,11 @@ function RecordPage({
           onSave={(description) => save.mutate({ description })}
           error={fieldError(save.error, 'description')}
         />
+        <LanguageChoice record={record} />
       </section>
 
       <ContentDraft recordId={record.id} fields={fields} />
+      <Translations record={record} fields={fields} />
 
       {channels.map((channel) => (
         <details key={channel} open className="record-channel">

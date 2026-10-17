@@ -1261,6 +1261,8 @@ export function useSaveContentRecord(recordId: number) {
       content?: Record<string, unknown>
       groups?: string[]
       applied_suggestion_run_id?: number
+      /** ADR-200: set, or cleared with null; left out, it stays. */
+      language?: string | null
     }) =>
       read(
         api.PATCH('/content/{content_id}', {
@@ -1319,6 +1321,43 @@ export function useDraftContent(recordId: number) {
     mutationFn: (body: { source: string; channels: string[] }) =>
       read(api.POST('/content/{content_id}/drafts', { params: { path: { content_id: recordId } }, body })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [...keys.contentRecord(recordId), 'drafts'] }),
+  })
+}
+
+// --- translations (task-369; ADR-200) --------------------------------------
+
+/** Translate a record into another of its brand's languages, as a new linked record. */
+export function useTranslateContent(recordId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (language: string) =>
+      read(api.POST('/content/{content_id}/translations', { params: { path: { content_id: recordId } }, body: { language } })),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.contentRecord(recordId) }),
+        queryClient.invalidateQueries({ queryKey: [...keys.content, 'page'] }),
+      ]),
+  })
+}
+
+/** Fresh translations proposed on a translation, newest first, in the content draft's shape. */
+export function useRetranslations(recordId: number, enabled: boolean) {
+  return useQuery({
+    queryKey: [...keys.contentRecord(recordId), 'retranslations'],
+    queryFn: () =>
+      read(api.GET('/content/{content_id}/retranslations', { params: { path: { content_id: recordId } } })),
+    enabled,
+  })
+}
+
+/** Ask for a fresh translation of a translation's original; nothing is written. */
+export function useRetranslate(recordId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () =>
+      read(api.POST('/content/{content_id}/retranslations', { params: { path: { content_id: recordId } } })),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: [...keys.contentRecord(recordId), 'retranslations'] }),
   })
 }
 
