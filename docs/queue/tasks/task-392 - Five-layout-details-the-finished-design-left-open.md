@@ -4,7 +4,7 @@ title: Small details the finished design left open
 status: To Do
 assignee: []
 created_date: '2026-10-17 13:31'
-updated_date: '2026-10-17 18:25'
+updated_date: '2026-10-17 18:42'
 labels:
   - frontend
 dependencies: []
@@ -71,7 +71,7 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 - [x] #17 The recipient page's tables have header cells with scope and an accessible name each
 - [x] #18 React Aria's own strings follow the interface's language through an I18nProvider
 - [x] #19 A keyboard-reachable Keyboard shortcuts action exists in the shell, and single-key shortcuts carry aria-keyshortcuts
-- [ ] #20 Upload new uses a styled file trigger with the chosen file's name beside it
+- [x] #20 Upload new uses a styled file trigger with the chosen file's name beside it
 - [ ] #21 A long body field opens taller than a short one
 <!-- AC:END -->
 
@@ -101,4 +101,6 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 2026-10-17: item 18 (UX-16) fixed: components/InterfaceLanguage.tsx wraps the app (main.tsx) in I18nProvider locale en-GB (INTERFACE_LOCALE). Test in InterfaceLanguage.test.tsx: under a German browser a popover's hidden close button says Dismiss; red with a pass-through provider (React Aria reads the browser language at load and on languagechange, so the test fires that event after render). Live in the pane, whose browser is de: the Personalise popover's dismiss buttons read Dismiss. Not in this item: our own formatDate uses toLocaleString() and still follows the browser (17.10.2026, 16:58:10 in German), where the renders draw 14 Oct 2026, 08:12.
 
 2026-10-17: item 19 (UX-17) done. Placement decided by the user: the navigation foot, above Sign out (ShortcutsEntry in shortcuts/Shortcuts.tsx, used in shell/Shell.tsx; the foot's button class is now nav-foot-action). Found on the way: React Aria's Button drops aria-keyshortcuts (its filterDOMProps passes only some aria props), so VariantEditor's existing Alt+Arrow attribute had never reached the page; keyShortcuts(keys), a ref, sets it on the element for ?, n (three New buttons), p and Alt+Arrow; SearchBox's Input takes / directly. No attribute for the g-then-letter navigation: aria-keyshortcuts cannot express a sequence. Tests in Shortcuts, Shell, Content, Preview, AudienceEditor and VariantEditor, mutation-checked (no-op helper: 5 fail; entry removed from the shell: 2 fail). Live: foot order avatar, Keyboard shortcuts, Sign out; it opens the overview; icon on the rail; attributes present.
+
+2026-10-17: item 20 (UX-24) fixed: ImageField's Upload and the More section's replace use FileTrigger (IMAGE_TYPES, same accept list); Upload names the chosen file beside Choose a file…, or No file chosen; .file-choice in index.css. Tests in ImageField.upload.test.tsx and ImageField.test.tsx (the form's absence check now looks for the Replace button, not a label), mutation-checked twice. Live: the native input is display none, the button calls its click, nothing was uploaded.
 <!-- SECTION:NOTES:END -->
