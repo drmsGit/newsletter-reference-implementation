@@ -4,7 +4,7 @@ title: Small details the finished design left open
 status: To Do
 assignee: []
 created_date: '2026-10-17 13:31'
-updated_date: '2026-10-17 16:00'
+updated_date: '2026-10-17 16:13'
 labels:
   - frontend
 dependencies: []
@@ -24,7 +24,30 @@ ordinal: 210600
 5. On the record page the Duplicate button sits slightly above its brand pulldown (the row is .record-duplicate, frontend/src/screens/ContentDetail.tsx:236, styled at frontend/src/index.css:842); render 27 draws them on one baseline.
 6. The rich-text hint under every multi-line field promises more than the email renders. It reads "**bold**, *italic*, [link](https://…), and a line starting with - for a bullet" (frontend/src/components/EditorFields.tsx:108), but render_rich_text formats only **bold**, [label](https://…) links and new lines (backend/app/rendering/service.py:56-57 and the function after them); *italic* and "- " lines reach the email as typed. Found 2026-10-17 when the editorial became rich text. Either the hint says only what renders, or the formatter learns italic and bullet lines (escaped first, as it does now, and a push still strips them, strip_rich_text). Nothing else promises them: the AI prompts and the content prompt do not mention italics or bullets.
 
-Check items 1 to 5 against their renders at 1,440 px in the browser pane, light and dark.
+**From the UX audit of 2026-10-17** (docs/design/ux-audit-2026-10-17/FINDINGS.md; screenshots beside it). Triaged with the user the same day: the small, verified fixes are items 7 to 21 here; the findings that need a decision first became tasks of their own (TASK-393 to TASK-401); UX-23 is dropped, because Audiences puts New and Suggest under the title as render 37 draws it. Every cause below was checked against the code, not taken from the report.
+
+Regressions from TASK-372 itself, so worth doing first:
+
+7. (UX-01, audit P1) The image picker's cards are crushed: each card is a button, and step 1 of TASK-372 (aded12e) gave every button a fixed height (frontend/src/index.css:154, the button rule), so a 96 px thumbnail sits in a 28 px button and overlaps the rows and the filters. The card needs height: auto and its own padding (.image-grid__card, frontend/src/index.css:1242; markup frontend/src/components/ImageField.tsx:233).
+8. (UX-02, audit P1) New record and New audience still use the old inline form inside their dialogs (className create-form at frontend/src/screens/ContentCreate.tsx:51 and frontend/src/screens/AudienceCreate.tsx:54): the heading and the first field share a row, the fields are about 164 px wide, and Create comes before Cancel. Use the dialog-form and DialogActions pattern every other create dialog uses since step 14 (frontend/src/components/NewDialog.tsx).
+9. (UX-06) Multi-line fields have the weak divider as their border (about 1.38:1 on white, against WCAG 1.4.11): the older rule .field textarea (frontend/src/index.css:765) overrides the strong field border step 1 set for textarea. Remove or align that rule so textareas use the field border token, as inputs do.
+10. (UX-07) The Personalise menu runs the label into the token ("Salutation formal{{salutation_formal}}"): the item is a flex row, so the space between the label and the token's span collapses (frontend/src/components/EditorFields.tsx:177). Give the token its own element with a gap, in monospace.
+11. (UX-11) In Settings, General, the read-only facts (Sending's channels; AI's default model, key, tokens, warning, spent) start at the card's left edge while the inputs beside them are inset 16 px: the rule .card-rows .fact-list { padding: 0; } (frontend/src/index.css:1703) also hits the plain dt/dd lists (dl.fact-list.facts-compat, frontend/src/screens/Settings.tsx:97, 133, 205 and the AI facts in Sections). Render them with the shared Fact rows, or give the compat lists the 16 px inset.
+12. (UX-12, UX-25) Buttons beside a field line up with the field's label instead of its control: Add under "Put it under" and "Add a subcategory" (categories), Duplicate (record), Give (user access), Issue a key (integration), and Rename and Delete in Settings, Brands, where the name field also stays about 164 px wide. The cause is the global button rule's align-self: flex-start (frontend/src/index.css:172), added in step 1 so buttons in a column keep their width; it overrides the row's align-items. In a row (.inline-form, .create-form, .field-pair and similar) the button should align to the end, and the Brands name field should grow (frontend/src/screens/Brands.tsx:56).
+13. (UX-22) In the list column the search box and the filters start 12 px left of the title and the rows: the title has 20 px (frontend/src/index.css:1358, .list-head), the search and filters 8 px (index.css:1361 .col-list .filters, index.css:1530 .col-list .search-compact). One indent per column (HANDOFF section 3). The decision history shows the same offset.
+14. (UX-13) Dialogs differ in where Close sits and in which order the actions come: the image picker has Close under its heading on the left, the preview a right-aligned header, Paste people stacks Check and Cancel (frontend/src/screens/AudiencePeople.tsx:196, 243). One header pattern (title, Close at the right where there is one) and one footer (Cancel, then the primary action, at the right).
+
+Accessibility and polish:
+
+15. (UX-08) Every "Personalise…" button has the same accessible name (frontend/src/components/EditorFields.tsx:173): name it by its field, for example "Personalise Subject line", keeping the short visible text.
+16. (UX-09) The Remove buttons in a user's Access card are all named "Remove" (frontend/src/screens/PersonDetail.tsx:72): name each by what it removes, "Remove Admin on Grathaus Outdoor", as other lists do.
+17. (UX-10) The recipient page's tables have no header cells (frontend/src/screens/RecipientDetail.tsx:42, 65, 84, 105, 118 and the groups table at 191): consent, deliveries, decisions, interests and consent history are td-only rows. Add column headers (th with scope) and an accessible name per table.
+18. (UX-16) React Aria's own words follow the browser's locale, so in an English interface a German browser hears "ausgewählt" and "Schließen": the app sets no locale (frontend/src/main.tsx renders App without an I18nProvider). Wrap it in I18nProvider with the interface's language; record content keeps its own languages.
+19. (UX-17) The keyboard shortcuts have no visible way in: the overview opens only with ?, and only one control in the client carries aria-keyshortcuts. Add a keyboard-reachable "Keyboard shortcuts" action in the shell and aria-keyshortcuts where a single key is valid (Open preview, the navigation). Whether the character shortcuts can be turned off is its own task (TASK-393, from UX-04 and UX-05).
+20. (UX-24) "Upload new" in the image sheet shows the browser's native file button ("Datei auswählen") next to the app's own fields (frontend/src/components/ImageField.tsx:334, 370): a styled trigger that opens the same native chooser, with the chosen file's name beside it (React Aria FileTrigger).
+21. (UX-28) A long body field opens four rows high, the same as a short one (frontend/src/components/EditorFields.tsx:100, rows={4} for every rich-text field): a field whose definition has size long (storage/fields.json, body_long) should open taller.
+
+Check items 1 to 5 against their renders at 1,440 px in the browser pane, light and dark; items 7 to 21 against the audit's screenshot for each, and with the keyboard where the item is about names or focus.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -35,4 +58,19 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 - [ ] #4 Performance on the record page uses fact rows
 - [ ] #5 The Duplicate button and its pulldown share a baseline
 - [ ] #6 The rich-text hint promises only what the email renders, or the renderer formats italic and bullet lines as the hint says
+- [ ] #7 The image picker's cards show their whole thumbnail and title, without overlapping the rows or the filters
+- [ ] #8 New record and New audience use the dialog form and DialogActions: heading on its own row, full-width fields, Cancel then Create
+- [ ] #9 Multi-line fields have the same strong field border as inputs
+- [ ] #10 Personalise menu items show a gap between the label and the token, the token in monospace
+- [ ] #11 Settings General read-only facts share the 16 px inset of the inputs beside them
+- [ ] #12 Buttons beside a field align with its control, not its label, and the Brands name field grows
+- [ ] #13 In the list column the search box and filters start at the same indent as the title and the rows
+- [ ] #14 Dialogs share one header pattern and one footer order: Cancel, then the primary action, at the right
+- [ ] #15 Each Personalise button is named by its field
+- [ ] #16 Each Remove in a user's Access card is named by the access it removes
+- [ ] #17 The recipient page's tables have header cells with scope and an accessible name each
+- [ ] #18 React Aria's own strings follow the interface's language through an I18nProvider
+- [ ] #19 A keyboard-reachable Keyboard shortcuts action exists in the shell, and single-key shortcuts carry aria-keyshortcuts
+- [ ] #20 Upload new uses a styled file trigger with the chosen file's name beside it
+- [ ] #21 A long body field opens taller than a short one
 <!-- AC:END -->
