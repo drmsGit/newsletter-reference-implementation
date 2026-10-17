@@ -4,7 +4,7 @@ title: Small details the finished design left open
 status: To Do
 assignee: []
 created_date: '2026-10-17 13:31'
-updated_date: '2026-10-17 16:24'
+updated_date: '2026-10-17 16:36'
 labels:
   - frontend
 dependencies: []
@@ -61,7 +61,7 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 - [x] #7 The image picker's cards show their whole thumbnail and title, without overlapping the rows or the filters
 - [x] #8 New record and New audience use the dialog form and DialogActions: heading on its own row, full-width fields, Cancel then Create
 - [x] #9 Multi-line fields have the same strong field border as inputs
-- [ ] #10 Personalise menu items show a gap between the label and the token, the token in monospace
+- [x] #10 Personalise menu items show a gap between the label and the token, the token in monospace
 - [ ] #11 Settings General read-only facts share the 16 px inset of the inputs beside them
 - [ ] #12 Buttons beside a field align with its control, not its label, and the Brands name field grows
 - [ ] #13 In the list column the search box and filters start at the same indent as the title and the rows
@@ -81,4 +81,6 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 2026-10-17: items 7 and 8 (UX-01, UX-02) fixed in the commit after c58eb2f. The image card overrides the button height (index.css, .image-grid__card); live, cards are 158 px with the 96 px thumbnail inside. New record and New audience use dialog-form and DialogActions, heading in the Dialog; tests in Content.test.tsx and AudienceEditor.test.tsx, each mutation-checked.
 
 2026-10-17: item 9 (UX-06) fixed: the old .field textarea rule removed, so textareas use the base field rule (strong border, 6/8 px padding, red when invalid). Checked live: textarea and input borders computed equal, light #857a6c and dark #8f857a. CSS only, no unit test possible in jsdom.
+
+2026-10-17: item 10 (UX-07) fixed: label and token in the MenuItem's label and description slots, token as code, .personalise-entry spaces them (index.css). Test in EditorFields.personalise.test.tsx, mutation-checked on the slot and the code element. Live: at least 16 px between label and token, monospace, aria-describedby set.
 <!-- SECTION:NOTES:END -->
