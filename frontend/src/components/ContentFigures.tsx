@@ -1,6 +1,7 @@
 import { useContentPerformance, type ContentFigures } from '../api/resources'
 import DataTable, { type DataColumn } from './DataTable'
 import DetailSection from './DetailSection'
+import Fact from './Fact'
 import ScreenState from './ScreenState'
 
 /**
@@ -18,9 +19,9 @@ export function shareText(figures: ContentFigures | null | undefined): string {
 /** The columns a list of records shows its figures in (a category's records). */
 export function figureColumns<T>(of: (item: T) => ContentFigures | null | undefined): DataColumn<T>[] {
   return [
-    { key: 'deliveries', header: 'Sent in', render: (item) => String(of(item)?.deliveries ?? 0) },
-    { key: 'clicks', header: 'Clicks', render: (item) => String(of(item)?.clicks ?? 0) },
-    { key: 'share', header: 'Share of clicks', render: (item) => shareText(of(item)) },
+    { key: 'deliveries', header: 'Sent in', numeric: true, render: (item) => String(of(item)?.deliveries ?? 0) },
+    { key: 'clicks', header: 'Clicks', numeric: true, render: (item) => String(of(item)?.clicks ?? 0) },
+    { key: 'share', header: 'Share of clicks', numeric: true, render: (item) => shareText(of(item)) },
   ]
 }
 
@@ -43,24 +44,22 @@ export function Performance({ recordId }: { recordId: number }) {
         ) : (
           overall && (
             <>
-              <dl className="facts">
-                <dt>Sent in</dt>
-                <dd>
+              {/* Fact rows, as every details card (render 27; task-392 item 4). */}
+              <dl className="fact-list">
+                <Fact label="Sent in">
                   {overall.deliveries} {overall.deliveries === 1 ? 'delivery' : 'deliveries'}
                   {overall.picked > 0 && `, ${overall.picked} of them picked by a personalised block`}
-                </dd>
-                <dt>Clicks on it</dt>
-                <dd>
+                </Fact>
+                <Fact label="Clicks on it">
                   {overall.clicks}, from {overall.unique_clickers}{' '}
                   {overall.unique_clickers === 1 ? 'delivery' : 'deliveries'}
-                </dd>
-                <dt>Share of clicks</dt>
-                <dd>
+                </Fact>
+                <Fact label="Share of clicks">
                   {shareText(overall)}
                   {overall.click_share != null && (
                     <span className="muted"> of the {overall.clicks_in_deliveries} clicks in the emails that carried it</span>
                   )}
-                </dd>
+                </Fact>
               </dl>
               <DataTable
                 label="By campaign"

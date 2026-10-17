@@ -24,6 +24,18 @@ describe("a record's figures (task-359; ADR-196 addendum 2026-10-16)", () => {
     expect(within(table).getByText('30 %')).toBeInTheDocument()
   })
 
+  it('shows its facts as the shared fact rows and its figures right-aligned (task-392 item 4, render 27)', async () => {
+    open({ overall: FIGURES, by_campaign: [{ campaign_id: 3, campaign_name: 'Spring', figures: FIGURES }] })
+    await screen.findByText(/40 deliveries/)
+    const terms = [...document.querySelectorAll('dt')]
+    expect(terms.map((t) => t.textContent)).toEqual(['Sent in', 'Clicks on it', 'Share of clicks'])
+    for (const term of terms) expect(term.parentElement).toHaveClass('fact')
+    const table = screen.getByRole('grid', { name: 'By campaign' })
+    for (const name of ['Sent in', 'Clicks', 'Share of clicks']) {
+      expect(within(table).getByRole('columnheader', { name })).toHaveClass('num')
+    }
+  })
+
   it('says plainly when it has not been sent', async () => {
     open({ overall: { ...FIGURES, deliveries: 0, picked: 0, clicks: 0, unique_clickers: 0, clicks_in_deliveries: 0,
       click_share: null }, by_campaign: [] })
