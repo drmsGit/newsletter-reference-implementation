@@ -356,7 +356,7 @@ function Choices({
   const options = [...new Set([...offered, ...selected])]
   if (options.length === 0) return null
   return (
-    <CheckboxGroup className="categories" value={selected} onChange={onChange}>
+    <CheckboxGroup className="react-aria-CheckboxGroup categories" value={selected} onChange={onChange}>
       <Label>{label}</Label>
       {options.map((value) => (
         <Checkbox key={value} value={value}>

@@ -57,7 +57,7 @@ export default function ContentDraft({ recordId, fields }: { recordId: number; f
       <CheckboxGroup
         value={ticked}
         onChange={(value) => setUnticked(channels.filter((c) => !value.includes(c)))}
-        className="categories"
+        className="react-aria-CheckboxGroup categories option-pair"
       >
         <Label>Draft the text fields for</Label>
         {channels.map((channel) => (
@@ -158,7 +158,7 @@ export function Proposal({ recordId, draft, ticked }: { recordId: number; draft:
       )}
       {draft.fields.length > 0 && (
         <>
-          <CheckboxGroup value={fieldTicks} onChange={setFieldTicks} className="categories">
+          <CheckboxGroup value={fieldTicks} onChange={setFieldTicks} className="react-aria-CheckboxGroup categories">
             <Label>Drafted fields</Label>
             {draft.fields.map((f) => (
               <Checkbox key={f.name} value={f.name} aria-label={f.label}>
@@ -176,7 +176,7 @@ export function Proposal({ recordId, draft, ticked }: { recordId: number; draft:
       )}
       {draft.categories.length > 0 && (
         <>
-          <CheckboxGroup value={categoryTicks} onChange={setCategoryTicks} className="categories">
+          <CheckboxGroup value={categoryTicks} onChange={setCategoryTicks} className="react-aria-CheckboxGroup categories">
             <Label>Proposed categories</Label>
             {draft.categories.map((c) => (
               <div key={c.category_id} className="draft-category">

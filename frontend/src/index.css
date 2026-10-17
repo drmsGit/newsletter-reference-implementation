@@ -1778,3 +1778,26 @@ a.btn-link:hover { background: var(--brand-surface-2); }
 .react-aria-Radio[data-selected]::before { border: 4px solid var(--brand-accent); }
 .react-aria-Radio[data-focus-visible] { outline: 2px solid var(--brand-focus); outline-offset: 2px; }
 .react-aria-Radio[data-disabled] { color: var(--brand-muted); cursor: not-allowed; }
+/* The same rows for the checkboxes of a group (ui.css .opt, renders 23 and 27;
+   task-392 item 2): the row carries the tint, the border and the focus ring.
+   A checkbox on its own stays a plain box with its text. */
+.react-aria-CheckboxGroup > .react-aria-Checkbox {
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--brand-line);
+  border-radius: 8px;
+  background: var(--brand-surface);
+}
+.react-aria-CheckboxGroup > .react-aria-Checkbox::before { margin-top: 0; }
+.react-aria-CheckboxGroup > .react-aria-Checkbox[data-hovered] { background: var(--brand-surface-2); }
+.react-aria-CheckboxGroup > .react-aria-Checkbox[data-selected] { border-color: var(--brand-accent); background: var(--brand-selected); }
+.react-aria-CheckboxGroup > .react-aria-Checkbox[data-focus-visible] { outline: 2px solid var(--brand-focus); outline-offset: 2px; }
+.react-aria-CheckboxGroup > .react-aria-Checkbox[data-focus-visible]::before { outline: none; }
+.react-aria-CheckboxGroup > .react-aria-Checkbox[data-disabled] { cursor: not-allowed; }
+/* Few short choices side by side (render 27: Email beside Push). */
+/* Two classes, to win over .card-rows > .categories, which makes a grid. */
+.react-aria-CheckboxGroup.option-pair { display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px; }
+.option-pair > .react-aria-Label { flex-basis: 100%; }
+.option-pair > .react-aria-Checkbox { flex: 1 1 12rem; }

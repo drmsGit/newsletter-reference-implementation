@@ -143,7 +143,7 @@ function Categories({ selected, onChange }: { selected: number[]; onChange: (ids
   if (!categories.data) return null
   return (
     <CheckboxGroup
-      className="categories"
+      className="react-aria-CheckboxGroup categories"
       value={selected.map(String)}
       onChange={(values) => onChange(values.map(Number))}
     >
