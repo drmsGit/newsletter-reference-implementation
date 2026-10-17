@@ -216,14 +216,14 @@ describe('one profile', () => {
 
 describe('settings and its parts', () => {
   it('reaches brand profiles as a part of Settings, marking the part that is open', async () => {
-    const { default: SettingsLayout } = await import('./SettingsLayout')
+    const { SettingsMenu, SettingsSplit } = await import('./SettingsLayout')
     stubFetch({
       'GET /brand-profiles/': () => jsonResponse(page([summary({})])),
       'GET /brand-profiles/structure': () => jsonResponse(STRUCTURE),
     })
     renderWithProviders(
       <Routes>
-        <Route path="/settings" element={<SettingsLayout />}>
+        <Route path="/settings" element={<SettingsSplit label="Settings parts" list={<SettingsMenu />} />}>
           <Route index element={<p>General settings</p>} />
           <Route path="brand-profiles" element={<BrandProfiles />} />
         </Route>

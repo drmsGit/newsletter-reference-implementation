@@ -1,10 +1,23 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { Route, Routes } from 'react-router'
+
 import Settings from './Settings'
+import { AiPromptDetail } from './AiPrompts'
 import { jsonResponse, renderWithProviders, stubFetch } from '../test-utils'
 
 afterEach(() => vi.unstubAllGlobals())
+
+/** One AI task's own page (task-372, decision 23): its model, output and prompt moved off General. */
+function renderTask(key = 'subject_preheader') {
+  return renderWithProviders(
+    <Routes>
+      <Route path="/settings/ai-prompts/:key" element={<AiPromptDetail />} />
+    </Routes>,
+    { route: `/settings/ai-prompts/${key}` },
+  )
+}
 
 const SETTINGS = {
   signals: { weights: { click: 500, open: 0 }, half_lives: { click: 45, open: 45 } },
@@ -65,9 +78,20 @@ describe('the settings screen', () => {
     expect(await screen.findByText('200')).toBeInTheDocument()
     expect(screen.getByText('switched off')).toBeInTheDocument()
     expect(screen.getByText('no — counted, not credited')).toBeInTheDocument()
+    // The tasks are not here: General points at their own part.
+    expect(screen.queryByText('held for review')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'AI prompts' })).toHaveAttribute('href', '/settings/ai-prompts')
+  })
+
+  it("shows one AI task's model, output and prompt on its own page", async () => {
+    stubFetch({ 'GET /settings': () => jsonResponse(SETTINGS) })
+    const { container } = renderTask()
+    expect(await screen.findByRole('heading', { name: 'Subject & preheader' })).toBeInTheDocument()
     expect(screen.getByText('held for review')).toBeInTheDocument()
     expect(screen.getByText('version 2 of 2')).toBeInTheDocument()
     expect(screen.getByText('the default (claude-opus-5)')).toBeInTheDocument()
+    // Read-only too, without the permissions.
+    expect(within(container).queryAllByRole('button')).toHaveLength(0)
   })
 
   it('warns when the server says the AI warning threshold is crossed', async () => {
@@ -194,8 +218,8 @@ describe('editing settings', () => {
   it('offers the model only to someone who may also run AI', async () => {
     /** `may_configure_ai` is the server's answer (settings.manage + ai.run). */
     stubFetch({ 'GET /settings': () => jsonResponse(MANAGER) })
-    const { unmount } = renderWithProviders(<Settings />)
-    await screen.findByRole('button', { name: 'Save send cap' })
+    const { unmount } = renderTask()
+    await screen.findByRole('button', { name: 'Save output mode' })
     expect(screen.queryByRole('button', { name: 'Save model' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save output mode' })).toBeInTheDocument()
     unmount()
@@ -205,7 +229,7 @@ describe('editing settings', () => {
       'GET /settings': () => jsonResponse({ ...MANAGER, may_configure_ai: true }),
       'PUT /settings/ai/tasks/subject_preheader/model': () => jsonResponse({ model: null }),
     })
-    renderWithProviders(<Settings />)
+    renderTask()
     fireEvent.click(await screen.findByRole('button', { name: 'Save model' }))
     expect(await screen.findByText('Saved.')).toBeInTheDocument()
     // "the default" is sent as null, which points the task back at the deployment default.
@@ -218,10 +242,12 @@ describe('a task with no approval step (ADR-140 addendum 2026-10-16)', () => {
     const draft = { ...SETTINGS.ai_tasks[0], key: 'content_draft', label: 'Content draft', held_form: false,
       approval_mode: 'auto_apply' }
     stubFetch({ 'GET /settings': () => jsonResponse({ ...SETTINGS, may_manage: true, ai_tasks: [draft, SETTINGS.ai_tasks[0]] }) })
-    renderWithProviders(<Settings />)
+    const { unmount } = renderTask('content_draft')
     expect(await screen.findByText(/no approval step/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Output of Content draft/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Output of Subject & preheader/ })).toBeInTheDocument()
+    unmount()
+    renderTask('subject_preheader')
+    expect(await screen.findByRole('button', { name: /Output of Subject & preheader/ })).toBeInTheDocument()
   })
 })
 
@@ -271,8 +297,8 @@ describe('signal tuning and prompts', () => {
 
   it('offers publishing only to someone who may also run AI', async () => {
     stubFetch({ 'GET /settings': () => jsonResponse(MANAGER) })
-    renderWithProviders(<Settings />)
-    await screen.findByRole('button', { name: 'Save signal tuning' })
+    renderTask()
+    await screen.findByRole('button', { name: 'Save output mode' })
     expect(screen.queryByRole('button', { name: /Publish as version/ })).not.toBeInTheDocument()
   })
 
@@ -286,7 +312,7 @@ describe('signal tuning and prompts', () => {
       'POST /settings/ai/tasks/subject_preheader/prompt': () =>
         jsonResponse({ version: 3, body: 'Shorter.', is_published: true, created_at: '2026-10-03T00:00:00Z' }, 201),
     })
-    renderWithProviders(<Settings />)
+    renderTask()
 
     fireEvent.change(await screen.findByLabelText('Prompt for Subject & preheader'), {
       target: { value: 'Shorter.' },

@@ -1,24 +1,23 @@
-import { useState, type ReactNode } from 'react'
-import { Button, Input, Label, TextArea, TextField } from 'react-aria-components'
+import { useState } from 'react'
+import { Input, Label, TextField } from 'react-aria-components'
+import { Link } from 'react-router'
 
 import {
-  usePublishPrompt,
   useSaveAiProvider,
   useSaveSignals,
   useSaveAiBudgetPeriod,
   useSaveSendCap,
   useSaveSessionLengths,
   useSaveSpendCap,
-  useSetTaskApproval,
-  useSetTaskModel,
   useSettings,
   type SettingsView,
 } from '../api/resources'
-import { HttpError } from '../api/session'
 import Choice from '../components/Choice'
 import DataTable from '../components/DataTable'
+import DetailSection from '../components/DetailSection'
+import { Form, Outcome } from '../components/SettingsForm'
 import ScreenState from '../components/ScreenState'
-import { formatDate } from './Campaigns'
+import { AI_PROMPTS } from './AiPrompts'
 
 /**
  * Settings.
@@ -42,37 +41,26 @@ export default function Settings() {
   const settings = useSettings()
 
   return (
-    <>
-      <h1>Settings</h1>
-      <ScreenState query={settings}>
-        {settings.data && (
-          <>
-            <p className="muted">
-              {settings.data.may_manage
-                ? 'Changes take effect for the whole deployment, and each one is recorded in the audit log.'
-                : 'Read-only: changing settings needs permission to manage them. Every change is recorded in the audit log.'}
-            </p>
-            <Sections s={settings.data} />
-          </>
-        )}
-      </ScreenState>
-    </>
-  )
-}
-
-/** What a save did, said once beside its control. */
-function Outcome({ write }: { write: { isSuccess: boolean; isError: boolean; error: unknown } }) {
-  if (write.isSuccess) return <p role="status">Saved.</p>
-  if (!write.isError) return null
-  const error = write.error instanceof HttpError ? write.error : undefined
-  return (
-    <p role="alert">
-      {error?.status === 403
-        ? 'You do not have permission to change this.'
-        : error?.detail
-          ? `Not saved: ${error.detail}`
-          : 'Not saved. The server refused the value.'}
-    </p>
+    // Column 3 beside the Settings menu (task-372, render 33).
+    <div className="detail">
+      <div className="detail-scroll">
+        <ScreenState query={settings}>
+          {settings.data && (
+            <>
+              <div className="detail-head">
+                <h2>General</h2>
+                <p className="muted">
+                  {settings.data.may_manage
+                    ? 'Changes take effect for the whole deployment, and each one is recorded in the audit log.'
+                    : 'Read-only: changing settings needs permission to manage them. Every change is recorded in the audit log.'}
+                </p>
+              </div>
+              <Sections s={settings.data} />
+            </>
+          )}
+        </ScreenState>
+      </div>
+    </div>
   )
 }
 
@@ -93,27 +81,6 @@ function NumberField({
   )
 }
 
-function Form({ children, onSave, saving, label }: {
-  children: ReactNode
-  onSave: () => void
-  saving: boolean
-  label: string
-}) {
-  return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault()
-        onSave()
-      }}
-    >
-      {children}
-      <Button type="submit" isDisabled={saving}>
-        {saving ? 'Saving…' : label}
-      </Button>
-    </form>
-  )
-}
-
 /** Whole numbers only; anything else is not sent at all. What a value may BE
  * (positive, warn not above hard stop) is the server's rule, not this one. */
 function parseWhole(raw: string): number | null {
@@ -127,7 +94,7 @@ function SendCap({ s }: { s: SettingsView }) {
   const [invalid, setInvalid] = useState(false)
   if (!s.may_manage) {
     return (
-      <dl className="facts">
+      <dl className="fact-list facts-compat">
         <dt>Most recipients one send may reach</dt>
         <dd>{s.max_send_recipients}</dd>
       </dl>
@@ -163,7 +130,7 @@ function SessionLengths({ s }: { s: SettingsView }) {
   const [invalid, setInvalid] = useState(false)
   if (!s.may_manage) {
     return (
-      <dl className="facts">
+      <dl className="fact-list facts-compat">
         <dt>A sign-in lasts at most</dt>
         <dd>{s.session_absolute_hours} hours</dd>
         <dt>Signed out after no activity for</dt>
@@ -219,9 +186,11 @@ function SpendCap({ s }: { s: SettingsView }) {
         if (ok) save.mutate({ warn_tokens: warnTokens, hard_stop_tokens: stopTokens, budget_usd: budget })
       }}
     >
-      <NumberField label="Warn at (tokens)" value={warn} onChange={setWarn} />
-      <NumberField label="Stop at (tokens)" value={stop} onChange={setStop} />
-      <NumberField label="Budget (USD)" value={usd} onChange={setUsd} />
+      <div className="field-pair">
+        <NumberField label="Warn at (tokens)" value={warn} onChange={setWarn} />
+        <NumberField label="Stop at (tokens)" value={stop} onChange={setStop} />
+        <NumberField label="Budget (USD)" value={usd} onChange={setUsd} />
+      </div>
       {invalid && <p role="alert">Tokens are whole numbers; the budget is a number.</p>}
       <Outcome write={save} />
     </Form>
@@ -233,7 +202,7 @@ function Provider({ s }: { s: SettingsView }) {
   const [provider, setProvider] = useState(s.ai_provider)
   if (!s.may_manage) {
     return (
-      <dl className="facts">
+      <dl className="fact-list facts-compat">
         <dt>Provider</dt>
         <dd>{s.ai_provider}</dd>
       </dl>
@@ -265,7 +234,7 @@ function BudgetPeriod({ s }: { s: SettingsView }) {
   const [period, setPeriod] = useState(s.ai_budget.period ?? 'month')
   if (!s.may_manage) {
     return (
-      <dl className="facts">
+      <dl className="fact-list facts-compat">
         <dt>The token budget refills</dt>
         <dd>{PERIODS.find((p) => p.id === s.ai_budget.period)?.name ?? s.ai_budget.period}</dd>
       </dl>
@@ -277,100 +246,6 @@ function BudgetPeriod({ s }: { s: SettingsView }) {
       <p className="muted">Periods start at midnight UTC on the first day.</p>
       <Outcome write={save} />
     </Form>
-  )
-}
-
-const DEFAULT_MODEL = '__default__'
-
-function Task({ s, task }: { s: SettingsView; task: SettingsView['ai_tasks'][number] }) {
-  const approval = useSetTaskApproval()
-  const model = useSetTaskModel()
-  const [mode, setMode] = useState(task.approval_mode)
-  const [chosen, setChosen] = useState(task.model ?? DEFAULT_MODEL)
-
-  return (
-    <section aria-labelledby={`task-${task.key}`}>
-      <h3 id={`task-${task.key}`}>{task.label}</h3>
-      <p>{task.description}</p>
-
-      {s.may_configure_ai ? (
-        <Form
-          label="Save model"
-          saving={model.isPending}
-          onSave={() => model.mutate({ task: task.key, model: chosen === DEFAULT_MODEL ? null : chosen })}
-        >
-          <Choice
-            label={`Model for ${task.label}`}
-            options={[
-              { id: DEFAULT_MODEL, name: `the default (${s.ai_model})` },
-              ...s.governed_models.map((m) => ({ id: m, name: m })),
-            ]}
-            selected={chosen}
-            onChange={setChosen}
-          />
-          <Outcome write={model} />
-        </Form>
-      ) : (
-        <dl className="facts">
-          <dt>Model</dt>
-          <dd>{task.model ?? `the default (${s.ai_model})`}</dd>
-        </dl>
-      )}
-
-      {!task.held_form ? (
-        // Nothing to hold: the output only appears where a person takes it
-        // themselves (ADR-140 addendum 2026-10-16), so no switch is offered.
-        <dl className="facts">
-          <dt>Output</dt>
-          <dd>no approval step — it only appears where a person takes it themselves</dd>
-        </dl>
-      ) : s.may_manage ? (
-        <Form
-          label="Save output mode"
-          saving={approval.isPending}
-          onSave={() =>
-            approval.mutate({ task: task.key, mode: mode as 'auto_apply' | 'require_approval' })
-          }
-        >
-          <Choice
-            label={`Output of ${task.label}`}
-            options={[
-              // The service's own words for the two modes (settings.service).
-              { id: 'auto_apply', name: 'applied directly' },
-              { id: 'require_approval', name: 'held for review' },
-            ]}
-            selected={mode}
-            onChange={setMode}
-          />
-          <Outcome write={approval} />
-        </Form>
-      ) : (
-        <dl className="facts">
-          <dt>Output</dt>
-          <dd>{task.approval_mode === 'require_approval' ? 'held for review' : 'applied directly'}</dd>
-        </dl>
-      )}
-
-      <dl className="facts">
-        <dt>Prompt</dt>
-        <dd>
-          {task.prompt_version != null
-            ? `version ${task.prompt_version} of ${task.versions.length}`
-            : 'the built-in default (never published)'}
-        </dd>
-      </dl>
-      {s.may_configure_ai && <PromptEditor task={task} />}
-      <details>
-        <summary>The live prompt</summary>
-        <pre style={{ whiteSpace: 'pre-wrap' }}>{task.prompt_body}</pre>
-        {task.versions.length > 0 && (
-          <p className="muted">
-            Published versions:{' '}
-            {task.versions.map((v) => `v${v.version} (${formatDate(v.created_at)})`).join(', ')}
-          </p>
-        )}
-      </details>
-    </section>
   )
 }
 
@@ -422,7 +297,7 @@ function SignalsEditor({ s }: { s: SettingsView }) {
       }}
     >
       {types.map((t) => (
-        <div key={t}>
+        <div key={t} className="field-pair">
           <NumberField
             label={`Weight for ${t} (default ${s.signal_defaults.weights[t] ?? '—'})`}
             value={weights[t]}
@@ -441,41 +316,6 @@ function SignalsEditor({ s }: { s: SettingsView }) {
   )
 }
 
-/**
- * Publish a new version of one task's prompt (ADR-140 §3).
- *
- * **Never an edit.** Every publish is a new, immutable version that becomes
- * the live one -- an audit entry naming version 3 must keep meaning the text
- * version 3 had. Going back means publishing the old text again. The button
- * names the version it will create, so nobody believes they are correcting
- * the current one in place.
- */
-function PromptEditor({ task }: { task: SettingsView['ai_tasks'][number] }) {
-  const publish = usePublishPrompt()
-  const [body, setBody] = useState(task.prompt_body)
-  const next = Math.max(0, ...task.versions.map((v) => v.version)) + 1
-
-  return (
-    <Form
-      label={`Publish as version ${next}`}
-      saving={publish.isPending}
-      onSave={() => publish.mutate({ task: task.key, body })}
-    >
-      <TextField value={body} onChange={setBody}>
-        <Label>Prompt for {task.label}</Label>
-        <TextArea rows={10} style={{ width: '100%' }} />
-      </TextField>
-      {publish.isSuccess ? (
-        <p role="status">
-          Published as version {publish.data.version}; it is now the live prompt.
-        </p>
-      ) : (
-        <Outcome write={publish} />
-      )}
-    </Form>
-  )
-}
-
 function Sections({ s }: { s: SettingsView }) {
   const budget = s.ai_budget
   const signalRows = s.known_contribution_types.map((type, index) => ({
@@ -487,10 +327,9 @@ function Sections({ s }: { s: SettingsView }) {
 
   return (
     <>
-      <section aria-labelledby="sending">
-        <h2 id="sending">Sending</h2>
+      <DetailSection id="sending" title="Sending">
         <SendCap s={s} />
-        <dl className="facts">
+        <dl className="fact-list facts-compat">
           {s.channels.map((c) => (
             <div key={c.name} style={{ display: 'contents' }}>
               <dt>Channel: {c.name}</dt>
@@ -517,14 +356,12 @@ function Sections({ s }: { s: SettingsView }) {
           items={s.delivery_providers.map((p, index) => ({ ...p, id: index }))}
           emptyMessage="No delivery providers are registered."
         />
-      </section>
-      <section aria-labelledby="sessions">
-        <h2 id="sessions">Sign-in sessions</h2>
+      </DetailSection>
+      <DetailSection id="sessions" title="Sign-in sessions">
         <SessionLengths s={s} />
-      </section>
+      </DetailSection>
 
-      <section aria-labelledby="signals">
-        <h2 id="signals">Signals</h2>
+      <DetailSection id="signals" title="Signals">
         {s.may_manage ? (
           <SignalsEditor s={s} />
         ) : (
@@ -539,15 +376,14 @@ function Sections({ s }: { s: SettingsView }) {
             emptyMessage="No contribution types are known."
           />
         )}
-      </section>
+      </DetailSection>
 
-      <section aria-labelledby="ai">
-        <h2 id="ai">AI</h2>
+      <DetailSection id="ai" title="AI">
         {budget.over_warn && (
           <p role="alert">AI use has passed the warning threshold ({budget.used_pct}% of the cap).</p>
         )}
         <Provider s={s} />
-        <dl className="facts">
+        <dl className="fact-list facts-compat">
           <dt>Default model</dt>
           <dd>
             {s.ai_model}
@@ -574,11 +410,12 @@ function Sections({ s }: { s: SettingsView }) {
         </dl>
         <SpendCap s={s} />
         <BudgetPeriod s={s} />
-
-        {s.ai_tasks.map((task) => (
-          <Task key={task.key} s={s} task={task} />
-        ))}
-      </section>
+      </DetailSection>
+      {/* Per task, not global: its own entry (task-372, decision 23, 2026-10-17). */}
+      <p className="muted quiet">
+        The model, output mode and prompt of each AI task are under{' '}
+        <Link to={AI_PROMPTS}>AI prompts</Link>.
+      </p>
     </>
   )
 }

@@ -31,7 +31,8 @@ import Brands from './screens/Brands'
 import Personalisation, { PersonalisationEntry } from './screens/Personalisation'
 import BrandProfiles from './screens/BrandProfiles'
 import { DeliveriesSplit, NoSendOpen } from './screens/Deliveries'
-import SettingsLayout from './screens/SettingsLayout'
+import { Legacy, SettingsMenu, SettingsSplit } from './screens/SettingsLayout'
+import { AI_PROMPTS, AiPromptDetail, AiPromptsSplit, NoTaskOpen } from './screens/AiPrompts'
 import DeliveryAsSent from './screens/DeliveryAsSent'
 import DeliveryDetail from './screens/DeliveryDetail'
 import RequireSession from './routes/RequireSession'
@@ -80,19 +81,25 @@ export default function App() {
         <Route path="/campaigns/:id/variants/:variantId/send" element={<SendVariant />} />
         <Route path="/monitoring" element={<Monitoring />} />
         {/* Settings and its parts as subpages, under one menu entry. */}
-        <Route path="/settings" element={<SettingsLayout />}>
+        {/* Settings as a drill-in (task-372, decisions 19 and 23): the parts
+            beside General, a part's list beside what is open. */}
+        <Route path="/settings" element={<SettingsSplit label="Settings parts" list={<SettingsMenu />} />}>
           <Route index element={<Settings />} />
-          <Route path="brand-profiles" element={<BrandProfiles />} />
-          <Route path="brand-profiles/:id" element={<BrandProfileDetail />} />
-          <Route path="personalisation" element={<Personalisation />} />
-          <Route path="personalisation/:id" element={<PersonalisationEntry />} />
-          <Route path="users" element={<People />} />
-          <Route path="users/:id" element={<PersonDetail />} />
-          <Route path="roles" element={<Roles />} />
-          <Route path="roles/:id" element={<RoleDetail />} />
-          <Route path="integrations" element={<Integrations />} />
-          <Route path="integrations/:id" element={<IntegrationDetail />} />
-          <Route path="brands" element={<Brands />} />
+          <Route path="brand-profiles" element={<Legacy><BrandProfiles /></Legacy>} />
+          <Route path="brand-profiles/:id" element={<Legacy><BrandProfileDetail /></Legacy>} />
+          <Route path="personalisation" element={<Legacy><Personalisation /></Legacy>} />
+          <Route path="personalisation/:id" element={<Legacy><PersonalisationEntry /></Legacy>} />
+          <Route path="users" element={<Legacy><People /></Legacy>} />
+          <Route path="users/:id" element={<Legacy><PersonDetail /></Legacy>} />
+          <Route path="roles" element={<Legacy><Roles /></Legacy>} />
+          <Route path="roles/:id" element={<Legacy><RoleDetail /></Legacy>} />
+          <Route path="integrations" element={<Legacy><Integrations /></Legacy>} />
+          <Route path="integrations/:id" element={<Legacy><IntegrationDetail /></Legacy>} />
+          <Route path="brands" element={<Legacy><Brands /></Legacy>} />
+        </Route>
+        <Route element={<AiPromptsSplit />}>
+          <Route path={AI_PROMPTS} element={<NoTaskOpen />} />
+          <Route path={`${AI_PROMPTS}/:key`} element={<AiPromptDetail />} />
         </Route>
         {/* Content and its parts as subpages (task-359), like Settings. */}
         {/* A drill-in (task-372, decision 20): the parts, then a part's list
