@@ -65,14 +65,18 @@ function Page({ person }: { person: Person }) {
           <p className="muted">No role yet: they can sign in but see nothing.</p>
         ) : (
           <ul aria-label="Roles" className="link-list">
-            {person.grants.map((g) => (
-              <li key={g.id}>
-                {multiBrand ? `${g.role_name} on ${g.brand_name}` : g.role_name}{' '}
-                <Button className="btn-plain btn-sm" onPress={() => remove.mutate(g.id)}>
-                  Remove
-                </Button>
-              </li>
-            ))}
+            {person.grants.map((g) => {
+              const access = multiBrand ? `${g.role_name} on ${g.brand_name}` : g.role_name
+              return (
+                <li key={g.id}>
+                  {access}{' '}
+                  {/* Named by what it removes: one Remove per row (task-392 item 16). */}
+                  <Button className="btn-plain btn-sm" aria-label={`Remove ${access}`} onPress={() => remove.mutate(g.id)}>
+                    Remove
+                  </Button>
+                </li>
+              )
+            })}
           </ul>
         )}
         <div className="inline-form">

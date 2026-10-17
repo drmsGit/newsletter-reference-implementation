@@ -82,6 +82,13 @@ describe('the administration subpages (task-358)', () => {
     expect(screen.queryByRole('button', { name: /Deactivate/ })).not.toBeInTheDocument()
   })
 
+  it('names each Remove by the access it takes away (task-392 item 16)', async () => {
+    server()
+    open('/settings/users/2')
+    const access = await screen.findByRole('list', { name: 'Roles' })
+    expect(await within(access).findByRole('button', { name: 'Remove Manager on Acme' })).toHaveTextContent('Remove')
+  })
+
   it('deactivates someone else, and says why when it is refused', async () => {
     const writes = server({
       'POST /auth/users/2/active': (r) => (writes.push(r.clone()),
