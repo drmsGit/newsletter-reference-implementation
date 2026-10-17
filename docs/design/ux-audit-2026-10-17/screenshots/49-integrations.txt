@@ -1,0 +1,77 @@
+- log
+- log
+- complementary:
+  - generic: Omnichannel Orchestration Reference
+  - button "Collapse the navigation" [expanded]:
+  - generic: Brand
+  - button "Grathaus Outdoor Brand":
+    - generic: Brand
+    - generic: Grathaus Outdoor
+  - combobox
+  - navigation "Main":
+    - list:
+      - link "Approvals":
+        - /url: /manager/approvals
+        - generic: Approvals
+      - link "Campaigns":
+        - /url: /manager/campaigns
+        - generic: Campaigns
+      - link "Monitoring":
+        - /url: /manager/monitoring
+        - generic: Monitoring
+      - link "Content":
+        - /url: /manager/content
+        - generic: Content
+      - link "Audiences":
+        - /url: /manager/audiences
+        - generic: Audiences
+      - link "Recipients":
+        - /url: /manager/recipients
+        - generic: Recipients
+      - link "Deliveries":
+        - /url: /manager/deliveries
+        - generic: Deliveries
+      - link "Decision slots":
+        - /url: /manager/decision-slots
+        - generic: Decision slots
+      - link "Settings":
+        - /url: /manager/settings
+        - generic: Settings
+  - img "Initial admin": IA
+  - button "Sign out":
+    - generic: Sign out
+- main:
+  - region "Integration list":
+    - link "Settings":
+      - /url: /manager/settings
+      - text: Settings
+    - heading "Integrations" [level=1]
+    - button "New integration"
+    - paragraph: Other systems that call this platform, each with its own keys and what it may do.
+    - grid "Integrations":
+      - row "n8n":
+        - gridcell "n8n Active · 1 live key campaigns.manage, sends.execute, sends.plan":
+          - generic: n8n
+          - generic: Active · 1 live key
+          - generic: campaigns.manage, sends.execute, sends.plan
+      - row "webshop":
+        - gridcell "webshop Active · 2 live keys audiences.manage, sends.execute":
+          - generic: webshop
+          - generic: Active · 2 live keys
+          - generic: audiences.manage, sends.execute
+      - row "Acme Agency (demo)":
+        - gridcell "Acme Agency (demo) Active · 0 live keys sends.execute":
+          - generic: Acme Agency (demo)
+          - generic: Active · 0 live keys
+          - generic: sends.execute
+      - row "task-331 scratch":
+        - gridcell "task-331 scratch Deactivated · 0 live keys sends.execute":
+          - generic: task-331 scratch
+          - generic: Deactivated · 0 live keys
+          - generic: sends.execute
+      - row "SCRATCH task-358":
+        - gridcell "SCRATCH task-358 Deactivated · 0 live keys Nothing yet":
+          - generic: SCRATCH task-358
+          - generic: Deactivated · 0 live keys
+          - generic: Nothing yet
+  - paragraph: Select an integration to see its keys.

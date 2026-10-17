@@ -1,0 +1,228 @@
+{
+  "buttons": [
+    {
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "rgba(0, 0, 0, 0)",
+      "color": "rgb(31, 27, 22)",
+      "h": 28,
+      "label": "Collapse the navigation",
+      "shortcuts": null,
+      "text": "",
+      "w": 28
+    },
+    {
+      "bg": "rgb(255, 255, 255)",
+      "border": "rgb(228, 218, 202)",
+      "color": "rgb(31, 27, 22)",
+      "h": 40,
+      "label": null,
+      "shortcuts": null,
+      "text": "BrandGrathaus Outdoor",
+      "w": 207
+    },
+    {
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "rgba(0, 0, 0, 0)",
+      "color": "rgb(26, 93, 116)",
+      "h": 24,
+      "label": null,
+      "shortcuts": null,
+      "text": "Sign out",
+      "w": 61.15625
+    },
+    {
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "rgba(0, 0, 0, 0)",
+      "color": "rgb(31, 27, 22)",
+      "h": 94,
+      "label": "Notification · Record “Gravel im Altmühltal: Eine Runde mit drei Abkürzungen”",
+      "shortcuts": null,
+      "text": "NotificationRecord“Gravel im Altmühltal: Eine Runde mit drei Abkürzungen”",
+      "w": 237.796875
+    },
+    {
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "rgba(0, 0, 0, 0)",
+      "color": "rgb(26, 93, 116)",
+      "h": 24,
+      "label": "Move Notification up",
+      "shortcuts": null,
+      "text": " ",
+      "w": 24
+    },
+    {
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "rgba(0, 0, 0, 0)",
+      "color": "rgb(26, 93, 116)",
+      "h": 24,
+      "label": "Move Notification down",
+      "shortcuts": null,
+      "text": " ",
+      "w": 24
+    },
+    {
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "rgba(0, 0, 0, 0)",
+      "color": "rgb(26, 93, 116)",
+      "h": 24,
+      "label": "Remove Notification",
+      "shortcuts": null,
+      "text": "Remove",
+      "w": 67.203125
+    },
+    {
+      "bg": "rgb(255, 255, 255)",
+      "border": "rgb(228, 218, 202)",
+      "color": "rgb(31, 27, 22)",
+      "h": 28,
+      "label": null,
+      "shortcuts": null,
+      "text": "Open preview ",
+      "w": 111.171875
+    },
+    {
+      "bg": "rgb(255, 255, 255)",
+      "border": "rgb(133, 122, 108)",
+      "color": "rgb(31, 27, 22)",
+      "h": 28,
+      "label": null,
+      "shortcuts": null,
+      "text": "Newsletter Deutsch (default) · de",
+      "w": 762
+    },
+    {
+      "bg": "rgb(246, 241, 232)",
+      "border": "rgb(228, 218, 202)",
+      "color": "rgb(31, 27, 22)",
+      "h": 28,
+      "label": null,
+      "shortcuts": null,
+      "text": "Use another record",
+      "w": 145.3203125
+    },
+    {
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "rgba(0, 0, 0, 0)",
+      "color": "rgb(26, 93, 116)",
+      "h": 24,
+      "label": null,
+      "shortcuts": null,
+      "text": "Personalise…",
+      "w": 100.34375
+    },
+    {
+      "bg": "rgb(255, 255, 255)",
+      "border": "rgb(228, 218, 202)",
+      "color": "rgb(31, 27, 22)",
+      "h": 28,
+      "label": null,
+      "shortcuts": null,
+      "text": "Change Notification title in catalogue",
+      "w": 255.3046875
+    },
+    {
+      "bg": "rgba(0, 0, 0, 0)",
+      "border": "rgba(0, 0, 0, 0)",
+      "color": "rgb(26, 93, 116)",
+      "h": 24,
+      "label": null,
+      "shortcuts": null,
+      "text": "Personalise…",
+      "w": 100.34375
+    },
+    {
+      "bg": "rgb(255, 255, 255)",
+      "border": "rgb(228, 218, 202)",
+      "color": "rgb(31, 27, 22)",
+      "h": 28,
+      "label": null,
+      "shortcuts": null,
+      "text": "Change Notification text in catalogue",
+      "w": 255.234375
+    },
+    {
+      "bg": "rgb(255, 255, 255)",
+      "border": "rgb(228, 218, 202)",
+      "color": "rgb(31, 27, 22)",
+      "h": 28,
+      "label": null,
+      "shortcuts": null,
+      "text": "Change image…",
+      "w": 125.609375
+    },
+    {
+      "bg": "rgb(255, 255, 255)",
+      "border": "rgb(228, 218, 202)",
+      "color": "rgb(31, 27, 22)",
+      "h": 28,
+      "label": null,
+      "shortcuts": null,
+      "text": "Remove",
+      "w": 75.203125
+    },
+    {
+      "bg": "rgb(255, 255, 255)",
+      "border": "rgb(228, 218, 202)",
+      "color": "rgb(31, 27, 22)",
+      "h": 28,
+      "label": null,
+      "shortcuts": null,
+      "text": "Change Notification image in catalogue",
+      "w": 268.9453125
+    },
+    {
+      "bg": "rgb(255, 255, 255)",
+      "border": "rgb(228, 218, 202)",
+      "color": "rgb(31, 27, 22)",
+      "h": 28,
+      "label": null,
+      "shortcuts": null,
+      "text": "Change Opens this link in catalogue",
+      "w": 247.578125
+    }
+  ],
+  "current": [
+    {
+      "current": null,
+      "text": "Approvals"
+    },
+    {
+      "current": "page",
+      "text": "Campaigns"
+    },
+    {
+      "current": null,
+      "text": "Monitoring"
+    },
+    {
+      "current": null,
+      "text": "Content"
+    },
+    {
+      "current": null,
+      "text": "Audiences"
+    },
+    {
+      "current": null,
+      "text": "Recipients"
+    },
+    {
+      "current": null,
+      "text": "Deliveries"
+    },
+    {
+      "current": null,
+      "text": "Decision slots"
+    },
+    {
+      "current": null,
+      "text": "Settings"
+    }
+  ],
+  "lang": "en",
+  "skip": 0,
+  "viewport": {
+    "height": 755,
+    "width": 1456
+  }
+}

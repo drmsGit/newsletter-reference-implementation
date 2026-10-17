@@ -1,0 +1,302 @@
+[
+  {
+    "name": "01-approvals",
+    "url": "http://localhost:5173/manager/approvals"
+  },
+  {
+    "name": "02-approval-history",
+    "url": "http://localhost:5173/manager/approvals/history"
+  },
+  {
+    "name": "03-campaigns",
+    "url": "http://localhost:5173/manager/campaigns"
+  },
+  {
+    "name": "04-campaign-detail",
+    "url": "http://localhost:5173/manager/campaigns/12"
+  },
+  {
+    "name": "05-variant-editor",
+    "url": "http://localhost:5173/manager/campaigns/12/variants/12"
+  },
+  {
+    "name": "06-preview",
+    "url": "http://localhost:5173/manager/campaigns/12/variants/12"
+  },
+  {
+    "name": "07-personalise",
+    "url": "http://localhost:5173/manager/campaigns/12/variants/12"
+  },
+  {
+    "name": "08-image-picker",
+    "url": "http://localhost:5173/manager/campaigns/12/variants/12"
+  },
+  {
+    "name": "09-image-upload",
+    "url": "http://localhost:5173/manager/campaigns/12/variants/12"
+  },
+  {
+    "name": "10-image-web",
+    "url": "http://localhost:5173/manager/campaigns/12/variants/12"
+  },
+  {
+    "name": "11-send",
+    "url": "http://localhost:5173/manager/campaigns/12/variants/12/send"
+  },
+  {
+    "name": "12-monitoring",
+    "url": "http://localhost:5173/manager/monitoring"
+  },
+  {
+    "name": "13-content",
+    "url": "http://localhost:5173/manager/content"
+  },
+  {
+    "name": "14-records",
+    "url": "http://localhost:5173/manager/content/records"
+  },
+  {
+    "name": "15-record-detail",
+    "url": "http://localhost:5173/manager/content/156"
+  },
+  {
+    "name": "16-new-record",
+    "url": "http://localhost:5173/manager/content/156"
+  },
+  {
+    "name": "17-categories",
+    "url": "http://localhost:5173/manager/content/categories"
+  },
+  {
+    "name": "18-category-detail",
+    "url": "http://localhost:5173/manager/content/categories/1"
+  },
+  {
+    "name": "19-new-category",
+    "url": "http://localhost:5173/manager/content/categories/1"
+  },
+  {
+    "name": "20-graph",
+    "url": "http://localhost:5173/manager/content/graph"
+  },
+  {
+    "name": "21-audiences",
+    "url": "http://localhost:5173/manager/audiences"
+  },
+  {
+    "name": "22-audience-detail",
+    "url": "http://localhost:5173/manager/audiences/2"
+  },
+  {
+    "name": "23-new-audience",
+    "url": "http://localhost:5173/manager/audiences/2"
+  },
+  {
+    "name": "24-suggest-audience",
+    "url": "http://localhost:5173/manager/audiences/2"
+  },
+  {
+    "name": "25-rule-editor",
+    "url": "http://localhost:5173/manager/audiences/2"
+  },
+  {
+    "name": "26-paste-people",
+    "url": "http://localhost:5173/manager/audiences/2"
+  },
+  {
+    "name": "27-recipients",
+    "url": "http://localhost:5173/manager/recipients"
+  },
+  {
+    "name": "28-recipient-detail",
+    "url": "http://localhost:5173/manager/recipients/1000"
+  },
+  {
+    "name": "29-deliveries",
+    "url": "http://localhost:5173/manager/deliveries"
+  },
+  {
+    "name": "30-delivery-detail",
+    "url": "http://localhost:5173/manager/deliveries/5"
+  },
+  {
+    "name": "31-as-sent",
+    "url": "http://localhost:5173/manager/deliveries/5/executions/801"
+  },
+  {
+    "name": "32-slots",
+    "url": "http://localhost:5173/manager/decision-slots"
+  },
+  {
+    "name": "33-slot-detail",
+    "url": "http://localhost:5173/manager/decision-slots/5"
+  },
+  {
+    "name": "34-settings",
+    "url": "http://localhost:5173/manager/settings"
+  },
+  {
+    "name": "35-profiles",
+    "url": "http://localhost:5173/manager/settings/brand-profiles"
+  },
+  {
+    "name": "36-profile-detail",
+    "url": "http://localhost:5173/manager/settings/brand-profiles/1"
+  },
+  {
+    "name": "37-new-profile",
+    "url": "http://localhost:5173/manager/settings/brand-profiles/1"
+  },
+  {
+    "name": "38-personalisation",
+    "url": "http://localhost:5173/manager/settings/personalisation"
+  },
+  {
+    "name": "39-expression-detail",
+    "url": "http://localhost:5173/manager/settings/personalisation/2"
+  },
+  {
+    "name": "40-new-expression",
+    "url": "http://localhost:5173/manager/settings/personalisation/2"
+  },
+  {
+    "name": "41-ai-prompts",
+    "url": "http://localhost:5173/manager/settings/ai-prompts"
+  },
+  {
+    "name": "42-ai-prompt-detail",
+    "url": "http://localhost:5173/manager/settings/ai-prompts/content_draft"
+  },
+  {
+    "name": "43-users",
+    "url": "http://localhost:5173/manager/settings/users"
+  },
+  {
+    "name": "44-user-detail",
+    "url": "http://localhost:5173/manager/settings/users/95"
+  },
+  {
+    "name": "45-new-user",
+    "url": "http://localhost:5173/manager/settings/users/95"
+  },
+  {
+    "name": "46-roles",
+    "url": "http://localhost:5173/manager/settings/roles"
+  },
+  {
+    "name": "47-role-detail",
+    "url": "http://localhost:5173/manager/settings/roles/2"
+  },
+  {
+    "name": "48-new-role",
+    "url": "http://localhost:5173/manager/settings/roles/2"
+  },
+  {
+    "name": "49-integrations",
+    "url": "http://localhost:5173/manager/settings/integrations"
+  },
+  {
+    "name": "50-integration-detail",
+    "url": "http://localhost:5173/manager/settings/integrations/1947"
+  },
+  {
+    "name": "51-new-integration",
+    "url": "http://localhost:5173/manager/settings/integrations/1947"
+  },
+  {
+    "name": "52-brands",
+    "url": "http://localhost:5173/manager/settings/brands"
+  },
+  {
+    "name": "53-new-brand",
+    "url": "http://localhost:5173/manager/settings/brands"
+  },
+  {
+    "name": "54-shortcuts",
+    "url": "http://localhost:5173/manager/settings/brands"
+  },
+  {
+    "name": "55-shortcuts-background-navigation",
+    "url": "http://localhost:5173/manager/campaigns"
+  },
+  {
+    "name": "56-new-campaign",
+    "url": "http://localhost:5173/manager/campaigns"
+  },
+  {
+    "name": "57-modal-search-focus",
+    "url": "http://localhost:5173/manager/campaigns"
+  },
+  {
+    "name": "58-push-editor",
+    "url": "http://localhost:5173/manager/campaigns/9/variants/9"
+  },
+  {
+    "name": "59-record-binding",
+    "url": "http://localhost:5173/manager/campaigns/9/variants/9"
+  },
+  {
+    "name": "60-push-preview",
+    "url": "http://localhost:5173/manager/campaigns/9/variants/9"
+  },
+  {
+    "name": "61-collapsed-navigation",
+    "url": "http://localhost:5173/manager/campaigns/9/variants/9"
+  },
+  {
+    "name": "62-tablet-editor",
+    "url": "http://localhost:5173/manager/campaigns/9/variants/9"
+  },
+  {
+    "name": "63-phone-editor",
+    "url": "http://localhost:5173/manager/campaigns/9/variants/9"
+  },
+  {
+    "name": "64-phone-personalise",
+    "url": "http://localhost:5173/manager/campaigns/9/variants/9"
+  },
+  {
+    "name": "65-phone-image-picker",
+    "url": "http://localhost:5173/manager/campaigns/9/variants/9"
+  },
+  {
+    "name": "66-general-lower",
+    "url": "http://localhost:5173/manager/settings"
+  },
+  {
+    "name": "67-profile-look",
+    "url": "http://localhost:5173/manager/settings/brand-profiles/1"
+  },
+  {
+    "name": "68-profile-footer",
+    "url": "http://localhost:5173/manager/settings/brand-profiles/1"
+  },
+  {
+    "name": "69-record-fields",
+    "url": "http://localhost:5173/manager/content/156"
+  },
+  {
+    "name": "70-record-bottom",
+    "url": "http://localhost:5173/manager/content/156"
+  },
+  {
+    "name": "71-send-plan",
+    "url": "http://localhost:5173/manager/campaigns/12/variants/12/send"
+  },
+  {
+    "name": "72-send-schedule",
+    "url": "http://localhost:5173/manager/campaigns/12/variants/12/send"
+  },
+  {
+    "name": "73-slot-picks",
+    "url": "http://localhost:5173/manager/decision-slots/5"
+  },
+  {
+    "name": "74-slot-reasons",
+    "url": "http://localhost:5173/manager/decision-slots/5"
+  },
+  {
+    "name": "75-brand-menu",
+    "url": "http://localhost:5173/manager/decision-slots/5"
+  }
+]

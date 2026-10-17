@@ -1,0 +1,94 @@
+- log:
+  - generic: Content draft ausgewählt.
+  - generic: Content draft ausgewählt.
+  - generic: Content draft ausgewählt.
+- log
+- complementary:
+  - generic: Omnichannel Orchestration Reference
+  - button "Collapse the navigation" [expanded]:
+  - generic: Brand
+  - button "Grathaus Outdoor Brand":
+    - generic: Brand
+    - generic: Grathaus Outdoor
+  - combobox
+  - navigation "Main":
+    - list:
+      - link "Approvals":
+        - /url: /manager/approvals
+        - generic: Approvals
+      - link "Campaigns":
+        - /url: /manager/campaigns
+        - generic: Campaigns
+      - link "Monitoring":
+        - /url: /manager/monitoring
+        - generic: Monitoring
+      - link "Content":
+        - /url: /manager/content
+        - generic: Content
+      - link "Audiences":
+        - /url: /manager/audiences
+        - generic: Audiences
+      - link "Recipients":
+        - /url: /manager/recipients
+        - generic: Recipients
+      - link "Deliveries":
+        - /url: /manager/deliveries
+        - generic: Deliveries
+      - link "Decision slots":
+        - /url: /manager/decision-slots
+        - generic: Decision slots
+      - link "Settings":
+        - /url: /manager/settings
+        - generic: Settings
+  - img "Initial admin": IA
+  - button "Sign out":
+    - generic: Sign out
+- main:
+  - region "AI prompt list":
+    - link "Settings":
+      - /url: /manager/settings
+      - text: Settings
+    - heading "AI prompts" [level=1]
+    - paragraph: "One per AI task: its model, its output mode and its prompt. The provider, the limits and the budget are under General."
+    - grid "AI tasks":
+      - row "Content draft" [active] [selected]:
+        - 'gridcell "Content draft Model: the default · Output: no approval step Prompt: version 1 of 1"':
+          - generic: Content draft
+          - generic: "Model: the default · Output: no approval step"
+          - generic: "Prompt: version 1 of 1"
+      - row "Content translation":
+        - 'gridcell "Content translation Model: the default · Output: no approval step Prompt: version 1 of 1"':
+          - generic: Content translation
+          - generic: "Model: the default · Output: no approval step"
+          - generic: "Prompt: version 1 of 1"
+      - row "Subject & preheader":
+        - 'gridcell "Subject & preheader Model: the default · Output: applied directly Prompt: version 2 of 2"':
+          - generic: Subject & preheader
+          - generic: "Model: the default · Output: applied directly"
+          - generic: "Prompt: version 2 of 2"
+      - row "Variant from a topic":
+        - 'gridcell "Variant from a topic Model: the default · Output: no approval step Prompt: version 1 of 1"':
+          - generic: Variant from a topic
+          - generic: "Model: the default · Output: no approval step"
+          - generic: "Prompt: version 1 of 1"
+  - heading "Content draft" [level=2]
+  - paragraph: Drafts a content record's text fields from a source a manager pastes, and proposes categories from the existing ones with a score and a reason. A person takes what they want on the record's page; nothing is saved by itself.
+  - region "Model":
+    - heading "Model" [level=3]
+    - generic: Model for Content draft
+    - button "the default (claude-opus-5) Model for Content draft":
+      - generic: the default (claude-opus-5)
+    - combobox
+    - button "Save model"
+  - region "Output":
+    - heading "Output" [level=3]
+    - term: Output
+    - definition: no approval step — it only appears where a person takes it themselves
+  - region "Prompt":
+    - heading "Prompt" [level=3]
+    - term: Prompt
+    - definition: version 1 of 1
+    - generic: Prompt for Content draft
+    - textbox "Prompt for Content draft": "You draft the text of one content record for a newsletter from the source below. Write in the language the source is written in. Use only what the source says; do not invent facts, prices, dates or addresses. Do not write links, and do not use placeholders such as {{first_name}}. Fill these fields. Each line gives the field name, what it is, and guidance: {fields} Then choose the categories this record belongs to, from this list only, each with a score from 1 (barely belongs) to 10 (squarely belongs) and one short reason: {categories} Your house style: - a calm, professional tone, very \"on point\"; straight to the point Answer with one JSON object and nothing else, in this shape: {\"fields\": {\"field_name\": \"text\"}, \"categories\": [{\"name\": \"Category name\", \"score\": 7, \"reason\": \"why\"}]} The source: {source}"
+    - button "Publish as version 2"
+    - generic "The live prompt"

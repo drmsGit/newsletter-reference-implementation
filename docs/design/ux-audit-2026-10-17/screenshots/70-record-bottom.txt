@@ -1,0 +1,471 @@
+- complementary:
+  - generic: Omnichannel Orchestration Reference
+  - button "Collapse the navigation" [expanded]:
+  - generic: Brand
+  - button "Grathaus Outdoor Brand":
+    - generic: Brand
+    - generic: Grathaus Outdoor
+  - combobox
+  - navigation "Main":
+    - list:
+      - link "Approvals":
+        - /url: /manager/approvals
+        - generic: Approvals
+      - link "Campaigns":
+        - /url: /manager/campaigns
+        - generic: Campaigns
+      - link "Monitoring":
+        - /url: /manager/monitoring
+        - generic: Monitoring
+      - link "Content":
+        - /url: /manager/content
+        - generic: Content
+      - link "Audiences":
+        - /url: /manager/audiences
+        - generic: Audiences
+      - link "Recipients":
+        - /url: /manager/recipients
+        - generic: Recipients
+      - link "Deliveries":
+        - /url: /manager/deliveries
+        - generic: Deliveries
+      - link "Decision slots":
+        - /url: /manager/decision-slots
+        - generic: Decision slots
+      - link "Settings":
+        - /url: /manager/settings
+        - generic: Settings
+  - img "Initial admin": IA
+  - button "Sign out":
+    - generic: Sign out
+- main:
+  - region "Records":
+    - link "Content":
+      - /url: /manager/content
+      - text: Content
+    - heading "Records" [level=1]
+    - button "New record"
+    - search:
+      - textbox "Find content by title or description"
+      - button "Search"
+    - generic: Status
+    - button "Any status Status":
+      - generic: Status
+      - generic: Any status
+    - combobox
+    - generic: Category
+    - button "Any category Category":
+      - generic: Category
+      - generic: Any category
+    - combobox
+    - generic: Ready for
+    - button "Any channel Ready for":
+      - generic: Ready for
+      - generic: Any channel
+    - combobox
+    - grid "Content records":
+      - 'row "Two-person tent for €229: pitch it before you buy" [selected]':
+        - 'gridcell "Two-person tent for €229: pitch it before you buy A freestanding dome tent for €229, assessed by interior dimensions, luggage and an actual trial pitch before purchase. active"':
+          - generic: "Two-person tent for €229: pitch it before you buy"
+          - generic: A freestanding dome tent for €229, assessed by interior dimensions, luggage and an actual trial pitch before purchase.
+          - generic: active
+      - 'row "Grathaus Basis hut sleeping liner: 340 grams for €29"':
+        - 'gridcell "Grathaus Basis hut sleeping liner: 340 grams for €29 A washable cotton-blend hut liner for staffed accommodation where bedding is provided. active"':
+          - generic: "Grathaus Basis hut sleeping liner: 340 grams for €29"
+          - generic: A washable cotton-blend hut liner for staffed accommodation where bedding is provided.
+          - generic: active
+      - 'row "Animal tracks in snow: add a scale before guessing"':
+        - 'gridcell "Animal tracks in snow: add a scale before guessing A wildlife observation guide for tracks in the Bavarian Forest, focused on keeping your distance and recording details calmly. active"':
+          - generic: "Animal tracks in snow: add a scale before guessing"
+          - generic: A wildlife observation guide for tracks in the Bavarian Forest, focused on keeping your distance and recording details calmly.
+          - generic: active
+      - 'row "Your first ski tour: the descent is not an afterthought"':
+        - 'gridcell "Your first ski tour: the descent is not an afterthought A first ski-touring preparation guide that puts skiing ability and suitable training ahead of the elevation gain. active"':
+          - generic: "Your first ski tour: the descent is not an afterthought"
+          - generic: A first ski-touring preparation guide that puts skiing ability and suitable training ahead of the elevation gain.
+          - generic: active
+      - 'row "Via ferratas in a group: agree that no is an answer"':
+        - 'gridcell "Via ferratas in a group: agree that no is an answer A conversation guide to making different expectations and concerns visible before a group chooses a via ferrata. active"':
+          - generic: "Via ferratas in a group: agree that no is an answer"
+          - generic: A conversation guide to making different expectations and concerns visible before a group chooses a via ferrata.
+          - generic: active
+      - 'row "Day hikes in the Chiemgau: plan the return journey first"':
+        - 'gridcell "Day hikes in the Chiemgau: plan the return journey first A planning guide to day hikes using buses and trains in the Chiemgau, where the last connection sets the time limit. active"':
+          - generic: "Day hikes in the Chiemgau: plan the return journey first"
+          - generic: A planning guide to day hikes using buses and trains in the Chiemgau, where the last connection sets the time limit.
+          - generic: active
+      - 'row "Rosenheim: Winterausrüstung gebraucht abgeben am 6. März"':
+        - 'gridcell "Rosenheim: Winterausrüstung gebraucht abgeben am 6. März Ein Annahmetermin für saubere gebrauchte Winterbekleidung mit vorher geklärten Bedingungen und ausdrücklich begrenztem Sortiment. active"':
+          - generic: "Rosenheim: Winterausrüstung gebraucht abgeben am 6. März"
+          - generic: Ein Annahmetermin für saubere gebrauchte Winterbekleidung mit vorher geklärten Bedingungen und ausdrücklich begrenztem Sortiment.
+          - generic: active
+      - 'row "Isolierflasche für 29 Euro: Der Verschluss wird mit Handschuhen getestet"':
+        - 'gridcell "Isolierflasche für 29 Euro: Der Verschluss wird mit Handschuhen getestet Eine robuste Edelstahlflasche mit 750 Millilitern Volumen, deren Handhabung für Wintertage vor dem Packen ausprobiert wird. active"':
+          - generic: "Isolierflasche für 29 Euro: Der Verschluss wird mit Handschuhen getestet"
+          - generic: Eine robuste Edelstahlflasche mit 750 Millilitern Volumen, deren Handhabung für Wintertage vor dem Packen ausprobiert wird.
+          - generic: active
+      - 'row "Grathaus Basis Isolationsjacke: 139 Euro für die Winterpause"':
+        - 'gridcell "Grathaus Basis Isolationsjacke: 139 Euro für die Winterpause Eine Jacke mit synthetischer Füllung für ruhige Winterphasen, die mit der tatsächlich vorgesehenen Schichtenkombination anprobiert wird. active"':
+          - generic: "Grathaus Basis Isolationsjacke: 139 Euro für die Winterpause"
+          - generic: Eine Jacke mit synthetischer Füllung für ruhige Winterphasen, die mit der tatsächlich vorgesehenen Schichtenkombination anprobiert wird.
+          - generic: active
+      - 'row "Wintertag in der Gruppe: Ein Treffpunkt ohne Liftfahrt"':
+        - 'gridcell "Wintertag in der Gruppe: Ein Treffpunkt ohne Liftfahrt Eine Organisationshilfe für Gruppen mit verschiedenen Winterplänen und einem gemeinsam erreichbaren Treffpunkt im Tal. active"':
+          - generic: "Wintertag in der Gruppe: Ein Treffpunkt ohne Liftfahrt"
+          - generic: Eine Organisationshilfe für Gruppen mit verschiedenen Winterplänen und einem gemeinsam erreichbaren Treffpunkt im Tal.
+          - generic: active
+      - 'row "Drei Winterwochenenden: Leihkosten vollständig vergleichen"':
+        - 'gridcell "Drei Winterwochenenden: Leihkosten vollständig vergleichen Ein Rechenblatt für winterliche Leihausrüstung, das Tagespreis, benötigte Teile und Rückgabebedingungen getrennt erfasst. active"':
+          - generic: "Drei Winterwochenenden: Leihkosten vollständig vergleichen"
+          - generic: Ein Rechenblatt für winterliche Leihausrüstung, das Tagespreis, benötigte Teile und Rückgabebedingungen getrennt erfasst.
+          - generic: active
+      - 'row "Augsburg: LVS-Unterlagen und Servicefragen am 5. Februar"':
+        - 'gridcell "Augsburg: LVS-Unterlagen und Servicefragen am 5. Februar Ein kostenloser Ladenabend zum Klären modellbezogener Unterlagen und Hersteller-Servicewege für vorhandene LVS-Geräte. active"':
+          - generic: "Augsburg: LVS-Unterlagen und Servicefragen am 5. Februar"
+          - generic: Ein kostenloser Ladenabend zum Klären modellbezogener Unterlagen und Hersteller-Servicewege für vorhandene LVS-Geräte.
+          - generic: active
+      - 'row "Lawinenschaufel für 59 Euro: Mit Handschuhen zusammensetzen"':
+        - 'gridcell "Lawinenschaufel für 59 Euro: Mit Handschuhen zusammensetzen Eine zerlegbare Aluminiumschaufel, deren Packmaß und Bedienbarkeit vor dem Winter im passenden Lernrahmen geprüft werden. active"':
+          - generic: "Lawinenschaufel für 59 Euro: Mit Handschuhen zusammensetzen"
+          - generic: Eine zerlegbare Aluminiumschaufel, deren Packmaß und Bedienbarkeit vor dem Winter im passenden Lernrahmen geprüft werden.
+          - generic: active
+      - 'row "LVS-Gerät für 269 Euro: Bedienung vor Zusatzfunktionen"':
+        - 'gridcell "LVS-Gerät für 269 Euro: Bedienung vor Zusatzfunktionen Ein digitales Dreiantennen-Gerät, das mit praktischer Einweisung, vollständigen Produktunterlagen und passendem Lernangebot ausgewählt wird. active"':
+          - generic: "LVS-Gerät für 269 Euro: Bedienung vor Zusatzfunktionen"
+          - generic: Ein digitales Dreiantennen-Gerät, das mit praktischer Einweisung, vollständigen Produktunterlagen und passendem Lernangebot ausgewählt wird.
+          - generic: active
+      - 'row "Lawinenausbildung: Nach der Übung die offenen Fragen festhalten"':
+        - 'gridcell "Lawinenausbildung: Nach der Übung die offenen Fragen festhalten Eine Nachbereitungshilfe für qualifizierte Lawinenausbildung, die Lernbedarf und weitere praktische Termine sichtbar macht. active"':
+          - generic: "Lawinenausbildung: Nach der Übung die offenen Fragen festhalten"
+          - generic: Eine Nachbereitungshilfe für qualifizierte Lawinenausbildung, die Lernbedarf und weitere praktische Termine sichtbar macht.
+          - generic: active
+      - 'row "Lawinenlagebericht: Die Zahl ist erst die erste Zeile"':
+        - 'gridcell "Lawinenlagebericht: Die Zahl ist erst die erste Zeile Eine Lesehilfe für den vollständigen Lawinenlagebericht mit Gebiet, Gültigkeit, Gefahrenstellen und beschriebenen Problemen. active"':
+          - generic: "Lawinenlagebericht: Die Zahl ist erst die erste Zeile"
+          - generic: Eine Lesehilfe für den vollständigen Lawinenlagebericht mit Gebiet, Gültigkeit, Gefahrenstellen und beschriebenen Problemen.
+          - generic: active
+      - 'row "München: Langlaufski pflegen am 20. Februar"':
+        - 'gridcell "München: Langlaufski pflegen am 20. Februar Ein Ladenworkshop zur modellgerechten Pflege von Langlaufski mit vorheriger Abstimmung des mitgebrachten Materials. active"':
+          - generic: "München: Langlaufski pflegen am 20. Februar"
+          - generic: Ein Ladenworkshop zur modellgerechten Pflege von Langlaufski mit vorheriger Abstimmung des mitgebrachten Materials.
+          - generic: active
+      - 'row "Langlaufhose für 79 Euro: Beweglich ohne dickes Futter"':
+        - 'gridcell "Langlaufhose für 79 Euro: Beweglich ohne dickes Futter Eine ungefütterte Hose mit windabweisender Vorderseite für aktive Langlaufeinheiten und eine bewusst gewählte Schichtenkombination. active"':
+          - generic: "Langlaufhose für 79 Euro: Beweglich ohne dickes Futter"
+          - generic: Eine ungefütterte Hose mit windabweisender Vorderseite für aktive Langlaufeinheiten und eine bewusst gewählte Schichtenkombination.
+          - generic: active
+      - 'row "Klassik-Langlaufset für 249 Euro: Passend statt nur lang genug"':
+        - 'gridcell "Klassik-Langlaufset für 249 Euro: Passend statt nur lang genug Ein Set aus klassischen Langlaufski und Bindung, das anhand von Gewicht, Erfahrung und passenden Schuhen ausgewählt wird. active"':
+          - generic: "Klassik-Langlaufset für 249 Euro: Passend statt nur lang genug"
+          - generic: Ein Set aus klassischen Langlaufski und Bindung, das anhand von Gewicht, Erfahrung und passenden Schuhen ausgewählt wird.
+          - generic: active
+      - 'row "Loipenbericht lesen: Geöffnet ist genauer als Schneehöhe"':
+        - 'gridcell "Loipenbericht lesen: Geöffnet ist genauer als Schneehöhe Eine Planungshilfe für Langlauftage, bei der aktueller Betriebsstatus und tatsächlich nutzbare Strecken vor der Anfahrt geprüft werden. active"':
+          - generic: "Loipenbericht lesen: Geöffnet ist genauer als Schneehöhe"
+          - generic: Eine Planungshilfe für Langlauftage, bei der aktueller Betriebsstatus und tatsächlich nutzbare Strecken vor der Anfahrt geprüft werden.
+          - generic: active
+      - 'row "Langlauf anfangen: Erst die Technikrichtung festlegen"':
+        - 'gridcell "Langlauf anfangen: Erst die Technikrichtung festlegen Eine Einstiegshilfe, die klassische Technik und Skating als unterschiedliche Lern- und Ausrüstungsentscheidungen betrachtet. active"':
+          - generic: "Langlauf anfangen: Erst die Technikrichtung festlegen"
+          - generic: Eine Einstiegshilfe, die klassische Technik und Skating als unterschiedliche Lern- und Ausrüstungsentscheidungen betrachtet.
+          - generic: active
+      - 'row "Augsburg: Schneeschuhbindungen ausprobieren am 9. Januar"':
+        - 'gridcell "Augsburg: Schneeschuhbindungen ausprobieren am 9. Januar Ein kostenloser Ladenvormittag zur Größenwahl und Bedienbarkeit von Schneeschuhbindungen mit den eigenen Winterschuhen. active"':
+          - generic: "Augsburg: Schneeschuhbindungen ausprobieren am 9. Januar"
+          - generic: Ein kostenloser Ladenvormittag zur Größenwahl und Bedienbarkeit von Schneeschuhbindungen mit den eigenen Winterschuhen.
+          - generic: active
+      - 'row "Wintergamaschen für 39 Euro: Über den eigenen Schuh probieren"':
+        - 'gridcell "Wintergamaschen für 39 Euro: Über den eigenen Schuh probieren Ein Paar hohe Gamaschen für Schnee, dessen Passform mit Schuh, Hose und vorgesehener Schneeschuhbindung gemeinsam geprüft wird. active"':
+          - generic: "Wintergamaschen für 39 Euro: Über den eigenen Schuh probieren"
+          - generic: Ein Paar hohe Gamaschen für Schnee, dessen Passform mit Schuh, Hose und vorgesehener Schneeschuhbindung gemeinsam geprüft wird.
+          - generic: active
+      - 'row "Schneeschuhe für 149 Euro: Das Gepäck zählt beim Gewicht mit"':
+        - 'gridcell "Schneeschuhe für 149 Euro: Das Gepäck zählt beim Gewicht mit Ein Schneeschuhpaar mit verstellbarer Bindung, dessen Auswahl das gesamte Tragegewicht und den vorhandenen Winterschuh einbezieht. active"':
+          - generic: "Schneeschuhe für 149 Euro: Das Gepäck zählt beim Gewicht mit"
+          - generic: Ein Schneeschuhpaar mit verstellbarer Bindung, dessen Auswahl das gesamte Tragegewicht und den vorhandenen Winterschuh einbezieht.
+          - generic: active
+      - 'row "Schneeschuhgehen mit Rücksicht: Freie Fläche heißt nicht frei"':
+        - 'gridcell "Schneeschuhgehen mit Rücksicht: Freie Fläche heißt nicht frei Eine Vorbereitungshilfe zum Beachten von Wildruhezonen und örtlichen Winterhinweisen bei Schneeschuhunternehmungen. active"':
+          - generic: "Schneeschuhgehen mit Rücksicht: Freie Fläche heißt nicht frei"
+          - generic: Eine Vorbereitungshilfe zum Beachten von Wildruhezonen und örtlichen Winterhinweisen bei Schneeschuhunternehmungen.
+          - generic: active
+      - 'row "Schneeschuhroute wählen: Der Sommerweg genügt nicht"':
+        - 'gridcell "Schneeschuhroute wählen: Der Sommerweg genügt nicht Eine Auswahlhilfe für winterlich geeignete Schneeschuhunternehmungen mit aktuellen Informationen statt übernommener Sommerstrecken. active"':
+          - generic: "Schneeschuhroute wählen: Der Sommerweg genügt nicht"
+          - generic: Eine Auswahlhilfe für winterlich geeignete Schneeschuhunternehmungen mit aktuellen Informationen statt übernommener Sommerstrecken.
+          - generic: active
+      - 'row "Rosenheim: Fellsprechstunde am 12. Dezember"':
+        - 'gridcell "Rosenheim: Fellsprechstunde am 12. Dezember Ein kostenloser Beratungstermin für vorhandene Steigfelle mit Sichtung von Befestigungen und offenen Pflegefragen. active"':
+          - generic: "Rosenheim: Fellsprechstunde am 12. Dezember"
+          - generic: Ein kostenloser Beratungstermin für vorhandene Steigfelle mit Sichtung von Befestigungen und offenen Pflegefragen.
+          - generic: active
+      - 'row "Tourenskischuhe für 399 Euro: Bindung und Schuh gemeinsam prüfen"':
+        - 'gridcell "Tourenskischuhe für 399 Euro: Bindung und Schuh gemeinsam prüfen Eine Beratung zum Tourenskischuh, bei der Passform und die dokumentierte Kompatibilität mit dem vorhandenen System geklärt werden. active"':
+          - generic: "Tourenskischuhe für 399 Euro: Bindung und Schuh gemeinsam prüfen"
+          - generic: Eine Beratung zum Tourenskischuh, bei der Passform und die dokumentierte Kompatibilität mit dem vorhandenen System geklärt werden.
+          - generic: active
+      - 'row "Steigfelle ab 129 Euro: Die Skimaße kommen mit in den Laden"':
+        - 'gridcell "Steigfelle ab 129 Euro: Die Skimaße kommen mit in den Laden Ein Auswahlratgeber für Steigfelle, bei dem Skiabmessungen, Befestigung und passende Pflege gemeinsam betrachtet werden. active"':
+          - generic: "Steigfelle ab 129 Euro: Die Skimaße kommen mit in den Laden"
+          - generic: Ein Auswahlratgeber für Steigfelle, bei dem Skiabmessungen, Befestigung und passende Pflege gemeinsam betrachtet werden.
+          - generic: active
+      - 'row "Pistenskitour am Abend: Eine Stirnlampe öffnet keine Piste"':
+        - 'gridcell "Pistenskitour am Abend: Eine Stirnlampe öffnet keine Piste Eine Checkliste für Pistenskitouren, die aktuelle Betreiberregeln und ausgewiesene Zeiten vor die Feierabendplanung stellt. active"':
+          - generic: "Pistenskitour am Abend: Eine Stirnlampe öffnet keine Piste"
+          - generic: Eine Checkliste für Pistenskitouren, die aktuelle Betreiberregeln und ausgewiesene Zeiten vor die Feierabendplanung stellt.
+          - generic: active
+      - 'row "Erste Skitour: Die Abfahrt ist kein Restprogramm"':
+        - 'gridcell "Erste Skitour: Die Abfahrt ist kein Restprogramm Eine Vorbereitungshilfe für den Skitoureneinstieg, bei der skifahrerische Erfahrung und passende Ausbildung vor der Höhenmeterzahl stehen. active"':
+          - generic: "Erste Skitour: Die Abfahrt ist kein Restprogramm"
+          - generic: Eine Vorbereitungshilfe für den Skitoureneinstieg, bei der skifahrerische Erfahrung und passende Ausbildung vor der Höhenmeterzahl stehen.
+          - generic: active
+      - 'row "Rosenheim: Erste-Hilfe-Lernfragen sammeln am 27. November"':
+        - 'gridcell "Rosenheim: Erste-Hilfe-Lernfragen sammeln am 27. November Ein kostenloser Informationsabend zur Suche nach praktischen Erste-Hilfe-Angeboten mit Raum für Fragen zu Ablauf und Voraussetzungen. active"':
+          - generic: "Rosenheim: Erste-Hilfe-Lernfragen sammeln am 27. November"
+          - generic: Ein kostenloser Informationsabend zur Suche nach praktischen Erste-Hilfe-Angeboten mit Raum für Fragen zu Ablauf und Voraussetzungen.
+          - generic: active
+      - 'row "Erste-Hilfe-Tasche für 24 Euro: Inhalt auf einen Blick"':
+        - 'gridcell "Erste-Hilfe-Tasche für 24 Euro: Inhalt auf einen Blick Eine gefüllte Erste-Hilfe-Tasche mit aufklappbaren Innenfächern und herausnehmbarer Bestandsliste für die individuelle Prüfung. active"':
+          - generic: "Erste-Hilfe-Tasche für 24 Euro: Inhalt auf einen Blick"
+          - generic: Eine gefüllte Erste-Hilfe-Tasche mit aufklappbaren Innenfächern und herausnehmbarer Bestandsliste für die individuelle Prüfung.
+          - generic: active
+      - 'row "Erste-Hilfe-Material in der Gruppe: Zuständigkeit klar verteilen"':
+        - 'gridcell "Erste-Hilfe-Material in der Gruppe: Zuständigkeit klar verteilen Eine organisatorische Checkliste für gemeinsam mitgeführtes Erste-Hilfe-Material mit festen Zuständigkeiten vor und nach der Tour. active"':
+          - generic: "Erste-Hilfe-Material in der Gruppe: Zuständigkeit klar verteilen"
+          - generic: Eine organisatorische Checkliste für gemeinsam mitgeführtes Erste-Hilfe-Material mit festen Zuständigkeiten vor und nach der Tour.
+          - generic: active
+      - 'row "Erste-Hilfe-Kurs fürs Draußensein: Vor der Buchung nachfragen"':
+        - 'gridcell "Erste-Hilfe-Kurs fürs Draußensein: Vor der Buchung nachfragen Eine Auswahlhilfe für praktische Erste-Hilfe-Kurse mit Blick auf Lernziel, Übungsanteil und persönliche Vorkenntnisse. active"':
+          - generic: "Erste-Hilfe-Kurs fürs Draußensein: Vor der Buchung nachfragen"
+          - generic: Eine Auswahlhilfe für praktische Erste-Hilfe-Kurse mit Blick auf Lernziel, Übungsanteil und persönliche Vorkenntnisse.
+          - generic: active
+      - 'row "München: Kartenlegenden verstehen am 26. November"':
+        - 'gridcell "München: Kartenlegenden verstehen am 26. November Ein kostenloser Ladenabend zum Lesen von Kartenlegenden und zum Erkennen unterschiedlicher Darstellungsregeln. active"':
+          - generic: "München: Kartenlegenden verstehen am 26. November"
+          - generic: Ein kostenloser Ladenabend zum Lesen von Kartenlegenden und zum Erkennen unterschiedlicher Darstellungsregeln.
+          - generic: active
+      - 'row "Dokumententasche für 15 Euro: Lesbar ohne langes Auspacken"':
+        - 'gridcell "Dokumententasche für 15 Euro: Lesbar ohne langes Auspacken Eine transparente Tasche im Format A5 für wichtige Papierinformationen auf gemeinsamen Unternehmungen. active"':
+          - generic: "Dokumententasche für 15 Euro: Lesbar ohne langes Auspacken"
+          - generic: Eine transparente Tasche im Format A5 für wichtige Papierinformationen auf gemeinsamen Unternehmungen.
+          - generic: active
+      - 'row "Toureninfo daheim lassen: Ein Blatt statt verstreuter Nachrichten"':
+        - 'gridcell "Toureninfo daheim lassen: Ein Blatt statt verstreuter Nachrichten Eine Vorlage für vereinbarte Toureninformationen und eine klare Rückmeldung an eine benannte Kontaktperson. active"':
+          - generic: "Toureninfo daheim lassen: Ein Blatt statt verstreuter Nachrichten"
+          - generic: Eine Vorlage für vereinbarte Toureninformationen und eine klare Rückmeldung an eine benannte Kontaktperson.
+          - generic: active
+      - 'row "Wetterinformationen vergleichen: Uhrzeit und Höhenlage mitlesen"':
+        - 'gridcell "Wetterinformationen vergleichen: Uhrzeit und Höhenlage mitlesen Ein Leseschema für Wetterinformationen, das Bezugszeit, Gebiet und Höhenlage vor der gemeinsamen Tourenentscheidung klärt. active"':
+          - generic: "Wetterinformationen vergleichen: Uhrzeit und Höhenlage mitlesen"
+          - generic: Ein Leseschema für Wetterinformationen, das Bezugszeit, Gebiet und Höhenlage vor der gemeinsamen Tourenentscheidung klärt.
+          - generic: active
+      - 'row "Kletterhose für 89 Euro: Bewegungsfreiheit ohne lose Enden"':
+        - 'gridcell "Kletterhose für 89 Euro: Bewegungsfreiheit ohne lose Enden Eine robuste Hose mit Zwickeleinsatz, die bei der Anprobe mit typischen Kletterbewegungen geprüft wird. active"':
+          - generic: "Kletterhose für 89 Euro: Bewegungsfreiheit ohne lose Enden"
+          - generic: Eine robuste Hose mit Zwickeleinsatz, die bei der Anprobe mit typischen Kletterbewegungen geprüft wird.
+          - generic: active
+      - 'row "Chalkbag für 19 Euro: Der Verschluss zählt beim Transport"':
+        - 'gridcell "Chalkbag für 19 Euro: Der Verschluss zählt beim Transport Ein einfacher Chalkbag mit Kordelverschluss, dessen Alltagstauglichkeit sich auch in der gepackten Tasche zeigt. active"':
+          - generic: "Chalkbag für 19 Euro: Der Verschluss zählt beim Transport"
+          - generic: Ein einfacher Chalkbag mit Kordelverschluss, dessen Alltagstauglichkeit sich auch in der gepackten Tasche zeigt.
+          - generic: active
+      - 'row "Seilsack für 39 Euro: Eine Plane gegen Bodenkontakt"':
+        - 'gridcell "Seilsack für 39 Euro: Eine Plane gegen Bodenkontakt Ein Seilsack mit herausnehmbarer Plane, der Transport und übersichtliches Auslegen eines Kletterseils unterstützt. active"':
+          - generic: "Seilsack für 39 Euro: Eine Plane gegen Bodenkontakt"
+          - generic: Ein Seilsack mit herausnehmbarer Plane, der Transport und übersichtliches Auslegen eines Kletterseils unterstützt.
+          - generic: active
+      - 'row "Kletterfelsen in der Fränkischen Schweiz: Sperrungen zuerst lesen"':
+        - 'gridcell "Kletterfelsen in der Fränkischen Schweiz: Sperrungen zuerst lesen Eine Vorbereitungshilfe für den Felsbesuch, die aktuelle Zugangsregeln und lokale Hinweise vor die Routenauswahl stellt. active"':
+          - generic: "Kletterfelsen in der Fränkischen Schweiz: Sperrungen zuerst lesen"
+          - generic: Eine Vorbereitungshilfe für den Felsbesuch, die aktuelle Zugangsregeln und lokale Hinweise vor die Routenauswahl stellt.
+          - generic: active
+      - 'row "Augsburg: Gurtanprobe für Klettersteige am 20. November"':
+        - 'gridcell "Augsburg: Gurtanprobe für Klettersteige am 20. November Ein Ladenabend mit begleiteten Passformvergleichen für Klettergurte ohne Ausbildung in der Anwendung eines Klettersteigsystems. active"':
+          - generic: "Augsburg: Gurtanprobe für Klettersteige am 20. November"
+          - generic: Ein Ladenabend mit begleiteten Passformvergleichen für Klettergurte ohne Ausbildung in der Anwendung eines Klettersteigsystems.
+          - generic: active
+      - 'row "Zustiegsschuhe für 125 Euro: Der Rückweg gehört zur Anprobe"':
+        - 'gridcell "Zustiegsschuhe für 125 Euro: Der Rückweg gehört zur Anprobe Ein robuster Schuh für felsige Zustiege, bei dem Zehenraum und Fersenhalt auch mit Blick auf den späteren Abstieg geprüft werden. active"':
+          - generic: "Zustiegsschuhe für 125 Euro: Der Rückweg gehört zur Anprobe"
+          - generic: Ein robuster Schuh für felsige Zustiege, bei dem Zehenraum und Fersenhalt auch mit Blick auf den späteren Abstieg geprüft werden.
+          - generic: active
+      - 'row "Sonnenbrille für Zustiege: 49 Euro mit festem Etui"':
+        - 'gridcell "Sonnenbrille für Zustiege: 49 Euro mit festem Etui Eine Sportsonnenbrille für offene Zustiege, deren Sitz zusammen mit dem vorhandenen Helm geprüft wird. active"':
+          - generic: "Sonnenbrille für Zustiege: 49 Euro mit festem Etui"
+          - generic: Eine Sportsonnenbrille für offene Zustiege, deren Sitz zusammen mit dem vorhandenen Helm geprüft wird.
+          - generic: active
+      - 'row "Klettersteige in der Gruppe: Das Nein wird vorher besprochen"':
+        - 'gridcell "Klettersteige in der Gruppe: Das Nein wird vorher besprochen Eine Gesprächshilfe gegen Gruppendruck, damit unterschiedliche Erwartungen vor der Auswahl eines Klettersteigs sichtbar werden. active"':
+          - generic: "Klettersteige in der Gruppe: Das Nein wird vorher besprochen"
+          - generic: Eine Gesprächshilfe gegen Gruppendruck, damit unterschiedliche Erwartungen vor der Auswahl eines Klettersteigs sichtbar werden.
+          - generic: active
+      - 'row "Rosenheim: Alpine Tourenwahl am 12. November"':
+        - 'gridcell "Rosenheim: Alpine Tourenwahl am 12. November Ein kostenloser Vortragsabend, der anhand zweier fiktiver Touren die Gesamtanforderung alpiner Kletterunternehmungen vergleicht. active"':
+          - generic: "Rosenheim: Alpine Tourenwahl am 12. November"
+          - generic: Ein kostenloser Vortragsabend, der anhand zweier fiktiver Touren die Gesamtanforderung alpiner Kletterunternehmungen vergleicht.
+          - generic: active
+      - 'row "Alpinrucksack mit 28 Litern: Weniger außen hängen lassen"':
+        - 'gridcell "Alpinrucksack mit 28 Litern: Weniger außen hängen lassen Ein schmaler Rucksack für 109 Euro mit schlichtem Innenraum und bewusst begrenzten Außenfächern. active"':
+          - generic: "Alpinrucksack mit 28 Litern: Weniger außen hängen lassen"
+          - generic: Ein schmaler Rucksack für 109 Euro mit schlichtem Innenraum und bewusst begrenzten Außenfächern.
+          - generic: active
+      - 'row "Alpine Tourenberichte: Was das Foto nicht verrät"':
+        - 'gridcell "Alpine Tourenberichte: Was das Foto nicht verrät Ein Leseschlüssel für alpine Tourenberichte, der Datum, Bedingungen und Abstieg getrennt von spektakulären Bildern betrachtet. active"':
+          - generic: "Alpine Tourenberichte: Was das Foto nicht verrät"
+          - generic: Ein Leseschlüssel für alpine Tourenberichte, der Datum, Bedingungen und Abstieg getrennt von spektakulären Bildern betrachtet.
+          - generic: active
+    - navigation "Pages":
+      - button "Newer" [disabled]
+      - generic: 1–50 of 131
+      - button "Older"
+  - 'heading "Two-person tent for €229: pitch it before you buy" [level=2]'
+  - strong: Active
+  - button "Deactivate"
+  - switch "Machine ready" [checked]
+  - text: Machine ready
+  - generic: May a decision slot pick this without a person choosing it.
+  - generic: Duplicate into
+  - button "Grathaus Outdoor Duplicate into":
+    - generic: Grathaus Outdoor
+  - combobox
+  - button "Duplicate"
+  - paragraph:
+    - text: No unsent campaign uses this record. Sends use the published version.
+    - link "Where it is used":
+      - /url: "#used-in-heading"
+  - region "Details":
+    - heading "Details" [level=3]
+    - generic: Title (required)
+    - textbox "Title (required)": "Two-person tent for €229: pitch it before you buy"
+    - generic: Description
+    - textbox "Description": A freestanding dome tent for €229, assessed by interior dimensions, luggage and an actual trial pitch before purchase.
+    - term: Language
+    - definition:
+      - text: English
+      - generic: — This record is a translation, so its language stays.
+  - region "Draft with AI":
+    - heading "Draft with AI" [level=3]
+    - generic: Source
+    - textbox "Source"
+    - generic: "Paste the content or write a brief — not anyone's personal details: the text goes to the model provider and is not kept here. 0 of 12,000 characters."
+    - group "Draft the text fields for":
+      - generic: Draft the text fields for
+      - checkbox "Email" [checked]
+      - text: Email
+      - checkbox "Push" [checked]
+      - text: Push
+    - button "Draft with AI"
+    - status
+  - region "Translations":
+    - heading "Translations" [level=3]
+    - paragraph:
+      - text: English, translated by AI from
+      - 'link "Zelt für zwei Personen für 229 Euro: Vor dem Kauf aufbauen"':
+        - /url: /manager/content/18
+      - text: (German).
+    - paragraph: Up to date with the original.
+  - generic "Email":
+    - heading "Email" [level=3]
+  - switch "Ready for Email" [checked]
+  - text: Ready for Email
+  - paragraph: Marked ready by demo · 17.10.2026, 16:58:09
+  - generic: Hero headline
+  - textbox "Hero headline": Room for two means checking
+  - generic: The h1. Largest type in the email and usually over a background image, so it must be SHORT — shorter than headline_medium.
+  - button "Personalise…"
+  - group "Image":
+    - paragraph:
+      - strong: Image
+    - img "Zelt an einem See bei Sonnenuntergang"
+    - text: default-20261017-21-600x600-zelt-see-abend.jpg
+    - text: Zelt an einem See bei Sonnenuntergang
+    - paragraph:
+      - button "Change image…"
+      - button "Remove"
+  - generic: Hero button text
+  - textbox "Hero button text": Compare the tent
+  - button "Personalise…"
+  - generic: Headline
+  - textbox "Headline": €229 and a proper test pitch
+  - button "Personalise…"
+  - generic: Body text (long)
+  - textbox "Body text (long)": A tent labelled for two people may have room for two sleeping places and little space for luggage. Check the interior dimensions against the way you plan to use it before buying. This model costs €229 and weighs 2.6 kilograms, according to its product details. Use your own sleeping mats to check the floor area. Once they are side by side, is there still room to move? Where will you keep clothing that should not be left in the porch? The capacity printed on the packaging does not answer every question. Try pitching the tent once if a display model or suitable test area is available. Take time to look at the poles, clips and guy points. Check the included items against the product list. Follow the product guidance and the local rules for your overnight location. Packed size and carry weight belong in the comparison too. Carrying 2.6 kilograms on foot is different from loading it into a car. The tent is not automatically suitable for every season or weather condition. Someone staying mainly at designated campsites will have different needs from a person on a longer trekking trip. A clear use case is more helpful than a dramatic product photograph.
+  - generic: "**bold**, *italic*, [link](https://…), and a line starting with - for a bullet."
+  - generic: The longer text of a record, for the Single text block (ADR-198 point 2). The short text goes in Body text (short).
+  - button "Personalise…"
+  - generic: Body text (short)
+  - textbox "Body text (short)": This two-person dome tent costs €229 and weighs 2.6 kilograms. Before buying, compare its interior length and luggage space with your own sleeping mats, and try pitching it. A stated capacity says little about how comfortable it is to sleep with equipment inside. Our guide recommends setting it up in a shop or at home. Check the packed dimensions and what is included separately from the product photograph.
+  - generic: "**bold**, *italic*, [link](https://…), and a line starting with - for a bullet."
+  - button "Personalise…"
+  - generic: Link text
+  - textbox "Link text": View the tent
+  - button "Personalise…"
+  - generic: Link
+  - textbox "Link": https://www.grathaus.example/kuppelzelt-zwei-personen-229
+  - generic "Push":
+    - heading "Push" [level=3]
+  - switch "Ready for Push" [checked]
+  - text: Ready for Push
+  - paragraph: Marked ready by demo · 17.10.2026, 16:58:09
+  - generic: Notification title
+  - textbox "Notification title": Try pitching before you buy
+  - button "Personalise…"
+  - generic: Notification text
+  - textbox "Notification text": This 2.6-kilogram dome tent costs €229; compare it using your own sleeping mats.
+  - button "Personalise…"
+  - group "Notification image":
+    - paragraph:
+      - strong: Notification image
+    - img "Zelt an einem See bei Sonnenuntergang"
+    - text: default-20261017-21-600x600-zelt-see-abend.jpg
+    - text: Zelt an einem See bei Sonnenuntergang
+    - paragraph:
+      - button "Change image…"
+      - button "Remove"
+  - generic: Opens this link
+  - textbox "Opens this link": https://www.grathaus.example/kuppelzelt-zwei-personen-229
+  - region "Performance":
+    - heading "Performance" [level=3]
+    - paragraph: No email or push that carried this record has been sent yet.
+  - region "Categories":
+    - heading "Categories" [level=3]
+    - paragraph: Categories build each recipient's interest profile. For finding content, facets will follow.
+    - list:
+      - generic: Biwak
+      - generic: Score for Biwak
+      - button "3 Score for Biwak":
+        - generic: "3"
+      - combobox
+      - button "Remove Biwak": Remove
+      - generic: Camping & Trekking
+      - generic: Score for Camping & Trekking
+      - button "9 Score for Camping & Trekking":
+        - generic: "9"
+      - combobox
+      - button "Remove Camping & Trekking": Remove
+      - generic: Nachhaltigkeit
+      - generic: Score for Nachhaltigkeit
+      - button "4 Score for Nachhaltigkeit":
+        - generic: "4"
+      - combobox
+      - button "Remove Nachhaltigkeit": Remove
+    - generic: Add a category
+    - button "Choose a category Add a category":
+      - generic: Choose a category
+    - combobox
+    - generic: Score
+    - button "10 Score":
+      - generic: "10"
+    - combobox
+    - button "Add" [disabled]
+    - paragraph: 1 = barely in the category, 10 = squarely in it.
+  - region "Published versions":
+    - heading "Published versions" [level=3]
+    - list:
+      - generic "Version 1 · demo · 17.10.2026, 16:58:09":
+        - text: Version 1
+        - generic: · demo · 17.10.2026, 16:58:09
+  - region "Used in":
+    - heading "Used in" [level=3]
+    - paragraph: No campaign has a module bound to this record.
+    - paragraph: A decision slot that may pick this record when it sends is not listed.

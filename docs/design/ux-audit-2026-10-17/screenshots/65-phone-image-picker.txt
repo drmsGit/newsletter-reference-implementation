@@ -1,0 +1,239 @@
+- log
+- log
+- complementary:
+  - generic: Omnichannel Orchestration Reference
+  - button "Collapse the navigation" [expanded]:
+  - generic: Brand
+  - button "Grathaus Outdoor Brand":
+    - generic: Brand
+    - generic: Grathaus Outdoor
+  - combobox
+  - navigation "Main":
+    - list:
+      - link "Approvals":
+        - /url: /manager/approvals
+        - generic: Approvals
+      - link "Campaigns":
+        - /url: /manager/campaigns
+        - generic: Campaigns
+      - link "Monitoring":
+        - /url: /manager/monitoring
+        - generic: Monitoring
+      - link "Content":
+        - /url: /manager/content
+        - generic: Content
+      - link "Audiences":
+        - /url: /manager/audiences
+        - generic: Audiences
+      - link "Recipients":
+        - /url: /manager/recipients
+        - generic: Recipients
+      - link "Deliveries":
+        - /url: /manager/deliveries
+        - generic: Deliveries
+      - link "Decision slots":
+        - /url: /manager/decision-slots
+        - generic: Decision slots
+      - link "Settings":
+        - /url: /manager/settings
+        - generic: Settings
+  - img "Initial admin": IA
+  - button "Sign out":
+    - generic: Sign out
+- main:
+  - region "Modules":
+    - link "Testtag im Laden (Push)":
+      - /url: /manager/campaigns/9
+      - text: Testtag im Laden (Push)
+    - heading "Modules" [level=1]
+    - list:
+      - 'button "Notification · Record “Gravel im Altmühltal: Eine Runde mit drei Abkürzungen”"':
+        - generic: Notification
+        - text: Record
+        - generic: "“Gravel im Altmühltal: Eine Runde mit drei Abkürzungen”"
+      - button "Move Notification up" [disabled]:
+      - button "Move Notification down" [disabled]:
+      - button "Remove Notification": Remove
+    - paragraph: A push variant holds 1 module, and this one is full.
+  - region "Push":
+    - heading "Push" [level=2]
+    - paragraph:
+      - text: push · draft ·
+      - link "Send…":
+        - /url: /manager/campaigns/9/variants/9/send
+    - region "Preview":
+      - generic: Nothing to flag.
+      - button "Open preview"
+    - region "Brand profile":
+      - heading "Brand profile" [level=3]
+      - generic: Brand profile
+      - button "Newsletter Deutsch (default) · de Brand profile":
+        - generic: Newsletter Deutsch (default) · de
+      - combobox
+    - region "Notification":
+      - heading "Notification" [level=3]
+      - paragraph:
+        - text: Fields from
+        - 'link "“Gravel im Altmühltal: Eine Runde mit drei Abkürzungen”"':
+          - /url: /manager/content/1
+        - text: .
+        - button "Use another record"
+      - generic: Notification title (required)
+      - textbox "Notification title (required)": Gravelrunde im Altmühltal
+      - button "Personalise…"
+      - button "Change Notification title in catalogue"
+      - generic: Notification text (required)
+      - textbox "Notification text (required)": Das Planungsbeispiel umfasst 68 Kilometer, 700 Höhenmeter und drei mögliche Ausstiege.
+      - button "Personalise…"
+      - button "Change Notification text in catalogue"
+      - group "Notification image":
+        - paragraph:
+          - strong: Notification image
+        - img "Gravelrad auf einem Feldweg mit Hügeln im Hintergrund"
+        - text: default-20261017-18-600x600-gravel-feldweg.jpg
+        - text: Gravelrad auf einem Feldweg mit Hügeln im Hintergrund
+        - paragraph:
+          - button "Change image…"
+          - button "Remove"
+      - button "Change Notification image in catalogue"
+      - generic: Opens this link
+      - textbox "Opens this link": https://www.grathaus.example/altmuehltal-gravelrunde-ausstiege
+      - button "Change Opens this link in catalogue"
+- button "Schließen"
+- 'dialog "Choose an image: Notification image" [active]':
+  - heading "Choose an image" [level=2]
+  - button "Close"
+  - tablist "Where the image comes from":
+    - tab "Library" [selected]
+    - tab "Upload new"
+    - tab "Web address"
+  - tabpanel "Library":
+    - generic: Brand
+    - button "Grathaus Outdoor Brand":
+      - generic: Grathaus Outdoor
+    - combobox
+    - generic: Search (optional)
+    - textbox "Search (optional)"
+    - list "Images":
+      - button "herbstlaub bank 600×600":
+        - generic: herbstlaub bank
+        - generic: 600×600
+      - button "gletscher seilschaft 600×600":
+        - generic: gletscher seilschaft
+        - generic: 600×600
+      - button "huettenabend tisch 600×600":
+        - generic: huettenabend tisch
+        - generic: 600×600
+      - button "kurs knoten 600×600":
+        - generic: kurs knoten
+        - generic: 600×600
+      - button "fuehrung gruppe 600×600":
+        - generic: fuehrung gruppe
+        - generic: 600×600
+      - button "testtag parkplatz 600×600":
+        - generic: testtag parkplatz
+        - generic: 600×600
+      - button "vortrag abend 600×600":
+        - generic: vortrag abend
+        - generic: 600×600
+      - button "laden innenraum 600×600":
+        - generic: laden innenraum
+        - generic: 600×600
+      - button "secondhand regal 600×600":
+        - generic: secondhand regal
+        - generic: 600×600
+      - button "reparatur werkbank 600×600":
+        - generic: reparatur werkbank
+        - generic: 600×600
+      - button "karte kompass 600×600":
+        - generic: karte kompass
+        - generic: 600×600
+      - button "erstehilfe set 600×600":
+        - generic: erstehilfe set
+        - generic: 600×600
+      - button "vogel fernglas 600×600":
+        - generic: vogel fernglas
+        - generic: 600×600
+      - button "murmeltier fels 600×600":
+        - generic: murmeltier fels
+        - generic: 600×600
+      - button "hirsch lichtung 600×600":
+        - generic: hirsch lichtung
+        - generic: 600×600
+      - button "picknick alm 600×600":
+        - generic: picknick alm
+        - generic: 600×600
+      - button "kinder wald 600×600":
+        - generic: kinder wald
+        - generic: 600×600
+      - button "kocher tasse 600×600":
+        - generic: kocher tasse
+        - generic: 600×600
+      - button "biwak sterne 600×600":
+        - generic: biwak sterne
+        - generic: 600×600
+      - button "zelt see abend 600×600":
+        - generic: zelt see abend
+        - generic: 600×600
+      - button "radtaschen bruecke 600×600":
+        - generic: radtaschen bruecke
+        - generic: 600×600
+      - button "mtb singletrail 600×600":
+        - generic: mtb singletrail
+        - generic: 600×600
+      - button "gravel feldweg 600×600":
+        - generic: gravel feldweg
+        - generic: 600×600
+      - button "winterhuette licht 600×600":
+        - generic: winterhuette licht
+        - generic: 600×600
+      - button "lawinensuche lvs 600×600":
+        - generic: lawinensuche lvs
+        - generic: 600×600
+      - button "langlauf loipe 600×600":
+        - generic: langlauf loipe
+        - generic: 600×600
+      - button "schneeschuh spur 600×600":
+        - generic: schneeschuh spur
+        - generic: 600×600
+      - button "skitour aufstieg 600×600":
+        - generic: skitour aufstieg
+        - generic: 600×600
+      - button "karabiner gurt 600×600":
+        - generic: karabiner gurt
+        - generic: 600×600
+      - button "alpinwand seil 600×600":
+        - generic: alpinwand seil
+        - generic: 600×600
+      - button "boulderblock matte 600×600":
+        - generic: boulderblock matte
+        - generic: 600×600
+      - button "kletterhalle griffe 600×600":
+        - generic: kletterhalle griffe
+        - generic: 600×600
+      - button "familie bachlauf 600×600":
+        - generic: familie bachlauf
+        - generic: 600×600
+      - button "klettersteig leiter 600×600":
+        - generic: klettersteig leiter
+        - generic: 600×600
+      - button "wanderschuhe pfad 600×600":
+        - generic: wanderschuhe pfad
+        - generic: 600×600
+      - button "rucksack packen 600×600":
+        - generic: rucksack packen
+        - generic: 600×600
+      - button "weitwanderweg wiese 600×600":
+        - generic: weitwanderweg wiese
+        - generic: 600×600
+      - button "gipfelkreuz nebel 600×600":
+        - generic: gipfelkreuz nebel
+        - generic: 600×600
+      - button "huette morgen 600×600":
+        - generic: huette morgen
+        - generic: 600×600
+      - button "wanderweg herbst 600×600":
+        - generic: wanderweg herbst
+        - generic: 600×600
+    - complementary "Selected image":
+      - paragraph: Select an image to see it larger and use it.

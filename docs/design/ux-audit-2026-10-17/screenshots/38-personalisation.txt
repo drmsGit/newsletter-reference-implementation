@@ -1,0 +1,62 @@
+- log
+- log
+- complementary:
+  - generic: Omnichannel Orchestration Reference
+  - button "Collapse the navigation" [expanded]:
+  - generic: Brand
+  - button "Grathaus Outdoor Brand":
+    - generic: Brand
+    - generic: Grathaus Outdoor
+  - combobox
+  - navigation "Main":
+    - list:
+      - link "Approvals":
+        - /url: /manager/approvals
+        - generic: Approvals
+      - link "Campaigns":
+        - /url: /manager/campaigns
+        - generic: Campaigns
+      - link "Monitoring":
+        - /url: /manager/monitoring
+        - generic: Monitoring
+      - link "Content":
+        - /url: /manager/content
+        - generic: Content
+      - link "Audiences":
+        - /url: /manager/audiences
+        - generic: Audiences
+      - link "Recipients":
+        - /url: /manager/recipients
+        - generic: Recipients
+      - link "Deliveries":
+        - /url: /manager/deliveries
+        - generic: Deliveries
+      - link "Decision slots":
+        - /url: /manager/decision-slots
+        - generic: Decision slots
+      - link "Settings":
+        - /url: /manager/settings
+        - generic: Settings
+  - img "Initial admin": IA
+  - button "Sign out":
+    - generic: Sign out
+- main:
+  - region "Entry list":
+    - link "Settings":
+      - /url: /manager/settings
+      - text: Settings
+    - heading "Personalisation" [level=1]
+    - button "New entry"
+    - paragraph: Entries a text can use, such as a salutation. Each one says, per language, what to write for which recipient, and what to write when nothing is known about them. An email uses its brand profile's language.
+    - grid "Entries":
+      - row "Salutation formal":
+        - 'gridcell "Salutation formal {{salutation_formal}} de, en"':
+          - generic: Salutation formal
+          - code: "{{salutation_formal}}"
+          - generic: de, en
+      - row "Salutation informal":
+        - 'gridcell "Salutation informal {{salutation_informal}} de, en"':
+          - generic: Salutation informal
+          - code: "{{salutation_informal}}"
+          - generic: de, en
+  - paragraph: Select an entry to see what it writes for whom.

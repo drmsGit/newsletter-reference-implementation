@@ -1,0 +1,509 @@
+[
+  {
+    "id": "UX-01",
+    "priority": "P1",
+    "kind": "Defect",
+    "title": "Image thumbnails overflow their buttons and overlap the filters",
+    "screen": "Image picker / Library",
+    "shot": "08-image-picker",
+    "observed": "Each image button measures 28 px high while its image measures 96 px high. The images overlap adjacent rows and extend into the filter area; names and sizes are visually obscured. Reproduced at desktop and phone widths.",
+    "impact": "It is difficult to identify an asset or know which image a click will select.",
+    "fix": "Give image cards intrinsic height, prevent flex shrinking of thumbnails, and reserve separate rows for thumbnail, name and dimensions. Keep the grid below the filters.",
+    "steps": "Open an email or Push variant → Change image… → Library.",
+    "box": [
+      16,
+      32,
+      47,
+      57
+    ],
+    "source": "frontend/src/index.css:155; frontend/src/index.css:1242"
+  },
+  {
+    "id": "UX-02",
+    "priority": "P1",
+    "kind": "Defect",
+    "title": "New record and New audience use a broken horizontal form layout",
+    "screen": "Create dialogs",
+    "shot": "16-new-record",
+    "observed": "The heading and first field share a row; fields are only about 164 px wide. Help text wraps beside fields. New category, New campaign and Settings creation dialogs instead use a full-width vertical form.",
+    "impact": "The first input looks attached to the title; labels, fields and actions lack a reliable reading order visually.",
+    "fix": "Use the same vertical dialog form and footer component as New category. Keep the heading outside the field layout.",
+    "steps": "Records → New record; compare Audiences → New audience and Categories → New category.",
+    "box": [
+      32,
+      34,
+      35,
+      32
+    ],
+    "source": "frontend/src/screens/ContentCreate.tsx:51; frontend/src/screens/AudienceCreate.tsx:54; frontend/src/index.css:758"
+  },
+  {
+    "id": "UX-03",
+    "priority": "P1",
+    "kind": "Defect",
+    "title": "Category graph labels collide with nodes and edges",
+    "screen": "Content / Graph",
+    "shot": "20-graph",
+    "observed": "Multiple labels sit under adjacent circles or cross the dense edge bundle. Several category names are partially obscured.",
+    "impact": "The drawing does not reliably communicate category names or relationships. The accessible table helps but does not repair the visual graph.",
+    "fix": "Separate labels from node geometry, reduce edge density until a category is selected, and add zoom or a focused neighborhood view.",
+    "steps": "Content → Graph, with the current 26-category dataset.",
+    "box": [
+      24,
+      22,
+      42,
+      64
+    ],
+    "source": ""
+  },
+  {
+    "id": "UX-04",
+    "priority": "P1",
+    "kind": "Accessibility",
+    "title": "Character-only shortcuts cannot be disabled or remapped",
+    "screen": "Global keyboard shortcuts",
+    "shot": "54-shortcuts",
+    "observed": "?, /, p and g-then-letter sequences are active outside text fields. The help dialog offers no off/remap control; the registry explicitly describes shortcuts as not configurable.",
+    "impact": "Accidental activation from speech input or stray keys. This conflicts with WCAG 2.1.4 for global character-only shortcuts.",
+    "fix": "Provide a persistent off switch or remapping with a non-character modifier; preserve focused-widget keyboard behavior.",
+    "steps": "Focus a non-input control → ?; review the help. Test g then c and / outside text inputs.",
+    "box": null,
+    "source": "frontend/src/shortcuts/Shortcuts.tsx:76"
+  },
+  {
+    "id": "UX-05",
+    "priority": "P2",
+    "kind": "Defect",
+    "title": "Global navigation shortcuts operate behind an open modal",
+    "screen": "Keyboard shortcuts dialog",
+    "shot": "55-shortcuts-background-navigation",
+    "observed": "Opened shortcut help on Settings → Brands. With Close focused, g then c changed the URL and background to Campaigns while the dialog stayed open.",
+    "impact": "The modal does not isolate navigation commands; its content can change beneath the user.",
+    "fix": "Suspend background commands while a modal is open, or make modal navigation an explicit action that closes the dialog and intentionally restores focus.",
+    "steps": "Settings → Brands → ? → focus Close → g then c.",
+    "box": [
+      15,
+      0,
+      28,
+      28
+    ],
+    "source": "frontend/src/shortcuts/Shortcuts.tsx:76"
+  },
+  {
+    "id": "UX-06",
+    "priority": "P2",
+    "kind": "Accessibility",
+    "title": "Textarea borders use the weak divider color",
+    "screen": "Record fields / profile multiline fields",
+    "shot": "69-record-fields",
+    "observed": "Body text (long) has a 1 px #e4daca border on white, about 1.38:1 contrast. Single-line fields use the stronger #857a6c border, about 4.20:1. The textarea background is also white, so the boundary is its principal visible affordance.",
+    "impact": "Multiline editable areas are harder to distinguish, especially with low vision; review against WCAG 1.4.11.",
+    "fix": "Use the strong field-border token for textareas as for inputs. Keep decorative card separators on the weaker token.",
+    "steps": "Open a record → scroll to Body text (long); compare the surrounding inputs.",
+    "box": [
+      44,
+      55,
+      54,
+      17
+    ],
+    "source": "frontend/src/index.css:765"
+  },
+  {
+    "id": "UX-07",
+    "priority": "P2",
+    "kind": "Defect",
+    "title": "Personalisation labels run into token names",
+    "screen": "Personalise menu",
+    "shot": "07-personalise",
+    "observed": "The menu renders “Salutation formal{{salutation_formal}}” with no visual gap. The same happens on phone width.",
+    "impact": "Labels and machine tokens cannot be scanned independently.",
+    "fix": "Use a two-column menu row with a real gap; style the token in monospace and allow truncation or wrapping without colliding.",
+    "steps": "In a variant field → Personalise….",
+    "box": [
+      80,
+      36,
+      19,
+      9
+    ],
+    "source": "frontend/src/components/EditorFields.tsx:177"
+  },
+  {
+    "id": "UX-08",
+    "priority": "P2",
+    "kind": "Accessibility",
+    "title": "Repeated Personalise buttons have identical accessible names",
+    "screen": "Record and variant editors",
+    "shot": "05-variant-editor",
+    "observed": "Every field action is named “Personalise…”. The sampled controls have no field-specific aria-label or aria-describedby association.",
+    "impact": "A screen-reader button list does not reveal which field each action edits.",
+    "fix": "Name actions by field, e.g. “Personalise subject line” and “Personalise headline”, while retaining concise visible text.",
+    "steps": "Inspect the editor accessibility tree or navigate among its Personalise buttons.",
+    "box": null,
+    "source": "frontend/src/components/EditorFields.tsx:173"
+  },
+  {
+    "id": "UX-09",
+    "priority": "P2",
+    "kind": "Accessibility",
+    "title": "Role-removal buttons do not name the role or brand",
+    "screen": "Settings / Users / Access",
+    "shot": "44-user-detail",
+    "observed": "The two access rows each expose a button named only “Remove”, for Admin on two different brands. Other parts of the platform use names such as “Remove Biwak”.",
+    "impact": "The consequence of the action is ambiguous when navigating controls by name.",
+    "fix": "Use “Remove Admin on Grathaus Outdoor” and the equivalent name for each assignment.",
+    "steps": "Settings → Users → Initial admin → inspect Access.",
+    "box": [
+      90,
+      36,
+      8,
+      9
+    ],
+    "source": ""
+  },
+  {
+    "id": "UX-10",
+    "priority": "P2",
+    "kind": "Accessibility",
+    "title": "Recipient data tables have no column or row headers",
+    "screen": "Recipients / detail",
+    "shot": "28-recipient-detail",
+    "observed": "Consent renders channel, purpose, status, source and time as td-only rows. Interests and Consent history follow the same pattern.",
+    "impact": "Relationships between values are not programmatically identified; “demo” and a timestamp have no announced header context.",
+    "fix": "Add visible column headings with th/scope, a row header where appropriate, and a concise table caption or accessible label.",
+    "steps": "Recipients → grathaus-1000 → inspect Consent and lower tables.",
+    "box": [
+      43,
+      18,
+      55,
+      12
+    ],
+    "source": "frontend/src/screens/RecipientDetail.tsx:42"
+  },
+  {
+    "id": "UX-11",
+    "priority": "P2",
+    "kind": "Defect",
+    "title": "General settings facts lose the card content inset",
+    "screen": "Settings / General",
+    "shot": "66-general-lower",
+    "observed": "In Sending and AI, label/value rows start at the left card edge while neighboring inputs and buttons start 16 px inside. The AI facts appear as ungrouped lines rather than the fact rows used elsewhere.",
+    "impact": "The vertical alignment breaks within the same card and weakens label/value grouping.",
+    "fix": "Render these facts with the shared fact-row component and the same 16 px content inset.",
+    "steps": "Settings → General → compare Sending; scroll to AI.",
+    "box": [
+      43,
+      68,
+      55,
+      17
+    ],
+    "source": ""
+  },
+  {
+    "id": "UX-12",
+    "priority": "P2",
+    "kind": "Defect",
+    "title": "Inline action buttons align with labels instead of inputs",
+    "screen": "Category, record and access forms",
+    "shot": "18-category-detail",
+    "observed": "The Add button in “Put it under” is level with the label, above the selection field. Duplicate on records, Give in user access, and Issue a key show the same staggered baseline.",
+    "impact": "Connected controls look unrelated and the horizontal alignment feels unfinished.",
+    "fix": "Align the button with the input/control bottom edge, accounting for field label height and bottom margins.",
+    "steps": "Categories → Wandern → Put it under. Compare record Duplicate and user Give a role.",
+    "box": [
+      44,
+      61,
+      54,
+      9
+    ],
+    "source": ""
+  },
+  {
+    "id": "UX-13",
+    "priority": "P3",
+    "kind": "Inconsistency",
+    "title": "Dialog headers and action order vary",
+    "screen": "Modals across the app",
+    "shot": "09-image-upload",
+    "observed": "The image picker puts Close below its heading on the left. Preview puts Close in a right-aligned header. Paste people stacks Check and Cancel; the broken creation forms place Create before Cancel, while the standard dialogs put Cancel before Create at the right.",
+    "impact": "Users must relearn where to dismiss or confirm each dialog.",
+    "fix": "Adopt shared modal-header and action-footer patterns; use a consistent Cancel → primary-action order.",
+    "steps": "Compare Change image…, Open preview, New record, New category and Paste people.",
+    "box": [
+      15,
+      27,
+      35,
+      14
+    ],
+    "source": ""
+  },
+  {
+    "id": "UX-14",
+    "priority": "P2",
+    "kind": "Recommendation",
+    "title": "Long profile form has its only Save action at the bottom",
+    "screen": "Settings / Brand profile",
+    "shot": "68-profile-footer",
+    "observed": "Save is a normal card near the end of a multi-screen form and scrolls away. There is no persistent save action while editing the earlier sections.",
+    "impact": "Saving requires a long scroll and the commitment model is easy to miss.",
+    "fix": "Keep a compact Save/dirty-state action area visible while editing, or provide deliberate section-level saves.",
+    "steps": "Open Newsletter Deutsch and scroll through Legal details, Look, Header and Footer.",
+    "box": [
+      43,
+      72,
+      55,
+      10
+    ],
+    "source": ""
+  },
+  {
+    "id": "UX-15",
+    "priority": "P2",
+    "kind": "Recommendation",
+    "title": "Autosave and explicit-save screens do not explain their difference",
+    "screen": "Records versus brand profiles and expressions",
+    "shot": "15-record-detail",
+    "observed": "Records use blur-based AutosaveField; profile forms have Save; expression Save is enabled even before any edit. At rest, the record screen has no nearby explanation of its blur-save behavior. This is a clarity finding, not a claim that saves fail.",
+    "impact": "A user can expect Save on an autosaving page or assume a profile edit already persisted.",
+    "fix": "Show a consistent “Saves when you leave a field” cue or saved/unsaved status, and use predictable dirty-state actions on explicit-save forms.",
+    "steps": "Compare a record detail with Newsletter Deutsch and Salutation formal; no data edit was submitted.",
+    "box": null,
+    "source": "frontend/src/components/EditorFields.tsx:82; frontend/src/screens/Personalisation.tsx:273"
+  },
+  {
+    "id": "UX-16",
+    "priority": "P2",
+    "kind": "Inconsistency",
+    "title": "ARIA system messages use German inside an English interface",
+    "screen": "Lists, menus and dialogs",
+    "shot": "54-shortcuts",
+    "observed": "The document declares lang=en and app text is English, but row selection live logs say “ausgewählt” and React Aria dismissal controls are named “Schließen”. Native file-upload controls also follow the German browser locale.",
+    "impact": "The assistive experience switches language unexpectedly. Native browser wording and app-controlled ARIA localization need to be distinguished.",
+    "fix": "Set an explicit application locale for React Aria matching the chosen UI language; keep record-content languages intact.",
+    "steps": "Inspect live logs after Enter on a row and the hidden dismissal buttons in modal/menu snapshots.",
+    "box": null,
+    "source": ""
+  },
+  {
+    "id": "UX-17",
+    "priority": "P2",
+    "kind": "Recommendation",
+    "title": "Shortcuts lack a visible entry point and control metadata",
+    "screen": "Global navigation and editor actions",
+    "shot": "54-shortcuts",
+    "observed": "Help is opened with ?, and hints appear while Alt/Ctrl is held. No visible “Keyboard shortcuts” help control was found in the shell. Sampled navigation and preview controls expose no aria-keyshortcuts.",
+    "impact": "The shortcut system is useful once known but difficult to discover and inspect through assistive tools.",
+    "fix": "Add a visible, keyboard-reachable shortcuts help action. Expose supported single-key shortcuts through aria-keyshortcuts where valid, and explain sequences in help/description text.",
+    "steps": "Inspect the navigation rail and help; examine Open preview and navigation control attributes.",
+    "box": null,
+    "source": "frontend/src/shortcuts/Shortcuts.tsx:174"
+  },
+  {
+    "id": "UX-18",
+    "priority": "P2",
+    "kind": "Recommendation",
+    "title": "Scheduled send time has no visible timezone",
+    "screen": "Send / Plan the send",
+    "shot": "72-send-schedule",
+    "observed": "Choosing “At a time” reveals Send at with a local date/time value, but no timezone beside it or in the section help.",
+    "impact": "A manager cannot confirm how the selected time will be interpreted.",
+    "fix": "Display the actual scheduling timezone and repeat the resolved date, time and zone before commitment.",
+    "steps": "Send Deutsch → When → At a time. Do not press Plan the send.",
+    "box": [
+      70,
+      75,
+      27,
+      8
+    ],
+    "source": ""
+  },
+  {
+    "id": "UX-19",
+    "priority": "P2",
+    "kind": "Recommendation",
+    "title": "Campaign status and delivery status use conflicting-looking labels",
+    "screen": "Campaigns versus Monitoring",
+    "shot": "03-campaigns",
+    "observed": "Campaigns shows Familienherbst, Hüttensaison-Finale and others as “draft”; Monitoring shows those same campaigns as “Sent”. These can represent distinct states, but the campaign list does not explain that distinction.",
+    "impact": "The same campaign appears unfinished in one section and sent in another.",
+    "fix": "Label the states explicitly, e.g. editing status versus latest delivery outcome, or show both. Confirm intended semantics before changing backend status logic.",
+    "steps": "Compare Campaigns and Monitoring for Familienherbst.",
+    "box": [
+      17,
+      56,
+      24,
+      30
+    ],
+    "source": ""
+  },
+  {
+    "id": "UX-20",
+    "priority": "P2",
+    "kind": "Recommendation",
+    "title": "Manager-facing content exposes internal identifiers and excessive precision",
+    "screen": "Decision slots, archived messages and record help",
+    "shot": "74-slot-reasons",
+    "observed": "Decision explanations contain category_ids, recipient_top_score and long floating-point formulas. Other screens expose content_recommendation, list_unsubscribe, opted_in, headline_medium and an ADR number in field help.",
+    "impact": "Routine users have to translate implementation terms to understand the result.",
+    "fix": "Lead with human-readable strategy, category and status labels; round displayed scores; retain exact machine data in an optional technical-details disclosure.",
+    "steps": "Decision slots → Familienherbst slot → scroll to Reasons given; compare record field help.",
+    "box": [
+      44,
+      6,
+      54,
+      90
+    ],
+    "source": ""
+  },
+  {
+    "id": "UX-21",
+    "priority": "P2",
+    "kind": "Recommendation",
+    "title": "Push preview displays raw fields instead of a notification",
+    "screen": "Push / Preview",
+    "shot": "60-push-preview",
+    "observed": "The main preview shows push_title, push_body, push_image_url and push_link as a definition list. The image is a URL rather than a visible notification image.",
+    "impact": "Managers cannot assess notification hierarchy, image composition or likely truncation.",
+    "fix": "Provide a clearly labelled representative notification preview, with the raw payload available as secondary details. Do not imply exact rendering across every device.",
+    "steps": "Open Testtag im Laden (Push) → Edit Push → Open preview.",
+    "box": [
+      37,
+      47,
+      54,
+      25
+    ],
+    "source": ""
+  },
+  {
+    "id": "UX-22",
+    "priority": "P3",
+    "kind": "Inconsistency",
+    "title": "Search and filters do not share the list title indent",
+    "screen": "Campaigns, Records and Approvals",
+    "shot": "14-records",
+    "observed": "Titles and row text begin at x=252 while search/filter boundaries begin at x=240. Decision history similarly offsets the filters 12 px left of its title and table text.",
+    "impact": "The left edge zigzags, despite the handoff’s one-indent-per-column rule.",
+    "fix": "Choose a consistent content alignment for list headers, search and filters; distinguish control borders from text padding deliberately.",
+    "steps": "Compare Records heading, search and filters; then Decision history.",
+    "box": [
+      16,
+      5,
+      26,
+      22
+    ],
+    "source": ""
+  },
+  {
+    "id": "UX-23",
+    "priority": "P3",
+    "kind": "Inconsistency",
+    "title": "Audience header places New on a separate row",
+    "screen": "Audiences / list",
+    "shot": "21-audiences",
+    "observed": "New audience and Suggest from campaign sit below the heading; Campaigns and Records place the primary New action beside the heading.",
+    "impact": "Header height and the search position vary between otherwise equivalent list screens.",
+    "fix": "Keep the primary New action on the title row and place Suggest as a secondary action using a consistent overflow or secondary row.",
+    "steps": "Compare Audiences with Campaigns or Records.",
+    "box": [
+      16,
+      3,
+      25,
+      13
+    ],
+    "source": ""
+  },
+  {
+    "id": "UX-24",
+    "priority": "P3",
+    "kind": "Inconsistency",
+    "title": "Upload control falls back to a different visual system",
+    "screen": "Image picker / Upload new",
+    "shot": "09-image-upload",
+    "observed": "The raw file input shows the browser’s square “Datei auswählen” control next to styled English form fields.",
+    "impact": "Upload feels like a different product surface, especially next to the segmented tabs.",
+    "fix": "Use a styled accessible file-picker trigger while retaining the native chooser, selected filename and supported-file help. Browser-native chooser language can remain browser-controlled.",
+    "steps": "Change image… → Upload new.",
+    "box": [
+      16,
+      44,
+      33,
+      4
+    ],
+    "source": ""
+  },
+  {
+    "id": "UX-25",
+    "priority": "P3",
+    "kind": "Recommendation",
+    "title": "Brand rename fields are unnecessarily narrow",
+    "screen": "Settings / Brands",
+    "shot": "52-brands",
+    "observed": "Brand-name inputs remain around 164 px wide in a card with ample unused space; Rename and Delete sit above the field baseline. Other detail editors stretch ordinary text fields.",
+    "impact": "Long names require horizontal text scrolling while most of the card remains empty.",
+    "fix": "Use a consistent responsive form row with a flexible name field and aligned actions.",
+    "steps": "Settings → Brands.",
+    "box": [
+      44,
+      20,
+      33,
+      23
+    ],
+    "source": ""
+  },
+  {
+    "id": "UX-26",
+    "priority": "P2",
+    "kind": "Recommendation",
+    "title": "Phone layout stacks navigation, module list and detail rather than presenting one work area",
+    "screen": "Responsive editor at 390 × 844",
+    "shot": "63-phone-editor",
+    "observed": "At phone width, global navigation uses about 129 px, then the module list, then the editor starts around y=366. The handoff calls for one column at a time at phone width.",
+    "impact": "Editing begins well below the top and switching modules requires scrolling past other work areas.",
+    "fix": "Provide an explicit list/detail transition or compact module picker at phone width, preserving a clear Back control. Treat this as responsive design follow-up, not desktop breakage.",
+    "steps": "Set a 390 × 844 viewport and open the Push variant.",
+    "box": [
+      0,
+      0,
+      100,
+      47
+    ],
+    "source": ""
+  },
+  {
+    "id": "UX-27",
+    "priority": "P2",
+    "kind": "Recommendation",
+    "title": "Record catalogue mixes languages without showing language",
+    "screen": "Content / Records",
+    "shot": "14-records",
+    "observed": "English translations and German originals are interleaved. Rows expose title, description and active status but no language badge; current filters contain Status, Category and Ready for only.",
+    "impact": "It is harder to distinguish an original from a translation or choose the right language for a channel.",
+    "fix": "Add a concise language/original-translation cue to rows. Consider a language filter after confirming the intended catalogue workflow.",
+    "steps": "Content → Records; compare the English rows followed by German rows.",
+    "box": [
+      17,
+      28,
+      24,
+      65
+    ],
+    "source": ""
+  },
+  {
+    "id": "UX-28",
+    "priority": "P3",
+    "kind": "Recommendation",
+    "title": "Long body copy is confined to a four-row editor",
+    "screen": "Content / record text fields",
+    "shot": "69-record-fields",
+    "observed": "The long body field is 90 px tall with 286 px of scrollable content in the sampled English record. It has the same initial row count as the short body.",
+    "impact": "Reviewing a complete article requires a small nested scrolling area; long and short fields have weak visual differentiation.",
+    "fix": "Give long-form text a larger initial area or an expand-editor action, while keeping short copy compact.",
+    "steps": "Open the tent record and compare Body text (long) with Body text (short).",
+    "box": [
+      44,
+      55,
+      54,
+      17
+    ],
+    "source": "frontend/src/components/EditorFields.tsx:103"
+  }
+]

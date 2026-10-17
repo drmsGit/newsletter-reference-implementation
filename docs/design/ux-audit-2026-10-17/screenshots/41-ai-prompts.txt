@@ -1,0 +1,71 @@
+- log
+- log
+- complementary:
+  - generic: Omnichannel Orchestration Reference
+  - button "Collapse the navigation" [expanded]:
+  - generic: Brand
+  - button "Grathaus Outdoor Brand":
+    - generic: Brand
+    - generic: Grathaus Outdoor
+  - combobox
+  - navigation "Main":
+    - list:
+      - link "Approvals":
+        - /url: /manager/approvals
+        - generic: Approvals
+      - link "Campaigns":
+        - /url: /manager/campaigns
+        - generic: Campaigns
+      - link "Monitoring":
+        - /url: /manager/monitoring
+        - generic: Monitoring
+      - link "Content":
+        - /url: /manager/content
+        - generic: Content
+      - link "Audiences":
+        - /url: /manager/audiences
+        - generic: Audiences
+      - link "Recipients":
+        - /url: /manager/recipients
+        - generic: Recipients
+      - link "Deliveries":
+        - /url: /manager/deliveries
+        - generic: Deliveries
+      - link "Decision slots":
+        - /url: /manager/decision-slots
+        - generic: Decision slots
+      - link "Settings":
+        - /url: /manager/settings
+        - generic: Settings
+  - img "Initial admin": IA
+  - button "Sign out":
+    - generic: Sign out
+- main:
+  - region "AI prompt list":
+    - link "Settings":
+      - /url: /manager/settings
+      - text: Settings
+    - heading "AI prompts" [level=1]
+    - paragraph: "One per AI task: its model, its output mode and its prompt. The provider, the limits and the budget are under General."
+    - grid "AI tasks":
+      - row "Content draft":
+        - 'gridcell "Content draft Model: the default · Output: no approval step Prompt: version 1 of 1"':
+          - generic: Content draft
+          - generic: "Model: the default · Output: no approval step"
+          - generic: "Prompt: version 1 of 1"
+      - row "Content translation":
+        - 'gridcell "Content translation Model: the default · Output: no approval step Prompt: version 1 of 1"':
+          - generic: Content translation
+          - generic: "Model: the default · Output: no approval step"
+          - generic: "Prompt: version 1 of 1"
+      - row "Subject & preheader":
+        - 'gridcell "Subject & preheader Model: the default · Output: applied directly Prompt: version 2 of 2"':
+          - generic: Subject & preheader
+          - generic: "Model: the default · Output: applied directly"
+          - generic: "Prompt: version 2 of 2"
+      - row "Variant from a topic":
+        - 'gridcell "Variant from a topic Model: the default · Output: no approval step Prompt: version 1 of 1"':
+          - generic: Variant from a topic
+          - generic: "Model: the default · Output: no approval step"
+          - generic: "Prompt: version 1 of 1"
+  - paragraph: Select an AI task to see its model, output and prompt.

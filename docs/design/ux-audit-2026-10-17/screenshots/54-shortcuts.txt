@@ -1,0 +1,124 @@
+- log
+- log
+- complementary:
+  - generic: Omnichannel Orchestration Reference
+  - button "Collapse the navigation" [expanded]:
+  - generic: Brand
+  - button "Grathaus Outdoor Brand":
+    - generic: Brand
+    - generic: Grathaus Outdoor
+  - combobox
+  - navigation "Main":
+    - list:
+      - link "Approvals":
+        - /url: /manager/approvals
+        - generic: Approvals
+      - link "Campaigns":
+        - /url: /manager/campaigns
+        - generic: Campaigns
+      - link "Monitoring":
+        - /url: /manager/monitoring
+        - generic: Monitoring
+      - link "Content":
+        - /url: /manager/content
+        - generic: Content
+      - link "Audiences":
+        - /url: /manager/audiences
+        - generic: Audiences
+      - link "Recipients":
+        - /url: /manager/recipients
+        - generic: Recipients
+      - link "Deliveries":
+        - /url: /manager/deliveries
+        - generic: Deliveries
+      - link "Decision slots":
+        - /url: /manager/decision-slots
+        - generic: Decision slots
+      - link "Settings":
+        - /url: /manager/settings
+        - generic: Settings
+  - img "Initial admin": IA
+  - button "Sign out":
+    - generic: Sign out
+- main:
+  - region "Settings parts":
+    - heading "Settings" [level=1]
+    - navigation "Settings":
+      - list:
+        - link "General":
+          - /url: /manager/settings
+        - link "Brand profiles":
+          - /url: /manager/settings/brand-profiles
+        - link "Personalisation":
+          - /url: /manager/settings/personalisation
+        - link "AI prompts":
+          - /url: /manager/settings/ai-prompts
+        - link "Users":
+          - /url: /manager/settings/users
+        - link "Roles":
+          - /url: /manager/settings/roles
+        - link "Integrations":
+          - /url: /manager/settings/integrations
+        - link "Brands":
+          - /url: /manager/settings/brands
+  - heading "Brands" [level=2]
+  - paragraph: A brand keeps its own content, campaigns, audiences and looks; people get roles per brand. Its key is permanent; its name can change. A brand is deleted only once nothing belongs to it.
+  - button "New brand"
+  - list "Brands":
+    - form "Brand Grathaus Outdoor":
+      - generic: Name of default
+      - textbox "Name of default": Grathaus Outdoor
+      - button "Rename" [disabled]
+      - button "Delete Grathaus Outdoor…"
+    - form "Brand Grathaus Touren":
+      - generic: Name of grathaus-touren
+      - textbox "Name of grathaus-touren": Grathaus Touren
+      - button "Rename" [disabled]
+      - button "Delete Grathaus Touren…"
+- button "Schließen"
+- dialog "Keyboard shortcuts" [active]:
+  - heading "Keyboard shortcuts" [level=2]
+  - button "Close"
+  - region "Global":
+    - heading "Global" [level=3]
+    - term:
+      - generic: "?"
+    - definition: Show these shortcuts
+  - region "Go to":
+    - heading "Go to" [level=3]
+    - term:
+      - generic: g
+      - generic: then a
+    - definition: Approvals
+    - term:
+      - generic: g
+      - generic: then c
+    - definition: Campaigns
+    - term:
+      - generic: g
+      - generic: then m
+    - definition: Monitoring
+    - term:
+      - generic: g
+      - generic: then t
+    - definition: Content
+    - term:
+      - generic: g
+      - generic: then u
+    - definition: Audiences
+    - term:
+      - generic: g
+      - generic: then r
+    - definition: Recipients
+    - term:
+      - generic: g
+      - generic: then d
+    - definition: Deliveries
+    - term:
+      - generic: g
+      - generic: then s
+    - definition: Decision slots
+    - term:
+      - generic: g
+      - generic: then ,
+    - definition: Settings

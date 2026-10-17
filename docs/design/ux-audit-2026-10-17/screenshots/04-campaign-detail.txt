@@ -1,0 +1,190 @@
+- log
+- log
+- complementary:
+  - generic: Omnichannel Orchestration Reference
+  - button "Collapse the navigation" [expanded]:
+  - generic: Brand
+  - button "Grathaus Outdoor Brand":
+    - generic: Brand
+    - generic: Grathaus Outdoor
+  - combobox
+  - navigation "Main":
+    - list:
+      - link "Approvals":
+        - /url: /manager/approvals
+        - generic: Approvals
+      - link "Campaigns":
+        - /url: /manager/campaigns
+        - generic: Campaigns
+      - link "Monitoring":
+        - /url: /manager/monitoring
+        - generic: Monitoring
+      - link "Content":
+        - /url: /manager/content
+        - generic: Content
+      - link "Audiences":
+        - /url: /manager/audiences
+        - generic: Audiences
+      - link "Recipients":
+        - /url: /manager/recipients
+        - generic: Recipients
+      - link "Deliveries":
+        - /url: /manager/deliveries
+        - generic: Deliveries
+      - link "Decision slots":
+        - /url: /manager/decision-slots
+        - generic: Decision slots
+      - link "Settings":
+        - /url: /manager/settings
+        - generic: Settings
+  - img "Initial admin": IA
+  - button "Sign out":
+    - generic: Sign out
+- main:
+  - region "Campaign list":
+    - heading "Campaigns" [level=1]
+    - button "New campaign"
+    - search:
+      - textbox "Find a campaign by name"
+      - button "Search"
+    - grid "Campaigns":
+      - row "Herbst in den Bergen / Autumn in the mountains" [active] [selected]:
+        - gridcell "Herbst in den Bergen / Autumn in the mountains draft 17.10.2026, 14:47:22":
+          - generic: Herbst in den Bergen / Autumn in the mountains
+          - generic: draft
+          - generic: 17.10.2026, 14:47:22
+      - row "Bestellbestätigung":
+        - gridcell "Bestellbestätigung draft 17.10.2026, 14:47:22":
+          - generic: Bestellbestätigung
+          - generic: draft
+          - generic: 17.10.2026, 14:47:22
+      - row "Testtag im Laden (Push)":
+        - gridcell "Testtag im Laden (Push) draft 17.10.2026, 14:47:22":
+          - generic: Testtag im Laden (Push)
+          - generic: draft
+          - generic: 17.10.2026, 14:47:22
+      - row "Neue Ausgabe":
+        - gridcell "Neue Ausgabe draft 17.10.2026, 14:47:22":
+          - generic: Neue Ausgabe
+          - generic: draft
+          - generic: 17.10.2026, 14:47:22
+      - row "Reparaturwoche":
+        - gridcell "Reparaturwoche draft 17.10.2026, 14:47:22":
+          - generic: Reparaturwoche
+          - generic: draft
+          - generic: 17.10.2026, 14:47:22
+      - row "Familienherbst":
+        - gridcell "Familienherbst draft 8.10.2026, 08:30:00":
+          - generic: Familienherbst
+          - generic: draft
+          - generic: 8.10.2026, 08:30:00
+      - row "Hüttensaison-Finale":
+        - gridcell "Hüttensaison-Finale draft 1.10.2026, 08:30:00":
+          - generic: Hüttensaison-Finale
+          - generic: draft
+          - generic: 1.10.2026, 08:30:00
+      - row "Herbstauftakt":
+        - gridcell "Herbstauftakt draft 3.9.2026, 08:30:00":
+          - generic: Herbstauftakt
+          - generic: draft
+          - generic: 3.9.2026, 08:30:00
+      - row "Einstieg Skitouren":
+        - gridcell "Einstieg Skitouren draft 13.1.2026, 07:30:00":
+          - generic: Einstieg Skitouren
+          - generic: draft
+          - generic: 13.1.2026, 07:30:00
+      - row "Winterstart 2025":
+        - gridcell "Winterstart 2025 draft 25.11.2025, 07:30:00":
+          - generic: Winterstart 2025
+          - generic: draft
+          - generic: 25.11.2025, 07:30:00
+  - heading "Herbst in den Bergen / Autumn in the mountains" [level=2]
+  - term: Status
+  - definition: draft
+  - term: Variants
+  - definition: "2"
+  - term: Updated
+  - definition: 17.10.2026, 14:47:22
+  - region "Deutsch":
+    - heading "Deutsch" [level=3]
+    - term: Channel
+    - definition: email
+    - term: Status
+    - definition: draft
+    - term: Modules
+    - definition: "2"
+    - paragraph:
+      - link "Edit Deutsch":
+        - /url: /manager/campaigns/12/variants/12
+      - link "Send Deutsch…":
+        - /url: /manager/campaigns/12/variants/12/send
+      - button "Duplicate this variant"
+    - heading "Modules of Deutsch" [level=4]
+    - grid "Modules of Deutsch":
+      - rowgroup:
+        - row "Position Module Content Overridden here":
+          - columnheader "Position"
+          - columnheader "Module"
+          - columnheader "Content"
+          - columnheader "Overridden here"
+      - rowgroup:
+        - row "img_left":
+          - gridcell "1"
+          - rowheader "img_left"
+          - 'gridcell "Tagestouren im Chiemgau: Die Rückfahrt zuerst planen"':
+            - 'link "Tagestouren im Chiemgau: Die Rückfahrt zuerst planen"':
+              - /url: /manager/content/76
+          - gridcell "—"
+        - row "img_left":
+          - gridcell "2"
+          - rowheader "img_left"
+          - 'gridcell "Klettersteige in der Gruppe: Das Nein wird vorher besprochen"':
+            - 'link "Klettersteige in der Gruppe: Das Nein wird vorher besprochen"':
+              - /url: /manager/content/110
+          - gridcell "—"
+  - region "English":
+    - heading "English" [level=3]
+    - term: Channel
+    - definition: email
+    - term: Status
+    - definition: draft
+    - term: Modules
+    - definition: "2"
+    - paragraph:
+      - link "Edit English":
+        - /url: /manager/campaigns/12/variants/13
+      - link "Send English…":
+        - /url: /manager/campaigns/12/variants/13/send
+      - button "Duplicate this variant"
+    - heading "Modules of English" [level=4]
+    - grid "Modules of English":
+      - rowgroup:
+        - row "Position Module Content Overridden here":
+          - columnheader "Position"
+          - columnheader "Module"
+          - columnheader "Content"
+          - columnheader "Overridden here"
+      - rowgroup:
+        - row "img_left":
+          - gridcell "1"
+          - rowheader "img_left"
+          - 'gridcell "Day hikes in the Chiemgau: plan the return journey first"':
+            - 'link "Day hikes in the Chiemgau: plan the return journey first"':
+              - /url: /manager/content/151
+          - gridcell "—"
+        - row "img_left":
+          - gridcell "2"
+          - rowheader "img_left"
+          - 'gridcell "Via ferratas in a group: agree that no is an answer"':
+            - 'link "Via ferratas in a group: agree that no is an answer"':
+              - /url: /manager/content/152
+          - gridcell "—"
+  - region "New blank variant":
+    - heading "New blank variant" [level=3]
+    - generic: Name
+    - textbox "Name"
+    - generic: Channel
+    - button "email Channel":
+      - generic: email
+    - combobox
+    - button "Create blank variant" [disabled]

@@ -1,0 +1,171 @@
+- log:
+  - generic: Salutation formal ausgewählt.
+  - generic: Salutation formal ausgewählt.
+  - generic: Salutation formal ausgewählt.
+- log
+- complementary:
+  - generic: Omnichannel Orchestration Reference
+  - button "Collapse the navigation" [expanded]:
+  - generic: Brand
+  - button "Grathaus Outdoor Brand":
+    - generic: Brand
+    - generic: Grathaus Outdoor
+  - combobox
+  - navigation "Main":
+    - list:
+      - link "Approvals":
+        - /url: /manager/approvals
+        - generic: Approvals
+      - link "Campaigns":
+        - /url: /manager/campaigns
+        - generic: Campaigns
+      - link "Monitoring":
+        - /url: /manager/monitoring
+        - generic: Monitoring
+      - link "Content":
+        - /url: /manager/content
+        - generic: Content
+      - link "Audiences":
+        - /url: /manager/audiences
+        - generic: Audiences
+      - link "Recipients":
+        - /url: /manager/recipients
+        - generic: Recipients
+      - link "Deliveries":
+        - /url: /manager/deliveries
+        - generic: Deliveries
+      - link "Decision slots":
+        - /url: /manager/decision-slots
+        - generic: Decision slots
+      - link "Settings":
+        - /url: /manager/settings
+        - generic: Settings
+  - img "Initial admin": IA
+  - button "Sign out":
+    - generic: Sign out
+- main:
+  - region "Entry list":
+    - link "Settings":
+      - /url: /manager/settings
+      - text: Settings
+    - heading "Personalisation" [level=1]
+    - button "New entry"
+    - paragraph: Entries a text can use, such as a salutation. Each one says, per language, what to write for which recipient, and what to write when nothing is known about them. An email uses its brand profile's language.
+    - grid "Entries":
+      - row "Salutation formal" [selected]:
+        - 'gridcell "Salutation formal {{salutation_formal}} de, en"':
+          - generic: Salutation formal
+          - code: "{{salutation_formal}}"
+          - generic: de, en
+      - row "Salutation informal":
+        - 'gridcell "Salutation informal {{salutation_informal}} de, en"':
+          - generic: Salutation informal
+          - code: "{{salutation_informal}}"
+          - generic: de, en
+  - heading "Salutation formal" [level=2]
+  - paragraph:
+    - text: "In a text:"
+    - code: "{{salutation_formal}}"
+    - text: . The name stays as it is; a different name is a new entry.
+  - generic: Label
+  - textbox "Label": Salutation formal
+  - group "de":
+    - generic: de
+    - paragraph: "Tried in order; the first that fits is used. A case only fits when every name its text uses is filled. Texts may use {{first_name}} and {{last_name}}."
+    - list:
+      - group "de case 1":
+        - generic: When
+        - button "Gender When":
+          - generic: Gender
+        - combobox
+        - generic: Test
+        - button "is Test":
+          - generic: is
+        - combobox
+        - generic: Value
+        - button "female Value":
+          - generic: female
+        - combobox
+        - generic: Write
+        - textbox "Write": "Sehr geehrte Frau {{last_name}},"
+        - button "Remove case"
+      - group "de case 2":
+        - generic: When
+        - button "Gender When":
+          - generic: Gender
+        - combobox
+        - generic: Test
+        - button "is Test":
+          - generic: is
+        - combobox
+        - generic: Value
+        - button "male Value":
+          - generic: male
+        - combobox
+        - generic: Write
+        - textbox "Write": "Sehr geehrter Herr {{last_name}},"
+        - button "Remove case"
+    - button "Add a case"
+    - generic: Otherwise write (de)
+    - textbox "Otherwise write (de)": Sehr geehrte Damen und Herren,
+    - button "Remove de"
+  - group "en":
+    - generic: en
+    - paragraph: "Tried in order; the first that fits is used. A case only fits when every name its text uses is filled. Texts may use {{first_name}} and {{last_name}}."
+    - list:
+      - group "en case 1":
+        - generic: When
+        - button "Gender When":
+          - generic: Gender
+        - combobox
+        - generic: Test
+        - button "is Test":
+          - generic: is
+        - combobox
+        - generic: Value
+        - button "female Value":
+          - generic: female
+        - combobox
+        - generic: Write
+        - textbox "Write": "Dear Ms {{last_name}},"
+        - button "Remove case"
+      - group "en case 2":
+        - generic: When
+        - button "Gender When":
+          - generic: Gender
+        - combobox
+        - generic: Test
+        - button "is Test":
+          - generic: is
+        - combobox
+        - generic: Value
+        - button "male Value":
+          - generic: male
+        - combobox
+        - generic: Write
+        - textbox "Write": "Dear Mr {{last_name}},"
+        - button "Remove case"
+    - button "Add a case"
+    - generic: Otherwise write (en)
+    - textbox "Otherwise write (en)": Dear Sir or Madam,
+    - button "Remove en"
+  - paragraph:
+    - generic: Add a language (de, en, en-GB, …)
+    - textbox "Add a language (de, en, en-GB, …)"
+    - button "Add language" [disabled]
+  - paragraph:
+    - button "Save"
+    - button "Delete…"
+- button "Schließen"
+- dialog "New entry":
+  - heading "New entry" [level=2]
+  - generic: Name in a text, fixed once created (letters, digits, _)
+  - textbox "Name in a text, fixed once created (letters, digits, _)" [active]
+  - generic: Label
+  - textbox "Label"
+  - generic: First language (de, en, …)
+  - textbox "First language (de, en, …)": de
+  - generic: Text when nothing is known about the recipient
+  - textbox "Text when nothing is known about the recipient"
+  - button "Cancel"
+  - button "Create" [disabled]

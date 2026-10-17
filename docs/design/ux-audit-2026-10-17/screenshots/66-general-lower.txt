@@ -1,0 +1,149 @@
+- complementary:
+  - generic: Omnichannel Orchestration Reference
+  - button "Collapse the navigation" [expanded]:
+  - generic: Brand
+  - button "Grathaus Outdoor Brand":
+    - generic: Brand
+    - generic: Grathaus Outdoor
+  - combobox
+  - navigation "Main":
+    - list:
+      - link "Approvals":
+        - /url: /manager/approvals
+        - generic: Approvals
+      - link "Campaigns":
+        - /url: /manager/campaigns
+        - generic: Campaigns
+      - link "Monitoring":
+        - /url: /manager/monitoring
+        - generic: Monitoring
+      - link "Content":
+        - /url: /manager/content
+        - generic: Content
+      - link "Audiences":
+        - /url: /manager/audiences
+        - generic: Audiences
+      - link "Recipients":
+        - /url: /manager/recipients
+        - generic: Recipients
+      - link "Deliveries":
+        - /url: /manager/deliveries
+        - generic: Deliveries
+      - link "Decision slots":
+        - /url: /manager/decision-slots
+        - generic: Decision slots
+      - link "Settings":
+        - /url: /manager/settings
+        - generic: Settings
+  - img "Initial admin": IA
+  - button "Sign out":
+    - generic: Sign out
+- main:
+  - region "Settings parts":
+    - heading "Settings" [level=1]
+    - navigation "Settings":
+      - list:
+        - link "General":
+          - /url: /manager/settings
+        - link "Brand profiles":
+          - /url: /manager/settings/brand-profiles
+        - link "Personalisation":
+          - /url: /manager/settings/personalisation
+        - link "AI prompts":
+          - /url: /manager/settings/ai-prompts
+        - link "Users":
+          - /url: /manager/settings/users
+        - link "Roles":
+          - /url: /manager/settings/roles
+        - link "Integrations":
+          - /url: /manager/settings/integrations
+        - link "Brands":
+          - /url: /manager/settings/brands
+  - heading "General" [level=2]
+  - paragraph: Changes take effect for the whole deployment, and each one is recorded in the audit log.
+  - region "Sending":
+    - heading "Sending" [level=3]
+    - generic: Most recipients one send may reach
+    - textbox "Most recipients one send may reach": "250"
+    - button "Save send cap"
+    - term: "Channel: email"
+    - definition: available
+    - term: "Channel: push"
+    - definition: available
+    - grid "Delivery providers":
+      - rowgroup:
+        - row "Provider Channels Clicks credit content":
+          - columnheader "Provider"
+          - columnheader "Channels"
+          - columnheader "Clicks credit content"
+      - rowgroup:
+        - row "mock (nothing is sent)":
+          - rowheader "mock (nothing is sent)"
+          - gridcell "email, push"
+          - gridcell "no — counted, not credited"
+        - row "resend (real)":
+          - rowheader "resend (real)"
+          - gridcell "email"
+          - gridcell "yes"
+  - region "Sign-in sessions":
+    - heading "Sign-in sessions" [level=3]
+    - generic: A sign-in lasts at most (hours, 1 to 72)
+    - textbox "A sign-in lasts at most (hours, 1 to 72)": "12"
+    - generic: Signed out after no activity for (minutes, 5 to 480)
+    - textbox "Signed out after no activity for (minutes, 5 to 480)": "60"
+    - paragraph: Shorter values sign out anyone past them at once. A longer lifetime applies to sign-ins after the change.
+    - button "Save sign-in lengths"
+  - region "Signals":
+    - heading "Signals" [level=3]
+    - generic: Weight for click (default 5)
+    - textbox "Weight for click (default 5)": "5"
+    - generic: Half-life in days for click (default 45)
+    - textbox "Half-life in days for click (default 45)": "45"
+    - generic: Weight for manual (default 40)
+    - textbox "Weight for manual (default 40)": "40"
+    - generic: Half-life in days for manual (default 180)
+    - textbox "Half-life in days for manual (default 180)": "180"
+    - generic: Weight for open (default 0)
+    - textbox "Weight for open (default 0)": "0"
+    - generic: Half-life in days for open (default 45)
+    - textbox "Half-life in days for open (default 45)": "45"
+    - generic: Weight for unsubscribe (default -50)
+    - textbox "Weight for unsubscribe (default -50)": "-50"
+    - generic: Half-life in days for unsubscribe (default 120)
+    - textbox "Half-life in days for unsubscribe (default 120)": "120"
+    - button "Save signal tuning"
+  - region "AI":
+    - heading "AI" [level=3]
+    - generic: AI provider
+    - button "claude AI provider":
+      - generic: claude
+    - combobox
+    - button "Save provider"
+    - term: Default model
+    - definition: claude-opus-5 (set by the deployment)
+    - term: API key configured
+    - definition: "yes"
+    - term: Tokens used
+    - definition: 0 of 500.000 (0%) since 1.10.2026
+    - term: Warning at
+    - definition: 400.000 tokens
+    - term: Spent
+    - definition: $0.00 of a $5.00 budget
+    - generic: Warn at (tokens)
+    - textbox "Warn at (tokens)": "400000"
+    - generic: Stop at (tokens)
+    - textbox "Stop at (tokens)": "500000"
+    - generic: Budget (USD)
+    - textbox "Budget (USD)": "5"
+    - button "Save AI budget"
+    - generic: The token budget refills
+    - button "Every month The token budget refills":
+      - generic: Every month
+    - combobox
+    - paragraph: Periods start at midnight UTC on the first day.
+    - button "Save budget period"
+  - paragraph:
+    - text: The model, output mode and prompt of each AI task are under
+    - link "AI prompts":
+      - /url: /manager/settings/ai-prompts
+    - text: .

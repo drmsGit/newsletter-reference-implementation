@@ -1,0 +1,532 @@
+- complementary:
+  - generic: Omnichannel Orchestration Reference
+  - button "Collapse the navigation" [expanded]:
+  - generic: Brand
+  - button "Grathaus Outdoor Brand":
+    - generic: Brand
+    - generic: Grathaus Outdoor
+  - combobox
+  - navigation "Main":
+    - list:
+      - link "Approvals":
+        - /url: /manager/approvals
+        - generic: Approvals
+      - link "Campaigns":
+        - /url: /manager/campaigns
+        - generic: Campaigns
+      - link "Monitoring":
+        - /url: /manager/monitoring
+        - generic: Monitoring
+      - link "Content":
+        - /url: /manager/content
+        - generic: Content
+      - link "Audiences":
+        - /url: /manager/audiences
+        - generic: Audiences
+      - link "Recipients":
+        - /url: /manager/recipients
+        - generic: Recipients
+      - link "Deliveries":
+        - /url: /manager/deliveries
+        - generic: Deliveries
+      - link "Decision slots":
+        - /url: /manager/decision-slots
+        - generic: Decision slots
+      - link "Settings":
+        - /url: /manager/settings
+        - generic: Settings
+  - img "Initial admin": IA
+  - button "Sign out":
+    - generic: Sign out
+- main:
+  - region "Slot list":
+    - heading "Decision slots" [level=1]
+    - paragraph: "Read-only: slots are configured on their variant."
+    - grid "Decision slots":
+      - row "Für Sie ausgewählt":
+        - gridcell "Für Sie ausgewählt Winterstart 2025 / Deutsch recipient_top_score 486 picks":
+          - generic: Für Sie ausgewählt
+          - generic: Winterstart 2025 / Deutsch
+          - generic: recipient_top_score
+          - generic: 486 picks
+      - row "Für Sie ausgewählt":
+        - gridcell "Für Sie ausgewählt Einstieg Skitouren / Deutsch recipient_top_score 486 picks":
+          - generic: Für Sie ausgewählt
+          - generic: Einstieg Skitouren / Deutsch
+          - generic: recipient_top_score
+          - generic: 486 picks
+      - row "Für Sie ausgewählt":
+        - gridcell "Für Sie ausgewählt Herbstauftakt / Deutsch recipient_top_score 531 picks":
+          - generic: Für Sie ausgewählt
+          - generic: Herbstauftakt / Deutsch
+          - generic: recipient_top_score
+          - generic: 531 picks
+      - row "Für Sie ausgewählt":
+        - gridcell "Für Sie ausgewählt Hüttensaison-Finale / Deutsch recipient_top_score 531 picks":
+          - generic: Für Sie ausgewählt
+          - generic: Hüttensaison-Finale / Deutsch
+          - generic: recipient_top_score
+          - generic: 531 picks
+      - row "Für Sie ausgewählt" [selected]:
+        - gridcell "Für Sie ausgewählt Familienherbst / Deutsch recipient_top_score 369 picks":
+          - generic: Für Sie ausgewählt
+          - generic: Familienherbst / Deutsch
+          - generic: recipient_top_score
+          - generic: 369 picks
+      - row "Für Sie ausgewählt":
+        - gridcell "Für Sie ausgewählt Reparaturwoche / Deutsch recipient_top_score 0 picks":
+          - generic: Für Sie ausgewählt
+          - generic: Reparaturwoche / Deutsch
+          - generic: recipient_top_score
+          - generic: 0 picks
+  - heading "Für Sie ausgewählt" [level=2]
+  - term: Campaign
+  - definition:
+    - link "Familienherbst":
+      - /url: /manager/campaigns/5
+  - term: Variant
+  - definition: Deutsch
+  - term: Decision type
+  - definition: content_recommendation
+  - term: Strategy
+  - definition: recipient_top_score
+  - term: Shows up to
+  - definition: "3"
+  - region "What it chooses from":
+    - heading "What it chooses from" [level=3]
+    - paragraph: "34 active content records in categories #14, #6, #24, #7. This strategy picks per recipient, so one person may be offered fewer."
+    - heading "Candidate filter" [level=4]
+    - term: category_ids
+    - definition: "[14,6,24,7]"
+    - heading "Strategy settings" [level=4]
+    - term: content_score_weight
+    - definition: "1"
+    - term: preference_score_weight
+    - definition: "10"
+  - region "What it has picked":
+    - heading "What it has picked" [level=3]
+    - term: Picks made
+    - definition: "369"
+    - term: Distinct recipients
+    - definition: "123"
+    - term: Distinct content
+    - definition: "15"
+    - term: Score (min / avg / max)
+    - definition: 168.79 / 425.33 / 794.05
+    - term: Last pick
+    - definition: 17.10.2026, 16:58:56
+  - heading "Top content" [level=4]
+  - grid "Top content":
+    - rowgroup:
+      - row "Content Version Picks Share":
+        - columnheader "Content"
+        - columnheader "Version"
+        - columnheader "Picks"
+        - columnheader "Share"
+    - rowgroup:
+      - 'row "Augsburg: Naturheft für Kinder am 15. Mai"':
+        - 'rowheader "Augsburg: Naturheft für Kinder am 15. Mai"'
+        - gridcell "1"
+        - gridcell "101"
+        - gridcell "27.37%"
+      - 'row "Kinderregenjacke für 49 Euro: Die Kapuze gehört zur Probe"':
+        - 'rowheader "Kinderregenjacke für 49 Euro: Die Kapuze gehört zur Probe"'
+        - gridcell "1"
+        - gridcell "101"
+        - gridcell "27.37%"
+      - 'row "Familienwandern im Chiemgau: Drei gute Pausen statt Gipfelziel"':
+        - 'rowheader "Familienwandern im Chiemgau: Drei gute Pausen statt Gipfelziel"'
+        - gridcell "1"
+        - gridcell "29"
+        - gridcell "7.86%"
+      - 'row "Rosenheim: Familienwerkstatt für die nächste kleine Wanderung"':
+        - 'rowheader "Rosenheim: Familienwerkstatt für die nächste kleine Wanderung"'
+        - gridcell "1"
+        - gridcell "28"
+        - gridcell "7.59%"
+      - 'row "Grathaus Basis Kinderregenhose: 35 Euro und Platz zum Hinhocken"':
+        - 'rowheader "Grathaus Basis Kinderregenhose: 35 Euro und Platz zum Hinhocken"'
+        - gridcell "1"
+        - gridcell "22"
+        - gridcell "5.96%"
+      - 'row "Boulderbesuch mit Kindern: Die Matte ist kein Spielplatz"':
+        - 'rowheader "Boulderbesuch mit Kindern: Die Matte ist kein Spielplatz"'
+        - gridcell "1"
+        - gridcell "22"
+        - gridcell "5.96%"
+      - 'row "Sitzmatte für Familienpausen: 9 Euro gegen die kalte Bank"':
+        - 'rowheader "Sitzmatte für Familienpausen: 9 Euro gegen die kalte Bank"'
+        - gridcell "1"
+        - gridcell "21"
+        - gridcell "5.69%"
+      - 'row "Rosenheim: Spuren und Fotos lesen am 30. Oktober"':
+        - 'rowheader "Rosenheim: Spuren und Fotos lesen am 30. Oktober"'
+        - gridcell "1"
+        - gridcell "9"
+        - gridcell "2.44%"
+      - 'row "Kompaktfernglas für 89 Euro: 8-fach und 310 Gramm"':
+        - 'rowheader "Kompaktfernglas für 89 Euro: 8-fach und 310 Gramm"'
+        - gridcell "1"
+        - gridcell "6"
+        - gridcell "1.63%"
+      - 'row "Kleines Stativ für 49 Euro: Ruhige Bilder aus Abstand"':
+        - 'rowheader "Kleines Stativ für 49 Euro: Ruhige Bilder aus Abstand"'
+        - gridcell "1"
+        - gridcell "6"
+        - gridcell "1.63%"
+      - 'row "Tierspuren im Schnee: Erst den Maßstab dazulegen"':
+        - 'rowheader "Tierspuren im Schnee: Erst den Maßstab dazulegen"'
+        - gridcell "1"
+        - gridcell "6"
+        - gridcell "1.63%"
+      - 'row "Fränkische Schweiz: Kinder wählen den nächsten Wegpunkt"':
+        - 'rowheader "Fränkische Schweiz: Kinder wählen den nächsten Wegpunkt"'
+        - gridcell "1"
+        - gridcell "5"
+        - gridcell "1.36%"
+      - 'row "Kinderwanderstöcke für 44 Euro: Länge im Gelände probieren"':
+        - 'rowheader "Kinderwanderstöcke für 44 Euro: Länge im Gelände probieren"'
+        - gridcell "1"
+        - gridcell "5"
+        - gridcell "1.36%"
+      - 'row "München: Familienkartenabend am 29. Mai"':
+        - 'rowheader "München: Familienkartenabend am 29. Mai"'
+        - gridcell "1"
+        - gridcell "4"
+        - gridcell "1.08%"
+      - 'row "Familienrunde als Ausflugstagebuch: Drei Fragen genügen"':
+        - 'rowheader "Familienrunde als Ausflugstagebuch: Drei Fragen genügen"'
+        - gridcell "1"
+        - gridcell "4"
+        - gridcell "1.08%"
+  - heading "Reasons given" [level=4]
+  - paragraph: "recipient_top_score: recipient=482, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=60.06787655624592×10 = 609.6787655624591 (tied at score 609.6787655624591 between 4 candidates, ordered randomly) — 3"
+  - paragraph: "recipient_top_score: recipient=604, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=21.513745064926177×10 = 224.13745064926178 (tied at score 224.13745064926178 between 8 candidates, ordered randomly) — 3"
+  - paragraph: "recipient_top_score: recipient=547, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=34.16824885111264×10 = 350.6824885111264 (tied at score 350.6824885111264 between 8 candidates, ordered randomly) — 3"
+  - paragraph: "recipient_top_score: recipient=447, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=34.789060335645814×10 = 356.89060335645814 (tied at score 356.89060335645814 between 4 candidates, ordered randomly) — 3"
+  - paragraph: "recipient_top_score: recipient=798, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=37.566033245560774×10 = 384.6603324556078 (tied at score 384.6603324556078 between 8 candidates, ordered randomly) — 3"
+  - paragraph: "recipient_top_score: recipient=110, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=46.549226995983204×10 = 474.492269959832 (tied at score 474.492269959832 between 4 candidates, ordered randomly) — 3"
+  - paragraph: "recipient_top_score: recipient=362, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=35.185585621929×10 = 360.85585621929 (tied at score 360.85585621929 between 4 candidates, ordered randomly) — 3"
+  - paragraph: "recipient_top_score: recipient=985, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=29.035560144967455×10 = 299.35560144967457 (tied at score 299.35560144967457 between 8 candidates, ordered randomly) — 3"
+  - paragraph: "recipient_top_score: recipient=4, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=63.39509522180088×10 = 642.9509522180088 (tied at score 642.9509522180088 between 8 candidates, ordered randomly) — 3"
+  - paragraph: "recipient_top_score: recipient=127, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=25.927980530759047×10 = 268.2798053075905 (tied at score 268.2798053075905 between 4 candidates, ordered randomly) — 3"
+  - paragraph: "recipient_top_score: recipient=306, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=23.87989903238358×10 = 247.7989903238358 (tied at score 247.7989903238358 between 8 candidates, ordered randomly) — 3"
+  - paragraph: "recipient_top_score: recipient=586, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=41.88314578448291×10 = 427.8314578448291 (tied at score 427.8314578448291 between 4 candidates, ordered randomly) — 3"
+  - paragraph: "recipient_top_score: recipient=609, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=22.32733628662358×10 = 232.2733628662358 (tied at score 232.2733628662358 between 4 candidates, ordered randomly) — 3"
+  - paragraph: "recipient_top_score: recipient=165, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=25.203507118333274×10 = 261.0350711833328 (tied at score 261.0350711833328 between 4 candidates, ordered randomly) — 3"
+  - paragraph: "recipient_top_score: recipient=664, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=34.90080372933496×10 = 358.0080372933496 (tied at score 358.0080372933496 between 8 candidates, ordered randomly) — 3"
+  - paragraph: "recipient_top_score: recipient=477, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=23.70085323025776×10 = 246.0085323025776 (tied at score 246.0085323025776 between 8 candidates, ordered randomly) — 3"
+  - paragraph: "recipient_top_score: recipient=333, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=38.156936180692895×10 = 390.56936180692895 (tied at score 390.56936180692895 between 8 candidates, ordered randomly) — 3"
+  - paragraph: "recipient_top_score: recipient=848, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=45.89491919169686×10 = 467.9491919169686 (tied at score 467.9491919169686 between 8 candidates, ordered randomly) — 3"
+  - paragraph: "recipient_top_score: recipient=861, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=49.68248756327819×10 = 505.82487563278187 (tied at score 505.82487563278187 between 8 candidates, ordered randomly) — 3"
+  - paragraph: "recipient_top_score: recipient=455, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=24.91315592626177×10 = 258.13155926261766 (tied at score 258.13155926261766 between 4 candidates, ordered randomly) — 3"
+  - heading "Latest picks" [level=4]
+  - grid "Latest picks":
+    - rowgroup:
+      - row "When Recipient Content Score Reason":
+        - columnheader "When"
+        - columnheader "Recipient"
+        - columnheader "Content"
+        - columnheader "Score"
+        - columnheader "Reason"
+    - rowgroup:
+      - row "17.10.2026, 16:58:56":
+        - rowheader "17.10.2026, 16:58:56"
+        - gridcell "#217"
+        - 'gridcell "Augsburg: Naturheft für Kinder am 15. Mai"'
+        - gridcell "525.653449116683"
+        - 'gridcell "recipient_top_score: recipient=217, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=51.6653449116683×10 = 525.653449116683 (tied at score 525.653449116683 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:56":
+        - rowheader "17.10.2026, 16:58:56"
+        - gridcell "#217"
+        - 'gridcell "Kinderregenjacke für 49 Euro: Die Kapuze gehört zur Probe"'
+        - gridcell "525.653449116683"
+        - 'gridcell "recipient_top_score: recipient=217, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=51.6653449116683×10 = 525.653449116683 (tied at score 525.653449116683 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:56":
+        - rowheader "17.10.2026, 16:58:56"
+        - gridcell "#217"
+        - 'gridcell "Boulderbesuch mit Kindern: Die Matte ist kein Spielplatz"'
+        - gridcell "523.653449116683"
+        - 'gridcell "recipient_top_score: recipient=217, category_ids=[14, 6, 24, 7], content_score=7×1 + preference_score=51.6653449116683×10 = 523.653449116683 (tied at score 523.653449116683 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:56":
+        - rowheader "17.10.2026, 16:58:56"
+        - gridcell "#209"
+        - 'gridcell "Augsburg: Naturheft für Kinder am 15. Mai"'
+        - gridcell "332.7062616316026"
+        - 'gridcell "recipient_top_score: recipient=209, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=32.37062616316026×10 = 332.7062616316026 (tied at score 332.7062616316026 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:56":
+        - rowheader "17.10.2026, 16:58:56"
+        - gridcell "#209"
+        - 'gridcell "Sitzmatte für Familienpausen: 9 Euro gegen die kalte Bank"'
+        - gridcell "330.7062616316026"
+        - 'gridcell "recipient_top_score: recipient=209, category_ids=[14, 6, 24, 7], content_score=7×1 + preference_score=32.37062616316026×10 = 330.7062616316026 (tied at score 330.7062616316026 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:56":
+        - rowheader "17.10.2026, 16:58:56"
+        - gridcell "#209"
+        - 'gridcell "Kinderregenjacke für 49 Euro: Die Kapuze gehört zur Probe"'
+        - gridcell "332.7062616316026"
+        - 'gridcell "recipient_top_score: recipient=209, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=32.37062616316026×10 = 332.7062616316026 (tied at score 332.7062616316026 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#199"
+        - 'gridcell "Kinderregenjacke für 49 Euro: Die Kapuze gehört zur Probe"'
+        - gridcell "564.0559689949287"
+        - 'gridcell "recipient_top_score: recipient=199, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=55.505596899492865×10 = 564.0559689949287 (tied at score 564.0559689949287 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#199"
+        - 'gridcell "Rosenheim: Familienwerkstatt für die nächste kleine Wanderung"'
+        - gridcell "562.0559689949287"
+        - 'gridcell "recipient_top_score: recipient=199, category_ids=[14, 6, 24, 7], content_score=7×1 + preference_score=55.505596899492865×10 = 562.0559689949287 (tied at score 562.0559689949287 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#199"
+        - 'gridcell "Augsburg: Naturheft für Kinder am 15. Mai"'
+        - gridcell "564.0559689949287"
+        - 'gridcell "recipient_top_score: recipient=199, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=55.505596899492865×10 = 564.0559689949287 (tied at score 564.0559689949287 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#183"
+        - 'gridcell "Augsburg: Naturheft für Kinder am 15. Mai"'
+        - gridcell "329.760717646782"
+        - 'gridcell "recipient_top_score: recipient=183, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=32.0760717646782×10 = 329.760717646782 (tied at score 329.760717646782 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#183"
+        - 'gridcell "Familienwandern im Chiemgau: Drei gute Pausen statt Gipfelziel"'
+        - gridcell "327.760717646782"
+        - 'gridcell "recipient_top_score: recipient=183, category_ids=[14, 6, 24, 7], content_score=7×1 + preference_score=32.0760717646782×10 = 327.760717646782 (tied at score 327.760717646782 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#183"
+        - 'gridcell "Kinderregenjacke für 49 Euro: Die Kapuze gehört zur Probe"'
+        - gridcell "329.760717646782"
+        - 'gridcell "recipient_top_score: recipient=183, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=32.0760717646782×10 = 329.760717646782 (tied at score 329.760717646782 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#170"
+        - 'gridcell "Grathaus Basis Kinderregenhose: 35 Euro und Platz zum Hinhocken"'
+        - gridcell "571.7266895014012"
+        - 'gridcell "recipient_top_score: recipient=170, category_ids=[14, 6, 24, 7], content_score=7×1 + preference_score=56.47266895014012×10 = 571.7266895014012 (tied at score 571.7266895014012 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#170"
+        - 'gridcell "Kinderregenjacke für 49 Euro: Die Kapuze gehört zur Probe"'
+        - gridcell "573.7266895014012"
+        - 'gridcell "recipient_top_score: recipient=170, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=56.47266895014012×10 = 573.7266895014012 (tied at score 573.7266895014012 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#170"
+        - 'gridcell "Augsburg: Naturheft für Kinder am 15. Mai"'
+        - gridcell "573.7266895014012"
+        - 'gridcell "recipient_top_score: recipient=170, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=56.47266895014012×10 = 573.7266895014012 (tied at score 573.7266895014012 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#166"
+        - 'gridcell "Kinderregenjacke für 49 Euro: Die Kapuze gehört zur Probe"'
+        - gridcell "349.21811925189405"
+        - 'gridcell "recipient_top_score: recipient=166, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=34.021811925189404×10 = 349.21811925189405 (tied at score 349.21811925189405 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#166"
+        - 'gridcell "Augsburg: Naturheft für Kinder am 15. Mai"'
+        - gridcell "349.21811925189405"
+        - 'gridcell "recipient_top_score: recipient=166, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=34.021811925189404×10 = 349.21811925189405 (tied at score 349.21811925189405 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#166"
+        - 'gridcell "Familienwandern im Chiemgau: Drei gute Pausen statt Gipfelziel"'
+        - gridcell "347.21811925189405"
+        - 'gridcell "recipient_top_score: recipient=166, category_ids=[14, 6, 24, 7], content_score=7×1 + preference_score=34.021811925189404×10 = 347.21811925189405 (tied at score 347.21811925189405 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#165"
+        - 'gridcell "Rosenheim: Spuren und Fotos lesen am 30. Oktober"'
+        - gridcell "261.0350711833328"
+        - 'gridcell "recipient_top_score: recipient=165, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=25.203507118333274×10 = 261.0350711833328 (tied at score 261.0350711833328 between 4 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#165"
+        - 'gridcell "Kleines Stativ für 49 Euro: Ruhige Bilder aus Abstand"'
+        - gridcell "261.0350711833328"
+        - 'gridcell "recipient_top_score: recipient=165, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=25.203507118333274×10 = 261.0350711833328 (tied at score 261.0350711833328 between 4 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#165"
+        - 'gridcell "Tierspuren im Schnee: Erst den Maßstab dazulegen"'
+        - gridcell "261.0350711833328"
+        - 'gridcell "recipient_top_score: recipient=165, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=25.203507118333274×10 = 261.0350711833328 (tied at score 261.0350711833328 between 4 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#127"
+        - 'gridcell "Tierspuren im Schnee: Erst den Maßstab dazulegen"'
+        - gridcell "268.2798053075905"
+        - 'gridcell "recipient_top_score: recipient=127, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=25.927980530759047×10 = 268.2798053075905 (tied at score 268.2798053075905 between 4 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#127"
+        - 'gridcell "Rosenheim: Spuren und Fotos lesen am 30. Oktober"'
+        - gridcell "268.2798053075905"
+        - 'gridcell "recipient_top_score: recipient=127, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=25.927980530759047×10 = 268.2798053075905 (tied at score 268.2798053075905 between 4 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#127"
+        - 'gridcell "Kompaktfernglas für 89 Euro: 8-fach und 310 Gramm"'
+        - gridcell "268.2798053075905"
+        - 'gridcell "recipient_top_score: recipient=127, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=25.927980530759047×10 = 268.2798053075905 (tied at score 268.2798053075905 between 4 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#124"
+        - 'gridcell "Augsburg: Naturheft für Kinder am 15. Mai"'
+        - gridcell "178.21009374153638"
+        - 'gridcell "recipient_top_score: recipient=124, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=16.921009374153638×10 = 178.21009374153638 (tied at score 178.21009374153638 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#124"
+        - 'gridcell "Kinderregenjacke für 49 Euro: Die Kapuze gehört zur Probe"'
+        - gridcell "178.21009374153638"
+        - 'gridcell "recipient_top_score: recipient=124, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=16.921009374153638×10 = 178.21009374153638 (tied at score 178.21009374153638 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#124"
+        - 'gridcell "Rosenheim: Familienwerkstatt für die nächste kleine Wanderung"'
+        - gridcell "176.21009374153638"
+        - 'gridcell "recipient_top_score: recipient=124, category_ids=[14, 6, 24, 7], content_score=7×1 + preference_score=16.921009374153638×10 = 176.21009374153638 (tied at score 176.21009374153638 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#110"
+        - 'gridcell "Kompaktfernglas für 89 Euro: 8-fach und 310 Gramm"'
+        - gridcell "474.492269959832"
+        - 'gridcell "recipient_top_score: recipient=110, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=46.549226995983204×10 = 474.492269959832 (tied at score 474.492269959832 between 4 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#110"
+        - 'gridcell "Rosenheim: Spuren und Fotos lesen am 30. Oktober"'
+        - gridcell "474.492269959832"
+        - 'gridcell "recipient_top_score: recipient=110, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=46.549226995983204×10 = 474.492269959832 (tied at score 474.492269959832 between 4 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#110"
+        - 'gridcell "Tierspuren im Schnee: Erst den Maßstab dazulegen"'
+        - gridcell "474.492269959832"
+        - 'gridcell "recipient_top_score: recipient=110, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=46.549226995983204×10 = 474.492269959832 (tied at score 474.492269959832 between 4 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#107"
+        - 'gridcell "Augsburg: Naturheft für Kinder am 15. Mai"'
+        - gridcell "650.799900109706"
+        - 'gridcell "recipient_top_score: recipient=107, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=64.1799900109706×10 = 650.799900109706 (tied at score 650.799900109706 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#107"
+        - 'gridcell "Rosenheim: Familienwerkstatt für die nächste kleine Wanderung"'
+        - gridcell "648.799900109706"
+        - 'gridcell "recipient_top_score: recipient=107, category_ids=[14, 6, 24, 7], content_score=7×1 + preference_score=64.1799900109706×10 = 648.799900109706 (tied at score 648.799900109706 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#107"
+        - 'gridcell "Kinderregenjacke für 49 Euro: Die Kapuze gehört zur Probe"'
+        - gridcell "650.799900109706"
+        - 'gridcell "recipient_top_score: recipient=107, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=64.1799900109706×10 = 650.799900109706 (tied at score 650.799900109706 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#98"
+        - 'gridcell "Sitzmatte für Familienpausen: 9 Euro gegen die kalte Bank"'
+        - gridcell "506.30524351750984"
+        - 'gridcell "recipient_top_score: recipient=98, category_ids=[14, 6, 24, 7], content_score=7×1 + preference_score=49.93052435175098×10 = 506.30524351750984 (tied at score 506.30524351750984 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#98"
+        - 'gridcell "Kinderregenjacke für 49 Euro: Die Kapuze gehört zur Probe"'
+        - gridcell "508.30524351750984"
+        - 'gridcell "recipient_top_score: recipient=98, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=49.93052435175098×10 = 508.30524351750984 (tied at score 508.30524351750984 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#98"
+        - 'gridcell "Augsburg: Naturheft für Kinder am 15. Mai"'
+        - gridcell "508.30524351750984"
+        - 'gridcell "recipient_top_score: recipient=98, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=49.93052435175098×10 = 508.30524351750984 (tied at score 508.30524351750984 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#91"
+        - 'gridcell "Boulderbesuch mit Kindern: Die Matte ist kein Spielplatz"'
+        - gridcell "257.33299349460856"
+        - 'gridcell "recipient_top_score: recipient=91, category_ids=[14, 6, 24, 7], content_score=7×1 + preference_score=25.033299349460858×10 = 257.33299349460856 (tied at score 257.33299349460856 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#91"
+        - 'gridcell "Kinderregenjacke für 49 Euro: Die Kapuze gehört zur Probe"'
+        - gridcell "259.33299349460856"
+        - 'gridcell "recipient_top_score: recipient=91, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=25.033299349460858×10 = 259.33299349460856 (tied at score 259.33299349460856 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#91"
+        - 'gridcell "Augsburg: Naturheft für Kinder am 15. Mai"'
+        - gridcell "259.33299349460856"
+        - 'gridcell "recipient_top_score: recipient=91, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=25.033299349460858×10 = 259.33299349460856 (tied at score 259.33299349460856 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#90"
+        - 'gridcell "Augsburg: Naturheft für Kinder am 15. Mai"'
+        - gridcell "334.89804485863743"
+        - 'gridcell "recipient_top_score: recipient=90, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=32.589804485863745×10 = 334.89804485863743 (tied at score 334.89804485863743 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#90"
+        - 'gridcell "Rosenheim: Familienwerkstatt für die nächste kleine Wanderung"'
+        - gridcell "332.89804485863743"
+        - 'gridcell "recipient_top_score: recipient=90, category_ids=[14, 6, 24, 7], content_score=7×1 + preference_score=32.589804485863745×10 = 332.89804485863743 (tied at score 332.89804485863743 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#90"
+        - 'gridcell "Kinderregenjacke für 49 Euro: Die Kapuze gehört zur Probe"'
+        - gridcell "334.89804485863743"
+        - 'gridcell "recipient_top_score: recipient=90, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=32.589804485863745×10 = 334.89804485863743 (tied at score 334.89804485863743 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#79"
+        - 'gridcell "Kinderregenjacke für 49 Euro: Die Kapuze gehört zur Probe"'
+        - gridcell "526.8947756250475"
+        - 'gridcell "recipient_top_score: recipient=79, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=51.78947756250475×10 = 526.8947756250475 (tied at score 526.8947756250475 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#79"
+        - 'gridcell "Familienwandern im Chiemgau: Drei gute Pausen statt Gipfelziel"'
+        - gridcell "524.8947756250475"
+        - 'gridcell "recipient_top_score: recipient=79, category_ids=[14, 6, 24, 7], content_score=7×1 + preference_score=51.78947756250475×10 = 524.8947756250475 (tied at score 524.8947756250475 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#79"
+        - 'gridcell "Augsburg: Naturheft für Kinder am 15. Mai"'
+        - gridcell "526.8947756250475"
+        - 'gridcell "recipient_top_score: recipient=79, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=51.78947756250475×10 = 526.8947756250475 (tied at score 526.8947756250475 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#69"
+        - 'gridcell "Boulderbesuch mit Kindern: Die Matte ist kein Spielplatz"'
+        - gridcell "332.305775007412"
+        - 'gridcell "recipient_top_score: recipient=69, category_ids=[14, 6, 24, 7], content_score=7×1 + preference_score=32.5305775007412×10 = 332.305775007412 (tied at score 332.305775007412 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#69"
+        - 'gridcell "Augsburg: Naturheft für Kinder am 15. Mai"'
+        - gridcell "334.305775007412"
+        - 'gridcell "recipient_top_score: recipient=69, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=32.5305775007412×10 = 334.305775007412 (tied at score 334.305775007412 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#69"
+        - 'gridcell "Kinderregenjacke für 49 Euro: Die Kapuze gehört zur Probe"'
+        - gridcell "334.305775007412"
+        - 'gridcell "recipient_top_score: recipient=69, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=32.5305775007412×10 = 334.305775007412 (tied at score 334.305775007412 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#63"
+        - 'gridcell "Augsburg: Naturheft für Kinder am 15. Mai"'
+        - gridcell "487.2999495785318"
+        - 'gridcell "recipient_top_score: recipient=63, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=47.82999495785318×10 = 487.2999495785318 (tied at score 487.2999495785318 between 5 candidates, ordered randomly)"'
+      - row "17.10.2026, 16:58:55":
+        - rowheader "17.10.2026, 16:58:55"
+        - gridcell "#63"
+        - 'gridcell "Kinderregenjacke für 49 Euro: Die Kapuze gehört zur Probe"'
+        - gridcell "487.2999495785318"
+        - 'gridcell "recipient_top_score: recipient=63, category_ids=[14, 6, 24, 7], content_score=9×1 + preference_score=47.82999495785318×10 = 487.2999495785318 (tied at score 487.2999495785318 between 5 candidates, ordered randomly)"'

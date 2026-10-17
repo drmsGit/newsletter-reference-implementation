@@ -1,0 +1,107 @@
+- complementary:
+  - generic: Omnichannel Orchestration Reference
+  - button "Collapse the navigation" [expanded]:
+  - generic: Brand
+  - button "Grathaus Outdoor Brand":
+    - generic: Brand
+    - generic: Grathaus Outdoor
+  - combobox
+  - navigation "Main":
+    - list:
+      - link "Approvals":
+        - /url: /manager/approvals
+        - generic: Approvals
+      - link "Campaigns":
+        - /url: /manager/campaigns
+        - generic: Campaigns
+      - link "Monitoring":
+        - /url: /manager/monitoring
+        - generic: Monitoring
+      - link "Content":
+        - /url: /manager/content
+        - generic: Content
+      - link "Audiences":
+        - /url: /manager/audiences
+        - generic: Audiences
+      - link "Recipients":
+        - /url: /manager/recipients
+        - generic: Recipients
+      - link "Deliveries":
+        - /url: /manager/deliveries
+        - generic: Deliveries
+      - link "Decision slots":
+        - /url: /manager/decision-slots
+        - generic: Decision slots
+      - link "Settings":
+        - /url: /manager/settings
+        - generic: Settings
+  - img "Initial admin": IA
+  - button "Sign out":
+    - generic: Sign out
+- main:
+  - region "Send":
+    - link "Campaign":
+      - /url: /manager/campaigns/12
+      - text: Campaign
+    - heading "Send Deutsch" [level=1]
+    - paragraph: Herbst in den Bergen / Autumn in the mountains · email
+    - region "Planned and not sent yet":
+      - heading "Planned and not sent yet" [level=2]
+      - paragraph: Nothing planned for this variant.
+  - region "1. What goes out":
+    - heading "1. What goes out" [level=3]
+    - paragraph: As it would be frozen now. It is frozen when you plan the send.
+    - paragraph:
+      - text: "Subject:"
+      - strong: —
+    - iframe:
+      - img "Karte und Kompass auf einer Holzunterlage"
+      - 'heading "Chiemgau ohne Auto: rückwärts planen" [level=3]'
+      - generic: Wer im Chiemgau mit Bus und Bahn wandert, sollte zuerst die Rückfahrt festlegen. Für eine Beispieltour mit 12 Kilometern und 600 Höhenmetern reichen reine Gehzeiten als Planung nicht aus. Pausen, Wartezeiten und ein verpasster Abzweig gehören dazu. Unser Leitfaden zeigt, wie aus der letzten passenden Verbindung ein vernünftiger Starttermin wird und weshalb eine frühere Ausstiegsmöglichkeit auf die Karte gehört.
+      - link "Planung ansehen →":
+        - /url: https://www.grathaus.example/tagestour-chiemgau-rueckfahrt?nl_content=76
+      - img "Gruppe bei einer geführten Unternehmung"
+      - 'heading "Klettersteige in der Gruppe: Das Nein wird vorher besprochen" [level=3]'
+      - generic: Vier Personen verabreden sich für einen Klettersteig im Allgäu, aber jede stellt sich einen anderen Tag vor. Bevor eine Route gewählt wird, gehören Erfahrung, Unsicherheiten und Erwartungen auf den Tisch. Unser Gesprächsblatt enthält vier Fragen für die gemeinsame Vorbereitung. Eine davon lautet, ob alle ohne Rechtfertigung absagen dürfen. Das Ergebnis kann auch eine andere Unternehmung oder ein qualifiziert begleitetes Lernangebot sein.
+      - link "Gesprächsblatt lesen →":
+        - /url: https://www.grathaus.example/klettersteig-gruppe-nein-sagen?nl_content=110
+      - paragraph: Grathaus Outdoor GmbH (Demo) · Beispielstraße 12 · 80331 München
+      - paragraph:
+        - link "Impressum":
+          - /url: https://www.grathaus.example/impressum
+        - text: ·
+        - link "Datenschutz":
+          - /url: https://www.grathaus.example/datenschutz
+      - paragraph: Abmelden
+  - region "2. Send a test (optional)":
+    - heading "2. Send a test (optional)" [level=3]
+    - paragraph: "The email above with its subject marked [Test]. Not a delivery: no unsubscribe link, nothing counted or stored."
+    - generic: Test address
+    - textbox "Test address"
+    - generic: Show it as (optional)
+    - textbox "Show it as (optional)"
+    - generic: Provider
+    - button "mock (nothing is sent) Provider":
+      - generic: mock (nothing is sent)
+    - combobox
+    - button "Send a test" [disabled]
+  - region "3. Plan the send":
+    - heading "3. Plan the send" [level=3]
+    - paragraph: Planning freezes the email as it is now; later edits need a new send.
+    - generic: Name of the send
+    - textbox "Name of the send": Herbst in den Bergen / Autumn in the mountains
+    - generic: Audience
+    - button "Choose an audience group Audience":
+      - generic: Choose an audience group
+    - combobox
+    - generic: Provider
+    - button "mock (nothing is sent) Provider":
+      - generic: mock (nothing is sent)
+    - combobox
+    - generic: When
+    - button "When I send it When":
+      - generic: When I send it
+    - combobox
+    - checkbox "Don't send to someone who would get no content record"
+    - text: Don't send to someone who would get no content record
+    - button "Plan the send"

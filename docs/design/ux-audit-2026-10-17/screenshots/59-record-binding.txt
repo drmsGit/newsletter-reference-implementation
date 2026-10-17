@@ -1,0 +1,171 @@
+- log
+- log
+- complementary:
+  - generic: Omnichannel Orchestration Reference
+  - button "Collapse the navigation" [expanded]:
+  - generic: Brand
+  - button "Grathaus Outdoor Brand":
+    - generic: Brand
+    - generic: Grathaus Outdoor
+  - combobox
+  - navigation "Main":
+    - list:
+      - link "Approvals":
+        - /url: /manager/approvals
+        - generic: Approvals
+      - link "Campaigns":
+        - /url: /manager/campaigns
+        - generic: Campaigns
+      - link "Monitoring":
+        - /url: /manager/monitoring
+        - generic: Monitoring
+      - link "Content":
+        - /url: /manager/content
+        - generic: Content
+      - link "Audiences":
+        - /url: /manager/audiences
+        - generic: Audiences
+      - link "Recipients":
+        - /url: /manager/recipients
+        - generic: Recipients
+      - link "Deliveries":
+        - /url: /manager/deliveries
+        - generic: Deliveries
+      - link "Decision slots":
+        - /url: /manager/decision-slots
+        - generic: Decision slots
+      - link "Settings":
+        - /url: /manager/settings
+        - generic: Settings
+  - img "Initial admin": IA
+  - button "Sign out":
+    - generic: Sign out
+- main:
+  - region "Modules":
+    - link "Testtag im Laden (Push)":
+      - /url: /manager/campaigns/9
+      - text: Testtag im Laden (Push)
+    - heading "Modules" [level=1]
+    - list:
+      - 'button "Notification · Record “Gravel im Altmühltal: Eine Runde mit drei Abkürzungen”"':
+        - generic: Notification
+        - text: Record
+        - generic: "“Gravel im Altmühltal: Eine Runde mit drei Abkürzungen”"
+      - button "Move Notification up" [disabled]:
+      - button "Move Notification down" [disabled]:
+      - button "Remove Notification": Remove
+    - paragraph: A push variant holds 1 module, and this one is full.
+  - region "Push":
+    - heading "Push" [level=2]
+    - paragraph:
+      - text: push · draft ·
+      - link "Send…":
+        - /url: /manager/campaigns/9/variants/9/send
+    - region "Preview":
+      - generic: Nothing to flag.
+      - button "Open preview"
+    - region "Brand profile":
+      - heading "Brand profile" [level=3]
+      - generic: Brand profile
+      - button "Newsletter Deutsch (default) · de Brand profile":
+        - generic: Newsletter Deutsch (default) · de
+      - combobox
+    - region "Notification":
+      - heading "Notification" [level=3]
+      - paragraph:
+        - text: Fields from
+        - 'link "“Gravel im Altmühltal: Eine Runde mit drei Abkürzungen”"':
+          - /url: /manager/content/1
+        - text: .
+        - button "Keep this record"
+      - generic: Find a record by title or description
+      - textbox "Find a record by title or description" [active]
+      - generic: Category
+      - button "Any category Category":
+        - generic: Any category
+      - combobox
+      - switch "Show records not ready for Push"
+      - text: Show records not ready for Push
+      - listbox "Records to use":
+        - 'option "Two-person tent for €229: pitch it before you buy A freestanding dome tent for €229, assessed by interior dimensions, luggage and an actual trial pitch before purchase."':
+          - generic: "Two-person tent for €229: pitch it before you buy"
+          - generic: A freestanding dome tent for €229, assessed by interior dimensions, luggage and an actual trial pitch before purchase.
+        - 'option "Grathaus Basis hut sleeping liner: 340 grams for €29 A washable cotton-blend hut liner for staffed accommodation where bedding is provided."':
+          - generic: "Grathaus Basis hut sleeping liner: 340 grams for €29"
+          - generic: A washable cotton-blend hut liner for staffed accommodation where bedding is provided.
+        - 'option "Animal tracks in snow: add a scale before guessing A wildlife observation guide for tracks in the Bavarian Forest, focused on keeping your distance and recording details calmly."':
+          - generic: "Animal tracks in snow: add a scale before guessing"
+          - generic: A wildlife observation guide for tracks in the Bavarian Forest, focused on keeping your distance and recording details calmly.
+        - 'option "Your first ski tour: the descent is not an afterthought A first ski-touring preparation guide that puts skiing ability and suitable training ahead of the elevation gain."':
+          - generic: "Your first ski tour: the descent is not an afterthought"
+          - generic: A first ski-touring preparation guide that puts skiing ability and suitable training ahead of the elevation gain.
+        - 'option "Via ferratas in a group: agree that no is an answer A conversation guide to making different expectations and concerns visible before a group chooses a via ferrata."':
+          - generic: "Via ferratas in a group: agree that no is an answer"
+          - generic: A conversation guide to making different expectations and concerns visible before a group chooses a via ferrata.
+        - 'option "Day hikes in the Chiemgau: plan the return journey first A planning guide to day hikes using buses and trains in the Chiemgau, where the last connection sets the time limit."':
+          - generic: "Day hikes in the Chiemgau: plan the return journey first"
+          - generic: A planning guide to day hikes using buses and trains in the Chiemgau, where the last connection sets the time limit.
+        - 'option "Rosenheim: Winterausrüstung gebraucht abgeben am 6. März Ein Annahmetermin für saubere gebrauchte Winterbekleidung mit vorher geklärten Bedingungen und ausdrücklich begrenztem Sortiment."':
+          - generic: "Rosenheim: Winterausrüstung gebraucht abgeben am 6. März"
+          - generic: Ein Annahmetermin für saubere gebrauchte Winterbekleidung mit vorher geklärten Bedingungen und ausdrücklich begrenztem Sortiment.
+        - 'option "Isolierflasche für 29 Euro: Der Verschluss wird mit Handschuhen getestet Eine robuste Edelstahlflasche mit 750 Millilitern Volumen, deren Handhabung für Wintertage vor dem Packen ausprobiert wird."':
+          - generic: "Isolierflasche für 29 Euro: Der Verschluss wird mit Handschuhen getestet"
+          - generic: Eine robuste Edelstahlflasche mit 750 Millilitern Volumen, deren Handhabung für Wintertage vor dem Packen ausprobiert wird.
+        - 'option "Grathaus Basis Isolationsjacke: 139 Euro für die Winterpause Eine Jacke mit synthetischer Füllung für ruhige Winterphasen, die mit der tatsächlich vorgesehenen Schichtenkombination anprobiert wird."':
+          - generic: "Grathaus Basis Isolationsjacke: 139 Euro für die Winterpause"
+          - generic: Eine Jacke mit synthetischer Füllung für ruhige Winterphasen, die mit der tatsächlich vorgesehenen Schichtenkombination anprobiert wird.
+        - 'option "Wintertag in der Gruppe: Ein Treffpunkt ohne Liftfahrt Eine Organisationshilfe für Gruppen mit verschiedenen Winterplänen und einem gemeinsam erreichbaren Treffpunkt im Tal."':
+          - generic: "Wintertag in der Gruppe: Ein Treffpunkt ohne Liftfahrt"
+          - generic: Eine Organisationshilfe für Gruppen mit verschiedenen Winterplänen und einem gemeinsam erreichbaren Treffpunkt im Tal.
+        - 'option "Drei Winterwochenenden: Leihkosten vollständig vergleichen Ein Rechenblatt für winterliche Leihausrüstung, das Tagespreis, benötigte Teile und Rückgabebedingungen getrennt erfasst."':
+          - generic: "Drei Winterwochenenden: Leihkosten vollständig vergleichen"
+          - generic: Ein Rechenblatt für winterliche Leihausrüstung, das Tagespreis, benötigte Teile und Rückgabebedingungen getrennt erfasst.
+        - 'option "Augsburg: LVS-Unterlagen und Servicefragen am 5. Februar Ein kostenloser Ladenabend zum Klären modellbezogener Unterlagen und Hersteller-Servicewege für vorhandene LVS-Geräte."':
+          - generic: "Augsburg: LVS-Unterlagen und Servicefragen am 5. Februar"
+          - generic: Ein kostenloser Ladenabend zum Klären modellbezogener Unterlagen und Hersteller-Servicewege für vorhandene LVS-Geräte.
+        - 'option "Lawinenschaufel für 59 Euro: Mit Handschuhen zusammensetzen Eine zerlegbare Aluminiumschaufel, deren Packmaß und Bedienbarkeit vor dem Winter im passenden Lernrahmen geprüft werden."':
+          - generic: "Lawinenschaufel für 59 Euro: Mit Handschuhen zusammensetzen"
+          - generic: Eine zerlegbare Aluminiumschaufel, deren Packmaß und Bedienbarkeit vor dem Winter im passenden Lernrahmen geprüft werden.
+        - 'option "LVS-Gerät für 269 Euro: Bedienung vor Zusatzfunktionen Ein digitales Dreiantennen-Gerät, das mit praktischer Einweisung, vollständigen Produktunterlagen und passendem Lernangebot ausgewählt wird."':
+          - generic: "LVS-Gerät für 269 Euro: Bedienung vor Zusatzfunktionen"
+          - generic: Ein digitales Dreiantennen-Gerät, das mit praktischer Einweisung, vollständigen Produktunterlagen und passendem Lernangebot ausgewählt wird.
+        - 'option "Lawinenausbildung: Nach der Übung die offenen Fragen festhalten Eine Nachbereitungshilfe für qualifizierte Lawinenausbildung, die Lernbedarf und weitere praktische Termine sichtbar macht."':
+          - generic: "Lawinenausbildung: Nach der Übung die offenen Fragen festhalten"
+          - generic: Eine Nachbereitungshilfe für qualifizierte Lawinenausbildung, die Lernbedarf und weitere praktische Termine sichtbar macht.
+        - 'option "Lawinenlagebericht: Die Zahl ist erst die erste Zeile Eine Lesehilfe für den vollständigen Lawinenlagebericht mit Gebiet, Gültigkeit, Gefahrenstellen und beschriebenen Problemen."':
+          - generic: "Lawinenlagebericht: Die Zahl ist erst die erste Zeile"
+          - generic: Eine Lesehilfe für den vollständigen Lawinenlagebericht mit Gebiet, Gültigkeit, Gefahrenstellen und beschriebenen Problemen.
+        - 'option "München: Langlaufski pflegen am 20. Februar Ein Ladenworkshop zur modellgerechten Pflege von Langlaufski mit vorheriger Abstimmung des mitgebrachten Materials."':
+          - generic: "München: Langlaufski pflegen am 20. Februar"
+          - generic: Ein Ladenworkshop zur modellgerechten Pflege von Langlaufski mit vorheriger Abstimmung des mitgebrachten Materials.
+        - 'option "Langlaufhose für 79 Euro: Beweglich ohne dickes Futter Eine ungefütterte Hose mit windabweisender Vorderseite für aktive Langlaufeinheiten und eine bewusst gewählte Schichtenkombination."':
+          - generic: "Langlaufhose für 79 Euro: Beweglich ohne dickes Futter"
+          - generic: Eine ungefütterte Hose mit windabweisender Vorderseite für aktive Langlaufeinheiten und eine bewusst gewählte Schichtenkombination.
+        - 'option "Klassik-Langlaufset für 249 Euro: Passend statt nur lang genug Ein Set aus klassischen Langlaufski und Bindung, das anhand von Gewicht, Erfahrung und passenden Schuhen ausgewählt wird."':
+          - generic: "Klassik-Langlaufset für 249 Euro: Passend statt nur lang genug"
+          - generic: Ein Set aus klassischen Langlaufski und Bindung, das anhand von Gewicht, Erfahrung und passenden Schuhen ausgewählt wird.
+        - 'option "Loipenbericht lesen: Geöffnet ist genauer als Schneehöhe Eine Planungshilfe für Langlauftage, bei der aktueller Betriebsstatus und tatsächlich nutzbare Strecken vor der Anfahrt geprüft werden."':
+          - generic: "Loipenbericht lesen: Geöffnet ist genauer als Schneehöhe"
+          - generic: Eine Planungshilfe für Langlauftage, bei der aktueller Betriebsstatus und tatsächlich nutzbare Strecken vor der Anfahrt geprüft werden.
+      - paragraph: Showing 20 of 131. Type or choose a category to narrow them.
+      - generic: Notification title (required)
+      - textbox "Notification title (required)": Gravelrunde im Altmühltal
+      - button "Personalise…"
+      - button "Change Notification title in catalogue"
+      - generic: Notification text (required)
+      - textbox "Notification text (required)": Das Planungsbeispiel umfasst 68 Kilometer, 700 Höhenmeter und drei mögliche Ausstiege.
+      - button "Personalise…"
+      - button "Change Notification text in catalogue"
+      - group "Notification image":
+        - paragraph:
+          - strong: Notification image
+        - img "Gravelrad auf einem Feldweg mit Hügeln im Hintergrund"
+        - text: default-20261017-18-600x600-gravel-feldweg.jpg
+        - text: Gravelrad auf einem Feldweg mit Hügeln im Hintergrund
+        - paragraph:
+          - button "Change image…"
+          - button "Remove"
+      - button "Change Notification image in catalogue"
+      - generic: Opens this link
+      - textbox "Opens this link": https://www.grathaus.example/altmuehltal-gravelrunde-ausstiege
+      - button "Change Opens this link in catalogue"

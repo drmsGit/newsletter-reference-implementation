@@ -1,0 +1,70 @@
+- log
+- log
+- complementary:
+  - generic: Omnichannel Orchestration Reference
+  - button "Collapse the navigation" [expanded]:
+  - generic: Brand
+  - button "Grathaus Outdoor Brand":
+    - generic: Brand
+    - generic: Grathaus Outdoor
+  - combobox
+  - navigation "Main":
+    - list:
+      - link "Approvals":
+        - /url: /manager/approvals
+        - generic: Approvals
+      - link "Campaigns":
+        - /url: /manager/campaigns
+        - generic: Campaigns
+      - link "Monitoring":
+        - /url: /manager/monitoring
+        - generic: Monitoring
+      - link "Content":
+        - /url: /manager/content
+        - generic: Content
+      - link "Audiences":
+        - /url: /manager/audiences
+        - generic: Audiences
+      - link "Recipients":
+        - /url: /manager/recipients
+        - generic: Recipients
+      - link "Deliveries":
+        - /url: /manager/deliveries
+        - generic: Deliveries
+      - link "Decision slots":
+        - /url: /manager/decision-slots
+        - generic: Decision slots
+      - link "Settings":
+        - /url: /manager/settings
+        - generic: Settings
+  - img "Initial admin": IA
+  - button "Sign out":
+    - generic: Sign out
+- main:
+  - link "Waiting for a decision":
+    - /url: /manager/approvals
+    - text: Waiting for a decision
+  - heading "Decision history" [level=1]
+  - generic: Action
+  - button "Any action Action":
+    - generic: Action
+    - generic: Any action
+  - combobox
+  - generic: Requested by
+  - button "Anyone Requested by":
+    - generic: Requested by
+    - generic: Anyone
+  - combobox
+  - grid "Decided requests":
+    - rowgroup:
+      - row "Request Summary Outcome Requested by Decided by Ended Reason":
+        - columnheader "Request"
+        - columnheader "Summary"
+        - columnheader "Outcome"
+        - columnheader "Requested by"
+        - columnheader "Decided by"
+        - columnheader "Ended"
+        - columnheader "Reason"
+    - rowgroup:
+      - row "Nothing has been decided yet.":
+        - rowheader "Nothing has been decided yet."

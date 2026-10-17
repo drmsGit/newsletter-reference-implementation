@@ -1,0 +1,251 @@
+- log:
+  - generic: Acme Agency (demo) ausgewählt.
+  - generic: Acme Agency (demo) ausgewählt.
+  - generic: Acme Agency (demo) ausgewählt.
+- log
+- complementary:
+  - generic: Omnichannel Orchestration Reference
+  - button "Collapse the navigation" [expanded]:
+  - generic: Brand
+  - button "Grathaus Outdoor Brand":
+    - generic: Brand
+    - generic: Grathaus Outdoor
+  - combobox
+  - navigation "Main":
+    - list:
+      - link "Approvals":
+        - /url: /manager/approvals
+        - generic: Approvals
+      - link "Campaigns":
+        - /url: /manager/campaigns
+        - generic: Campaigns
+      - link "Monitoring":
+        - /url: /manager/monitoring
+        - generic: Monitoring
+      - link "Content":
+        - /url: /manager/content
+        - generic: Content
+      - link "Audiences":
+        - /url: /manager/audiences
+        - generic: Audiences
+      - link "Recipients":
+        - /url: /manager/recipients
+        - generic: Recipients
+      - link "Deliveries":
+        - /url: /manager/deliveries
+        - generic: Deliveries
+      - link "Decision slots":
+        - /url: /manager/decision-slots
+        - generic: Decision slots
+      - link "Settings":
+        - /url: /manager/settings
+        - generic: Settings
+  - img "Initial admin": IA
+  - button "Sign out":
+    - generic: Sign out
+- main:
+  - region "Integration list":
+    - link "Settings":
+      - /url: /manager/settings
+      - text: Settings
+    - heading "Integrations" [level=1]
+    - button "New integration"
+    - paragraph: Other systems that call this platform, each with its own keys and what it may do.
+    - grid "Integrations":
+      - row "n8n":
+        - gridcell "n8n Active · 1 live key campaigns.manage, sends.execute, sends.plan":
+          - generic: n8n
+          - generic: Active · 1 live key
+          - generic: campaigns.manage, sends.execute, sends.plan
+      - row "webshop":
+        - gridcell "webshop Active · 2 live keys audiences.manage, sends.execute":
+          - generic: webshop
+          - generic: Active · 2 live keys
+          - generic: audiences.manage, sends.execute
+      - row "Acme Agency (demo)" [active] [selected]:
+        - gridcell "Acme Agency (demo) Active · 0 live keys sends.execute":
+          - generic: Acme Agency (demo)
+          - generic: Active · 0 live keys
+          - generic: sends.execute
+      - row "task-331 scratch":
+        - gridcell "task-331 scratch Deactivated · 0 live keys sends.execute":
+          - generic: task-331 scratch
+          - generic: Deactivated · 0 live keys
+          - generic: sends.execute
+      - row "SCRATCH task-358":
+        - gridcell "SCRATCH task-358 Deactivated · 0 live keys Nothing yet":
+          - generic: SCRATCH task-358
+          - generic: Deactivated · 0 live keys
+          - generic: Nothing yet
+  - heading "Acme Agency (demo)" [level=2]
+  - paragraph: Raises the approval inbox's demo requests (seed_pending_actions.py).
+  - region "Keys":
+    - heading "Keys" [level=3]
+    - paragraph: "No live key: it cannot call the platform."
+    - generic: New key's label
+    - textbox "New key's label"
+    - generic: Expires after (days, empty for never)
+    - spinbutton "Expires after (days, empty for never)"
+    - button "Issue a key"
+  - region "What it may do":
+    - heading "What it may do" [level=3]
+    - paragraph: Tick what its keys may do, per brand. Each tick is saved at once. You can only allow what you may do yourself.
+    - table:
+      - rowgroup:
+        - row "Permission Grathaus Outdoor Grathaus Touren":
+          - columnheader "Permission"
+          - columnheader "Grathaus Outdoor"
+          - columnheader "Grathaus Touren"
+      - rowgroup:
+        - row "view See dashboards, campaigns, signals and delivery history view on Grathaus Outdoor view on Grathaus Touren":
+          - rowheader "view See dashboards, campaigns, signals and delivery history":
+            - code: view
+            - text: See dashboards, campaigns, signals and delivery history
+          - cell "view on Grathaus Outdoor":
+            - checkbox "view on Grathaus Outdoor"
+          - cell "view on Grathaus Touren":
+            - checkbox "view on Grathaus Touren"
+        - row "campaigns.manage Create and edit campaigns, variants and modules campaigns.manage on Grathaus Outdoor campaigns.manage on Grathaus Touren":
+          - rowheader "campaigns.manage Create and edit campaigns, variants and modules":
+            - code: campaigns.manage
+            - text: Create and edit campaigns, variants and modules
+          - cell "campaigns.manage on Grathaus Outdoor":
+            - checkbox "campaigns.manage on Grathaus Outdoor"
+          - cell "campaigns.manage on Grathaus Touren":
+            - checkbox "campaigns.manage on Grathaus Touren"
+        - row "content.manage Create and edit content records and categories content.manage on Grathaus Outdoor content.manage on Grathaus Touren":
+          - rowheader "content.manage Create and edit content records and categories":
+            - code: content.manage
+            - text: Create and edit content records and categories
+          - cell "content.manage on Grathaus Outdoor":
+            - checkbox "content.manage on Grathaus Outdoor"
+          - cell "content.manage on Grathaus Touren":
+            - checkbox "content.manage on Grathaus Touren"
+        - row "audiences.manage Create and edit audience groups and rules audiences.manage on Grathaus Outdoor audiences.manage on Grathaus Touren":
+          - rowheader "audiences.manage Create and edit audience groups and rules":
+            - code: audiences.manage
+            - text: Create and edit audience groups and rules
+          - cell "audiences.manage on Grathaus Outdoor":
+            - checkbox "audiences.manage on Grathaus Outdoor"
+          - cell "audiences.manage on Grathaus Touren":
+            - checkbox "audiences.manage on Grathaus Touren"
+        - row "sends.execute Plan and trigger sends, including real ones sends.execute on Grathaus Outdoor sends.execute on Grathaus Touren":
+          - rowheader "sends.execute Plan and trigger sends, including real ones":
+            - code: sends.execute
+            - text: Plan and trigger sends, including real ones
+          - cell "sends.execute on Grathaus Outdoor":
+            - checkbox "sends.execute on Grathaus Outdoor" [checked]
+          - cell "sends.execute on Grathaus Touren":
+            - checkbox "sends.execute on Grathaus Touren"
+        - row "ai.run Run AI tasks, which spends against the token budget ai.run on Grathaus Outdoor ai.run on Grathaus Touren":
+          - rowheader "ai.run Run AI tasks, which spends against the token budget":
+            - code: ai.run
+            - text: Run AI tasks, which spends against the token budget
+          - cell "ai.run on Grathaus Outdoor":
+            - checkbox "ai.run on Grathaus Outdoor"
+          - cell "ai.run on Grathaus Touren":
+            - checkbox "ai.run on Grathaus Touren"
+        - row "settings.manage Change tunable settings, budgets and AI prompts settings.manage on Grathaus Outdoor settings.manage on Grathaus Touren":
+          - rowheader "settings.manage Change tunable settings, budgets and AI prompts":
+            - code: settings.manage
+            - text: Change tunable settings, budgets and AI prompts
+          - cell "settings.manage on Grathaus Outdoor":
+            - checkbox "settings.manage on Grathaus Outdoor"
+          - cell "settings.manage on Grathaus Touren":
+            - checkbox "settings.manage on Grathaus Touren"
+        - row "users.manage Invite users, assign roles, deactivate accounts users.manage on Grathaus Outdoor users.manage on Grathaus Touren":
+          - rowheader "users.manage Invite users, assign roles, deactivate accounts":
+            - code: users.manage
+            - text: Invite users, assign roles, deactivate accounts
+          - cell "users.manage on Grathaus Outdoor":
+            - checkbox "users.manage on Grathaus Outdoor"
+          - cell "users.manage on Grathaus Touren":
+            - checkbox "users.manage on Grathaus Touren"
+        - row "credentials.manage Set provider and model credentials (write-only) credentials.manage on Grathaus Outdoor credentials.manage on Grathaus Touren":
+          - rowheader "credentials.manage Set provider and model credentials (write-only)":
+            - code: credentials.manage
+            - text: Set provider and model credentials (write-only)
+          - cell "credentials.manage on Grathaus Outdoor":
+            - checkbox "credentials.manage on Grathaus Outdoor"
+          - cell "credentials.manage on Grathaus Touren":
+            - checkbox "credentials.manage on Grathaus Touren"
+        - row "audiences.pin Add and remove individual audience members audiences.pin on Grathaus Outdoor audiences.pin on Grathaus Touren":
+          - rowheader "audiences.pin Add and remove individual audience members":
+            - code: audiences.pin
+            - text: Add and remove individual audience members
+          - cell "audiences.pin on Grathaus Outdoor":
+            - checkbox "audiences.pin on Grathaus Outdoor"
+          - cell "audiences.pin on Grathaus Touren":
+            - checkbox "audiences.pin on Grathaus Touren"
+        - row "sends.plan Prepare a send — snapshot and send instance — without firing it sends.plan on Grathaus Outdoor sends.plan on Grathaus Touren":
+          - rowheader "sends.plan Prepare a send — snapshot and send instance — without firing it":
+            - code: sends.plan
+            - text: Prepare a send — snapshot and send instance — without firing it
+          - cell "sends.plan on Grathaus Outdoor":
+            - checkbox "sends.plan on Grathaus Outdoor"
+          - cell "sends.plan on Grathaus Touren":
+            - checkbox "sends.plan on Grathaus Touren"
+        - row "recipients.manage Create and edit recipients recipients.manage on Grathaus Outdoor recipients.manage on Grathaus Touren":
+          - rowheader "recipients.manage Create and edit recipients":
+            - code: recipients.manage
+            - text: Create and edit recipients
+          - cell "recipients.manage on Grathaus Outdoor":
+            - checkbox "recipients.manage on Grathaus Outdoor"
+          - cell "recipients.manage on Grathaus Touren":
+            - checkbox "recipients.manage on Grathaus Touren"
+        - row "recipients.consent Record a consent decision for a recipient recipients.consent on Grathaus Outdoor recipients.consent on Grathaus Touren":
+          - rowheader "recipients.consent Record a consent decision for a recipient":
+            - code: recipients.consent
+            - text: Record a consent decision for a recipient
+          - cell "recipients.consent on Grathaus Outdoor":
+            - checkbox "recipients.consent on Grathaus Outdoor"
+          - cell "recipients.consent on Grathaus Touren":
+            - checkbox "recipients.consent on Grathaus Touren"
+        - row "insight.write Write engagement events into the signal layer insight.write on Grathaus Outdoor insight.write on Grathaus Touren":
+          - rowheader "insight.write Write engagement events into the signal layer":
+            - code: insight.write
+            - text: Write engagement events into the signal layer
+          - cell "insight.write on Grathaus Outdoor":
+            - checkbox "insight.write on Grathaus Outdoor"
+          - cell "insight.write on Grathaus Touren":
+            - checkbox "insight.write on Grathaus Touren"
+        - row "overrides.manage Override a system content pick, and reset one overrides.manage on Grathaus Outdoor overrides.manage on Grathaus Touren":
+          - rowheader "overrides.manage Override a system content pick, and reset one":
+            - code: overrides.manage
+            - text: Override a system content pick, and reset one
+          - cell "overrides.manage on Grathaus Outdoor":
+            - checkbox "overrides.manage on Grathaus Outdoor"
+          - cell "overrides.manage on Grathaus Touren":
+            - checkbox "overrides.manage on Grathaus Touren"
+        - row "integrations.manage Issue, rotate and revoke machine credentials integrations.manage on Grathaus Outdoor integrations.manage on Grathaus Touren":
+          - rowheader "integrations.manage Issue, rotate and revoke machine credentials":
+            - code: integrations.manage
+            - text: Issue, rotate and revoke machine credentials
+          - cell "integrations.manage on Grathaus Outdoor":
+            - checkbox "integrations.manage on Grathaus Outdoor"
+          - cell "integrations.manage on Grathaus Touren":
+            - checkbox "integrations.manage on Grathaus Touren"
+        - 'row "brand_profiles.manage Create and edit a brand''s profiles: look, texts and legal details brand_profiles.manage on Grathaus Outdoor brand_profiles.manage on Grathaus Touren"':
+          - 'rowheader "brand_profiles.manage Create and edit a brand''s profiles: look, texts and legal details"':
+            - code: brand_profiles.manage
+            - text: "Create and edit a brand's profiles: look, texts and legal details"
+          - cell "brand_profiles.manage on Grathaus Outdoor":
+            - checkbox "brand_profiles.manage on Grathaus Outdoor"
+          - cell "brand_profiles.manage on Grathaus Touren":
+            - checkbox "brand_profiles.manage on Grathaus Touren"
+        - row "brand_profiles.transactional Create or mark a transactional brand profile, sent without the opt-in check brand_profiles.transactional on Grathaus Outdoor brand_profiles.transactional on Grathaus Touren":
+          - rowheader "brand_profiles.transactional Create or mark a transactional brand profile, sent without the opt-in check":
+            - code: brand_profiles.transactional
+            - text: Create or mark a transactional brand profile, sent without the opt-in check
+          - cell "brand_profiles.transactional on Grathaus Outdoor":
+            - checkbox "brand_profiles.transactional on Grathaus Outdoor"
+          - cell "brand_profiles.transactional on Grathaus Touren":
+            - checkbox "brand_profiles.transactional on Grathaus Touren"
+  - region "Sending without a person":
+    - heading "Sending without a person" [level=3]
+    - paragraph: "A send it fires to at most this many recipients goes out at once; a bigger one waits for a person in Approvals. 0: every send waits."
+    - generic: Recipients per send, unattended
+    - spinbutton "Recipients per send, unattended": "0"
+    - button "Save" [disabled]
+  - paragraph:
+    - button "Deactivate Acme Agency (demo)"

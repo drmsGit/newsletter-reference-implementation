@@ -1,0 +1,100 @@
+- log:
+  - generic: Testtag im Laden (Push) ausgewählt.
+- log
+- complementary:
+  - generic: Omnichannel Orchestration Reference
+  - button "Collapse the navigation" [expanded]:
+  - generic: Brand
+  - button "Grathaus Outdoor Brand":
+    - generic: Brand
+    - generic: Grathaus Outdoor
+  - combobox
+  - navigation "Main":
+    - list:
+      - link "Approvals":
+        - /url: /manager/approvals
+        - generic: Approvals
+      - link "Campaigns":
+        - /url: /manager/campaigns
+        - generic: Campaigns
+      - link "Monitoring":
+        - /url: /manager/monitoring
+        - generic: Monitoring
+      - link "Content":
+        - /url: /manager/content
+        - generic: Content
+      - link "Audiences":
+        - /url: /manager/audiences
+        - generic: Audiences
+      - link "Recipients":
+        - /url: /manager/recipients
+        - generic: Recipients
+      - link "Deliveries":
+        - /url: /manager/deliveries
+        - generic: Deliveries
+      - link "Decision slots":
+        - /url: /manager/decision-slots
+        - generic: Decision slots
+      - link "Settings":
+        - /url: /manager/settings
+        - generic: Settings
+  - img "Initial admin": IA
+  - button "Sign out":
+    - generic: Sign out
+- main:
+  - region "Modules":
+    - link "Testtag im Laden (Push)":
+      - /url: /manager/campaigns/9
+      - text: Testtag im Laden (Push)
+    - heading "Modules" [level=1]
+    - list:
+      - 'button "Notification · Record “Gravel im Altmühltal: Eine Runde mit drei Abkürzungen”"':
+        - generic: Notification
+        - text: Record
+        - generic: "“Gravel im Altmühltal: Eine Runde mit drei Abkürzungen”"
+      - button "Move Notification up" [disabled]:
+      - button "Move Notification down" [disabled]:
+      - button "Remove Notification": Remove
+    - paragraph: A push variant holds 1 module, and this one is full.
+  - region "Push":
+    - heading "Push" [level=2]
+    - paragraph:
+      - text: push · draft ·
+      - link "Send…":
+        - /url: /manager/campaigns/9/variants/9/send
+    - region "Preview":
+      - generic: Rendering…
+      - button "Open preview"
+    - region "Brand profile":
+      - heading "Brand profile" [level=3]
+      - generic: Brand profile
+      - button "Newsletter Deutsch (default) · de Brand profile":
+        - generic: Newsletter Deutsch (default) · de
+      - combobox
+    - region "Notification":
+      - heading "Notification" [level=3]
+      - paragraph:
+        - text: Fields from
+        - 'link "“Gravel im Altmühltal: Eine Runde mit drei Abkürzungen”"':
+          - /url: /manager/content/1
+        - text: .
+        - button "Use another record"
+      - generic: Notification title (required)
+      - textbox "Notification title (required)": Gravelrunde im Altmühltal
+      - button "Personalise…"
+      - button "Change Notification title in catalogue"
+      - generic: Notification text (required)
+      - textbox "Notification text (required)": Das Planungsbeispiel umfasst 68 Kilometer, 700 Höhenmeter und drei mögliche Ausstiege.
+      - button "Personalise…"
+      - button "Change Notification text in catalogue"
+      - group "Notification image":
+        - paragraph:
+          - strong: Notification image
+        - generic: No image.
+        - paragraph:
+          - button "Change image…"
+          - button "Remove"
+      - button "Change Notification image in catalogue"
+      - generic: Opens this link
+      - textbox "Opens this link": https://www.grathaus.example/altmuehltal-gravelrunde-ausstiege
+      - button "Change Opens this link in catalogue"

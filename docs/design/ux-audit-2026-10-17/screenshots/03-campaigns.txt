@@ -1,0 +1,99 @@
+- complementary:
+  - generic: Omnichannel Orchestration Reference
+  - button "Collapse the navigation" [expanded]:
+  - generic: Brand
+  - button "Grathaus Outdoor Brand":
+    - generic: Brand
+    - generic: Grathaus Outdoor
+  - combobox
+  - navigation "Main":
+    - list:
+      - link "Approvals":
+        - /url: /manager/approvals
+        - generic: Approvals
+      - link "Campaigns" [active]:
+        - /url: /manager/campaigns
+        - generic: Campaigns
+      - link "Monitoring":
+        - /url: /manager/monitoring
+        - generic: Monitoring
+      - link "Content":
+        - /url: /manager/content
+        - generic: Content
+      - link "Audiences":
+        - /url: /manager/audiences
+        - generic: Audiences
+      - link "Recipients":
+        - /url: /manager/recipients
+        - generic: Recipients
+      - link "Deliveries":
+        - /url: /manager/deliveries
+        - generic: Deliveries
+      - link "Decision slots":
+        - /url: /manager/decision-slots
+        - generic: Decision slots
+      - link "Settings":
+        - /url: /manager/settings
+        - generic: Settings
+  - img "Initial admin": IA
+  - button "Sign out":
+    - generic: Sign out
+- main:
+  - region "Campaign list":
+    - heading "Campaigns" [level=1]
+    - button "New campaign"
+    - search:
+      - textbox "Find a campaign by name"
+      - button "Search"
+    - grid "Campaigns":
+      - row "Herbst in den Bergen / Autumn in the mountains":
+        - gridcell "Herbst in den Bergen / Autumn in the mountains draft 17.10.2026, 14:47:22":
+          - generic: Herbst in den Bergen / Autumn in the mountains
+          - generic: draft
+          - generic: 17.10.2026, 14:47:22
+      - row "Bestellbestätigung":
+        - gridcell "Bestellbestätigung draft 17.10.2026, 14:47:22":
+          - generic: Bestellbestätigung
+          - generic: draft
+          - generic: 17.10.2026, 14:47:22
+      - row "Testtag im Laden (Push)":
+        - gridcell "Testtag im Laden (Push) draft 17.10.2026, 14:47:22":
+          - generic: Testtag im Laden (Push)
+          - generic: draft
+          - generic: 17.10.2026, 14:47:22
+      - row "Neue Ausgabe":
+        - gridcell "Neue Ausgabe draft 17.10.2026, 14:47:22":
+          - generic: Neue Ausgabe
+          - generic: draft
+          - generic: 17.10.2026, 14:47:22
+      - row "Reparaturwoche":
+        - gridcell "Reparaturwoche draft 17.10.2026, 14:47:22":
+          - generic: Reparaturwoche
+          - generic: draft
+          - generic: 17.10.2026, 14:47:22
+      - row "Familienherbst":
+        - gridcell "Familienherbst draft 8.10.2026, 08:30:00":
+          - generic: Familienherbst
+          - generic: draft
+          - generic: 8.10.2026, 08:30:00
+      - row "Hüttensaison-Finale":
+        - gridcell "Hüttensaison-Finale draft 1.10.2026, 08:30:00":
+          - generic: Hüttensaison-Finale
+          - generic: draft
+          - generic: 1.10.2026, 08:30:00
+      - row "Herbstauftakt":
+        - gridcell "Herbstauftakt draft 3.9.2026, 08:30:00":
+          - generic: Herbstauftakt
+          - generic: draft
+          - generic: 3.9.2026, 08:30:00
+      - row "Einstieg Skitouren":
+        - gridcell "Einstieg Skitouren draft 13.1.2026, 07:30:00":
+          - generic: Einstieg Skitouren
+          - generic: draft
+          - generic: 13.1.2026, 07:30:00
+      - row "Winterstart 2025":
+        - gridcell "Winterstart 2025 draft 25.11.2025, 07:30:00":
+          - generic: Winterstart 2025
+          - generic: draft
+          - generic: 25.11.2025, 07:30:00
+  - paragraph: Select a campaign to see it.

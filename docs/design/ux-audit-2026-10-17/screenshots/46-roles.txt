@@ -1,0 +1,67 @@
+- log
+- log
+- complementary:
+  - generic: Omnichannel Orchestration Reference
+  - button "Collapse the navigation" [expanded]:
+  - generic: Brand
+  - button "Grathaus Outdoor Brand":
+    - generic: Brand
+    - generic: Grathaus Outdoor
+  - combobox
+  - navigation "Main":
+    - list:
+      - link "Approvals":
+        - /url: /manager/approvals
+        - generic: Approvals
+      - link "Campaigns":
+        - /url: /manager/campaigns
+        - generic: Campaigns
+      - link "Monitoring":
+        - /url: /manager/monitoring
+        - generic: Monitoring
+      - link "Content":
+        - /url: /manager/content
+        - generic: Content
+      - link "Audiences":
+        - /url: /manager/audiences
+        - generic: Audiences
+      - link "Recipients":
+        - /url: /manager/recipients
+        - generic: Recipients
+      - link "Deliveries":
+        - /url: /manager/deliveries
+        - generic: Deliveries
+      - link "Decision slots":
+        - /url: /manager/decision-slots
+        - generic: Decision slots
+      - link "Settings":
+        - /url: /manager/settings
+        - generic: Settings
+  - img "Initial admin": IA
+  - button "Sign out":
+    - generic: Sign out
+- main:
+  - region "Role list":
+    - link "Settings":
+      - /url: /manager/settings
+      - text: Settings
+    - heading "Roles" [level=1]
+    - button "New role"
+    - paragraph: A role is a set of permissions; a person holds a role on a brand. Every role can read.
+    - grid "Roles":
+      - row "Admin":
+        - gridcell "Admin Shipped · 18 permissions 2 people":
+          - generic: Admin
+          - generic: Shipped · 18 permissions
+          - generic: 2 people
+      - row "Manager":
+        - gridcell "Manager Shipped · 9 permissions 2 people":
+          - generic: Manager
+          - generic: Shipped · 9 permissions
+          - generic: 2 people
+      - row "Viewer":
+        - gridcell "Viewer Shipped · 1 permission 1 person":
+          - generic: Viewer
+          - generic: Shipped · 1 permission
+          - generic: 1 person
+  - paragraph: Select a role to see its permissions.

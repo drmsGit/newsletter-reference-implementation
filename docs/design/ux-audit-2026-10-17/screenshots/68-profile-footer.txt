@@ -1,0 +1,159 @@
+- complementary:
+  - generic: Omnichannel Orchestration Reference
+  - button "Collapse the navigation" [expanded]:
+  - generic: Brand
+  - button "Grathaus Outdoor Brand":
+    - generic: Brand
+    - generic: Grathaus Outdoor
+  - combobox
+  - navigation "Main":
+    - list:
+      - link "Approvals":
+        - /url: /manager/approvals
+        - generic: Approvals
+      - link "Campaigns":
+        - /url: /manager/campaigns
+        - generic: Campaigns
+      - link "Monitoring":
+        - /url: /manager/monitoring
+        - generic: Monitoring
+      - link "Content":
+        - /url: /manager/content
+        - generic: Content
+      - link "Audiences":
+        - /url: /manager/audiences
+        - generic: Audiences
+      - link "Recipients":
+        - /url: /manager/recipients
+        - generic: Recipients
+      - link "Deliveries":
+        - /url: /manager/deliveries
+        - generic: Deliveries
+      - link "Decision slots":
+        - /url: /manager/decision-slots
+        - generic: Decision slots
+      - link "Settings":
+        - /url: /manager/settings
+        - generic: Settings
+  - img "Initial admin": IA
+  - button "Sign out":
+    - generic: Sign out
+- main:
+  - region "Brand profile list":
+    - link "Settings":
+      - /url: /manager/settings
+      - text: Settings
+    - heading "Brand profiles" [level=1]
+    - button "New profile"
+    - paragraph: A profile is one look of this brand for its emails, with the legal details every email carries. Each variant picks one; new variants start on the default.
+    - grid "Brand profiles":
+      - row "Newsletter Deutsch" [selected]:
+        - gridcell "Newsletter Deutsch Default · de · marketing Complete":
+          - generic: Newsletter Deutsch
+          - generic: Default · de · marketing
+          - generic: Complete
+      - row "Newsletter English":
+        - gridcell "Newsletter English en · marketing Complete":
+          - generic: Newsletter English
+          - generic: en · marketing
+          - generic: Complete
+      - row "Service-Mails":
+        - gridcell "Service-Mails de · transactional Complete":
+          - generic: Service-Mails
+          - generic: de · transactional
+          - generic: Complete
+  - form "Newsletter Deutsch":
+    - heading "Newsletter Deutsch" [level=2]
+    - paragraph: Default profile · marketing · de
+    - group "Profile":
+      - generic: Profile
+      - generic: Name
+      - textbox "Name": Newsletter Deutsch
+      - generic: Language
+      - textbox "Language": de
+      - generic: The language its texts are in, such as en or de. One profile per language.
+      - generic: Kind
+      - 'button "Marketing: needs an opt-in Kind"':
+        - generic: "Marketing: needs an opt-in"
+      - combobox
+    - group "Legal details":
+      - generic: Legal details
+      - generic: Legal company name (required to send)
+      - textbox "Legal company name (required to send)": Grathaus Outdoor GmbH (Demo)
+      - generic: Address (required to send)
+      - textbox "Address (required to send)": Beispielstraße 12 80331 München
+      - generic: Imprint link (required to send)
+      - textbox "Imprint link (required to send)": https://www.grathaus.example/impressum
+      - generic: A full address starting with https://.
+      - generic: Privacy link (required to send)
+      - textbox "Privacy link (required to send)": https://www.grathaus.example/datenschutz
+      - generic: A full address starting with https://.
+    - group "Unsubscribe":
+      - generic: Unsubscribe
+      - generic: Unsubscribe wording (required to send)
+      - textbox "Unsubscribe wording (required to send)": Abmelden
+    - group "Link tracking":
+      - generic: Link tracking
+      - generic: UTM source
+      - textbox "UTM source"
+      - generic: UTM medium
+      - textbox "UTM medium"
+      - generic: Further link parameters
+      - textbox "Further link parameters"
+    - group "Look":
+      - generic: Look
+      - generic: Text colour
+      - textbox "Text colour"
+      - generic: "A colour as #rgb or #rrggbb, for example #1a5db0."
+      - generic: Body text colour
+      - textbox "Body text colour"
+      - generic: "A colour as #rgb or #rrggbb, for example #1a5db0."
+      - generic: Button colour
+      - textbox "Button colour"
+      - generic: "A colour as #rgb or #rrggbb, for example #1a5db0."
+      - generic: Button text colour
+      - textbox "Button text colour"
+      - generic: "A colour as #rgb or #rrggbb, for example #1a5db0."
+      - generic: Hero background
+      - textbox "Hero background"
+      - generic: "A colour as #rgb or #rrggbb, for example #1a5db0."
+      - generic: Font
+      - textbox "Font"
+      - generic: A font list with a safe fallback, for example Georgia, serif.
+      - generic: Headline size
+      - textbox "Headline size"
+      - generic: With its unit, for example 16px.
+      - generic: Body text size
+      - textbox "Body text size"
+      - generic: With its unit, for example 16px.
+      - generic: Button corner radius
+      - textbox "Button corner radius"
+      - generic: With its unit, for example 16px.
+    - group "Header":
+      - generic: Header
+      - group "Logo":
+        - paragraph:
+          - strong: Logo
+        - generic: No image.
+        - paragraph:
+          - button "Choose image…"
+      - generic: Logo links to
+      - textbox "Logo links to"
+      - generic: A full address starting with https://.
+      - generic: Menu links
+      - textbox "Menu links"
+      - generic: One link per line, written Label | https://address, in the order they should appear.
+    - group "Footer":
+      - generic: Footer
+      - generic: Footer links
+      - textbox "Footer links"
+      - generic: One link per line, written Label | https://address, in the order they should appear.
+      - generic: Service hotline
+      - textbox "Service hotline"
+      - generic: Footer text
+      - textbox "Footer text"
+    - paragraph:
+      - button "Save" [disabled]
+    - region "Profile actions":
+      - heading "Profile actions" [level=3]
+      - button "Duplicate"

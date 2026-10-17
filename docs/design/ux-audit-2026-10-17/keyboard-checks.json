@@ -1,0 +1,24 @@
+{
+  "passed": [
+    "Enter selected campaign, record, audience, profile, recipient, delivery, role and expression rows",
+    "ArrowDown focuses personalisation menu item",
+    "ArrowRight selects image picker Upload new tab",
+    "Escape closes preview, menu, image picker and create dialogs",
+    "Cancel then Tab wraps focus to first input in populated New record dialog",
+    "Escape restores focus to New record",
+    "Question mark typed into unsaved Title stays text and does not open shortcuts",
+    "Slash focuses campaign search outside dialog",
+    "p opens Push preview; Escape returns to shortcut origin",
+    "Active main navigation exposes aria-current=page",
+    "English document language exposed"
+  ],
+  "failed": [
+    "g then c from Close in Keyboard shortcuts navigates Settings to Campaigns while dialog remains open",
+    "No aria-keyshortcuts attributes on sampled campaign and variant controls"
+  ],
+  "limits": [
+    "Slash from New campaign Cancel did not move focus outside dialog; do not generalize shortcut navigation defect to a proven focus escape",
+    "No screen reader audio tested",
+    "No saved edits, sends, approvals, credential operations or permission changes performed"
+  ]
+}

@@ -1,0 +1,130 @@
+- log:
+  - generic: Manager ausgewählt.
+- log
+- complementary:
+  - generic: Omnichannel Orchestration Reference
+  - button "Collapse the navigation" [expanded]:
+  - generic: Brand
+  - button "Grathaus Outdoor Brand":
+    - generic: Brand
+    - generic: Grathaus Outdoor
+  - combobox
+  - navigation "Main":
+    - list:
+      - link "Approvals":
+        - /url: /manager/approvals
+        - generic: Approvals
+      - link "Campaigns":
+        - /url: /manager/campaigns
+        - generic: Campaigns
+      - link "Monitoring":
+        - /url: /manager/monitoring
+        - generic: Monitoring
+      - link "Content":
+        - /url: /manager/content
+        - generic: Content
+      - link "Audiences":
+        - /url: /manager/audiences
+        - generic: Audiences
+      - link "Recipients":
+        - /url: /manager/recipients
+        - generic: Recipients
+      - link "Deliveries":
+        - /url: /manager/deliveries
+        - generic: Deliveries
+      - link "Decision slots":
+        - /url: /manager/decision-slots
+        - generic: Decision slots
+      - link "Settings":
+        - /url: /manager/settings
+        - generic: Settings
+  - img "Initial admin": IA
+  - button "Sign out":
+    - generic: Sign out
+- main:
+  - region "Role list":
+    - link "Settings":
+      - /url: /manager/settings
+      - text: Settings
+    - heading "Roles" [level=1]
+    - button "New role"
+    - paragraph: A role is a set of permissions; a person holds a role on a brand. Every role can read.
+    - grid "Roles":
+      - row "Admin":
+        - gridcell "Admin Shipped · 18 permissions 2 people":
+          - generic: Admin
+          - generic: Shipped · 18 permissions
+          - generic: 2 people
+      - row "Manager" [active] [selected]:
+        - gridcell "Manager Shipped · 9 permissions 2 people":
+          - generic: Manager
+          - generic: Shipped · 9 permissions
+          - generic: 2 people
+      - row "Viewer":
+        - gridcell "Viewer Shipped · 1 permission 1 person":
+          - generic: Viewer
+          - generic: Shipped · 1 permission
+          - generic: 1 person
+  - heading "Manager" [level=2]
+  - paragraph: Shipped with the platform · held by 2 people
+  - region "Permissions":
+    - heading "Permissions" [level=3]
+    - 'group "Per brand: held on the brand the role is given on"':
+      - generic: "Per brand: held on the brand the role is given on"
+      - checkbox "campaigns.manage — Create and edit campaigns, variants and modules" [checked]
+      - code: campaigns.manage
+      - text: — Create and edit campaigns, variants and modules
+      - checkbox "content.manage — Create and edit content records and categories" [checked]
+      - code: content.manage
+      - text: — Create and edit content records and categories
+      - checkbox "audiences.manage — Create and edit audience groups and rules" [checked]
+      - code: audiences.manage
+      - text: — Create and edit audience groups and rules
+      - checkbox "sends.execute — Plan and trigger sends, including real ones" [checked]
+      - code: sends.execute
+      - text: — Plan and trigger sends, including real ones
+      - checkbox "audiences.pin — Add and remove individual audience members" [checked]
+      - code: audiences.pin
+      - text: — Add and remove individual audience members
+      - checkbox "sends.plan — Prepare a send — snapshot and send instance — without firing it" [checked]
+      - code: sends.plan
+      - text: — Prepare a send — snapshot and send instance — without firing it
+      - checkbox "recipients.consent — Record a consent decision for a recipient"
+      - code: recipients.consent
+      - text: — Record a consent decision for a recipient
+      - checkbox "overrides.manage — Override a system content pick, and reset one" [checked]
+      - code: overrides.manage
+      - text: — Override a system content pick, and reset one
+      - 'checkbox "brand_profiles.manage — Create and edit a brand''s profiles: look, texts and legal details"'
+      - code: brand_profiles.manage
+      - text: "— Create and edit a brand's profiles: look, texts and legal details"
+      - checkbox "brand_profiles.transactional — Create or mark a transactional brand profile, sent without the opt-in check"
+      - code: brand_profiles.transactional
+      - text: — Create or mark a transactional brand profile, sent without the opt-in check
+    - 'group "Everywhere: held on every brand at once"':
+      - generic: "Everywhere: held on every brand at once"
+      - checkbox "view — See dashboards, campaigns, signals and delivery history" [checked] [disabled]
+      - code: view
+      - text: — See dashboards, campaigns, signals and delivery history
+      - checkbox "ai.run — Run AI tasks, which spends against the token budget" [checked]
+      - code: ai.run
+      - text: — Run AI tasks, which spends against the token budget
+      - checkbox "settings.manage — Change tunable settings, budgets and AI prompts"
+      - code: settings.manage
+      - text: — Change tunable settings, budgets and AI prompts
+      - checkbox "users.manage — Invite users, assign roles, deactivate accounts"
+      - code: users.manage
+      - text: — Invite users, assign roles, deactivate accounts
+      - checkbox "credentials.manage — Set provider and model credentials (write-only)"
+      - code: credentials.manage
+      - text: — Set provider and model credentials (write-only)
+      - checkbox "recipients.manage — Create and edit recipients"
+      - code: recipients.manage
+      - text: — Create and edit recipients
+      - checkbox "insight.write — Write engagement events into the signal layer"
+      - code: insight.write
+      - text: — Write engagement events into the signal layer
+      - checkbox "integrations.manage — Issue, rotate and revoke machine credentials"
+      - code: integrations.manage
+      - text: — Issue, rotate and revoke machine credentials
+    - button "Save permissions" [disabled]
