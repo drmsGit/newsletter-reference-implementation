@@ -762,13 +762,6 @@ table tbody tr:last-child td { border-bottom: 0; }
   flex-wrap: wrap;
 }
 
-.field textarea {
-  font: inherit;
-  padding: var(--brand-space);
-  border: 1px solid var(--brand-line);
-  border-radius: var(--brand-radius);
-}
-
 .field-error {
   color: var(--brand-danger);
   margin: 0;
