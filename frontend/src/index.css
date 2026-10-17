@@ -171,6 +171,11 @@ button {
   /* In a column (a field, a form) a button keeps its own width. */
   align-self: flex-start;
 }
+/* In a row that lines a field and its button up at the end, the button
+   follows the row and sits level with the field's control, not its label
+   (task-392 items 5 and 12). */
+:is(.filters, .pager, .add-module, .create-form, .inline-form, .bind__filters, .record-duplicate,
+  .assignment, .assignment-add, .image-library__filters) > button { align-self: auto; }
 button[data-hovered] { background: var(--brand-surface-2); }
 button[data-pressed] { background: var(--brand-line); }
 button[data-disabled],
@@ -1612,6 +1617,7 @@ table.working tr.row-total th, table.working tr.row-total td { font-weight: 600;
 .card-rows > .react-aria-Table, .card-rows > .fact-list { padding: 0; }
 .card-rows .inline-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
 .card-rows .inline-form .react-aria-Select { flex: 1 1 12rem; }
+.brand-list .inline-form > .react-aria-TextField { flex: 1 1 12rem; }
 .card-rows .row-title { margin: 0 0 6px; font-size: 13px; line-height: 18px; font-weight: 600; }
 .link-list { list-style: none; margin: 0; padding: 0; }
 .card-rows > .link-list { padding: 12px 16px; }
