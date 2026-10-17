@@ -4,7 +4,7 @@ title: Small details the finished design left open
 status: To Do
 assignee: []
 created_date: '2026-10-17 13:31'
-updated_date: '2026-10-17 19:32'
+updated_date: '2026-10-17 19:37'
 labels:
   - frontend
 dependencies: []
@@ -57,7 +57,7 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 - [x] #3 A catalogue field's hide switch and Change in catalogue share one line as in render 21
 - [x] #4 Performance on the record page uses fact rows
 - [x] #5 The Duplicate button and its pulldown share a baseline
-- [ ] #6 The rich-text hint promises only what the email renders, or the renderer formats italic and bullet lines as the hint says
+- [x] #6 The rich-text hint promises only what the email renders, or the renderer formats italic and bullet lines as the hint says
 - [x] #7 The image picker's cards show their whole thumbnail and title, without overlapping the rows or the filters
 - [x] #8 New record and New audience use the dialog form and DialogActions: heading on its own row, full-width fields, Cancel then Create
 - [x] #9 Multi-line fields have the same strong field border as inputs
@@ -111,4 +111,6 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 2026-10-17: item 3 fixed: CatalogueField takes hideSwitch and renders a .field-foot (switch or Back to the catalogue value on the left, Change in catalogue as btn-plain at the right); index.css .field-foot. Tests in CatalogueModule.test.tsx (switch and link share the foot; Back and link share it), mutation-checked on the link style and the switch placement; the task-261 typing test still passes. Live on Familienherbst, Hero Banner: switch at the left, link at the right edge on each hideable field; Link alone at the right.
 
 2026-10-17: item 4 fixed: ContentFigures' Performance renders Fact rows in a fact-list, and figureColumns are numeric (so the category detail and graph tables right-align too). Test in ContentFigures.test.tsx, mutation-checked on a fact and a column. Live on record 98: facts at the card inset, figure headers and cells right-aligned. Left for later, not in this item: dl.facts is still used at ContentDetail.tsx:173 and :422, DecisionSlotDetail.tsx:163, Translations.tsx:41, CategoryGraph.tsx:168 and ImageField.tsx:299.
+
+2026-10-17: item 6 decided by the user (make the email render italics and bullets) and done: render_rich_text in backend/app/rendering/service.py now formats *italic* (one asterisk touching the words, so 5 * 3 * 2 stays) and groups consecutive lines starting with - and a space into one ul with inline spacing; strip_rich_text drops italics for push and keeps the dashes. Escaping first, unchanged. Tests backend/tests/test_rich_text.py, mutation-checked (italics, list grouping). The demo content holds no italics or bullet lines, so nothing in it renders differently. Not checked in an email preview: that would need formatted text written into a variant's content.
 <!-- SECTION:NOTES:END -->
