@@ -205,6 +205,7 @@ describe('the audience list (task-297)', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Suggest from campaign' }))
     const dialog = await screen.findByRole('dialog')
     fireEvent.change(within(dialog).getByLabelText(/Campaign/), { target: { value: 'spring' } })
+    expect([...dialog.querySelector('.dialog-actions')!.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Cancel'])
     fireEvent.click(await within(dialog).findByRole('button', { name: 'Spring edition' }))
     expect(await screen.findByRole('heading', { name: 'Spring travellers' })).toBeInTheDocument()
     expect(last(s)).toMatchObject({ path: '/api/audience-groups/suggested', body: { campaign_id: 77 } })
@@ -444,6 +445,24 @@ describe('the audience page is the editor (task-297)', () => {
       path: '/api/audience-groups/3/members/paste', ifMatch: T(1), body: { text: 'a, b c\ncrm-nobody', reason: 'Fair list' },
     }))
     expect(await screen.findByText(/Added 2/)).toBeInTheDocument()
+  })
+
+  it("keeps the dialogs' actions at their foot: Cancel, then the one action (task-392 item 14)", async () => {
+    const foot = (dialog: HTMLElement) =>
+      [...(dialog.querySelector('.dialog-actions')?.querySelectorAll('button') ?? [])].map((b) => b.textContent)
+    const s = server()
+    open(s)
+    fireEvent.click(await screen.findByRole('button', { name: 'Paste people' }))
+    const paste = await screen.findByRole('dialog')
+    expect(foot(paste)).toEqual(['Cancel', 'Check'])
+    fireEvent.change(within(paste).getByLabelText(/Identifiers or email addresses/), { target: { value: 'a, b c\ncrm-nobody' } })
+    fireEvent.click(within(paste).getByRole('button', { name: 'Check' }))
+    await within(paste).findByText('2 will be added, 1 already in.')
+    expect(foot(paste)).toEqual(['Cancel', 'Add 2'])
+    fireEvent.click(within(paste).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete audience' }))
+    expect(foot(await screen.findByRole('alertdialog'))).toEqual(['Cancel', 'Delete'])
   })
 
   it('deletes an unused audience after confirmation and goes back to the list', async () => {

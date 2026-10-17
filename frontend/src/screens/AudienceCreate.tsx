@@ -111,8 +111,8 @@ export function SuggestFromCampaign() {
               ))}
               {campaigns.data?.items.length === 0 && <li className="muted">No campaign matches.</li>}
             </ul>
-            <Button onPress={() => setOpen(false)}>Cancel</Button>
             {suggest.isError && <p role="alert">{refusal(suggest.error, 'create an audience')}</p>}
+            <DialogActions onCancel={() => setOpen(false)} />
           </Dialog>
         </Modal>
       </ModalOverlay>

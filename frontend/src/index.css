@@ -1078,7 +1078,6 @@ table tbody tr:last-child td { border-bottom: 0; }
   width: min(32rem, 95vw);
   max-height: 85vh;
   overflow: auto;
-  padding: calc(var(--brand-space) * 2);
 }
 
 .shortcuts {
@@ -1215,7 +1214,6 @@ table.working tr.row-total th, table.working tr.row-total td { font-weight: 600;
   width: min(64rem, 95vw);
   max-height: 92vh;
   overflow: auto;
-  padding: calc(var(--brand-space) * 2);
 }
 
 .image-library {

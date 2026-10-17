@@ -11,6 +11,7 @@ import {
   type AudienceGroupMember,
 } from '../api/resources'
 import { HttpError } from '../api/session'
+import { DialogActions } from '../components/NewDialog'
 import DataTable from '../components/DataTable'
 import DetailSection from '../components/DetailSection'
 import { SaveState } from '../components/EditorFields'
@@ -192,9 +193,6 @@ function PastePeople({
               <Label>Reason (optional)</Label>
               <Input />
             </TextField>
-            <Button isDisabled={!text.trim() || check.isPending} onPress={() => check.mutate({ text, channel })}>
-              Check
-            </Button>
             {check.isError && (
               <p role="alert">{(check.error instanceof HttpError && check.error.detail) || 'The list could not be checked.'}</p>
             )}
@@ -218,6 +216,13 @@ function PastePeople({
                     </ul>
                   </>
                 )}
+              </div>
+            )}
+            <SaveState mutation={apply} what="this audience" reload={reload} />
+            {/* One action at the foot: Check, then Add N once the list is checked
+                (task-392 item 14; render 45's Cancel and action). */}
+            <DialogActions onCancel={close}>
+              {report ? (
                 <Button
                   isDisabled={report.to_add === 0 || apply.isPending}
                   onPress={() =>
@@ -236,12 +241,12 @@ function PastePeople({
                 >
                   Add {report.to_add}
                 </Button>
-              </div>
-            )}
-            <SaveState mutation={apply} what="this audience" reload={reload} />
-            <p>
-              <Button onPress={close}>Cancel</Button>
-            </p>
+              ) : (
+                <Button isDisabled={!text.trim() || check.isPending} onPress={() => check.mutate({ text, channel })}>
+                  Check
+                </Button>
+              )}
+            </DialogActions>
           </Dialog>
         </Modal>
       </ModalOverlay>

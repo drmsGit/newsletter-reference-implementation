@@ -122,10 +122,10 @@ function Keys({ integration }: { integration: Integration }) {
                 <Heading slot="title">The new key</Heading>
                 <p><strong>This is the only time it is shown.</strong> Store it in the calling system now; it cannot be seen again.</p>
                 <p><code className="secret">{secret}</code></p>
-                <p>
-                  <Button onPress={() => void navigator.clipboard?.writeText(secret ?? '')}>Copy</Button>{' '}
+                <div className="dialog-actions">
+                  <Button onPress={() => void navigator.clipboard?.writeText(secret ?? '')}>Copy</Button>
                   <Button onPress={close}>I have stored it</Button>
-                </p>
+                </div>
               </>
             )}
           </Dialog>

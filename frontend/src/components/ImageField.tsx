@@ -125,9 +125,10 @@ export default function ImageField({
       )}
       <ModalOverlay isOpen={open} onOpenChange={setOpen} isDismissable className="preview-overlay">
         <Modal className="image-modal">
-          <Dialog aria-label={`Choose an image: ${label}`}>
+          <Dialog className="react-aria-Dialog sheet">
             {({ close }) => (
               <Picker
+                label={label}
                 current={value}
                 alt={alt}
                 onUse={(chosen, chosenAlt) => {
@@ -152,11 +153,13 @@ function refused(error: unknown) {
 
 /** The pop-in: the library, or a new upload, or an outside address. */
 function Picker({
+  label,
   current,
   alt,
   onUse,
   onClose,
 }: {
+  label: string
   current: string
   alt?: string
   onUse: (value: string, alt?: string) => void
@@ -164,11 +167,12 @@ function Picker({
 }) {
   return (
     <>
-      <div className="preview-head">
-        <Heading slot="title">Choose an image</Heading>
+      {/* A sheet (render 43): its title and Close on a bar, as the preview's. */}
+      <div className="sheet-head">
+        <Heading slot="title">Choose an image: {label}</Heading>
         <Button onPress={onClose}>Close</Button>
       </div>
-      <Tabs>
+      <Tabs className="react-aria-Tabs sheet-body">
         <TabList aria-label="Where the image comes from">
           <Tab id="library">Library</Tab>
           <Tab id="upload">Upload new</Tab>

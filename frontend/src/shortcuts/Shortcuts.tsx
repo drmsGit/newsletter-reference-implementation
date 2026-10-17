@@ -172,11 +172,12 @@ function ShortcutsOverlay({
   return (
     <ModalOverlay isOpen={open} onOpenChange={onOpenChange} isDismissable className="preview-overlay">
       <Modal className="shortcuts-modal">
-        <Dialog aria-label="Keyboard shortcuts">
-          <div className="preview-head">
+        <Dialog className="react-aria-Dialog sheet">
+          <div className="sheet-head">
             <Heading slot="title">Keyboard shortcuts</Heading>
             <Button onPress={() => onOpenChange(false)}>Close</Button>
           </div>
+          <div className="sheet-body">
           {ORDER.map((group) => {
             const rows = all.filter((e) => e.group === group)
             if (rows.length === 0) return null
@@ -201,6 +202,7 @@ function ShortcutsOverlay({
               </section>
             )
           })}
+          </div>
         </Dialog>
       </Modal>
     </ModalOverlay>

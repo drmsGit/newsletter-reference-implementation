@@ -19,6 +19,7 @@ import DataTable from '../components/DataTable'
 import DetailSection from '../components/DetailSection'
 import { AutosaveField, SaveState, fieldError } from '../components/EditorFields'
 import Fact from '../components/Fact'
+import { DialogActions } from '../components/NewDialog'
 import { SearchBox, useSearch } from '../components/RecipientSearch'
 import ScreenState from '../components/ScreenState'
 import AudiencePeople, { PEOPLE_PAGE } from './AudiencePeople'
@@ -173,13 +174,14 @@ function Delete({ group, reload }: { group: AudienceGroup; reload: () => void })
             ) : (
               <SaveState mutation={remove} what="this audience" reload={reload} />
             )}
-            <Button
-              isDisabled={remove.isPending || inUse}
-              onPress={() => remove.mutate(undefined, { onSuccess: () => navigate('/audiences') })}
-            >
-              Delete
-            </Button>{' '}
-            <Button onPress={() => setOpen(false)}>Cancel</Button>
+            <DialogActions onCancel={() => setOpen(false)}>
+              <Button
+                isDisabled={remove.isPending || inUse}
+                onPress={() => remove.mutate(undefined, { onSuccess: () => navigate('/audiences') })}
+              >
+                Delete
+              </Button>
+            </DialogActions>
           </Dialog>
         </Modal>
       </ModalOverlay>

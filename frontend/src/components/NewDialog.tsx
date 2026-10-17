@@ -34,8 +34,8 @@ export default function NewDialog({
   )
 }
 
-/** Cancel and the form's submit, at the dialog's foot. */
-export function DialogActions({ onCancel, children }: { onCancel: () => void; children: ReactNode }) {
+/** Cancel and the form's submit, at the dialog's foot; Cancel alone where nothing is submitted. */
+export function DialogActions({ onCancel, children }: { onCancel: () => void; children?: ReactNode }) {
   return (
     <div className="dialog-actions">
       <Button onPress={onCancel}>Cancel</Button>

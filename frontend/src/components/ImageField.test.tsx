@@ -71,6 +71,15 @@ describe('an image field (task-112; ADR-197)', () => {
     expect(screen.queryByLabelText(/Replace the file/)).not.toBeInTheDocument()
   })
 
+  it('opens as a sheet, its title and Close on the bar (task-392 item 14; render 43)', async () => {
+    open('')
+    fireEvent.click(screen.getByRole('button', { name: /(Choose|Change) image/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Choose an image: Image' })
+    const bar = within(dialog).getByRole('heading', { name: 'Choose an image: Image' }).parentElement!
+    expect(bar).toHaveClass('sheet-head')
+    expect(within(bar).getByRole('button', { name: 'Close' })).toBeInTheDocument()
+  })
+
   it('picks from the library in a pop-in, checking the image before using it', async () => {
     const { onChange } = open('')
     const dialog = await openPicker()

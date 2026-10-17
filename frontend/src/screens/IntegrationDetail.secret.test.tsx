@@ -38,6 +38,9 @@ it('forgets an issued secret from client caches when its dialog closes (task-358
     fireEvent.click(await screen.findByRole('button', { name: 'Issue a key' }))
     const dialog = await screen.findByRole('dialog', { name: 'The new key' })
     expect(within(dialog).getByText(secret)).toBeInTheDocument()
+    // Its two actions at its foot, the closing one last (task-392 item 14).
+    expect([...dialog.querySelector('.dialog-actions')!.querySelectorAll('button')].map((b) => b.textContent))
+      .toEqual(['Copy', 'I have stored it'])
     fireEvent.click(within(dialog).getByRole('button', { name: 'I have stored it' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.queryByText(secret)).not.toBeInTheDocument()

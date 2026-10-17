@@ -37,6 +37,15 @@ describe('keyboard shortcuts (task-266)', () => {
     expect(within(here).getByText('Find a campaign')).toBeInTheDocument()
   })
 
+  it('shows the overview as a sheet, its title and Close on the bar (task-392 item 14)', async () => {
+    app()
+    press('?')
+    const overview = await screen.findByRole('dialog', { name: 'Keyboard shortcuts' })
+    const bar = within(overview).getByRole('heading', { name: 'Keyboard shortcuts' }).parentElement!
+    expect(bar).toHaveClass('sheet-head')
+    expect(within(bar).getByRole('button', { name: 'Close' })).toBeInTheDocument()
+  })
+
   it('g then a letter goes to that screen', async () => {
     app()
     press('g')
