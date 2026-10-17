@@ -8,7 +8,9 @@ created: 2026-10-17
 
 The creative brief for a 3 to 5 minute product trailer. It is read together with [[STORYBOARD]] (every scene), [[VOICEOVER]] (both narration scripts) and `storyboard.html` (the same scenes as a visual board).
 
-**Status, 2026-10-17.** Nothing is built. This brief was made from the architecture decision records, the business documents, the design handoff and the live captures of the demo, and from an interview with Diede on the same day. The decisions in section 2 are Diede's. The scene content, the narration and the claim ledger are Claude's draft and have not been reviewed scene by scene. The point of the brief is that the later build needs little feedback: everything the build needs to know is here or in the storyboard, and what must be checked first is in section 15.
+**Status, 2026-10-17.** Nothing is built. This brief was made from the architecture decision records, the business documents, the design handoff and the live captures of the demo, and from an interview with Diede on the same day. The decisions in section 2 are Diede's. The scene content, the narration and the claim ledger are Claude's draft and have not been reviewed scene by scene. The point of the brief is that the later build needs little feedback: everything the build needs to know is here or in the storyboard, and what had to be checked first is in section 15.
+
+**Update, 2026-10-17, later the same day.** The checks of section 15 were run on scratch data ([[PREPRODUCTION-CHECKS]]) and this brief was corrected from what they found: scenes S01 and S07 to S16 in [[STORYBOARD]], the narration of S07, S09 and S10, the known flaws in section 8, the claim ledger in section 11 and the four drops in section 12. Two of the corrections are Claude's choices, not Diede's, and can be reversed: they are listed at the end of section 16.
 
 ## 1. The film in one sentence
 
@@ -91,12 +93,18 @@ About 380 spoken words, roughly 2:45 of speech, so more than a third of the film
 
 **Known flaws of the demo that a frame must not inherit.**
 
-- The unsubscribe link in "As sent" points at `http://localhost:8000/`. Redraw it with the neutral demo address.
-- "As sent" shows two notices about changed templates in the captured data. Re-capture after a fresh reset, or redraw without them.
-- The demo AI is a mock that returns placeholder text. Write believable suggestions, but keep the app's own provenance line ("Example provider", the prompt version) on screen so the film does not pretend to a real model.
-- Approvals is empty after a reset. It needs seeding before it can be shown.
-- Sent campaigns still carry the status "draft" in the list. Redraw the status as Sent.
-- Not built in the live app and not to be drawn as if they were: drag handles in the preview sheet, the P-key hint chip on "Open preview", search boxes on lists without server search.
+Verified present or absent on a fresh scratch reset ([[PREPRODUCTION-CHECKS]], section 6).
+
+- The unsubscribe link in "As sent" points at `http://localhost:8000/unsubscribe/<token>` (`PUBLIC_BASE_URL` is unset). Still present. Redraw it with a neutral demo address.
+- "As sent" shows two notices about changed templates only when the template folder changed after the send. After a fresh reset they are gone; any change in `storage/modules/email/`, a drop included, brings them back. Capture "As sent" before the first drop. S10 comes before S13 in the film, so the story order is already right.
+- The demo AI is a mock ("Mock subject 1 — Mock preheader 1", provenance `mock-1`), and on a fresh reset it does not run at all until a prompt is published in Settings. The caution line "Suggestions can be wrong. Check the subject before you use it." and the words "Example provider" exist only in the design canvases, not in the app. A frame that shows believable suggestions is a drawing and is marked as one in the shot notes.
+- Approvals is empty after a reset. The seed script (`backend/scripts/seed_pending_actions.py`) makes only "Send a prepared campaign" requests, from the integration "Acme Agency (demo)", and needs a planned draft send first.
+- Sent campaigns still carry the status "draft" in the list and on the campaign page. Redraw the status as Sent.
+- **No reader is excluded for consent or suppression anywhere in the demo**, and the one reader who unsubscribed stays reachable, because the seed writes the unsubscribe before the opt-in. The film cannot draw an exclusion from the demo.
+- The dated fields ("Last pick", "Updated" on drafts) show the reset's clock, while sent campaigns carry fixed dates. Choose the reset date on purpose and do not reset again after the captures.
+- Readers whose language is English can be among the recipients of the German email (reader #4). None of the three readers of S07 is affected.
+- The app shows 122 delivered where the reset script prints 123. Say "readers" or "recipients", never "delivered".
+- Not built in the live app and not to be drawn as if they were: drag handles in the preview sheet, the P-key hint chip on "Open preview", search boxes on lists without server search (only Campaigns, Recipients and Audiences have one).
 - The category Graph is the weak screen (overlapping labels, all-green circles). It is not in the film.
 - Phone and tablet layouts, and dark mode for screens 20 to 45, are not designed. The film is desktop only. The developer world's dark look is the editor and terminal, not the app in dark mode.
 
@@ -132,7 +140,7 @@ About 380 spoken words, roughly 2:45 of speech, so more than a third of the film
 
 ## 11. Claim ledger
 
-The positioning rule is that a claim must be demonstrable in the repository ([[POSITIONING]], rule 2): an accepted ADR shows a design, not a capability. Each line below rests on the sweeps of 2026-10-17, which read the code behind the decision records. "Not run" means read from the code and not yet performed on a scratch copy; section 15 lists what has to be run first.
+The positioning rule is that a claim must be demonstrable in the repository ([[POSITIONING]], rule 2): an accepted ADR shows a design, not a capability. Each line below rests on the sweeps of 2026-10-17, which read the code behind the decision records. The file drops and the demo numbers were run on a scratch copy on 2026-10-17; the results are in [[PREPRODUCTION-CHECKS]].
 
 ### Safe to show or say
 
@@ -140,15 +148,15 @@ The positioning rule is that a claim must be demonstrable in the repository ([[P
 |---|---|---|
 | Content is written once and referenced, never copied | [[ADR-012 — Content Records Represent Communication Units]], [[ADR-030 — Separate Global and Repeatable Structures]] | Within one brand. Across brands content is copied. |
 | An edit in a campaign changes that campaign; changing the shared library is a deliberate click | [[ADR-040 — Introduce Override Layer]], [[ADR-041 — Override Precedence]], [[ADR-186 — In the Composer an Override Is the Default and a Catalogue Edit Is Explicit]] | |
-| A decision slot picks per reader, from approved content, and the pick is explainable | [[ADR-083 — Personalization Happens Inside Variants Through Decision Slots]], [[ADR-084 — Decision Slots May Resolve One or Multiple Content Records]], [[ADR-085 — Decision Resolution Should Be Optionally Explainable]], [[ADR-127 — Decision Execution May Use Recipient Context]] | Built: up to five picks per slot, ranked, the empty-send floor. Not built: minimum items and fallback content. |
+| A decision slot picks per reader, from content a person has marked ready and published, and the pick is explainable | [[ADR-083 — Personalization Happens Inside Variants Through Decision Slots]], [[ADR-084 — Decision Slots May Resolve One or Multiple Content Records]], [[ADR-085 — Decision Resolution Should Be Optionally Explainable]], [[ADR-127 — Decision Execution May Use Recipient Context]] | Built: up to five picks per slot, ranked, the empty-send floor. Not built: minimum items and fallback content. The app does not use the word "approved": the rule is active, machine ready, marked ready for the channel, with a published version. Every pick has a reason, but never say "the best pick": most reasons read "tied … ordered randomly". In the demo most readers share the first two picks and differ in the third. |
 | AI suggests, a person decides | [[ADR-081 — AI Ranks Within Governed Candidate Sets]], [[ADR-082 — AI May Recommend but Not Publish]], [[ADR-140 — AI Capability Layer]], [[ADR-141 — In-App Assistive AI Actions]] | The demo AI is the mock; the one real adapter is a US vendor's. Never "EU-hosted" or "GDPR-friendly AI". |
 | When a machine asks to send, a person approves | [[ADR-142 — Autonomous Workflows and the Automation Boundary]] (the approval boundary only), [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]], [[ADR-168 — The Manager SPA Authenticates With Its Session Cookie]] | Only the approvals inbox is built. Autonomous workflows are not. |
-| A send is planned first and records who was left out and why | [[ADR-163 — Per-Channel Consent and Addressability]], [[ADR-086 — Decision Slots Fail Gracefully]], [[ADR-191 — Unsubscribe Is a Per-Message Token, a Confirm Page and One-Click]] | Never "GDPR compliant": the adopter takes the liability, the platform supplies mechanisms. |
+| A send is planned first and records who was left out and why | [[ADR-163 — Per-Channel Consent and Addressability]], [[ADR-086 — Decision Slots Fail Gracefully]], [[ADR-191 — Unsubscribe Is a Per-Message Token, a Confirm Page and One-Click]] | Never "GDPR compliant": the adopter takes the liability, the platform supplies mechanisms. The code records the stage that excluded someone, but the demo has no exclusions, so the film does not draw one. |
 | Open a reader's message and see the content they received | [[ADR-183 — A Snapshot Freezes the Composition and Every Delivery Records What It Got]], [[ADR-005 — Separate Snapshot State from Recipient Delivery Artifact]] | Say "content". The app itself notes that the layout is today's. [[ADR-062 — Snapshot Stores Final Render State]] is superseded by ADR-183: never say the snapshot stores the final HTML. |
 | A stranded send is flagged and a person releases it | [[ADR-192 — A Stranded Send Is Flagged, and a Person Releases It]] | |
 | Clicks come back as signals that fade with time and shape the next pick | [[ADR-110 — Insight Layer Transforms Events Into Signals]], [[ADR-111 — Decision Layer Consumes Signals, Not Raw Events]], [[ADR-112 — Signals Use Time-Based Decay]], [[ADR-132 — Signal Layer Implementation Event-Sourced Contributions with Decay-on-Read]] | Clicks only. Opens are not counted and are never shown as a rate. |
-| A dropped file is picked up: a content block, a decision strategy, an AI task | The registries for modules, strategies and AI tasks rescan on change; [[ADR-131 — Email Module Templates Use MJML as Source Format]], [[ADR-198 — The Email Block Set Is Seven Blocks, Square Images and Text Links]] | Each has its own file count. Not run. |
-| The delivery provider can be swapped with a file and a few lines | [[ADR-100 — Provider Layer as Send and Feedback Adapter]], [[ADR-101 — Provider Capabilities Are Explicit]], [[ADR-105 — Provider-Specific Data Must Not Be Architecture-Critical]] | Register it in the factory by hand; the server reloads. Not run. |
+| A dropped file is picked up: a content block, a decision strategy, an AI task | The registries for modules, strategies and AI tasks rescan on change; [[ADR-131 — Email Module Templates Use MJML as Source Format]], [[ADR-198 — The Email Block Set Is Seven Blocks, Square Images and Text Links]] | Run on scratch. Each has its own file count; a block and a strategy show in the open editor only after a page reload, an AI task on refocus (section 12). |
+| The delivery provider can be swapped with a file and a few lines | [[ADR-100 — Provider Layer as Send and Feedback Adapter]], [[ADR-101 — Provider Capabilities Are Explicit]], [[ADR-105 — Provider-Specific Data Must Not Be Architecture-Critical]] | Run on scratch: one new file and six inserted lines in four places in `factory.py`; the server restarts by itself because `factory.py` was edited. |
 | Email and push are channels of one campaign | [[ADR-160 — Channel Model and Composition]], [[ADR-161 — Channel Execution Shapes]], [[ADR-162 — Channel Rendering and Artifacts]], [[ADR-165 — Core Scope Is Channel-Neutral Content Orchestration]] | Push is delivered only by the mock provider. |
 | One company, several brands; roles and keys; an audit record | [[ADR-150 — Tenancy and Access Model]], [[ADR-153 — Audit and Accountability]], [[ADR-194 — Brand Profiles Carry an Email's Look, Texts and Legal Details]] | One install is one company. |
 | Nothing commercial is required to run it | [[ADR-171 — Nothing Required to Run This Platform Is Commercial]] | The mock providers are the default. |
@@ -172,14 +180,16 @@ The positioning rule is that a claim must be demonstrable in the repository ([[P
 
 ## 12. The four drops, as the code allows them
 
-These are the exact seams for Act 3. They were read from the code and not run.
+These are the exact seams for Act 3. Each was performed for real on a scratch copy on 2026-10-17; the exact files, console lines and timings are in [[PREPRODUCTION-CHECKS]] (section 5 and its appendix).
+
+**Why the manager app lags.** The server finds a new file at once: the registries for blocks, strategies and AI tasks rescan when their folder changes, and a new file never restarts the server. The manager app caches some lists until a page reload (block manifests, the strategy list) and refetches others when the window regains focus (the settings read, which carries the AI tasks and the providers). That is the whole difference between the rows below.
 
 | Drop | Where | What is really needed | What the manager then sees |
 |---|---|---|---|
-| **A content block** | `storage/modules/email/<name>.json` and `<name>.html`; the `.mjml` source is optional and compiled by `npm run build:modules` in `frontend/` | A manifest that names fields already defined in `storage/fields.json` (a field that is not defined gets the block skipped), and the template. CI checks that the committed `.html` matches the `.mjml`. | The block in "Add a module" for that channel. No migration. |
-| **A decision strategy** | `backend/app/decision/strategies/<name>.py`, shaped like `top_score.py` (a class with `meta` and `rank`) | One file; found by a package scan. | The strategy in the slot settings. |
-| **An AI task** | `backend/app/ai/tasks/<name>.py` with a `META` object and a default prompt | One file. The developer fixes what it reads and what it returns; the prompt text lives in the database and belongs to the manager ([[ADR-140 — AI Capability Layer]] §4). | A new record under Settings, AI prompts. Running it needs a screen, so show the entry, not a run. |
-| **A delivery provider** | `backend/app/delivery/providers/<name>.py` beside `resend.py`, plus the branch, the label and the tuple entry in `factory.py` | A file **and** a few edited lines in the factory; the provider must declare which channels it carries; under `uvicorn --reload` the server restarts on its own. | The provider in the send picker, beside `mock` and `resend`. |
+| **A content block** | `storage/modules/email/<name>.json` and `<name>.html`; the `.mjml` source is optional and compiled by `npm run build:modules` in `frontend/` (0.58 s) | A manifest that names fields already defined in `storage/fields.json` (a field that is not defined gets the block skipped), and the template. The MJML route is three files plus the build; a hand-written template with no MJML is two files and no build. CI checks that the committed `.html` matches the `.mjml`. | **After a page reload.** Before it the open editor lists the block by its file name and says it "cannot be edited or rendered". After a reload it shows "Quote" with its fields. A quote's attribution has no field of its own, so the block uses `heading`, which the editor labels "Heading". |
+| **A decision strategy** | `backend/app/decision/strategies/<name>.py`, shaped like `top_score.py` (a class with `meta` and `rank`) | One file, found by a package scan. **It must declare the slot's settings keys** (`content_score_weight`, `preference_score_weight` on the demo slots), or choosing it fails with "strategy_config has key(s) not declared by this strategy". | **After a page reload**, as a label ("Recency boost") in the slot's Strategy list. On the demo a recency bonus has no visible effect, because every record was written by the reset a moment ago: show the file and the list entry, never a result. |
+| **An AI task** | `backend/app/ai/tasks/<name>.py` with a `META` object and a default prompt | One file. The developer fixes what it reads and what it returns; the prompt text lives in the database and belongs to the manager ([[ADR-140 — AI Capability Layer]] §4). | **On refocus or on re-entering Settings**, no reload: a new record under Settings, AI prompts, with its default prompt and "Publish as version 1". The Model select lists vendor model names, so crop it. Running it needs a screen, so show the entry, not a run. |
+| **A delivery provider** | `backend/app/delivery/providers/<name>.py` beside `resend.py`, plus in `factory.py` the import, a branch, a label and the tuple entry | A file **and** six inserted lines in four places in the factory. The provider must declare which channels it carries (a push variant does not offer an email provider) and `reaches_real_inboxes`, which defaults to True. | The server restarts by itself, 1.4 s, **because `factory.py` is an edited file**; a new file alone restarts nothing. The picker lists it **on refocus**, under the label added to `PROVIDER_LABELS`. |
 
 **What is not simple:** adding a whole channel takes a manifest, a module manifest, a renderer, an address-key edit, a provider with a factory edit and consent rows, and the playbook's own addendum says so. The film shows a channel only as a thing that exists (push), never as a file you drop.
 
@@ -196,6 +206,14 @@ Kept here because each one would otherwise come back as a "mistake" in review.
 - **The "As sent" screen carries honest warnings** (the layout is today's). The film says "the content they received".
 - **Competitor names are out.** The presentation draft names two vendors as reference points; the film does not, because the draft itself says it is not a current feature or price audit.
 
+What the pre-production checks changed, each of which would otherwise read as a mistake:
+
+- **The hook's numbers held, the picks did not.** 123, 369 and 15 are identical after every reset, but the individual picks reshuffle, because tied candidates are ordered at random. Any frame that shows what a named reader got is read after the final reset.
+- **"From content a person approved" became "marked ready".** The app does not use the word "approved".
+- **The AI scene is two modes, not one flow.** "Use this" in the editor and a request in Approvals cannot be the same suggestion. The film shows the default mode, then a different request in Approvals (S08).
+- **The demo has no exclusions.** The consent and suppression counts the send scene was built on do not exist, so the send and "As sent" scenes no longer claim to show them (S09, S10).
+- **A new block needs a page reload.** The film shows the reload (S13).
+
 ## 14. Deliverables of the film
 
 1. Master, 16:9, 3840×2160, 24 fps, narration A, burned-in captions, plus a captions-off version.
@@ -207,14 +225,16 @@ Kept here because each one would otherwise come back as a "mistake" in review.
 
 ## 15. Pre-production checks
 
-All on a scratch database and a throwaway branch, never on the real development data. Nothing below has been done.
+Run on 2026-10-17, on a scratch database and a throwaway worktree, never on the real development data. Checks 1 to 5 are done and recorded in [[PREPRODUCTION-CHECKS]]; check 6 is open.
 
-1. Reset the demo on scratch and re-read every number the film uses: the hook's 123, 369 and 15 (from the Familienherbst slot), the results, the counts excluded for consent and suppression.
-2. Find three readers who really get different picks from one slot, and note their names (they are fictional addresses on the demo domain).
-3. Seed Approvals, and trace what produces "Apply an AI-suggested subject". If the path is not plain, S08 uses "Send a campaign" requested by an integration instead.
-4. Perform each of the four drops for real: write the files, build, reload, and keep the exact file contents, the console lines and the time it takes. Confirm what the editor shows without a restart or a refresh, and show exactly that.
-5. Re-capture "As sent" so the stale-template notices are gone, and fix or redraw the flaws in section 8.
-6. Decide the name handling: the end card reads `product.json`. The name is a neutral working title until a brand is chosen; no brand is cleared.
+1. **Done.** Reset the demo on scratch and re-read every number the film uses. The hook's 123, 369 and 15 held across two resets. The counts excluded for consent and suppression are zero.
+2. **Done.** Three readers who get different picks: Lea Huber (#32), Michael Zimmermann (#127), Peter Müller (#330), disjoint in both resets. Their ids and themes are stable, their individual picks are not.
+3. **Done.** Seed Approvals and trace the AI request. It needs a published prompt, the task's Output set to "held for review", and a press of "Suggest with AI". The seed script makes only "Send a prepared campaign" requests.
+4. **Done.** All four drops performed for real (section 12).
+5. **Done.** "As sent" re-captured: the notices are gone after a fresh reset and return after any drop. The flaws of section 8 are listed with their state.
+6. **Open.** Decide the name handling: the end card reads `product.json`. The name is a neutral working title until a brand is chosen; no brand is cleared.
+
+**Order for the real capture.** Reset once, on purpose, on the date the film should show. Capture everything that needs the demo as it is (S01, S05 to S11, S17, S18). Seed Approvals and publish the AI prompt before S08. Perform the four drops last, because each change in `storage/modules/email/` brings the "As sent" notices back. Do not reset again after the captures: the picks would reshuffle.
 
 ## 16. Open decisions (the default is assumed unless you say otherwise)
 
@@ -224,7 +244,17 @@ All on a scratch database and a throwaway branch, never on the real development 
 4. **Music:** composed or a licence-clean library track; the source is to be chosen.
 5. **A first-person ending only** (script B) if a full recording is not made: the last line, in Diede's voice, over narrator A.
 6. **The address on the end card** stays open until a website or repository exists.
-7. **The hook's numbers.** They are the live demo's and may change at the next reset; the hook is rewritten from whatever the reset gives.
+7. **The hook's numbers.** They held across two resets, but they are the live demo's and the hook is re-read from the final reset.
+8. **The demo seed.** Adding opted-out and suppressed readers and making the unsubscribe stick is a change to the project's demo data, not to the film (the checks propose it as a project follow-up; nothing is decided). Until it is done, S09 and S10 draw only what the demo has. If it is done, the "who was left out and why" shot comes back, and the narration of S09 and S10 can return to its first wording (see the end of this section).
+9. **The attribution of the quote block** has no field of its own. The film either shows the block with "Heading", or adds one more file (`storage/fields.json`) to the scene.
+
+### Choices made when the checks were applied
+
+These are Claude's, made on 2026-10-17 after the checks and not yet reviewed by Diede. Each can be reversed in the storyboard and the narration.
+
+1. **S08 uses the default AI mode, then a different request in Approvals.** Shot 1 is "Suggest with AI" with "Use this" and the real provenance line (`… · mock-1 · prompt v1`); shot 2 is the seeded "Send a prepared campaign" request from "Acme Agency (demo)", "Approve and run". The narration is unchanged and stays true. The alternative, the held AI request "Use an AI-suggested subject line" with a pick-one inside Approvals, is described in the storyboard. The suggestion text on screen is drawn in believable German and the frame is marked as a drawing; the provenance line stays as the app writes it.
+2. **S09 and S10 no longer talk about exclusions.** The demo has none, so the picture cannot show them. S09 now says the system plans the send, shows how many people it reaches and freezes what they will get; S10 says the reader's message shows what they received and why each piece was picked. The first wording was: S09 "… leaves out whoever said no, and tells you who and why." S10 "… and the reason anyone was left out."
+3. **S07 says "marked ready", not "approved".**
 
 ## 17. Sources
 
@@ -234,3 +264,4 @@ All on a scratch database and a throwaway branch, never on the real development 
 - The decision records named in section 11.
 - Code read for the file seams: `backend/app/modules/registry.py`, `backend/app/decision/strategies/`, `backend/app/ai/tasks/`, `backend/app/delivery/providers/factory.py`, `backend/app/channels/registry.py`, `storage/`.
 - The demo seed: `backend/app/demo/` and `backend/scripts/demo_reset.py`.
+- [[PREPRODUCTION-CHECKS]], the results of the checks of section 15, with the exact files of the four drops.

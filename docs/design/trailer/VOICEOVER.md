@@ -11,7 +11,8 @@ Clean read-aloud text for [[STORYBOARD]]. **A** is the master: a neutral narrato
 ## How to read it
 
 - A calm, unhurried read. No trailer growl: the drama is in the picture and the music.
-- About 135 words a minute. The film is about 4:10; A is about 380 words, B about 395, so both leave room for music and silence.
+- About 135 words a minute. The film is about 4:10; A is about 380 words, B about 400, so both leave room for music and silence.
+- **Changed on 2026-10-17, after the pre-production checks** ([[PREPRODUCTION-CHECKS]]), in both scripts: S07 now says "marked ready" where it said "approved" (the app has no such word); S09 and S10 no longer mention readers who were left out, because the demo has none to show. The first wording of S09 was "… leaves out whoever said no, and tells you who and why." and of S10 "… and the reason anyone was left out." They return only if the demo gains excluded readers ([[TRAILER-BRIEF]], end of section 16).
 - Each scene is a separate take. The time in brackets is the scene's length on screen; the read should end a little before it. Leave a breath before the first word of every take; the picture starts before the voice.
 - S01 and S19 have a held silence after the last word. Do not fill it.
 - Numbers are spoken out ("a hundred and twenty-three"). They are the live demo's and will be re-read after the next reset (see [[TRAILER-BRIEF]], section 15); if they change, the line changes.
@@ -37,17 +38,17 @@ A manager starts with content. Written once, kept in one place, and scored by wh
 **S06** [1:06 to 1:16, 19 words]
 A campaign doesn't copy it; it points to it. When one headline has to change, only that email changes.
 
-**S07** [1:16 to 1:36, 33 words]
-Now one email with a slot in the middle. The slot picks for each reader, from content a person approved. Same email, three readers, three different picks. And every pick can be explained.
+**S07** [1:16 to 1:36, 34 words]
+Now one email with a slot in the middle. The slot picks for each reader, from content a person marked ready. Same email, three readers, three different picks. And every pick can be explained.
 
 **S08** [1:36 to 1:50, 23 words]
 AI can suggest and draft. A person decides what goes out. Even when a machine asks to send, someone has to say yes.
 
-**S09** [1:50 to 2:00, 19 words]
-Before anything leaves, the system plans the send, leaves out whoever said no, and tells you who and why.
+**S09** [1:50 to 2:00, 21 words]
+Before anything leaves, the system plans the send, shows how many people it can reach, and freezes what they will get.
 
 **S10** [2:00 to 2:12, 16 words]
-Afterwards, open any reader's message: the content they received, and the reason anyone was left out.
+Afterwards, open any reader's message: the content they received, and the reason each piece was picked.
 
 **S11** [2:12 to 2:20, 15 words]
 Their clicks come back as signals that fade with time, and shape the next pick.
@@ -101,17 +102,17 @@ It starts with content. Written once, kept in one place, scored by what it's abo
 **S06** [1:06 to 1:16, 19 words]
 A campaign doesn't copy it. It points to it. When one headline has to change, only that email changes.
 
-**S07** [1:16 to 1:36, 36 words]
-Then one email with a slot in the middle. The slot picks for each reader, from content a person approved. Same email, three readers, three different picks. And I can see why each pick was made.
+**S07** [1:16 to 1:36, 37 words]
+Then one email with a slot in the middle. The slot picks for each reader, from content a person marked ready. Same email, three readers, three different picks. And I can see why each pick was made.
 
 **S08** [1:36 to 1:50, 23 words]
 AI can suggest and draft. A person decides what goes out. Even when a machine asks to send, someone has to say yes.
 
-**S09** [1:50 to 2:00, 19 words]
-Before anything leaves, the system plans the send, leaves out whoever said no, and tells me who and why.
+**S09** [1:50 to 2:00, 22 words]
+Before anything leaves, the system plans the send, shows me how many people it can reach, and freezes what they will get.
 
 **S10** [2:00 to 2:12, 18 words]
-Afterwards I can open any reader's message: the content they received, and the reason anyone was left out.
+Afterwards I can open any reader's message: the content they received, and the reason each piece was picked.
 
 **S11** [2:12 to 2:20, 15 words]
 Their clicks come back as signals that fade with time, and shape the next pick.
