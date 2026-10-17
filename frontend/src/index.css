@@ -350,6 +350,9 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--brand-accent);
 @media (prefers-contrast: more) { .chip, .badge { box-shadow: inset 0 0 0 1px currentColor; } }
 
 [role="alert"] { color: var(--brand-danger); }
+/* A warning drawn as a notice (a glyph and plain text), not an error: still
+   announced at once, but not in the danger colour (render 31). */
+.group.notice[role="alert"] { color: var(--brand-fg); }
 
 .signin {
   max-width: 24rem;
@@ -1632,6 +1635,13 @@ kbd {
 /* The frozen email inside its card, edge to edge. */
 .card-rows > .preview-stage--flush { padding: 12px 20px; border: 0; border-radius: 0; }
 .preview-frame--short { height: 480px; }
+
+/* --- deliveries (renders 29 to 31) ------------------------------------------ */
+.list-legend { font-size: 12px; line-height: 16px; padding-left: 9px; }
+.group--attention { border-color: var(--brand-human); }
+.card-rows > .search-compact { flex-wrap: nowrap; margin: 0; }
+.card-rows > .search-compact .react-aria-TextField { flex: 1; min-width: 0; margin: 0; }
+.preview-frame--message { height: 40rem; }
 
 /* A link that is a button (Edit, Send): the button's look, the link's meaning. */
 a.btn-link {

@@ -1,8 +1,11 @@
-import { Link, useParams } from 'react-router'
+import { AlertTriangle } from 'lucide-react'
+import { useParams } from 'react-router'
 
 import { useAsSent, type DeliveryAsSent as AsSent } from '../api/resources'
 import { HttpError } from '../api/session'
+import BackTo from '../components/BackTo'
 import DataTable, { type DataColumn } from '../components/DataTable'
+import Fact from '../components/Fact'
 import ScreenState from '../components/ScreenState'
 import { formatDate } from './Campaigns'
 
@@ -43,102 +46,117 @@ export default function DeliveryAsSent() {
   const notSent = asSent.error instanceof HttpError && asSent.error.status === 409
 
   return (
-    <>
-      <p>
-        <Link to={`/deliveries/${sendId}`}>← The send</Link>
-      </p>
-      <h1>As sent</h1>
-      {notSent ? (
-        <p role="status" className="muted">
-          There is nothing to show: this recipient was not sent this message, or
-          it was sent before delivery records existed.
-        </p>
-      ) : (
-        <ScreenState query={asSent}>
-          {asSent.data && (
-            <>
-              {!asSent.data.templates_match && (
-                <p role="alert">
-                  The templates have changed since this was sent. The content below
-                  is exactly what was sent; the layout is today's.
-                </p>
-              )}
-              {!asSent.data.hash_matches && (
-                <p role="alert">
-                  This rebuild is not byte-identical to what was sent.
-                </p>
-              )}
+    // Column 3 of the deliveries, the send's row still open in the list (render 31).
+    <div className="detail">
+      <div className="detail-scroll">
+        <div className="detail-head">
+          <BackTo to={`/deliveries/${sendId}`} label="The send" />
+          <h2>As sent</h2>
+        </div>
+        {notSent ? (
+          <p role="status" className="muted quiet">
+            There is nothing to show: this recipient was not sent this message, or
+            it was sent before delivery records existed.
+          </p>
+        ) : (
+          <ScreenState query={asSent}>
+            {asSent.data && (
+              <>
+                {!asSent.data.templates_match && (
+                  <p role="alert" className="group group-body notice">
+                    <AlertTriangle size={16} strokeWidth={1.75} aria-hidden="true" className="notice-icon" />
+                    <span>
+                      The templates have changed since this was sent. The content below
+                      is exactly what was sent; the layout is today's.
+                    </span>
+                  </p>
+                )}
+                {!asSent.data.hash_matches && (
+                  <p role="alert" className="group group-body notice">
+                    <AlertTriangle size={16} strokeWidth={1.75} aria-hidden="true" className="notice-icon" />
+                    <span>This rebuild is not byte-identical to what was sent.</span>
+                  </p>
+                )}
 
-              <dl className="facts">
-                <dt>Channel</dt>
-                <dd>{asSent.data.channel}</dd>
-                <dt>Sent</dt>
-                <dd>{formatDate(asSent.data.sent_at)}</dd>
-                {/*
-                  The envelope is rendered generically, like an approval's rows:
-                  email carries subject and preheader, another channel carries
-                  its own keys, and a client that knew the shapes would need
-                  editing for every channel added.
-                */}
-                {Object.entries(asSent.data.envelope).map(([key, value]) => (
-                  <div key={key} style={{ display: 'contents' }}>
-                    <dt>{key}</dt>
-                    <dd>{String(value ?? '—')}</dd>
-                  </div>
-                ))}
-              </dl>
-
-              {asSent.data.body != null && (
-                <>
-                  <h2>Message</h2>
+                <dl className="group fact-list">
+                  <Fact label="Channel">{asSent.data.channel}</Fact>
+                  <Fact label="Sent">{formatDate(asSent.data.sent_at)}</Fact>
                   {/*
-                    **Sandboxed with every permission withheld.**
-
-                    The body is email HTML: it was written for a mail client,
-                    not for this application's origin. An empty `sandbox`
-                    attribute gives the frame a unique origin of its own and
-                    refuses scripts, forms and popups, so nothing in a message
-                    can read this session or act as the person viewing it.
-                    `no-referrer` keeps the images it loads from learning which
-                    screen they were viewed on.
+                    The envelope is rendered generically, like an approval's rows:
+                    email carries subject and preheader, another channel carries
+                    its own keys, and a client that knew the shapes would need
+                    editing for every channel added.
                   */}
-                  <iframe
-                    title="The message as sent"
-                    sandbox=""
-                    referrerPolicy="no-referrer"
-                    srcDoc={asSent.data.body}
-                    style={{ width: '100%', height: '40rem', border: '1px solid #ccc' }}
-                  />
-                </>
-              )}
+                  {Object.entries(asSent.data.envelope).map(([key, value]) => (
+                    <Fact key={key} label={key}>
+                      {String(value ?? '—')}
+                    </Fact>
+                  ))}
+                </dl>
 
-              {asSent.data.fields && (
-                <>
-                  <h2>Fields</h2>
-                  <dl className="facts">
-                    {Object.entries(asSent.data.fields).map(([key, value]) => (
-                      <div key={key} style={{ display: 'contents' }}>
-                        <dt>{key}</dt>
-                        <dd>{String(value ?? '—')}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </>
-              )}
+                {asSent.data.body != null && (
+                  <section aria-labelledby="as-sent-message" className="detail-section">
+                    <h3 id="as-sent-message" className="group-title">
+                      Message
+                    </h3>
+                    <div className="preview-stage">
+                      {/*
+                        **Sandboxed with every permission withheld.**
 
-              <h2>Modules</h2>
-              <DataTable
-                label="Modules in this message"
-                columns={moduleColumns}
-                // A row per copy, so a module that repeated has several: the
-                // position in the list is the key, not the module id.
-                items={asSent.data.modules.map((m, index) => ({ ...m, id: index }))}
-                emptyMessage="This message had no modules."
-              />
-            </>
-          )}
-        </ScreenState>
-      )}
-    </>
+                        The body is email HTML: it was written for a mail client,
+                        not for this application's origin. An empty `sandbox`
+                        attribute gives the frame a unique origin of its own and
+                        refuses scripts, forms and popups, so nothing in a message
+                        can read this session or act as the person viewing it.
+                        `no-referrer` keeps the images it loads from learning which
+                        screen they were viewed on.
+                      */}
+                      <iframe
+                        title="The message as sent"
+                        className="preview-frame preview-frame--message"
+                        sandbox=""
+                        referrerPolicy="no-referrer"
+                        srcDoc={asSent.data.body}
+                      />
+                    </div>
+                  </section>
+                )}
+
+                {asSent.data.fields && (
+                  <section aria-labelledby="as-sent-fields" className="detail-section">
+                    <h3 id="as-sent-fields" className="group-title">
+                      Fields
+                    </h3>
+                    <dl className="group fact-list">
+                      {Object.entries(asSent.data.fields).map(([key, value]) => (
+                        <Fact key={key} label={key}>
+                          {String(value ?? '—')}
+                        </Fact>
+                      ))}
+                    </dl>
+                  </section>
+                )}
+
+                <section aria-labelledby="as-sent-modules" className="detail-section">
+                  <h3 id="as-sent-modules" className="group-title">
+                    Modules
+                  </h3>
+                  <div className="group table-card">
+                    <DataTable
+                      label="Modules in this message"
+                      columns={moduleColumns}
+                      // A row per copy, so a module that repeated has several: the
+                      // position in the list is the key, not the module id.
+                      items={asSent.data.modules.map((m, index) => ({ ...m, id: index }))}
+                      emptyMessage="This message had no modules."
+                    />
+                  </div>
+                </section>
+              </>
+            )}
+          </ScreenState>
+        )}
+      </div>
+    </div>
   )
 }

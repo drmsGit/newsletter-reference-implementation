@@ -1,10 +1,13 @@
+import { AlertTriangle } from 'lucide-react'
 import { Button } from 'react-aria-components'
 import { Link, useParams } from 'react-router'
 
 import { useDelivery, useDeliveryExecutions, useReleaseDelivery, type DeliveryExecution } from '../api/resources'
 import { HttpError } from '../api/session'
 import DataTable, { type DataColumn } from '../components/DataTable'
-import RecipientSearch, { useSearch } from '../components/RecipientSearch'
+import DetailSection from '../components/DetailSection'
+import Fact from '../components/Fact'
+import { SearchBox, useSearch } from '../components/RecipientSearch'
 import ScreenState from '../components/ScreenState'
 import { formatDate } from './Campaigns'
 
@@ -57,94 +60,97 @@ export default function DeliveryDetail() {
   const release = useReleaseDelivery(id)
 
   return (
-    <>
-      <p>
-        <Link to="/deliveries">← Deliveries</Link>
-      </p>
-      <ScreenState query={delivery}>
-        {delivery.data && (
-          <>
-            <h1>{delivery.data.name}</h1>
-            {(delivery.data.status === 'draft' || delivery.data.status === 'scheduled') &&
-              delivery.data.campaign_id != null &&
-              delivery.data.variant_id != null && (
-                <p>
-                  Not sent yet.{' '}
-                  <Link
-                    to={`/campaigns/${delivery.data.campaign_id}/variants/${delivery.data.variant_id}/send?send=${delivery.data.id}`}
-                  >
-                    Continue on the send screen
-                  </Link>
-                </p>
-              )}
-            <dl className="facts">
-              <dt>Status</dt>
-              <dd>{delivery.data.status}</dd>
-              <dt>Audience</dt>
-              <dd>{delivery.data.audience_group_name ?? '—'}</dd>
-              <dt>Provider</dt>
-              <dd>{delivery.data.provider ?? '—'}</dd>
-              <dt>From</dt>
-              <dd>{delivery.data.from_address ?? '—'}</dd>
-              <dt>Scheduled</dt>
-              <dd>{formatDate(delivery.data.scheduled_at)}</dd>
-              <dt>Recipients</dt>
-              <dd>{delivery.data.execution_count}</dd>
-              <dt>Sent</dt>
-              <dd>{delivery.data.sent_count}</dd>
-              <dt>Failed</dt>
-              <dd>{delivery.data.failed_count}</dd>
-              <dt>Excluded</dt>
-              <dd>{delivery.data.excluded_count}</dd>
-              {Object.entries(delivery.data.exclusions_by_stage).map(([stage, count]) => (
-                <div key={stage} style={{ display: 'contents' }}>
-                  <dt>Excluded: {stage}</dt>
-                  <dd>{count}</dd>
-                </div>
-              ))}
-            </dl>
-
-            {delivery.data.stranded && (
-              <section aria-labelledby="stranded-heading">
-                <h2 id="stranded-heading">This send looks stranded</h2>
-                <p>
-                  It is still marked sending, but nothing has happened since{' '}
-                  {formatDate(delivery.data.last_activity_at)}. The process sending it may have stopped.
-                  Releasing it marks it failed so it can be retried: a retry skips everyone already sent
-                  to, marks the person in flight as uncertain (never sent again), and sends the rest.
-                </p>
-                <Button onPress={() => release.mutate()} isDisabled={release.isPending}>
-                  Release this send
-                </Button>
-                {release.isError && (
-                  <p role="alert">
-                    Not released:{' '}
-                    {release.error instanceof HttpError ? release.error.detail : 'the request failed.'}
+    // Column 3 of the deliveries (task-372, renders 29 and 30).
+    <div className="detail">
+      <div className="detail-scroll">
+        <ScreenState query={delivery}>
+          {delivery.data && (
+            <>
+              <div className="detail-head">
+                <h2>{delivery.data.name}</h2>
+              </div>
+              {(delivery.data.status === 'draft' || delivery.data.status === 'scheduled') &&
+                delivery.data.campaign_id != null &&
+                delivery.data.variant_id != null && (
+                  <p className="group group-body">
+                    Not sent yet.{' '}
+                    <Link
+                      to={`/campaigns/${delivery.data.campaign_id}/variants/${delivery.data.variant_id}/send?send=${delivery.data.id}`}
+                    >
+                      Continue on the send screen
+                    </Link>
                   </p>
                 )}
-              </section>
-            )}
 
-            <h2>Recipients</h2>
-            <RecipientSearch />
-            <ScreenState query={executions}>
-              <DataTable
-                label="Recipients of this send"
-                columns={executionColumns(id)}
-                items={executions.data?.items ?? []}
-                emptyMessage="This send has no recipients."
-              />
-              {executions.data && (
-                <p className="muted" role="status">
-                  {q
-                    ? `${executions.data.total} matching “${q}”, showing ${executions.data.items.length}.`
-                    : `Showing ${executions.data.items.length} of ${executions.data.total}. Search to find someone.`}
-                </p>
+              {delivery.data.stranded && (
+                <section aria-labelledby="stranded-heading" className="detail-section">
+                  <h3 id="stranded-heading" className="group-title">
+                    This send looks stranded
+                  </h3>
+                  <div className="group card-rows group--attention">
+                    <p className="notice">
+                      <AlertTriangle size={16} strokeWidth={1.75} aria-hidden="true" className="notice-icon" />
+                      <span>
+                        It is still marked sending, but nothing has happened since{' '}
+                        {formatDate(delivery.data.last_activity_at)}. The process sending it may have stopped.
+                        Releasing it marks it failed so it can be retried: a retry skips everyone already sent
+                        to, marks the person in flight as uncertain (never sent again), and sends the rest.
+                      </span>
+                    </p>
+                    <div>
+                      <Button onPress={() => release.mutate()} isDisabled={release.isPending}>
+                        Release this send
+                      </Button>
+                    </div>
+                    {release.isError && (
+                      <p role="alert">
+                        Not released:{' '}
+                        {release.error instanceof HttpError ? release.error.detail : 'the request failed.'}
+                      </p>
+                    )}
+                  </div>
+                </section>
               )}
-            </ScreenState>
-          </>
-        )}
-      </ScreenState>
-    </>
+
+              <dl className="group fact-list">
+                <Fact label="Status">{delivery.data.status}</Fact>
+                <Fact label="Audience">{delivery.data.audience_group_name ?? '—'}</Fact>
+                <Fact label="Provider">{delivery.data.provider ?? '—'}</Fact>
+                <Fact label="From">{delivery.data.from_address ?? '—'}</Fact>
+                <Fact label="Scheduled">{formatDate(delivery.data.scheduled_at)}</Fact>
+                <Fact label="Recipients">{delivery.data.execution_count}</Fact>
+                <Fact label="Sent">{delivery.data.sent_count}</Fact>
+                <Fact label="Failed">{delivery.data.failed_count}</Fact>
+                <Fact label="Excluded">{delivery.data.excluded_count}</Fact>
+                {Object.entries(delivery.data.exclusions_by_stage).map(([stage, count]) => (
+                  <Fact key={stage} label={`Excluded: ${stage}`}>
+                    {count}
+                  </Fact>
+                ))}
+              </dl>
+
+              <DetailSection id="recipients-heading" title="Recipients" className="recipients-card">
+                <SearchBox label="Find a recipient (identifier or address)" compact />
+                <ScreenState query={executions}>
+                  <DataTable
+                    label="Recipients of this send"
+                    columns={executionColumns(id)}
+                    items={executions.data?.items ?? []}
+                    emptyMessage="This send has no recipients."
+                  />
+                  {executions.data && (
+                    <p className="muted" role="status">
+                      {q
+                        ? `${executions.data.total} matching “${q}”, showing ${executions.data.items.length}.`
+                        : `Showing ${executions.data.items.length} of ${executions.data.total}. Search to find someone.`}
+                    </p>
+                  )}
+                </ScreenState>
+              </DetailSection>
+            </>
+          )}
+        </ScreenState>
+      </div>
+    </div>
   )
 }

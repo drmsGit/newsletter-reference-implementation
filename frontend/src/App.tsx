@@ -30,7 +30,7 @@ import IntegrationDetail from './screens/IntegrationDetail'
 import Brands from './screens/Brands'
 import Personalisation, { PersonalisationEntry } from './screens/Personalisation'
 import BrandProfiles from './screens/BrandProfiles'
-import Deliveries from './screens/Deliveries'
+import { DeliveriesSplit, NoSendOpen } from './screens/Deliveries'
 import SettingsLayout from './screens/SettingsLayout'
 import DeliveryAsSent from './screens/DeliveryAsSent'
 import DeliveryDetail from './screens/DeliveryDetail'
@@ -118,12 +118,11 @@ export default function App() {
           <Route path="/decision-slots" element={<NoSlotOpen />} />
           <Route path="/decision-slots/:id" element={<DecisionSlotDetail />} />
         </Route>
-        <Route path="/deliveries" element={<Deliveries />} />
-        <Route path="/deliveries/:id" element={<DeliveryDetail />} />
-        <Route
-          path="/deliveries/:id/executions/:executionId"
-          element={<DeliveryAsSent />}
-        />
+        <Route element={<DeliveriesSplit />}>
+          <Route path="/deliveries" element={<NoSendOpen />} />
+          <Route path="/deliveries/:id" element={<DeliveryDetail />} />
+          <Route path="/deliveries/:id/executions/:executionId" element={<DeliveryAsSent />} />
+        </Route>
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

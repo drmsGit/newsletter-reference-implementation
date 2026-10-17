@@ -1,8 +1,8 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router'
 
-import Deliveries from './Deliveries'
+import Deliveries, { DeliveriesSplit, NoSendOpen } from './Deliveries'
 import DeliveryAsSent from './DeliveryAsSent'
 import DeliveryDetail from './DeliveryDetail'
 import { jsonResponse, page, renderWithProviders, stubFetch } from '../test-utils'
@@ -325,5 +325,58 @@ describe('a send stranded in sending (ADR-192, task-325)', () => {
     render({ 'GET /delivery/send-instances/4': () => jsonResponse({ ...STRANDED, stranded: false }) })
     expect(await screen.findByText(A_SEND.name)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Release this send' })).not.toBeInTheDocument()
+  })
+})
+
+describe('the sends beside the open one (task-372)', () => {
+  const OTHER = { ...A_SEND, id: 5, name: 'Autumn — send 1' }
+  const detail = (send: typeof A_SEND) => () =>
+    jsonResponse({ ...send, execution_count: 1, exclusions_by_stage: {}, audience_group_name: 'Everyone' })
+
+  function openSplit(route: string) {
+    const fetchMock = stubFetch({
+      'GET /delivery/send-instances': () => jsonResponse(page([A_SEND, OTHER])),
+      'GET /delivery/send-instances/4': detail(A_SEND),
+      'GET /delivery/send-instances/5': detail(OTHER),
+      'GET /delivery/send-instances/4/executions': () => jsonResponse(page([execution(11, 'sent')])),
+      'GET /delivery/send-instances/5/executions': () => jsonResponse(page([])),
+      'GET /delivery/executions/11/as-sent': () => jsonResponse(AS_SENT),
+    })
+    renderWithProviders(
+      <Routes>
+        <Route element={<DeliveriesSplit />}>
+          <Route path="/deliveries" element={<NoSendOpen />} />
+          <Route path="/deliveries/:id" element={<DeliveryDetail />} />
+          <Route path="/deliveries/:id/executions/:executionId" element={<DeliveryAsSent />} />
+        </Route>
+      </Routes>,
+      { route },
+    )
+    return fetchMock
+  }
+  const row = (name: RegExp) =>
+    within(screen.getByRole('grid', { name: 'Sends' })).getByRole('row', { name })
+
+  it("opens another send on the list's page, without the open send's recipient search", async () => {
+    const fetchMock = openSplit('/deliveries/4?offset=50&q=ana')
+    await screen.findByRole('heading', { name: 'Spring launch — send 1', level: 2 })
+    fireEvent.click(await screen.findByText('Autumn — send 1'))
+    await screen.findByRole('heading', { name: 'Autumn — send 1', level: 2 })
+    expect(row(/Autumn/)).toHaveAttribute('aria-selected', 'true')
+    const executions = fetchMock.mock.calls
+      .map(([r]) => new URL((r as Request).url))
+      .filter((u) => u.pathname === '/delivery/send-instances/5/executions')
+    expect(executions.length).toBeGreaterThan(0)
+    expect(executions.every((u) => !u.searchParams.get('q'))).toBe(true)
+    const lists = fetchMock.mock.calls
+      .map(([r]) => new URL((r as Request).url))
+      .filter((u) => u.pathname === '/delivery/send-instances')
+    expect(lists.every((u) => u.searchParams.get('offset') === '50')).toBe(true)
+  })
+
+  it("keeps the send marked while one recipient's message is open", async () => {
+    openSplit('/deliveries/4/executions/11')
+    expect(await screen.findByRole('heading', { name: 'As sent' })).toBeInTheDocument()
+    await waitFor(() => expect(row(/Spring launch/)).toHaveAttribute('aria-selected', 'true'))
   })
 })
