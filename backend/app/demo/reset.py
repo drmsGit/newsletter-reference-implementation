@@ -58,17 +58,17 @@ UNSUBSCRIBE = {"de": "Abmelden", "en": "Unsubscribe"}
 
 #: Each brand's look, on every one of its profiles (ADR-194), so switching the
 #: working brand changes the email (2026-10-17). Outdoor wears the platform's
-#: own palette (the manager app's v2 tokens); Touren a second, alpine one, its
-#: button white on burnt orange at about 5:1.
+#: own palette (the manager app's v2 tokens) with pill buttons; Touren a second,
+#: alpine one, its near-square button white on burnt orange at about 5:1.
 LOOK = {
     "outdoor": {"colour_text": "#1f1b16", "colour_body_text": "#62594e", "colour_button": "#1a5d74",
                 "colour_button_text": "#ffffff", "colour_hero_background": "#f6f1e8",
                 "font_family": "-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-                "size_headline": "26px", "size_body": "16px", "radius_button": "6px"},
+                "size_headline": "26px", "size_body": "16px", "radius_button": "999px"},
     "touren": {"colour_text": "#1d3b2a", "colour_body_text": "#3f4a43", "colour_button": "#b8471a",
                "colour_button_text": "#ffffff", "colour_hero_background": "#eef3ee",
                "font_family": "Georgia, 'Times New Roman', serif",
-               "size_headline": "28px", "size_body": "17px", "radius_button": "999px"},
+               "size_headline": "28px", "size_body": "17px", "radius_button": "2px"},
 }
 
 

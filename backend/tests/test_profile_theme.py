@@ -192,6 +192,17 @@ def test_two_profiles_give_two_looks_from_one_variant(db, world):
     assert "var(" not in plain and "var(" not in themed
 
 
+def test_the_profile_rounds_the_buttons_and_an_empty_radius_keeps_4px(db, world):
+    """The button radius is a profile field; until 2026-10-17 MJML buttons
+    were fixed at 4px, so it reached brand.css only and no email button."""
+    plain = render_frame(db, build_frame(db, world["variant"].id))[0].body
+    world["profile"].field_values = {**world["profile"].field_values, "radius_button": "999px"}
+    db.commit()
+    rounded = render_frame(db, build_frame(db, world["variant"].id))[0].body
+    assert "border-radius:4px" in _button_style(plain).replace(" ", "")
+    assert "border-radius:999px" in _button_style(rounded).replace(" ", "")
+
+
 def test_a_profile_value_reaches_a_module_template(db, world, monkeypatch):
     """AC2: for templates whose styles are attributes (MJML), not CSS."""
     import app.rendering.service as rendering

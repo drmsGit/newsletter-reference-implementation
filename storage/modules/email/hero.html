@@ -107,10 +107,10 @@
         <tbody>
           <tr>
             <td
-               align="center" bgcolor="{{ profile.colour_button or '#1a1a1a' }}" role="presentation" style="border:none;border-radius:4px;cursor:auto;mso-padding-alt:12px 24px;background:{{ profile.colour_button or '#1a1a1a' }};" valign="middle"
+               align="center" bgcolor="{{ profile.colour_button or '#1a1a1a' }}" role="presentation" style="border:none;border-radius:{{ profile.radius_button or '4px' }};cursor:auto;mso-padding-alt:12px 24px;background:{{ profile.colour_button or '#1a1a1a' }};" valign="middle"
             >
               <a
-                 href="{{ button_url }}" style="display:inline-block;background:{{ profile.colour_button or '#1a1a1a' }};color:{{ profile.colour_button_text or '#ffffff' }};font-family:{{ profile.font_family or 'Arial, Helvetica, sans-serif' }};font-size:15px;font-weight:600;line-height:120%;margin:0;text-decoration:none;text-transform:none;padding:12px 24px;mso-padding-alt:0px;border-radius:4px;" target="_blank"
+                 href="{{ button_url }}" style="display:inline-block;background:{{ profile.colour_button or '#1a1a1a' }};color:{{ profile.colour_button_text or '#ffffff' }};font-family:{{ profile.font_family or 'Arial, Helvetica, sans-serif' }};font-size:15px;font-weight:600;line-height:120%;margin:0;text-decoration:none;text-transform:none;padding:12px 24px;mso-padding-alt:0px;border-radius:{{ profile.radius_button or '4px' }};" target="_blank"
               >
                 {{ button_label_hero }}
               </a>

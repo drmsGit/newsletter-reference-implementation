@@ -4,5 +4,5 @@
   <mj-column padding="0 12px" />
   <mj-text color="{{ profile.colour_body_text or '#444444' }}" font-size="{{ profile.size_body or '16px' }}" line-height="1.6" padding="0 0 12px 0" align="left" />
   <mj-image padding="0 0 12px 0" align="left" />
-  <mj-button background-color="{{ profile.colour_button or '#1a1a1a' }}" color="{{ profile.colour_button_text or '#ffffff' }}" font-size="15px" font-weight="600" border-radius="4px" inner-padding="12px 24px" padding="8px 0 0 0" align="left" />
+  <mj-button background-color="{{ profile.colour_button or '#1a1a1a' }}" color="{{ profile.colour_button_text or '#ffffff' }}" font-size="15px" font-weight="600" border-radius="{{ profile.radius_button or '4px' }}" inner-padding="12px 24px" padding="8px 0 0 0" align="left" />
 </mj-attributes>
