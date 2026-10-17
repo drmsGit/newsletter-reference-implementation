@@ -3,11 +3,11 @@ id: TASK-71
 title: >-
   Rework seed/demo content into realistic material — prerequisite for testing
   Mode A.
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-27 13:57'
-updated_date: '2026-10-17 11:20'
+updated_date: '2026-10-17 13:43'
 labels:
   - backend
 dependencies: []
@@ -43,4 +43,12 @@ Interview 2026-10-17, one question at a time, to pick the topic that shows every
 2026-10-17: name Grathaus (Grathaus Outdoor, brand key outdoor; Grathaus Touren, brand key touren) and the category tree approved by the user: 9 main, 15 sub, three subs under two parents (Klettersteige under Wandern and Klettern, Familienwandern under Wandern and Familie & Kinder, Lawinenkunde under Wintersport and Sicherheit & Wissen); seasons, content kind and offers are not categories (ADR-175, facets). Kammweg was rejected as a name: it is a real long-distance trail with its own tourism association. The ChatGPT prompt is written (4f6747b, backend/scripts/seed_content_prompt.md): shared rules, six batches of 25, an English batch, an editions and transactional batch, 40 image prompts; files land in backend/scripts/demo/content and backend/scripts/demo/images. Next: the user runs the prompts; then the demo reset command and the importer extension (brand, language, image keys, push fields, editions).
 
 2026-10-17: the reset command built (66a9515): backend/scripts/demo_reset.py and backend/app/demo/ (catalogue, people, editions, reset), the demo.reset audit action, ADR-197 addendum 2026-10-17. Decided in its design pass: keep people and settings (accounts, roles, grants, Settings, integrations, audit log); rename the default brand Grathaus Outdoor and add Grathaus Touren; send each past edition to its segment of at most 200 through the real path. Tested: 13 cases incl. one full run on the test database with generated CSVs (then the baseline restored); full suite green apart from the unrelated retired-name check. Found and fixed on the way: the guard first compared with the dev URL, which in tests is the test database; it now refuses any *_test* name and pytest or CI. task-381 moved to right after the first reset of the dev database (variants there may still hold the retired module until then). Not yet done: running it with the real batches and images, on the dev database (needs the user's go-ahead).
+
+2026-10-17, the content arrived complete (158 rows, 9 edition word sets, 40 images at 600x600) and read with no problems. Ran demo_reset.py --yes on the dev database with Diede's go-ahead. Two defects found and fixed on the way (8973758): the reset stopped on a sign-in session whose working brand was a removed brand (now cleared, as the column allows), and every edition showed 0 delivered because the mock provider reports nothing (the reset now adds delivered and bounce events) and its dates were the reset's day (now the edition's). Left as the product's own: sent campaigns still say draft, because sending does not change a campaign's status; and back-dated sends show the note that unsubscribes before 2026-10-12 are not counted (UNSUBSCRIBES_COUNTED_SINCE, backend/app/campaigns/results.py:45), which is true of them.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The Grathaus demo: the content (158 records, 40 images, edition words) written with seed_content_prompt.md, and demo_reset.py, which empties the demo data and builds two brands, 1000 readers, five sent editions through the mock provider within the send cap, two drafts and the special cases (Prepare from a topic, push, two service mails, German and English). Run on the dev database on 2026-10-17 with the go-ahead. Verified by the reset tests (15, including a new one for a removed brand someone is signed in to), the full backend suite (2187 passed; the one known retired-name failure deselected), and a live look at the campaigns and their results in the browser pane.
+<!-- SECTION:FINAL_SUMMARY:END -->
