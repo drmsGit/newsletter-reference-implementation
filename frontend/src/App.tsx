@@ -28,8 +28,8 @@ import RoleDetail from './screens/RoleDetail'
 import Integrations from './screens/Integrations'
 import IntegrationDetail from './screens/IntegrationDetail'
 import Brands from './screens/Brands'
-import Personalisation, { PersonalisationEntry } from './screens/Personalisation'
-import BrandProfiles from './screens/BrandProfiles'
+import Personalisation, { NoEntryOpen, PERSONALISATION, PersonalisationEntry } from './screens/Personalisation'
+import BrandProfiles, { BRAND_PROFILES, NoProfileOpen } from './screens/BrandProfiles'
 import { DeliveriesSplit, NoSendOpen } from './screens/Deliveries'
 import { Legacy, SettingsMenu, SettingsSplit } from './screens/SettingsLayout'
 import { AI_PROMPTS, AiPromptDetail, AiPromptsSplit, NoTaskOpen } from './screens/AiPrompts'
@@ -85,10 +85,6 @@ export default function App() {
             beside General, a part's list beside what is open. */}
         <Route path="/settings" element={<SettingsSplit label="Settings parts" list={<SettingsMenu />} />}>
           <Route index element={<Settings />} />
-          <Route path="brand-profiles" element={<Legacy><BrandProfiles /></Legacy>} />
-          <Route path="brand-profiles/:id" element={<Legacy><BrandProfileDetail /></Legacy>} />
-          <Route path="personalisation" element={<Legacy><Personalisation /></Legacy>} />
-          <Route path="personalisation/:id" element={<Legacy><PersonalisationEntry /></Legacy>} />
           <Route path="users" element={<Legacy><People /></Legacy>} />
           <Route path="users/:id" element={<Legacy><PersonDetail /></Legacy>} />
           <Route path="roles" element={<Legacy><Roles /></Legacy>} />
@@ -96,6 +92,14 @@ export default function App() {
           <Route path="integrations" element={<Legacy><Integrations /></Legacy>} />
           <Route path="integrations/:id" element={<Legacy><IntegrationDetail /></Legacy>} />
           <Route path="brands" element={<Legacy><Brands /></Legacy>} />
+        </Route>
+        <Route element={<SettingsSplit label="Brand profile list" list={<BrandProfiles />} />}>
+          <Route path={BRAND_PROFILES} element={<NoProfileOpen />} />
+          <Route path={`${BRAND_PROFILES}/:id`} element={<BrandProfileDetail />} />
+        </Route>
+        <Route element={<SettingsSplit label="Entry list" list={<Personalisation />} />}>
+          <Route path={PERSONALISATION} element={<NoEntryOpen />} />
+          <Route path={`${PERSONALISATION}/:id`} element={<PersonalisationEntry />} />
         </Route>
         <Route element={<AiPromptsSplit />}>
           <Route path={AI_PROMPTS} element={<NoTaskOpen />} />

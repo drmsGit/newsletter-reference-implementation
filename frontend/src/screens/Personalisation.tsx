@@ -1,6 +1,17 @@
 import { useState, type FormEvent } from 'react'
-import { Button, Input, Label, TextField } from 'react-aria-components'
-import { useNavigate, useParams } from 'react-router'
+import {
+  Button,
+  Dialog,
+  GridList,
+  GridListItem,
+  Heading,
+  Input,
+  Label,
+  Modal,
+  ModalOverlay,
+  TextField,
+} from 'react-aria-components'
+import { useMatch, useNavigate, useParams } from 'react-router'
 
 import {
   useCreateExpression,
@@ -13,7 +24,7 @@ import {
 } from '../api/resources'
 import { HttpError } from '../api/session'
 import Choice from '../components/Choice'
-import DataTable, { type DataColumn } from '../components/DataTable'
+import BackTo from '../components/BackTo'
 import ScreenState from '../components/ScreenState'
 
 /** A part of Settings, beside the brand profiles whose texts it completes. */
@@ -35,12 +46,6 @@ const GENDERS = [
   { id: 'diverse', name: 'diverse' },
 ]
 
-const COLUMNS: DataColumn<ExpressionEntry>[] = [
-  { key: 'label', header: 'Entry', isRowHeader: true, render: (e) => e.label },
-  { key: 'name', header: 'In a text', render: (e) => `{{${e.name}}}` },
-  { key: 'languages', header: 'Languages', render: (e) => Object.keys(e.languages).sort().join(', ') },
-]
-
 /**
  * The brand's expression dictionary (task-365; ADR-199): entries a text can
  * use, such as {{salutation_formal}}. Each says, per language, what to write
@@ -49,30 +54,57 @@ const COLUMNS: DataColumn<ExpressionEntry>[] = [
 export default function Personalisation() {
   const dictionary = useExpressions()
   const navigate = useNavigate()
+  const openId = Number(useMatch(`${PERSONALISATION}/:id`)?.params.id)
+  const open = Number.isInteger(openId) ? openId : undefined
   return (
+    // Column 2 of the Settings drill-in (task-372; not drawn, it follows Users).
     <>
-      <h1>Personalisation</h1>
-      <p className="muted">
-        Entries a text can use, such as a salutation. Each one says, per language, what to write for which
-        recipient, and what to write when nothing is known about them. An email uses its brand profile's
-        language.
-      </p>
+      <div className="list-head">
+        <BackTo to="/settings" label="Settings" />
+        <div className="list-head__row">
+          <h1>Personalisation</h1>
+          {dictionary.data?.may_manage && <NewEntry />}
+        </div>
+        <p className="muted list-note">
+          Entries a text can use, such as a salutation. Each one says, per language, what to write for which
+          recipient, and what to write when nothing is known about them. An email uses its brand profile's
+          language.
+        </p>
+      </div>
       <ScreenState query={dictionary}>
-        {dictionary.data && (
-          <>
-            {dictionary.data.may_manage && <NewEntry />}
-            <DataTable
-              label="Entries"
-              columns={COLUMNS}
-              items={dictionary.data.items}
-              emptyMessage="This brand has no entries yet."
-              onRowAction={(e) => navigate(`${PERSONALISATION}/${e.id}`)}
-            />
-          </>
-        )}
+        <GridList
+          aria-label="Entries"
+          className="react-aria-GridList item-list"
+          items={dictionary.data?.items ?? []}
+          selectionMode="single"
+          selectionBehavior="replace"
+          selectedKeys={open !== undefined ? [open] : []}
+          onSelectionChange={(keys) => {
+            const [key] = keys === 'all' ? [] : [...keys]
+            if (key !== undefined && Number(key) !== open) navigate(`${PERSONALISATION}/${key}`)
+          }}
+          renderEmptyState={() => <p className="list-empty muted">This brand has no entries yet.</p>}
+        >
+          {(e: ExpressionEntry) => (
+            <GridListItem id={e.id} textValue={e.label} className="react-aria-GridListItem item">
+              <span className="item-title">{e.label}</span>
+              <span className="item-meta">
+                <span>
+                  <code>{`{{${e.name}}}`}</code>
+                </span>
+                <span>{Object.keys(e.languages).sort().join(', ')}</span>
+              </span>
+            </GridListItem>
+          )}
+        </GridList>
       </ScreenState>
     </>
   )
+}
+
+/** The details column before an entry is chosen. */
+export function NoEntryOpen() {
+  return <p className="detail-placeholder muted">Select an entry to see what it writes for whom.</p>
 }
 
 function problem(error: unknown): string {
@@ -80,8 +112,32 @@ function problem(error: unknown): string {
   return (error instanceof HttpError && error.detail) || 'the server refused it.'
 }
 
-/** A name, a label and a first language; the cases are added on the entry's page. */
+/**
+ * "New entry" in the list's header opens a dialog (task-372, decision 22): a
+ * name, a label and a first language; the cases are added on the entry's page.
+ */
 function NewEntry() {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Button className="btn-primary" onPress={() => setOpen(true)}>
+        New entry
+      </Button>
+      <ModalOverlay isOpen={open} onOpenChange={setOpen} isDismissable className="preview-overlay">
+        <Modal className="create-modal">
+          <Dialog aria-labelledby="new-entry-title">
+            <Heading slot="title" id="new-entry-title">
+              New entry
+            </Heading>
+            <NewEntryForm onCancel={() => setOpen(false)} />
+          </Dialog>
+        </Modal>
+      </ModalOverlay>
+    </>
+  )
+}
+
+function NewEntryForm({ onCancel }: { onCancel: () => void }) {
   const create = useCreateExpression()
   const navigate = useNavigate()
   const [name, setName] = useState('')
@@ -98,31 +154,31 @@ function NewEntry() {
   }
 
   return (
-    <details className="new-entry">
-      <summary>New entry</summary>
-      <form onSubmit={submit}>
-        <TextField value={name} onChange={setName} isRequired>
-          <Label>Name in a text, fixed once created (letters, digits, _)</Label>
-          <Input />
-        </TextField>
-        <TextField value={label} onChange={setLabel} isRequired>
-          <Label>Label</Label>
-          <Input />
-        </TextField>
-        <TextField value={language} onChange={setLanguage} isRequired>
-          <Label>First language (de, en, …)</Label>
-          <Input />
-        </TextField>
-        <TextField value={fallback} onChange={setFallback} isRequired>
-          <Label>Text when nothing is known about the recipient</Label>
-          <Input />
-        </TextField>
+    <form className="dialog-form" onSubmit={submit}>
+      <TextField value={name} onChange={setName} isRequired autoFocus>
+        <Label>Name in a text, fixed once created (letters, digits, _)</Label>
+        <Input />
+      </TextField>
+      <TextField value={label} onChange={setLabel} isRequired>
+        <Label>Label</Label>
+        <Input />
+      </TextField>
+      <TextField value={language} onChange={setLanguage} isRequired>
+        <Label>First language (de, en, …)</Label>
+        <Input />
+      </TextField>
+      <TextField value={fallback} onChange={setFallback} isRequired>
+        <Label>Text when nothing is known about the recipient</Label>
+        <Input />
+      </TextField>
+      {create.error != null && <p role="alert">Not created: {problem(create.error)}</p>}
+      <div className="dialog-actions">
+        <Button onPress={onCancel}>Cancel</Button>
         <Button type="submit" isDisabled={create.isPending || !name.trim() || !label.trim() || !fallback.trim()}>
           Create
         </Button>
-        {create.error != null && <p role="alert">Not created: {problem(create.error)}</p>}
-      </form>
-    </details>
+      </div>
+    </form>
   )
 }
 
@@ -132,14 +188,19 @@ export function PersonalisationEntry() {
   const dictionary = useExpressions()
   const entry = dictionary.data?.items.find((e) => e.id === Number(id))
   return (
-    <ScreenState query={dictionary}>
-      {dictionary.data &&
-        (entry ? (
-          <EntryForm key={entry.updated_at} entry={entry} readOnly={!dictionary.data.may_manage} />
-        ) : (
-          <p role="alert">This entry is not in the brand's dictionary.</p>
-        ))}
-    </ScreenState>
+    // Column 3 of the personalisation entries (task-372).
+    <div className="detail">
+      <div className="detail-scroll">
+        <ScreenState query={dictionary}>
+          {dictionary.data &&
+            (entry ? (
+              <EntryForm key={entry.updated_at} entry={entry} readOnly={!dictionary.data.may_manage} />
+            ) : (
+              <p role="alert" className="quiet">This entry is not in the brand's dictionary.</p>
+            ))}
+        </ScreenState>
+      </div>
+    </div>
   )
 }
 
@@ -161,14 +222,18 @@ function EntryForm({ entry, readOnly }: { entry: ExpressionEntry; readOnly: bool
         save.mutate({ version: entry.updated_at, label, languages })
       }}
     >
-      <h1>{entry.label}</h1>
-      <p className="muted">
-        In a text: <code>{`{{${entry.name}}}`}</code>. The name stays as it is; a different name is a new entry.
-      </p>
-      <TextField value={label} onChange={setLabel} isReadOnly={readOnly}>
-        <Label>Label</Label>
-        <Input />
-      </TextField>
+      <div className="detail-head">
+        <h2>{entry.label}</h2>
+        <p className="muted">
+          In a text: <code>{`{{${entry.name}}}`}</code>. The name stays as it is; a different name is a new entry.
+        </p>
+      </div>
+      <div className="group card-rows">
+        <TextField value={label} onChange={setLabel} isReadOnly={readOnly}>
+          <Label>Label</Label>
+          <Input />
+        </TextField>
+      </div>
       {Object.keys(languages)
         .sort()
         .map((code) => (
@@ -186,7 +251,7 @@ function EntryForm({ entry, readOnly }: { entry: ExpressionEntry; readOnly: bool
           />
         ))}
       {!readOnly && (
-        <p>
+        <p className="group group-body inline-form">
           <TextField value={added} onChange={setAdded}>
             <Label>Add a language (de, en, en-GB, …)</Label>
             <Input />
@@ -203,7 +268,7 @@ function EntryForm({ entry, readOnly }: { entry: ExpressionEntry; readOnly: bool
         </p>
       )}
       {!readOnly && (
-        <p>
+        <p className="group group-body btnrow">
           <Button type="submit" isDisabled={save.isPending}>
             {save.isPending ? 'Saving…' : 'Save'}
           </Button>{' '}
@@ -215,7 +280,9 @@ function EntryForm({ entry, readOnly }: { entry: ExpressionEntry; readOnly: bool
               <Button onPress={() => setConfirm(false)}>Keep it</Button>
             </span>
           ) : (
-            <Button onPress={() => setConfirm(true)}>Delete…</Button>
+            <Button className="btn-destructive" onPress={() => setConfirm(true)}>
+              Delete…
+            </Button>
           )}
         </p>
       )}
@@ -244,67 +311,78 @@ function LanguageCases({
   const setCase = (index: number, next: ExpressionCase) =>
     onChange({ ...spec, cases: cases.map((c, i) => (i === index ? next : c)) })
   return (
-    <fieldset className="language-cases">
-      <legend>{code}</legend>
-      <p className="muted">
-        Tried in order; the first that fits is used. A case only fits when every name its text uses is filled.
-        Texts may use {'{{first_name}}'} and {'{{last_name}}'}.
-      </p>
-      <ol>
-        {cases.map((c, index) => (
-          <li key={index} role="group" aria-label={`${code} case ${index + 1}`}>
-            <Choice
-              label="When"
-              options={FIELDS}
-              selected={c.field}
-              onChange={(field) => setCase(index, { ...c, field })}
-            />
-            <Choice
-              label="Test"
-              options={TESTS}
-              selected={c.is}
-              onChange={(test) =>
-                setCase(index, test === 'equals' ? { ...c, is: test } : { ...c, is: test, value: undefined })
-              }
-            />
-            {c.is === 'equals' &&
-              (c.field === 'gender' ? (
-                <Choice
-                  label="Value"
-                  options={GENDERS}
-                  selected={c.value ?? ''}
-                  onChange={(value) => setCase(index, { ...c, value })}
-                />
-              ) : (
-                <TextField value={c.value ?? ''} onChange={(value) => setCase(index, { ...c, value })} isReadOnly={readOnly}>
-                  <Label>Value</Label>
-                  <Input />
-                </TextField>
-              ))}
-            <TextField value={c.text} onChange={(text) => setCase(index, { ...c, text })} isReadOnly={readOnly}>
-              <Label>Write</Label>
-              <Input />
-            </TextField>
-            {!readOnly && (
-              <Button onPress={() => onChange({ ...spec, cases: cases.filter((_, i) => i !== index) })}>
-                Remove case
-              </Button>
-            )}
-          </li>
-        ))}
-      </ol>
-      {!readOnly && (
-        <Button
-          onPress={() => onChange({ ...spec, cases: [...cases, { field: 'first_name', is: 'filled', text: '' }] })}
-        >
-          Add a case
-        </Button>
-      )}
-      <TextField value={spec.fallback} onChange={(fallback) => onChange({ ...spec, fallback })} isReadOnly={readOnly}>
-        <Label>Otherwise write ({code})</Label>
-        <Input />
-      </TextField>
-      {!readOnly && <Button onPress={onRemove}>Remove {code}</Button>}
+    // Each language a titled card (task-372): the legend is its title.
+    <fieldset className="language-cases detail-section">
+      <legend className="group-title">{code}</legend>
+      <div className="group card-rows">
+        <p className="muted">
+          Tried in order; the first that fits is used. A case only fits when every name its text uses is filled.
+          Texts may use {'{{first_name}}'} and {'{{last_name}}'}.
+        </p>
+        <ol>
+          {cases.map((c, index) => (
+            <li key={index} role="group" aria-label={`${code} case ${index + 1}`}>
+              <Choice
+                label="When"
+                options={FIELDS}
+                selected={c.field}
+                onChange={(field) => setCase(index, { ...c, field })}
+              />
+              <Choice
+                label="Test"
+                options={TESTS}
+                selected={c.is}
+                onChange={(test) =>
+                  setCase(index, test === 'equals' ? { ...c, is: test } : { ...c, is: test, value: undefined })
+                }
+              />
+              {c.is === 'equals' &&
+                (c.field === 'gender' ? (
+                  <Choice
+                    label="Value"
+                    options={GENDERS}
+                    selected={c.value ?? ''}
+                    onChange={(value) => setCase(index, { ...c, value })}
+                  />
+                ) : (
+                  <TextField value={c.value ?? ''} onChange={(value) => setCase(index, { ...c, value })} isReadOnly={readOnly}>
+                    <Label>Value</Label>
+                    <Input />
+                  </TextField>
+                ))}
+              <TextField value={c.text} onChange={(text) => setCase(index, { ...c, text })} isReadOnly={readOnly}>
+                <Label>Write</Label>
+                <Input />
+              </TextField>
+              {!readOnly && (
+                <Button onPress={() => onChange({ ...spec, cases: cases.filter((_, i) => i !== index) })}>
+                  Remove case
+                </Button>
+              )}
+            </li>
+          ))}
+        </ol>
+        {!readOnly && (
+          <div>
+            <Button
+              onPress={() => onChange({ ...spec, cases: [...cases, { field: 'first_name', is: 'filled', text: '' }] })}
+            >
+              Add a case
+            </Button>
+          </div>
+        )}
+        <TextField value={spec.fallback} onChange={(fallback) => onChange({ ...spec, fallback })} isReadOnly={readOnly}>
+          <Label>Otherwise write ({code})</Label>
+          <Input />
+        </TextField>
+        {!readOnly && (
+          <div>
+            <Button className="btn-plain" onPress={onRemove}>
+              Remove {code}
+            </Button>
+          </div>
+        )}
+      </div>
     </fieldset>
   )
 }

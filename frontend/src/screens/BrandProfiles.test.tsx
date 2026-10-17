@@ -44,10 +44,11 @@ describe('the profile list', () => {
       'GET /brand-profiles/structure': () => jsonResponse(STRUCTURE),
     })
     renderWithProviders(<BrandProfiles />)
+    // A list of rows (task-372): the default first, said in its summary line.
     const rows = await screen.findAllByRole('row')
-    expect(within(rows[1]).getByText('Default', { selector: '[role="rowheader"] *, [role="rowheader"]' })).toBeInTheDocument()
-    expect(await screen.findByText('Missing: Legal company name, Imprint URL')).toBeInTheDocument()
-    expect(within(rows[1]).getByText('Complete')).toBeInTheDocument()
+    expect(within(rows[0]).getByText('Default · en · marketing')).toBeInTheDocument()
+    expect(within(rows[0]).getByText('Complete')).toBeInTheDocument()
+    expect(await within(rows[1]).findByText('Missing: Legal company name, Imprint URL')).toBeInTheDocument()
   })
 })
 
@@ -215,7 +216,8 @@ describe('one profile', () => {
 })
 
 describe('settings and its parts', () => {
-  it('reaches brand profiles as a part of Settings, marking the part that is open', async () => {
+  it('reaches brand profiles from the Settings menu as a drill-in, with the way back', async () => {
+    // task-372, decision 19: the list replaces the menu in column 2.
     const { SettingsMenu, SettingsSplit } = await import('./SettingsLayout')
     stubFetch({
       'GET /brand-profiles/': () => jsonResponse(page([summary({})])),
@@ -225,14 +227,18 @@ describe('settings and its parts', () => {
       <Routes>
         <Route path="/settings" element={<SettingsSplit label="Settings parts" list={<SettingsMenu />} />}>
           <Route index element={<p>General settings</p>} />
-          <Route path="brand-profiles" element={<BrandProfiles />} />
+        </Route>
+        <Route element={<SettingsSplit label="Brand profile list" list={<BrandProfiles />} />}>
+          <Route path="/settings/brand-profiles" element={<p>No profile open</p>} />
         </Route>
       </Routes>,
-      { route: '/settings/brand-profiles' },
+      { route: '/settings' },
     )
     const parts = screen.getByRole('navigation', { name: 'Settings' })
-    expect(within(parts).getByRole('link', { name: 'Brand profiles' })).toHaveAttribute('aria-current', 'page')
-    expect(within(parts).getByRole('link', { name: 'General' })).not.toHaveAttribute('aria-current')
+    expect(within(parts).getByRole('link', { name: 'General' })).toHaveAttribute('aria-current', 'page')
+    fireEvent.click(within(parts).getByRole('link', { name: 'Brand profiles' }))
     expect(await screen.findByRole('heading', { name: 'Brand profiles' })).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Settings' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
   })
 })

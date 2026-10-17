@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Button, Input, Label, Text, TextArea, TextField } from 'react-aria-components'
-import { Link, useNavigate, useParams } from 'react-router'
+import { useNavigate, useParams } from 'react-router'
 
 import {
   useBrandProfile,
@@ -37,26 +37,26 @@ export default function BrandProfileDetail() {
   const save = useSaveBrandProfile(id)
 
   return (
-    <>
-      <p>
-        <Link to={BRAND_PROFILES}>← Brand profiles</Link>
-      </p>
-      <ScreenState query={profile}>
-        <ScreenState query={structure}>
-          {profile.data && structure.data && (
-            // Keyed on the profile, not its version: a newer version arriving
-            // in the background must not wipe what somebody is typing.
-            <ProfileForm
-              key={profile.data.id}
-              profile={profile.data}
-              fields={structure.data}
-              save={save}
-              reload={() => profile.refetch()}
-            />
-          )}
+    // Column 3 of the brand profiles (task-372, render 34).
+    <div className="detail">
+      <div className="detail-scroll">
+        <ScreenState query={profile}>
+          <ScreenState query={structure}>
+            {profile.data && structure.data && (
+              // Keyed on the profile, not its version: a newer version arriving
+              // in the background must not wipe what somebody is typing.
+              <ProfileForm
+                key={profile.data.id}
+                profile={profile.data}
+                fields={structure.data}
+                save={save}
+                reload={() => profile.refetch()}
+              />
+            )}
+          </ScreenState>
         </ScreenState>
-      </ScreenState>
-    </>
+      </div>
+    </div>
   )
 }
 
@@ -151,12 +151,14 @@ function ProfileForm({
   return (
     // noValidate: the server's per-field refusals are the rules, in its words;
     // the browser's own URL check would refuse first, in different ones.
-    <form onSubmit={submit} aria-labelledby="profile-heading" noValidate>
-      <h1 id="profile-heading">{profile.name}</h1>
-      <p className="muted">
-        {profile.is_default ? 'Default profile · ' : ''}
-        {profile.kind} · {profile.language}
-      </p>
+    <form onSubmit={submit} aria-labelledby="profile-heading" noValidate className="profile-form">
+      <div className="detail-head">
+        <h2 id="profile-heading">{profile.name}</h2>
+        <p className="muted">
+          {profile.is_default ? 'Default profile · ' : ''}
+          {profile.kind} · {profile.language}
+        </p>
+      </div>
       {readOnly && (
         <p className="muted">You can read this profile. Changing it needs the brand-profile permission.</p>
       )}
@@ -183,74 +185,79 @@ function ProfileForm({
         </p>
       )}
 
-      <fieldset>
-        <legend>Profile</legend>
-        <TextField value={name} onChange={setName} isRequired isReadOnly={readOnly} isInvalid={!!fieldError(save.error, 'name')}>
-          <Label>Name</Label>
-          <Input />
-          <FieldError message={fieldError(save.error, 'name')} />
-        </TextField>
-        <TextField
-          value={language}
-          onChange={setLanguage}
-          isRequired
-          isReadOnly={readOnly}
-          isInvalid={!!fieldError(save.error, 'language')}
-        >
-          <Label>Language</Label>
-          <Input />
-          <Text slot="description" className="muted">
-            The language its texts are in, such as en or de. One profile per language.
-          </Text>
-          <FieldError message={fieldError(save.error, 'language')} />
-        </TextField>
-        {!readOnly && profile.may_mark_transactional ? (
-          <Choice
-            label="Kind"
-            options={[
-              { id: 'marketing', name: 'Marketing: needs an opt-in' },
-              { id: 'transactional', name: 'Transactional: sent without the opt-in check' },
-            ]}
-            selected={draft.kind}
-            onChange={setKind}
-          />
-        ) : (
-          <p>
-            Kind: {profile.kind}
-            {!readOnly && <span className="muted"> (making a profile transactional needs its own permission)</span>}
-          </p>
-        )}
-        <FieldError message={fieldError(save.error, 'kind')} />
+      <fieldset className="detail-section">
+        <legend className="sr-only">Profile</legend>
+        <div className="group card-rows">
+          <TextField value={name} onChange={setName} isRequired isReadOnly={readOnly} isInvalid={!!fieldError(save.error, 'name')}>
+            <Label>Name</Label>
+            <Input />
+            <FieldError message={fieldError(save.error, 'name')} />
+          </TextField>
+          <TextField
+            value={language}
+            onChange={setLanguage}
+            isRequired
+            isReadOnly={readOnly}
+            isInvalid={!!fieldError(save.error, 'language')}
+          >
+            <Label>Language</Label>
+            <Input />
+            <Text slot="description" className="muted">
+              The language its texts are in, such as en or de. One profile per language.
+            </Text>
+            <FieldError message={fieldError(save.error, 'language')} />
+          </TextField>
+          {!readOnly && profile.may_mark_transactional ? (
+            <Choice
+              label="Kind"
+              options={[
+                { id: 'marketing', name: 'Marketing: needs an opt-in' },
+                { id: 'transactional', name: 'Transactional: sent without the opt-in check' },
+              ]}
+              selected={draft.kind}
+              onChange={setKind}
+            />
+          ) : (
+            <p>
+              Kind: {profile.kind}
+              {!readOnly && <span className="muted"> (making a profile transactional needs its own permission)</span>}
+            </p>
+          )}
+          <FieldError message={fieldError(save.error, 'kind')} />
+        </div>
       </fieldset>
 
       {groups.map((group) => (
-        <fieldset key={group}>
-          <legend>{group}</legend>
-          {fields
-            .filter((f) => f.group === group && !alts.has(f.name))
-            .map((field) => (
-              <ProfileInput
-                key={field.name}
-                field={field}
-                value={values[field.name] ?? ''}
-                alt={field.alt ? (values[field.alt] ?? '') : undefined}
-                onChange={(value, alt) =>
-                  setValues((current) => ({
-                    ...current,
-                    [field.name]: value,
-                    ...(field.alt && alt !== undefined ? { [field.alt]: alt } : {}),
-                  }))
-                }
-                required={field.required_for.includes(profile.kind)}
-                readOnly={readOnly}
-                error={fieldError(save.error, field.name)}
-              />
-            ))}
+        // Each group a titled card (render 34): the legend is its title.
+        <fieldset key={group} className="detail-section">
+          <legend className="group-title">{group}</legend>
+          <div className="group card-rows">
+            {fields
+              .filter((f) => f.group === group && !alts.has(f.name))
+              .map((field) => (
+                <ProfileInput
+                  key={field.name}
+                  field={field}
+                  value={values[field.name] ?? ''}
+                  alt={field.alt ? (values[field.alt] ?? '') : undefined}
+                  onChange={(value, alt) =>
+                    setValues((current) => ({
+                      ...current,
+                      [field.name]: value,
+                      ...(field.alt && alt !== undefined ? { [field.alt]: alt } : {}),
+                    }))
+                  }
+                  required={field.required_for.includes(profile.kind)}
+                  readOnly={readOnly}
+                  error={fieldError(save.error, field.name)}
+                />
+              ))}
+          </div>
         </fieldset>
       ))}
 
       {!readOnly && (
-        <p>
+        <p className="group group-body btnrow">
           <Button type="submit" isDisabled={!dirty || save.isPending}>
             {save.isPending ? 'Saving…' : 'Save'}
           </Button>
@@ -342,44 +349,49 @@ function ProfileActions({ profile, dirty }: { profile: BrandProfile; dirty: bool
   const failed = [duplicate, makeDefault, remove].find((m) => m.isError)
 
   return (
-    <section aria-label="Profile actions" className="actions">
-      {dirty && <p className="muted">Save or undo your changes first; these act on the stored profile.</p>}
-      <Button
-        isDisabled={busy || dirty}
-        onPress={() => duplicate.mutate(undefined, { onSuccess: (copy) => navigate(`${BRAND_PROFILES}/${copy.id}`) })}
-      >
-        Duplicate
-      </Button>{' '}
-      {!profile.is_default && (
-        <>
-          <Button isDisabled={busy || dirty} onPress={() => makeDefault.mutate()}>
-            Make default
-          </Button>{' '}
-          {confirming ? (
-            <span role="group" aria-label="Confirm delete">
-              Variants using it will move to the default profile.{' '}
-              <Button
-                isDisabled={busy}
-                onPress={() => remove.mutate(undefined, { onSuccess: () => navigate(BRAND_PROFILES) })}
-              >
-                Delete {profile.name}
-              </Button>{' '}
-              <Button onPress={() => setConfirming(false)}>Keep it</Button>
-            </span>
-          ) : (
-            <Button isDisabled={busy || dirty} onPress={() => setConfirming(true)}>
-              Delete…
-            </Button>
-          )}
-        </>
-      )}
-      {failed && (
-        <p role="alert">
-          {failed.error instanceof HttpError && failed.error.status === 403
-            ? 'You do not have permission to manage brand profiles in this brand.'
-            : `Not done: ${(failed.error instanceof HttpError && failed.error.detail) || 'the server refused it.'}`}
-        </p>
-      )}
+    <section aria-labelledby="profile-actions" className="detail-section">
+      <h3 id="profile-actions" className="group-title">
+        Profile actions
+      </h3>
+      <div className="group group-body">
+        {dirty && <p className="muted">Save or undo your changes first; these act on the stored profile.</p>}
+        <Button
+          isDisabled={busy || dirty}
+          onPress={() => duplicate.mutate(undefined, { onSuccess: (copy) => navigate(`${BRAND_PROFILES}/${copy.id}`) })}
+        >
+          Duplicate
+        </Button>{' '}
+        {!profile.is_default && (
+          <>
+            <Button isDisabled={busy || dirty} onPress={() => makeDefault.mutate()}>
+              Make default
+            </Button>{' '}
+            {confirming ? (
+              <span role="group" aria-label="Confirm delete">
+                Variants using it will move to the default profile.{' '}
+                <Button
+                  isDisabled={busy}
+                  onPress={() => remove.mutate(undefined, { onSuccess: () => navigate(BRAND_PROFILES) })}
+                >
+                  Delete {profile.name}
+                </Button>{' '}
+                <Button onPress={() => setConfirming(false)}>Keep it</Button>
+              </span>
+            ) : (
+              <Button className="btn-destructive" isDisabled={busy || dirty} onPress={() => setConfirming(true)}>
+                Delete…
+              </Button>
+            )}
+          </>
+        )}
+        {failed && (
+          <p role="alert">
+            {failed.error instanceof HttpError && failed.error.status === 403
+              ? 'You do not have permission to manage brand profiles in this brand.'
+              : `Not done: ${(failed.error instanceof HttpError && failed.error.detail) || 'the server refused it.'}`}
+          </p>
+        )}
+      </div>
     </section>
   )
 }

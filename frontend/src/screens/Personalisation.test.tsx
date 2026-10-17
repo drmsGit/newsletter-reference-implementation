@@ -63,7 +63,9 @@ describe('the expression dictionary (task-365; ADR-199)', () => {
 
   it('creates an entry with its first language and fallback', async () => {
     const writes = open('/settings/personalisation')
-    fireEvent.click(await screen.findByText('New entry'))
+    // "New entry" opens a dialog (task-372, decision 22).
+    fireEvent.click(await screen.findByRole('button', { name: 'New entry' }))
+    expect(await screen.findByRole('dialog', { name: 'New entry' })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(/^Name in a text/), { target: { value: 'greeting' } })
     fireEvent.change(screen.getByLabelText(/^Label/), { target: { value: 'Greeting' } })
     fireEvent.change(screen.getByLabelText(/^Text when nothing is known/), { target: { value: 'Hallo,' } })
