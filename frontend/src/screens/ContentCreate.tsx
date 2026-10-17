@@ -45,7 +45,7 @@ function CreateForm({ onCancel }: { onCancel: () => void }) {
     if (!title.trim() || create.isPending) return
     create.mutate(
       { title: title.trim(), description: description.trim() },
-      { onSuccess: (record) => navigate(`/content/${record.id}`) },
+      { onSuccess: (record) => { onCancel(); navigate(`/content/${record.id}`) } },
     )
   }
 

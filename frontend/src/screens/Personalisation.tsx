@@ -149,7 +149,7 @@ function NewEntryForm({ onCancel }: { onCancel: () => void }) {
     event.preventDefault()
     create.mutate(
       { name: name.trim(), label: label.trim(), languages: { [language.trim()]: { cases: [], fallback } } },
-      { onSuccess: (entry) => navigate(`${PERSONALISATION}/${entry.id}`) },
+      { onSuccess: (entry) => { onCancel(); navigate(`${PERSONALISATION}/${entry.id}`) } },
     )
   }
 

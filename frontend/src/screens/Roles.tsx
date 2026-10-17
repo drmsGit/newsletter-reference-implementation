@@ -60,7 +60,7 @@ function NewRole({ roles, onCancel }: { roles: Role[]; onCancel: () => void }) {
   function submit(event: FormEvent) {
     event.preventDefault()
     create.mutate({ key: key.trim(), name: name.trim(), ...(from ? { copy_from: Number(from) } : {}) },
-      { onSuccess: (role) => navigate(`${ROLES}/${role.id}`) })
+      { onSuccess: (role) => { onCancel(); navigate(`${ROLES}/${role.id}`) } })
   }
   return (
     <form className="dialog-form" onSubmit={submit} aria-label="Create a role">

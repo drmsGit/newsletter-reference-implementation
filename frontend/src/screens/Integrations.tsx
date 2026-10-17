@@ -54,7 +54,7 @@ function NewIntegration({ onCancel }: { onCancel: () => void }) {
   function submit(event: FormEvent) {
     event.preventDefault()
     create.mutate({ name: name.trim(), ...(description.trim() ? { description: description.trim() } : {}) },
-      { onSuccess: (integration) => navigate(`${INTEGRATIONS}/${integration.id}`) })
+      { onSuccess: (integration) => { onCancel(); navigate(`${INTEGRATIONS}/${integration.id}`) } })
   }
   return (
     <form className="dialog-form" onSubmit={submit} aria-label="Create an integration">

@@ -133,7 +133,7 @@ function CreateForm({ onCancel }: { onCancel: () => void }) {
   function submit(event: FormEvent) {
     event.preventDefault()
     if (!name.trim() || create.isPending) return
-    create.mutate({ name: name.trim() }, { onSuccess: (profile) => navigate(`${BRAND_PROFILES}/${profile.id}`) })
+    create.mutate({ name: name.trim() }, { onSuccess: (profile) => { onCancel(); navigate(`${BRAND_PROFILES}/${profile.id}`) } })
   }
 
   return (

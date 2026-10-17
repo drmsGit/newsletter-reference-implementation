@@ -134,7 +134,7 @@ function CreateForm({ onCancel }: { onCancel: () => void }) {
   function submit(event: FormEvent) {
     event.preventDefault()
     if (!name.trim() || create.isPending) return
-    create.mutate({ name: name.trim(), type }, { onSuccess: (c) => navigate(`${CATEGORIES}/${c.id}`) })
+    create.mutate({ name: name.trim(), type }, { onSuccess: (c) => { onCancel(); navigate(`${CATEGORIES}/${c.id}`) } })
   }
   return (
     <form className="dialog-form" onSubmit={submit} aria-label="Create a category">

@@ -48,7 +48,7 @@ function CreateForm({ onCancel }: { onCancel: () => void }) {
     if (!name.trim() || create.isPending) return
     create.mutate(
       { name: name.trim(), description: description.trim() },
-      { onSuccess: (group) => navigate(`/audiences/${group.id}`) },
+      { onSuccess: (group) => { onCancel(); navigate(`/audiences/${group.id}`) } },
     )
   }
 
@@ -103,7 +103,7 @@ export function SuggestFromCampaign() {
                 <li key={c.id}>
                   <Button
                     isDisabled={suggest.isPending}
-                    onPress={() => suggest.mutate(c.id, { onSuccess: (group) => navigate(`/audiences/${group.id}`) })}
+                    onPress={() => suggest.mutate(c.id, { onSuccess: (group) => { setOpen(false); navigate(`/audiences/${group.id}`) } })}
                   >
                     {c.name}
                   </Button>

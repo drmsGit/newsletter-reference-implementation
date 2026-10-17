@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Route, Routes } from 'react-router'
+import { Outlet, Route, Routes } from 'react-router'
 
 import Content from './Content'
 import { ShortcutsProvider } from '../shortcuts/Shortcuts'
@@ -8,7 +8,7 @@ import { jsonResponse, page, renderWithProviders, stubFetch } from '../test-util
 
 afterEach(() => vi.unstubAllGlobals())
 
-function open({ refuse }: { refuse?: number } = {}, { shortcuts = false } = {}) {
+function open({ refuse }: { refuse?: number } = {}, { shortcuts = false, split = false } = {}) {
   const writes: Request[] = []
   stubFetch({
     'GET /content/': () => jsonResponse(page([])),
@@ -20,7 +20,16 @@ function open({ refuse }: { refuse?: number } = {}, { shortcuts = false } = {}) 
       return refuse ? jsonResponse({ detail: 'no' }, refuse) : jsonResponse({ id: 77, title: 'x', content: {} })
     },
   } as never)
-  const routes = (
+  const routes = split ? (
+    // As in the app: the list is a layout that stays mounted while the new
+    // record opens beside it, so its dialog's state outlives the navigation.
+    <Routes>
+      <Route element={<><Content /><Outlet /></>}>
+        <Route path="/content/records" element={null} />
+        <Route path="/content/:id" element={<h1>Record page</h1>} />
+      </Route>
+    </Routes>
+  ) : (
     <Routes>
       <Route path="/content/records" element={<Content />} />
       <Route path="/content/:id" element={<h1>Record page</h1>} />
@@ -43,6 +52,17 @@ describe('creating a record (task-281)', () => {
     fireEvent.submit(within(form).getByLabelText(/^Title/).closest('form')!)
     await waitFor(() => expect(writes).toHaveLength(1))
     expect(await writes[0].json()).toEqual({ title: 'Lisbon in spring', description: 'Three days', content: {} })
+    expect(await screen.findByRole('heading', { name: 'Record page' })).toBeInTheDocument()
+  })
+
+  it('closes once the record is made, though the list stays beside it (the split, task-372)', async () => {
+    open({}, { split: true })
+    fireEvent.click(await screen.findByRole('button', { name: /New record/ }))
+    const form = await dialog()
+    fireEvent.change(within(form).getByLabelText(/^Title/), { target: { value: 'Porto' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Create' }))
+    // While it stays open, the page behind it is hidden from the reader.
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New content record' })).not.toBeInTheDocument())
     expect(await screen.findByRole('heading', { name: 'Record page' })).toBeInTheDocument()
   })
 

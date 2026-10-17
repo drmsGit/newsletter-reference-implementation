@@ -80,7 +80,7 @@ function NewPerson({ multiBrand, onCancel }: { multiBrand: boolean; onCancel: ()
     create.mutate(
       { email: email.trim(), display_name: name.trim(), is_external: external, role_key: role,
         ...(brand ? { brand_id: Number(brand) } : {}) },
-      { onSuccess: (person) => navigate(`${PEOPLE}/${person.id}`) },
+      { onSuccess: (person) => { onCancel(); navigate(`${PEOPLE}/${person.id}`) } },
     )
   }
   return (
