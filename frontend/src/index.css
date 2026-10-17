@@ -1,29 +1,110 @@
 /*
- * Brand tokens.
+ * The manager app's look, v2 (task-372): docs/design/HANDOFF.md, tokens.css and
+ * canvas-v2/ui.css. The tokens are docs/design/tokens.css (keep the two equal);
+ * the rules below give React Aria's own classes and the plain elements the
+ * component library's look, so every screen takes it at once. ADR-173: React
+ * Aria for behaviour, plain CSS for the look; ADR-171: the system font only.
  *
- * **These values are placeholders and are known to be.** ADR-170's Notes record
- * the brand/theming split -- email keeps a full plain-CSS `brand.css` owned by
- * designers, and the management UI gets a small palette of colours, fonts,
- * sizes and logos applied through CSS custom properties. ADR-173 point 1 picks
- * plain CSS over those properties, which is why they are here.
+ * Linen is the ground, Petrol the one action colour, Pale Pink the navigation's
+ * "you are here" (and nothing else: it is the failed tint's hue). Note the change
+ * of meaning from v1: --brand-bg is the ground, white is --brand-surface.
  *
- * The backlog item that defines the actual palette is still open. Every value
- * below is a neutral stand-in chosen to be obviously provisional rather than
- * plausibly final: nothing downstream should read as designed until that item
- * closes, and a screen that looks finished is harder to revisit than one that
- * does not.
+ * Themes follow the system (decided 2026-10-17): dark under prefers-color-scheme,
+ * increased contrast under prefers-contrast; data-theme on <html> forces either.
  */
 :root {
-  --brand-fg: #1a1a1a;
-  --brand-bg: #ffffff;
-  --brand-muted: #6b6b6b;
-  --brand-line: #d8d8d8;
-  --brand-accent: #2a5db0;
+  --brand-fg: #1f1b16;
+  --brand-bg: #fcf8f2;
+  --brand-muted: #62594e;
+  --brand-line: #e4daca;
+  --brand-accent: #1a5d74;
   --brand-danger: #b3261e;
-
-  --brand-font: system-ui, -apple-system, "Segoe UI", sans-serif;
-  --brand-radius: 4px;
+  --brand-font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --brand-radius: 6px;
   --brand-space: 8px;
+
+  --brand-surface: #ffffff;
+  --brand-surface-2: #f6f1e8;
+  --brand-line-strong: #857a6c;
+  --brand-accent-fg: #ffffff;
+  --brand-focus: #1a5d74;
+  --brand-sidebar: #f3ecdf;
+  --brand-selected: #dceaef;
+  --brand-highlight: #f4bebb;
+
+  --brand-human: #7a4a00;
+  --brand-human-bg: #fff0d6;
+  --brand-success: #1d6b34;
+  --brand-success-bg: #e1f4e6;
+  --brand-info: #0a5eb0;
+  --brand-info-bg: #e3effb;
+  --brand-danger-bg: #fde8e6;
+
+  --brand-font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --brand-radius-panel: 10px;
+  --brand-radius-chip: 999px;
+  --brand-shadow: 0 0.5px 1px rgb(0 0 0 / 0.12);
+  --brand-control-height-sm: 24px;
+  --brand-control-height: 28px;
+  --brand-control-height-lg: 36px;
+
+  --brand-avatar-bg-s: 50%;
+  --brand-avatar-bg-l: 90%;
+  --brand-avatar-fg-s: 60%;
+  --brand-avatar-fg-l: 24%;
+  color-scheme: light;
+}
+
+/* Dark: the system's setting, unless the page forces light; or forced. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --brand-fg: #f4eee6; --brand-bg: #14110f; --brand-muted: #b0a79b; --brand-line: #3a342d;
+    --brand-accent: #6fc3dd; --brand-danger: #ff8d85; --brand-surface: #1e1b18; --brand-surface-2: #2a2622;
+    --brand-line-strong: #8f857a; --brand-accent-fg: #0b2530; --brand-focus: #6fc3dd; --brand-sidebar: #191614;
+    --brand-selected: #19424f; --brand-highlight: #613534; --brand-human: #ffc970; --brand-human-bg: #3a2a0c;
+    --brand-success: #7dd99a; --brand-success-bg: #12301c; --brand-info: #7db9ff; --brand-info-bg: #14304f;
+    --brand-danger-bg: #3f1b18; --brand-shadow: 0 0 0 0.5px rgb(255 255 255 / 0.08);
+    --brand-avatar-bg-s: 32%; --brand-avatar-bg-l: 24%; --brand-avatar-fg-s: 70%; --brand-avatar-fg-l: 86%;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --brand-fg: #f4eee6; --brand-bg: #14110f; --brand-muted: #b0a79b; --brand-line: #3a342d;
+  --brand-accent: #6fc3dd; --brand-danger: #ff8d85; --brand-surface: #1e1b18; --brand-surface-2: #2a2622;
+  --brand-line-strong: #8f857a; --brand-accent-fg: #0b2530; --brand-focus: #6fc3dd; --brand-sidebar: #191614;
+  --brand-selected: #19424f; --brand-highlight: #613534; --brand-human: #ffc970; --brand-human-bg: #3a2a0c;
+  --brand-success: #7dd99a; --brand-success-bg: #12301c; --brand-info: #7db9ff; --brand-info-bg: #14304f;
+  --brand-danger-bg: #3f1b18; --brand-shadow: 0 0 0 0.5px rgb(255 255 255 / 0.08);
+  --brand-avatar-bg-s: 32%; --brand-avatar-bg-l: 24%; --brand-avatar-fg-s: 70%; --brand-avatar-fg-l: 86%;
+  color-scheme: dark;
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --brand-bg: #ffffff; --brand-sidebar: #f3ecdf; --brand-surface-2: #ece4d6; --brand-selected: #bfd8e0;
+    --brand-highlight: #efa9a5; --brand-line: #8a7f70; --brand-line-strong: #3d362d; --brand-fg: #000000;
+    --brand-muted: #3f382f; --brand-accent: #0e4558; --brand-focus: #0e4558; --brand-human: #5e3a00;
+    --brand-success: #14532a; --brand-info: #07468a; --brand-danger: #8e1a13;
+    --brand-avatar-bg-l: 86%; --brand-avatar-fg-s: 70%; --brand-avatar-fg-l: 16%;
+  }
+}
+@media (prefers-contrast: more) and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --brand-bg: #000000; --brand-surface: #0d0b0a; --brand-sidebar: #0d0b0a; --brand-surface-2: #201c18;
+    --brand-selected: #1a5a70; --brand-highlight: #7a3f3d; --brand-line: #9c9387; --brand-line-strong: #cfc6ba;
+    --brand-fg: #ffffff; --brand-muted: #d8d0c4; --brand-accent: #8fd4ea; --brand-accent-fg: #000000;
+    --brand-focus: #8fd4ea; --brand-human: #ffd98a; --brand-success: #a5e4bb; --brand-info: #a8d1ff;
+    --brand-danger: #ffb4ad; --brand-avatar-bg-l: 16%; --brand-avatar-fg-s: 80%; --brand-avatar-fg-l: 92%;
+  }
+}
+@media (prefers-contrast: more) {
+  :root[data-theme="dark"] {
+    --brand-bg: #000000; --brand-surface: #0d0b0a; --brand-sidebar: #0d0b0a; --brand-surface-2: #201c18;
+    --brand-selected: #1a5a70; --brand-highlight: #7a3f3d; --brand-line: #9c9387; --brand-line-strong: #cfc6ba;
+    --brand-fg: #ffffff; --brand-muted: #d8d0c4; --brand-accent: #8fd4ea; --brand-accent-fg: #000000;
+    --brand-focus: #8fd4ea; --brand-human: #ffd98a; --brand-success: #a5e4bb; --brand-info: #a8d1ff;
+    --brand-danger: #ffb4ad; --brand-avatar-bg-l: 16%; --brand-avatar-fg-s: 80%; --brand-avatar-fg-l: 92%;
+  }
 }
 
 *,
@@ -32,74 +113,186 @@
   box-sizing: border-box;
 }
 
+/* --- type (HANDOFF section 4) --------------------------------------------- */
+
 body {
   margin: 0;
   font-family: var(--brand-font);
+  font-size: 13px;
+  line-height: 18px;
   color: var(--brand-fg);
   background: var(--brand-bg);
-  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
 }
 
-/*
- * Layout and controls.
- *
- * React Aria ships behaviour and no appearance -- every rule below is ours,
- * which is ADR-173 point 1's tradeoff made visible: the library gives focus
- * management, keyboard handling and ARIA wiring, and holds no opinion about
- * how any of it looks. These are provisional like the tokens above.
- */
+h1 { font-size: 26px; line-height: 32px; font-weight: 700; margin: 0 0 12px; }
+h2 { font-size: 22px; line-height: 28px; font-weight: 600; margin: 20px 0 10px; }
+h3 { font-size: 15px; line-height: 20px; font-weight: 600; margin: 16px 0 6px; }
+h4 { font-size: 13px; line-height: 18px; font-weight: 600; margin: 12px 0 4px; }
+p { margin: 0 0 8px; }
+code, samp { font-family: var(--brand-font-mono); font-size: 12px; }
+
+a { color: var(--brand-accent); text-underline-offset: 2px; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+/* The keyboard focus ring, for the keyboard only: React Aria sets
+   data-focus-visible, plain elements get :focus-visible. */
+:focus-visible,
+[data-focus-visible] {
+  outline: 2px solid var(--brand-focus);
+  outline-offset: 2px;
+}
+:focus:not(:focus-visible) { outline: none; }
+
+/* --- button (ui.css .btn) --------------------------------------------------- */
 
 button {
   font: inherit;
-  padding: var(--brand-space) calc(var(--brand-space) * 2);
-  border: 1px solid var(--brand-line);
+  font-weight: 500;
+  height: var(--brand-control-height);
+  padding: 0 12px;
   border-radius: var(--brand-radius);
-  background: var(--brand-bg);
+  border: 1px solid var(--brand-line);
+  background: var(--brand-surface);
   color: var(--brand-fg);
+  box-shadow: var(--brand-shadow);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   cursor: pointer;
+  white-space: nowrap;
+  vertical-align: middle;
+  /* In a column (a field, a form) a button keeps its own width. */
+  align-self: flex-start;
 }
-
-button[data-pressed] {
-  background: var(--brand-line);
+button[data-hovered] { background: var(--brand-surface-2); }
+button[data-pressed] { background: var(--brand-line); }
+button[data-disabled],
+button:disabled {
+  color: var(--brand-muted);
+  background: var(--brand-surface-2);
+  box-shadow: none;
+  cursor: not-allowed;
 }
+button[data-pending] { cursor: progress; }
+button svg { flex: none; }
 
-button[data-disabled] {
+/* The one decision action of a screen, and the classes a screen opts into. */
+button.btn-primary,
+button[type="submit"]:not(.btn-plain):not(.btn-secondary) {
+  background: var(--brand-accent);
+  border-color: var(--brand-accent);
+  color: var(--brand-accent-fg);
+  box-shadow: none;
+}
+button.btn-primary[data-hovered],
+button[type="submit"]:not(.btn-plain):not(.btn-secondary)[data-hovered] { filter: brightness(1.1); }
+button.btn-primary[data-pressed],
+button[type="submit"]:not(.btn-plain):not(.btn-secondary)[data-pressed] { filter: brightness(0.9); }
+button.btn-primary[data-disabled],
+button[type="submit"]:not(.btn-plain):not(.btn-secondary)[data-disabled] {
+  background: var(--brand-surface-2);
+  border-color: var(--brand-line);
+  color: var(--brand-muted);
+  filter: none;
+}
+button.btn-lg { height: var(--brand-control-height-lg); padding: 0 16px; border-radius: 8px; }
+button.btn-sm { height: var(--brand-control-height-sm); padding: 0 8px; }
+button.btn-icon { width: var(--brand-control-height); padding: 0; }
+button.btn-sm.btn-icon { width: var(--brand-control-height-sm); }
+button.btn-destructive { color: var(--brand-danger); }
+button.btn-plain {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--brand-accent);
+}
+button.btn-plain[data-hovered] { background: var(--brand-surface-2); }
+button.btn-plain[data-disabled] { background: transparent; }
+
+/* --- fields (ui.css .field, .lbl, .help, .err) ------------------------------ */
+
+.react-aria-TextField,
+.react-aria-NumberField,
+.react-aria-SearchField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.react-aria-Label { font-weight: 500; }
+
+input[type="text"], input[type="email"], input[type="search"], input[type="url"], input[type="number"],
+input[type="password"], input[type="date"], input[type="datetime-local"], input[type="time"], input:not([type]),
+textarea,
+select {
+  font: inherit;
+  height: var(--brand-control-height);
+  width: 100%;
+  padding: 0 8px;
+  border-radius: var(--brand-radius);
+  border: 1px solid var(--brand-line-strong);
+  background: var(--brand-surface);
+  color: var(--brand-fg);
+}
+textarea { height: auto; min-height: 64px; padding: 6px 8px; resize: vertical; }
+input[data-invalid], textarea[data-invalid], [data-invalid] > input, [data-invalid] > textarea {
+  border-color: var(--brand-danger);
+  box-shadow: inset 0 0 0 1px var(--brand-danger);
+}
+input:disabled, textarea:disabled, input[data-disabled], textarea[data-disabled] {
+  background: var(--brand-surface-2);
   color: var(--brand-muted);
   cursor: not-allowed;
 }
-
-/* React Aria sets data-focus-visible only for keyboard focus, so a mouse click
-   does not leave a ring behind while a Tab press still shows one. */
-button[data-focus-visible],
-input[data-focus-visible] {
-  outline: 2px solid var(--brand-accent);
-  outline-offset: 2px;
+[slot="description"] { font-size: 12px; line-height: 16px; color: var(--brand-muted); }
+.react-aria-FieldError,
+[slot="errorMessage"] {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--brand-danger);
 }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--brand-accent); }
 
-.react-aria-TextField {
+/* --- select, popover and option list (ui.css .select-btn, .group, .menu-i) --- */
+
+.react-aria-Select {
   display: flex;
   flex-direction: column;
-  gap: calc(var(--brand-space) / 2);
-  margin-bottom: calc(var(--brand-space) * 2);
+  gap: 4px;
 }
-
-.react-aria-TextField input {
-  font: inherit;
-  padding: var(--brand-space);
-  border: 1px solid var(--brand-line);
-  border-radius: var(--brand-radius);
+.react-aria-Select > button {
+  align-self: stretch;
+  justify-content: space-between;
+  min-width: 10rem;
+  padding: 0 8px 0 10px;
+  border-color: var(--brand-line-strong);
+  box-shadow: none;
+  font-weight: 400;
 }
-
-.react-aria-FieldError {
-  color: var(--brand-danger);
-  font-size: 0.875rem;
+.react-aria-Select > button::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  margin-left: 8px;
+  border-right: 1.5px solid var(--brand-muted);
+  border-bottom: 1.5px solid var(--brand-muted);
+  transform: translateY(-2px) rotate(45deg);
+  flex: none;
 }
+.react-aria-SelectValue[data-placeholder] { color: var(--brand-muted); }
 
 .react-aria-Popover {
-  background: var(--brand-bg);
+  background: var(--brand-surface);
   border: 1px solid var(--brand-line);
-  border-radius: var(--brand-radius);
-  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+  border-radius: var(--brand-radius-panel);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.14);
   min-width: var(--trigger-width);
   /* React Aria caps the popover's height to the room on screen (an inline
      max-height); without this a long list drew past the box, over its own
@@ -108,29 +301,55 @@ input[data-focus-visible] {
   overflow: auto;
 }
 
-.react-aria-ListBox {
-  padding: calc(var(--brand-space) / 2);
+.react-aria-ListBox,
+.react-aria-Menu {
+  padding: 4px;
   outline: none;
 }
 
-.react-aria-ListBoxItem {
-  padding: var(--brand-space);
+.react-aria-ListBoxItem,
+.react-aria-MenuItem {
+  padding: 4px 8px;
+  min-height: var(--brand-control-height);
+  display: flex;
+  align-items: center;
   border-radius: var(--brand-radius);
   cursor: pointer;
   outline: none;
 }
-
 .react-aria-ListBoxItem[data-focused],
+.react-aria-MenuItem[data-focused] { background: var(--brand-surface-2); }
 .react-aria-ListBoxItem[data-selected] {
-  background: var(--brand-accent);
-  color: var(--brand-bg);
+  background: var(--brand-selected);
+  font-weight: 600;
 }
+.react-aria-ListBoxItem[data-disabled] { color: var(--brand-muted); cursor: default; }
 
-.react-aria-Select {
-  display: flex;
+/* --- status chip (ui.css .chip) ---------------------------------------------- */
+
+.chip,
+.badge {
+  display: inline-flex;
   align-items: center;
-  gap: var(--brand-space);
+  gap: 5px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--brand-radius-chip);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  background: var(--brand-surface-2);
+  color: var(--brand-muted);
+  white-space: nowrap;
+  border: 0;
 }
+.chip-wait { background: var(--brand-human-bg); color: var(--brand-human); }
+.chip-ok { background: var(--brand-success-bg); color: var(--brand-success); }
+.chip-run { background: var(--brand-info-bg); color: var(--brand-info); }
+.chip-bad { background: var(--brand-danger-bg); color: var(--brand-danger); }
+@media (prefers-contrast: more) { .chip, .badge { box-shadow: inset 0 0 0 1px currentColor; } }
+
+[role="alert"] { color: var(--brand-danger); }
 
 .signin {
   max-width: 24rem;
@@ -229,33 +448,43 @@ input[data-focus-visible] {
   border-bottom-color: var(--brand-accent);
 }
 
-.react-aria-Table {
+/* Tables (ui.css .dtable): a real table, figures right-aligned by their cells. */
+.react-aria-Table,
+table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: calc(var(--brand-space) * 2);
+  font-variant-numeric: tabular-nums;
+}
+.react-aria-Table { margin-top: 8px; }
+
+.react-aria-Table th,
+.react-aria-Table td,
+table th,
+table td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--brand-line);
+  vertical-align: top;
 }
 
 .react-aria-Table th,
-.react-aria-Table td {
-  text-align: left;
-  padding: var(--brand-space);
-  border-bottom: 1px solid var(--brand-line);
-}
-
-.react-aria-Table th {
-  font-size: 0.8125rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+table th {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
   color: var(--brand-muted);
+  white-space: nowrap;
 }
+.react-aria-Table tbody tr:last-child td,
+table tbody tr:last-child td { border-bottom: 0; }
 
 .react-aria-Row[data-hovered] {
-  background: color-mix(in srgb, var(--brand-accent) 6%, transparent);
+  background: var(--brand-surface-2);
   cursor: pointer;
 }
 
 .react-aria-Row[data-focus-visible] {
-  outline: 2px solid var(--brand-accent);
+  outline: 2px solid var(--brand-focus);
   outline-offset: -2px;
 }
 
@@ -267,13 +496,16 @@ input[data-focus-visible] {
    participate in the parent grid instead of forming a row of its own. */
 .facts {
   display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: calc(var(--brand-space) / 2) calc(var(--brand-space) * 2);
-  margin: calc(var(--brand-space) * 2) 0;
+  grid-template-columns: minmax(8rem, max-content) 1fr;
+  gap: 8px 16px;
+  margin: 12px 0;
+  align-items: baseline;
 }
 
 .facts dt {
   color: var(--brand-muted);
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .facts dd {
@@ -504,22 +736,23 @@ input[data-focus-visible] {
 .react-aria-Checkbox::before {
   content: "";
   flex: none;
-  width: 1em;
-  height: 1em;
-  margin-top: 0.15em;
-  border: 1px solid var(--brand-muted);
-  border-radius: 2px;
-  background: var(--brand-bg);
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  border: 1px solid var(--brand-line-strong);
+  border-radius: 4px;
+  background: var(--brand-surface);
 }
 
 .react-aria-Checkbox[data-selected]::before {
   background: var(--brand-accent);
   border-color: var(--brand-accent);
-  box-shadow: inset 0 0 0 2px var(--brand-bg);
+  box-shadow: inset 0 0 0 2px var(--brand-surface);
 }
 
+.react-aria-Checkbox[data-focus-visible] { outline: none; }
 .react-aria-Checkbox[data-focus-visible]::before {
-  outline: 2px solid var(--brand-accent);
+  outline: 2px solid var(--brand-focus);
   outline-offset: 2px;
 }
 
@@ -566,22 +799,26 @@ input[data-focus-visible] {
 .preview-overlay {
   position: fixed;
   inset: 0;
-  background: rgb(0 0 0 / 40%);
+  background: rgb(20 17 15 / 45%);
   display: grid;
   place-items: center;
   z-index: 10;
 }
 
 .create-modal {
-  background: var(--brand-bg);
-  border-radius: var(--brand-radius);
+  background: var(--brand-surface);
+  border-radius: 14px;
+  border: 1px solid var(--brand-line);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.28);
   width: min(32rem, 95vw);
   padding: calc(var(--brand-space) * 2);
 }
 
 .preview-modal {
-  background: var(--brand-bg);
-  border-radius: var(--brand-radius);
+  background: var(--brand-surface);
+  border-radius: 14px;
+  border: 1px solid var(--brand-line);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.28);
   width: min(70rem, 95vw);
   max-height: 92vh;
   overflow: auto;
@@ -624,8 +861,10 @@ input[data-focus-visible] {
 
 /* The keyboard shortcuts overview (task-266). */
 .shortcuts-modal {
-  background: var(--brand-bg);
-  border-radius: var(--brand-radius);
+  background: var(--brand-surface);
+  border-radius: 14px;
+  border: 1px solid var(--brand-line);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.28);
   width: min(32rem, 95vw);
   max-height: 85vh;
   overflow: auto;
@@ -644,12 +883,14 @@ input[data-focus-visible] {
 }
 
 kbd {
-  font-family: var(--brand-font);
-  font-size: 0.85em;
-  padding: 1px 6px;
-  border: 1px solid var(--brand-line);
-  border-bottom-width: 2px;
-  border-radius: var(--brand-radius);
+  font: inherit;
+  font-size: 11px;
+  line-height: 14px;
+  padding: 0 5px;
+  border: 1px solid var(--brand-line-strong);
+  border-radius: 4px;
+  color: var(--brand-muted);
+  background: var(--brand-surface-2);
 }
 
 /* Shortcut keys shown on their elements while Alt or Ctrl is held (2026-10-04). */
@@ -662,7 +903,7 @@ kbd {
 
 .shortcut-hint kbd {
   background: var(--brand-fg);
-  color: var(--brand-bg);
+  color: var(--brand-surface);
   border-color: var(--brand-fg);
   font-size: 0.75em;
 }
@@ -682,37 +923,39 @@ kbd {
   cursor: pointer;
 }
 
+/* ui.css .switch: a 36 x 20 track. */
 .switch__indicator {
-  width: 2em;
-  height: 1em;
-  border: 1px solid var(--brand-line);
-  border-radius: 1em;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--brand-line-strong);
   position: relative;
+  flex: none;
 }
 
 .switch__indicator::before {
   content: "";
   position: absolute;
-  top: 1px;
-  left: 1px;
-  width: calc(1em - 4px);
-  height: calc(1em - 4px);
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: var(--brand-line);
+  background: var(--brand-surface);
 }
 
 .react-aria-Switch[data-selected] .switch__indicator {
   background: var(--brand-accent);
-  border-color: var(--brand-accent);
 }
 
 .react-aria-Switch[data-selected] .switch__indicator::before {
-  left: calc(1em + 1px);
-  background: white;
+  left: 18px;
+  background: var(--brand-accent-fg);
 }
 
+.react-aria-Switch[data-focus-visible] { outline: none; }
 .react-aria-Switch[data-focus-visible] .switch__indicator {
-  outline: 2px solid var(--brand-accent);
+  outline: 2px solid var(--brand-focus);
   outline-offset: 2px;
 }
 
@@ -761,8 +1004,10 @@ kbd {
 }
 
 .image-modal {
-  background: var(--brand-bg);
-  border-radius: var(--brand-radius);
+  background: var(--brand-surface);
+  border-radius: 14px;
+  border: 1px solid var(--brand-line);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.28);
   width: min(64rem, 95vw);
   max-height: 92vh;
   overflow: auto;
@@ -827,26 +1072,36 @@ kbd {
 }
 
 /* Tabs (first used by the image pop-in). */
+/* Tabs as the segmented control (ui.css .seg). */
 .react-aria-TabList {
-  display: flex;
-  gap: var(--brand-space);
-  border-bottom: 1px solid currentColor;
-  margin-bottom: var(--brand-space);
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  border-radius: 8px;
+  background: var(--brand-surface-2);
+  border: 1px solid var(--brand-line);
+  margin-bottom: 12px;
 }
 
 .react-aria-Tab {
-  padding: 0.4rem 0.75rem;
+  font-weight: 500;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: 6px;
   cursor: pointer;
-  border-bottom: 3px solid transparent;
+  outline: none;
 }
 
 .react-aria-Tab[data-selected] {
-  border-bottom-color: currentColor;
-  font-weight: 600;
+  background: var(--brand-surface);
+  box-shadow: var(--brand-shadow);
 }
 
 .react-aria-Tab[data-focus-visible] {
-  outline: 2px solid currentColor;
+  outline: 2px solid var(--brand-focus);
+  outline-offset: 2px;
 }
 
 /* The category graph (task-359): plain SVG, no library (ADR-173). Layout
