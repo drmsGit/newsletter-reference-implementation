@@ -12,7 +12,7 @@ Clean read-aloud text for [[STORYBOARD]]. **A** is the master: a neutral narrato
 
 - A calm, unhurried read. No trailer growl: the drama is in the picture and the music.
 - About 135 words a minute. The film is about 4:10; A is about 380 words, B about 400, so both leave room for music and silence.
-- **Changed on 2026-10-17, after the pre-production checks** ([[PREPRODUCTION-CHECKS]]), in both scripts: S07 now says "marked ready" where it said "approved" (the app has no such word); S09 and S10 no longer mention readers who were left out, because the demo has none to show. The first wording of S09 was "… leaves out whoever said no, and tells you who and why." and of S10 "… and the reason anyone was left out." They return only if the demo gains excluded readers ([[TRAILER-BRIEF]], end of section 16).
+- **Changed on 2026-10-17, after the pre-production checks** ([[PREPRODUCTION-CHECKS]]), in both scripts: S07 now says "marked ready" where it said "approved" (the app has no such word); S09 and S10 no longer mention readers who were left out, because the demo has none to show. The first wording of S09 was "… leaves out whoever said no, and tells you who and why." and of S10 "… and the reason anyone was left out." They do not return until unsubscription is built ([[TRAILER-BRIEF]], section 16, decision 8): Diede decided on 2026-10-17 that the film makes no claim about unsubscribing, opt-out or readers left out. S03 and S18 still say "consent" until decision 10 of the same section is made.
 - Each scene is a separate take. The time in brackets is the scene's length on screen; the read should end a little before it. Leave a breath before the first word of every take; the picture starts before the voice.
 - S01 and S19 have a held silence after the last word. Do not fill it.
 - Numbers are spoken out ("a hundred and twenty-three"). They are the live demo's and will be re-read after the next reset (see [[TRAILER-BRIEF]], section 15); if they change, the line changes.
@@ -146,4 +146,4 @@ I'm Diede Slembrouck. Come and see how it works.
 
 ## Lines that must not be added in a re-record
 
-Not "two files", not "a weekend", not "open source" or "free", not "GDPR", not "real email", not an open rate, not a vendor's name. The reasons are in [[TRAILER-BRIEF]], section 11.
+Not "two files", not "a weekend", not "open source" or "free", not "GDPR", not "real email", not an open rate, not a vendor's name, and nothing about unsubscribing, opt-out or readers who were left out. The reasons are in [[TRAILER-BRIEF]], section 11.

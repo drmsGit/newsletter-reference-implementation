@@ -10,7 +10,7 @@ The creative brief for a 3 to 5 minute product trailer. It is read together with
 
 **Status, 2026-10-17.** Nothing is built. This brief was made from the architecture decision records, the business documents, the design handoff and the live captures of the demo, and from an interview with Diede on the same day. The decisions in section 2 are Diede's. The scene content, the narration and the claim ledger are Claude's draft and have not been reviewed scene by scene. The point of the brief is that the later build needs little feedback: everything the build needs to know is here or in the storyboard, and what had to be checked first is in section 15.
 
-**Update, 2026-10-17, later the same day.** The checks of section 15 were run on scratch data ([[PREPRODUCTION-CHECKS]]) and this brief was corrected from what they found: scenes S01 and S07 to S16 in [[STORYBOARD]], the narration of S07, S09 and S10, the known flaws in section 8, the claim ledger in section 11 and the four drops in section 12. Two of the corrections are Claude's choices, not Diede's, and can be reversed: they are listed at the end of section 16.
+**Update, 2026-10-17, later the same day.** The checks of section 15 were run on scratch data ([[PREPRODUCTION-CHECKS]]) and this brief was corrected from what they found: scenes S01 and S07 to S16 in [[STORYBOARD]], the narration of S07, S09 and S10, the known flaws in section 8, the claim ledger in section 11 and the four drops in section 12. Three of the corrections are Claude's choices, not Diede's, and can be reversed: they are listed at the end of section 16. A fourth change, that the film says nothing about unsubscribing, is Diede's decision (section 16, decision 8).
 
 ## 1. The film in one sentence
 

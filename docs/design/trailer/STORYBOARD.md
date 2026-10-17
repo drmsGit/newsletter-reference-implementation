@@ -12,7 +12,7 @@ Twenty scenes, about 4:10. Read [[TRAILER-BRIEF]] first: it holds the decisions,
 
 All UI frames are drawn at 1440×810 logical px and rendered at 3840×2160. Where a live capture and a render disagree, the live capture wins.
 
-**Corrected 2026-10-17, after the pre-production checks** ([[PREPRODUCTION-CHECKS]]): S01, S06 and S07 to S16 carry what was verified on a scratch copy of the demo. The narration of S07, S09 and S10 changed (see [[VOICEOVER]]), and two of those changes are Claude's choices that Diede has not reviewed: [[TRAILER-BRIEF]], end of section 16.
+**Corrected 2026-10-17, after the pre-production checks** ([[PREPRODUCTION-CHECKS]]): S01, S06 and S07 to S16 carry what was verified on a scratch copy of the demo. The narration of S07, S09 and S10 changed (see [[VOICEOVER]]), and three of the corrections are Claude's choices that Diede has not reviewed ([[TRAILER-BRIEF]], end of section 16). That the film says nothing about unsubscribing is Diede's decision (section 16, decision 8), applied to S09 to S11 and S13.
 
 ---
 
