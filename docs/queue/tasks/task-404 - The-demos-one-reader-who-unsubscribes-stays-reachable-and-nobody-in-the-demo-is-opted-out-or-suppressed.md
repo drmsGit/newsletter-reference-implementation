@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-17 17:34'
+updated_date: '2026-10-17 17:55'
 labels:
   - backend
 dependencies: []
@@ -37,3 +38,13 @@ Not a duplicate: task-71 built the demo and its notes ask for "an unsubscribe" a
 - [ ] #4 test_demo_reset asserts all of the above and fails when the old order of the two rows is restored
 - [ ] #5 The figures the trailer brief and storyboard quote from the demo are re-read after the change, and the differences are reported to the user
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-17, added at the user's request: two more demo-data findings of the same checks file (docs/design/trailer/PREPRODUCTION-CHECKS.md sections 6 and 1.2) that no task covered, worth deciding in the same pass.
+
+3. Readers whose language is en receive the German send. Reader #4 (Daniel Turner, English) is among the 123 recipients of the German Familienherbst, because the demo's Familie & Kinder group has no language rule; audience rules can select by language (frontend/src/api/resources.ts:516, the languages a rule can choose from), so the demo groups behind a German send should use one, or the demo should say why it does not. None of the three readers the trailer names is affected.
+
+4. Every demo campaign's results carry the footnote Unsubscribes made before 12.10.2026 are not counted. The footnote shows when any of the campaign's sends was created before UNSUBSCRIBES_COUNTED_SINCE (backend/app/campaigns/results.py:41-45 and :81), the moment consent events began to record their delivery (migrate_0048). The demo dates its editions before it (Familienherbst on 2026-10-08), but writes its own unsubscribe linked to its delivery, so that one is counted (the card shows Unsubscribes 1 beside the footnote). The footnote is true for real data and noise in the demo: dating the demo sends after the cutoff, or the reset saying why it stays, would settle it. Not a product defect.
+<!-- SECTION:NOTES:END -->
