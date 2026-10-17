@@ -1,0 +1,4 @@
+{"kokoro": {}, "openai": {},
+ "elevenlabs": {"voice_id": "Xb7hH8MSUJpSbSDYk0k2", "env_file": "/path/to/the/env/file/holding/ELEVENLABS_API_KEY", "model_id": "eleven_multilingual_v2",
+                "output_format": "pcm_24000", "voice_settings": {"stability": 0.5, "similarity_boost": 0.75, "style": 0.0}, "stitch": true},
+ "pronunciations": {}}

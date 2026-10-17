@@ -1,0 +1,11 @@
+{
+  "base": "Calm, measured, warm British narrator for a product film. Unhurried, with space between sentences. Never dramatic or salesy. A question ends with a light, open lift. Say AI, API and CRM as letters, with each letter distinct.",
+  "scenes": {
+    "S01": "Hushed and a little curious. The last sentence is a real question: lift gently at its end.",
+    "S02": "A plain observation, slightly weary on the two things that do not fit.",
+    "S03": "Gather warmth through the sentence; the last clause is an invitation, not a claim.",
+    "S12": "Matter of fact, with a small smile on the last sentence.",
+    "S19": "Three separate short statements, each said with quiet finality and a clear pause after it.",
+    "S20": "Warm and unforced, like a closing thought. The last line can trail off a little."
+  }
+}

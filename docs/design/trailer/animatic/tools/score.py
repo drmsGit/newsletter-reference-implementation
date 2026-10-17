@@ -31,7 +31,7 @@ for sid, d in DUR:
     T0[sid] = c
     c += d
 TOTAL = c  # 286
-S08_ANCHORS = (0.8, 8.0, 16.3)  # seconds after the scene start: the record, the variant, Approvals
+SPLIT = {"S08": (0.8, 8.0, 16.3), "S19": (0.4, 2.2, 4.0)}  # scenes read sentence by sentence: seconds after the scene start
 LEAD = {"S01": 1.2, "S04": 1.5, "S18": 0.3, "S19": 0.4, "S20": 0.8}  # voice starts this long after the scene starts
 
 
@@ -120,43 +120,42 @@ def build_music():
     mix.add(64.0, thump(70, 34, 2.2, glide=0.18, decay=2.2), 1.0)         # the title: the first full hit
     mix.add(64.0, synth.noise_burst(0.35, lp=0.3, decay=9.0), 0.32)
 
-    # ---------------- Act 2 (74 to 164): mood A, the manager
+    # ---------------- Act 2 (74 to 164): mood A, the manager: calm and warm, no heartbeat, no sub rumble
     bar = 4 * A_BEAT
     t = 66.0
-    while t < 144.0:
-        mix.add(t, thump(66, 44, 0.55), 0.62 if t < 74 else 0.80)
-        mix.add(t + 2 * A_BEAT, thump(60, 42, 0.45), 0.45)
+    while t < 144.0:                                                       # a soft low mallet on each bar
+        mix.add(t, kal(146.83, 1.4, 0.55), 0.16, -0.1)
         t += bar
     for t0 in (78.0 + i * bar for i in range(int((150 - 78) / bar))):
         for j, b in enumerate((0.5, 1.5, 2.25, 3.5)):
-            mix.add(t0 + b * A_BEAT, tick(), 0.14, -0.5 if j % 2 == 0 else 0.5)
-    mix.add(70, synth.pad((110.0, 164.81, 246.94), 44, 3.0, 3.0), 0.20)
-    mix.add(106, synth.pad((98.0, 146.83, 220.0), 34, 3.0, 3.0), 0.20)
-    mix.add(132, synth.pad((110.0, 164.81, 246.94), 32, 3.0, 4.0), 0.18)
-    mix.add(82, synth.pad((55.0,), 66, 1.5, 3.0), 0.50)
-    seq = (440.0, 523.25, 659.25, 587.33, 659.25, 523.25)
+            mix.add(t0 + b * A_BEAT, tick(), 0.10, -0.5 if j % 2 == 0 else 0.5)
+    # warm added-ninth chords, kept above 140 Hz so nothing rumbles
+    mix.add(70, synth.pad((146.83, 185.0, 220.0, 329.63), 44, 3.5, 3.5), 0.16)     # D add9
+    mix.add(106, synth.pad((196.0, 246.94, 293.66, 440.0), 34, 3.5, 3.5), 0.16)    # G add9
+    mix.add(132, synth.pad((146.83, 185.0, 220.0, 329.63), 32, 3.5, 4.0), 0.15)
+    seq = (587.33, 739.99, 880.0, 659.25, 880.0, 739.99)                   # D major pentatonic, six against four
     step = A_BEAT / 2
     i = 0
     t = 82.0
     while t < 144.0:
-        f = seq[i % 6]
-        mix.add(t, kal(f, 1.2, 1.0 if i % 6 == 0 else 0.62), 0.28, -0.25)
+        mix.add(t, kal(seq[i % 6], 1.2, 0.9 if i % 6 == 0 else 0.55), 0.24, -0.25)
         i += 1
         t += step
     i = 0
     t = 112.0 + step
     while t < 143.0:
-        mix.add(t, kal(seq[i % 6] * 2, 0.9, 0.8 if i % 6 == 3 else 0.5), 0.15, 0.45)
+        mix.add(t, kal(seq[i % 6] * 2, 0.9, 0.7 if i % 6 == 3 else 0.45), 0.12, 0.45)
         i += 1
         t += step
-    mix.add(108.0, thump(60, 36, 1.6, glide=0.15, decay=2.6), 0.9)        # the triptych locks (S07)
+    for f in (293.66, 440.0, 587.33):                                      # the triptych locks (S07): a soft chord, no boom
+        mix.add(108.0, kal(f, 2.4, 0.8), 0.15, 0)
     for t in (113.5, 120.5):
-        mix.add(t, tick(), 0.30, 0.0)
-    mix.add(130.0, thump(90, 70, 0.25, glide=0.02, decay=14), 0.6)       # "Approve and run"
-    mix.add(130.0, tick(), 0.4)
-    mix.add(148.0, kal(440.0, 3.0, 0.8), 0.28, 0)                         # the pulse thins to one note
-    mix.add(153.0, tick(), 0.35)                                          # "Release"
-    for t, g in ((157.0, 0.2), (159.0, 0.3), (161.0, 0.42)):               # the signal comes back
+        mix.add(t, tick(), 0.26, 0.0)
+    mix.add(130.0, tick(), 0.34)                                           # "Approve and run"
+    mix.add(130.0, kal(587.33, 1.4, 0.8), 0.20)
+    mix.add(148.0, kal(587.33, 3.0, 0.8), 0.22, 0)                         # the motif thins to one note
+    mix.add(153.0, tick(), 0.30)                                           # "Release"
+    for t, g in ((157.0, 0.18), (159.0, 0.26), (161.0, 0.36)):             # the signal comes back
         mix.add(t, tick(), g)
 
     # ---------------- Act 3 (164 to 240): mood B, the developer
@@ -192,7 +191,7 @@ def build_music():
     # ---------------- Act 4 (240 to 268): the two meet, the full swell, then silence
     t = 240.0
     while t < 266.0:
-        mix.add(t, thump(66, 44, 0.5), 0.55)
+        mix.add(t, thump(66, 44, 0.5), 0.40)
         t += B_BEAT * 2
     mix.add(240.0, synth.riser(12.0, a0=0.01, a1=0.35), 0.24)
     arp = (659.25, 783.99, 987.77, 1174.66)
@@ -203,7 +202,7 @@ def build_music():
         mix.add(t, kal(seq[i % 6], 1.0, 0.7), 0.20, -0.3)
         i += 1
         t += B_BEAT / 2
-    mix.add(240, synth.pad((110.0, 164.81, 246.94), 28, 4.0, 1.0), 0.20)
+    mix.add(240, synth.pad((146.83, 185.0, 220.0, 329.63), 28, 4.0, 1.0), 0.18)
     mix.add(252, synth.pad((82.41, 123.47, 164.81), 16, 3.0, 1.0), 0.18)
     for k in range(10):                                                   # a tick on every cut of the montage
         mix.add(252.3 + k, tick(), 0.30, -0.4 if k % 2 else 0.4)
@@ -213,7 +212,7 @@ def build_music():
     # ---------------- Act 5 (268 to 286): a gap, one soft mallet note, silence
     mix.add(270.0, kal(440.0, 4.0, 0.8), 0.30, 0)
 
-    reverb(mix.L, mix.R, 0.24)
+    reverb(mix.L, mix.R, 0.18)
     # the swell cuts to silence at 268.0 (the pillar card), keeping the end card's one note
     cut = int(268.0 * SR)
     fade = int(0.04 * SR)
@@ -241,11 +240,11 @@ def load_narration(total_n):
     placed = {}
     parts = {}
     for sid, _ in DUR:
-        if sid == "S08":
+        if sid in SPLIT:
             ps = []
-            for i, a in enumerate(S08_ANCHORS, 1):
+            for i, a in enumerate(SPLIT[sid], 1):
                 st = T0[sid] + a
-                d = _place(nar, NARR / f"S08_{i}.wav", st)
+                d = _place(nar, NARR / f"{sid}_{i}.wav", st)
                 ps.append((st, d))
             parts[sid] = ps
             placed[sid] = (ps[0][0], ps[-1][0] + ps[-1][1] - ps[0][0])

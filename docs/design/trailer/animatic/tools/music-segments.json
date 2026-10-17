@@ -1,0 +1,18 @@
+{
+  "note": "One ElevenLabs music generation per act, placed on the scene timeline by mix_eleven.py. Seconds are the act's span on the film's timeline; each segment is generated 2 s longer so neighbours can overlap. No big impacts: the hits, ticks and whooshes are sound effects placed separately.",
+  "common": "Instrumental only. No vocals. No strings. No piano. Nothing romantic or cinematic-epic. Quiet confidence.",
+  "segments": [
+    {"id": "a0-hook", "start": 0, "end": 14,
+     "prompt": "Sparse, quiet, tense opening for a product film: a low soft drone and one slow steady pulse, a few very soft low thumps spaced several seconds apart, no melody, then it holds and thins out. Dark and warm, minimal."},
+    {"id": "a1-problem-core", "start": 14, "end": 74,
+     "prompt": "A slow quiet pad rises under a problem, a little unresolved at first, then resolves into a calm warm added-ninth chord at about two thirds, with the first soft kalimba or marimba notes arriving, ending open and optimistic. Minimal, no big impacts, no drums."},
+    {"id": "a2-manager", "start": 74, "end": 164,
+     "prompt": "Calm, warm, optimistic minimal ambient bed. A soft kalimba and marimba motif repeats and slowly phases, gentle pad with added-ninth chords above a low register, very light ticks, relaxed tempo around 96 bpm, steady and unhurried. Not dark, not ominous, no heartbeat, no deep rumble, no drums, no big impacts. Fades gently at the end."},
+    {"id": "a3-developer", "start": 164, "end": 240,
+     "prompt": "Quiet but driven minimal groove for a developer scene: muted plucked bass and short plucks in E minor, soft sixteenth-note ticks, a warm dark pad underneath, around 108 bpm, restrained and steady, slowly building. No big impacts, no heavy drums, no melody lead."},
+    {"id": "a4-one-system", "start": 240, "end": 268,
+     "prompt": "A confident build: a warm pad and a rising mallet arpeggio meet a steady pulse and grow into a full but controlled swell, then stop cleanly on the last beat. No strings, no piano, no drums."},
+    {"id": "a5-end", "start": 268, "end": 286,
+     "prompt": "One single soft kalimba note with a long natural decay, then silence. Nothing else."}
+  ]
+}

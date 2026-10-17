@@ -162,7 +162,7 @@ The developer's world is the project's dark values: ground `#14110f`, card `#1e1
 - **See.** A hard cut from linen to dark. A terminal and an editor side by side on the repo tree: `storage/`, `backend/app/` and `docs/architecture/ADR/`. A cursor blinks. In the terminal a one-line request in plain words appears (for example "add a decision strategy that favours recent content") and the file it asks for takes shape in the editor: the same seam, by hand or with an assistant. A small caption: "The developer".
 - **Source.** Built for the film from the real folder names.
 - **Text.** "The developer".
-- **A.** Behind the screens, a developer keeps it growing, by hand or with an AI assistant. Not by asking a vendor. By adding a file.
+- **A.** Behind the screens, a developer keeps it growing, by hand or with an AI assistant. Not by asking a vendor, but by adding a file.
 - **B.** Behind the screens, someone has to keep it growing, by hand or with an AI assistant. I wanted that to mean adding a file.
 - **Sound.** The music thins to a pulse; a restrained whoosh on the cut only.
 - **Evidence.** `docs/playbook-strategy.md` §4 (convention-based extension, not no-code). [[ADR-143 — AI-Assisted Development Boundary]] §7: the supported seams for AI-assisted work are provider adapters, decision strategies, MJML email modules and AI task files, which are the four drops of this act, and "the seams AI can generate against are the same seams a human can extend". §1: the AI's output is a proposal, never a deployment.

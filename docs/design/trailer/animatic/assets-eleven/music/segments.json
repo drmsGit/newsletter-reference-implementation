@@ -1,0 +1,44 @@
+[
+ {
+  "id": "a0-hook",
+  "start": 0,
+  "end": 14,
+  "length": 16.0,
+  "file": "a0-hook-21c9f60cb6ea.wav"
+ },
+ {
+  "id": "a1-problem-core",
+  "start": 14,
+  "end": 74,
+  "length": 62.0,
+  "file": "a1-problem-core-fe6160502c40.wav"
+ },
+ {
+  "id": "a2-manager",
+  "start": 74,
+  "end": 164,
+  "length": 92.0,
+  "file": "a2-manager-cde0a0bf0b46.wav"
+ },
+ {
+  "id": "a3-developer",
+  "start": 164,
+  "end": 240,
+  "length": 78.0,
+  "file": "a3-developer-927053b4c3b0.wav"
+ },
+ {
+  "id": "a4-one-system",
+  "start": 240,
+  "end": 268,
+  "length": 30.0,
+  "file": "a4-one-system-1918b001be5b.wav"
+ },
+ {
+  "id": "a5-end",
+  "start": 268,
+  "end": 286,
+  "length": 20.0,
+  "file": "a5-end-ba69c9fbc492.wav"
+ }
+]

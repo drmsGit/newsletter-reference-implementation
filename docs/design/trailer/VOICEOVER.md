@@ -12,7 +12,7 @@ Clean read-aloud text for [[STORYBOARD]]. **A** is the master: a neutral narrato
 
 - A calm, unhurried read. No trailer growl: the drama is in the picture and the music.
 - About 135 words a minute. The film is about 4:46; A is about 460 words, B about 490, so about 70 percent of the film is narrated. If the first animatic feels crowded, S03b and S16b are the first lines to compress or cut.
-- **The first cut uses a synthetic read of script A** (decided 2026-10-17). Script B is for Diede to record later.
+- **The first cut uses a synthetic read of script A** (decided 2026-10-17): the final voice is ElevenLabs Alice (British female, multilingual v2); Kokoro `bf_emma` is the free draft voice. AI, API and CRM are left as written. Script B is for Diede to record later.
 - **Changed on 2026-10-17, after the pre-production checks** ([[PREPRODUCTION-CHECKS]]), in both scripts: S07 now says "marked ready" where it said "approved" (the app has no such word); S09 and S10 no longer mention readers who were left out, because the demo has none to show. The first wording of S09 was "… leaves out whoever said no, and tells you who and why." and of S10 "… and the reason anyone was left out." They do not return until unsubscription is built ([[TRAILER-BRIEF]], section 16, decision 8): Diede decided on 2026-10-17 that the film makes no claim about unsubscribing, opt-out or readers left out. S03 and S18 still say "consent" until decision 10 of the same section is made.
 - **Changed on 2026-10-17, after Diede's review of the storyboard:** S03 gains the AI premise ("AI has changed what a company, or its agency, can build for itself."); a new line S03b for other systems reaching the core; S12 says "by hand or with an AI assistant"; S16 says "Email or push, any sending service"; a new line S16b says the reasons stay with the code in the same repository; S20 adds "Always adapting to your business." S08's narration is unchanged.
 - Each scene is a separate take. The time in brackets is the scene's length on screen; the read should end a little before it. Leave a breath before the first word of every take; the picture starts before the voice.
@@ -58,8 +58,8 @@ Afterwards, open any reader's message: the content they received, and the reason
 **S11** [2:36 to 2:44, 15 words]
 Their clicks come back as signals that fade with time, and shape the next pick.
 
-**S12** [2:44 to 2:56, 24 words]
-Behind the screens, a developer keeps it growing, by hand or with an AI assistant. Not by asking a vendor. By adding a file.
+**S12** [2:44 to 2:56, 25 words]
+Behind the screens, a developer keeps it growing, by hand or with an AI assistant. Not by asking a vendor, but by adding a file.
 
 **S13** [2:56 to 3:08, 14 words]
 A new content block: a manifest and a template. It appears in the editor.
