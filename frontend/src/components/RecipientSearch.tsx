@@ -29,7 +29,7 @@ export default function RecipientSearch() {
  * new ones. Used for recipients above, and for content, campaign and audience
  * names (2026-10-03).
  */
-export function SearchBox({ label }: { label: string }) {
+export function SearchBox({ label, compact = false }: { label: string; compact?: boolean }) {
   const [params, setParams] = useSearchParams()
   const [value, setValue] = useState(params.get('q') ?? '')
   const input = useRef<HTMLInputElement>(null)
@@ -46,20 +46,26 @@ export function SearchBox({ label }: { label: string }) {
 
   return (
     <form
-      className="filters"
+      className={compact ? 'filters search-compact' : 'filters'}
       role="search"
       onSubmit={(event) => {
         event.preventDefault()
         run(value)
       }}
     >
-      <TextField value={value} onChange={setValue}>
-        <Label>
-          {label} <ShortcutHint keys="/" />
-        </Label>
-        <Input ref={input} />
+      <TextField value={value} onChange={setValue} aria-label={compact ? label : undefined}>
+        {/* In a list column (task-372) the label is the placeholder, and still the field's name. */}
+        {!compact && (
+          <Label>
+            {label} <ShortcutHint keys="/" />
+          </Label>
+        )}
+        <Input ref={input} placeholder={compact ? label : undefined} />
       </TextField>
-      <Button type="submit">Search</Button>
+      {/* Not the screen's primary action, so not drawn as one (render 20). */}
+      <Button type="submit" className="btn-secondary">
+        Search
+      </Button>
       {params.get('q') && (
         <Button
           onPress={() => {

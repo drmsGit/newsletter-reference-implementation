@@ -18,12 +18,15 @@ export default function NameAndChannel({
   pending,
   error,
   onSubmit,
+  onCancel,
 }: {
   nameLabel: string
   submitLabel: string
   pending: boolean
   error: unknown
   onSubmit: (value: { name: string; channel: string }) => void
+  /** In a create dialog (task-372, render 45): a Cancel beside the button. */
+  onCancel?: () => void
 }) {
   const settings = useSettings()
   const channels = (settings.data?.channels ?? [])
@@ -39,17 +42,14 @@ export default function NameAndChannel({
   }
 
   return (
-    <form className="create-form" onSubmit={submit}>
-      <TextField value={name} onChange={setName} isRequired>
+    <form className={onCancel ? 'dialog-form' : 'create-form'} onSubmit={submit}>
+      <TextField value={name} onChange={setName} isRequired autoFocus={onCancel !== undefined}>
         <Label>{nameLabel}</Label>
         <Input />
       </TextField>
       {channels.length > 0 && (
         <Choice label="Channel" options={channels} selected={chosen} onChange={setChannel} />
       )}
-      <Button type="submit" isDisabled={pending || !name.trim() || !chosen}>
-        {pending ? 'Creating…' : submitLabel}
-      </Button>
       {error != null && (
         <p role="alert">
           {error instanceof HttpError && error.status === 403
@@ -57,6 +57,12 @@ export default function NameAndChannel({
             : `Not created: ${(error instanceof HttpError && error.detail) || 'the server refused it.'}`}
         </p>
       )}
+      <div className={onCancel ? 'dialog-actions' : 'btnrow'}>
+        {onCancel && <Button onPress={onCancel}>Cancel</Button>}
+        <Button type="submit" isDisabled={pending || !name.trim() || !chosen}>
+          {pending ? 'Creating…' : submitLabel}
+        </Button>
+      </div>
     </form>
   )
 }

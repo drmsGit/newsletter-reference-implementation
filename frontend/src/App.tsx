@@ -5,7 +5,7 @@ import Approvals, { ApprovalsSplit, NoRequestOpen } from './screens/Approvals'
 import AudienceDetail from './screens/AudienceDetail'
 import Audiences from './screens/Audiences'
 import CampaignDetail from './screens/CampaignDetail'
-import Campaigns from './screens/Campaigns'
+import { CampaignsSplit, NoCampaignOpen } from './screens/Campaigns'
 import Content from './screens/Content'
 import RecipientDetail from './screens/RecipientDetail'
 import Recipients from './screens/Recipients'
@@ -72,8 +72,10 @@ export default function App() {
         {/* Static before dynamic is how React Router ranks these anyway; listed
             apart so the reader sees "history" is not an approval id. */}
         <Route path="/approvals/history" element={<Approvals mode="history" />} />
-        <Route path="/campaigns" element={<Campaigns />} />
-        <Route path="/campaigns/:id" element={<CampaignDetail />} />
+        <Route element={<CampaignsSplit />}>
+          <Route path="/campaigns" element={<NoCampaignOpen />} />
+          <Route path="/campaigns/:id" element={<CampaignDetail />} />
+        </Route>
         <Route path="/campaigns/:id/variants/:variantId" element={<VariantEditor />} />
         <Route path="/campaigns/:id/variants/:variantId/send" element={<SendVariant />} />
         <Route path="/monitoring" element={<Monitoring />} />

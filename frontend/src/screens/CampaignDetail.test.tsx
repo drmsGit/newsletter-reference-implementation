@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router'
 
 import CampaignDetail from './CampaignDetail'
-import Campaigns from './Campaigns'
+import { CampaignsSplit, NoCampaignOpen } from './Campaigns'
 import { jsonResponse, page, renderWithProviders, stubFetch, A_BRAND_PROFILE } from '../test-utils'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -82,22 +82,35 @@ function renderDetail() {
   )
 }
 
+function renderSplit(route = '/campaigns') {
+  return renderWithProviders(
+    <Routes>
+      <Route element={<CampaignsSplit />}>
+        <Route path="/campaigns" element={<NoCampaignOpen />} />
+        <Route path="/campaigns/:id" element={<CampaignDetail />} />
+      </Route>
+      <Route path="/campaigns/:id/variants/:variantId" element={<p>editor 7/21</p>} />
+    </Routes>,
+    { route },
+  )
+}
+
 describe('the campaign list', () => {
-  it('opens a campaign from its row', async () => {
-    stubFetch({
+  it('opens a campaign beside the list, keeping the search, and marks it as the one open', async () => {
+    const fetchMock = stubFetch({
       'GET /campaigns/': () => jsonResponse(page([COMPOSITION.campaign])),
       'GET /campaigns/1/results': () => jsonResponse(NO_RESULTS),
       'GET /campaigns/1/composition': () => jsonResponse(COMPOSITION),
     })
-    renderWithProviders(
-      <Routes>
-        <Route path="/campaigns" element={<Campaigns />} />
-        <Route path="/campaigns/:id" element={<CampaignDetail />} />
-      </Routes>,
-      { route: '/campaigns' },
-    )
+    renderSplit('/campaigns?q=spr')
+    expect(screen.getByText('Select a campaign to see it.')).toBeInTheDocument()
     fireEvent.click(await screen.findByText('Spring'))
     expect(await screen.findByRole('heading', { name: 'Variant A' })).toBeInTheDocument()
+    // The list stays beside the campaign, narrowed as it was.
+    const row = within(screen.getByRole('grid', { name: 'Campaigns' })).getByRole('row', { name: /Spring/ })
+    expect(row).toHaveAttribute('aria-selected', 'true')
+    const reads = fetchMock.mock.calls.map(([r]) => new URL((r as Request).url))
+    expect(reads.filter((u) => u.pathname === '/campaigns/').every((u) => u.searchParams.get('q') === 'spr')).toBe(true)
   })
 })
 
@@ -176,22 +189,32 @@ describe('creating', () => {
       'GET /settings': () => jsonResponse(CHANNELS),
       'POST /campaigns/': () => jsonResponse({ id: 7, name: 'Autumn', variants: [{ id: 21 }] }),
     })
-    renderWithProviders(
-      <Routes>
-        <Route path="/campaigns" element={<Campaigns />} />
-        <Route path="/campaigns/:id/variants/:variantId" element={<p>editor 7/21</p>} />
-      </Routes>,
-      { route: '/campaigns' },
-    )
-    fireEvent.change(await screen.findByLabelText(/^New campaign/), { target: { value: 'Autumn' } })
+    renderSplit()
+    // "New ..." opens a dialog (task-372, decision 22), in place of the inline form.
+    fireEvent.click(await screen.findByRole('button', { name: 'New campaign' }))
+    const dialog = await screen.findByRole('dialog', { name: 'New campaign' })
+    fireEvent.change(within(dialog).getByLabelText(/^Name/), { target: { value: 'Autumn' } })
     // Only the switched-on channel is offered.
-    await waitFor(() => expect(screen.getByRole('button', { name: /email/ })).toBeInTheDocument())
-    fireEvent.click(screen.getByRole('button', { name: 'Create campaign' }))
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: /email/ })).toBeInTheDocument())
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create campaign' }))
     expect(await screen.findByText('editor 7/21')).toBeInTheDocument()
     const post = fetchMock.mock.calls.map(([r]) => r as Request).find((r) => r.method === 'POST')!
     expect(await post.clone().json()).toEqual({
       name: 'Autumn', channel: 'email', status: 'draft', initial_variant_name: 'Variant A',
     })
+  })
+
+  it('closes the dialog on Cancel without creating anything', async () => {
+    const fetchMock = stubFetch({
+      'GET /campaigns/': () => jsonResponse(page([])),
+      'GET /settings': () => jsonResponse(CHANNELS),
+    })
+    renderSplit()
+    fireEvent.click(await screen.findByRole('button', { name: 'New campaign' }))
+    const dialog = await screen.findByRole('dialog', { name: 'New campaign' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(fetchMock.mock.calls.some(([r]) => (r as Request).method === 'POST')).toBe(false)
   })
 
   it('creates a blank variant below the variants and opens it in the editor', async () => {
@@ -211,9 +234,10 @@ describe('creating', () => {
     expect(await screen.findByRole('link', { name: 'Edit Variant A' })).toHaveAttribute(
       'href', '/campaigns/1/variants/3',
     )
-    fireEvent.change(screen.getByLabelText(/^New blank variant/), { target: { value: 'Plain' } })
-    await waitFor(() => expect(screen.getByRole('button', { name: /email/ })).toBeInTheDocument())
-    fireEvent.click(screen.getByRole('button', { name: 'Create blank variant' }))
+    const blank = screen.getByRole('region', { name: 'New blank variant' })
+    fireEvent.change(within(blank).getByLabelText(/^Name/), { target: { value: 'Plain' } })
+    await waitFor(() => expect(within(blank).getByRole('button', { name: /email/ })).toBeInTheDocument())
+    fireEvent.click(within(blank).getByRole('button', { name: 'Create blank variant' }))
     expect(await screen.findByText('editor 1/22')).toBeInTheDocument()
     const post = fetchMock.mock.calls.map(([r]) => r as Request).find((r) => r.method === 'POST')!
     expect(await post.clone().json()).toEqual({ name: 'Plain', channel: 'email', status: 'draft' })
@@ -235,14 +259,22 @@ describe('the results section (task-58)', () => {
       }),
     })
     renderDetail()
-    const table = await screen.findByRole('grid', { name: 'Results by variant' })
-    const rows = within(table).getAllByRole('row')
+    // Two tables (task-372, decision 15): delivery, then engagement, each with the whole campaign on top.
+    const delivery = await screen.findByRole('grid', { name: 'Delivery by variant' })
+    const rows = within(delivery).getAllByRole('row')
     expect(rows[1]).toHaveTextContent('Whole campaign')
-    expect(rows[1]).toHaveTextContent('37.5 %')
-    expect(rows[1]).toHaveTextContent('1 (consent 1)')
+    expect(rows[1]).toHaveClass('row-total')
+    expect(rows[2]).not.toHaveClass('row-total')
+    expect(within(rows[1]).getByText('consent 1')).toBeInTheDocument()
     expect(rows[2]).toHaveTextContent('Variant A (email)')
-    // Push reports no deliveries, and with nothing sent there is no rate.
-    expect(within(rows[3]).getAllByText('—')).toHaveLength(2)
+    // Push reports no deliveries.
+    expect(within(rows[3]).getAllByText('—')).toHaveLength(1)
+    const engagement = screen.getByRole('grid', { name: 'Engagement by variant' })
+    const used = within(engagement).getAllByRole('row')
+    expect(used[1]).toHaveTextContent('Whole campaign')
+    expect(used[1]).toHaveTextContent('37.5 %')
+    // With nothing delivered there is no rate.
+    expect(within(used[3]).getAllByText('—')).toHaveLength(1)
     expect(screen.getByText(/Unsubscribes made before .* are not counted/)).toBeInTheDocument()
   })
 
@@ -254,7 +286,7 @@ describe('the results section (task-58)', () => {
     renderDetail()
     expect(await screen.findByRole('heading', { name: 'Spring' })).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByText('Results')).not.toBeInTheDocument())
-    expect(screen.queryByRole('grid', { name: 'Results by variant' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('grid', { name: 'Delivery by variant' })).not.toBeInTheDocument()
   })
 
   it('leaves out the partial note when every send is counted in full', async () => {
@@ -266,7 +298,7 @@ describe('the results section (task-58)', () => {
       }),
     })
     renderDetail()
-    await screen.findByRole('grid', { name: 'Results by variant' })
+    await screen.findByRole('grid', { name: 'Delivery by variant' })
     expect(screen.getByText(/Opens are not counted\./)).toBeInTheDocument()
     expect(screen.queryByText(/Unsubscribes made before/)).not.toBeInTheDocument()
   })

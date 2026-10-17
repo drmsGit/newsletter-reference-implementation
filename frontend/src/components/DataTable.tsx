@@ -14,6 +14,8 @@ export type DataColumn<T> = {
    * record they belong to. Exactly one column per table should set it.
    */
   isRowHeader?: boolean
+  /** A column of figures: right-aligned, header and cells alike (HANDOFF, tables). */
+  numeric?: boolean
 }
 
 type Props<T> = {
@@ -29,6 +31,8 @@ type Props<T> = {
   items: T[]
   emptyMessage: string
   onRowAction?: (item: T) => void
+  /** A class for one row, such as a totals row drawn apart from the rest. */
+  rowClassName?: (item: T) => string | undefined
 }
 
 /**
@@ -51,6 +55,7 @@ export default function DataTable<T extends { id: number }>({
   items,
   emptyMessage,
   onRowAction,
+  rowClassName,
 }: Props<T>) {
   const byId = new Map(items.map((item) => [item.id, item]))
 
@@ -69,16 +74,23 @@ export default function DataTable<T extends { id: number }>({
     >
       <TableHeader>
         {columns.map((column) => (
-          <Column key={column.key} id={column.key} isRowHeader={column.isRowHeader}>
+          <Column
+            key={column.key}
+            id={column.key}
+            isRowHeader={column.isRowHeader}
+            className={column.numeric ? 'react-aria-Column num' : undefined}
+          >
             {column.header}
           </Column>
         ))}
       </TableHeader>
       <TableBody renderEmptyState={() => <span className="muted">{emptyMessage}</span>}>
         {items.map((item) => (
-          <Row key={item.id} id={item.id}>
+          <Row key={item.id} id={item.id} className={rowClassName?.(item) ? `react-aria-Row ${rowClassName(item)}` : undefined}>
             {columns.map((column) => (
-              <Cell key={column.key}>{column.render(item)}</Cell>
+              <Cell key={column.key} className={column.numeric ? 'react-aria-Cell num' : undefined}>
+                {column.render(item)}
+              </Cell>
             ))}
           </Row>
         ))}

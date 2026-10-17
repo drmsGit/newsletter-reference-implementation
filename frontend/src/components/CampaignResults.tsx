@@ -1,3 +1,5 @@
+import { ChevronDown } from 'lucide-react'
+
 import { useCampaignResults, type VariantResults } from '../api/resources'
 import DataTable, { type DataColumn } from './DataTable'
 
@@ -10,6 +12,9 @@ import DataTable, { type DataColumn } from './DataTable'
  * it; this section only shows it. Nothing appears until a send has gone out,
  * and it folds away, since the campaign page is also where the campaign is
  * built. Comparing campaigns is the analytics tool's job, not this page's.
+ *
+ * Twelve figures do not fit one table beside a list, so they are two
+ * (task-372, decision 15): what reached people, then what they did with it.
  */
 export default function CampaignResults({ campaignId }: { campaignId: number }) {
   const results = useCampaignResults(campaignId)
@@ -22,12 +27,29 @@ export default function CampaignResults({ campaignId }: { campaignId: number }) 
   const since = new Date(data.unsubscribes_counted_since).toLocaleDateString(undefined, { dateStyle: 'medium' })
 
   return (
-    <details open>
+    <details open className="results">
       <summary>
-        <h2 style={{ display: 'inline' }}>Results</h2>
+        <ChevronDown size={16} strokeWidth={1.75} aria-hidden="true" className="results-chevron" />
+        <h3>Results</h3>
       </summary>
-      <DataTable label="Results by variant" columns={columns} items={rows} emptyMessage="Nothing sent yet." />
-      <p className="muted">
+      {/* Two tables in one card (task-372, decision 15): delivery, then engagement. */}
+      <div className="group results-card">
+        <DataTable
+          label="Delivery by variant"
+          columns={delivery}
+          items={rows}
+          emptyMessage="Nothing sent yet."
+          rowClassName={(r) => (r.id === 0 ? 'row-total' : undefined)}
+        />
+        <DataTable
+          label="Engagement by variant"
+          columns={engagement}
+          items={rows}
+          emptyMessage="Nothing sent yet."
+          rowClassName={(r) => (r.id === 0 ? 'row-total' : undefined)}
+        />
+      </div>
+      <p className="muted results-note">
         Counted per delivery. Click rate is unique clickers over sent. Opens are not counted.
         {data.unsubscribes_partial && ` Unsubscribes made before ${since} are not counted.`}
       </p>
@@ -45,28 +67,40 @@ function percent(value: number | null | undefined) {
   return value == null ? '—' : `${(value * 100).toFixed(1)} %`
 }
 
+/** The excluded count, with the stages that excluded them on a line below. */
 function excluded(row: Row) {
   const stages = Object.entries(row.excluded_by_stage ?? {})
   if (row.excluded === 0 || stages.length === 0) return count(row.excluded)
-  return `${row.excluded.toLocaleString()} (${stages.map(([stage, n]) => `${stage} ${n}`).join(', ')})`
+  return (
+    <>
+      {row.excluded.toLocaleString()}
+      <span className="cell-sub">{stages.map(([stage, n]) => `${stage} ${n}`).join(', ')}</span>
+    </>
+  )
 }
 
-const columns: DataColumn<Row>[] = [
-  {
-    key: 'name',
-    header: 'Variant',
-    isRowHeader: true,
-    render: (r) => (r.channel ? `${r.name} (${r.channel})` : r.name),
-  },
-  { key: 'recipients', header: 'Recipients', render: (r) => count(r.recipients) },
-  { key: 'sent', header: 'Sent', render: (r) => count(r.sent) },
-  { key: 'delivered', header: 'Delivered', render: (r) => count(r.delivered) },
-  { key: 'failed', header: 'Failed', render: (r) => count(r.failed) },
-  { key: 'excluded', header: 'Excluded', render: excluded },
-  { key: 'bounced', header: 'Bounced', render: (r) => count(r.bounced) },
-  { key: 'complaints', header: 'Complaints', render: (r) => count(r.complaints) },
-  { key: 'clicks', header: 'Clicks', render: (r) => count(r.clicks_total) },
-  { key: 'clickers', header: 'Unique clickers', render: (r) => count(r.unique_clickers) },
-  { key: 'rate', header: 'Click rate', render: (r) => percent(r.click_rate) },
-  { key: 'unsubscribes', header: 'Unsubscribes', render: (r) => count(r.unsubscribes) },
+const variant: DataColumn<Row> = {
+  key: 'name',
+  header: 'Variant',
+  isRowHeader: true,
+  render: (r) => (r.channel ? `${r.name} (${r.channel})` : r.name),
+}
+
+const delivery: DataColumn<Row>[] = [
+  variant,
+  { key: 'recipients', header: 'Recipients', numeric: true, render: (r) => count(r.recipients) },
+  { key: 'sent', header: 'Sent', numeric: true, render: (r) => count(r.sent) },
+  { key: 'delivered', header: 'Delivered', numeric: true, render: (r) => count(r.delivered) },
+  { key: 'failed', header: 'Failed', numeric: true, render: (r) => count(r.failed) },
+  { key: 'excluded', header: 'Excluded', numeric: true, render: excluded },
+  { key: 'bounced', header: 'Bounced', numeric: true, render: (r) => count(r.bounced) },
+  { key: 'complaints', header: 'Complaints', numeric: true, render: (r) => count(r.complaints) },
+]
+
+const engagement: DataColumn<Row>[] = [
+  variant,
+  { key: 'clicks', header: 'Clicks', numeric: true, render: (r) => count(r.clicks_total) },
+  { key: 'clickers', header: 'Unique clickers', numeric: true, render: (r) => count(r.unique_clickers) },
+  { key: 'rate', header: 'Click rate', numeric: true, render: (r) => percent(r.click_rate) },
+  { key: 'unsubscribes', header: 'Unsubscribes', numeric: true, render: (r) => count(r.unsubscribes) },
 ]

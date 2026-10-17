@@ -12,6 +12,7 @@ import { useParams } from 'react-router'
 
 import { useApproval, useDecide, type PendingActionDetail } from '../api/resources'
 import { HttpError } from '../api/session'
+import Fact from '../components/Fact'
 import ScreenState from '../components/ScreenState'
 import { deadline } from './Approvals'
 import { formatDate } from './Campaigns'
@@ -134,15 +135,6 @@ export default function ApprovalDetail() {
         </div>
       )}
     </ScreenState>
-  )
-}
-
-function Fact({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="fact">
-      <dt>{label}</dt>
-      <dd>{children}</dd>
-    </div>
   )
 }
 

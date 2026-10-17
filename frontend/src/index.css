@@ -1432,6 +1432,81 @@ kbd {
 }
 .btnrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
 
+/* --- campaigns (render 20) ------------------------------------------------- */
+
+/* A list title with its "New ..." button at the right (decision 22). */
+.list-head--action { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.list-foot--end { justify-content: flex-end; }
+
+/* The search box of a list column: the label is the placeholder. */
+.col-list .search-compact { flex-wrap: nowrap; padding: 4px 8px 12px; }
+.search-compact .react-aria-TextField { flex: 1; min-width: 0; margin: 0; }
+
+/* Figures right-aligned, header and cells; a totals row drawn apart. */
+.react-aria-Table th.num,
+.react-aria-Table td.num { text-align: right; }
+.react-aria-Row.row-total td { font-weight: 600; background: var(--brand-surface-2); }
+.cell-sub { display: block; font-size: 12px; line-height: 16px; font-weight: 400; color: var(--brand-muted); }
+
+/* A details part: its title above, then its cards. */
+.detail-section { display: flex; flex-direction: column; gap: 12px; }
+.detail-section > .group-title { margin: 0; }
+.group-actions { position: relative; padding: 12px 16px; border-top: 1px solid var(--brand-line); }
+.group-actions > p { margin: 0; }
+.group-actions > p + p { margin-top: 8px; }
+
+/* A table in a card, with a small title inside it; wide tables scroll inside. */
+.table-card, .results-card { overflow-x: auto; }
+.table-card__title { margin: 0; padding: 12px 16px 0; font-size: 13px; line-height: 18px; font-weight: 600; }
+.group .react-aria-Table { margin: 0; }
+.group .react-aria-Table th:first-child, .group .react-aria-Table td:first-child { padding-left: 16px; }
+.group .react-aria-Table th:last-child, .group .react-aria-Table td:last-child { padding-right: 16px; }
+.results-card .react-aria-Table + .react-aria-Table { border-top: 1px solid var(--brand-line); }
+.results-card .react-aria-Table + .react-aria-Table th { padding-top: 12px; }
+
+/* The results fold away: a chevron, not the browser's triangle. */
+.results > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px 8px;
+  list-style: none;
+  cursor: pointer;
+}
+.results > summary::-webkit-details-marker { display: none; }
+.results > summary h3 { margin: 0; }
+.results:not([open]) .results-chevron { transform: rotate(-90deg); }
+.results-note { margin: 8px 0 0; padding: 0 16px; font-size: 12px; line-height: 16px; }
+
+/* An inline create form in a card (New blank variant): one row, bottoms aligned. */
+.group-body .create-form > .react-aria-TextField { flex: 1 1 12rem; margin-bottom: 0; }
+.group-body .create-form > .react-aria-Select { flex: 1 1 12rem; }
+.group-body .create-form > .btnrow { margin: 0; }
+
+/* A link that is a button (Edit, Send): the button's look, the link's meaning. */
+a.btn-link {
+  display: inline-flex;
+  align-items: center;
+  height: var(--brand-control-height);
+  padding: 0 12px;
+  border-radius: var(--brand-radius);
+  border: 1px solid var(--brand-line);
+  background: var(--brand-surface);
+  color: var(--brand-fg);
+  box-shadow: var(--brand-shadow);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+a.btn-link:hover { background: var(--brand-surface-2); }
+
+/* A create dialog (render 45): title, fields, then Cancel and Create at the right. */
+.create-modal h2 { margin: 0 0 16px; }
+.dialog-form { display: flex; flex-direction: column; }
+.dialog-form .react-aria-Select { margin-bottom: 12px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.dialog-actions button { align-self: auto; }
+
 /* Below about 1,100 px the details wrap under the list; at phone width one
    column at a time (HANDOFF section 3). */
 @media (max-width: 1100px) {
