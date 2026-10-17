@@ -206,8 +206,9 @@ kind,key,brand,subject,preheader,editorial
 - editorial — 50–90 words, German, the short introduction at the top of the mail.
               You may use **bold**. No links.
               For editions, you may start with the placeholder
-              {{salutation_formal}} followed by a comma, on its own line — it is
-              replaced by a salutation per reader. No other placeholders.
+              {{salutation_formal}} on its own line, with no comma after it — it
+              is replaced by a salutation per reader that brings its own comma.
+              No other placeholders.
 
 Rows to write:
 edition, herbstauftakt, outdoor          — early September: autumn hiking, huts still open

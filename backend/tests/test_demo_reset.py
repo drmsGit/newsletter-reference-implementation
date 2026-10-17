@@ -128,7 +128,7 @@ def _fixture(tmp_path: Path) -> Path:
         writer.writerow(["kind", "key", "brand", "subject", "preheader", "editorial"])
         for edition in editions.EDITIONS:
             writer.writerow(["edition", edition.key, edition.brand, f"Betreff {edition.key}", "Vorschau",
-                             "{{salutation_formal}},\nHerzlich willkommen."])
+                             "{{salutation_formal}}\nHerzlich willkommen."])
         writer.writerow(["transactional", "bestellbestaetigung", "outdoor", "Ihre Bestellung", "", "Danke."])
         writer.writerow(["transactional", "buchungsbestaetigung", "touren", "Ihre Buchung", "", "Danke."])
     return content
@@ -242,3 +242,22 @@ def test_a_brand_someone_is_signed_in_to_is_still_removed():
         db.query(BrandDB).filter(BrandDB.key == f"gone-{tag}").delete()
         db.commit()
         db.close()
+
+
+def test_the_demo_editorials_leave_the_comma_to_the_salutation():
+    """Found 2026-10-17: the editions read "Sehr geehrte Damen und Herren,,".
+    Every salutation in the starter dictionary ends with its own comma
+    (storage/expressions.json), so an editorial must not add another."""
+    import json
+
+    starter = json.loads((Path(__file__).resolve().parents[2] / "storage" / "expressions.json").read_text())
+    for entry in ("salutation_formal", "salutation_informal"):
+        for spec in starter["entries"][entry]["languages"].values():
+            assert spec["fallback"].endswith(",") and all(c["text"].endswith(",") for c in spec["cases"])
+    problems: list[str] = []
+    words = editions.read_words(Path(__file__).resolve().parents[1] / "scripts" / "demo" / "content" / "editions.csv",
+                                problems)
+    assert words and not problems
+    for key, entry in words.items():
+        text = " ".join(str(v) for v in entry.values()) if isinstance(entry, dict) else str(entry)
+        assert "{{salutation_formal}}," not in text and "{{salutation_informal}}," not in text, key
