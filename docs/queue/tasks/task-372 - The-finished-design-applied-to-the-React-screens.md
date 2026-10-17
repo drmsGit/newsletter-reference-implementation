@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-11 20:44'
-updated_date: '2026-10-17 12:46'
+updated_date: '2026-10-17 12:51'
 labels:
   - frontend
 dependencies: []
@@ -77,4 +77,6 @@ Next: decision slots (render 32) and the preview sheet (24, decision 16 decided)
 2026-10-17, step 8 built and pushed: the preview as a sheet (render 24; decisions 5 and 16). The module list's drag handles are TASK-391 and not built. Next: the send steps (renders 25, 26), with open decision 17 (the planned sends listed in column 2 beside the steps) to ask first.
 
 2026-10-17, Diede: decision 17, the send screen as drawn: column 2 holds the title and the planned sends, which now stay listed while one is continued (marked as open). Step 9 built and pushed. Step 4 (the send) was not seen live, since that needs a planned send; its tests cover it. Next: deliveries and results (renders 29 to 31), then audiences (37; decision 18 to ask), recipients (38), monitoring and the decision history (39, 40; decision 14 to ask), settings (33 to 36, 44; decision 23 to confirm) and sign-in (41, 42).
+
+2026-10-17, step 10 built and pushed: deliveries as list and details (renders 29 to 31). Opening another send keeps the list page but not the recipient search (q belongs to the open send; test). The stranded card was not seen live (no send is stranded now); its tests cover it. Next: audiences (render 37), with open decision 18 (who a send reaches, as a section after the rules) to ask first.
 <!-- SECTION:NOTES:END -->
