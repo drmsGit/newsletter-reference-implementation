@@ -4,7 +4,7 @@ title: Small details the finished design left open
 status: To Do
 assignee: []
 created_date: '2026-10-17 13:31'
-updated_date: '2026-10-17 16:56'
+updated_date: '2026-10-17 17:02'
 labels:
   - frontend
 dependencies: []
@@ -65,7 +65,7 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 - [x] #11 Settings General read-only facts share the 16 px inset of the inputs beside them
 - [x] #12 Buttons beside a field align with its control, not its label, and the Brands name field grows
 - [x] #13 In the list column the search box and filters start at the same indent as the title and the rows
-- [ ] #14 Dialogs share one header pattern and one footer order: Cancel, then the primary action, at the right
+- [x] #14 Dialogs share one header pattern and one footer order: Cancel, then the primary action, at the right
 - [ ] #15 Each Personalise button is named by its field
 - [ ] #16 Each Remove in a user's Access card is named by the access it removes
 - [ ] #17 The recipient page's tables have header cells with scope and an accessible name each
@@ -89,4 +89,6 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 2026-10-17: items 12 (UX-12, UX-25) and 5 fixed together, one cause: in the ten rows that align to the end (.filters, .pager, .add-module, .create-form, .inline-form, .bind__filters, .record-duplicate, .assignment, .assignment-add, .image-library__filters) a direct-child button now has align-self: auto (index.css, after the button rule); the Brands name field grows (.brand-list .inline-form). Live: button bottom equals control bottom (0 px) for Rename, Delete, Duplicate, Remove, Add (record and category), Give, Issue a key, Save; Brands name field 427 px. CSS only, no unit test possible in jsdom.
 
 2026-10-17: item 13 (UX-22) closed as matching the design, not changed. Render 20 draws the search box at x 240 (8 px into the list column), the same as the selected row's highlight, and the title and row text at x 252 (20 px); ui.css gives .filters and .search 8 px padding; HANDOFF's one-indent rule is about text. The user chose to keep it as drawn. AC #13 is ticked as closed by that decision, not as fulfilled.
+
+2026-10-17: item 14 (UX-13) fixed against renders 24, 43 and 45. Sheets: the image picker and the shortcut overview get the sheet-head bar (they used the unstyled preview-head); the preview already matched. Footers in DialogActions or dialog-actions: Paste people (Cancel, then Check or Add N), Delete audience (Cancel, Delete), Suggest from campaign (Cancel), The new key (Copy, I have stored it). The ten create dialogs already matched render 45. Tests in ImageField, Shortcuts, AudienceEditor and IntegrationDetail.secret, mutation-checked four ways. Live: all four opened and cancelled, nothing written.
 <!-- SECTION:NOTES:END -->
