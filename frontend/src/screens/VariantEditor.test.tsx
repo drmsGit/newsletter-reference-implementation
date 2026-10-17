@@ -44,7 +44,7 @@ const T = (n: number) => `2026-10-03T10:00:0${n}.000000Z`
  * makes "two quick saves never refuse each other" a real assertion rather than
  * one the stub satisfies by agreeing with everything.
  */
-function server(overrides: { canAdd?: boolean; accepted?: string[] } = {}) {
+function server(overrides: { canAdd?: boolean; accepted?: string[]; preparable?: boolean } = {}) {
   let clock = 1
   const state = {
     variant: { id: 3, campaign_id: 1, channel: 'email', name: 'Variant A',
@@ -63,7 +63,7 @@ function server(overrides: { canAdd?: boolean; accepted?: string[] } = {}) {
     campaign: { id: 1, name: 'Spring', status: 'draft', created_at: T(0), updated_at: T(0) },
     variants: [{
       variant: state.variant, module_limit: null, can_add_module: overrides.canAdd ?? true,
-      has_envelope: true, brand_profile: A_BRAND_PROFILE, accepted_module_types: overrides.accepted ?? ['cta', 'editorial', 'hero'],
+      has_envelope: true, preparable_from_topic: overrides.preparable ?? false, brand_profile: A_BRAND_PROFILE, accepted_module_types: overrides.accepted ?? ['cta', 'editorial', 'hero'],
       modules: [...state.modules].sort((a, b) => a.position - b.position),
       envelope_modules: [], decision_slots: [],
     }],
@@ -450,5 +450,20 @@ describe('AI subject and preheader suggestions (task-367)', () => {
         jsonResponse([{ ...RUN, options: [], notices: [], reply: 'I would have to invent the details.' }]),
     })
     expect(await screen.findByText('I would have to invent the details.')).toBeInTheDocument()
+  })
+})
+
+describe('preparing from a topic in the editor (task-370)', () => {
+  it('is offered only when the server says the variant is empty', async () => {
+    const { handlers } = server({ preparable: true })
+    open({ ...handlers, 'GET /campaigns/variants/3/topic-proposals': () => jsonResponse([]) })
+    expect(await screen.findByRole('button', { name: 'Propose a variant' })).toBeInTheDocument()
+  })
+
+  it('is not offered otherwise', async () => {
+    const { handlers } = server()
+    open(handlers)
+    await screen.findByRole('heading', { name: 'Modules' })
+    expect(screen.queryByRole('button', { name: 'Propose a variant' })).not.toBeInTheDocument()
   })
 })

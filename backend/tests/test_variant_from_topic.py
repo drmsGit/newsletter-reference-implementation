@@ -347,3 +347,20 @@ def test_a_visible_header_and_footer_do_not_count_as_content(db, world, model):
     model["reply"] = _reply(world)
     with signed_in(db) as (client, _token, csrf):
         assert _ask(client, csrf, world["variant"].id).status_code == 200
+
+
+def test_the_composition_says_when_it_is_offered(db, world):
+    variant = world["variant"]
+    push = create_campaign(db, name=f"{TAG} push offer", brand_id=world["brand"].id, channel="push")
+
+    def offered(campaign_id, variant_id):
+        with signed_in(db) as (client, _token, _csrf):
+            composition = client.get(f"/campaigns/{campaign_id}/composition").json()
+        return next(v for v in composition["variants"] if v["variant"]["id"] == variant_id)["preparable_from_topic"]
+
+    assert offered(variant.campaign_id, variant.id) is True
+    push_variant = db.query(VariantDB).filter_by(campaign_id=push.id).one()
+    assert offered(push.id, push_variant.id) is False
+    create_module_for_variant(db, variant_id=variant.id, module_type="editorial", module_data={"text": "Mine"},
+                              brand_id=world["brand"].id)
+    assert offered(variant.campaign_id, variant.id) is False

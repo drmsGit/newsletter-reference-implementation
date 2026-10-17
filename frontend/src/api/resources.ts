@@ -1019,6 +1019,45 @@ export function useSuggestSubject(variantId: number) {
   })
 }
 
+// --- a variant from a topic (task-370; ADR-141 addendum 2026-10-17) --------
+
+export type TopicProposal = components['schemas']['TopicProposal']
+export type BuildChoice = components['schemas']['BuildFromProposal']
+
+/** Every topic proposal for an empty variant, newest first. */
+export function useTopicProposals(variantId: number, enabled: boolean) {
+  return useQuery({
+    queryKey: ['variants', variantId, 'topic-proposals'],
+    queryFn: () =>
+      read(api.GET('/campaigns/variants/{variant_id}/topic-proposals', { params: { path: { variant_id: variantId } } })),
+    enabled,
+  })
+}
+
+/** Ask the model for a proposal. Nothing is written to the variant. */
+export function useProposeFromTopic(variantId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (topic: string) =>
+      read(api.POST('/campaigns/variants/{variant_id}/topic-proposals', {
+        params: { path: { variant_id: variantId } }, body: { topic },
+      })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['variants', variantId, 'topic-proposals'] }),
+  })
+}
+
+/** Build the ticked parts into the empty variant; the editor then shows them. */
+export function useBuildFromProposal(campaignId: number, variantId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (choice: BuildChoice) =>
+      read(api.POST('/campaigns/variants/{variant_id}/build-from-proposal', {
+        params: { path: { variant_id: variantId } }, body: choice,
+      })),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.composition(campaignId) }),
+  })
+}
+
 export function useSaveVariant(campaignId: number) {
   return useComposerWrite(
     campaignId,

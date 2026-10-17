@@ -4455,6 +4455,11 @@ export interface components {
             can_add_module: boolean;
             /** Has Envelope */
             has_envelope: boolean;
+            /**
+             * Preparable From Topic
+             * @default false
+             */
+            preparable_from_topic: boolean;
             /** Accepted Module Types */
             accepted_module_types: string[];
             /** Modules */

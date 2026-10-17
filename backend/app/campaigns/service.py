@@ -412,6 +412,18 @@ def update_variant(
     return to_variant(variant, db)
 
 
+def _preparable_from_topic(db: Session, variant) -> bool:
+    """Whether "Prepare from a topic" is offered (task-370): the task's own
+    check, so the editor never holds a second copy of the rule."""
+    from app.ai.tasks import variant_from_topic
+
+    try:
+        variant_from_topic.check(db, variant)
+    except variant_from_topic.ProposalRefused:
+        return False
+    return True
+
+
 def module_audit_detail(module) -> dict:
     """What a module.created / module.updated entry records (task-252), the
     same on both planes. Takes the row or its response model. `module_data` is
@@ -1426,6 +1438,7 @@ def campaign_composition(db: Session, campaign_id: int, *, brand_id: int) -> dic
             "module_limit": limit,
             "can_add_module": limit is None or len(modules) < limit,
             "has_envelope": envelope_module_type(variant.channel) is not None,
+            "preparable_from_topic": _preparable_from_topic(db, variant),
             "accepted_module_types": [
                 m.name for m in list_manifests(variant.channel, offered=True)
                 if not any(v.envelope for v in m.variables)

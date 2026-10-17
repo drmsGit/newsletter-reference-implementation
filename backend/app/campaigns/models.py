@@ -613,6 +613,9 @@ class ComposedVariant(BaseModel):
     module_limit: int | None = None
     can_add_module: bool
     has_envelope: bool
+    #: "Prepare from a topic" is offered: an email variant with no content
+    #: blocks yet (task-370; ADR-141 addendum 2026-10-17).
+    preparable_from_topic: bool = False
     accepted_module_types: list[str]
     modules: list[ComposedModule]
     # The subject/preheader module, kept apart from the body (ADR-162 point 1).

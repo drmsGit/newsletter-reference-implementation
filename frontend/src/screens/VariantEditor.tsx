@@ -22,6 +22,7 @@ import ScreenState from '../components/ScreenState'
 import CatalogueModule from './CatalogueModule'
 import Fence from './Fence'
 import SubjectSuggestions, { type SuggestionOption } from './SubjectSuggestions'
+import TopicProposal from './TopicProposal'
 import PreviewBar from './Preview'
 import { ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
 import { BRAND_PROFILES, fieldLabels } from './BrandProfiles'
@@ -121,6 +122,7 @@ function Editor({
       <div className="editor">
         <section className="editor__stack" aria-labelledby="stack-heading">
           <h2 id="stack-heading">Modules</h2>
+          {composed.preparable_from_topic && <TopicProposal campaignId={campaignId} variantId={variant.id} />}
           <Stack
             campaignId={campaignId}
             modules={modules}
