@@ -21,6 +21,7 @@ body{margin:0}
 
 <section class="col-list" aria-label="Decision slots" style="min-height: {{minH}}px">
 <header class="list-head"><h1 class="ts-large" style="margin: 0">Decision slots</h1><div class="ts-cap" style="margin-top: 2px">Read-only: slots are configured on their variant.</div></header>
+<form class="search" role="search"><input class="field" type="text" aria-label="Find a slot by name" placeholder="Find a slot by name"><button class="btn" type="button">Search</button></form>
 <div class="list" role="group" aria-label="Decision slots">
 <sc-for list="{{rows}}" as="r" hint-placeholder-count="6">
 <a href="#" class="item" aria-current="{{r.current}}">

@@ -247,3 +247,6 @@ textarea.field{height:auto;min-height:64px;padding:6px 8px;resize:vertical}
 .list-tools > p{padding:0 12px}
 /* native checkboxes and radios take the accent */
 .root input[type="checkbox"],.root input[type="radio"]{accent-color:var(--brand-accent)}
+
+/* shortcut hint inside a button or line (the real app shows these only while Alt or Ctrl is held; drawn here so the key is documented) */
+.root kbd{font:inherit;font-size:11px;line-height:14px;padding:0 5px;margin-left:8px;border:1px solid var(--brand-line-strong);border-radius:4px;color:var(--brand-muted);background:var(--brand-surface-2)}

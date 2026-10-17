@@ -5,7 +5,7 @@ created: 2026-10-12
 
 # Canvas snapshot, v2 (three columns)
 
-A copy of the v2 boards of the Claude Design canvas "Approvals redesign" (https://claude.ai/artifact/HEESqGiNZKeWaqT2d5DatL, page "Three columns"), first taken 2026-10-12 and brought up to the screens added on 2026-10-17 (canvas version 48), so the design does not depend on the canvas staying reachable. It matches the published files. Start from [[HANDOFF]].
+A copy of the v2 boards of the Claude Design canvas "Approvals redesign" (https://claude.ai/artifact/HEESqGiNZKeWaqT2d5DatL, page "Three columns"), first taken 2026-10-12 and brought up to the screens added on 2026-10-17 (canvas version 52), so the design does not depend on the canvas staying reachable. It matches the published files. Start from [[HANDOFF]].
 
 | File | Board |
 |---|---|
@@ -21,7 +21,8 @@ A copy of the v2 boards of the Claude Design canvas "Approvals redesign" (https:
 | `V2Deliveries` (+ `V2DeliveriesStranded`), `V2DeliveryAsSent`, `V2DecisionSlots` | Deliveries, one recipient's message as sent, decision slots |
 | `V2Monitoring`, `V2ApprovalsHistory` | The two wide-table screens (one column of table, no list and details) |
 | `V2Audiences`, `V2Recipients` | Audiences with the rule editor, recipients with a person's page |
-| `V2Settings` (prop `part`: general, profile, users, integrations; wrappers `V2SettingsProfile`, `V2SettingsUsers`, `V2SettingsIntegrations`), `V2SignIn` (+ `V2SignIn2`) | Settings and sign-in |
+| `V2Settings` (prop `part`: general, prompts, profile, users, integrations; wrappers `V2SettingsPrompts`, `V2SettingsProfile`, `V2SettingsUsers`, `V2SettingsIntegrations`), `V2SignIn` (+ `V2SignIn2`) | Settings and sign-in |
+| `V2CreateDialogs` | The create dialogs behind every "New ..." button |
 | `ui.css` | The foundation and the component library, linked by every board |
 | `canvas.json` | The layout of the canvas, with its pages and Diede's sticky notes |
 

@@ -53,19 +53,15 @@ body{margin:0}
 <div class="col-detail" style="min-height: {{minH}}px">
 <div class="detail-scroll">
 
-<header class="detail-head">
-<h2 class="ts-title" style="margin: 0">Variant A</h2>
-<p class="muted" style="margin: 4px 0 0">Email · Draft · <a href="#">Send…</a></p>
+<header class="detail-head" style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px">
+<div><h2 class="ts-title" style="margin: 0">Variant A</h2>
+<p class="muted" style="margin: 4px 0 0">Email · Draft · <a href="#">Send…</a></p></div>
+<div class="btnrow" style="flex-wrap: nowrap; margin-top: 2px"><span class="muted" style="white-space: nowrap">Nothing to flag.</span><button class="btn" type="button">Open preview<kbd>P</kbd></button></div>
 </header>
 
 <section aria-labelledby="bp-h">
 <h3 id="bp-h" class="ts-head group-title">Brand profile</h3>
 <div class="group frow"><button class="select-btn" type="button" aria-label="Brand profile"><span>Nordlicht default (default) · en</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div>
-</section>
-
-<section aria-labelledby="pv-h">
-<h3 id="pv-h" class="ts-head group-title">Preview</h3>
-<div class="group frow"><div class="btnrow" style="justify-content: space-between"><span>Nothing to flag.</span><button class="btn" type="button">Open preview</button></div></div>
 </section>
 
 <section aria-labelledby="env-h">
@@ -154,13 +150,13 @@ body{margin:0}
 
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"mode":{"editor":"enum","default":"record","options":["record","picker","slot"]},"minH":{"editor":"int","default":1540,"min":900,"max":6000},"$preview":{"width":1440,"height":1540}}'>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"mode":{"editor":"enum","default":"record","options":["record","picker","slot"]},"minH":{"editor":"int","default":1430,"min":900,"max":6000},"$preview":{"width":1440,"height":1430}}'>
 class Component extends DCLogic {
 renderVals() {
 const theme = this.props.theme ?? 'light';
 const contrast = this.props.contrast ?? 'normal';
 const mode = this.props.mode ?? 'record';
-const minH = parseInt(this.props.minH ?? 1540, 10) || 900;
+const minH = parseInt(this.props.minH ?? 1430, 10) || 900;
 const sel = mode === 'slot' ? 2 : 0;
 const defs = [
 { label: 'Hero', kind: 'record', binding: '“Ethiopia Guji, washed”' },

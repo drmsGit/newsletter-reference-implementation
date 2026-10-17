@@ -13,9 +13,9 @@
 body{margin:0}
 </style>
 </helmet>
-<dc-import name="V2Settings" theme="{{theme}}" contrast="{{contrast}}" part="users" min-h="800" hint-size="100%,800px"></dc-import>
+<dc-import name="V2Settings" theme="{{theme}}" contrast="{{contrast}}" part="users" min-h="760" hint-size="100%,760px"></dc-import>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"$preview":{"width":1440,"height":800}}'>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"$preview":{"width":1440,"height":760}}'>
 class Component extends DCLogic {
 renderVals() {
 return { theme: this.props.theme ?? 'light', contrast: this.props.contrast ?? 'normal' };

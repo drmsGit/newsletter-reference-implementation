@@ -127,7 +127,7 @@
     },
     "V2Editor.dc.html": {
       "expand": "fill",
-      "h": 1540,
+      "h": 1430,
       "page": "v2",
       "title": "Variant editor",
       "w": 1440,
@@ -136,7 +136,7 @@
     },
     "V2EditorPicker.dc.html": {
       "expand": "fill",
-      "h": 1300,
+      "h": 1200,
       "page": "v2",
       "title": "Variant editor: choosing a record",
       "w": 1440,
@@ -145,7 +145,7 @@
     },
     "V2EditorSlot.dc.html": {
       "expand": "fill",
-      "h": 1620,
+      "h": 1530,
       "page": "v2",
       "title": "Variant editor: decision slot settings",
       "w": 1440,
@@ -280,7 +280,7 @@
     },
     "V2Settings.dc.html": {
       "expand": "fill",
-      "h": 1980,
+      "h": 1500,
       "page": "v2",
       "title": "Settings: general",
       "w": 1440,
@@ -298,7 +298,7 @@
     },
     "V2SettingsUsers.dc.html": {
       "expand": "fill",
-      "h": 800,
+      "h": 760,
       "page": "v2",
       "title": "Settings: users",
       "w": 1440,
@@ -331,6 +331,24 @@
       "w": 1440,
       "x": 3040,
       "y": 27560
+    },
+    "V2SettingsPrompts.dc.html": {
+      "expand": "fill",
+      "h": 780,
+      "page": "v2",
+      "title": "Settings: AI prompts",
+      "w": 1440,
+      "x": 0,
+      "y": 28560
+    },
+    "V2CreateDialogs.dc.html": {
+      "expand": "fill",
+      "h": 1420,
+      "page": "v2",
+      "title": "Create dialogs",
+      "w": 1440,
+      "x": 1520,
+      "y": 28560
     }
   },
   "createdOnFiles": {
@@ -497,7 +515,9 @@
     "V2SettingsUsers.dc.html",
     "V2SettingsIntegrations.dc.html",
     "V2SignIn.dc.html",
-    "V2SignIn2.dc.html"
+    "V2SignIn2.dc.html",
+    "V2SettingsPrompts.dc.html",
+    "V2CreateDialogs.dc.html"
   ],
   "pages": [
     {

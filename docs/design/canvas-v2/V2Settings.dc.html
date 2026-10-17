@@ -21,49 +21,27 @@ body{margin:0}
 </div>
 
 <section class="col-list" aria-label="Settings" style="min-height: {{minH}}px">
+
+<sc-if value="{{isMenu}}" hint-placeholder-val="{{true}}">
 <header class="list-head"><h1 class="ts-large" style="margin: 0">Settings</h1></header>
 <nav aria-label="Settings" class="list" style="flex: 0 0 auto">
-<sc-for list="{{menu}}" as="m" hint-placeholder-count="7">
+<sc-for list="{{menu}}" as="m" hint-placeholder-count="8">
 <a href="#" class="item" aria-current="{{m.current}}"><span class="ts-strong">{{m.label}}</span></a>
 </sc-for>
 </nav>
-
-<sc-if value="{{isProfile}}" hint-placeholder-val="{{false}}">
-<div style="border-top: 1px solid var(--brand-line); margin: 8px 0 0"></div>
-<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px 4px"><h2 class="ts-head" style="margin: 0">Brand profiles</h2><button class="btn btn-sm btn-primary" type="button">New profile</button></div>
-<div class="list" role="group" aria-label="Brand profiles">
-<a href="#" class="item" aria-current="true"><span class="clip ts-strong">Nordlicht, English</span><span class="ts-cap">Default · en · marketing</span><span class="ts-cap" style="color: var(--brand-success)">Complete</span></a>
-<a href="#" class="item" aria-current="false"><span class="clip ts-strong">Nordlicht, Deutsch</span><span class="ts-cap">de · marketing</span><span class="ts-cap" style="color: var(--brand-success)">Complete</span></a>
-<a href="#" class="item" aria-current="false"><span class="clip ts-strong">Order confirmations</span><span class="ts-cap">en · transactional</span><span class="ts-cap" style="color: var(--brand-human)">Missing: Imprint link, Privacy link</span></a>
-</div>
 </sc-if>
 
-<sc-if value="{{isUsers}}" hint-placeholder-val="{{false}}">
-<div style="border-top: 1px solid var(--brand-line); margin: 8px 0 0"></div>
-<div style="padding: 12px 20px 4px"><h2 class="ts-head" style="margin: 0">Users</h2><div class="ts-cap">Everyone with an account, and what they may do. Deactivating someone signs them out at once.</div></div>
-<div style="padding: 8px 8px 0"><button class="btn" type="button" style="width: 100%; justify-content: space-between"><span>New user</span><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 2.5L8 6l-3.5 3.5"></path></svg></button></div>
-<div class="list" role="group" aria-label="Users">
-<a href="#" class="item" aria-current="false"><span class="clip ts-strong">Maria Hartmann <span class="muted" style="font-weight: 400">· you</span></span><span class="clip ts-cap">m.hartmann@nordlicht-kaffee.example</span><span class="ts-cap">Manager · last sign-in 17 Oct 2026, 08:44</span></a>
-<a href="#" class="item" aria-current="true"><span class="clip ts-strong">Jonas Weber</span><span class="clip ts-cap">jonas.weber@nordlicht-kaffee.example</span><span class="ts-cap">Editor · last sign-in 16 Oct 2026, 17:10</span></a>
-<a href="#" class="item" aria-current="false"><span class="clip ts-strong">Anke Voss <span class="muted" style="font-weight: 400">· external</span></span><span class="clip ts-cap">anke.voss@example.test</span><span class="ts-cap">Editor on Nordlicht Kaffee · Never</span></a>
-<a href="#" class="item" aria-current="false"><span class="clip ts-strong">Robin Approver <span class="muted" style="font-weight: 400">· deactivated</span></span><span class="clip ts-cap">robin@nordlicht-kaffee.example</span><span class="ts-cap">No role · last sign-in 02 Sep 2026, 09:12</span></a>
-</div>
-</sc-if>
-
-<sc-if value="{{isIntegrations}}" hint-placeholder-val="{{false}}">
-<div style="border-top: 1px solid var(--brand-line); margin: 8px 0 0"></div>
-<div style="padding: 12px 20px 4px"><h2 class="ts-head" style="margin: 0">Integrations</h2><div class="ts-cap">Other systems that call this platform, each with its own keys and what it may do.</div></div>
-<form class="list-form" aria-label="New integration">
-<label class="lbl" for="ni" style="margin: 0">New integration</label>
-<input id="ni" class="field" type="text">
-<label class="lbl" for="nw" style="margin: 0">What it is for</label>
-<input id="nw" class="field" type="text">
-<div class="row"><button class="btn btn-primary" type="button" disabled>Create</button></div>
-</form>
-<div class="list" role="group" aria-label="Integrations">
-<a href="#" class="item" aria-current="true"><span class="clip ts-strong">Scheduler</span><span class="ts-cap">Active · 1 live key, one expiring soon</span><span class="clip ts-cap">send, view</span></a>
-<a href="#" class="item" aria-current="false"><span class="clip ts-strong">CRM sync</span><span class="ts-cap">Active · 2 live keys</span><span class="clip ts-cap">view</span></a>
-<a href="#" class="item" aria-current="false"><span class="clip ts-strong">Old export</span><span class="ts-cap">Deactivated · 0 live keys</span><span class="clip ts-cap">Nothing yet</span></a>
+<sc-if value="{{isList}}" hint-placeholder-val="{{false}}">
+<header class="list-head" style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px">
+<div style="min-width: 0"><a href="#" class="back"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 2.5L4 6l3.5 3.5"></path></svg>Settings</a><h1 class="ts-large" style="margin: 4px 0 0">{{listTitle}}</h1></div>
+<sc-if value="{{hasNew}}" hint-placeholder-val="{{true}}"><button class="btn btn-primary" type="button" style="margin-top: 22px; flex: none">{{newLabel}}</button></sc-if>
+</header>
+<div class="list-tools"><p class="ts-cap" style="margin: 0">{{intro}}</p></div>
+<sc-if value="{{hasSearch}}" hint-placeholder-val="{{true}}"><form class="search" role="search"><input class="field" type="text" aria-label="{{searchLabel}}" placeholder="{{searchLabel}}"><button class="btn" type="button">Search</button></form></sc-if>
+<div class="list" role="group" aria-label="{{listTitle}}">
+<sc-for list="{{items}}" as="r" hint-placeholder-count="4">
+<a href="#" class="item" aria-current="{{r.current}}"><span class="clip ts-strong">{{r.name}}</span><span class="clip ts-cap">{{r.l2}}</span><span class="clip ts-cap" style="color: {{r.c3}}">{{r.l3}}</span></a>
+</sc-for>
 </div>
 </sc-if>
 </section>
@@ -119,16 +97,39 @@ body{margin:0}
 <form class="frow" style="border-top: 1px solid var(--brand-line)"><div class="btnrow"><div style="flex: 1 1 140px"><label class="lbl" for="wt" style="margin: 0 0 4px">Warn at (tokens)</label><input id="wt" class="field" type="text" value="800000"></div><div style="flex: 1 1 140px"><label class="lbl" for="st" style="margin: 0 0 4px">Stop at (tokens)</label><input id="st" class="field" type="text" value="1000000"></div><div style="flex: 1 1 140px"><label class="lbl" for="bu" style="margin: 0 0 4px">Budget (USD)</label><input id="bu" class="field" type="text" value="50"></div></div><div><button class="btn" type="button">Save AI budget</button></div></form>
 <div class="frow"><div class="btnrow" style="align-items: flex-end"><div style="flex: 1 1 200px"><label class="lbl" for="bp" style="margin: 0 0 4px">The token budget refills</label><button id="bp" class="select-btn" type="button"><span>Every month</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div><button class="btn" type="button">Save budget period</button></div><div class="help" style="margin: 0">Periods start at midnight UTC on the first day.</div></div>
 </div>
+<p class="ts-cap" style="margin: 8px 16px 0">The model, output mode and prompt of each AI task are under AI prompts.</p>
+</section>
+</sc-if>
 
-<div class="group" style="margin-top: 12px">
-<div class="frow"><h4 class="ts-strong" style="margin: 0">Content draft</h4><div class="muted">Drafts the text fields of a content record from a source text.</div></div>
+<!-- ================= AI prompts ================= -->
+<sc-if value="{{isPrompts}}" hint-placeholder-val="{{false}}">
+<header class="detail-head">
+<a href="#" class="back"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 2.5L4 6l3.5 3.5"></path></svg>AI prompts</a>
+<h2 class="ts-title" style="margin: 4px 0 0">Content draft</h2>
+<div class="ts-cap" style="margin-top: 2px">Drafts the text fields of a content record from a source text.</div>
+</header>
+
+<section aria-labelledby="pm-h">
+<h3 id="pm-h" class="ts-head group-title">Model</h3>
+<div class="group">
 <div class="frow"><div class="btnrow" style="align-items: flex-end"><div style="flex: 1 1 200px"><label class="lbl" for="m2" style="margin: 0 0 4px">Model for Content draft</label><button id="m2" class="select-btn" type="button"><span>the default (example-model-1)</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div><button class="btn" type="button">Save model</button></div></div>
+</div>
+</section>
+
+<section aria-labelledby="po-h">
+<h3 id="po-h" class="ts-head group-title">Output</h3>
+<div class="group">
 <div class="frow"><div class="btnrow" style="align-items: flex-end"><div style="flex: 1 1 200px"><label class="lbl" for="o2" style="margin: 0 0 4px">Output of Content draft</label><button id="o2" class="select-btn" type="button"><span>applied directly</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div><button class="btn" type="button">Save output mode</button></div></div>
+</div>
+</section>
+
+<section aria-labelledby="pp-h">
+<h3 id="pp-h" class="ts-head group-title">Prompt</h3>
+<div class="group">
 <div class="frow" style="padding: 0"><dl style="margin: 0"><div class="fact"><dt>Prompt</dt><dd>version 2 of 2</dd></div></dl></div>
-<div class="frow"><label class="lbl" for="pr" style="margin: 0">Prompt for Content draft</label><textarea id="pr" class="field" rows="5">You write short, plain marketing copy for a coffee roaster…</textarea><div><button class="btn" type="button">Publish as version 3</button></div></div>
+<div class="frow"><label class="lbl" for="pr" style="margin: 0">Prompt for Content draft</label><textarea id="pr" class="field" rows="8">You write short, plain marketing copy for a coffee roaster…</textarea><div><button class="btn" type="button">Publish as version 3</button></div></div>
 <div class="frow"><details><summary>The live prompt</summary><div class="muted" style="margin-top: 6px">Published versions: v1 (01 Sep 2026), v2 (22 Sep 2026)</div></details></div>
 </div>
-<p class="ts-cap" style="margin: 8px 16px 0">The same block repeats for Content translation, Subject &amp; preheader and Variant from a topic.</p>
 </section>
 </sc-if>
 
@@ -274,22 +275,53 @@ body{margin:0}
 
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"part":{"editor":"enum","default":"general","options":["general","profile","users","integrations"]},"minH":{"editor":"int","default":1980,"min":900,"max":6000},"$preview":{"width":1440,"height":1980}}'>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"part":{"editor":"enum","default":"general","options":["general","prompts","profile","users","integrations"]},"minH":{"editor":"int","default":1500,"min":900,"max":6000},"$preview":{"width":1440,"height":1500}}'>
 class Component extends DCLogic {
 renderVals() {
 const theme = this.props.theme ?? 'light';
 const contrast = this.props.contrast ?? 'normal';
 const part = this.props.part ?? 'general';
-const minH = parseInt(this.props.minH ?? 1980, 10) || 900;
-const label = { general: 'General', profile: 'Brand profiles', users: 'Users', integrations: 'Integrations' };
-const names = ['General', 'Brand profiles', 'Personalisation', 'Users', 'Roles', 'Integrations', 'Brands'];
+const minH = parseInt(this.props.minH ?? 1500, 10) || 900;
+const label = { general: 'General', prompts: 'AI prompts', profile: 'Brand profiles', users: 'Users', integrations: 'Integrations' };
+const names = ['General', 'Brand profiles', 'Personalisation', 'AI prompts', 'Users', 'Roles', 'Integrations', 'Brands'];
 const menu = names.map((n) => ({ label: n, current: n === label[part] ? 'page' : 'false' }));
+const lists = {
+  prompts: { title: 'AI prompts', newLabel: '', searchLabel: '', hasNew: false, hasSearch: false, intro: 'One per AI task: its model, its output mode and its prompt. The provider, the limits and the budget are under General.', items: [
+    { name: 'Content draft', l2: 'Model: the default · Output: applied directly', l3: 'Prompt: version 2 of 2', c3: 'var(--brand-muted)', current: 'true' },
+    { name: 'Content translation', l2: 'Model: the default · Output: held for review', l3: 'Prompt: version 1 of 1', c3: 'var(--brand-muted)', current: 'false' },
+    { name: 'Subject & preheader', l2: 'Model: the default · Output: no approval step', l3: 'Prompt: the built-in default (never published)', c3: 'var(--brand-muted)', current: 'false' },
+    { name: 'Variant from a topic', l2: 'Model: example-model-2 · Output: held for review', l3: 'Prompt: version 3 of 3', c3: 'var(--brand-muted)', current: 'false' } ] },
+  profile: { title: 'Brand profiles', newLabel: 'New profile', searchLabel: 'Find a profile by name', intro: 'A profile is one look of this brand for its emails, with the legal details every email carries. Each variant picks one; new variants start on the default.', items: [
+    { name: 'Nordlicht, English', l2: 'Default · en · marketing', l3: 'Complete', c3: 'var(--brand-success)', current: 'true' },
+    { name: 'Nordlicht, Deutsch', l2: 'de · marketing', l3: 'Complete', c3: 'var(--brand-success)', current: 'false' },
+    { name: 'Order confirmations', l2: 'en · transactional', l3: 'Missing: Imprint link, Privacy link', c3: 'var(--brand-human)', current: 'false' } ] },
+  users: { title: 'Users', newLabel: 'New user', searchLabel: 'Find a user by name or email address', intro: 'Everyone with an account, and what they may do. Deactivating someone signs them out at once.', items: [
+    { name: 'Maria Hartmann · you', l2: 'm.hartmann@nordlicht-kaffee.example', l3: 'Manager · last sign-in 17 Oct 2026, 08:44', c3: 'var(--brand-muted)', current: 'false' },
+    { name: 'Jonas Weber', l2: 'jonas.weber@nordlicht-kaffee.example', l3: 'Editor · last sign-in 16 Oct 2026, 17:10', c3: 'var(--brand-muted)', current: 'true' },
+    { name: 'Anke Voss · external', l2: 'anke.voss@example.test', l3: 'Editor on Nordlicht Kaffee · Never', c3: 'var(--brand-muted)', current: 'false' },
+    { name: 'Robin Approver · deactivated', l2: 'robin@nordlicht-kaffee.example', l3: 'No role · last sign-in 02 Sep 2026, 09:12', c3: 'var(--brand-muted)', current: 'false' } ] },
+  integrations: { title: 'Integrations', newLabel: 'New integration', searchLabel: 'Find an integration by name', intro: 'Other systems that call this platform, each with its own keys and what it may do.', items: [
+    { name: 'Scheduler', l2: 'Active · 1 live key, one expiring soon', l3: 'send, view', c3: 'var(--brand-muted)', current: 'true' },
+    { name: 'CRM sync', l2: 'Active · 2 live keys', l3: 'view', c3: 'var(--brand-muted)', current: 'false' },
+    { name: 'Old export', l2: 'Deactivated · 0 live keys', l3: 'Nothing yet', c3: 'var(--brand-muted)', current: 'false' } ] }
+};
+const L = lists[part] || { title: '', newLabel: '', searchLabel: '', hasNew: false, hasSearch: false, intro: '', items: [] };
 return {
 themeClass: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : ''),
 theme,
 contrast,
 minH,
 menu,
+isMenu: !lists[part],
+isList: !!lists[part],
+listTitle: L.title,
+newLabel: L.newLabel,
+hasNew: L.hasNew !== false,
+hasSearch: L.hasSearch !== false,
+searchLabel: L.searchLabel,
+intro: L.intro,
+items: L.items,
+isPrompts: part === 'prompts',
 isGeneral: part === 'general',
 isProfile: part === 'profile',
 isUsers: part === 'users',

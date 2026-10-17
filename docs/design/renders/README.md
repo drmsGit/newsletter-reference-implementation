@@ -41,35 +41,39 @@ What the design looks like, as images, for the session that builds it (queue tas
 
 ## The other screens, light, 1440 wide
 
+**Redrawn 2026-10-17 after review:** renders 01 to 11 now show a search box above the approvals filters, because every list that can grow gets one (HANDOFF section 9, decision 21). The box is a proposal until the server can search that list. Renders 21 to 24, 28 to 36, 39 and 40 changed in the same review (the Preview button and drag handles, the New buttons in place of inline forms, the settings drill-in, search); 44 and 45 are new.
+
 Added 2026-10-17 for TASK-372. Each is a full screen in the three-column pattern, drawn from what the React screen contains today (the wording, fields and tables are the real ones; the names, figures and dates are invented). Heights are the content's measured height, so they differ.
 
 | File | Size | Shows |
 |---|---|---|
-| `20-campaigns.png` | 1440 × 1840 | Campaigns: the list with the create form and search; the open campaign with its results (two tables), each variant with its modules and decision slots, and New blank variant. |
-| `21-editor.png` | 1440 × 1540 | The variant editor, navigation collapsed. Column 2 is the module stack; column 3 the brand profile, preview bar, envelope fields with the AI suggestions, and the open module. A module bound to a record, one typed in, one on a decision slot (the cue chips tell them apart). |
-| `22-editor-picker.png` | 1440 × 1300 | The same editor with the record picker open on a module. |
-| `23-editor-slot.png` | 1440 × 1620 | The same editor with a decision slot's settings open: strategy, how many it shows, categories, number fields with an invalid value and its message, "Use one content record instead". |
-| `24-preview-sheet.png` | 1440 × 900 | The preview as a sheet over the editor: who it is shown for, the state of each module, the rendered email. |
+| `20-campaigns.png` | 1440 × 1840 | Campaigns: the title with its New campaign button, search, the list; the open campaign with its results (two tables), each variant with its modules and decision slots, and New blank variant. |
+| `21-editor.png` | 1440 × 1430 | The variant editor, navigation collapsed. Column 2 is the module stack, each row with the arrows, Remove and a cue chip (Record, Slot, Typed in); the stack is not draggable. Column 3: an "Open preview" button with its P key in the header, the brand profile, the envelope fields with the AI suggestions, and the open module. |
+| `22-editor-picker.png` | 1440 × 1200 | The same editor with the record picker open on a module. |
+| `23-editor-slot.png` | 1440 × 1530 | The same editor with a decision slot's settings open: strategy, how many it shows, categories, number fields with an invalid value and its message, "Use one content record instead". |
+| `24-preview-sheet.png` | 1440 × 900 | The preview as a sheet over the editor: who it is shown for, the module list (each row has a drag handle: the one place modules can be dragged), the rendered email. |
 | `25-send-plan.png` | 1440 × 1380 | Send a variant, steps 1 to 3: what goes out, the optional test send, planning the send. Column 2 lists the sends planned and not sent yet. |
 | `26-send-ready.png` | 1440 × 1100 | The same screen once a send is planned: step 4, docked at the foot of the details with the real-email warning and "Send real email to 1,180 people". |
 | `27-content-record.png` | 1440 × 2760 | Content: the list with its filters, and one record page with every section (status, publication, details, draft with AI, translations, the channel sections, performance, categories, published versions, used in). |
-| `28-categories.png` | 1440 × 1280 | The categories list with the create form; one category's page (name and type, where it sits, its records, signal, delete). |
+| `28-categories.png` | 1440 × 1280 | The categories list with its New category button and search; one category's page (name and type, where it sits, its records, signal, delete). |
 | `29-deliveries.png`, `30-delivery-stranded.png` | 1440 × 880, 1440 × 1020 | Deliveries: the list, and a send with its recipients; and the same send when it looks stranded, with "Release this send". |
 | `31-delivery-as-sent.png` | 1440 × 1180 | One recipient's message as it was sent: the changed-templates notice, envelope, the message, fields, modules. |
 | `32-decision-slots.png` | 1440 × 1240 | Decision slots: the list, and a slot's page (what it chooses from, what it has picked, latest picks). Read-only. |
-| `33-settings-general.png` | 1440 × 1980 | Settings: the sub-menu in column 2, General in column 3 (sending, sign-in sessions, signals, AI with its per-task block). |
-| `34-settings-brand-profile.png` | 1440 × 2600 | Settings, brand profiles: the sub-menu with the profile list under it, and one profile's form with every group. |
-| `35-settings-users.png`, `36-settings-integrations.png` | 1440 × 800, 1440 × 840 | Users (the person, their access, sign-in) and integrations (keys, the permission grid per brand, sending without a person). |
+| `33-settings-general.png` | 1440 × 1500 | Settings: the sub-menu in column 2, General in column 3 (sending, sign-in sessions, signals, and AI: the provider and default model, the limits, the budget and its refill). |
+| `34-settings-brand-profile.png` | 1440 × 2600 | Settings, brand profiles: the drill-in (back to Settings, the title with New profile, search, the profile list) and one profile's form with every group. |
+| `35-settings-users.png`, `36-settings-integrations.png` | 1440 × 760, 1440 × 840 | The same drill-in for users (New user, search, the person, their access, sign-in) and integrations (New integration, search, keys, the permission grid per brand, sending without a person). |
 | `37-audiences.png` | 1440 × 2740 | Audiences: the list; the audience editor with an open rule, leave-out rules, people added by hand, and the arithmetic of who a send reaches. |
 | `38-recipients.png` | 1440 × 1120 | Recipients: the list, and a person's read-only page with its six sections. |
 | `39-monitoring.png`, `40-decision-history.png` | 1440 × 760 each | The two **wide-table exceptions**: one column of table in place of list and details. Monitoring is one table with no counts; the decision history has seven columns. |
 | `41-sign-in.png`, `42-sign-in-code.png` | 1440 × 640 each | Sign-in, outside the shell: the address step, and the code step with its error. |
 | `43-image-sheet.png` | 1440 × 900 | "Choose an image" as a sheet over a content record: Library tab with the grid and the selected image. |
+| `44-settings-ai-prompts.png` | 1440 × 780 | Settings, AI prompts: the same drill-in as the brand profiles, with the four AI tasks as records (no New button, no search), and the open task's details: model, output mode, prompt and its versions. |
+| `45-create-dialogs.png` | 1440 × 1420 | The create dialogs behind every "New ..." button: campaign, category, audience, brand profile, user, integration, role, brand. The fields are the existing forms'; the titles and Cancel are new. |
 
 ## What the renders do not show
 
 - **Narrow and phone widths.** The rule is in [[HANDOFF]] (below about 1,100 px the details wrap under the list; on a phone one column at a time) but no layout was drawn for it. The prototype's columns have fixed minimum heights, so a render of it at phone width would mislead; it is deliberately not here.
-- **Dark and increased contrast for screens 20 to 43.** Every board takes `theme` and `contrast` props and uses only the tokens, so the sets apply, but none of these screens was rendered in them. The approvals screen (01 to 05) and the libraries (13 to 16) are.
+- **Dark and increased contrast for screens 20 to 45.** Every board takes `theme` and `contrast` props and uses only the tokens, so the sets apply, but none of these screens was rendered in them. The approvals screen (01 to 05) and the libraries (13 to 16) are.
 - **Screens and parts still not drawn.** Settings: Personalisation, Roles and Brands (a list and a form, same pattern as Users and Brand profiles). The category graph. The "Upload new" and "Web address" tabs of the image sheet. The dialogs: New record, New audience, Suggest an audience from a campaign, Paste people, New brand profile, the new-key dialog, the keyboard-shortcuts dialog. Empty, loading and error lines of these screens; the shared lines are on `12-states-board.png`. The approvals inbox, history link and detail are 01 to 12.
 - **Hover and pressed on the real screen.** They are drawn on the component boards (15, 16), not on the screen renders.
 - **Motion.** The spinner is a still frame.
@@ -88,7 +92,7 @@ python3 -m http.server 8765 --bind 127.0.0.1 &
 
 The variants (increased contrast, the screen in each state, the dark library) are one-line wrapper pages that import a board with props (`theme="dark"`, `contrast="more"`, `state="options"`), as the dark board in the canvas does; they are not kept. Window heights for the tall boards are the boards' measured content heights.
 
-Screens 20 to 43 were made the same way, each board at 1440 × its content height. The height of each board was measured in the browser with the minimum heights switched off, then written into the board (and into `../canvas-v2/canvas.json`), so a frame fits its content. Boards with a variant (`mode`, `step`, `part`, `state`) are wrapper pages that import the board with that prop, as `V2EditorPicker`, `V2SendReady`, `V2DeliveriesStranded`, `V2SettingsProfile`, `V2SettingsUsers`, `V2SettingsIntegrations` and `V2SignIn2` do; those wrappers are in `../canvas-v2/`.
+Screens 20 to 45 were made the same way, each board at 1440 × its content height. The height of each board was measured in the browser with the minimum heights switched off, then written into the board (and into `../canvas-v2/canvas.json`), so a frame fits its content. Boards with a variant (`mode`, `step`, `part`, `state`) are wrapper pages that import the board with that prop, as `V2EditorPicker`, `V2SendReady`, `V2DeliveriesStranded`, `V2SettingsProfile`, `V2SettingsUsers`, `V2SettingsIntegrations` and `V2SignIn2` do; those wrappers are in `../canvas-v2/`.
 
 **Found while rendering the later screens, and fixed in `ui.css`:** plain links in a screen came out browser-blue (they now take the accent); a disabled plain button kept a grey fill; a wide column in a wrapping row dropped under the navigation when its table was wide (it now has a flex basis); native checkboxes were browser-blue (now the accent); the list column's labels sat 12 px left of its one text indent.
 

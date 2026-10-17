@@ -21,6 +21,7 @@ body{margin:0}
 
 <section class="col-list" aria-label="Deliveries" style="min-height: {{minH}}px">
 <header class="list-head"><h1 class="ts-large" style="margin: 0">Deliveries</h1></header>
+<form class="search" role="search"><input class="field" type="text" aria-label="Find a send by name" placeholder="Find a send by name"><button class="btn" type="button">Search</button></form>
 <div class="list" role="group" aria-label="Sends">
 <sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
 <a href="#" class="item" aria-current="{{r.current}}">

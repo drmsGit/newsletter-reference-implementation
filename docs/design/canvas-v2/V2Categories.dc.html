@@ -20,20 +20,13 @@ body{margin:0}
 </div>
 
 <section class="col-list" aria-label="Categories" style="min-height: {{minH}}px">
-<header class="list-head" style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px"><h1 class="ts-large" style="margin: 0">Content</h1></header>
+<header class="list-head" style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px"><h1 class="ts-large" style="margin: 0">Content</h1><button class="btn btn-primary" type="button" style="margin-top: 2px">New category</button></header>
 <div class="list-tools">
 <div class="seg" role="tablist" aria-label="Content"><button type="button" role="tab" aria-selected="false">Records</button><button type="button" role="tab" aria-selected="true">Categories</button><button type="button" role="tab" aria-selected="false">Graph</button></div>
 <p class="ts-cap" style="margin: 0">The categories content is sorted into, and what a recipient’s interests are counted in. They are shared by every brand: a change here reaches all of them.</p>
 </div>
 
-<form class="list-form" aria-label="Create a category">
-<label class="lbl" for="nc" style="margin: 0">New category</label>
-<input id="nc" class="field" type="text">
-<div class="row">
-<button class="select-btn" type="button" style="width: auto; min-width: 130px" aria-label="Type: Main"><span><span class="muted">Type</span>&nbsp; Main</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button>
-<button class="btn btn-primary" type="button" disabled>Create</button>
-</div>
-</form>
+<form class="search" role="search"><input class="field" type="text" aria-label="Find a category by name" placeholder="Find a category by name"><button class="btn" type="button">Search</button></form>
 
 <div class="list" role="group" aria-label="Categories">
 <sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
