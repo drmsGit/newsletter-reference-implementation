@@ -1146,31 +1146,25 @@ kbd {
   opacity: 0.6;
 }
 
-/* The audience editor (task-297): the arithmetic beside the rules and people.
-   Layout polish is its own session; this is only the two columns. */
-.audience-editor {
-  display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-  gap: 2rem;
-  align-items: start;
-}
-@media (max-width: 900px) {
-  .audience-editor {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-.audience-editor .rule {
-  border: 1px solid var(--brand-line);
-  padding: 0.75rem;
-  margin-block: 0.75rem;
-}
-.badge {
-  display: inline-block;
-  font-size: 0.8em;
-  padding: 0 0.5em;
-  border: 1px solid currentColor;
-  border-radius: 1em;
-}
+/* The audience page (task-297; v2, task-372 render 37): rules, people and
+   the reach are cards down the details column (decision 18). */
+.rule--line { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.rule__text { min-width: 0; }
+.rule__text .muted { display: block; font-size: 12px; line-height: 16px; margin-top: 2px; }
+.rule__actions { display: flex; gap: 4px; flex: none; }
+/* A rule being edited is drawn apart from the rows around it. */
+.card-rows > form.rule { background: var(--brand-surface-2); display: grid; gap: 12px; }
+.card-rows > form.rule .react-aria-TextField, .card-rows > form.rule .react-aria-Select { margin: 0; }
+
+.card-rows > table.working { padding: 0; }
+table.working th { font-size: 13px; line-height: 18px; font-weight: 400; color: var(--brand-fg); white-space: normal; }
+table.working th, table.working td { padding: 8px 16px; }
+table.working td { text-align: right; }
+table.working th .muted { margin-left: 4px; }
+table.working tr.row-total th, table.working tr.row-total td { font-weight: 600; background: var(--brand-surface-2); }
+
+.list-actions { margin: 8px 0 0; }
+.recalculate .field-note { display: block; margin-top: 6px; }
 
 /* The image field and its pop-in (task-112; ADR-197). */
 .image-field__current {

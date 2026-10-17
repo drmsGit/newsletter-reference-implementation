@@ -13,6 +13,7 @@ import {
 import { HttpError } from '../api/session'
 import CategoryChoice from '../components/CategoryChoice'
 import { SaveState } from '../components/EditorFields'
+import DetailSection from '../components/DetailSection'
 import ScreenState from '../components/ScreenState'
 import {
   EngagementFields,
@@ -47,11 +48,13 @@ export default function AudienceRules({ groupId, reload }: { groupId: number; re
         blocks={(blocks.data ?? []).filter((b) => b.kind === 'exclude')}
         reload={reload}
       >
-        <p>
-          Leaves these people out even if a rule or a hand-add includes them. People who opted out are never sent
-          to anyway: that&apos;s consent, not this list.
-        </p>
-        <p className="muted">To reach people who did not click, include who received it and leave out who clicked.</p>
+        <div>
+          <p>
+            Leaves these people out even if a rule or a hand-add includes them. People who opted out are never sent
+            to anyway: that&apos;s consent, not this list.
+          </p>
+          <p className="muted">To reach people who did not click, include who received it and leave out who clicked.</p>
+        </div>
       </RuleSection>
     </ScreenState>
   )
@@ -75,8 +78,7 @@ function RuleSection({
   const [adding, setAdding] = useState(false)
   const id = `rules-${kind}`
   return (
-    <section aria-labelledby={id} className="rules">
-      <h2 id={id}>{title}</h2>
+    <DetailSection id={id} title={title} className="rules">
       {children}
       {blocks.map((block) => (
         <Rule key={block.id} groupId={groupId} kind={kind} block={block} reload={reload} />
@@ -87,9 +89,11 @@ function RuleSection({
       {adding ? (
         <RuleForm groupId={groupId} kind={kind} reload={reload} onDone={() => setAdding(false)} />
       ) : (
-        <Button onPress={() => setAdding(true)}>Add a rule</Button>
+        <div>
+          <Button onPress={() => setAdding(true)}>Add a rule</Button>
+        </div>
       )}
-    </section>
+    </DetailSection>
   )
 }
 
@@ -176,12 +180,19 @@ function Rule({
     return <RuleForm groupId={groupId} kind={kind} block={block} reload={reload} onDone={() => setEditing(false)} />
   return (
     <div className="rule rule--line" role="group" aria-label={name}>
-      {block.label && <strong>{block.label}</strong>} <RuleSummary criteria={block.criteria ?? {}} />{' '}
-      {block.source === 'suggested' && <span className="badge">Suggested</span>}{' '}
-      <Button onPress={() => setEditing(true)}>Edit</Button>{' '}
-      <Button isDisabled={remove.isPending} onPress={() => remove.mutate(block.id)}>
-        Remove rule
-      </Button>
+      <div className="rule__text">
+        {block.label && <strong>{block.label}</strong>}{' '}
+        {block.source === 'suggested' && <span className="badge">Suggested</span>}{' '}
+        <RuleSummary criteria={block.criteria ?? {}} />
+      </div>
+      <div className="rule__actions">
+        <Button className="btn-sm" onPress={() => setEditing(true)}>
+          Edit
+        </Button>
+        <Button className="btn-plain btn-sm" isDisabled={remove.isPending} onPress={() => remove.mutate(block.id)}>
+          Remove rule
+        </Button>
+      </div>
       <SaveState mutation={remove} what="this audience" reload={reload} />
     </div>
   )

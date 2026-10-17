@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router'
 
 import AudienceDetail from './AudienceDetail'
+import { AudiencesSplit, NoAudienceOpen } from './Audiences'
 import { jsonResponse, page, renderWithProviders, stubFetch } from '../test-utils'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -106,5 +107,59 @@ describe("an audience's reach", () => {
     )
     expect(await screen.findByText('Removed by exclusion segments')).toBeInTheDocument()
     expect(screen.queryByText(/of them added by hand/)).not.toBeInTheDocument()
+  })
+})
+
+describe('the audiences beside the open one (task-372)', () => {
+  const OTHER = { ...GROUP, id: 4, name: 'Autumn walkers' }
+  function openSplit(route: string) {
+    const fetchMock = stubFetch({
+      ...EDITOR,
+      'GET /api/audience-groups/': () => jsonResponse(page([GROUP, OTHER])),
+      'GET /api/audience-groups/3': () => jsonResponse(GROUP),
+      'GET /api/audience-groups/4': () => jsonResponse(OTHER),
+      'GET /api/audience-groups/4/blocks': () => jsonResponse([]),
+      'GET /api/audience-groups/4/members': () => jsonResponse(page([])),
+      'GET /settings': () => jsonResponse({ channels: [{ name: 'email', available: true }] }),
+      'GET /api/audience-groups/3/preview': () => jsonResponse(preview([someone(1)])),
+      'GET /api/audience-groups/4/preview': () => jsonResponse(preview([someone(2)])),
+    })
+    renderWithProviders(
+      <Routes>
+        <Route element={<AudiencesSplit />}>
+          <Route path="/audiences" element={<NoAudienceOpen />} />
+          <Route path="/audiences/:id" element={<AudienceDetail />} />
+        </Route>
+      </Routes>,
+      { route },
+    )
+    // Each check needs at least one request: "every" holds for none.
+    return (path: string) => {
+      const urls = fetchMock.mock.calls.map(([r]) => new URL((r as Request).url)).filter((u) => u.pathname === path)
+      expect(urls.length).toBeGreaterThan(0)
+      return urls
+    }
+  }
+
+  it("keeps the list's search and page apart from the group's own", async () => {
+    const asked = openSplit('/audiences/3?q=spr&offset=50&who=ana&people=50')
+    await screen.findByRole('heading', { name: 'Spring travellers', level: 2 })
+    await screen.findByText(/matching “ana”/)
+    // The list asks for its search and page; the reach for its recipient; the people for theirs.
+    expect(asked('/api/audience-groups/').every((u) => u.searchParams.get('q') === 'spr')).toBe(true)
+    expect(asked('/api/audience-groups/').every((u) => u.searchParams.get('offset') === '50')).toBe(true)
+    expect(asked('/api/audience-groups/3/preview').every((u) => u.searchParams.get('q') === 'ana')).toBe(true)
+    expect(asked('/api/audience-groups/3/members').every((u) => u.searchParams.get('offset') === '50')).toBe(true)
+  })
+
+  it("opens another group with the list's search and page, and none of the group's own", async () => {
+    const asked = openSplit('/audiences/3?q=spr&offset=50&who=ana&people=50')
+    fireEvent.click(await screen.findByText('Autumn walkers'))
+    await screen.findByRole('heading', { name: 'Autumn walkers', level: 2 })
+    const row = within(screen.getByRole('grid', { name: 'Audience groups' })).getByRole('row', { name: /Autumn/ })
+    expect(row).toHaveAttribute('aria-selected', 'true')
+    expect(asked('/api/audience-groups/4/preview').every((u) => !u.searchParams.get('q'))).toBe(true)
+    expect(asked('/api/audience-groups/4/members').every((u) => (u.searchParams.get('offset') ?? '0') === '0')).toBe(true)
+    expect(asked('/api/audience-groups/').every((u) => u.searchParams.get('q') === 'spr')).toBe(true)
   })
 })

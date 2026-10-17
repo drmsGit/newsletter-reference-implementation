@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Button, Dialog, Heading, Modal, ModalOverlay } from 'react-aria-components'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
+import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 
 import {
@@ -16,10 +16,12 @@ import {
 import { HttpError } from '../api/session'
 import Choice from '../components/Choice'
 import DataTable from '../components/DataTable'
+import DetailSection from '../components/DetailSection'
 import { AutosaveField, SaveState, fieldError } from '../components/EditorFields'
-import RecipientSearch, { useSearch } from '../components/RecipientSearch'
+import Fact from '../components/Fact'
+import { SearchBox, useSearch } from '../components/RecipientSearch'
 import ScreenState from '../components/ScreenState'
-import AudiencePeople from './AudiencePeople'
+import AudiencePeople, { PEOPLE_PAGE } from './AudiencePeople'
 import AudienceRules from './AudienceRules'
 import { formatDate } from './Campaigns'
 
@@ -39,35 +41,37 @@ export default function AudienceDetail() {
   const [channel, channels, setChannel] = useChannel()
 
   return (
-    <>
-      <p>
-        <Link to="/audiences">← Audiences</Link>
-      </p>
-      <ScreenState query={group}>
-        {group.data && (
-          <>
-            <h1>{group.data.name}</h1>
-            <Details group={group.data} reload={reload} />
-            {channels.length > 1 && (
-              <Choice
-                label="Channel"
-                options={channels.map((c) => ({ id: c, name: c }))}
-                selected={channel}
-                onChange={setChannel}
-              />
-            )}
-            <div className="audience-editor">
-              <div>
-                <AudienceRules groupId={groupId} reload={reload} />
-                <AudiencePeople groupId={groupId} channel={channel} reload={reload} />
+    // Column 3 of the audiences (task-372, render 37). Who a send reaches
+    // follows the rules and the people (decision 18, 2026-10-17): no room for
+    // it beside them in the details column.
+    <div className="detail">
+      <div className="detail-scroll">
+        <ScreenState query={group}>
+          {group.data && (
+            <>
+              <div className="detail-head">
+                <h2>{group.data.name}</h2>
               </div>
+              <div className="group card-rows">
+                <Details group={group.data} reload={reload} />
+                {channels.length > 1 && (
+                  <Choice
+                    label="Channel"
+                    options={channels.map((c) => ({ id: c, name: c }))}
+                    selected={channel}
+                    onChange={setChannel}
+                  />
+                )}
+              </div>
+              <AudienceRules groupId={groupId} reload={reload} />
+              <AudiencePeople groupId={groupId} channel={channel} reload={reload} />
               <Reach groupId={groupId} channel={channel} />
-            </div>
-            <Delete group={group.data} reload={reload} />
-          </>
-        )}
-      </ScreenState>
-    </>
+              <Delete group={group.data} reload={reload} />
+            </>
+          )}
+        </ScreenState>
+      </div>
+    </div>
   )
 }
 
@@ -84,7 +88,8 @@ function useChannel(): [string, string[], (next: string) => void] {
   const set = (next: string) => {
     const updated = new URLSearchParams(params)
     updated.set('channel', next)
-    updated.delete('offset')
+    // The people added by hand are marked per channel: their page starts again.
+    updated.delete(PEOPLE_PAGE)
     setParams(updated)
   }
   return [channel, channels, set]
@@ -109,19 +114,17 @@ function Details({ group, reload }: { group: AudienceGroup; reload: () => void }
         error={fieldError(save.error, 'description')}
       />
       <SaveState mutation={save} what="this audience" reload={reload} />
-      <dl className="facts">
-        <dt>Created</dt>
-        <dd>{formatDate(group.created_at)}</dd>
-        <dt>Updated</dt>
-        <dd>{formatDate(group.updated_at)}</dd>
+      <dl className="fact-list">
+        <Fact label="Created">{formatDate(group.created_at)}</Fact>
+        <Fact label="Updated">{formatDate(group.updated_at)}</Fact>
       </dl>
       {group.source_campaign_id != null && (
         // Manual, always (Manager Workflow 4.7): the suggestion is never redone behind the manager's back.
-        <p>
+        <p className="recalculate">
           <Button isDisabled={recalculate.isPending} onPress={() => recalculate.mutate(undefined)}>
             Recalculate from campaign
           </Button>{' '}
-          <span className="muted">
+          <span className="muted field-note">
             Brings the suggested rules up to date with the campaign&apos;s content: new topics are added, dropped
             ones removed, the rest kept as you set them. Your own rules stay.
           </span>
@@ -146,8 +149,12 @@ function Delete({ group, reload }: { group: AudienceGroup; reload: () => void })
   // The server's own words for a group in use (`GroupInUse`); any other 409 is a stale version.
   const inUse = refused?.status === 409 && refused.detail?.startsWith('Used by')
   return (
-    <section aria-label="Delete">
-      <Button onPress={() => setOpen(true)}>Delete audience</Button>
+    <DetailSection id="audience-delete" title="Delete">
+      <div>
+        <Button className="btn-destructive" onPress={() => setOpen(true)}>
+          Delete audience
+        </Button>
+      </div>
       <ModalOverlay
         isOpen={open}
         onOpenChange={(next) => {
@@ -176,7 +183,7 @@ function Delete({ group, reload }: { group: AudienceGroup; reload: () => void })
           </Dialog>
         </Modal>
       </ModalOverlay>
-    </section>
+    </DetailSection>
   )
 }
 
@@ -201,8 +208,9 @@ function Working({ arithmetic: a, channel }: { arithmetic: Arithmetic; channel: 
   return (
     <table className="working" aria-label={`How the audience on ${channel} is arrived at`}>
       <tbody>
-        {rows.map(([label, value, note]) => (
-          <tr key={label}>
+        {rows.map(([label, value, note], index) => (
+          // The last row is the total the others add up to.
+          <tr key={label} className={index === rows.length - 1 ? 'row-total' : undefined}>
             <th scope="row">
               {label}
               {note && <span className="muted">{note}</span>}
@@ -229,28 +237,33 @@ function Working({ arithmetic: a, channel }: { arithmetic: Arithmetic; channel: 
  * both happen on the server, so a segment of thousands is searched whole.
  */
 function Reach({ groupId, channel }: { groupId: number; channel: string }) {
-  const q = useSearch()
+  // Its own name in the address, `?who=`: the list beside it searches by `?q=`.
+  const q = useSearch(WHO)
   const preview = useAudiencePreview(groupId, channel, q)
 
   return (
-    <section aria-labelledby="reach">
-      <h2 id="reach">Who a send reaches</h2>
-      <RecipientSearch />
+    <DetailSection id="reach" title="Who a send reaches">
       <ScreenState query={preview}>
         {preview.data && (
           <>
             <Working arithmetic={preview.data.arithmetic} channel={channel} />
             <p className="muted">As of now: a send works this out again when it goes out.</p>
-            <dl className="facts">
-              <dt>Reachable on {channel}</dt>
-              <dd>{preview.data.reachable_count}</dd>
+            <dl className="fact-list">
+              <Fact label={`Reachable on ${channel}`}>{preview.data.reachable_count}</Fact>
               {Object.entries(preview.data.dropped_by_stage).map(([stage, count]) => (
-                <div key={stage} style={{ display: 'contents' }}>
-                  <dt>Not reachable: {stage}</dt>
-                  <dd>{count}</dd>
-                </div>
+                <Fact key={stage} label={`Not reachable: ${stage}`}>
+                  {count}
+                </Fact>
               ))}
             </dl>
+            {/* `/` stays with the list's search (task-266: one per screen). */}
+            <SearchBox
+              label="Find a recipient (identifier or address)"
+              compact
+              param={WHO}
+              pageParam={null}
+              shortcut={false}
+            />
             <DataTable
               label={`Reachable on ${channel}`}
               columns={[
@@ -269,6 +282,9 @@ function Reach({ groupId, channel }: { groupId: number; channel: string }) {
           </>
         )}
       </ScreenState>
-    </section>
+    </DetailSection>
   )
 }
+
+/** The address's name for this page's recipient search (task-372: the list beside it has `q`). */
+const WHO = 'who'

@@ -12,6 +12,7 @@ import {
 } from '../api/resources'
 import { HttpError } from '../api/session'
 import DataTable from '../components/DataTable'
+import DetailSection from '../components/DetailSection'
 import { SaveState } from '../components/EditorFields'
 import Pager, { useOffset } from '../components/Pager'
 import RecipientPicker, { type PickedRecipient } from '../components/RecipientPicker'
@@ -25,6 +26,9 @@ import { formatDate } from './Campaigns'
  * point 1). Add one with the recipient search, or paste a list; remove one.
  * Adding and removing take effect at once.
  */
+/** The address's name for this list's page (task-372: the audiences list beside it has `offset`). */
+export const PEOPLE_PAGE = 'people'
+
 export default function AudiencePeople({
   groupId,
   channel,
@@ -34,13 +38,12 @@ export default function AudiencePeople({
   channel: string
   reload: () => void
 }) {
-  const members = useAudienceMembers(groupId, channel, useOffset())
+  const members = useAudienceMembers(groupId, channel, useOffset(PEOPLE_PAGE))
   const remove = useRemovePerson(groupId)
   const [pasted, setPasted] = useState<string | null>(null)
 
   return (
-    <section aria-labelledby="people">
-      <h2 id="people">Added by hand</h2>
+    <DetailSection id="people" title="Added by hand">
       <ScreenState query={members}>
         <DataTable<AudienceGroupMember>
           label="People added by hand"
@@ -67,6 +70,7 @@ export default function AudiencePeople({
               header: '',
               render: (m) => (
                 <Button
+                  className="btn-plain btn-sm"
                   aria-label={`Remove ${m.external_id ?? m.recipient_id}`}
                   isDisabled={remove.isPending}
                   onPress={() => remove.mutate(m.recipient_id)}
@@ -79,17 +83,19 @@ export default function AudiencePeople({
           items={members.data?.items ?? []}
           emptyMessage="Nobody added by hand."
         />
-        <Pager page={members.data} />
+        <Pager page={members.data} param={PEOPLE_PAGE} />
       </ScreenState>
       <SaveState mutation={remove} what="this audience" reload={reload} />
       <AddOne groupId={groupId} reload={reload} />
-      <PastePeople groupId={groupId} channel={channel} onAdded={setPasted} reload={reload} />
+      <div>
+        <PastePeople groupId={groupId} channel={channel} onAdded={setPasted} reload={reload} />
+      </div>
       {pasted && (
         <p role="status" className="muted">
           {pasted}
         </p>
       )}
-    </section>
+    </DetailSection>
   )
 }
 

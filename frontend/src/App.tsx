@@ -3,7 +3,7 @@ import { Route, Routes } from 'react-router'
 import ApprovalDetail from './screens/ApprovalDetail'
 import Approvals, { ApprovalsSplit, NoRequestOpen } from './screens/Approvals'
 import AudienceDetail from './screens/AudienceDetail'
-import Audiences from './screens/Audiences'
+import { AudiencesSplit, NoAudienceOpen } from './screens/Audiences'
 import CampaignDetail from './screens/CampaignDetail'
 import { CampaignsSplit, NoCampaignOpen } from './screens/Campaigns'
 import Content from './screens/Content'
@@ -110,8 +110,10 @@ export default function App() {
           <Route path="/content/categories/:id" element={<CategoryDetail />} />
         </Route>
         <Route path="/content/graph" element={<GraphPage><CategoryGraph /></GraphPage>} />
-        <Route path="/audiences" element={<Audiences />} />
-        <Route path="/audiences/:id" element={<AudienceDetail />} />
+        <Route element={<AudiencesSplit />}>
+          <Route path="/audiences" element={<NoAudienceOpen />} />
+          <Route path="/audiences/:id" element={<AudienceDetail />} />
+        </Route>
         <Route path="/recipients" element={<Recipients />} />
         <Route path="/recipients/:id" element={<RecipientDetail />} />
         <Route element={<DecisionSlotsSplit />}>

@@ -21,7 +21,7 @@ export function NewAudience() {
   useShortcut('n', 'New audience', () => setOpen(true))
   return (
     <>
-      <Button onPress={() => setOpen(true)}>
+      <Button className="btn-primary" onPress={() => setOpen(true)}>
         New audience <ShortcutHint keys="n" />
       </Button>
       <ModalOverlay isOpen={open} onOpenChange={setOpen} isDismissable className="preview-overlay">

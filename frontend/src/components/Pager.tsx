@@ -8,9 +8,9 @@ export const PAGE_SIZE = 50
  * The page a screen is on, from the URL (`?offset=`), so a page survives a
  * reload, the back button steps back through pages, and a link can be shared.
  */
-export function useOffset(): number {
+export function useOffset(param = 'offset'): number {
   const [params] = useSearchParams()
-  return Math.max(0, Number(params.get('offset') ?? 0) || 0)
+  return Math.max(0, Number(params.get(param) ?? 0) || 0)
 }
 
 /**
@@ -23,16 +23,19 @@ export function useOffset(): number {
  */
 export default function Pager({
   page,
+  param = 'offset',
 }: {
   page: { total: number; limit: number; offset: number; items: unknown[] } | undefined
+  /** The address's name for this page, when two paged lists share a screen (task-372). */
+  param?: string
 }) {
   const [params, setParams] = useSearchParams()
   if (!page || page.total <= page.limit) return null
 
   function go(to: number) {
     const next = new URLSearchParams(params)
-    if (to > 0) next.set('offset', String(to))
-    else next.delete('offset')
+    if (to > 0) next.set(param, String(to))
+    else next.delete(param)
     setParams(next)
   }
 
