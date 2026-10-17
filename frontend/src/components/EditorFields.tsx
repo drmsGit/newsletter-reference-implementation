@@ -151,6 +151,7 @@ export function AutosaveField({
       {/* An entry goes in at the caret and is saved at once, like a picked
           image: the press took the focus, so no blur will save it. */}
       <Personalise
+        field={label}
         onInsert={(token) => {
           const at = caret ?? draft.length
           const next = draft.slice(0, at) + token + draft.slice(at)
@@ -164,13 +165,17 @@ export function AutosaveField({
 }
 
 /** "Personalise…": the brand's entries, by label, to put into a text. */
-function Personalise({ onInsert }: { onInsert: (token: string) => void }) {
+function Personalise({ field, onInsert }: { field: string; onInsert: (token: string) => void }) {
   const dictionary = useExpressions()
   const entries = dictionary.data?.items ?? []
   if (entries.length === 0) return null
   return (
     <MenuTrigger>
-      <Button className="personalise btn-plain btn-sm">Personalise…</Button>
+      {/* Named by its field: a page has one per text field (task-392 item 15).
+          The visible word starts the name, so speech input still finds it. */}
+      <Button className="personalise btn-plain btn-sm" aria-label={`Personalise ${field}`}>
+        Personalise…
+      </Button>
       <Popover>
         <Menu aria-label="Insert a personalisation" onAction={(name) => onInsert(`{{${String(name)}}}`)}>
           {entries.map((entry) => (

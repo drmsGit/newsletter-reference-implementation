@@ -32,21 +32,35 @@ describe('Personalise… (task-365; ADR-199)', () => {
     const input = screen.getByLabelText('Subject') as HTMLInputElement
     input.setSelectionRange(5, 5)
     fireEvent.select(input)
-    fireEvent.click(await screen.findByRole('button', { name: 'Personalise…' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Personalise Subject' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: /Salutation formal/ }))
     expect(onSave).toHaveBeenCalledWith('Dear {{salutation_formal}} news')
   })
 
   it('names each entry by its label and gives its token apart, as code (task-392 item 10)', async () => {
     field({})
-    fireEvent.click(await screen.findByRole('button', { name: 'Personalise…' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Personalise Subject' }))
     const item = await screen.findByRole('menuitem', { name: 'Salutation formal', description: '{{salutation_formal}}' })
     expect(item.querySelector('code')).toHaveTextContent('{{salutation_formal}}')
   })
 
+  it('names each button by its field, keeping the short visible text (task-392 item 15)', async () => {
+    stubFetch({ 'GET /expressions': () => jsonResponse(ENTRIES) } as never)
+    renderWithProviders(
+      <>
+        <AutosaveField field={{ name: 'subject', label: 'Subject line', type: 'text' }} value="" onSave={vi.fn()}
+          personalise error={undefined} />
+        <AutosaveField field={{ name: 'preheader', label: 'Preheader', type: 'text' }} value="" onSave={vi.fn()}
+          personalise error={undefined} />
+      </>,
+    )
+    expect(await screen.findByRole('button', { name: 'Personalise Subject line' })).toHaveTextContent('Personalise…')
+    expect(screen.getByRole('button', { name: 'Personalise Preheader' })).toBeInTheDocument()
+  })
+
   it('appends when the field was never focused', async () => {
     const onSave = field({ value: 'Hello' })
-    fireEvent.click(await screen.findByRole('button', { name: 'Personalise…' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Personalise Subject' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: /Salutation formal/ }))
     expect(onSave).toHaveBeenCalledWith('Hello{{salutation_formal}}')
   })
@@ -71,7 +85,7 @@ describe('Personalise… (task-365; ADR-199)', () => {
         )}
       </>,
     )
-    await screen.findByRole('button', { name: 'Personalise…' })
-    expect(screen.getAllByRole('button', { name: 'Personalise…' })).toHaveLength(1)
+    await screen.findByRole('button', { name: 'Personalise Subject' })
+    expect(screen.getAllByRole('button', { name: /^Personalise/ })).toHaveLength(1)
   })
 })
