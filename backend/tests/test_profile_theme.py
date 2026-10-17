@@ -249,3 +249,19 @@ def test_a_frame_without_tags_or_look_renders_untagged(db, world):
     body = render_frame(db, frame)[0].body
     assert 'href="https://shop.test/sale"' in body
     assert "#1a1a1a" in _button_style(body)
+
+
+def test_the_editorial_is_rich_text_as_the_text_blocks_are(db, world):
+    """Decided 2026-10-17: the editorial's text is rich text, like Single
+    Text's body: **bold**, [label](https://…) and a new line render, and
+    anything else stays escaped (render_rich_text)."""
+    module = (db.query(ModuleInstanceDB)
+              .filter(ModuleInstanceDB.variant_id == world["variant"].id,
+                      ModuleInstanceDB.module_type == "editorial").one())
+    module.module_data = {"text": "**Spring** is here.\nSee [the sale](https://shop.test/spring) <b>now</b>"}
+    db.commit()
+    body = render_frame(db, build_frame(db, world["variant"].id))[0].body
+    text = body[body.index('class="module-editorial"'):]
+    assert "<strong>Spring</strong> is here.<br>See" in text
+    assert 'href="https://shop.test/spring' in text and ">the sale</a>" in text
+    assert "&lt;b&gt;now&lt;/b&gt;" in text and "<b>now</b>" not in text

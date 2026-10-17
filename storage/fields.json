@@ -138,7 +138,7 @@
       "label": "Text",
       "concept": "text",
       "channel": "email",
-      "type": "text"
+      "type": "richtext"
     },
     "url": {
       "label": "Call-to-action link",
