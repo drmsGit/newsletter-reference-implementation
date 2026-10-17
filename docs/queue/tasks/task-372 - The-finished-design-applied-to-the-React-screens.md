@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-11 20:44'
-updated_date: '2026-10-17 12:14'
+updated_date: '2026-10-17 12:24'
 labels:
   - frontend
 dependencies: []
@@ -59,4 +59,10 @@ Campaigns (render 20; decisions 15 and 22): the list is column 2 with New campai
 Codex doc-33 (commit dcdade9 on codex/regression-tests): in the approvals split a chosen option and a typed reason carried over to the next request when it was cached. Fixed in fea49fa by keying Decide by the request; the same carry-over in the campaigns split (the blank variant name) is keyed by the campaign. Codex tests landed with the fix, plus one for campaigns; each fails without its key.
 
 Next: the variant editor (render 21 to 23), with open decisions 13 (drawn with the navigation collapsed) and 11 (the system and human cue) to ask first.
+
+2026-10-17, Diede: decision 13, the editor keeps the navigation as the person set it (no collapse of its own); decision 11, the system and human cue is the neutral chip as drawn in render 21 (Record, Slot, Typed in, a glyph and a word).
+
+Step 5 built and pushed, 19240a1: the variant editor as stack (column 2) and details (column 3), the chip on each stack row, the row named as one line ("Hero · Record “Lisbon”"). Renders 22 and 23 still draw drag handles and "Drag a row to reorder it"; not built, per the correction above (the stack keeps arrows and Alt+Arrow). Left for later: the slot's categories are plain checkboxes, not render 23's option rows; inside a catalogue field, "Change X in catalogue" and the hide switch stay stacked below the field rather than sharing a line as drawn.
+
+Next: content (render 27 and 28), with open decision 20 (the Records, Categories, Graph switch) to ask first.
 <!-- SECTION:NOTES:END -->
