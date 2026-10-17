@@ -1,10 +1,10 @@
 ---
 id: TASK-392
 title: Small details the finished design left open
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-17 13:31'
-updated_date: '2026-10-17 19:37'
+updated_date: '2026-10-17 20:46'
 labels:
   - frontend
 dependencies: []
@@ -52,7 +52,7 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The category graph uses v2 tokens for its circles, after a choice of which tokens carry rising and falling
+- [x] #1 The category graph uses v2 tokens for its circles, after a choice of which tokens carry rising and falling
 - [x] #2 Slot settings categories are option rows as in render 23
 - [x] #3 A catalogue field's hide switch and Change in catalogue share one line as in render 21
 - [x] #4 Performance on the record page uses fact rows
@@ -113,4 +113,12 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 2026-10-17: item 4 fixed: ContentFigures' Performance renders Fact rows in a fact-list, and figureColumns are numeric (so the category detail and graph tables right-align too). Test in ContentFigures.test.tsx, mutation-checked on a fact and a column. Live on record 98: facts at the card inset, figure headers and cells right-aligned. Left for later, not in this item: dl.facts is still used at ContentDetail.tsx:173 and :422, DecisionSlotDetail.tsx:163, Translations.tsx:41, CategoryGraph.tsx:168 and ImageField.tsx:299.
 
 2026-10-17: item 6 decided by the user (make the email render italics and bullets) and done: render_rich_text in backend/app/rendering/service.py now formats *italic* (one asterisk touching the words, so 5 * 3 * 2 stays) and groups consecutive lines starting with - and a space into one ul with inline spacing; strip_rich_text drops italics for push and keeps the dashes. Escaping first, unchanged. Tests backend/tests/test_rich_text.py, mutation-checked (italics, list grouping). The demo content holds no italics or bullet lines, so nothing in it renders differently. Not checked in an email preview: that would need formatted text written into a variant's content.
+
+2026-10-17: item 1 decided by the user (calm tokens and an arrow) and done: .graph-node fills are --brand-muted, --brand-success for rising and --brand-human for falling (index.css), and CategoryGraph adds an aria-hidden ▲ or ▼ tspan after a rising or falling name; the intro's colour words follow. Test in CategoryGraph.test.tsx, mutation-checked on the arrow's aria-hidden. Live: 26 rising nodes at rgb(29,107,52) with ▲; probes give falling rgb(122,74,0) and none rgb(98,89,78) in light, the dark tokens in dark.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+All 21 items done or settled on 2026-10-17. The five layout details left by TASK-372 (1 to 5) and the rich-text hint (6) are fixed: the graph's trend in tokens with an arrow, slot and draft checkboxes as option rows, a catalogue field's switch and link on one line, Performance as fact rows with right-aligned figures, and italics and bullet lists in the email. The fifteen small findings of the UX audit of 2026-10-17 (7 to 21) are fixed: the image cards and two create dialogs (regressions from TASK-372), textarea borders, Personalise labels and names, Settings facts, buttons level with their fields (with item 5), dialog headers and footers, Remove names, the recipient tables' headers, React Aria's language, a visible shortcuts entry with aria-keyshortcuts, the image sheet's file buttons and taller long fields. Item 13 was dropped by the user's decision: the list column matches render 20. Each fix has a test that fails without it (mutation-checked) except the CSS-only ones (9, 12, 2), which were measured in the browser pane; every item was checked live on demo data. The audit's larger findings are TASK-393 to TASK-401.
+<!-- SECTION:FINAL_SUMMARY:END -->
