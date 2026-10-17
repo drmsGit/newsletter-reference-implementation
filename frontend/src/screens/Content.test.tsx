@@ -67,6 +67,17 @@ describe('creating a record (task-281)', () => {
     expect(screen.queryByRole('heading', { name: 'Record page' })).not.toBeInTheDocument()
   })
 
+  it('is laid out as every create dialog: heading above the form, Cancel then Create at its foot (task-392 item 8)', async () => {
+    open()
+    fireEvent.click(await screen.findByRole('button', { name: /New record/ }))
+    const form = (await dialog()).querySelector('form')!
+    expect(form).toHaveClass('dialog-form')
+    expect(within(form).queryByRole('heading')).not.toBeInTheDocument()
+    const actions = within(form).getAllByRole('button').map((b) => b.textContent)
+    expect(actions).toEqual(['Cancel', 'Create'])
+    expect(within(form).getByRole('button', { name: 'Create' }).parentElement).toHaveClass('dialog-actions')
+  })
+
   it('opens with n, is listed in the shortcut overview, and closes on Esc', async () => {
     open({}, { shortcuts: true })
     await screen.findByRole('button', { name: /New record/ })

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 
 import { useCreateContent } from '../api/resources'
 import { HttpError } from '../api/session'
+import { DialogActions } from '../components/NewDialog'
 import { ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
 
 /**
@@ -23,7 +24,8 @@ export default function ContentCreate() {
       </Button>
       <ModalOverlay isOpen={open} onOpenChange={setOpen} isDismissable className="preview-overlay">
         <Modal className="create-modal">
-          <Dialog aria-label="New content record">
+          <Dialog aria-labelledby="new-record-title">
+            <Heading slot="title" id="new-record-title">New content record</Heading>
             <CreateForm onCancel={() => setOpen(false)} />
           </Dialog>
         </Modal>
@@ -48,8 +50,7 @@ function CreateForm({ onCancel }: { onCancel: () => void }) {
   }
 
   return (
-    <form className="create-form" onSubmit={submit}>
-      <Heading slot="title">New content record</Heading>
+    <form className="dialog-form" onSubmit={submit}>
       <TextField value={title} onChange={setTitle} isRequired autoFocus>
         <Label>Title</Label>
         <Input />
@@ -59,10 +60,6 @@ function CreateForm({ onCancel }: { onCancel: () => void }) {
         <Input />
       </TextField>
       <p className="muted">The fields are filled on the record&apos;s page, where they save as you go.</p>
-      <Button type="submit" isDisabled={create.isPending || !title.trim()}>
-        {create.isPending ? 'Creating…' : 'Create'}
-      </Button>{' '}
-      <Button onPress={onCancel}>Cancel</Button>
       {create.isError && (
         <p role="alert">
           {create.error instanceof HttpError && create.error.status === 403
@@ -70,6 +67,11 @@ function CreateForm({ onCancel }: { onCancel: () => void }) {
             : `Not created: ${(create.error instanceof HttpError && create.error.detail) || 'the server refused it.'}`}
         </p>
       )}
+      <DialogActions onCancel={onCancel}>
+        <Button type="submit" isDisabled={create.isPending || !title.trim()}>
+          {create.isPending ? 'Creating…' : 'Create'}
+        </Button>
+      </DialogActions>
     </form>
   )
 }

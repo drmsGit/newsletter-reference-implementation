@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 
 import { useCampaigns, useCreateAudience, useSuggestAudience } from '../api/resources'
 import { HttpError } from '../api/session'
+import { DialogActions } from '../components/NewDialog'
 import { ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
 
 function refusal(error: unknown, what: string) {
@@ -26,7 +27,8 @@ export function NewAudience() {
       </Button>
       <ModalOverlay isOpen={open} onOpenChange={setOpen} isDismissable className="preview-overlay">
         <Modal className="create-modal">
-          <Dialog aria-label="New audience">
+          <Dialog aria-labelledby="new-audience-title">
+            <Heading slot="title" id="new-audience-title">New audience</Heading>
             <CreateForm onCancel={() => setOpen(false)} />
           </Dialog>
         </Modal>
@@ -51,8 +53,7 @@ function CreateForm({ onCancel }: { onCancel: () => void }) {
   }
 
   return (
-    <form className="create-form" onSubmit={submit}>
-      <Heading slot="title">New audience</Heading>
+    <form className="dialog-form" onSubmit={submit}>
       <TextField value={name} onChange={setName} isRequired autoFocus>
         <Label>Name</Label>
         <Input />
@@ -62,11 +63,12 @@ function CreateForm({ onCancel }: { onCancel: () => void }) {
         <Input />
       </TextField>
       <p className="muted">Its rules and people are added on its page.</p>
-      <Button type="submit" isDisabled={create.isPending || !name.trim()}>
-        {create.isPending ? 'Creating…' : 'Create'}
-      </Button>{' '}
-      <Button onPress={onCancel}>Cancel</Button>
       {create.isError && <p role="alert">{refusal(create.error, 'create an audience')}</p>}
+      <DialogActions onCancel={onCancel}>
+        <Button type="submit" isDisabled={create.isPending || !name.trim()}>
+          {create.isPending ? 'Creating…' : 'Create'}
+        </Button>
+      </DialogActions>
     </form>
   )
 }

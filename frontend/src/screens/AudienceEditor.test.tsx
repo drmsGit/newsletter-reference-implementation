@@ -188,6 +188,17 @@ describe('the audience list (task-297)', () => {
     expect(last(s).body).toEqual({ name: 'Spring travellers', description: 'For the spring edition' })
   })
 
+  it('lays out New audience as every create dialog: heading above the form, Cancel then Create (task-392 item 8)', async () => {
+    open(server(), '/audiences')
+    fireEvent.click(await screen.findByRole('button', { name: /New audience/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'New audience' })
+    const form = dialog.querySelector('form')!
+    expect(form).toHaveClass('dialog-form')
+    expect(within(form).queryByRole('heading')).not.toBeInTheDocument()
+    expect(within(form).getAllByRole('button').map((b) => b.textContent)).toEqual(['Cancel', 'Create'])
+    expect(within(form).getByRole('button', { name: 'Create' }).parentElement).toHaveClass('dialog-actions')
+  })
+
   it('suggests an audience from a campaign and opens it', async () => {
     const s = server()
     open(s, '/audiences')

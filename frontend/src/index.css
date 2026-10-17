@@ -1239,12 +1239,19 @@ table.working tr.row-total th, table.working tr.row-total td { font-weight: 600;
   gap: var(--brand-space);
 }
 
+/* A card is a button: it overrides the button's one-line control height,
+   which would crush the thumbnail into 28 px (task-392 item 7, UX-01). */
 .image-grid__card {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   width: 100%;
+  height: auto;
+  padding: 8px;
   gap: 0.25rem;
   text-align: left;
+  white-space: normal;
 }
 
 .image-grid__card img {
