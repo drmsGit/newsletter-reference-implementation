@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-11 20:44'
-updated_date: '2026-10-17 12:42'
+updated_date: '2026-10-17 12:46'
 labels:
   - frontend
 dependencies: []
@@ -75,4 +75,6 @@ Next: decision slots (render 32) and the preview sheet (24, decision 16 decided)
 2026-10-17, step 7 built and pushed: decision slots as list and details (render 32), no open decision. No search box until TASK-390. Next: the preview sheet (24, decision 16 decided), then the send steps (25, 26; decision 17 to ask).
 
 2026-10-17, step 8 built and pushed: the preview as a sheet (render 24; decisions 5 and 16). The module list's drag handles are TASK-391 and not built. Next: the send steps (renders 25, 26), with open decision 17 (the planned sends listed in column 2 beside the steps) to ask first.
+
+2026-10-17, Diede: decision 17, the send screen as drawn: column 2 holds the title and the planned sends, which now stay listed while one is continued (marked as open). Step 9 built and pushed. Step 4 (the send) was not seen live, since that needs a planned send; its tests cover it. Next: deliveries and results (renders 29 to 31), then audiences (37; decision 18 to ask), recipients (38), monitoring and the decision history (39, 40; decision 14 to ask), settings (33 to 36, 44; decision 23 to confirm) and sign-in (41, 42).
 <!-- SECTION:NOTES:END -->
