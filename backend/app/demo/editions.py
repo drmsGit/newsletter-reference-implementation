@@ -54,6 +54,8 @@ EDITIONS = [
 
 #: What the past sends' readers did, as shares of those who received it.
 OPEN_RATE, CLICK_RATE = 0.46, 0.14
+#: Of the messages sent, how many the provider reports as bounced.
+BOUNCE_RATE = 0.01
 
 
 def read_words(path: Path, problems: list[str]) -> dict[str, dict]:
@@ -178,10 +180,11 @@ def send_and_date(db: Session, edition: Edition, variant, *, brand_id: int, cate
     send_send_instance(db, send.id, brand_id=brand_id)
 
     sent_on = edition.sent
-    db.query(CampaignDB).filter(CampaignDB.id == variant.campaign_id).update(
-        {"created_at": sent_on - timedelta(days=6)}, synchronize_session=False)
-    db.query(VariantDB).filter(VariantDB.id == variant.id).update(
-        {"created_at": sent_on - timedelta(days=6)}, synchronize_session=False)
+    # Created a week before, last changed when it went out: the list and the
+    # campaign page show the edition's own dates, not the day of the reset.
+    dated = {"created_at": sent_on - timedelta(days=6), "updated_at": sent_on}
+    db.query(CampaignDB).filter(CampaignDB.id == variant.campaign_id).update(dated, synchronize_session=False)
+    db.query(VariantDB).filter(VariantDB.id == variant.id).update(dated, synchronize_session=False)
     db.query(SnapshotDB).filter(SnapshotDB.id == snapshot.id).update({"created_at": sent_on},
                                                                     synchronize_session=False)
     db.query(SendInstanceDB).filter(SendInstanceDB.id == send.id).update(
@@ -197,6 +200,17 @@ def send_and_date(db: Session, edition: Edition, variant, *, brand_id: int, cate
     unsubscribed = None
     for execution in executions:
         if execution.status != "sent":
+            continue
+        # What the provider reports for each message, as a real one does by
+        # webhook: delivered, or now and then a bounce. The mock reports
+        # nothing, so without this the campaign showed 0 delivered.
+        reported = "bounce" if rng.random() < BOUNCE_RATE else "delivered"
+        db.add(EngagementEventDB(
+            delivery_execution_id=execution.id, event_type=reported, provider="mock",
+            provider_event_id=f"grathaus-{reported}-{execution.id}", event_data={},
+            occurred_at=sent_on + timedelta(seconds=rng.randint(5, 240))))
+        db.commit()
+        if reported == "bounce":
             continue
         carried = sorted(sent_content_ids(db, execution) or set())
         if rng.random() >= OPEN_RATE:

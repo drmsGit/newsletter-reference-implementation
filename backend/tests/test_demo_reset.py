@@ -200,3 +200,45 @@ def test_a_full_run_builds_grathaus_and_keeps_people_and_settings(tmp_path):
 def test_a_prefixed_batch_name_from_a_download_is_read(tmp_path):
     _write(tmp_path / "grathaus-outdoor-batch-1.csv", [_row()])
     assert len(catalogue.read_all(tmp_path).rows) == 1
+
+
+def test_a_brand_someone_is_signed_in_to_is_still_removed():
+    """Found running the reset on the dev database (2026-10-17): a session
+    whose working brand was one of the removed ones stopped the reset with a
+    foreign-key error. The session stays and falls back to no working brand,
+    the state the column documents; its owner is not signed out."""
+    import uuid
+    from datetime import timedelta
+
+    from app.auth.db_models import BrandDB, SessionDB, UserDB
+    from app.database import SessionLocal
+    from app.demo.reset import remove_brands
+    from app.auth.service import now
+
+    db = SessionLocal()
+    tag = uuid.uuid4().hex[:8]
+    try:
+        brand = BrandDB(key=f"gone-{tag}", name=f"Gone {tag}")
+        user = UserDB(email=f"reset-{tag}@example.invalid", is_active=True)
+        db.add_all([brand, user])
+        db.flush()
+        session = SessionDB(user_id=user.id, token_hash=f"h-{tag}".ljust(64, "0"), brand_id=brand.id,
+                            expires_at=now() + timedelta(hours=1))
+        db.add(session)
+        db.commit()
+        brand_id, session_id = brand.id, session.id
+
+        remove_brands(db, [brand_id])
+        db.commit()
+        db.expunge_all()
+
+        assert db.get(BrandDB, brand_id) is None
+        kept = db.get(SessionDB, session_id)
+        assert kept is not None and kept.brand_id is None
+    finally:
+        db.rollback()
+        db.query(SessionDB).filter(SessionDB.token_hash == f"h-{tag}".ljust(64, "0")).delete()
+        db.query(UserDB).filter(UserDB.email == f"reset-{tag}@example.invalid").delete()
+        db.query(BrandDB).filter(BrandDB.key == f"gone-{tag}").delete()
+        db.commit()
+        db.close()

@@ -66,19 +66,30 @@ class Outcome:
 def empty(db: Session) -> list[str]:
     """Empty the demo data and every brand but the two Grathaus ones;
     returns the brand keys whose image folders are to go."""
-    from app.auth.db_models import BrandDB, RoleAssignmentDB
+    from app.auth.db_models import BrandDB
     from app.auth.service import ensure_default_brand
-    from app.auth.db_models import IntegrationGrantDB
 
     default = ensure_default_brand(db)
     keys = [key for (key,) in db.query(BrandDB.key)]
     db.execute(text(f"TRUNCATE TABLE {', '.join(EMPTIED)} RESTART IDENTITY"))
-    gone = [b.id for b in db.query(BrandDB).filter(BrandDB.id != default.id, BrandDB.key != TOUREN_KEY)]
-    db.query(RoleAssignmentDB).filter(RoleAssignmentDB.brand_id.in_(gone)).delete(synchronize_session=False)
-    db.query(IntegrationGrantDB).filter(IntegrationGrantDB.brand_id.in_(gone)).delete(synchronize_session=False)
-    db.query(BrandDB).filter(BrandDB.id.in_(gone)).delete(synchronize_session=False)
+    remove_brands(db, [b.id for b in db.query(BrandDB).filter(BrandDB.id != default.id, BrandDB.key != TOUREN_KEY)])
     db.commit()
     return keys
+
+
+def remove_brands(db: Session, gone: list[int]) -> None:
+    """Remove brands from the kept tables' point of view: the grants on them go,
+    and a sign-in working in one keeps going with no working brand, the
+    state the session's column documents (the resolver falls back), rather
+    than its owner being signed out. Found on the dev database 2026-10-17:
+    without this the reset stopped on the session's foreign key."""
+    from app.auth.db_models import BrandDB, IntegrationGrantDB, RoleAssignmentDB, SessionDB
+
+    db.query(RoleAssignmentDB).filter(RoleAssignmentDB.brand_id.in_(gone)).delete(synchronize_session=False)
+    db.query(IntegrationGrantDB).filter(IntegrationGrantDB.brand_id.in_(gone)).delete(synchronize_session=False)
+    db.query(SessionDB).filter(SessionDB.brand_id.in_(gone)).update({SessionDB.brand_id: None},
+                                                                     synchronize_session=False)
+    db.query(BrandDB).filter(BrandDB.id.in_(gone)).delete(synchronize_session=False)
 
 
 def remove_image_files(keys: list[str]) -> None:
