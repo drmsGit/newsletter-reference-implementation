@@ -3,8 +3,9 @@ addendum 2026-10-17, point 5).
 
 Everything is checked before anything is written — the run is this variant's
 proposal, the variant is still empty, the ticked records are still ones a
-machine may take and still fill their block, the ticked blocks were proposed
-— so a refusal leaves the variant as it was. Then, in the scaffold's order:
+machine may take and still fill their block, the ticked blocks were proposed,
+the editorial passes its own write's check (task-389) — so a refusal leaves
+the variant as it was. Then, in the scaffold's order:
 the envelope (position 0 anyway, and the one write with refusals of its own,
 ADR-199), the hero, the editorial, the image blocks alternating left and
 right, and the slot's block continuing the alternation. Each write is the
@@ -27,8 +28,8 @@ def build(db: Session, request: Request, variant, payload, *, brand_id: int) -> 
     422 for a choice the proposal does not hold."""
     from app.ai.db_models import AIRunDB
     from app.campaigns.service import (
-        create_decision_slot_for_variant, create_module_for_variant, module_audit_detail, set_envelope_fields,
-        slot_audit_detail,
+        _refuse_module_data, create_decision_slot_for_variant, create_module_for_variant, module_audit_detail,
+        set_envelope_fields, slot_audit_detail,
     )
 
     run = db.get(AIRunDB, payload.run_id)
@@ -65,6 +66,14 @@ def build(db: Session, request: Request, variant, payload, *, brand_id: int) -> 
         raise HTTPException(status_code=409, detail=(
             f"Record {', '.join(lost)} is no longer one a machine may take for this block (published, ready "
             "for email, machine ready, in this language); nothing was built. Ask for a new proposal."))
+
+    # The editorial's own check (its entries, ADR-199), made before the first
+    # write, through the function its write uses: it is built after the hero,
+    # so its refusal would otherwise leave the envelope and hero saved
+    # (task-389). The envelope needs none here — it is the first write, and
+    # its refusal writes nothing.
+    if editorial:
+        _refuse_module_data(variant.channel, task.EDITORIAL, {"text": editorial}, db=db, brand_id=brand_id)
 
     if envelope:
         set_envelope_fields(db, variant.id, envelope, brand_id=brand_id)

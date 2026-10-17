@@ -364,3 +364,15 @@ def test_the_composition_says_when_it_is_offered(db, world):
     create_module_for_variant(db, variant_id=variant.id, module_type="editorial", module_data={"text": "Mine"},
                               brand_id=world["brand"].id)
     assert offered(variant.campaign_id, variant.id) is False
+
+
+def test_a_subject_the_envelope_refuses_builds_nothing(db, world, model):
+    """task-389: the envelope's own check (ADR-199) comes before any write."""
+    variant = world["variant"]
+    model["reply"] = _reply(world, subject="Hello {{t389_nobody_has_this}}")
+    with signed_in(db) as (client, _token, csrf):
+        run_id = _ask(client, csrf, variant.id).json()["ai_run_id"]
+        before = _stack(db, variant.id)
+        built = _build(client, csrf, variant.id, run_id)
+    assert built.status_code == 422, built.text
+    assert _stack(db, variant.id) == before
