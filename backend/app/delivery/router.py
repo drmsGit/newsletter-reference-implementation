@@ -559,6 +559,12 @@ def get_delivery_as_sent(
         raise HTTPException(status_code=409, detail=str(error))
     if result is None:
         raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
+    # The display copy only, after the comparison with what was sent: its
+    # library images inside it, for a frame that may not fetch them
+    # (app/assets/inline.py). The rebuild itself keeps their addresses.
+    from app.assets.inline import inline_media
+
+    result["body"] = inline_media(db, result.get("body"), brand_id)
     return result
 
 

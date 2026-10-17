@@ -54,6 +54,7 @@ def preview_variant_frame(
     db: Session = Depends(get_db),
     brand_id: int = Depends(working_brand),
 ):
+    from app.assets.inline import inline_media
     from app.delivery.service import frame_now, render_now
 
     try:
@@ -65,7 +66,9 @@ def preview_variant_frame(
         raise HTTPException(status_code=409, detail=str(exc))
     return VariantFramePreview(
         channel=frame["channel"], subject=artifact.envelope.get("subject"),
-        preheader=artifact.envelope.get("preheader"), html=artifact.body, fields=artifact.fields or None,
+        preheader=artifact.envelope.get("preheader"),
+        # Its library images inside the HTML: the frame showing it may not fetch (app/assets/inline.py).
+        html=inline_media(db, artifact.body, brand_id), fields=artifact.fields or None,
     )
 
 

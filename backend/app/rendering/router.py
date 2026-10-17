@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.assets.inline import inline_media
 from app.auth.dependencies import working_brand
 from app.database import get_db
 from app.campaigns.db_models import VariantDB
@@ -77,7 +78,9 @@ def render_variant(
         variant_id=variant_id,
         channel=variant.channel if variant else "",
         role=artifact.role,
-        artifact_body=artifact.body or "",
+        # Shown in a frame that may not fetch from localhost: the brand's
+        # library images travel inside it (app/assets/inline.py).
+        artifact_body=inline_media(db, artifact.body, brand_id) or "",
         fields=artifact.fields,
         modules=module_states(db, variant_id, recipient_id, brand_id=brand_id),
     )
