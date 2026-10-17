@@ -8,7 +8,9 @@ created: 2026-10-10
 
 **Status: not final. The direction is correct, the values and the drawn components are not.** This page records what the design session agreed on 2026-10-10 and what it left open. Nothing here is a spec to build from yet. It is checked against [[CONSTRAINTS]] before anything is built, and conflicts are settled first.
 
-**Update 2026-10-12:** the type, the screen layout and the visual reference changed. See the last section, "Update 2026-10-12: three columns and Apple criteria". Where it disagrees with the text above, the update wins.
+**Update 2026-10-12:** the type, the screen layout and the visual reference changed. See the section "Update 2026-10-12: three columns and Apple criteria". Where it disagrees with the text above, the update wins.
+
+**Update 2026-10-17 (evening):** v2 is built in React. The last section, "Update 2026-10-17 (evening): v2 built, and what the build decided", records the state and the decisions taken while building. Where any earlier text disagrees with it, that section wins.
 
 Files in this folder: `CONSTRAINTS.md` (what the code allows, written by the repo), `DESIGN.md` (this page), `tokens.css` (the tokens, same `--brand-*` names as `frontend/src/index.css`; the v2 values since 2026-10-12), `HANDOFF.md` (everything a session needs to build v2), `canvas-v2/` (a snapshot of the v2 canvas boards and the component library), `renders/` (those boards as images, with an index).
 
@@ -53,7 +55,9 @@ Also agreed: the system font (SF Pro on Apple devices) with the system monospace
 | Component designs | Not final (see below) |
 | Page layout and composition | Not decided. See "What the screen explorations showed" |
 
-## Identity (proposed, round 06, not adopted)
+## Identity (proposed, round 06, not adopted; retired with the name)
+
+**Retired.** The working name was ruled out (2026-10-11), and this identity went with it; a new identity follows the new name, after positioning. The exploration files (`logodevelopment/`) and the presentation draft built on them are kept locally and are not in the public repository (`.gitignore`, 2026-10-17), so the paths below do not resolve here. Kept as the record of round 06:
 
 Provisional direction from Diede: the full wordmark of the retired working name in IBM Plex SemiBold with the two custom flat-armed r's in normal contexts; the same two r's side by side (rr) as the icon-only symbol where the name cannot fit. Placeholder if the name changes. Not cleared (name or logo). Working choice for now (Diede): the squarer a (a2); a0 and a1 are kept as alternatives. Construction, clear space, minimum sizes, fallback policy and states are in `logodevelopment/round-06/source/identity-principles.md`; discussion in `logodevelopment/LOGO-DISCUSSION.md` [28]. Tokens, components and CONSTRAINTS are unchanged.
 
@@ -133,9 +137,9 @@ Screen work is paused until the way of working in this session is clearer. The s
 - Placeholder icons, because SF Symbols are licensed for Apple platforms only.
 - The editor's preview as a second group in column 3.
 
-**Where the values live.** `tokens.css` in this folder now carries the approved v2 values (system font, the Linen ground, the Petrol accent, dark and increased-contrast sets). The canvas "Approvals redesign" holds the foundation and the component library, and `canvas-v2/` in this folder is a snapshot of it, with `ui.css` as the component library. `frontend/src/index.css` still holds the old placeholder values: nothing of v2 is built in React yet.
+**Where the values live.** `tokens.css` in this folder now carries the approved v2 values (system font, the Linen ground, the Petrol accent, dark and increased-contrast sets). The canvas "Approvals redesign" holds the foundation and the component library, and `canvas-v2/` in this folder is a snapshot of it, with `ui.css` as the component library. `frontend/src/index.css` still holds the old placeholder values: nothing of v2 is built in React yet. *(Corrected 2026-10-17: no longer true. `frontend/src/index.css` carries the v2 values, with the dark and increased-contrast sets; see the last section.)*
 
-**Status of the build.** Not started. A first implementation of the shell and the approvals screen was written on 2026-10-12 and rewound at Diede's request, because the aim of that session was this documentation. [[HANDOFF]] has everything the session that builds it needs: where the design is, what is decided, what the repo already holds that must not change, what the first attempt taught us, what is open, and what may have to change for the screens still in Jinja.
+**Status of the build.** Not started. *(Corrected 2026-10-17: built; see the last section.)* A first implementation of the shell and the approvals screen was written on 2026-10-12 and rewound at Diede's request, because the aim of that session was this documentation. [[HANDOFF]] has everything the session that builds it needs: where the design is, what is decided, what the repo already holds that must not change, what the first attempt taught us, what is open, and what may have to change for the screens still in Jinja.
 
 **Content check.** The approvals screens in the earlier canvas showed things the repo does not back: an email "as sent" preview, "Request changes", Pending/Decided/Mine tabs, a density toggle, system-proposed audience numbers, an override rate, a check panel, snapshot ids, A/R key hints on buttons, and a role line for the signed-in user. The v2 screen draws only what `frontend/src/screens/Approvals.tsx`, `ApprovalDetail.tsx` and `docs/react-screen-inventory.md` contain.
 
@@ -144,3 +148,26 @@ Screen work is paused until the way of working in this session is clearer. The s
 **Update 2026-10-17: the rest of the screens are drawn.** At Diede's request the screens that were missing were drawn in the three-column pattern so the build session has them: campaigns, the variant editor with its record picker and slot settings, the preview sheet, the send steps, content (list, record page, categories, image sheet), deliveries (with a stranded send and the message as sent), decision slots, audiences, recipients, monitoring, the decision history, settings (general, brand profile, users, integrations) and sign-in. They are renders 20 to 43 in `renders/`, boards in `canvas-v2/`, and on the canvas. Each was drawn from what the React screen contains today, not from the Jinja pages. **They propose layout and never decide behaviour.** The proposals that need a decision (the wide-table exception for Monitoring and the decision history, the send steps beside a list, the audience arithmetic as a section, settings with a list under the sub-menu, the editor with the navigation collapsed, a draft of the system and human cues) are open decisions 13 to 20 in [[HANDOFF]] section 9. Still not drawn: Settings → Personalisation, Roles and Brands, the category graph, the dialogs, and dark and increased contrast for these screens.
 
 **Review of 2026-10-17: six structure changes.** Diede reviewed the drawn screens and agreed: (a) the AI prompts are their own Settings entry, a list of records like the brand profiles with one record per AI task, and General keeps the provider and the limits; (b) every list that can grow gets a search box (drawn; most lists need server support, so building it is a separate task); (c) the editor has a Preview button with the P key and the sheet, with no preview group in the details; (d) the module list in the preview sheet can be dragged (a separate feature task; it is the one surface where the recorded Variant Editor decision allows dragging, and the module stack keeps its arrows and Alt+Arrow with no dragging); (e) settings lists are a drill-in, so a long list has the whole column; (f) every list header has a "New ..." button that opens a dialog, in place of inline create forms. [[HANDOFF]] section 9, decisions 21 to 24 (and 5, 16, 19), records them. One reading to confirm: the AI provider and default model stay in General with the limits, because they are global and cannot be a record in a list of prompts.
+
+## Update 2026-10-17 (evening): v2 built, and what the build decided
+
+**Built.** Every screen of renders 20 to 45 is built in React in the three-column pattern (task-372), and the details the design left open plus the small findings of the UX audit of 2026-10-17 are fixed (task-392, closed). The tokens, with the dark and increased-contrast sets, are in `frontend/src/index.css`. The renders stay the reference for look; where the build had to choose, the choice is below.
+
+**Decided by Diede during the build (2026-10-17).**
+
+- **The list column's indent is as render 20 draws it:** boxes (the search field, the filters, the selected row's highlight) start at 8 px, text (the title, the rows' text) at 20 px. "One indent per column" is about text. The audit read the search box against the title and asked to move it; that was declined.
+- **A visible way into the keyboard shortcuts:** a "Keyboard shortcuts" button in the navigation foot, above Sign out (an icon on the rail), opening the same overview as `?`. The keys are still not printed on buttons. Controls that one key operates say so to a screen reader (`aria-keyshortcuts`).
+- **The category graph**, which was never drawn, is drawn as Obsidian draws a graph, tidy for the demo: the full width with nothing beside it; small neutral dots (4 to 10 px, by picks); hairline links; no names, trends or symbols in the drawing until a dot is hovered or focused, when its name shows, its links and neighbours light in the accent and the rest fades; a chosen category's figures, relations and records in tables below the drawing, the trend in words; no list of every category. A redesign of its own is TASK-394.
+
+**Patterns the build settled, following the renders** (no new decision; recorded so the next screen follows them).
+
+- **Two dialog shapes.** A sheet (preview, image picker, shortcut overview; renders 24 and 43) has a title bar with Close at its right and a rule under it. A dialog (render 45) has its title, then the fields, then Cancel and the one action at its foot on the right. Every create dialog closes before it opens what it made.
+- **Checkbox lists are option rows,** like the radio rows: a row per choice, the ticked one in the selected tint with the accent border, the focus ring on the row (renders 23 and 27). A checkbox on its own stays a plain box with its text. Few short choices sit side by side (render 27's channels).
+- **Facts are fact rows** (`Fact`) in every card, inset as the fields beside them; columns of figures are right-aligned.
+- **A button beside a field sits level with the field's control,** not its label.
+- **A field's foot line** (render 21): the hide switch or "Back to the catalogue value" on the left, "Change … in catalogue" as a plain link on the right.
+- **React Aria speaks the interface's language** (British English), whatever the browser's.
+- **A file is chosen with the app's own button** ("Choose a file…", the chosen file's name beside it), never the browser's file control.
+
+**Still open for design,** each a task of its own from the UX audit: turning the character shortcuts off and pausing them under a dialog (TASK-393), the graph's redesign (TASK-394), the send time's zone (TASK-395), campaign and delivery status told apart (TASK-396), autosave and Save forms saying which they are (TASK-397), labels instead of internal names (TASK-398), a push preview that looks like a notification (TASK-399), a record's language in the list (TASK-400), and one work area at a time at phone width (TASK-401). Settings → Personalisation, Roles and Brands, and dark and increased contrast for screens 20 to 45, are built from the pattern but still not drawn.
+
