@@ -355,6 +355,8 @@ describe('the decision history', () => {
     expect(within(table).getByText('Robin Approver')).toBeInTheDocument()
     expect(within(table).getByText('Wrong audience')).toBeInTheDocument()
     expect(within(table).getByText('nobody (expired)')).toBeInTheDocument()
+    // The outcome as the request page's status chip (task-372): a glyph and a word.
+    expect(within(table).getByText('Rejected')).toHaveClass('chip')
     expect(lastQuery(fetchMock).get('status')).toBe('decided')
     expect(screen.getByRole('link', { name: /Waiting for a decision/ })).toHaveAttribute(
       'href', '/approvals')

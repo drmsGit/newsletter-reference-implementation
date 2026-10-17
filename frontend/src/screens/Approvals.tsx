@@ -8,10 +8,12 @@ import {
   type ApprovalQuery,
   type PendingActionRow,
 } from '../api/resources'
+import BackTo from '../components/BackTo'
 import Choice from '../components/Choice'
 import Pager, { PAGE_SIZE, useOffset } from '../components/Pager'
 import DataTable, { type DataColumn } from '../components/DataTable'
 import ScreenState from '../components/ScreenState'
+import StatusChip from '../components/StatusChip'
 import { formatDate } from './Campaigns'
 
 /**
@@ -37,7 +39,7 @@ function subjectLink(a: PendingActionRow): string | null {
 }
 
 const historyColumns: DataColumn<PendingActionRow>[] = [
-  { key: 'label', header: 'Request', isRowHeader: true, render: (a) => a.label },
+  { key: 'label', header: 'Request', isRowHeader: true, render: (a) => <Link to={`/approvals/${a.id}`}>{a.label}</Link> },
   { key: 'summary', header: 'Summary', render: (a) => a.summary },
   {
     key: 'outcome',
@@ -45,14 +47,17 @@ const historyColumns: DataColumn<PendingActionRow>[] = [
     // What an approved action ended in, as it stands now (task-338), linked to
     // what it acted on. Nobody is notified: following up is the deliveries
     // screen's job, not the approver's.
-    render: (a) =>
-      a.outcome ? (
-        <>
-          {a.status} — {subjectLink(a) ? <Link to={subjectLink(a)!}>{a.outcome}</Link> : a.outcome}
-        </>
-      ) : (
-        a.status
-      ),
+    render: (a) => (
+      <span className="chips">
+        <StatusChip status={a.status} />
+        {a.outcome && (
+          <>
+            <span className="sr-only"> — </span>
+            {subjectLink(a) ? <Link to={subjectLink(a)!}>{a.outcome}</Link> : a.outcome}
+          </>
+        )}
+      </span>
+    ),
   },
   { key: 'requested_by', header: 'Requested by', render: requester },
   {
@@ -134,7 +139,7 @@ export default function Approvals({ mode = 'waiting' }: { mode?: 'waiting' | 'hi
     <div className="filters">
       <Choice
         label="Action"
-        pulldown={!history}
+        pulldown
         options={[
           { id: ANY, name: history ? 'Any action' : 'All' },
           ...(options.data?.actions ?? []).map((a) => ({ id: a.key, name: a.label })),
@@ -144,7 +149,7 @@ export default function Approvals({ mode = 'waiting' }: { mode?: 'waiting' | 'hi
       />
       <Choice
         label="Requested by"
-        pulldown={!history}
+        pulldown
         options={[
           { id: ANY, name: history ? 'Anyone' : 'All' },
           ...(options.data?.requesters ?? []).map((r) => ({
@@ -161,24 +166,29 @@ export default function Approvals({ mode = 'waiting' }: { mode?: 'waiting' | 'hi
   if (!history) return <WaitingList query={approvals} rows={rows} filtered={filtered} filters={filters} />
 
   return (
-    <>
-      <h1>Decision history</h1>
-      <p>
-        <Link to="/approvals">← Waiting for a decision</Link>
-      </p>
+    // One wide table, no details column (task-372, decision 14, 2026-10-17).
+    <div className="wide-page">
+      <div className="list-head">
+        <BackTo to="/approvals" label="Waiting for a decision" />
+        <h1>Decision history</h1>
+      </div>
       {filters}
-      <ScreenState query={approvals}>
-        <DataTable
-          label="Decided requests"
-          columns={historyColumns}
-          items={rows}
-          emptyMessage={filtered ? 'No request matches these filters.' : 'Nothing has been decided yet.'}
-          onRowAction={(a) => navigate(`/approvals/${a.id}`)}
-        />
+      <div className="wide-body">
+        <ScreenState query={approvals}>
+          <DataTable
+            label="Decided requests"
+            columns={historyColumns}
+            items={rows}
+            emptyMessage={filtered ? 'No request matches these filters.' : 'Nothing has been decided yet.'}
+            onRowAction={(a) => navigate(`/approvals/${a.id}`)}
+          />
+        </ScreenState>
+      </div>
+      <div className="list-foot list-foot--end">
         {/* The server's total (ADR-185): Older is disabled exactly on the last page. */}
         <Pager page={approvals.data} />
-      </ScreenState>
-    </>
+      </div>
+    </div>
   )
 }
 

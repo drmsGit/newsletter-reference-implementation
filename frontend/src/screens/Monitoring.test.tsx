@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router'
 
@@ -26,7 +26,10 @@ describe('the monitoring screen', () => {
     stubFetch({ 'GET /campaigns/monitoring': () => jsonResponse(page([ROW])) })
     renderWithProviders(<Monitoring />)
 
-    expect(await screen.findByText('In flight — with failures')).toBeInTheDocument()
+    // Two chips, a glyph and a word each (task-372), still read as one phrase.
+    const state = (await screen.findByText('In flight')).closest('[role="gridcell"]')
+    expect(state).toHaveTextContent('In flight — with failures')
+    expect(within(state as HTMLElement).getByText('with failures')).toHaveClass('chip-bad')
     expect(
       screen.getByText('Main (email): scheduled; Push (push): approved, not planned'),
     ).toBeInTheDocument()
