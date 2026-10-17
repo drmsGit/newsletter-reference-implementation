@@ -31,7 +31,7 @@ Two people, a marketing manager and a developer, run one communication system, a
 | Hero functions | One slot, three readers, three picks. Exactly what each person got. AI proposes, a person decides (a content record and a variant, then Approvals). Push is a beat in the montage, not a hero. |
 | Content language | German demo content as it is (the fictional brand Grathaus Outdoor), English interface and narration, key lines captioned in English. Names and content on screen are the demo's own; none is invented for the film. |
 | Claims | Built things only. No brand or competitor names. No "designed next" beat. |
-| Ending | "The playbook. The working code. A conversation." with the address left open, and the line "Always adapting to your business." under the tagline. No "open source" and no "free". |
+| Ending | "The playbook. The working code. A conversation." with Diede's LinkedIn address on screen for now, and the line "Always adapting to your business." under the tagline. No "open source" and no "free". |
 | Music | Two moods, no strings and no piano: **A, a quiet machine** for the manager's world, **B, a driven pulse** for the developer's. The two samples in `audio/` set the direction; the final score is composed or licensed. |
 | Cuts | A master of about 4:46 and a teaser of 60 to 75 seconds. |
 | Developer look | Dark-warm. |
@@ -95,8 +95,15 @@ About 460 spoken words in script A (about 490 in B), roughly 3:25 of speech: abo
 
 | Set | Where | Use it for | Do not use it for |
 |---|---|---|---|
-| **Live captures** | `docs/design/ux-audit-2026-10-17/screenshots/` (brand Grathaus Outdoor, real demo data, German emails with images; 1456×755; untracked in git) | Layout, labels, data and real rendered emails | Anything affected by the known flaws below |
+| **Live captures** | `docs/design/ux-audit-2026-10-17/screenshots/` (brand Grathaus Outdoor, real demo data, German emails with images; 1456×755; taken at commit `01e6992`, 2026-10-17 16:54, so older than the app now) | Layout, labels, data and real rendered emails | Anything affected by the known flaws below |
 | **Design renders** | `docs/design/renders/` (brand Nordlicht Kaffee, invented data; light theme except 02, 04, 05, 14, 16) | The intended layout where the live app has an open defect, the editor's cue chips, the send steps, the stranded send | Data, names and figures: they are invented |
+
+**Which version of the app the frames draw** (from Diede's feedback, 2026-10-17 evening, after the board still showed the old create dialog with its title beside the field). The audit captures and the design renders are **references for layout, never the source**. The source is the running app at a **recorded commit**:
+
+1. The frame project records the commit it draws from. Every frame is checked against the running app at that commit, in light theme, from the final reset, and screens are captured fresh for that purpose.
+2. Right before rendering, run `git log <recorded commit>..main -- frontend/src frontend/index.html storage/modules`. Any change that touches a screen in the film means that screen is looked at again. The queue's UX audit task (task-392) is still open, so the app keeps moving.
+3. **Stale references as of this writing:** `16-new-record.jpg` shows the "New content record" dialog with the title beside its field and "Create" before "Cancel"; the app now stacks each label above its field and ends with Cancel, then Create, like every dialog. In general every audit capture of a dialog, the image sheet, a fact row, a field row with a button, a long text field and the navigation foot predates the fixes of the evening. The visual board marks every audit image as a reference taken before those fixes.
+4. Round 2 checked labels, states and behaviour on a scratch app at the commit of that day. It did not re-capture the audit images, so a frame is never built from an audit image alone.
 
 **Known flaws of the demo that a frame must not inherit.**
 
@@ -142,7 +149,7 @@ Verified present or absent on a fresh scratch reset ([[PREPRODUCTION-CHECKS]], s
 - **A, neutral narrator, third person.** The master. A calm, unhurried read, no trailer growl. **Decided 2026-10-17: a synthetic read first.**
 - **B, first person, Diede.** For a later recording. It ends on "I'm Diede Slembrouck. … Come and see how it works." It changes "the manager" and "you" into "I" and "me" and nothing else.
 
-**Music.** Licence-clean instrumental only: composed for the film or a library track whose licence allows the use. No track from a commercial catalogue. **Decided by Diede, 2026-10-17: no strings and no piano; they sound too romantic and over the top.** The sound is a low pulse, soft mallet or kalimba tones, muted plucks, small ticks and a low drone with open fifths. The arc: a sparse drone and a pulse in the hook; a low pad rising under the problem; a quiet mallet motif for the manager; a tick per click and one low hit per file drop for the developer; a full swell into the pillar card; then silence before the end card, with one soft mallet note under it. Two mood samples, synthesised from nothing so there is nothing to license, are in `audio/` (`mood-a-quiet-machine.m4a` for the manager's world, `mood-b-driven-pulse.m4a` for the developer's; `audio/synth.py` makes them again). **Decided 2026-10-17: both moods.** They are a direction, not the score: the final music is composed or licensed along these two.
+**Music.** Licence-clean instrumental only: composed for the film or a library track whose licence allows the use. No track from a commercial catalogue. **Decided by Diede, 2026-10-17: no strings and no piano; they sound too romantic and over the top.** The sound is a low pulse, soft mallet or kalimba tones, muted plucks, small ticks and a low drone with open fifths. The arc: a sparse drone and a pulse in the hook; a low pad rising under the problem; a quiet mallet motif for the manager; a tick per click and one low hit per file drop for the developer; a full swell into the pillar card; then silence before the end card, with one soft mallet note under it. Two mood samples, synthesised from nothing so there is nothing to license, are in `audio/` (`mood-a-quiet-machine.m4a` for the manager's world, `mood-b-driven-pulse.m4a` for the developer's; `audio/synth.py` makes them again). **Decided 2026-10-17: both moods for the first round; if only one can be used, the developer mood, B.** They are a direction, not the score: the final music is composed or licensed along these two.
 
 **Sound design.** Soft interface ticks, a muted hit for each file landing, a restrained whoosh only on the hard cut into the developer world. The narration ducks the music.
 
@@ -263,6 +270,8 @@ Run on 2026-10-17, on a scratch database and a throwaway worktree, never on the 
 
 **The second round is done** ([[PREPRODUCTION-CHECKS-2]]): (a) S08 flows, verified with the mock (nothing readable) and with a stand-in reply whose labels were all seen; (b) a push-only provider, verified; (c) the S16b files and four change-history lines, verified; (d) the Integrations screen, verified on scratch; (e) S05, S06, S17 and S18: S05 and S06 match with small differences, **S17 and S18 differ from the first storyboard** and the scenes are corrected. What remains is Diede's decision on a real model, the capture of the final reset, and the follow-ups of that file's section 8 (project defects, not film work).
 
+**Re-read after the final reset (read-only, on the development database, 2026-10-17, 20:06 UTC, after Diede's reset at 19:44 UTC).** The hook's numbers hold: the Familienherbst slot has 369 picks, 123 readers and 15 distinct content; the send is 123 sent, 0 failed, 0 excluded. The three readers of S07 are unchanged and their picks still do not overlap (record titles, in rank order). Lea Huber (#32): "Kinderregenjacke für 49 Euro: Die Kapuze gehört zur Probe", "Augsburg: Naturheft für Kinder am 15. Mai", "Sitzmatte für Familienpausen: 9 Euro gegen die kalte Bank". Michael Zimmermann (#127): "Tierspuren im Schnee: Erst den Maßstab dazulegen", "Kompaktfernglas für 89 Euro: 8-fach und 310 Gramm", "Rosenheim: Spuren und Fotos lesen am 30. Oktober". Peter Müller (#330): "Grathaus Basis Kinderregenhose: 35 Euro und Platz zum Hinhocken", "Familienrunde als Ausflugstagebuch: Drei Fragen genügen", "Familienwandern im Chiemgau: Drei gute Pausen statt Gipfelziel". 101 of the 123 readers share the two most common picks. The headlines the emails show (the module headline fields) are read in the capture pass.
+
 **Order for the real capture.** Reset once, on purpose, on the date the film should show. Capture everything that needs the demo as it is (S01, S05 to S11, S17, S18). Seed Approvals and publish the AI prompt before S08. Perform the four drops last, because each change in `storage/modules/email/` brings the "As sent" notices back. Do not reset again after the captures: the picks would reshuffle.
 
 ## 16. Decisions and open questions
@@ -284,15 +293,20 @@ Run on 2026-10-17, on a scratch database and a throwaway worktree, never on the 
 13. **S03:** show how other systems (CRM, data warehouse, shop, analytics) reach the core.
 14. Scenes S01, S04, S05, S06, S07, S09, S10, S11, S12, S13, S14, S15, S17 to S19 were marked okay.
 
+### Decided later the same evening
+
+15. **S08's result frames are drawings,** with exact labels (the stand-in replies of round 2). No real model.
+16. **Music:** both samples are accepted for the first round; if only one can be used, the developer mood, B.
+17. **The end card's address is Diede's LinkedIn profile for now** (`linkedin.com/in/diede-slembrouck`, text only). Whether to add an email address (`ds@diede-slembrouck.de`) or a domain (`thisisdiede.com`) later is open. The frame project takes the contact as one value, so changing it is a re-render. The repository's own address is not shown: it still carries the retired working name.
+18. **The film does not say "public".** The default holds: "in the same repository" (S16b). The word appears only in this brief's notes, nowhere in a narration line or on a card.
+19. **The demo data is final and may be used.** Diede reset the demo on the development database on 2026-10-17 (about 21:45 local, 19:44 UTC). The hook's numbers were re-read from it, read-only, at 20:06 UTC: see section 15. The demo must not be reset again after the captures.
+
 ### Still open
 
 1. **The final music.** Composed or licensed along the two moods; the source is to be chosen.
-2. **The address on the end card** stays open until a website or repository exists.
-3. **The hook's numbers** held across two resets, but the hook is re-read from the final reset.
-4. **S08: a real model or drawings.** With the demo's mock AI both flows return text nothing can read, so the result frames are drawings. A real model on scratch needs the key in the environment and the AI provider set to claude in Settings (a few cents); the provenance line then names a vendor model, which is cropped. Diede decides; round 2 recommends drawings and no real model, because every label and state of the success path is now known, the mock's `mock-1` provenance names no vendor, and a real model answers differently each time.
-5. **S17's two-variant campaign.** The demo has none. The default is to make one on the capture database (a minute, no project file changes); the alternatives are a change to the demo seed or showing two campaigns side by side.
-6. **"Public".** The repository is public. The default is that the film says "in the same repository"; Diede decides whether it also says "public" (never "open source" or "free").
-7. **Pacing.** About 70 percent of the film is narrated. The first animatic with the synthetic read will show whether it needs air; S03b and S16b are the first to compress.
+2. **S17's two-variant campaign.** The demo has none. The default is to make one on the capture database (a minute, no project file changes); the alternatives are a change to the demo seed or showing two campaigns side by side.
+3. **The email address or domain** for the end card, later (decision 17).
+4. **Pacing.** About 70 percent of the film is narrated. The first animatic with the synthetic read will show whether it needs air; S03b and S16b are the first to compress.
 
 ### Choices made when the checks were applied
 

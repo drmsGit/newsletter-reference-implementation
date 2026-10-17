@@ -17,7 +17,7 @@ Clean read-aloud text for [[STORYBOARD]]. **A** is the master: a neutral narrato
 - **Changed on 2026-10-17, after Diede's review of the storyboard:** S03 gains the AI premise ("AI has changed what a company, or its agency, can build for itself."); a new line S03b for other systems reaching the core; S12 says "by hand or with an AI assistant"; S16 says "Email or push, any sending service"; a new line S16b says the reasons stay with the code in the same repository; S20 adds "Always adapting to your business." S08's narration is unchanged.
 - Each scene is a separate take. The time in brackets is the scene's length on screen; the read should end a little before it. Leave a breath before the first word of every take; the picture starts before the voice.
 - S01 and S19 have a held silence after the last word. Do not fill it.
-- Numbers are spoken out ("a hundred and twenty-three"). They are the live demo's and will be re-read after the next reset (see [[TRAILER-BRIEF]], section 15); if they change, the line changes.
+- Numbers are spoken out ("a hundred and twenty-three"). They are the live demo's, re-read read-only from the final reset of 2026-10-17 and unchanged ([[TRAILER-BRIEF]], section 15); if the demo is ever reset again, the line is re-read.
 - Captions are burned in from these texts. Keep the wording identical to what is read.
 
 ## Script A: neutral narrator, third person
