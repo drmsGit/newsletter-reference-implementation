@@ -4,6 +4,7 @@ title: The category graph's labels stay readable when categories crowd
 status: To Do
 assignee: []
 created_date: '2026-10-17 16:13'
+updated_date: '2026-10-17 20:59'
 labels:
   - frontend
 dependencies: []
@@ -22,3 +23,9 @@ From the UX audit of 2026-10-17 (docs/design/ux-audit-2026-10-17/FINDINGS.md, UX
 - [ ] #1 With the demo's categories every label in the graph is readable without overlapping a circle or another label
 - [ ] #2 Choosing a category makes its relations stand out from the rest
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-17 evening, before this task: the graph was tidied for the November demo at the user's brief (commit after 504cf72): full width, small neutral dots, names only on hover or focus with the dot's links and neighbours lit and the rest faded, a chosen category's figures, relations and records in tables below, the full category list removed. So no label overlaps at rest; a crowded hover can still lay a name over a line. The redesign this task asks for (layout, zoom, a focused neighbourhood) is still open.
+<!-- SECTION:NOTES:END -->
