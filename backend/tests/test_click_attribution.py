@@ -45,7 +45,7 @@ def delivered(db):
     db.add(campaign); db.flush()
     variant = VariantDB(campaign_id=campaign.id, channel="email", name="v", status="sent")
     db.add(variant); db.flush()
-    db.add(ModuleInstanceDB(variant_id=variant.id, module_type="single_stack", position=1,
+    db.add(ModuleInstanceDB(variant_id=variant.id, module_type="img_left", position=1,
                             content_record_id=record.id, module_data={}))
     snapshot = SnapshotDB(variant_id=variant.id,
                           render_context={"frame_version": 1, "channel": "email", "modules": []})

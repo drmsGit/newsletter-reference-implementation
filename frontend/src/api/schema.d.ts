@@ -6034,11 +6034,6 @@ export interface components {
              * @default false
              */
             pairs: boolean;
-            /**
-             * Retired
-             * @default false
-             */
-            retired: boolean;
             /** Variables */
             variables: components["schemas"]["ModuleVariableOut"][];
         };

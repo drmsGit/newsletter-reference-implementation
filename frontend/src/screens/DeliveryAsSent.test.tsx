@@ -9,7 +9,7 @@ afterEach(() => vi.unstubAllGlobals())
 
 describe('what one recipient got (task-109)', () => {
   it('lists every copy of a slot module that showed several picks, in order', async () => {
-    const slot = { module_id: 12, module_type: 'single_stack', kind: 'slot', override_id: null }
+    const slot = { module_id: 12, module_type: 'img_left', kind: 'slot', override_id: null }
     stubFetch({
       'GET /delivery/executions/7/as-sent': () => jsonResponse({
         execution_id: 7, send_instance_id: 3, recipient_id: 1, channel: 'email', sent_at: '2026-10-11T10:00:00Z',

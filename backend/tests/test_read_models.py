@@ -168,7 +168,7 @@ class TestB11CampaignComposition:
         slot = DecisionSlotDB(variant_id=variant.id, name="slot", decision_type="content_recommendation",
                               decision_strategy="top_score")
         db.add(slot); db.flush()
-        slotted = ModuleInstanceDB(variant_id=variant.id, module_type="single_stack", position=9,
+        slotted = ModuleInstanceDB(variant_id=variant.id, module_type="img_left", position=9,
                                    decision_slot_id=slot.id, module_data={})
         override = ContentOverrideDB(module_instance_id=content.id, field_overrides={"headline_medium": "X"},
                                      overridden_by="t", active=True)
@@ -235,7 +235,7 @@ class TestB11CampaignComposition:
             page = page_client.get(f"/ui/campaigns/{composed['campaign'].id}")
             assert page.status_code == 200, page.text[:300]
             assert f"#{composed['content']} img_right" in page.text
-            assert f"#{composed['slotted']} single_stack" not in page.text, (
+            assert f"#{composed['slotted']} img_left" not in page.text, (
                 "the page offered an override the service refuses (ADR-178 point 5)"
             )
         finally:

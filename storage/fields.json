@@ -127,14 +127,6 @@
       "channel": "push",
       "type": "text"
     },
-    "section_heading": {
-      "label": "Heading above this module",
-      "concept": "heading",
-      "channel": "email",
-      "type": "text",
-      "size": "small",
-      "note": "Optional. Shown above the module, and only when the module itself is shown."
-    },
     "subject": {
       "label": "Subject line",
       "concept": "subject",

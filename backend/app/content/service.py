@@ -872,9 +872,7 @@ def readiness_warning(content: dict | None, channel: str) -> str | None:
         value = content.get(name)
         return value is not None and not (isinstance(value, str) and not value.strip())
 
-    # Only what a manager can still place: a retired module is no reason to
-    # fill a field (ADR-198 point 5).
-    modules = sorted((m for m in list_manifests(channel, offered=True) if m.cms), key=lambda m: m.name)
+    modules = sorted((m for m in list_manifests(channel) if m.cms), key=lambda m: m.name)
     needs = [(m, fields_a_record_must_fill(m)) for m in modules]
     if not needs or any(all(filled(name) for name in required) for _, required in needs):
         return None

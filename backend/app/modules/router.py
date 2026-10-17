@@ -50,8 +50,6 @@ class ModuleManifestOut(BaseModel):
     #: Two in a row share one 50:50 row (ADR-198 point 4): the Column. The
     #: editor offers adding two at once.
     pairs: bool = False
-    #: Still rendered where it is used, no longer offered (ADR-198 point 5).
-    retired: bool = False
     variables: list[ModuleVariableOut]
 
 
@@ -64,7 +62,6 @@ def _to_out(manifest: ModuleManifest) -> ModuleManifestOut:
         cms=manifest.cms,
         carries_envelope=envelope_module_type(manifest.channel) == manifest.name,
         pairs=manifest.pairs,
-        retired=manifest.retired,
         variables=[
             ModuleVariableOut(
                 name=v.name, required=v.required, label=v.label, envelope=v.envelope,

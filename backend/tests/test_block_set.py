@@ -172,36 +172,6 @@ class TestTheBlocks:
         assert get_manifest("email", "headline").decorative
 
 
-class TestRetired:
-    def test_single_stack_is_not_offered(self):
-        offered = {m.name for m in list_manifests("email", offered=True)}
-        assert "single_stack" not in offered
-        assert {"hero", "headline", "img_left", "img_right", "column", "single_text", "cta"} <= offered
-        assert "single_stack" in {m.name for m in list_manifests("email")}, "still known, so it renders"
-
-    def test_adding_it_is_refused(self, db, world):
-        with pytest.raises(ValueError, match="retired"):
-            world["variant"](("single_stack", None, {}))
-
-    def test_one_already_there_renders_and_can_be_edited(self, db, world):
-        a = world["record"]("Alpha")
-        variant_id = world["variant"](("img_left", a, None), ("img_left", a, None))
-        module = db.query(ModuleInstanceDB).filter(ModuleInstanceDB.variant_id == variant_id,
-                                                  ModuleInstanceDB.module_type == "img_left").order_by(
-            ModuleInstanceDB.position).first()
-        module.module_type = "single_stack"  # as one made before it was retired
-        db.commit()
-        assert "Alpha headline" in render_variant_html(db, variant_id)
-        updated = update_module(db, module.id, module_type="single_stack", content_record_id=a,
-                                            module_data={"section_heading": "Still here"},
-                                            brand_id=world["brand"].id)
-        assert updated is not None
-        with pytest.raises(ValueError, match="retired"):
-            other = db.query(ModuleInstanceDB).filter(ModuleInstanceDB.variant_id == variant_id,
-                                                     ModuleInstanceDB.module_type == "img_left").one()
-            update_module(db, other.id, module_type="single_stack", brand_id=world["brand"].id)
-
-
 class TestTheHead:
     def test_the_responsive_rules_come_with_an_mjml_block(self, db, world):
         a = world["record"]("Alpha")

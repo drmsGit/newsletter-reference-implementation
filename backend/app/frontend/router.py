@@ -975,7 +975,7 @@ def campaign_detail(
                 # create the same thing — and a manager who used it would get a
                 # duplicate the envelope writer then silently ignores.
                 "module_templates": [
-                    m for m in list_manifests(variant.channel, offered=True)
+                    m for m in list_manifests(variant.channel)
                     if not any(v.envelope for v in m.variables)
                 ],
                 # Cardinality, read from the channel manifest rather than known

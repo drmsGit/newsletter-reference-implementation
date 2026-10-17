@@ -8,8 +8,10 @@ other fields still come from the content or the slot's pick. The field is the
 module's own: never overridden, never a catalogue field.
 
 Since 2026-10-15 (task-371, ADR-198 point 5) the heading has left the image
-blocks for the Headline block; the retired Single Stack still carries it, so
-the mechanism is tested on that one, which keeps rendering where it is used.
+blocks; the retired Single Stack carried it until it was deleted (task-381).
+The mechanism is kept (user, 2026-10-17) with no shipped block using it, so
+it is tested on a block these tests plant: a catalogue block with a heading
+typed in the module, as Single Stack was.
 """
 import uuid
 
@@ -25,7 +27,41 @@ from main import app
 from tests.machine import editor, machine
 
 client = TestClient(app, raise_server_exceptions=False)
-pytestmark = pytest.mark.usefixtures("one_editor")
+pytestmark = pytest.mark.usefixtures("one_editor", "headed_block")
+
+BLOCK, HEADING = "t381_headed", "t381_heading"
+MANIFEST = {
+    "label": "Headed block (test)", "channel": "email", "cms": True,
+    "variables": [
+        {"name": HEADING, "required": False, "source": "module"},
+        {"name": "headline_medium", "required": True},
+        {"name": "body_medium", "required": False},
+    ],
+}
+TEMPLATE = (f"{{% if {HEADING} %}}<p class=\"module-section-heading\">{{{{ {HEADING} }}}}</p>{{% endif %}}"
+            "<h2>{{ headline_medium }}</h2>")
+
+
+@pytest.fixture
+def headed_block(monkeypatch):
+    """A block with a field typed in the module, planted for these tests only,
+    with its field defined beside the shipped ones."""
+    import json
+
+    from app.modules import registry
+
+    shipped = registry.field_definitions()
+    monkeypatch.setattr(registry, "field_definitions", lambda: {**shipped, HEADING: {
+        "label": "Heading above this module", "concept": "heading", "channel": "email", "type": "text",
+        "size": "small"}})
+    folder = registry.MODULES_DIR / "email"
+    (folder / f"{BLOCK}.json").write_text(json.dumps(MANIFEST))
+    (folder / f"{BLOCK}.html").write_text(TEMPLATE)
+    registry._registry_mtime = None
+    yield
+    (folder / f"{BLOCK}.json").unlink(missing_ok=True)
+    (folder / f"{BLOCK}.html").unlink(missing_ok=True)
+    registry._registry_mtime = None
 
 SHOWN, HIDDEN, ON_RECORD = "Picked for you", "Nobody sees this", "From the catalogue"
 
@@ -47,12 +83,12 @@ def world(db, default_brand):
     db.add_all([picked, nothing]); db.flush()
     db.add(DecisionResolutionDB(decision_slot_id=picked.id, recipient_id=None,
                                 content_record_id=record.id, reason="r", score=1))
-    on_record = ModuleInstanceDB(variant_id=variant.id, module_type="single_stack", position=1,
-                                 content_record_id=record.id, module_data={"section_heading": ON_RECORD})
-    on_pick = ModuleInstanceDB(variant_id=variant.id, module_type="single_stack", position=2,
-                               decision_slot_id=picked.id, module_data={"section_heading": SHOWN})
-    on_nothing = ModuleInstanceDB(variant_id=variant.id, module_type="single_stack", position=3,
-                                  decision_slot_id=nothing.id, module_data={"section_heading": HIDDEN})
+    on_record = ModuleInstanceDB(variant_id=variant.id, module_type=BLOCK, position=1,
+                                 content_record_id=record.id, module_data={HEADING: ON_RECORD})
+    on_pick = ModuleInstanceDB(variant_id=variant.id, module_type=BLOCK, position=2,
+                               decision_slot_id=picked.id, module_data={HEADING: SHOWN})
+    on_nothing = ModuleInstanceDB(variant_id=variant.id, module_type=BLOCK, position=3,
+                                  decision_slot_id=nothing.id, module_data={HEADING: HIDDEN})
     db.add_all([on_record, on_pick, on_nothing]); db.commit()
     yield {"variant": variant, "on_record": on_record}
     db.rollback()
@@ -74,9 +110,9 @@ def world(db, default_brand):
 def test_the_manifest_says_which_fields_are_typed_in_the_module():
     with machine([VIEW]) as headers:
         manifests = client.get("/modules", params={"channel": "email"}, headers=headers).json()
-    stack = next(m for m in manifests if m["name"] == "single_stack")
-    source = {v["name"]: v["source"] for v in stack["variables"]}
-    assert source["section_heading"] == "module"
+    block = next(m for m in manifests if m["name"] == BLOCK)
+    source = {v["name"]: v["source"] for v in block["variables"]}
+    assert source[HEADING] == "module"
     assert source["headline_medium"] == "content"
 
 
@@ -91,16 +127,16 @@ def test_the_heading_renders_with_its_module_and_hides_with_it(world):
 def test_a_module_typed_field_is_never_overridden(db, world):
     with editor() as headers:
         response = client.put(f"/overrides/modules/{world['on_record'].id}",
-                              json={"field_overrides": {"section_heading": "Pinned"}}, headers=headers)
+                              json={"field_overrides": {HEADING: "Pinned"}}, headers=headers)
     assert response.status_code == 400, response.text
 
 
 def test_a_catalogue_module_stores_only_its_module_typed_fields(world):
     url = f"/campaigns/modules/{world['on_record'].id}"
     with editor() as headers:
-        ok = client.put(url, json={"module_type": "single_stack", "content_record_id": None,
-                                   "module_data": {"section_heading": "New"}}, headers=headers)
-        refused = client.put(url, json={"module_type": "single_stack",
+        ok = client.put(url, json={"module_type": BLOCK, "content_record_id": None,
+                                   "module_data": {HEADING: "New"}}, headers=headers)
+        refused = client.put(url, json={"module_type": BLOCK,
                                         "module_data": {"headline_medium": "Typed over the catalogue"}},
                              headers=headers)
     assert ok.status_code == 200, ok.text
@@ -110,5 +146,5 @@ def test_a_catalogue_module_stores_only_its_module_typed_fields(world):
 def test_a_module_typed_field_is_not_a_catalogue_field():
     from app.content.service import catalogue_fields, content_field_groups
 
-    assert "section_heading" not in content_field_groups()["email"]
-    assert "section_heading" not in {f["name"] for f in catalogue_fields()}
+    assert HEADING not in content_field_groups()["email"]
+    assert HEADING not in {f["name"] for f in catalogue_fields()}

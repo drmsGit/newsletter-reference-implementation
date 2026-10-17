@@ -14,7 +14,7 @@ function module(id: number, position: number, extra: object = {}) {
   return {
     id,
     position,
-    module_type: 'single_stack',
+    module_type: 'img_left',
     content_record_id: null,
     decision_slot_id: null,
     module_data: {},
@@ -36,7 +36,7 @@ const COMPOSITION = {
       module_limit: 10,
       can_add_module: true,
       has_envelope: true, brand_profile: A_BRAND_PROFILE,
-      accepted_module_types: ['single_stack', 'cta'],
+      accepted_module_types: ['img_left', 'cta'],
       envelope_modules: [
         module(9, 0, { module_type: 'envelope', module_data: { subject: 'Spring is here' } }),
       ],

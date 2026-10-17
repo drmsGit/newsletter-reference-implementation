@@ -292,7 +292,7 @@ def source(db, default_brand):
     db.flush()
 
     db.add(ModuleInstanceDB(
-        variant_id=variant.id, module_type="single_stack", position=1,
+        variant_id=variant.id, module_type="img_left", position=1,
         content_record_id=record.id,
     ))
     db.add(ModuleInstanceDB(
@@ -300,7 +300,7 @@ def source(db, default_brand):
         module_data={"button_label": "Book", "button_url": "https://brand-a.example/book"},
     ))
     db.add(ModuleInstanceDB(
-        variant_id=variant.id, module_type="single_stack", position=7,  # and another
+        variant_id=variant.id, module_type="img_left", position=7,  # and another
         decision_slot_id=slot.id,
     ))
     db.commit()
@@ -442,7 +442,7 @@ class TestTheBoundaryDecidesWhetherContentIsCopied:
         """Otherwise the target's catalogue gains a duplicate per reference."""
         variant = source["variant"]
         db.add(ModuleInstanceDB(
-            variant_id=variant.id, module_type="single_stack", position=9,
+            variant_id=variant.id, module_type="img_left", position=9,
             content_record_id=source["record"].id,
         ))
         db.commit()
@@ -583,7 +583,7 @@ class TestWhatTheCopyArrivesAs:
             # renumber from 1 and close the source's gaps.
             assert positions == [0, 1, 2, 3], f"positions came across as {positions}"
             types = [m.module_type for m in _modules(db, report.campaign_id)]
-            assert types == ["envelope", "single_stack", "cta", "single_stack"], (
+            assert types == ["envelope", "img_left", "cta", "img_left"], (
                 "renumbering reordered the layout"
             )
         finally:

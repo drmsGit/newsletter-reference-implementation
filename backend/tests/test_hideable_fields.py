@@ -112,7 +112,6 @@ class TestTheStandardSet:
     @pytest.mark.parametrize("module, hideable", [
         ("img_left", {"image_url", "headline_medium", "body_medium", "button_label"}),
         ("img_right", {"image_url", "headline_medium", "body_medium", "button_label"}),
-        ("single_stack", {"image_url", "headline_medium", "body_medium", "button_label"}),
         # The MJML block set (ADR-198): the same rule for the new blocks.
         ("column", {"image_url", "headline_medium", "body_medium", "button_label"}),
         ("single_text", {"headline_medium", "body_long", "button_label"}),
