@@ -4,7 +4,7 @@ title: Small details the finished design left open
 status: To Do
 assignee: []
 created_date: '2026-10-17 13:31'
-updated_date: '2026-10-17 16:38'
+updated_date: '2026-10-17 16:47'
 labels:
   - frontend
 dependencies: []
@@ -56,14 +56,14 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 - [ ] #2 Slot settings categories are option rows as in render 23
 - [ ] #3 A catalogue field's hide switch and Change in catalogue share one line as in render 21
 - [ ] #4 Performance on the record page uses fact rows
-- [ ] #5 The Duplicate button and its pulldown share a baseline
+- [x] #5 The Duplicate button and its pulldown share a baseline
 - [ ] #6 The rich-text hint promises only what the email renders, or the renderer formats italic and bullet lines as the hint says
 - [x] #7 The image picker's cards show their whole thumbnail and title, without overlapping the rows or the filters
 - [x] #8 New record and New audience use the dialog form and DialogActions: heading on its own row, full-width fields, Cancel then Create
 - [x] #9 Multi-line fields have the same strong field border as inputs
 - [x] #10 Personalise menu items show a gap between the label and the token, the token in monospace
 - [x] #11 Settings General read-only facts share the 16 px inset of the inputs beside them
-- [ ] #12 Buttons beside a field align with its control, not its label, and the Brands name field grows
+- [x] #12 Buttons beside a field align with its control, not its label, and the Brands name field grows
 - [ ] #13 In the list column the search box and filters start at the same indent as the title and the rows
 - [ ] #14 Dialogs share one header pattern and one footer order: Cancel, then the primary action, at the right
 - [ ] #15 Each Personalise button is named by its field
@@ -85,4 +85,6 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 2026-10-17: item 10 (UX-07) fixed: label and token in the MenuItem's label and description slots, token as code, .personalise-entry spaces them (index.css). Test in EditorFields.personalise.test.tsx, mutation-checked on the slot and the code element. Live: at least 16 px between label and token, monospace, aria-describedby set.
 
 2026-10-17: item 11 (UX-11) fixed: the six facts-compat lists in Settings.tsx are Fact rows; the facts-compat CSS removed. Test in Settings.test.tsx (every dt sits in a .fact), mutation-checked. Live: the facts and the field labels start at the same x (273 px) in Sending and AI.
+
+2026-10-17: items 12 (UX-12, UX-25) and 5 fixed together, one cause: in the ten rows that align to the end (.filters, .pager, .add-module, .create-form, .inline-form, .bind__filters, .record-duplicate, .assignment, .assignment-add, .image-library__filters) a direct-child button now has align-self: auto (index.css, after the button rule); the Brands name field grows (.brand-list .inline-form). Live: button bottom equals control bottom (0 px) for Rename, Delete, Duplicate, Remove, Add (record and category), Give, Issue a key, Save; Brands name field 427 px. CSS only, no unit test possible in jsdom.
 <!-- SECTION:NOTES:END -->
