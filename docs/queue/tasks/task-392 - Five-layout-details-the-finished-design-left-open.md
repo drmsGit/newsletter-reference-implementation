@@ -4,7 +4,7 @@ title: Small details the finished design left open
 status: To Do
 assignee: []
 created_date: '2026-10-17 13:31'
-updated_date: '2026-10-17 16:47'
+updated_date: '2026-10-17 16:56'
 labels:
   - frontend
 dependencies: []
@@ -34,7 +34,7 @@ Regressions from TASK-372 itself, so worth doing first:
 10. (UX-07) The Personalise menu runs the label into the token ("Salutation formal{{salutation_formal}}"): the item is a flex row, so the space between the label and the token's span collapses (frontend/src/components/EditorFields.tsx:177). Give the token its own element with a gap, in monospace.
 11. (UX-11) In Settings, General, the read-only facts (Sending's channels; AI's default model, key, tokens, warning, spent) start at the card's left edge while the inputs beside them are inset 16 px: the rule .card-rows .fact-list { padding: 0; } (frontend/src/index.css:1703) also hits the plain dt/dd lists (dl.fact-list.facts-compat, frontend/src/screens/Settings.tsx:97, 133, 205 and the AI facts in Sections). Render them with the shared Fact rows, or give the compat lists the 16 px inset.
 12. (UX-12, UX-25) Buttons beside a field line up with the field's label instead of its control: Add under "Put it under" and "Add a subcategory" (categories), Duplicate (record), Give (user access), Issue a key (integration), and Rename and Delete in Settings, Brands, where the name field also stays about 164 px wide. The cause is the global button rule's align-self: flex-start (frontend/src/index.css:172), added in step 1 so buttons in a column keep their width; it overrides the row's align-items. In a row (.inline-form, .create-form, .field-pair and similar) the button should align to the end, and the Brands name field should grow (frontend/src/screens/Brands.tsx:56).
-13. (UX-22) In the list column the search box and the filters start 12 px left of the title and the rows: the title has 20 px (frontend/src/index.css:1358, .list-head), the search and filters 8 px (index.css:1361 .col-list .filters, index.css:1530 .col-list .search-compact). One indent per column (HANDOFF section 3). The decision history shows the same offset.
+13. (UX-22) In the list column the search box and the filters start 12 px left of the title and the rows: the title has 20 px (frontend/src/index.css:1358, .list-head), the search and filters 8 px (index.css:1361 .col-list .filters, index.css:1530 .col-list .search-compact). One indent per column (HANDOFF section 3). The decision history shows the same offset. DROPPED 2026-10-17 by the user's decision: the code matches render 20 and ui.css (.filters and .search, 8 px), where boxes line up with boxes at 8 px (the selected row's highlight) and text with text at 20 px; the audit compared a box edge with text.
 14. (UX-13) Dialogs differ in where Close sits and in which order the actions come: the image picker has Close under its heading on the left, the preview a right-aligned header, Paste people stacks Check and Cancel (frontend/src/screens/AudiencePeople.tsx:196, 243). One header pattern (title, Close at the right where there is one) and one footer (Cancel, then the primary action, at the right).
 
 Accessibility and polish:
@@ -64,7 +64,7 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 - [x] #10 Personalise menu items show a gap between the label and the token, the token in monospace
 - [x] #11 Settings General read-only facts share the 16 px inset of the inputs beside them
 - [x] #12 Buttons beside a field align with its control, not its label, and the Brands name field grows
-- [ ] #13 In the list column the search box and filters start at the same indent as the title and the rows
+- [x] #13 In the list column the search box and filters start at the same indent as the title and the rows
 - [ ] #14 Dialogs share one header pattern and one footer order: Cancel, then the primary action, at the right
 - [ ] #15 Each Personalise button is named by its field
 - [ ] #16 Each Remove in a user's Access card is named by the access it removes
@@ -87,4 +87,6 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 2026-10-17: item 11 (UX-11) fixed: the six facts-compat lists in Settings.tsx are Fact rows; the facts-compat CSS removed. Test in Settings.test.tsx (every dt sits in a .fact), mutation-checked. Live: the facts and the field labels start at the same x (273 px) in Sending and AI.
 
 2026-10-17: items 12 (UX-12, UX-25) and 5 fixed together, one cause: in the ten rows that align to the end (.filters, .pager, .add-module, .create-form, .inline-form, .bind__filters, .record-duplicate, .assignment, .assignment-add, .image-library__filters) a direct-child button now has align-self: auto (index.css, after the button rule); the Brands name field grows (.brand-list .inline-form). Live: button bottom equals control bottom (0 px) for Rename, Delete, Duplicate, Remove, Add (record and category), Give, Issue a key, Save; Brands name field 427 px. CSS only, no unit test possible in jsdom.
+
+2026-10-17: item 13 (UX-22) closed as matching the design, not changed. Render 20 draws the search box at x 240 (8 px into the list column), the same as the selected row's highlight, and the title and row text at x 252 (20 px); ui.css gives .filters and .search 8 px padding; HANDOFF's one-indent rule is about text. The user chose to keep it as drawn. AC #13 is ticked as closed by that decision, not as fulfilled.
 <!-- SECTION:NOTES:END -->
