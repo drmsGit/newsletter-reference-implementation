@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router'
 import { useCampaigns, useCreateAudience, useSuggestAudience } from '../api/resources'
 import { HttpError } from '../api/session'
 import { DialogActions } from '../components/NewDialog'
-import { ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
+import { keyShortcuts, ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
 
 function refusal(error: unknown, what: string) {
   if (error instanceof HttpError && error.status === 403) return `You do not have permission to ${what} in this brand.`
@@ -22,7 +22,7 @@ export function NewAudience() {
   useShortcut('n', 'New audience', () => setOpen(true))
   return (
     <>
-      <Button className="btn-primary" onPress={() => setOpen(true)}>
+      <Button className="btn-primary" ref={keyShortcuts('n')} onPress={() => setOpen(true)}>
         New audience <ShortcutHint keys="n" />
       </Button>
       <ModalOverlay isOpen={open} onOpenChange={setOpen} isDismissable className="preview-overlay">

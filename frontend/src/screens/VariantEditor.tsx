@@ -25,7 +25,7 @@ import Fence from './Fence'
 import SubjectSuggestions, { type SuggestionOption } from './SubjectSuggestions'
 import TopicProposal from './TopicProposal'
 import PreviewBar from './Preview'
-import { ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
+import { keyShortcuts, ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
 import { BRAND_PROFILES, fieldLabels } from './BrandProfiles'
 
 /**
@@ -362,7 +362,7 @@ function Stack({
                 className="stack__select"
                 onPress={() => onSelect(module.id)}
                 onKeyDown={(event) => onKeyDown(event, module, index)}
-                aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
+                ref={keyShortcuts('Alt+ArrowUp Alt+ArrowDown')}
                 // Said as one line, "Hero · Record “Lisbon”": browsers join the two
                 // lines' parts without spaces otherwise.
                 aria-label={`${label} · ${source.word}${source.name ? ` ${source.name}` : ''}`}

@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router'
 import { useCreateContent } from '../api/resources'
 import { HttpError } from '../api/session'
 import { DialogActions } from '../components/NewDialog'
-import { ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
+import { keyShortcuts, ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
 
 /**
  * "New record" on the Content list (task-281; Content Write Surface pass,
@@ -19,7 +19,7 @@ export default function ContentCreate() {
   useShortcut('n', 'New content record', () => setOpen(true))
   return (
     <>
-      <Button className="btn-primary" onPress={() => setOpen(true)}>
+      <Button className="btn-primary" ref={keyShortcuts('n')} onPress={() => setOpen(true)}>
         New record <ShortcutHint keys="n" />
       </Button>
       <ModalOverlay isOpen={open} onOpenChange={setOpen} isDismissable className="preview-overlay">

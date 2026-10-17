@@ -10,7 +10,7 @@ import {
 import Fact from '../components/Fact'
 import RecipientPicker from '../components/RecipientPicker'
 import ScreenState from '../components/ScreenState'
-import { ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
+import { keyShortcuts, ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
 
 /**
  * The variant editor's preview (task-265): a collapsed bar that says what the
@@ -52,7 +52,7 @@ export default function PreviewBar({
             ? 'Rendering…'
             : findings.text}
       </span>
-      <Button onPress={() => setOpen(true)}>
+      <Button ref={keyShortcuts('p')} onPress={() => setOpen(true)}>
         Open preview <ShortcutHint keys="p" />
       </Button>
       <ModalOverlay isOpen={open} onOpenChange={setOpen} isDismissable className="preview-overlay">

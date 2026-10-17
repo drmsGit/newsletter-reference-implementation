@@ -199,6 +199,11 @@ describe('the audience list (task-297)', () => {
     expect(within(form).getByRole('button', { name: 'Create' }).parentElement).toHaveClass('dialog-actions')
   })
 
+  it('tells a screen reader that n opens New audience (task-392 item 19)', async () => {
+    open(server(), '/audiences')
+    expect(await screen.findByRole('button', { name: /New audience/ })).toHaveAttribute('aria-keyshortcuts', 'n')
+  })
+
   it('suggests an audience from a campaign and opens it', async () => {
     const s = server()
     open(s, '/audiences')

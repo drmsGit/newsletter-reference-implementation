@@ -78,6 +78,11 @@ describe('creating a record (task-281)', () => {
     expect(within(form).getByRole('button', { name: 'Create' }).parentElement).toHaveClass('dialog-actions')
   })
 
+  it('tells a screen reader that n opens it (task-392 item 19)', async () => {
+    open()
+    expect(await screen.findByRole('button', { name: /New record/ })).toHaveAttribute('aria-keyshortcuts', 'n')
+  })
+
   it('opens with n, is listed in the shortcut overview, and closes on Esc', async () => {
     open({}, { shortcuts: true })
     await screen.findByRole('button', { name: /New record/ })

@@ -8,7 +8,7 @@ import { PRODUCT_NAME } from '../branding'
 import BrandSwitcher from './BrandSwitcher'
 import Nav, { GoToShortcuts } from './Nav'
 import { avatarHue, initials } from './avatar'
-import { ShortcutsProvider } from '../shortcuts/Shortcuts'
+import { ShortcutsEntry, ShortcutsProvider } from '../shortcuts/Shortcuts'
 
 /**
  * The frame every signed-in screen sits inside.
@@ -94,8 +94,9 @@ export default function Shell() {
           >
             {initials(who)}
           </span>
+          <ShortcutsEntry />
           <Button
-            className="btn-plain nav-signout"
+            className="btn-plain nav-foot-action"
             onPress={() =>
               signOut.mutate(undefined, {
                 // Same lesson as signing in: clearing the cache changes state,

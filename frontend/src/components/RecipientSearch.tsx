@@ -75,7 +75,7 @@ export function SearchBox({
             {label} {shortcut && <ShortcutHint keys="/" />}
           </Label>
         )}
-        <Input ref={input} placeholder={compact ? label : undefined} />
+        <Input ref={input} placeholder={compact ? label : undefined} aria-keyshortcuts={shortcut ? '/' : undefined} />
       </TextField>
       {/* Not the screen's primary action, so not drawn as one (render 20). */}
       <Button type="submit" className="btn-secondary">

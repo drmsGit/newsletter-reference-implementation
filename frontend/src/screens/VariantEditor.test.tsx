@@ -269,6 +269,12 @@ describe('the variant editor', () => {
 })
 
 describe('the module stack', () => {
+  it('tells a screen reader that Alt+Arrow moves a module (task-392 item 19)', async () => {
+    open(server().handlers)
+    expect(await screen.findByRole('button', { name: /^Call to action ·/ }))
+      .toHaveAttribute('aria-keyshortcuts', 'Alt+ArrowUp Alt+ArrowDown')
+  })
+
   it('moves a module with its button and with Alt+Arrow, stating its version', async () => {
     const { handlers } = server()
     const fetchMock = open({

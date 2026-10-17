@@ -504,9 +504,9 @@ button.brand-tile {
   width: 100%;
 }
 .shell[data-nav="collapsed"] .nav-foot { padding-left: 0; align-items: center; }
-button.nav-signout { padding: 0 4px; height: 24px; }
-.shell[data-nav="collapsed"] button.nav-signout { width: 32px; justify-content: center; padding: 0; }
-.shell:not([data-nav="collapsed"]) button.nav-signout svg { display: none; }
+button.nav-foot-action { padding: 0 4px; height: 24px; }
+.shell[data-nav="collapsed"] button.nav-foot-action { width: 32px; justify-content: center; padding: 0; }
+.shell:not([data-nav="collapsed"]) button.nav-foot-action svg { display: none; }
 
 /* The initials avatar (HANDOFF section 4): the hue is set on the element as
    --avatar-hue; the theme gives the saturation and lightness. */
@@ -566,8 +566,8 @@ button.nav-signout { padding: 0 4px; height: 24px; }
   .nav-col button.brand-tile { margin: 0; }
   .nav-col .shell__logo { display: none; }
   .nav-col .nav-foot { margin: 0 0 0 auto; padding: 0; border-top: 0; flex-direction: row; width: auto; align-items: center; }
-  .shell .nav-col button.nav-signout svg { display: inline; }
-  .nav-col .nav-signout .nav-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .shell .nav-col button.nav-foot-action svg { display: inline; }
+  .nav-col .nav-foot-action .nav-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .shell__main { padding: 16px; }
 }
 

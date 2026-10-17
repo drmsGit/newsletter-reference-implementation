@@ -61,6 +61,23 @@ describe('the shell', () => {
     expect(screen.queryByRole('img', { name: 'Acme shop' })).not.toBeInTheDocument()
   })
 
+  it('offers the shortcut overview from the navigation foot, above Sign out (task-392 item 19)', async () => {
+    const client = makeQueryClient()
+    client.setQueryData(sessionQueryKey, A_SESSION)
+    stubFetch({ 'GET /auth/session': () => jsonResponse(A_SESSION) })
+    renderWithProviders(
+      <Routes>
+        <Route path="/" element={<Shell />} />
+      </Routes>,
+      { client },
+    )
+    const entry = await screen.findByRole('button', { name: 'Keyboard shortcuts' })
+    const signOut = screen.getByRole('button', { name: /Sign out/ })
+    expect(entry.compareDocumentPosition(signOut) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(entry)
+    expect(await screen.findByRole('dialog', { name: 'Keyboard shortcuts' })).toBeInTheDocument()
+  })
+
   it('collapses to a rail that keeps every name, and remembers it', async () => {
     const client = makeQueryClient()
     client.setQueryData(sessionQueryKey, A_SESSION)
@@ -76,6 +93,7 @@ describe('the shell', () => {
     // Hidden from sight, never removed: the links and Sign out keep their names in the rail.
     expect(screen.getByRole('link', { name: /Campaigns/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Sign out/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Keyboard shortcuts' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Brand: Acme/ })).toBeInTheDocument()
     expect(window.localStorage.getItem('nav-collapsed')).toBe('1')
     unmount()

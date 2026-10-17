@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Keyboard } from 'lucide-react'
 import { Button, Dialog, Heading, Modal, ModalOverlay } from 'react-aria-components'
 
 /**
@@ -40,6 +41,9 @@ const ShortcutsContext = createContext<Registry | null>(null)
  */
 const HintsContext = createContext(false)
 
+/** Opens the overview, for the entry in the navigation's foot. */
+const OpenOverviewContext = createContext<(() => void) | null>(null)
+
 // The key that shows the hints: Alt (Option on a Mac) or Ctrl, held alone.
 const HINT_KEYS = new Set(['Alt', 'Control'])
 
@@ -63,6 +67,8 @@ export function ShortcutsProvider({ children }: { children: ReactNode }) {
   entriesRef.current = entries
   const pending = useRef<{ key: string; at: number } | null>(null)
   const nextId = useRef(1)
+
+  const openOverview = useRef(() => setOpen(true)).current
 
   const registry = useRef<Registry>({
     register(entry) {
@@ -126,8 +132,10 @@ export function ShortcutsProvider({ children }: { children: ReactNode }) {
   return (
     <ShortcutsContext.Provider value={registry}>
     <HintsContext.Provider value={hints}>
+    <OpenOverviewContext.Provider value={openOverview}>
       {children}
       <ShortcutsOverlay open={open} onOpenChange={setOpen} entries={entries} />
+    </OpenOverviewContext.Provider>
     </HintsContext.Provider>
     </ShortcutsContext.Provider>
   )
@@ -152,6 +160,33 @@ export function useShortcut(keys: string, description: string, handler: (() => v
     // `handler`'s identity changes every render; `latest` carries the current one.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registry, keys, description, group, handler === null])
+}
+
+/**
+ * Says a control's single-key shortcut to a screen reader, as a ref:
+ * `ref={keyShortcuts('n')}`. React Aria's Button passes only some aria-*
+ * props to the element and drops aria-keyshortcuts without a warning, so the
+ * attribute is set on the element itself (task-392 item 19).
+ */
+export function keyShortcuts(keys: string) {
+  return (element: HTMLElement | null) => element?.setAttribute('aria-keyshortcuts', keys)
+}
+
+/**
+ * The overview's visible way in, in the navigation's foot (task-392 item 19;
+ * the user's choice, 2026-10-17): the same overview as ?, reachable by Tab.
+ * The keys stay off the buttons themselves (DESIGN.md: found through ?, Alt
+ * and Ctrl); this is the one place that names where to find them.
+ */
+export function ShortcutsEntry() {
+  const openOverview = useContext(OpenOverviewContext)
+  if (!openOverview) return null
+  return (
+    <Button className="btn-plain nav-foot-action" ref={keyShortcuts('?')} onPress={openOverview}>
+      <Keyboard size={16} strokeWidth={1.75} aria-hidden="true" />
+      <span className="nav-label">Keyboard shortcuts</span>
+    </Button>
+  )
 }
 
 const ORDER: Group[] = ['Global', 'Go to', 'This screen']

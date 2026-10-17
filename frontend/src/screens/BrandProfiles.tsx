@@ -24,7 +24,7 @@ import { HttpError } from '../api/session'
 import BackTo from '../components/BackTo'
 import Pager, { useOffset } from '../components/Pager'
 import ScreenState from '../components/ScreenState'
-import { ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
+import { keyShortcuts, ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
 
 /** Where the profiles live: a part of Settings, not an area of its own (user, 2026-10-11). */
 export const BRAND_PROFILES = '/settings/brand-profiles'
@@ -111,7 +111,7 @@ function NewProfile() {
   useShortcut('n', 'New brand profile', () => setOpen(true))
   return (
     <>
-      <Button className="btn-primary" onPress={() => setOpen(true)}>
+      <Button className="btn-primary" ref={keyShortcuts('n')} onPress={() => setOpen(true)}>
         New profile <ShortcutHint keys="n" />
       </Button>
       <ModalOverlay isOpen={open} onOpenChange={setOpen} isDismissable className="preview-overlay">

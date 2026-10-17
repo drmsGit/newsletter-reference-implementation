@@ -103,6 +103,11 @@ describe('the preview bar', () => {
 })
 
 describe('the preview overlay', () => {
+  it('tells a screen reader that p opens it (task-392 item 19)', async () => {
+    open(handlers().handlers)
+    expect(await screen.findByRole('button', { name: 'Open preview' })).toHaveAttribute('aria-keyshortcuts', 'p')
+  })
+
   it('shows the sandboxed render, the module states and what a preview is', async () => {
     open(handlers().handlers)
     fireEvent.click(await screen.findByRole('button', { name: 'Open preview' }))

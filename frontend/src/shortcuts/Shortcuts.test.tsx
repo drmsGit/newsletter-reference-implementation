@@ -5,7 +5,7 @@ import { Route, Routes } from 'react-router'
 import { SearchBox } from '../components/RecipientSearch'
 import Nav, { GoToShortcuts } from '../shell/Nav'
 import { renderWithProviders } from '../test-utils'
-import { ShortcutsProvider } from './Shortcuts'
+import { ShortcutsEntry, ShortcutsProvider } from './Shortcuts'
 
 afterEach(() => vi.useRealTimers())
 
@@ -44,6 +44,23 @@ describe('keyboard shortcuts (task-266)', () => {
     const bar = within(overview).getByRole('heading', { name: 'Keyboard shortcuts' }).parentElement!
     expect(bar).toHaveClass('sheet-head')
     expect(within(bar).getByRole('button', { name: 'Close' })).toBeInTheDocument()
+  })
+
+  it('opens from a visible button as well as from ?, which the button names (task-392 item 19)', async () => {
+    renderWithProviders(
+      <ShortcutsProvider>
+        <ShortcutsEntry />
+      </ShortcutsProvider>,
+    )
+    const entry = screen.getByRole('button', { name: 'Keyboard shortcuts' })
+    expect(entry).toHaveAttribute('aria-keyshortcuts', '?')
+    fireEvent.click(entry)
+    expect(await screen.findByRole('dialog', { name: 'Keyboard shortcuts' })).toBeInTheDocument()
+  })
+
+  it('tells a screen reader that / reaches the search', () => {
+    app()
+    expect(screen.getByRole('textbox', { name: /Find a campaign/ })).toHaveAttribute('aria-keyshortcuts', '/')
   })
 
   it('g then a letter goes to that screen', async () => {
