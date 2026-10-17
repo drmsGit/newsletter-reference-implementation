@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-11 20:44'
-updated_date: '2026-10-17 12:37'
+updated_date: '2026-10-17 12:40'
 labels:
   - frontend
 dependencies: []
@@ -71,4 +71,6 @@ Next: content (render 27 and 28), with open decision 20 (the Records, Categories
 Step 6 built and pushed, d47bb8f. The records list moved to /content/records; a record keeps /content/:id with the list beside it; /content shows the parts, so g t now lands on them. Found live and fixed: the categories list kept "0 subcategories" when the links loaded after the categories (React Aria caches rows by item; dependencies added, test with late links). Left for later: the graph keeps its old green and red circles (it is not drawn); the record page's Performance figures are the old label and value grid, not fact rows; the duplicate row's button sits slightly above the select.
 
 Next: decision slots (render 32) and the preview sheet (24, decision 16 decided), then the send steps (25, 26; decision 17 to ask).
+
+2026-10-17, step 7 built and pushed: decision slots as list and details (render 32), no open decision. No search box until TASK-390. Next: the preview sheet (24, decision 16 decided), then the send steps (25, 26; decision 17 to ask).
 <!-- SECTION:NOTES:END -->
