@@ -212,6 +212,21 @@ def test_a_proposal_is_read_back_with_titles_and_the_topic_is_not_kept(db, world
     assert "Iberia" not in json.dumps(run.input_snapshot)
 
 
+def test_a_reply_that_starts_over_is_read_by_its_last_whole_answer(db, world, model):
+    """Seen 2026-10-17 with the real model: a cut-off first object (hero and
+    editorial only), then the whole answer. The two together are not one JSON
+    value, so nothing was read; the last whole object is the answer."""
+    ids = world["ids"]
+    first = json.dumps({"hero": {"record_id": ids["lisbon"], "reason": "Early."}, "editorial": "A start."})
+    model["reply"] = first + " " + _reply(world)
+    with signed_in(db) as (client, _token, csrf):
+        _ask(client, csrf, world["variant"].id)
+        [proposal] = client.get(f"/campaigns/variants/{world['variant'].id}/topic-proposals").json()
+    assert [b["title"].split()[0] for b in proposal["blocks"]] == ["Porto", "Madrid"]
+    assert proposal["subject"] == "A long weekend in Iberia"
+    assert proposal["editorial"] == "Three cities for a **long weekend**."
+
+
 # --- refused before the call -----------------------------------------------------------
 
 @pytest.mark.parametrize("topic", ["   ", "x" * 501])

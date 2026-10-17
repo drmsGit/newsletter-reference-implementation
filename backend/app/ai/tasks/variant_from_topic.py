@@ -23,7 +23,7 @@ import json
 
 from sqlalchemy.orm import Session
 
-from app.ai.tasks.base import TaskMeta
+from app.ai.tasks.base import TaskMeta, json_object
 
 TASK_KEY = "variant_from_topic"
 
@@ -167,15 +167,6 @@ def build_prompt(db: Session, template: str, topic: str, offered: dict[str, list
             .replace("{records}", "\n".join(lines)).replace("{categories}", vocabulary or "(none)"))
 
 
-def _json_object(text: str) -> dict:
-    start, end = text.find("{"), text.rfind("}")
-    if start < 0 or end <= start:
-        return {}
-    try:
-        value = json.loads(text[start:end + 1])
-    except ValueError:
-        return {}
-    return value if isinstance(value, dict) else {}
 
 
 def _record_id(item) -> int | None:
@@ -200,7 +191,7 @@ def read_proposal(db: Session, text: str, offered: dict[str, list[str]]) -> dict
     from app.content.db_models import ContentRecordDB
     from app.content.service import list_categories
 
-    answer = _json_object(text or "")
+    answer = json_object(text or "") or {}
     titles = {r.id: r.title for r in db.query(ContentRecordDB).filter(
         ContentRecordDB.id.in_([int(i) for i in offered]))}
     notices: list[str] = []

@@ -25,7 +25,7 @@ import re
 
 from sqlalchemy.orm import Session
 
-from app.ai.tasks.base import TaskMeta
+from app.ai.tasks.base import TaskMeta, json_object
 
 TASK_KEY = "content_translate"
 
@@ -122,15 +122,6 @@ def build_prompt(template: str, source: dict[str, str], source_language: str, ta
             .replace("{fields}", json.dumps(source, ensure_ascii=False, indent=1)))
 
 
-def _json_object(text: str) -> dict:
-    start, end = text.find("{"), text.rfind("}")
-    if start < 0 or end <= start:
-        return {}
-    try:
-        value = json.loads(text[start:end + 1])
-    except ValueError:
-        return {}
-    return value if isinstance(value, dict) else {}
 
 
 def _kept(original: str, translated: str) -> bool:
@@ -144,7 +135,7 @@ def read_translation(text: str, source: dict[str, str]) -> tuple[dict[str, str],
     manager must be told. Only keys that were sent are kept; a field whose
     placeholders or link addresses changed is left out, so it keeps the
     original's words."""
-    answer = _json_object(text or "")
+    answer = json_object(text or "") or {}
     fields: dict[str, str] = {}
     changed, missing = [], []
     for name, original in source.items():

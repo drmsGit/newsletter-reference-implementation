@@ -20,7 +20,7 @@ import re
 
 from sqlalchemy.orm import Session
 
-from app.ai.tasks.base import TaskMeta
+from app.ai.tasks.base import TaskMeta, json_object
 
 TASK_KEY = "content_draft"
 
@@ -123,15 +123,6 @@ def build_prompt(db: Session, template: str, source: str, channels: list[str]) -
             .replace("{source}", source))
 
 
-def _json_object(text: str) -> dict | None:
-    start, end = text.find("{"), text.rfind("}")
-    if start < 0 or end <= start:
-        return None
-    try:
-        value = json.loads(text[start:end + 1])
-    except ValueError:
-        return None
-    return value if isinstance(value, dict) else None
 
 
 def read_proposal(db: Session, text: str, channels: list[str] | None = None) -> dict:
@@ -145,7 +136,7 @@ def read_proposal(db: Session, text: str, channels: list[str] | None = None) -> 
     record and the person ticks what they take."""
     from app.content.service import catalogue_fields, list_categories
 
-    answer = _json_object(text or "") or {}
+    answer = json_object(text or "") or {}
     if channels is None:
         channels = sorted({f.get("channel") for f in catalogue_fields() if f.get("channel")})
     wanted = {f["name"]: f for f in drafted_fields(channels)}

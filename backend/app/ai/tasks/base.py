@@ -14,6 +14,7 @@ codebase already follows for decision strategies, email modules, channels and
 renderers.
 """
 
+import json
 from dataclasses import dataclass, field
 
 
@@ -48,3 +49,25 @@ class TaskMeta:
     #: offering the switch, and the server refuses `require_approval` for it
     #: (ADR-140 addendum 2026-10-16).
     held_form: bool = True
+
+
+def json_object(text: str) -> dict | None:
+    """The answer in a model's reply: its last whole JSON object.
+
+    A reply may carry prose around the object, or more than one object: the
+    real model has started over mid-reply, a cut-off object and then the whole
+    one (2026-10-17). Every object that parses is read, and the last one is
+    the answer. None when there is none.
+    """
+    decoder = json.JSONDecoder()
+    found, at = None, text.find("{")
+    while at >= 0:
+        try:
+            value, end = decoder.raw_decode(text, at)
+        except ValueError:
+            at = text.find("{", at + 1)
+            continue
+        if isinstance(value, dict):
+            found = value
+        at = text.find("{", end)
+    return found
