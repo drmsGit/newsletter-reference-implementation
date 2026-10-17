@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-11 20:44'
-updated_date: '2026-10-17 12:51'
+updated_date: '2026-10-17 12:58'
 labels:
   - frontend
 dependencies: []
@@ -79,4 +79,6 @@ Next: decision slots (render 32) and the preview sheet (24, decision 16 decided)
 2026-10-17, Diede: decision 17, the send screen as drawn: column 2 holds the title and the planned sends, which now stay listed while one is continued (marked as open). Step 9 built and pushed. Step 4 (the send) was not seen live, since that needs a planned send; its tests cover it. Next: deliveries and results (renders 29 to 31), then audiences (37; decision 18 to ask), recipients (38), monitoring and the decision history (39, 40; decision 14 to ask), settings (33 to 36, 44; decision 23 to confirm) and sign-in (41, 42).
 
 2026-10-17, step 10 built and pushed: deliveries as list and details (renders 29 to 31). Opening another send keeps the list page but not the recipient search (q belongs to the open send; test). The stranded card was not seen live (no send is stranded now); its tests cover it. Next: audiences (render 37), with open decision 18 (who a send reaches, as a section after the rules) to ask first.
+
+2026-10-17, Diede: decision 18, who a send reaches is a section after the people added by hand, as drawn. Step 11 built and pushed. The audience page now names its own state apart from the list beside it: ?people= for the hand-added people page and ?who= for the recipient search (the list has ?offset= and ?q=). An old link with ?q= for an audience's recipient search now sets the list's search instead. Next: recipients (render 38), then monitoring and the decision history (39, 40; decision 14 to ask), settings (33 to 36, 44; decision 23 to confirm) and sign-in (41, 42).
 <!-- SECTION:NOTES:END -->
