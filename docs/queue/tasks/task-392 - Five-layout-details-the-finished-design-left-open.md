@@ -4,7 +4,7 @@ title: Small details the finished design left open
 status: To Do
 assignee: []
 created_date: '2026-10-17 13:31'
-updated_date: '2026-10-17 17:31'
+updated_date: '2026-10-17 18:19'
 labels:
   - frontend
 dependencies: []
@@ -69,7 +69,7 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 - [x] #15 Each Personalise button is named by its field
 - [x] #16 Each Remove in a user's Access card is named by the access it removes
 - [x] #17 The recipient page's tables have header cells with scope and an accessible name each
-- [ ] #18 React Aria's own strings follow the interface's language through an I18nProvider
+- [x] #18 React Aria's own strings follow the interface's language through an I18nProvider
 - [ ] #19 A keyboard-reachable Keyboard shortcuts action exists in the shell, and single-key shortcuts carry aria-keyshortcuts
 - [ ] #20 Upload new uses a styled file trigger with the chosen file's name beside it
 - [ ] #21 A long body field opens taller than a short one
@@ -97,4 +97,6 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 2026-10-17: item 16 (UX-09) fixed: PersonDetail names each Remove by the row's access text (Remove <role> on <brand>, or Remove <role> with one brand). Test in Administration.test.tsx (waits for the brands, which load after the grants), mutation-checked. Live on user 96: Remove Viewer on Grathaus Outdoor.
 
 2026-10-17: item 17 (UX-10) fixed: a local Table in RecipientDetail.tsx gives each of the six tables aria-label, an sr-only thead of th scope=col, and the first cell as th scope=row (the design draws no header row, render 38); index.css gives body row headers the cell look. Tests in Recipients.test.tsx (six tables), mutation-checked on the name and the row headers. Live on recipient 1000: tables named, headers in the accessibility tree, thead 1 px, row headers 13 px normal weight.
+
+2026-10-17: item 18 (UX-16) fixed: components/InterfaceLanguage.tsx wraps the app (main.tsx) in I18nProvider locale en-GB (INTERFACE_LOCALE). Test in InterfaceLanguage.test.tsx: under a German browser a popover's hidden close button says Dismiss; red with a pass-through provider (React Aria reads the browser language at load and on languagechange, so the test fires that event after render). Live in the pane, whose browser is de: the Personalise popover's dismiss buttons read Dismiss. Not in this item: our own formatDate uses toLocaleString() and still follows the browser (17.10.2026, 16:58:10 in German), where the renders draw 14 Oct 2026, 08:12.
 <!-- SECTION:NOTES:END -->
