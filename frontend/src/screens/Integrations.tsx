@@ -3,41 +3,50 @@ import { Button, Input, Label, TextField } from 'react-aria-components'
 import { useNavigate } from 'react-router'
 
 import { useCreateIntegration, useIntegrations, type Integration } from '../api/resources'
-import DataTable, { type DataColumn } from '../components/DataTable'
-import ScreenState from '../components/ScreenState'
+import NewDialog, { DialogActions } from '../components/NewDialog'
+import PartList from '../components/PartList'
 import { refused } from './People'
 
 export const INTEGRATIONS = '/settings/integrations'
-
-const COLUMNS: DataColumn<Integration>[] = [
-  { key: 'name', header: 'Integration', isRowHeader: true, render: (i) => i.name },
-  { key: 'state', header: 'State', render: (i) => (i.is_active ? 'Active' : 'Deactivated') },
-  { key: 'keys', header: 'Live keys', render: (i) => `${i.live_keys}${i.expiring_soon ? ', one expiring soon' : ''}` },
-  { key: 'grants', header: 'May', render: (i) => (i.grants.length ? i.grants.map((g) => g.permission).join(', ') : 'Nothing yet') },
-]
 
 /**
  * The systems that call this platform (task-358; ADR-166): a CRM syncing
  * contacts, an automation firing sends. Each has its own keys and its own
  * grants, per brand.
+ *
+ * v2 (task-372, render 36): column 2 of the Settings drill-in.
  */
 export default function Integrations() {
   const integrations = useIntegrations()
-  const navigate = useNavigate()
   return (
-    <>
-      <h1>Integrations</h1>
-      <p className="muted">Other systems that call this platform, each with its own keys and what it may do.</p>
-      <NewIntegration />
-      <ScreenState query={integrations}>
-        <DataTable label="Integrations" columns={COLUMNS} items={integrations.data ?? []}
-          emptyMessage="No system calls this platform yet." onRowAction={(i) => navigate(`${INTEGRATIONS}/${i.id}`)} />
-      </ScreenState>
-    </>
+    <PartList
+      base={INTEGRATIONS}
+      title="Integrations"
+      note="Other systems that call this platform, each with its own keys and what it may do."
+      newButton={<NewDialog label="New integration">{(close) => <NewIntegration onCancel={close} />}</NewDialog>}
+      label="Integrations"
+      query={integrations}
+      items={integrations.data ?? []}
+      empty="No system calls this platform yet."
+      textValue={(i) => i.name}
+      row={(i: Integration) => (
+        <>
+          <span className="item-title">{i.name}</span>
+          <span className="item-summary muted">
+            {i.is_active ? 'Active' : 'Deactivated'} · {i.live_keys} live key{i.live_keys === 1 ? '' : 's'}
+            {i.expiring_soon ? ', one expiring soon' : ''}
+          </span>
+          <span className="item-summary muted">
+            {i.grants.length ? [...new Set(i.grants.map((g) => g.permission))].join(', ') : 'Nothing yet'}
+          </span>
+        </>
+      )}
+    />
   )
 }
 
-function NewIntegration() {
+/** "New integration" (render 45): the fields the inline form had, in a dialog. */
+function NewIntegration({ onCancel }: { onCancel: () => void }) {
   const create = useCreateIntegration()
   const navigate = useNavigate()
   const [name, setName] = useState('')
@@ -48,8 +57,8 @@ function NewIntegration() {
       { onSuccess: (integration) => navigate(`${INTEGRATIONS}/${integration.id}`) })
   }
   return (
-    <form className="inline-form" onSubmit={submit} aria-label="Create an integration">
-      <TextField value={name} onChange={setName} isRequired>
+    <form className="dialog-form" onSubmit={submit} aria-label="Create an integration">
+      <TextField value={name} onChange={setName} isRequired autoFocus>
         <Label>New integration</Label>
         <Input />
       </TextField>
@@ -57,8 +66,10 @@ function NewIntegration() {
         <Label>What it is for</Label>
         <Input />
       </TextField>
-      <Button type="submit" isDisabled={!name.trim() || create.isPending}>Create</Button>
       {create.error != null && <p role="alert">Not created: {refused(create.error)}</p>}
+      <DialogActions onCancel={onCancel}>
+        <Button type="submit" isDisabled={!name.trim() || create.isPending}>Create</Button>
+      </DialogActions>
     </form>
   )
 }

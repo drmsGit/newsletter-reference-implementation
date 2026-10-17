@@ -8,6 +8,7 @@ import People from './People'
 import PersonDetail from './PersonDetail'
 import RoleDetail from './RoleDetail'
 import Roles from './Roles'
+import { SettingsSplit } from './SettingsLayout'
 import { A_SESSION, jsonResponse, renderWithProviders, stubFetch } from '../test-utils'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -102,10 +103,12 @@ describe('the administration subpages (task-358)', () => {
     expect((await writes[0].json()).permissions.sort()).toEqual(['campaigns.manage', 'content.manage', 'view'])
   })
 
-  it('names each role as a link to its page', async () => {
+  it('opens a role from its row (task-372: the roles are a list beside the open one)', async () => {
     server()
     open('/settings/roles')
-    expect(await screen.findByRole('link', { name: 'Manager' })).toHaveAttribute('href', '/settings/roles/2')
+    const list = await screen.findByRole('grid', { name: 'Roles' })
+    fireEvent.click(within(list).getByText('Manager'))
+    expect(await screen.findByRole('button', { name: 'Save permissions' })).toBeInTheDocument()
   })
 
   it("ticks an integration's permissions per brand, each saved at once", async () => {
@@ -153,5 +156,31 @@ describe('the administration subpages (task-358)', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'I have stored it' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.queryByText('k1.s3cr3t')).not.toBeInTheDocument()
+  })
+})
+
+describe('the users beside the open one (task-372)', () => {
+  it('does not carry a role chosen for one person to the next', async () => {
+    server()
+    renderWithProviders(
+      <Routes>
+        <Route element={<SettingsSplit label="User list" list={<People />} />}>
+          <Route path="/settings/users/:id" element={<PersonDetail />} />
+        </Route>
+      </Routes>,
+      { route: '/settings/users/1' },
+    )
+    expect(await screen.findByRole('heading', { name: 'Person 1', level: 2 })).toBeInTheDocument()
+    // The page's reads in: an empty pulldown does not open.
+    await screen.findByRole('button', { name: /On brand/ })
+    await waitFor(() => expect(screen.getByRole('button', { name: /Give a role/ })).not.toHaveAttribute('data-disabled'))
+    fireEvent.click(screen.getByRole('button', { name: /Give a role/ }))
+    fireEvent.click(await screen.findByRole('option', { name: 'Manager' }))
+    expect(screen.getByRole('button', { name: /Give a role/ })).toHaveTextContent('Manager')
+    fireEvent.click(within(screen.getByRole('grid', { name: 'Users' })).getByText('Person 2'))
+    expect(await screen.findByRole('heading', { name: 'Person 2', level: 2 })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Give a role/ })).toHaveTextContent('Choose a role')
+    expect(within(screen.getByRole('grid', { name: 'Users' })).getByRole('row', { name: /Person 2/ }))
+      .toHaveAttribute('aria-selected', 'true')
   })
 })

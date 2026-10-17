@@ -1,16 +1,16 @@
 import { useState } from 'react'
 import { Button, Checkbox, Dialog, Heading, Input, Label, Modal, ModalOverlay, TextField } from 'react-aria-components'
-import { Link, useParams } from 'react-router'
+import { useParams } from 'react-router'
 
 import {
   useAddIntegrationGrant, useDeactivateIntegration, useGrantablePermissions, useIntegrations, useIssueKey,
   useRemoveIntegrationGrant, useRevokeKey, useSetUnattended, type Integration,
 } from '../api/resources'
 import { useSession } from '../api/session'
+import DetailSection from '../components/DetailSection'
 import ScreenState from '../components/ScreenState'
 import { formatDate } from './Campaigns'
 import { refused } from './People'
-import { INTEGRATIONS } from './Integrations'
 
 /** One integration: its keys, what it may do on which brand, and how much it may send unattended. */
 export default function IntegrationDetail() {
@@ -18,9 +18,20 @@ export default function IntegrationDetail() {
   const integrations = useIntegrations()
   const integration = integrations.data?.find((i) => i.id === Number(id))
   return (
-    <ScreenState query={integrations}>
-      {integrations.data && (integration ? <Page integration={integration} /> : <p role="alert">This integration does not exist.</p>)}
-    </ScreenState>
+    // Column 3 of the integrations (task-372, render 36). Keyed by the
+    // integration: a label or ceiling typed for one is not carried to the next.
+    <div className="detail">
+      <div className="detail-scroll">
+        <ScreenState query={integrations}>
+          {integrations.data &&
+            (integration ? (
+              <Page key={integration.id} integration={integration} />
+            ) : (
+              <p role="alert" className="quiet">This integration does not exist.</p>
+            ))}
+        </ScreenState>
+      </div>
+    </div>
   )
 }
 
@@ -28,16 +39,23 @@ function Page({ integration }: { integration: Integration }) {
   const deactivate = useDeactivateIntegration(integration.id)
   return (
     <>
-      <p><Link to={INTEGRATIONS}>← Integrations</Link></p>
-      <h1>{integration.name}</h1>
-      {integration.description && <p>{integration.description}</p>}
-      {!integration.is_active && <p role="status">Deactivated: none of its keys work any more.</p>}
+      <div className="detail-head">
+        <h2>{integration.name}</h2>
+        {integration.description && <p className="muted">{integration.description}</p>}
+      </div>
+      {!integration.is_active && (
+        <p role="status" className="group group-body">
+          Deactivated: none of its keys work any more.
+        </p>
+      )}
       <Keys integration={integration} />
       <Grants integration={integration} />
       <Unattended integration={integration} />
       {integration.is_active && (
-        <p>
-          <Button onPress={() => deactivate.mutate(undefined)}>Deactivate {integration.name}</Button>
+        <p className="group group-body">
+          <Button className="btn-destructive" onPress={() => deactivate.mutate(undefined)}>
+            Deactivate {integration.name}
+          </Button>
           {deactivate.error != null && <span role="alert"> Not deactivated: {refused(deactivate.error)}</span>}
         </p>
       )}
@@ -55,18 +73,21 @@ function Keys({ integration }: { integration: Integration }) {
   const [days, setDays] = useState(integration.suggested_expiry_days ? String(integration.suggested_expiry_days) : '')
   const live = integration.credentials.filter((c) => !c.revoked_at)
   return (
-    <section aria-labelledby="integration-keys">
-      <h2 id="integration-keys">Keys</h2>
+    <DetailSection id="integration-keys" title="Keys">
       {live.length === 0 ? (
         <p className="muted">No live key: it cannot call the platform.</p>
       ) : (
-        <ul aria-label="Live keys">
+        <ul aria-label="Live keys" className="link-list">
           {live.map((c) => (
             <li key={c.id}>
+              <span>
               <code>{c.key_id}</code> {c.label && <strong>{c.label}</strong>} · issued {formatDate(c.created_at)} · last used{' '}
               {c.last_used_at ? formatDate(c.last_used_at) : 'never'} ·{' '}
-              {c.expires_at ? `expires ${formatDate(c.expires_at)}${c.expiring_soon ? ' (soon)' : ''}` : 'no expiry'}{' '}
-              <Button onPress={() => revoke.mutate(c.id)}>Revoke</Button>
+              {c.expires_at ? `expires ${formatDate(c.expires_at)}${c.expiring_soon ? ' (soon)' : ''}` : 'no expiry'}
+              </span>
+              <Button className="btn-plain btn-sm" onPress={() => revoke.mutate(c.id)}>
+                Revoke
+              </Button>
             </li>
           ))}
         </ul>
@@ -110,7 +131,7 @@ function Keys({ integration }: { integration: Integration }) {
           </Dialog>
         </Modal>
       </ModalOverlay>
-    </section>
+    </DetailSection>
   )
 }
 
@@ -136,8 +157,7 @@ function Grants({ integration }: { integration: Integration }) {
   const toggle = (permission: string, brand_id: number, on: boolean) =>
     (on ? add : remove).mutate({ permission, brand_id })
   return (
-    <section aria-labelledby="integration-grants">
-      <h2 id="integration-grants">What it may do</h2>
+    <DetailSection id="integration-grants" title="What it may do">
       <p className="muted">
         Tick what its keys may do{several ? ', per brand' : ''}. Each tick is saved at once. You can only allow what you
         may do yourself.
@@ -174,7 +194,7 @@ function Grants({ integration }: { integration: Integration }) {
         </table>
       </ScreenState>
       {(add.error ?? remove.error) != null && <p role="alert">Not changed: {refused(add.error ?? remove.error)}</p>}
-    </section>
+    </DetailSection>
   )
 }
 
@@ -182,8 +202,7 @@ function Unattended({ integration }: { integration: Integration }) {
   const set = useSetUnattended(integration.id)
   const [ceiling, setCeiling] = useState(String(integration.unattended_ceiling))
   return (
-    <section aria-labelledby="integration-unattended">
-      <h2 id="integration-unattended">Sending without a person</h2>
+    <DetailSection id="integration-unattended" title="Sending without a person">
       <p className="muted">
         A send it fires to at most this many recipients goes out at once; a bigger one waits for a person in
         Approvals. 0: every send waits.
@@ -197,6 +216,6 @@ function Unattended({ integration }: { integration: Integration }) {
           onPress={() => set.mutate(Number(ceiling))}>Save</Button>
       </div>
       {set.error != null && <p role="alert">Not saved: {refused(set.error)}</p>}
-    </section>
+    </DetailSection>
   )
 }

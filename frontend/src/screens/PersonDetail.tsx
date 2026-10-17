@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { Button } from 'react-aria-components'
-import { Link, useParams } from 'react-router'
+import { useParams } from 'react-router'
 
 import { useAddGrant, useAdminBrands, usePeople, useRemoveGrant, useRoles, useSetPersonActive, type Person } from '../api/resources'
 import Choice from '../components/Choice'
+import DetailSection from '../components/DetailSection'
+import Fact from '../components/Fact'
 import ScreenState from '../components/ScreenState'
 import { formatDate } from './Campaigns'
-import { PEOPLE, refused } from './People'
+import { refused } from './People'
 
 /** One person: their grants, role by brand, and whether they may sign in. */
 export default function PersonDetail() {
@@ -14,9 +16,20 @@ export default function PersonDetail() {
   const people = usePeople()
   const person = people.data?.find((p) => p.id === Number(id))
   return (
-    <ScreenState query={people}>
-      {people.data && (person ? <Page person={person} /> : <p role="alert">This person has no account here.</p>)}
-    </ScreenState>
+    // Column 3 of the users (task-372, render 35). Keyed by the person: a
+    // role chosen for one is not carried to the next (doc-33).
+    <div className="detail">
+      <div className="detail-scroll">
+        <ScreenState query={people}>
+          {people.data &&
+            (person ? (
+              <Page key={person.id} person={person} />
+            ) : (
+              <p role="alert" className="quiet">This person has no account here.</p>
+            ))}
+        </ScreenState>
+      </div>
+    </div>
   )
 }
 
@@ -32,32 +45,32 @@ function Page({ person }: { person: Person }) {
   const error = add.error ?? remove.error ?? active.error
   return (
     <>
-      <p><Link to={PEOPLE}>← Users</Link></p>
-      <h1>{person.display_name || person.email}</h1>
-      <dl className="facts">
-        <dt>Email</dt>
-        <dd>{person.email}</dd>
-        <dt>Account</dt>
-        <dd>
+      <div className="detail-head">
+        <h2>{person.display_name || person.email}</h2>
+      </div>
+      <dl className="group fact-list">
+        <Fact label="Email">{person.email}</Fact>
+        <Fact label="Account">
           {person.is_active ? 'Active' : 'Deactivated'}
           {person.is_external ? ', from outside the company' : ''}
-        </dd>
-        <dt>Last sign-in</dt>
-        <dd>{person.last_login_at ? formatDate(person.last_login_at) : 'Never'}</dd>
-        <dt>Signed in now</dt>
-        <dd>{person.live_sessions} {person.live_sessions === 1 ? 'session' : 'sessions'}</dd>
+        </Fact>
+        <Fact label="Last sign-in">{person.last_login_at ? formatDate(person.last_login_at) : 'Never'}</Fact>
+        <Fact label="Signed in now">
+          {person.live_sessions} {person.live_sessions === 1 ? 'session' : 'sessions'}
+        </Fact>
       </dl>
 
-      <section aria-labelledby="person-access">
-        <h2 id="person-access">Access</h2>
+      <DetailSection id="person-access" title="Access">
         {person.grants.length === 0 ? (
           <p className="muted">No role yet: they can sign in but see nothing.</p>
         ) : (
-          <ul aria-label="Roles">
+          <ul aria-label="Roles" className="link-list">
             {person.grants.map((g) => (
               <li key={g.id}>
                 {multiBrand ? `${g.role_name} on ${g.brand_name}` : g.role_name}{' '}
-                <Button onPress={() => remove.mutate(g.id)}>Remove</Button>
+                <Button className="btn-plain btn-sm" onPress={() => remove.mutate(g.id)}>
+                  Remove
+                </Button>
               </li>
             ))}
           </ul>
@@ -75,18 +88,23 @@ function Page({ person }: { person: Person }) {
             Give
           </Button>
         </div>
-      </section>
+      </DetailSection>
 
-      <section aria-labelledby="person-account">
-        <h2 id="person-account">Sign-in</h2>
+      <DetailSection id="person-account" title="Sign-in">
         {person.is_you ? (
           <p className="muted">This is you. Someone else who manages users can deactivate your account.</p>
         ) : person.is_active ? (
-          <Button onPress={() => active.mutate(false)}>Deactivate (signs them out now)</Button>
+          <div>
+            <Button className="btn-destructive" onPress={() => active.mutate(false)}>
+              Deactivate (signs them out now)
+            </Button>
+          </div>
         ) : (
-          <Button onPress={() => active.mutate(true)}>Reactivate</Button>
+          <div>
+            <Button onPress={() => active.mutate(true)}>Reactivate</Button>
+          </div>
         )}
-      </section>
+      </DetailSection>
       {error != null && <p role="alert">Not changed: {refused(error)}</p>}
     </>
   )

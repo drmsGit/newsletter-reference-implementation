@@ -68,8 +68,3 @@ export function SettingsSplit({ list, label }: { list: ReactNode; label: string 
     </div>
   )
 }
-
-/** A part not yet drawn as a drill-in, shown beside the menu with the page's own padding. */
-export function Legacy({ children }: { children: ReactNode }) {
-  return <div className="detail-legacy">{children}</div>
-}

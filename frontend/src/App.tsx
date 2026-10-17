@@ -21,17 +21,18 @@ import { ContentMenu, ContentSplit, GraphPage, NothingOpen, RECORDS } from './sc
 import Categories from './screens/Categories'
 import CategoryGraph from './screens/CategoryGraph'
 import CategoryDetail from './screens/CategoryDetail'
-import People from './screens/People'
+import People, { PEOPLE } from './screens/People'
 import PersonDetail from './screens/PersonDetail'
-import Roles from './screens/Roles'
+import Roles, { ROLES } from './screens/Roles'
 import RoleDetail from './screens/RoleDetail'
-import Integrations from './screens/Integrations'
+import Integrations, { INTEGRATIONS } from './screens/Integrations'
 import IntegrationDetail from './screens/IntegrationDetail'
 import Brands from './screens/Brands'
 import Personalisation, { NoEntryOpen, PERSONALISATION, PersonalisationEntry } from './screens/Personalisation'
 import BrandProfiles, { BRAND_PROFILES, NoProfileOpen } from './screens/BrandProfiles'
 import { DeliveriesSplit, NoSendOpen } from './screens/Deliveries'
-import { Legacy, SettingsMenu, SettingsSplit } from './screens/SettingsLayout'
+import { SettingsMenu, SettingsSplit } from './screens/SettingsLayout'
+import { NothingChosen } from './components/PartList'
 import { AI_PROMPTS, AiPromptDetail, AiPromptsSplit, NoTaskOpen } from './screens/AiPrompts'
 import DeliveryAsSent from './screens/DeliveryAsSent'
 import DeliveryDetail from './screens/DeliveryDetail'
@@ -85,13 +86,7 @@ export default function App() {
             beside General, a part's list beside what is open. */}
         <Route path="/settings" element={<SettingsSplit label="Settings parts" list={<SettingsMenu />} />}>
           <Route index element={<Settings />} />
-          <Route path="users" element={<Legacy><People /></Legacy>} />
-          <Route path="users/:id" element={<Legacy><PersonDetail /></Legacy>} />
-          <Route path="roles" element={<Legacy><Roles /></Legacy>} />
-          <Route path="roles/:id" element={<Legacy><RoleDetail /></Legacy>} />
-          <Route path="integrations" element={<Legacy><Integrations /></Legacy>} />
-          <Route path="integrations/:id" element={<Legacy><IntegrationDetail /></Legacy>} />
-          <Route path="brands" element={<Legacy><Brands /></Legacy>} />
+          <Route path="brands" element={<Brands />} />
         </Route>
         <Route element={<SettingsSplit label="Brand profile list" list={<BrandProfiles />} />}>
           <Route path={BRAND_PROFILES} element={<NoProfileOpen />} />
@@ -100,6 +95,18 @@ export default function App() {
         <Route element={<SettingsSplit label="Entry list" list={<Personalisation />} />}>
           <Route path={PERSONALISATION} element={<NoEntryOpen />} />
           <Route path={`${PERSONALISATION}/:id`} element={<PersonalisationEntry />} />
+        </Route>
+        <Route element={<SettingsSplit label="User list" list={<People />} />}>
+          <Route path={PEOPLE} element={<NothingChosen text="Select a person to see their access." />} />
+          <Route path={`${PEOPLE}/:id`} element={<PersonDetail />} />
+        </Route>
+        <Route element={<SettingsSplit label="Role list" list={<Roles />} />}>
+          <Route path={ROLES} element={<NothingChosen text="Select a role to see its permissions." />} />
+          <Route path={`${ROLES}/:id`} element={<RoleDetail />} />
+        </Route>
+        <Route element={<SettingsSplit label="Integration list" list={<Integrations />} />}>
+          <Route path={INTEGRATIONS} element={<NothingChosen text="Select an integration to see its keys." />} />
+          <Route path={`${INTEGRATIONS}/:id`} element={<IntegrationDetail />} />
         </Route>
         <Route element={<AiPromptsSplit />}>
           <Route path={AI_PROMPTS} element={<NoTaskOpen />} />
