@@ -55,6 +55,10 @@ _BRAND_CSS_PATH = (
 
 _RICH_TEXT_LINK = re.compile(r"\[([^\]]+)\]\((https?://[^\s)]+)\)")
 _RICH_TEXT_BOLD = re.compile(r"\*\*(.+?)\*\*")
+# One asterisk each side, touching the words it wraps: "5 * 3 * 2" stays as typed.
+_RICH_TEXT_ITALIC = re.compile(r"(?<!\*)\*(?=\S)([^*\n]+?)(?<=\S)\*(?!\*)")
+# Email clients ignore much CSS, so a list carries its spacing inline.
+_RICH_TEXT_LIST = '<ul style="margin:0;padding-left:1.2em">'
 
 
 @lru_cache(maxsize=1)
@@ -64,17 +68,44 @@ def _load_brand_css() -> str:
     return ""
 
 
+def _rich_line(line: str) -> str:
+    line = _RICH_TEXT_LINK.sub(r'<a href="\2">\1</a>', line)
+    line = _RICH_TEXT_BOLD.sub(r"<strong>\1</strong>", line)
+    return _RICH_TEXT_ITALIC.sub(r"<em>\1</em>", line)
+
+
 def render_rich_text(text: str) -> Markup:
     """
-    Minimal, safe markdown-like syntax for CMS body fields: **bold** and
-    [label](url) links, plus newlines. Everything else is HTML-escaped first,
-    so raw HTML can never be injected through content — the controlled
-    alternative to the raw-HTML-in-content-fields risk autoescaping closed.
+    Minimal, safe markdown-like syntax for CMS body fields, the editor's hint
+    word for word: **bold**, *italic*, [label](url) links, a line starting
+    with "- " for a bullet (consecutive ones are one list), and newlines.
+    Everything else is HTML-escaped first, so raw HTML can never be injected
+    through content — the controlled alternative to the raw-HTML-in-content-
+    fields risk autoescaping closed. Italics and bullets since 2026-10-17
+    (task-392 item 6): until then the hint promised them and the email showed
+    the characters typed.
     """
-    body = str(escape(text))
-    body = _RICH_TEXT_LINK.sub(r'<a href="\2">\1</a>', body)
-    body = _RICH_TEXT_BOLD.sub(r"<strong>\1</strong>", body)
-    body = body.replace("\n", "<br>")
+    parts: list[tuple[str, str]] = []
+    items: list[str] = []
+
+    def end_list() -> None:
+        if items:
+            parts.append(("list", _RICH_TEXT_LIST + "".join(f"<li>{i}</li>" for i in items) + "</ul>"))
+            items.clear()
+
+    for line in str(escape(text)).split("\n"):
+        if line.startswith("- "):
+            items.append(_rich_line(line[2:]))
+            continue
+        end_list()
+        parts.append(("line", _rich_line(line)))
+    end_list()
+    # Lines break with <br>; a list is a block of its own and needs none.
+    body = ""
+    for index, (kind, html) in enumerate(parts):
+        if index and kind == "line" and parts[index - 1][0] == "line":
+            body += "<br>"
+        body += html
     return Markup(body)
 
 
@@ -119,7 +150,8 @@ def strip_rich_text(variables: dict, manifest: ModuleManifest) -> dict:
         if var.type != "richtext" or not isinstance(value, str) or not value:
             continue
         text = _RICH_TEXT_LINK.sub(r"\1", value)
-        plain[var.name] = _RICH_TEXT_BOLD.sub(r"\1", text)
+        text = _RICH_TEXT_BOLD.sub(r"\1", text)
+        plain[var.name] = _RICH_TEXT_ITALIC.sub(r"\1", text)
     return plain
 
 
