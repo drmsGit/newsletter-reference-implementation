@@ -109,6 +109,7 @@ describe('the preview overlay', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Preview of Variant A' })
     const frame = within(dialog).getByTitle('Rendered email: Variant A')
     expect(frame).toHaveAttribute('sandbox', '')
+    expect(within(dialog).getByRole('heading', { name: 'Rendered email: Variant A' })).toBeInTheDocument()
     expect(frame.getAttribute('srcdoc')).toContain('<h1>Go</h1>')
     expect(within(dialog).getByText(/A test send shows what will actually be sent/)).toBeInTheDocument()
     expect(within(dialog).getByText(/finds nothing — its rule matches no content/).closest('li'))
@@ -145,6 +146,8 @@ describe('the preview overlay', () => {
     const dialog = await screen.findByRole('dialog')
     expect(await within(dialog).findByText('World')).toBeInTheDocument()
     expect(within(dialog).queryByTitle(/Rendered email/)).not.toBeInTheDocument()
+    // A push variant is not an email, and its heading says so (task-372).
+    expect(within(dialog).getByRole('heading', { name: 'Fields of Variant A' })).toBeInTheDocument()
   })
 })
 

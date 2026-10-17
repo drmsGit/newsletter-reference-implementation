@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { UserRound } from 'lucide-react'
 import { Button, Dialog, Heading, Modal, ModalOverlay } from 'react-aria-components'
 
 import {
@@ -6,6 +7,7 @@ import {
   type ModuleManifest,
   type ModuleState,
 } from '../api/resources'
+import Fact from '../components/Fact'
 import RecipientPicker from '../components/RecipientPicker'
 import ScreenState from '../components/ScreenState'
 import { ShortcutHint, useShortcut } from '../shortcuts/Shortcuts'
@@ -55,42 +57,56 @@ export default function PreviewBar({
       </Button>
       <ModalOverlay isOpen={open} onOpenChange={setOpen} isDismissable className="preview-overlay">
         <Modal className="preview-modal">
-          <Dialog aria-label={`Preview of ${variantName}`}>
-            <div className="preview-head">
+          <Dialog aria-label={`Preview of ${variantName}`} className="react-aria-Dialog sheet">
+            {/* A sheet (task-372, render 24; decisions 5 and 16): its title and Close on a bar. */}
+            <div className="sheet-head">
               <Heading slot="title">Preview of {variantName}</Heading>
               <Button onPress={() => setOpen(false)}>Close</Button>
             </div>
-            <p className="muted">
-              A preview shows what is saved now, unpublished edits included. A test send shows what
-              will actually be sent.
-            </p>
-            <RecipientChoice recipient={recipient} onChange={setRecipient} />
-            <ScreenState query={render}>
-              {render.data && (
-                <div className="preview-body">
-                  <ModuleStates modules={render.data.modules ?? []} byName={byName} named={recipient != null} />
-                  {render.data.artifact_body ? (
-                    // No scripts, no same-origin access: the document is the
-                    // email as rendered, shown and nothing more.
-                    <iframe
-                      className="preview-frame"
-                      title={`Rendered email: ${variantName}`}
-                      sandbox=""
-                      srcDoc={render.data.artifact_body}
-                    />
-                  ) : (
-                    <dl className="facts">
-                      {Object.entries(render.data.fields ?? {}).map(([key, value]) => (
-                        <div key={key} style={{ display: 'contents' }}>
-                          <dt>{key}</dt>
-                          <dd>{typeof value === 'string' ? value : JSON.stringify(value)}</dd>
+            <div className="sheet-body">
+              <p className="muted">
+                A preview shows what is saved now, unpublished edits included. A test send shows what
+                will actually be sent.
+              </p>
+              <RecipientChoice recipient={recipient} onChange={setRecipient} />
+              <ScreenState query={render}>
+                {render.data && (
+                  <div className="preview-body">
+                    <section aria-labelledby="preview-modules">
+                      <h3 id="preview-modules" className="sheet-title">
+                        Modules
+                      </h3>
+                      <ModuleStates modules={render.data.modules ?? []} byName={byName} named={recipient != null} />
+                    </section>
+                    <section aria-labelledby="preview-render">
+                      <h3 id="preview-render" className="sheet-title">
+                        {render.data.artifact_body ? `Rendered email: ${variantName}` : `Fields of ${variantName}`}
+                      </h3>
+                      {render.data.artifact_body ? (
+                        <div className="preview-stage">
+                          {/* No scripts, no same-origin access: the document is the
+                              email as rendered, shown and nothing more. */}
+                          <iframe
+                            className="preview-frame"
+                            title={`Rendered email: ${variantName}`}
+                            sandbox=""
+                            srcDoc={render.data.artifact_body}
+                          />
                         </div>
-                      ))}
-                    </dl>
-                  )}
-                </div>
-              )}
-            </ScreenState>
+                      ) : (
+                        <dl className="group fact-list">
+                          {Object.entries(render.data.fields ?? {}).map(([key, value]) => (
+                            <Fact key={key} label={key}>
+                              {typeof value === 'string' ? value : JSON.stringify(value)}
+                            </Fact>
+                          ))}
+                        </dl>
+                      )}
+                    </section>
+                  </div>
+                )}
+              </ScreenState>
+            </div>
           </Dialog>
         </Modal>
       </ModalOverlay>
@@ -126,7 +142,7 @@ function ModuleStates({
   named: boolean
 }) {
   return (
-    <ol className="module-states">
+    <ol className="group module-states">
       {modules.map((m) => {
         const label = byName.get(m.module_type)?.label ?? m.module_type
         return (
@@ -174,9 +190,14 @@ function RecipientChoice({
 }) {
   if (recipient) {
     return (
-      <p>
-        For <strong>{recipient.label}</strong>.{' '}
-        <Button onPress={() => onChange(null)}>Generic preview</Button>
+      <p className="preview-for">
+        <span className="chip">
+          <UserRound size={12} strokeWidth={1.75} aria-hidden="true" />
+          For {recipient.label}.
+        </span>
+        <Button className="btn-sm" onPress={() => onChange(null)}>
+          Generic preview
+        </Button>
       </p>
     )
   }

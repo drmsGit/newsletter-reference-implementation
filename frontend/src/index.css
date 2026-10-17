@@ -967,42 +967,69 @@ table tbody tr:last-child td { border-bottom: 0; }
   padding: calc(var(--brand-space) * 2);
 }
 
+/* The preview sheet (task-372, render 24): a title bar, then the module
+   states beside the email on a framed stage. */
 .preview-modal {
   background: var(--brand-surface);
   border-radius: 14px;
   border: 1px solid var(--brand-line);
   box-shadow: 0 20px 60px rgb(0 0 0 / 0.28);
-  width: min(70rem, 95vw);
-  max-height: 92vh;
+  width: min(78rem, 94vw);
+  max-height: 94vh;
   overflow: auto;
-  padding: calc(var(--brand-space) * 2);
 }
-
-.preview-head {
+.sheet { outline: none; }
+.sheet-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  background: var(--brand-surface);
+  border-bottom: 1px solid var(--brand-line);
 }
+.sheet-head h2 { margin: 0; }
+.sheet-body { padding: 16px 24px 24px; }
+.sheet-body > p { margin: 0 0 12px; }
+.sheet-title { margin: 8px 0 8px; }
+.preview-for { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 .preview-body {
   display: grid;
   grid-template-columns: minmax(16rem, 1fr) 2fr;
-  gap: calc(var(--brand-space) * 2);
+  gap: 24px;
   align-items: start;
 }
+@media (max-width: 900px) { .preview-body { grid-template-columns: minmax(0, 1fr); } }
 
-.module-states {
-  margin: 0;
-  padding-left: 1.2em;
-  display: grid;
-  gap: var(--brand-space);
+.module-states { list-style: none; margin: 0; padding: 0; }
+.module-states > li { position: relative; padding: 10px 16px; }
+.module-states > li + li::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 0;
+  height: 1px;
+  background: var(--brand-line);
 }
 
+.preview-stage {
+  padding: 20px;
+  border: 1px solid var(--brand-line);
+  border-radius: var(--brand-radius-panel);
+  background: var(--brand-bg);
+}
 .preview-frame {
+  display: block;
   width: 100%;
-  height: 70vh;
+  height: 68vh;
   border: 1px solid var(--brand-line);
   border-radius: var(--brand-radius);
+  /* The email is drawn on white in every theme: it is the email, not the app. */
   background: #fff;
 }
 
