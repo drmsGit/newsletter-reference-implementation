@@ -4,7 +4,7 @@ title: Small details the finished design left open
 status: To Do
 assignee: []
 created_date: '2026-10-17 13:31'
-updated_date: '2026-10-17 16:13'
+updated_date: '2026-10-17 16:18'
 labels:
   - frontend
 dependencies: []
@@ -58,8 +58,8 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 - [ ] #4 Performance on the record page uses fact rows
 - [ ] #5 The Duplicate button and its pulldown share a baseline
 - [ ] #6 The rich-text hint promises only what the email renders, or the renderer formats italic and bullet lines as the hint says
-- [ ] #7 The image picker's cards show their whole thumbnail and title, without overlapping the rows or the filters
-- [ ] #8 New record and New audience use the dialog form and DialogActions: heading on its own row, full-width fields, Cancel then Create
+- [x] #7 The image picker's cards show their whole thumbnail and title, without overlapping the rows or the filters
+- [x] #8 New record and New audience use the dialog form and DialogActions: heading on its own row, full-width fields, Cancel then Create
 - [ ] #9 Multi-line fields have the same strong field border as inputs
 - [ ] #10 Personalise menu items show a gap between the label and the token, the token in monospace
 - [ ] #11 Settings General read-only facts share the 16 px inset of the inputs beside them
@@ -74,3 +74,9 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 - [ ] #20 Upload new uses a styled file trigger with the chosen file's name beside it
 - [ ] #21 A long body field opens taller than a short one
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-17: items 7 and 8 (UX-01, UX-02) fixed in the commit after c58eb2f. The image card overrides the button height (index.css, .image-grid__card); live, cards are 158 px with the 96 px thumbnail inside. New record and New audience use dialog-form and DialogActions, heading in the Dialog; tests in Content.test.tsx and AudienceEditor.test.tsx, each mutation-checked.
+<!-- SECTION:NOTES:END -->
