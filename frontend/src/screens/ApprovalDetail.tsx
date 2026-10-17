@@ -131,7 +131,12 @@ export default function ApprovalDetail() {
               </p>
             )}
           </div>
-          {approval.data.may_decide && approval.data.status === 'pending' && <Decision approval={approval.data} />}
+          {/* Keyed by the request: in the split the details stay mounted from one
+              request to the next, and a choice or reason belongs to the request it
+              was made on (ADR-141 section 4; Codex doc-33). */}
+          {approval.data.may_decide && approval.data.status === 'pending' && (
+            <Decision key={approval.data.id} approval={approval.data} />
+          )}
         </div>
       )}
     </ScreenState>

@@ -54,7 +54,9 @@ export default function CampaignDetail() {
               {composition.data.variants.map((composed) => (
                 <VariantSection key={composed.variant.id} campaignId={id} composed={composed} />
               ))}
-              <BlankVariant campaignId={id} />
+              {/* Keyed by the campaign: a name typed here belongs to this campaign,
+                  not the next one opened beside the list. */}
+              <BlankVariant key={id} campaignId={id} />
             </>
           )}
         </ScreenState>

@@ -4,7 +4,8 @@ import { Route, Routes } from 'react-router'
 
 import CampaignDetail from './CampaignDetail'
 import { CampaignsSplit, NoCampaignOpen } from './Campaigns'
-import { jsonResponse, page, renderWithProviders, stubFetch, A_BRAND_PROFILE } from '../test-utils'
+import { keys } from '../api/resources'
+import { jsonResponse, makeQueryClient, page, renderWithProviders, stubFetch, A_BRAND_PROFILE } from '../test-utils'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -82,7 +83,7 @@ function renderDetail() {
   )
 }
 
-function renderSplit(route = '/campaigns') {
+function renderSplit(route = '/campaigns', client = makeQueryClient()) {
   return renderWithProviders(
     <Routes>
       <Route element={<CampaignsSplit />}>
@@ -91,7 +92,7 @@ function renderSplit(route = '/campaigns') {
       </Route>
       <Route path="/campaigns/:id/variants/:variantId" element={<p>editor 7/21</p>} />
     </Routes>,
-    { route },
+    { route, client },
   )
 }
 
@@ -111,6 +112,28 @@ describe('the campaign list', () => {
     expect(row).toHaveAttribute('aria-selected', 'true')
     const reads = fetchMock.mock.calls.map(([r]) => new URL((r as Request).url))
     expect(reads.filter((u) => u.pathname === '/campaigns/').every((u) => u.searchParams.get('q') === 'spr')).toBe(true)
+  })
+  it('starts the next campaign with an empty blank-variant name', async () => {
+    const other = { ...COMPOSITION, campaign: { ...COMPOSITION.campaign, id: 2, name: 'Autumn' } }
+    // Cached, as a campaign already visited is: a loading screen would unmount
+    // the form and hide the carry-over (Codex doc-33's point about approvals).
+    const client = makeQueryClient()
+    client.setQueryData(keys.composition(2), other)
+    stubFetch({
+      'GET /campaigns/': () => jsonResponse(page([COMPOSITION.campaign, other.campaign])),
+      'GET /settings': () => jsonResponse(CHANNELS),
+      'GET /campaigns/1/results': () => jsonResponse(NO_RESULTS),
+      'GET /campaigns/2/results': () => jsonResponse(NO_RESULTS),
+      'GET /campaigns/1/composition': () => jsonResponse(COMPOSITION),
+      'GET /campaigns/2/composition': () => jsonResponse(other),
+    })
+    renderSplit('/campaigns/1', client)
+    await screen.findByRole('heading', { name: 'Spring', level: 2 })
+    const blank = () => screen.getByRole('region', { name: 'New blank variant' })
+    fireEvent.change(within(blank()).getByLabelText(/^Name/), { target: { value: 'Plain' } })
+    fireEvent.click(within(screen.getByRole('grid', { name: 'Campaigns' })).getByText('Autumn'))
+    await screen.findByRole('heading', { name: 'Autumn', level: 2 })
+    expect(within(blank()).getByLabelText(/^Name/)).toHaveValue('')
   })
 })
 
