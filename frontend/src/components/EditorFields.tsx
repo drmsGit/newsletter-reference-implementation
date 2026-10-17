@@ -21,6 +21,15 @@ import ImageField from './ImageField'
  * typing was meant for another act — ADR-186's "Change in catalogue" — must
  * not save it to this one on the way there (task-261).
  */
+/**
+ * How many rows a text opens with. Only a long body is taller: a field's size
+ * names where it renders, not how long it is (storage/fields.json), and
+ * body_long is the one its note calls the longer text (task-392 item 21).
+ */
+function rowsFor(size: string | null | undefined): number {
+  return size === 'long' ? 10 : 4
+}
+
 export function AutosaveField({
   field,
   value,
@@ -31,7 +40,11 @@ export function AutosaveField({
   error,
 }: {
   // A module's field, or a record's (`ContentField`): what a form needs of either.
-  field: Pick<ModuleVariable, 'name' | 'label' | 'type' | 'note'> & { required?: boolean; alt?: string | null }
+  field: Pick<ModuleVariable, 'name' | 'label' | 'type' | 'note'> & {
+    required?: boolean
+    alt?: string | null
+    size?: string | null
+  }
   value: string
   /** `also` carries the image's paired alt field, saved in the same write. */
   onSave: (value: string, also?: Record<string, string>) => void
@@ -97,7 +110,7 @@ export function AutosaveField({
         {field.required && <span className="muted"> (required)</span>}
       </Label>
       {multiline ? (
-        <TextArea rows={4} onSelect={remember} onKeyUp={remember} />
+        <TextArea rows={rowsFor(field.size)} onSelect={remember} onKeyUp={remember} />
       ) : (
         <Input type={field.type === 'url' ? 'url' : 'text'} onSelect={remember} onKeyUp={remember} />
       )}
