@@ -627,7 +627,10 @@ table th {
   white-space: nowrap;
 }
 .react-aria-Table tbody tr:last-child td,
-table tbody tr:last-child td { border-bottom: 0; }
+table tbody tr:last-child td,
+table tbody tr:last-child th { border-bottom: 0; }
+/* A row header in a plain table's body reads as its row's first cell. */
+table tbody th[scope="row"] { font-size: inherit; line-height: inherit; font-weight: inherit; color: inherit; white-space: normal; }
 
 .react-aria-Row[data-hovered] {
   background: var(--brand-surface-2);

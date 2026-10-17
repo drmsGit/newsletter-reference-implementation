@@ -39,102 +39,112 @@ function Person({ activity: a }: { activity: Activity }) {
         </p>
       </div>
       <Section title="Consent" note="This brand, per channel and purpose.">
-        <table>
-          <tbody>
-            {a.consent_grid.map((cell) => {
-              const c = cell as { channel: string; purpose: string; status: string | null; source?: string | null;
-                recorded_at?: string | null }
-              return (
-                <tr key={`${c.channel}-${c.purpose}`}>
-                  <td>{c.channel}</td>
-                  <td>{c.purpose}</td>
-                  <td>{c.status ?? 'Not asked'}</td>
-                  <td className="muted">{c.source ?? ''}</td>
-                  <td className="muted">{c.recorded_at ? formatDate(c.recorded_at) : ''}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+        <Table label="Consent" columns={['Channel', 'Purpose', 'Status', 'Source', 'Recorded']}>
+          {a.consent_grid.map((cell) => {
+            const c = cell as { channel: string; purpose: string; status: string | null; source?: string | null;
+              recorded_at?: string | null }
+            return (
+              <tr key={`${c.channel}-${c.purpose}`}>
+                <th scope="row">{c.channel}</th>
+                <td>{c.purpose}</td>
+                <td>{c.status ?? 'Not asked'}</td>
+                <td className="muted">{c.source ?? ''}</td>
+                <td className="muted">{c.recorded_at ? formatDate(c.recorded_at) : ''}</td>
+              </tr>
+            )
+          })}
+        </Table>
       </Section>
       <Groups recipientId={a.recipient_id} />
       <Section title="Deliveries" note="What this brand sent them, newest first.">
         {a.deliveries.length === 0 ? (
           <p className="muted">Nothing sent yet.</p>
         ) : (
-          <table>
-            <tbody>
-              {a.deliveries.map((d) => (
-                <tr key={d.id}>
-                  <td><Link to={`/deliveries/${d.send_instance_id}`}>{d.send_instance_name}</Link></td>
-                  <td>{d.channel}</td>
-                  <td>{d.status}</td>
-                  <td className="muted">{d.exclusion_reason ?? ''}</td>
-                  <td className="muted">{formatDate(d.sent_at ?? d.created_at)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <Table label="Deliveries" columns={['Send', 'Channel', 'Status', 'Excluded because', 'Sent']}>
+            {a.deliveries.map((d) => (
+              <tr key={d.id}>
+                <th scope="row"><Link to={`/deliveries/${d.send_instance_id}`}>{d.send_instance_name}</Link></th>
+                <td>{d.channel}</td>
+                <td>{d.status}</td>
+                <td className="muted">{d.exclusion_reason ?? ''}</td>
+                <td className="muted">{formatDate(d.sent_at ?? d.created_at)}</td>
+              </tr>
+            ))}
+          </Table>
         )}
       </Section>
       <Section title="Decisions" note="What decision slots picked for them, newest first.">
         {a.decisions.length === 0 ? (
           <p className="muted">No decision has picked for them yet.</p>
         ) : (
-          <table>
-            <tbody>
-              {a.decisions.map((d) => (
-                <tr key={d.id}>
-                  <td>
-                    <Link to={`/content/${d.content_record_id}`}>{d.content_title}</Link>
-                    {d.content_version != null && <span className="muted"> · version {d.content_version}</span>}
-                  </td>
-                  <td className="num">{d.score ?? ''}</td>
-                  <td>{d.reason ?? ''}</td>
-                  <td className="muted">{formatDate(d.created_at)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <Table label="Decisions" columns={['Content', 'Score', 'Reason', 'Picked']}>
+            {a.decisions.map((d) => (
+              <tr key={d.id}>
+                <th scope="row">
+                  <Link to={`/content/${d.content_record_id}`}>{d.content_title}</Link>
+                  {d.content_version != null && <span className="muted"> · version {d.content_version}</span>}
+                </th>
+                <td className="num">{d.score ?? ''}</td>
+                <td>{d.reason ?? ''}</td>
+                <td className="muted">{formatDate(d.created_at)}</td>
+              </tr>
+            ))}
+          </Table>
         )}
       </Section>
       <Section title="Interests" note="Their interest profile, one per person across brands.">
         {a.preferences.length === 0 ? (
           <p className="muted">No interests recorded.</p>
         ) : (
-          <table>
-            <tbody>
-              {a.preferences.map((p) => (
-                <tr key={p.category_id}>
-                  <td>{p.category_name}</td>
-                  <td className="num">{p.score}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <Table label="Interests" columns={['Category', 'Score']}>
+            {a.preferences.map((p) => (
+              <tr key={p.category_id}>
+                <th scope="row">{p.category_name}</th>
+                <td className="num">{p.score}</td>
+              </tr>
+            ))}
+          </Table>
         )}
       </Section>
       <Section title="Consent history" note="Every brand, each event labelled with its brand.">
-        <table>
-          <tbody>
-            {a.consent_history.map((e, i) => (
-              <tr key={i}>
-                <td>{e.brand_name ?? `Brand ${e.brand_id}`}</td>
-                <td>{e.channel}</td>
-                <td>{e.purpose}</td>
-                <td>{e.status}</td>
-                <td className="muted">{e.source ?? ''}</td>
-                <td className="muted">{formatDate(e.created_at)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <Table label="Consent history" columns={['Brand', 'Channel', 'Purpose', 'Status', 'Source', 'Recorded']}>
+          {a.consent_history.map((e, i) => (
+            <tr key={i}>
+              <th scope="row">{e.brand_name ?? `Brand ${e.brand_id}`}</th>
+              <td>{e.channel}</td>
+              <td>{e.purpose}</td>
+              <td>{e.status}</td>
+              <td className="muted">{e.source ?? ''}</td>
+              <td className="muted">{formatDate(e.created_at)}</td>
+            </tr>
+          ))}
+        </Table>
       </Section>
     </>
   )
 }
 
 /** A part of the page: its title and what it covers on the ground, its rows in a card. */
+/**
+ * A table as render 38 draws it, without a header row: its column headers are
+ * there for a screen reader only, and the first cell of each row names it
+ * (task-392 item 17).
+ */
+function Table({ label, columns, children }: { label: string; columns: string[]; children: React.ReactNode }) {
+  return (
+    <table aria-label={label}>
+      <thead className="sr-only">
+        <tr>
+          {columns.map((c) => (
+            <th key={c} scope="col">{c}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>{children}</tbody>
+    </table>
+  )
+}
+
 function Section({ title, note, children }: { title: string; note: string; children: React.ReactNode }) {
   const id = `section-${title.toLowerCase().replace(/\W+/g, '-')}`
   return (
@@ -188,17 +198,15 @@ function Groups({ recipientId }: { recipientId: number }) {
         {groups.data && groups.data.items.length === 0 ? (
           <p className="muted">No audience group touches them on {channel}.</p>
         ) : (
-          <table>
-            <tbody>
-              {groups.data?.items.map((g: Group) => (
-                <tr key={g.group_id}>
-                  <td><Link to={`/audiences/${g.group_id}`}>{g.group_name}</Link></td>
-                  <td>{g.member ? 'In' : 'Out'}</td>
-                  <td>{g.reasons.map((r) => (REASON[r.kind] ?? (() => r.kind))(r.label)).join(' · ')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <Table label="Audience groups" columns={['Group', 'In or out', 'Why']}>
+            {groups.data?.items.map((g: Group) => (
+              <tr key={g.group_id}>
+                <th scope="row"><Link to={`/audiences/${g.group_id}`}>{g.group_name}</Link></th>
+                <td>{g.member ? 'In' : 'Out'}</td>
+                <td>{g.reasons.map((r) => (REASON[r.kind] ?? (() => r.kind))(r.label)).join(' · ')}</td>
+              </tr>
+            ))}
+          </Table>
         )}
       </ScreenState>
       <p className="muted">As of now: a send works this out again when it goes out.</p>

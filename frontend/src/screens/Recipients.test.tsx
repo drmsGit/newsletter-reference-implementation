@@ -136,6 +136,22 @@ describe('one person: why did they get this (task-292)', () => {
   })
 })
 
+describe("the recipient page's tables (task-392 item 17)", () => {
+  const section = (name: string) => screen.findByRole('region', { name })
+  it.each(['Consent', 'Audience groups', 'Deliveries', 'Decisions', 'Interests', 'Consent history'])(
+    '%s is a named table with column headers, each row named by its first cell',
+    async (title) => {
+      open('/recipients/7', server().handlers)
+      const card = await section(title)
+      const table = await within(card).findByRole('table', { name: title })
+      expect(within(table).getAllByRole('columnheader').length).toBeGreaterThan(1)
+      const [, ...body] = within(table).getAllByRole('row')
+      expect(body.length).toBeGreaterThan(0)
+      for (const row of body) expect(within(row).getAllByRole('rowheader')).toHaveLength(1)
+    },
+  )
+})
+
 describe('the people beside the open one (task-372)', () => {
   it("opens another person with the list's search and page, not the open person's channel", async () => {
     const BEN = { ...ANNA, id: 8, external_id: 'crm-ben' }
