@@ -68,10 +68,24 @@ def _load_brand_css() -> str:
     return ""
 
 
+#: Stands in for a link's address while bold and italics run, so an asterisk
+#: in an address (a search, say) is never formatted (Codex c4caca9, doc-36).
+#: render_rich_text strips the character from what was typed.
+_ADDRESS_MARK = "\x00"
+_KEPT_ADDRESS = re.compile(_ADDRESS_MARK + r"(\d+)" + _ADDRESS_MARK)
+
+
 def _rich_line(line: str) -> str:
-    line = _RICH_TEXT_LINK.sub(r'<a href="\2">\1</a>', line)
+    addresses: list[str] = []
+
+    def link(match: re.Match) -> str:
+        addresses.append(match.group(2))
+        return f'<a href="{_ADDRESS_MARK}{len(addresses) - 1}{_ADDRESS_MARK}">{match.group(1)}</a>'
+
+    line = _RICH_TEXT_LINK.sub(link, line)
     line = _RICH_TEXT_BOLD.sub(r"<strong>\1</strong>", line)
-    return _RICH_TEXT_ITALIC.sub(r"<em>\1</em>", line)
+    line = _RICH_TEXT_ITALIC.sub(r"<em>\1</em>", line)
+    return _KEPT_ADDRESS.sub(lambda match: addresses[int(match.group(1))], line)
 
 
 def render_rich_text(text: str) -> Markup:
@@ -93,7 +107,7 @@ def render_rich_text(text: str) -> Markup:
             parts.append(("list", _RICH_TEXT_LIST + "".join(f"<li>{i}</li>" for i in items) + "</ul>"))
             items.clear()
 
-    for line in str(escape(text)).split("\n"):
+    for line in str(escape(text.replace(_ADDRESS_MARK, ""))).split("\n"):
         if line.startswith("- "):
             items.append(_rich_line(line[2:]))
             continue

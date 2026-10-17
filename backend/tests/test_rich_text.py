@@ -55,3 +55,11 @@ def test_push_has_no_document_so_italics_are_stripped_and_dashes_stay():
                               variables=[ModuleVariable(name="push_body", type="richtext")])
     out = strip_rich_text({"push_body": "a *quiet* and **loud** word\n- one"}, manifest)
     assert out["push_body"] == "a quiet and loud word\n- one"
+
+
+def test_bold_can_wrap_a_whole_link_and_its_address_stays_as_written():
+    """With doc-36's case (an asterisk in a link's address, Codex c4caca9):
+    the address is never formatted, the words around and inside the link are."""
+    out = str(render_rich_text("**see [the *map*](https://example.test/m?q=*a*)**"))
+    assert out == '<strong>see <a href="https://example.test/m?q=*a*">the <em>map</em></a></strong>'
+
