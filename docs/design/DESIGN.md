@@ -12,7 +12,7 @@ created: 2026-10-10
 
 Files in this folder: `CONSTRAINTS.md` (what the code allows, written by the repo), `DESIGN.md` (this page), `tokens.css` (the tokens, same `--brand-*` names as `frontend/src/index.css`; the v2 values since 2026-10-12), `HANDOFF.md` (everything a session needs to build v2), `canvas-v2/` (a snapshot of the v2 canvas boards and the component library), `renders/` (those boards as images, with an index).
 
-The visual reference is the design canvas "Approvals redesign" in Claude Design, page "Three columns" (since 2026-10-12). It replaces the earlier canvas "Tarrow Design System", which is retired together with the name. It is a look reference only.
+The visual reference is the design canvas "Approvals redesign" in Claude Design, page "Three columns" (since 2026-10-12). It replaces the earlier design-system canvas named after the retired working name, which is retired together with the name. It is a look reference only.
 
 ## How to use this in a code session
 
@@ -55,7 +55,7 @@ Also agreed: the system font (SF Pro on Apple devices) with the system monospace
 
 ## Identity (proposed, round 06, not adopted)
 
-Provisional direction from Diede: the full wordmark "Tarrow" in IBM Plex SemiBold with the two custom flat-armed r's in normal contexts; the same two r's side by side (rr) as the icon-only symbol where the name cannot fit. Placeholder if the name changes. Not cleared (name or logo). Working choice for now (Diede): the squarer a (a2); a0 and a1 are kept as alternatives. Construction, clear space, minimum sizes, fallback policy and states are in `logodevelopment/round-06/source/identity-principles.md`; discussion in `logodevelopment/LOGO-DISCUSSION.md` [28]. Tokens, components and CONSTRAINTS are unchanged.
+Provisional direction from Diede: the full wordmark of the retired working name in IBM Plex SemiBold with the two custom flat-armed r's in normal contexts; the same two r's side by side (rr) as the icon-only symbol where the name cannot fit. Placeholder if the name changes. Not cleared (name or logo). Working choice for now (Diede): the squarer a (a2); a0 and a1 are kept as alternatives. Construction, clear space, minimum sizes, fallback policy and states are in `logodevelopment/round-06/source/identity-principles.md`; discussion in `logodevelopment/LOGO-DISCUSSION.md` [28]. Tokens, components and CONSTRAINTS are unchanged.
 
 ## Tokens
 

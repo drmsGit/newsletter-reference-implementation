@@ -29,7 +29,7 @@ For the session that builds this. It says where the design lives, what was decid
 | What the code and email clients allow | [[CONSTRAINTS]]. |
 | What each screen really contains | [[react-screen-inventory]], [[react-migration-inventory]], and the screens in `frontend/src/screens/`. |
 
-The earlier canvas "Tarrow Design System" is retired together with the name. Do not use it as a source: it was drawn from invented content.
+The earlier design-system canvas named after the retired working name is retired together with the name. Do not use it as a source: it was drawn from invented content.
 
 ## 2. Decided, and what was drafted
 
