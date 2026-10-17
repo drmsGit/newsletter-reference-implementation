@@ -164,6 +164,9 @@ ASSET_COPIED = "asset.copied"
 EXPRESSION_CREATED = "expression.created"
 EXPRESSION_UPDATED = "expression.updated"
 EXPRESSION_DELETED = "expression.deleted"
+# task-71: the demo reset emptied the demo data and built Grathaus. The
+# entry is what remains of the history it removed (ADR-153: the log is kept).
+DEMO_RESET = "demo.reset"
 
 #: Every action name an entry may carry (task-52, ADR-153 addendum
 #: 2026-10-08). Collected from the constants above, so adding one is still one

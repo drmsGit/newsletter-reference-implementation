@@ -8,7 +8,7 @@ topic:
   - rendering
   - brand
 created: 2026-10-15
-modified: 2026-10-15
+modified: 2026-10-17
 source:
   - "task-112 design, five questions decided by the user 2026-09-27"
   - "task-112 scope and upload questions, decided by the user 2026-10-15, one question at a time"
@@ -238,6 +238,28 @@ Decided with the user on 2026-10-15. This narrows point 1 and the last bullet of
 - **A library image without alt text renders without it.** No usage can make up for it.
 - **Alt values stored on usages that point to a library image are no longer used.** Whether they are cleared or kept is for the build. The header comment of `storage/fields.json` ("which inherits the library image's alt when left empty") is then out of date.
 - **The `alt` key that pairs an image field with its alt field stands** (the ADR-177 and ADR-194 addenda of 2026-10-15). So does [[ADR-187 — A Manager Hides Fields Per Module, and Required Means Required When Shown]] point 8: `image_alt` follows the image and is not hideable.
+
+## Addendum 2026-10-17 — A full demo reset deletes images
+
+Decided by the user on 2026-10-17 in task-71 (realistic demo content and a demo reset command). This is the one exception to point 4 and point 13. Nothing above changes this record's Decision section.
+
+**1. The demo reset deletes the whole image library.**
+
+- **It empties all demo data:** content, campaigns, sends, recipients, results and the image library. Every asset row goes, and its file with it.
+- **It keeps** user accounts, roles, grants, Settings, integrations and the audit log.
+- **Point 4's reason does not hold at a reset.** Point 4 keeps a file because an email already sent may still fetch it. The reset deletes every email that could show one too: its sends, snapshots and deliveries.
+- **This is the reasoning of [[ADR-198 — The Email Block Set Is Seven Blocks, Square Images and Text Links]] point 5** (task-381): a retired module's files are deleted only at a full reset, when nothing that used them remains.
+
+**2. Only an explicit command deletes an asset.**
+
+- **The reset runs as `backend/scripts/demo_reset.py --yes`,** and it refuses the test database. It is built in task-71.
+- **Nothing in the product or the API deletes an asset.** There, point 4 holds unchanged: deleting hides from the picker.
+
+**Consequences.**
+
+- **A rehearsal starts from a known library.** Every reset leaves the same images.
+- **No orphaned files.** No file outlives its asset row.
+- **An email sent from a development database before a reset can no longer show its images.** That is acceptable only because the reset is for demo and development databases, never a real installation's.
 
 ## Related ADRs
 

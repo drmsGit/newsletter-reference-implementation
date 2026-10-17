@@ -22,12 +22,15 @@ records also in English.
 1. Run the **batches** below one by one in ChatGPT (paste the shared rules,
    then the batch). Save each answer as
    `backend/scripts/demo/content/batch-<N>.csv`.
-2. Run the **English batch** with eight rows you choose from batches 1–6.
+2. Run the **English batch** with eight rows you choose from batches 1–6, and
+   save it as `backend/scripts/demo/content/english.csv`. Each English record is
+   linked to the German one with the same brand and `button_url` (ADR-200), so
+   keep the link unchanged.
 3. Run the **editions batch** and save it as `backend/scripts/demo/content/editions.csv`.
 4. Generate the **images** from the list at the end, square, and save each as
    `backend/scripts/demo/images/<key>.jpg`.
-5. The demo reset command imports all of it (it is built after this prompt;
-   task-71).
+5. Reset the dev database to the demo: `./venv/bin/python scripts/demo_reset.py --yes`
+   (from `backend/`). It reports anything it could not use.
 
 Content records are not personal data, so realistic content does not conflict
 with ADR-143; only recipient data must be pseudonymised.
