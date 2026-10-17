@@ -3,7 +3,7 @@ id: doc-34
 title: Regression tests — record drafts and send outcome isolation — source 328e04d
 type: other
 created_date: '2026-10-17 13:03'
-updated_date: '2026-10-17 13:06'
+updated_date: '2026-10-17 13:58'
 ---
 Source covered: 328e04d7d31855f092a591875e616112c15f970a (task-372). The content cases were first validated at d47bb8fb55876f3ae78143ed5b8eb71ffc7c1870; the send case at 1c24eca4872404f3bbbac766c54550f5bc4ce576; all three were then validated together against the exact source above.
 Tests-branch batch commit: dec60cf3831ad2202206d8bcdf48be678b597047. Parent dcdade9c4f0f95ff1f9e1bb3761efe8312b8b789. Exactly the two authorized test paths changed (134 added lines); byte-identical to the validated copies. Normal hooks were not bypassed.
@@ -31,3 +31,5 @@ Safety/limitations: no backend or schema changes in the reviewed range, so no ba
 Origin push: succeeded, exit 0: git push origin refs/heads/codex/regression-tests:refs/heads/codex/regression-tests. Independently confirmed by git ls-remote --heads origin refs/heads/codex/regression-tests: dec60cf3831ad2202206d8bcdf48be678b597047. All prior batches and the old production base remain unchanged. No main or PR action. This new batch awaits integration with its fixes; compatibility blockers on the older base remain as recorded above.
 
 Further source validation after the monitoring/history layout commit: at 4346fcca5806e125567ebc062a3251797c85f5a2 in the same isolated worktree, node node_modules/vitest/vitest.mjs run returned 409 passed, the same 3 strict new failures, exit 1; node node_modules/typescript/bin/tsc -b passed, exit 0. No new failure from the extracted status chip or wide tables. The later 0a1ae32b53dd32c0649aceaaa964be3d1fa02030 changes queue notes only.
+
+Integration verification 2026-10-17: b57a86a347d103621c7b502f99282906fe0f4acb integrates both files from dec60cf byte for byte (blobs 4a1b3b65a057182b2cbccf162d3927371b09c7b6 and 58793603893ffad44fb551c51b816437081bf3d7), keys the record page by record id and generation and the send step by send id. In the isolated regression-envelope worktree at that exact commit, node node_modules/vitest/vitest.mjs run src/screens/ContentDetail.record-isolation.test.tsx src/screens/SendVariant.send-isolation.test.tsx passed all 3 tests, exit 0. The full client suite at 8973758 passed all 419 tests, exit 0. No strict failures remain from this batch; its integration is complete.
