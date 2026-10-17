@@ -1,5 +1,5 @@
 import { Route, Routes } from 'react-router'
-import { screen } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import Shell from './Shell'
@@ -55,7 +55,38 @@ describe('the shell', () => {
     first.unmount()
 
     shellWith(null)
-    expect(await screen.findByText(A_SESSION.user.email)).toBeInTheDocument()
-    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    // The person is their avatar now (task-372): the display name is its name, the email its hover text.
+    const avatar = await screen.findByRole('img', { name: A_SESSION.user.display_name })
+    expect(avatar).toHaveAttribute('title', A_SESSION.user.email)
+    expect(screen.queryByRole('img', { name: 'Acme shop' })).not.toBeInTheDocument()
+  })
+
+  it('collapses to a rail that keeps every name, and remembers it', async () => {
+    const client = makeQueryClient()
+    client.setQueryData(sessionQueryKey, A_SESSION)
+    stubFetch({ 'GET /auth/session': () => jsonResponse(A_SESSION) })
+    window.localStorage.removeItem('nav-collapsed')
+    const { unmount } = renderWithProviders(
+      <Routes>
+        <Route path="/" element={<Shell />} />
+      </Routes>,
+      { client },
+    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Collapse the navigation' }))
+    // Hidden from sight, never removed: the links and Sign out keep their names in the rail.
+    expect(screen.getByRole('link', { name: /Campaigns/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Sign out/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Brand: Acme/ })).toBeInTheDocument()
+    expect(window.localStorage.getItem('nav-collapsed')).toBe('1')
+    unmount()
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/" element={<Shell />} />
+      </Routes>,
+      { client },
+    )
+    expect(await screen.findByRole('button', { name: 'Expand the navigation' })).toBeInTheDocument()
+    window.localStorage.removeItem('nav-collapsed')
   })
 })

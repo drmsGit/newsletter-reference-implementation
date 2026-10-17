@@ -9,6 +9,7 @@ import {
 } from 'react-aria-components'
 
 import { useSwitchBrand, type SessionContext } from '../api/session'
+import { avatarHue, initials } from './avatar'
 
 /**
  * Change the brand this session is working in.
@@ -23,22 +24,50 @@ import { useSwitchBrand, type SessionContext } from '../api/session'
  * The list is `session.brands`, which is the brands this person may switch to
  * rather than every brand that exists. Offering more would be showing somebody
  * a list of other people's brands.
+ *
+ * v2 (task-372): the label sits inside the control (navigation board). In the
+ * collapsed rail the switcher is the brand's tile, which opens the navigation
+ * so the brand can be chosen; the brand's name stays its accessible name.
  */
-export default function BrandSwitcher({ session }: { session: SessionContext }) {
+export default function BrandSwitcher({
+  session,
+  collapsed = false,
+  onExpand,
+}: {
+  session: SessionContext
+  collapsed?: boolean
+  onExpand?: () => void
+}) {
   const switchBrand = useSwitchBrand()
   const brand = session.brand
 
   if (!brand?.switchable) return null
 
+  if (collapsed)
+    return (
+      <Button
+        className="brand-tile avatar avatar--square"
+        aria-label={`Brand: ${brand.name}. Open the navigation to switch.`}
+        style={{ '--avatar-hue': avatarHue(brand.name) } as React.CSSProperties}
+        onPress={onExpand}
+      >
+        {initials(brand.name)}
+      </Button>
+    )
+
   return (
     <Select
+      className="react-aria-Select brand-select"
       selectedKey={brand.id}
       isDisabled={switchBrand.isPending}
       onSelectionChange={(key) => switchBrand.mutate(Number(key))}
     >
-      <Label>Brand</Label>
-      <Button>
-        <SelectValue />
+      <Label className="sr-only">Brand</Label>
+      <Button className="brand-btn">
+        <span className="brand-btn__text">
+          <span className="brand-btn__label" aria-hidden="true">Brand</span>
+          <SelectValue />
+        </span>
       </Button>
       <Popover>
         <ListBox items={session.brands}>

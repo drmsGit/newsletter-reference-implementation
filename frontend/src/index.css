@@ -361,16 +361,50 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--brand-accent);
   color: var(--brand-danger);
 }
 
-.shell__bar {
+/* --- the shell: column 1 and the screen beside it (HANDOFF section 3) ------- */
+
+.shell {
   display: flex;
-  align-items: center;
-  gap: calc(var(--brand-space) * 2);
-  padding: var(--brand-space) calc(var(--brand-space) * 2);
-  border-bottom: 1px solid var(--brand-line);
+  min-height: 100vh;
 }
 
-.shell__brand {
-  font-weight: 600;
+.nav-col {
+  flex: 0 0 232px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  background: var(--brand-sidebar);
+  border-right: 1px solid var(--brand-line);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 12px 16px;
+}
+.shell[data-nav="collapsed"] .nav-col {
+  flex-basis: 56px;
+  padding-left: 8px;
+  padding-right: 8px;
+  align-items: center;
+}
+
+.nav-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 40px;
+  margin: 0 0 4px 8px;
+  width: calc(100% - 8px);
+}
+.shell[data-nav="collapsed"] .nav-top { margin: 0 0 4px; justify-content: center; width: auto; }
+.nav-name { font-weight: 600; font-size: 12px; line-height: 15px; }
+button.nav-toggle { color: var(--brand-fg); flex: none; }
+
+/* Hidden but still read: the rail's labels and the name (HANDOFF section 7). */
+.shell[data-nav="collapsed"] .nav-name,
+.shell[data-nav="collapsed"] .nav-label,
+.shell[data-nav="collapsed"] .nav-item .shortcut-hint {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
 }
 
 /* The working brand's logo (task-356): sized only; no brand colour or font. */
@@ -379,45 +413,127 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--brand-accent);
   height: 24px;
   width: auto;
   max-width: 160px;
+  margin: 4px 0 0 8px;
 }
+.shell[data-nav="collapsed"] .shell__logo { display: none; }
 
-.shell__user {
-  margin-left: auto;
-  color: var(--brand-muted);
+.brand-select { width: 100%; margin: 4px 0 12px; }
+.brand-select > button.brand-btn {
+  height: 40px;
+  border-color: var(--brand-line);
+  box-shadow: var(--brand-shadow);
 }
-
-.shell__main {
-  padding: calc(var(--brand-space) * 3);
-}
-
-/* --- navigation and lists ------------------------------------------------- */
-
-.nav {
-  border-bottom: 1px solid var(--brand-line);
-  padding: 0 calc(var(--brand-space) * 2);
-}
-
-.nav ul {
-  display: flex;
-  gap: calc(var(--brand-space) * 2);
-  list-style: none;
-  margin: 0;
+.brand-btn__text { display: flex; flex-direction: column; align-items: flex-start; line-height: 16px; min-width: 0; }
+.brand-btn__label { font-size: 11px; line-height: 13px; color: var(--brand-muted); }
+.brand-btn__text .react-aria-SelectValue { font-weight: 500; }
+button.brand-tile {
+  width: 32px;
+  height: 32px;
   padding: 0;
+  border: 0;
+  box-shadow: none;
+  margin: 4px 0 12px;
+  font-size: 12px;
 }
 
-.nav a {
-  display: inline-block;
-  padding: var(--brand-space) 0;
-  color: var(--brand-muted);
+.nav-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; width: 100%; }
+.nav-gap-before { margin-top: 12px; }
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--brand-control-height);
+  padding: 0 8px;
+  border-radius: var(--brand-radius);
+  color: var(--brand-fg);
   text-decoration: none;
-  border-bottom: 2px solid transparent;
+  font-weight: 500;
 }
-
+.nav-item svg { flex: none; color: var(--brand-accent); }
+.nav-item:hover { background: var(--brand-line); }
 /* React Router sets aria-current on the active link; style the real state
    rather than a class we would have to keep in step with it. */
-.nav a[aria-current='page'] {
-  color: var(--brand-fg);
-  border-bottom-color: var(--brand-accent);
+.nav-item[aria-current="page"] { background: var(--brand-highlight); font-weight: 600; }
+.nav-item:focus-visible { outline-offset: -2px; }
+.shell[data-nav="collapsed"] .nav-item { width: 40px; height: 32px; padding: 0; justify-content: center; }
+
+.nav-foot {
+  margin-top: auto;
+  padding: 12px 0 0 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  border-top: 1px solid var(--brand-line);
+  width: 100%;
+}
+.shell[data-nav="collapsed"] .nav-foot { padding-left: 0; align-items: center; }
+button.nav-signout { padding: 0 4px; height: 24px; }
+.shell[data-nav="collapsed"] button.nav-signout { width: 32px; justify-content: center; padding: 0; }
+.shell:not([data-nav="collapsed"]) button.nav-signout svg { display: none; }
+
+/* The initials avatar (HANDOFF section 4): the hue is set on the element as
+   --avatar-hue; the theme gives the saturation and lightness. */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--avatar-size, 32px);
+  height: var(--avatar-size, 32px);
+  border-radius: 50%;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1;
+  user-select: none;
+  background: hsl(var(--avatar-hue, 210) var(--brand-avatar-bg-s) var(--brand-avatar-bg-l));
+  color: hsl(var(--avatar-hue, 210) var(--brand-avatar-fg-s) var(--brand-avatar-fg-l));
+}
+.avatar--square { border-radius: 8px; }
+.avatar-sm { --avatar-size: 24px; font-size: 11px; }
+
+.shell__main {
+  flex: 1;
+  min-width: 0;
+  padding: 24px;
+}
+
+/* Narrow (open decision 12, the handoff's proposal): below 800 px the
+   navigation is a collapsed bar on top of the screen. */
+@media (max-width: 800px) {
+  .shell { flex-direction: column; }
+  .nav-col,
+  .shell[data-nav="collapsed"] .nav-col {
+    position: static;
+    height: auto;
+    flex: none;
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    padding: 8px;
+    border-right: 0;
+    border-bottom: 1px solid var(--brand-line);
+  }
+  .nav-col .nav-top { margin: 0; width: auto; }
+  .nav-col .nav-name,
+  .nav-col .nav-label,
+  .nav-col .nav-item .shortcut-hint {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+  }
+  .nav-col .nav-list { flex-direction: row; flex-wrap: wrap; width: auto; }
+  .nav-col .nav-gap-before { margin-top: 0; }
+  .nav-col .nav-item,
+  .shell[data-nav="collapsed"] .nav-col .nav-item { width: 36px; height: 32px; padding: 0; justify-content: center; }
+  .nav-col .brand-select { width: auto; margin: 0; }
+  .nav-col button.brand-tile { margin: 0; }
+  .nav-col .shell__logo { display: none; }
+  .nav-col .nav-foot { margin: 0 0 0 auto; padding: 0; border-top: 0; flex-direction: row; width: auto; align-items: center; }
+  .shell .nav-col button.nav-signout svg { display: inline; }
+  .nav-col .nav-signout .nav-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .shell__main { padding: 16px; }
 }
 
 /* A section's own parts (Settings: General, Brand profiles), styled as the
