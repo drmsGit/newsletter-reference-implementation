@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-11 20:44'
-updated_date: '2026-10-17 12:40'
+updated_date: '2026-10-17 12:42'
 labels:
   - frontend
 dependencies: []
@@ -73,4 +73,6 @@ Step 6 built and pushed, d47bb8f. The records list moved to /content/records; a 
 Next: decision slots (render 32) and the preview sheet (24, decision 16 decided), then the send steps (25, 26; decision 17 to ask).
 
 2026-10-17, step 7 built and pushed: decision slots as list and details (render 32), no open decision. No search box until TASK-390. Next: the preview sheet (24, decision 16 decided), then the send steps (25, 26; decision 17 to ask).
+
+2026-10-17, step 8 built and pushed: the preview as a sheet (render 24; decisions 5 and 16). The module list's drag handles are TASK-391 and not built. Next: the send steps (renders 25, 26), with open decision 17 (the planned sends listed in column 2 beside the steps) to ask first.
 <!-- SECTION:NOTES:END -->
