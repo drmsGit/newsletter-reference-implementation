@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button, Input, Label, ListBox, ListBoxItem, Switch, Text, TextField } from 'react-aria-components'
 import { Link } from 'react-router'
 
@@ -166,8 +166,8 @@ function CatalogueFields({
                   setOverride={setOverride}
                   saveField={saveField}
                   recordId={recordId}
+                  hideSwitch={field.hideable ? <HideSwitch field={field} hide={hide} /> : undefined}
                 />
-                {field.hideable && <HideSwitch field={field} hide={hide} />}
               </div>
             ),
           )}
@@ -460,6 +460,7 @@ function CatalogueField({
   setOverride,
   saveField,
   recordId,
+  hideSwitch,
 }: {
   module: ComposedModule
   field: ModuleManifest['variables'][number]
@@ -469,6 +470,8 @@ function CatalogueField({
   setOverride: ReturnType<typeof useSetOverride>
   saveField: ReturnType<typeof useSaveCatalogueField>
   recordId: number
+  /** The field's Hide switch, on its foot line (render 21). */
+  hideSwitch?: ReactNode
 }) {
   const label = field.label ?? field.name
   const catalogueText = typeof catalogue === 'string' ? catalogue : ''
@@ -512,7 +515,7 @@ function CatalogueField({
   }
 
   const changeInCatalogue = (
-    <Button data-catalogue-for={field.name} onPress={() => setCatalogueDraft(catalogueText)}>
+    <Button className="btn-plain field-foot__end" data-catalogue-for={field.name} onPress={() => setCatalogueDraft(catalogueText)}>
       Change {label} in catalogue
     </Button>
   )
@@ -525,7 +528,10 @@ function CatalogueField({
         <p>
           <span className="muted">{label}:</span> {catalogueText || '—'}
         </p>
-        {changeInCatalogue}
+        <div className="field-foot">
+          {hideSwitch}
+          {changeInCatalogue}
+        </div>
       </div>
     )
   }
@@ -550,15 +556,18 @@ function CatalogueField({
         }}
         error={fieldError(setOverride.error, field.name)}
       />
-      {overridden && (
-        <>
-          <Text className="muted">Catalogue: {catalogueText || '—'}</Text>{' '}
+      {overridden && <Text className="muted">Catalogue: {catalogueText || '—'}</Text>}
+      {/* One line under the field (render 21): the switch or the way back on
+          the left, the explicit catalogue edit on the right. */}
+      <div className="field-foot">
+        {hideSwitch}
+        {overridden && (
           <Button onPress={() => setOverride.mutate({ id: module.id, unset: [field.name] })}>
             Back to the catalogue value
-          </Button>{' '}
-        </>
-      )}
-      {changeInCatalogue}
+          </Button>
+        )}
+        {changeInCatalogue}
+      </div>
     </div>
   )
 }

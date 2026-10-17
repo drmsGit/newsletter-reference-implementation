@@ -777,6 +777,12 @@ table tbody th[scope="row"] { font-size: inherit; line-height: inherit; font-wei
   margin: 0;
 }
 
+/* A catalogue field's foot (render 21): its switch or the way back on the
+   left, Change in catalogue on the right, on one line (task-392 item 3). */
+.field-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.field-foot > .field-foot__end { margin-left: auto; }
+.field-foot .hide-switch { margin: 0; }
+
 /*
  * ADR-178 point 4: an overridden field is shown distinctly, with the
  * catalogue value it covers visible beneath it (task-258).

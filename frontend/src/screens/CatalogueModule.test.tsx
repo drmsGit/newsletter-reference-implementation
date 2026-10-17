@@ -270,6 +270,13 @@ describe('overriding', () => {
     })
   })
 
+  it('puts Back to the catalogue value beside Change in catalogue (task-392 item 3)', async () => {
+    open(server({ override: { id: 70, field_overrides: { headline_hero: 'Short' }, reason: null } }).handlers)
+    const back = await screen.findByRole('button', { name: 'Back to the catalogue value' })
+    expect(back.closest('.field-foot')).not.toBeNull()
+    expect(back.closest('.field-foot')).toBe(screen.getByRole('button', { name: 'Change Headline in catalogue' }).closest('.field-foot'))
+  })
+
   it('resets one field, and every field only after asking', async () => {
     const { handlers, writes } = server({
       override: { id: 70, field_overrides: { headline_hero: 'Short', button_label_hero: 'Book' }, reason: null },
@@ -492,6 +499,15 @@ describe('hiding a field in this module (task-291, ADR-187)', () => {
     expect(screen.queryByRole('switch', { name: /Hide Heading above this module/ })).not.toBeInTheDocument()
     expect(await screen.findByLabelText(/^Button link/)).toBeInTheDocument()
     expect(screen.queryByRole('switch', { name: /Hide Button link/ })).not.toBeInTheDocument()
+  })
+
+  it('puts the switch and Change in catalogue on one line under the field, as render 21 (task-392 item 3)', async () => {
+    open(server().handlers)
+    const foot = (await sw('Hide Headline in this module')).closest('.field-foot')
+    expect(foot).not.toBeNull()
+    const change = screen.getByRole('button', { name: 'Change Headline in catalogue' })
+    expect(change.closest('.field-foot')).toBe(foot)
+    expect(change).toHaveClass('btn-plain')
   })
 
   it('hides with the module version, folds the field, and showing it brings the stored value back', async () => {
