@@ -56,6 +56,21 @@ LEGAL = {
 }
 UNSUBSCRIBE = {"de": "Abmelden", "en": "Unsubscribe"}
 
+#: Each brand's look, on every one of its profiles (ADR-194), so switching the
+#: working brand changes the email (2026-10-17). Outdoor wears the platform's
+#: own palette (the manager app's v2 tokens); Touren a second, alpine one, its
+#: button white on burnt orange at about 5:1.
+LOOK = {
+    "outdoor": {"colour_text": "#1f1b16", "colour_body_text": "#62594e", "colour_button": "#1a5d74",
+                "colour_button_text": "#ffffff", "colour_hero_background": "#f6f1e8",
+                "font_family": "-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+                "size_headline": "26px", "size_body": "16px", "radius_button": "6px"},
+    "touren": {"colour_text": "#1d3b2a", "colour_body_text": "#3f4a43", "colour_button": "#b8471a",
+               "colour_button_text": "#ffffff", "colour_hero_background": "#eef3ee",
+               "font_family": "Georgia, 'Times New Roman', serif",
+               "size_headline": "28px", "size_body": "17px", "radius_button": "999px"},
+}
+
 
 @dataclass
 class Outcome:
@@ -130,23 +145,24 @@ def brands(db: Session) -> dict[str, int]:
 
 def profiles(db: Session, brand_ids: dict[str, int]) -> dict[str, int]:
     """Outdoor: marketing de (default), marketing en, transactional de.
-    Touren: marketing de (default), transactional de. {name: id}."""
+    Touren: marketing de (default), transactional de. Each with its brand's
+    legal details and look. {name: id}."""
     from app.brand_profiles.service import TRANSACTIONAL, create_profile, ensure_default_profile
 
     made = {}
     for brand, brand_id in brand_ids.items():
         default = ensure_default_profile(db, brand_id)
         default.name, default.language = "Newsletter Deutsch", "de"
-        default.field_values = {**LEGAL[brand], "unsubscribe_text": UNSUBSCRIBE["de"]}
+        default.field_values = {**LEGAL[brand], **LOOK[brand], "unsubscribe_text": UNSUBSCRIBE["de"]}
         db.commit()
         made[f"{brand}:de"] = default.id
         if brand == "outdoor":
             made[f"{brand}:en"] = create_profile(
                 db, brand_id, name="Newsletter English", language="en",
-                field_values={**LEGAL[brand], "unsubscribe_text": UNSUBSCRIBE["en"]}).id
+                field_values={**LEGAL[brand], **LOOK[brand], "unsubscribe_text": UNSUBSCRIBE["en"]}).id
         made[f"{brand}:transactional"] = create_profile(
             db, brand_id, name="Service-Mails", language="de", kind=TRANSACTIONAL,
-            field_values=dict(LEGAL[brand]), allow_transactional=True).id
+            field_values={**LEGAL[brand], **LOOK[brand]}, allow_transactional=True).id
     return made
 
 

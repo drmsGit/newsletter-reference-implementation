@@ -134,6 +134,23 @@ def _fixture(tmp_path: Path) -> Path:
     return content
 
 
+def test_each_brand_has_a_look_of_its_own_that_a_profile_accepts():
+    """The demo shows a brand switch changing the email (2026-10-17): Outdoor
+    in the platform's own palette, Touren in a second, plainly different one.
+    Every value is one the profile form itself would accept."""
+    from app.brand_profiles.service import clean_values
+    from app.brand_profiles.structure import profile_structure
+    from app.demo.reset import LOOK
+
+    look_fields = {f.name for f in profile_structure() if f.group == "Look"}
+    for brand in ("outdoor", "touren"):
+        assert set(LOOK[brand]) == look_fields, brand
+        assert clean_values(LOOK[brand]) == LOOK[brand]
+    differ = [name for name in look_fields if LOOK["outdoor"][name] != LOOK["touren"][name]]
+    assert {"colour_text", "colour_button", "colour_hero_background", "font_family"} <= set(differ)
+    assert LOOK["outdoor"]["colour_button"] == "#1a5d74"   # the platform's accent
+
+
 def test_a_full_run_builds_grathaus_and_keeps_people_and_settings(tmp_path):
     from app.audit.db_models import AuditEventDB
     from app.auth.db_models import BrandDB, UserDB
@@ -158,6 +175,12 @@ def test_a_full_run_builds_grathaus_and_keeps_people_and_settings(tmp_path):
         assert outdoor.name == "Grathaus Outdoor" and brands[TOUREN_KEY] == "Grathaus Touren" and len(brands) == 2
         assert {(p.language, p.kind) for p in db.query(BrandProfileDB).filter_by(brand_id=outdoor.id)} == {
             ("de", "marketing"), ("en", "marketing"), ("de", "transactional")}
+        # Every profile of a brand carries that brand's look.
+        from app.demo.reset import LOOK
+        touren_id = db.query(BrandDB).filter_by(key=TOUREN_KEY).one().id
+        for brand_id, brand in ((outdoor.id, "outdoor"), (touren_id, "touren")):
+            for profile in db.query(BrandProfileDB).filter_by(brand_id=brand_id):
+                assert LOOK[brand].items() <= (profile.field_values or {}).items(), (brand, profile.name)
         english = db.query(ContentRecordDB).filter_by(language="en").one()
         assert db.get(ContentRecordDB, english.translation_of_id).title == "Tagestouren 0"
         assert db.query(RecipientDB).count() == 1000
