@@ -4,7 +4,7 @@ title: Small details the finished design left open
 status: To Do
 assignee: []
 created_date: '2026-10-17 13:31'
-updated_date: '2026-10-17 17:06'
+updated_date: '2026-10-17 17:31'
 labels:
   - frontend
 dependencies: []
@@ -68,7 +68,7 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 - [x] #14 Dialogs share one header pattern and one footer order: Cancel, then the primary action, at the right
 - [x] #15 Each Personalise button is named by its field
 - [x] #16 Each Remove in a user's Access card is named by the access it removes
-- [ ] #17 The recipient page's tables have header cells with scope and an accessible name each
+- [x] #17 The recipient page's tables have header cells with scope and an accessible name each
 - [ ] #18 React Aria's own strings follow the interface's language through an I18nProvider
 - [ ] #19 A keyboard-reachable Keyboard shortcuts action exists in the shell, and single-key shortcuts carry aria-keyshortcuts
 - [ ] #20 Upload new uses a styled file trigger with the chosen file's name beside it
@@ -95,4 +95,6 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 2026-10-17: item 15 (UX-08) fixed: Personalise takes the field's label and names its button Personalise <label> (EditorFields.tsx); visible text unchanged. Tests in EditorFields.personalise.test.tsx, mutation-checked. Live on record 156: eight buttons, eight distinct names.
 
 2026-10-17: item 16 (UX-09) fixed: PersonDetail names each Remove by the row's access text (Remove <role> on <brand>, or Remove <role> with one brand). Test in Administration.test.tsx (waits for the brands, which load after the grants), mutation-checked. Live on user 96: Remove Viewer on Grathaus Outdoor.
+
+2026-10-17: item 17 (UX-10) fixed: a local Table in RecipientDetail.tsx gives each of the six tables aria-label, an sr-only thead of th scope=col, and the first cell as th scope=row (the design draws no header row, render 38); index.css gives body row headers the cell look. Tests in Recipients.test.tsx (six tables), mutation-checked on the name and the row headers. Live on recipient 1000: tables named, headers in the accessibility tree, thead 1 px, row headers 13 px normal weight.
 <!-- SECTION:NOTES:END -->
