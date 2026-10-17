@@ -1,9 +1,10 @@
 ---
 id: TASK-392
-title: Five layout details the finished design left open
+title: Small details the finished design left open
 status: To Do
 assignee: []
 created_date: '2026-10-17 13:31'
+updated_date: '2026-10-17 16:00'
 labels:
   - frontend
 dependencies: []
@@ -21,8 +22,9 @@ ordinal: 210600
 3. In a catalogue-bound module's fields, "Change X in catalogue" (frontend/src/screens/CatalogueModule.tsx:516) and the hide switch stay stacked under the field; render 21 puts the switch on the left and the link on the right of one line under the field.
 4. The record page's Performance section keeps the old label/value grid (dl.facts at frontend/src/components/ContentFigures.tsx:46) inside its card, where render 27 draws fact rows (the shared Fact component, frontend/src/components/Fact.tsx).
 5. On the record page the Duplicate button sits slightly above its brand pulldown (the row is .record-duplicate, frontend/src/screens/ContentDetail.tsx:236, styled at frontend/src/index.css:842); render 27 draws them on one baseline.
+6. The rich-text hint under every multi-line field promises more than the email renders. It reads "**bold**, *italic*, [link](https://…), and a line starting with - for a bullet" (frontend/src/components/EditorFields.tsx:108), but render_rich_text formats only **bold**, [label](https://…) links and new lines (backend/app/rendering/service.py:56-57 and the function after them); *italic* and "- " lines reach the email as typed. Found 2026-10-17 when the editorial became rich text. Either the hint says only what renders, or the formatter learns italic and bullet lines (escaped first, as it does now, and a push still strips them, strip_rich_text). Nothing else promises them: the AI prompts and the content prompt do not mention italics or bullets.
 
-Check each against its render at 1,440 px in the browser pane, light and dark.
+Check items 1 to 5 against their renders at 1,440 px in the browser pane, light and dark.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -32,4 +34,5 @@ Check each against its render at 1,440 px in the browser pane, light and dark.
 - [ ] #3 A catalogue field's hide switch and Change in catalogue share one line as in render 21
 - [ ] #4 Performance on the record page uses fact rows
 - [ ] #5 The Duplicate button and its pulldown share a baseline
+- [ ] #6 The rich-text hint promises only what the email renders, or the renderer formats italic and bullet lines as the hint says
 <!-- AC:END -->
