@@ -4,7 +4,7 @@ title: The finished design applied to the React screens
 status: To Do
 assignee: []
 created_date: '2026-10-11 20:44'
-updated_date: '2026-10-17 08:12'
+updated_date: '2026-10-17 10:41'
 labels:
   - frontend
 dependencies: []
@@ -36,4 +36,12 @@ What is not drawn: Settings Personalisation, Roles and Brands (same pattern as U
 Read these before building. (1) The boards are layout proposals drawn from what the React screens contain today; they never decide behaviour, and where a board and the code or an ADR disagree the code wins (HANDOFF section 10). The names, figures and dates in them are invented. (2) Eight layout choices need Diede's yes and are open decisions 13 to 20 in HANDOFF section 9: the editor with the navigation collapsed; Monitoring and the decision history as one column of table (a wide-table exception to the three-column rule); the results table split in two; the preview as a sheet; the send steps with the planned sends listed beside them; the audience arithmetic as a section; settings with a list under the sub-menu; the Records, Categories, Graph switch. (3) The system and human cue has only a draft (a neutral chip with a glyph and a word on each module row, render 21), not an approved design; open decision 11. (4) Density has no control drawn (open decision 1). (5) Several screens are still Jinja; HANDOFF section 8 says where the logic may have to change before the pattern fits, and a change of behaviour is a decision to record first, not a style change.
 
 Not done by the design session, left for this task: density, dark-mode switch, the phone layout (proposal: below 800 px the navigation stacks above the screen and starts collapsed), the icon set that replaces the placeholders, which browsers are supported.
+
+2026-10-17, Diede (design review, later the same day): six structure changes were agreed and the boards, renders and canvas (version 51) redrawn. They are in docs/design/HANDOFF.md section 9 (decisions 5, 16, 19 and 21 to 24). Renders 01 to 11, 21 to 24, 28 to 36, 39, 40 changed; 44 (AI prompts) and 45 (create dialogs) are new.
+
+In scope for this task: (a) the AI prompts get their own Settings entry, General keeps the limits (the provider and default model moved with the prompts; Diede to confirm); (c) the editor has an Open preview button with the p key and the sheet, with no preview group in the details; (e) settings lists are a drill-in (the menu is replaced by a back control, the title with its New button, search and the list); (f) every list header has a New button that opens a dialog, in place of the inline create forms (the dialogs are render 45; New record has none drawn).
+
+Not in this task: (b) search on every list that can grow is TASK-390, because the paged lists need a search parameter on the server; build a search box here only on a list that already searches (Campaigns, Content, Audiences, Recipients). (d) dragging is TASK-391, and only on the preview sheet's module list. The editor's module stack stays non-draggable: the Variant Editor interview (2026-09-25) rejects dragging there and VariantEditor.tsx says so. An earlier answer in the review proposed dragging on the stack; that was wrong and is corrected.
+
+2026-10-17, Diede (design review), correction to (a) above: the AI prompts are a list of records, drilled into like the brand profiles. Column 2 lists the four AI tasks (no New button, no search: they are the platform's own); each record's page holds only that task's model, output mode and prompt with its versions (render 44). The AI provider, the default model, the key status and the limits stay in General, because they are global and cannot be a record in that list (render 33). This replaces the earlier line that the provider moved with the prompts. HANDOFF section 9, decision 23; canvas version 52.
 <!-- SECTION:NOTES:END -->
