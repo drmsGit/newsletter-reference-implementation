@@ -174,8 +174,11 @@ function Personalise({ onInsert }: { onInsert: (token: string) => void }) {
       <Popover>
         <Menu aria-label="Insert a personalisation" onAction={(name) => onInsert(`{{${String(name)}}}`)}>
           {entries.map((entry) => (
-            <MenuItem key={entry.name} id={entry.name} textValue={entry.label}>
-              {entry.label} <span className="muted">{`{{${entry.name}}}`}</span>
+            // The label names the entry; its token is said apart and set as
+            // code, so the two never run together (task-392 item 10).
+            <MenuItem key={entry.name} id={entry.name} textValue={entry.label} className="react-aria-MenuItem personalise-entry">
+              <Text slot="label">{entry.label}</Text>
+              <Text slot="description" elementType="code">{`{{${entry.name}}}`}</Text>
             </MenuItem>
           ))}
         </Menu>

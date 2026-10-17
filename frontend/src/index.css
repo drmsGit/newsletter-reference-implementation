@@ -747,6 +747,8 @@ table tbody tr:last-child td { border-bottom: 0; }
 .card-rows > .field-personalise { padding-right: 16px; }
 .field-personalise > .react-aria-TextField { margin: 0; }
 .field-personalise > .personalise { position: absolute; top: 8px; right: 16px; }
+.personalise-entry { justify-content: space-between; gap: 16px; }
+.personalise-entry code { color: var(--brand-muted); }
 .card-rows > .module-own-fields, .card-rows > .slot-settings, .card-rows > .categories { display: grid; gap: 12px; }
 .bound-to { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .slot-instead { display: flex; flex-direction: column; gap: 8px; }
