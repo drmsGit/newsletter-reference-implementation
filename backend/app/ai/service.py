@@ -290,7 +290,7 @@ def run_task(
 
 
 def runs_for_target(
-    db: Session, target_type: str, target_id: int, limit: int = 25,
+    db: Session, target_type: str, target_id: int, limit: int = 25, *, task_key: str,
 ) -> list[AIRunDB]:
     """Every run this task made against one thing, newest first.
 
@@ -309,6 +309,10 @@ def runs_for_target(
     return (
         db.query(AIRunDB)
         .filter(
+            # This task's runs only: other tasks point at the same thing (a
+            # topic proposal at a variant, task-370), and their output is not
+            # this task's to read.
+            AIRunDB.task_key == task_key,
             AIRunDB.target_type == target_type,
             AIRunDB.target_id == target_id,
         )
@@ -388,7 +392,7 @@ def suggestions_for_variant(db: Session, variant_id: int, *, brand_id: int) -> l
     from app.approvals.actions import ai_subject_apply
     from app.approvals.db_models import PendingActionDB
 
-    runs = runs_for_target(db, "variant", variant_id)
+    runs = runs_for_target(db, "variant", variant_id, task_key=subject_task.TASK_KEY)
     # A held run's options are taken in Approvals, not beside the editor
     # (task-367): the Jinja page sends a held run there and never offers it
     # "Use this", and an editor that did would step round the approval.

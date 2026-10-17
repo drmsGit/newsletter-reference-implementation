@@ -1508,7 +1508,7 @@ def variant_suggestion_history(
         )
 
     runs = []
-    for run in runs_for_target(db, "variant", variant_id):
+    for run in runs_for_target(db, "variant", variant_id, task_key=subject_task.TASK_KEY):
         runs.append({
             "run": run,
             "options": subject_task.parse_options(run.output_text or ""),

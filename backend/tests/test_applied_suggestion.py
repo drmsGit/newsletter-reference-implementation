@@ -97,3 +97,21 @@ def test_only_the_apply_action_marks_a_run_held(db, world):
         db.delete(other)
         db.delete(run)
         db.commit()
+
+
+def test_another_tasks_run_on_the_variant_is_no_subject_suggestion(db, world):
+    """task-370's topic runs are pointed at the variant too; the subject panel
+    showed one as an unreadable suggestion."""
+    variant = world["variant"]()
+    subject, topic = _run(db, variant.id), AIRunDB(task_key="variant_from_topic", provider="mock", status="ok",
+                                                  target_type="variant", target_id=variant.id, output_text="{}")
+    db.add(topic)
+    db.commit()
+    try:
+        with signed_in(db) as (client, _token, _csrf):
+            runs = client.get(f"/campaigns/variants/{variant.id}/suggestions").json()
+        assert [r["run_id"] for r in runs] == [subject.id]
+    finally:
+        db.delete(topic)
+        db.delete(subject)
+        db.commit()

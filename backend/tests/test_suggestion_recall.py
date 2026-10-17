@@ -203,7 +203,7 @@ class TestTheListingHelpers:
         first = _run(db, variant, "1. SUBJECT: One\n")
         second = _run(db, variant, "1. SUBJECT: Two\n")
 
-        found = runs_for_target(db, "variant", variant.id)
+        found = runs_for_target(db, "variant", variant.id, task_key="subject_preheader")
 
         assert [r.id for r in found][:2] == [second.id, first.id]
 
