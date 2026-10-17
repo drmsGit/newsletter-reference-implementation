@@ -40,3 +40,14 @@ AGENTS.md
 
 # Uploaded library images (ADR-197): data, not source.
 storage/assets/
+
+# Naming and identity work for the retired working name, and the presentation
+# draft built on it: confidential (domain registrations, third-party name use,
+# counsel's brief), like docs/business/decisions/ (the user, 2026-10-17).
+docs/design/logodevelopment/
+docs/design/presentation/
+# The UX audit's captures of the Users screens show real people's email
+# addresses; the repository is public, so they stay local (2026-10-17).
+docs/design/ux-audit-2026-10-17/screenshots/43-users.*
+docs/design/ux-audit-2026-10-17/screenshots/44-user-detail.*
+docs/design/ux-audit-2026-10-17/screenshots/45-new-user.*
