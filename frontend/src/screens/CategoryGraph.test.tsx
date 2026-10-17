@@ -53,6 +53,16 @@ describe('the category graph (task-359)', () => {
     expect(screen.getByRole('button', { name: /^Family: .*\(falling\)/ })).toBeInTheDocument()
   })
 
+  it('marks a rising or falling category with an arrow, so colour is not the only cue (task-392 item 1)', async () => {
+    open()
+    const label = async (name: RegExp) => (await screen.findByRole('button', { name })).querySelector('text')!
+    expect((await label(/^Beach:/)).textContent).toBe('Beach ▲')
+    expect((await label(/^Family:/)).textContent).toBe('Family ▼')
+    expect((await label(/^City:/)).textContent).toBe('City')
+    // Said once, in words, by the button's name; the arrow is for the eye.
+    expect((await label(/^Beach:/)).querySelector('tspan')).toHaveAttribute('aria-hidden', 'true')
+  })
+
   it("opens a category's records and their figures from the drawing by keyboard", async () => {
     open()
     fireEvent.keyDown(await screen.findByRole('button', { name: /^Beach:/ }), { key: 'Enter' })

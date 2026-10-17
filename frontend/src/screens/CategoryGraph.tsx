@@ -71,7 +71,7 @@ export default function CategoryGraph() {
       <h1>Category graph</h1>
       <p className="muted">
         Each circle is a category: bigger when its records were picked more often and its signal is stronger;
-        green when interest is rising, red when it is falling. A dark line is a parent–child link, a light one
+        green with ▲ when interest is rising, amber with ▼ when it is falling. A dark line is a parent–child link, a light one
         records the two share. Choose a category to see its records.
       </p>
       <ScreenState query={graph}>
@@ -140,6 +140,9 @@ function Drawing({ graph, selected, onSelect }: { graph: Graph; selected: number
             <circle cx={at.x} cy={at.y} r={at.r} />
             <text x={at.x} y={at.y + at.r + 14} textAnchor="middle">
               {node.name}
+              {/* The trend for the eye, beside its colour (task-392 item 1); the
+                  button's name already says it in words. */}
+              {trend(node) !== 'flat' && <tspan aria-hidden="true">{trend(node) === 'up' ? ' ▲' : ' ▼'}</tspan>}
             </text>
           </g>
         )

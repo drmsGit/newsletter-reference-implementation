@@ -1333,9 +1333,12 @@ table.working tr.row-total th, table.working tr.row-total td { font-weight: 600;
 .graph-edge--relation { stroke: var(--brand-fg); stroke-opacity: 0.6; }
 .graph-edge--cooccurrence { stroke: var(--brand-line); }
 .graph-node { cursor: pointer; }
-.graph-node circle { fill: #8a8a8a; stroke: var(--brand-bg); stroke-width: 2; }
-.graph-node--up circle { fill: #198754; }
-.graph-node--down circle { fill: var(--brand-danger); }
+/* The trend in tokens (task-392 item 1, the user's choice 2026-10-17):
+   rising green, falling the amber of "a person should look", not error red,
+   none muted; dark mode and increased contrast follow the tokens. */
+.graph-node circle { fill: var(--brand-muted); stroke: var(--brand-bg); stroke-width: 2; }
+.graph-node--up circle { fill: var(--brand-success); }
+.graph-node--down circle { fill: var(--brand-human); }
 .graph-node--selected circle, .graph-node:focus-visible circle { stroke: var(--brand-accent); stroke-width: 4; }
 .graph-node:focus { outline: none; }
 .graph-node text { font-size: 13px; fill: var(--brand-fg); }
