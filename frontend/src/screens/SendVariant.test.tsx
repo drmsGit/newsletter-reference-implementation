@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router'
 
@@ -168,6 +168,15 @@ describe('sending a variant (task-67; ADR-183 addendum 2026-10-13)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
     expect(await screen.findByRole('heading', { name: '4. Send' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: '3. Plan the send' })).not.toBeInTheDocument()
+    // Decision 17 (task-372): the list stays beside the steps, the continued send marked as open.
+    const continued = screen.getByText(/Spring — planned/).closest('li')!
+    expect(continued).toHaveAttribute('aria-current', 'true')
+    expect(within(continued).queryByRole('button', { name: 'Continue' })).not.toBeInTheDocument()
+  })
+
+  it('says when nothing is planned for the variant', async () => {
+    open(server({ open: [] }).handlers)
+    expect(await screen.findByText('Nothing planned for this variant.')).toBeInTheDocument()
   })
 
   it('confirms with the count as of now, and fires', async () => {

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { AlertTriangle } from 'lucide-react'
 import { Button, Checkbox, Input, Label, TextField } from 'react-aria-components'
 import { Link, useParams, useSearchParams } from 'react-router'
 
@@ -15,7 +16,10 @@ import {
   useTestVariant,
 } from '../api/resources'
 import { HttpError } from '../api/session'
+import BackTo from '../components/BackTo'
 import Choice from '../components/Choice'
+import DetailSection from '../components/DetailSection'
+import Fact from '../components/Fact'
 import RecipientPicker, { type PickedRecipient } from '../components/RecipientPicker'
 import ScreenState from '../components/ScreenState'
 import { formatDate } from './Campaigns'
@@ -35,6 +39,10 @@ import { formatDate } from './Campaigns'
  * and the one being worked on is kept in the address (`?send=`). A person who
  * may fire a send is its approval (ADR-174). Every rule -- the cap, the legal
  * details, who may fire -- is the server's.
+ *
+ * v2 (task-372, renders 25 and 26; decision 17, 2026-10-17): the title and the
+ * planned sends are column 2 and stay there while one is continued, marked as
+ * the open one; the steps are column 3.
  */
 export default function SendVariant() {
   const params = useParams()
@@ -51,41 +59,50 @@ export default function SendVariant() {
     setSearch(next)
   }
 
+  const composed = composition.data?.variants.find((v) => v.variant.id === variantId)
+
   return (
-    <>
-      <p>
-        <Link to={`/campaigns/${campaignId}`}>← Campaign</Link>
-      </p>
-      <ScreenState query={composition}>
-        {composition.data &&
-          (() => {
-            const composed = composition.data.variants.find((v) => v.variant.id === variantId)
-            if (!composed) return <p role="alert">This variant is not part of the campaign.</p>
-            const { variant } = composed
-            return (
-              <>
-                <h1>Send {variant.name}</h1>
-                <p className="muted">
-                  {composition.data.campaign.name} · {variant.channel}
-                </p>
-                {sendId == null && <OpenSends variantId={variantId} onContinue={continueWith} />}
-                <WhatGoesOut variantId={variantId} />
-                {variant.channel === 'email' && <TestStep variantId={variantId} channel={variant.channel} />}
-                {sendId == null ? (
-                  <PlanStep
-                    variantId={variantId}
-                    channel={variant.channel}
-                    defaultName={composition.data.campaign.name}
-                    onPlanned={continueWith}
-                  />
-                ) : (
-                  <SendStep sendId={sendId} campaignId={campaignId} onAnother={() => continueWith(null)} />
-                )}
-              </>
-            )
-          })()}
-      </ScreenState>
-    </>
+    <div className="split">
+      <section className="col-list" aria-label="Send">
+        <div className="list-head">
+          <BackTo to={`/campaigns/${campaignId}`} label="Campaign" />
+          <h1>Send {composed?.variant.name ?? 'variant'}</h1>
+          {composition.data && composed && (
+            <p className="list-count">
+              {composition.data.campaign.name} · {composed.variant.channel}
+            </p>
+          )}
+        </div>
+        <OpenSends variantId={variantId} current={sendId} onContinue={continueWith} />
+      </section>
+      <section className="col-detail">
+        <div className="detail-scroll">
+          <ScreenState query={composition}>
+            {composition.data &&
+              (!composed ? (
+                <p role="alert">This variant is not part of the campaign.</p>
+              ) : (
+                <>
+                  <WhatGoesOut variantId={variantId} />
+                  {composed.variant.channel === 'email' && (
+                    <TestStep variantId={variantId} channel={composed.variant.channel} />
+                  )}
+                  {sendId == null ? (
+                    <PlanStep
+                      variantId={variantId}
+                      channel={composed.variant.channel}
+                      defaultName={composition.data.campaign.name}
+                      onPlanned={continueWith}
+                    />
+                  ) : (
+                    <SendStep sendId={sendId} campaignId={campaignId} onAnother={() => continueWith(null)} />
+                  )}
+                </>
+              ))}
+          </ScreenState>
+        </div>
+      </section>
+    </div>
   )
 }
 
@@ -94,23 +111,47 @@ function refused(error: unknown, action: string) {
   return `${(error instanceof HttpError && error.detail) || 'The server refused it.'}`
 }
 
-/** Sends of this variant that were planned and not sent yet. */
-function OpenSends({ variantId, onContinue }: { variantId: number; onContinue: (id: number) => void }) {
+/**
+ * Sends of this variant that were planned and not sent yet, in column 2. The
+ * one being continued stays listed, marked as the open one (decision 17).
+ */
+function OpenSends({
+  variantId,
+  current,
+  onContinue,
+}: {
+  variantId: number
+  current: number | null
+  onContinue: (id: number) => void
+}) {
   const open = useOpenSends(variantId)
-  if (!open.data || open.data.length === 0) return null
+  if (!open.data) return null
   return (
-    <section aria-labelledby="open-sends">
-      <h2 id="open-sends">Planned and not sent yet</h2>
-      <ul>
-        {open.data.map((send) => (
-          <li key={send.id}>
-            {send.name} — {send.status === 'scheduled' && send.scheduled_at
-              ? `scheduled for ${formatDate(send.scheduled_at)}`
-              : `planned ${formatDate(send.created_at)}`}{' '}
-            <Button onPress={() => onContinue(send.id)}>Continue</Button>
-          </li>
-        ))}
-      </ul>
+    <section aria-labelledby="open-sends" className="open-sends">
+      <h2 id="open-sends" className="list-subtitle">
+        Planned and not sent yet
+      </h2>
+      {open.data.length === 0 ? (
+        <p className="list-empty muted">Nothing planned for this variant.</p>
+      ) : (
+        <ul className="item-list">
+          {open.data.map((send) => (
+            <li key={send.id} className="open-send" aria-current={send.id === current || undefined}>
+              <span className="item-title">
+                {send.name} —{' '}
+                {send.status === 'scheduled' && send.scheduled_at
+                  ? `scheduled for ${formatDate(send.scheduled_at)}`
+                  : `planned ${formatDate(send.created_at)}`}
+              </span>
+              {send.id !== current && (
+                <Button className="btn-sm" onPress={() => onContinue(send.id)}>
+                  Continue
+                </Button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   )
 }
@@ -119,34 +160,31 @@ function OpenSends({ variantId, onContinue }: { variantId: number; onContinue: (
 function WhatGoesOut({ variantId }: { variantId: number }) {
   const preview = useFramePreview(variantId)
   return (
-    <section aria-labelledby="step-what">
-      <h2 id="step-what">1. What goes out</h2>
-      <p className="muted">As it would be frozen now. It is frozen when you plan the send.</p>
+    <DetailSection id="step-what" title="1. What goes out">
+      <div>
+        <p className="muted">As it would be frozen now. It is frozen when you plan the send.</p>
+        {preview.data?.html && (
+          <p>
+            Subject: <strong>{preview.data.subject || '—'}</strong>
+          </p>
+        )}
+      </div>
       {preview.isError && <p role="alert">Cannot be sent yet: {refused(preview.error, 'see it')}</p>}
       {preview.data &&
         (preview.data.html ? (
-          <>
-            <p>
-              <strong>Subject:</strong> {preview.data.subject || '—'}
-            </p>
-            <iframe
-              title="What goes out"
-              srcDoc={preview.data.html}
-              sandbox=""
-              style={{ width: '100%', height: 480, border: '1px solid currentColor' }}
-            />
-          </>
+          <div className="preview-stage preview-stage--flush">
+            <iframe title="What goes out" className="preview-frame preview-frame--short" srcDoc={preview.data.html} sandbox="" />
+          </div>
         ) : (
-          <dl className="facts">
+          <dl className="fact-list">
             {Object.entries(preview.data.fields ?? {}).map(([key, value]) => (
-              <div key={key} style={{ display: 'contents' }}>
-                <dt>{key}</dt>
-                <dd>{String(value) || '—'}</dd>
-              </div>
+              <Fact key={key} label={key}>
+                {String(value) || '—'}
+              </Fact>
             ))}
           </dl>
         ))}
-    </section>
+    </DetailSection>
   )
 }
 
@@ -168,7 +206,8 @@ function ProviderFields({
   const providers = (settings.data?.delivery_providers ?? []).filter((p) => p.channels.includes(channel))
   const chosen = providers.find((p) => p.name === provider)
   return (
-    <>
+    // Provider and sender side by side (renders 25, 26).
+    <div className="field-pair">
       <Choice
         label="Provider"
         options={providers.map((p) => ({ id: p.name, name: p.label }))}
@@ -181,7 +220,7 @@ function ProviderFields({
           <Input />
         </TextField>
       )}
-    </>
+    </div>
   )
 }
 
@@ -204,8 +243,7 @@ function TestStep({ variantId, channel }: { variantId: number; channel: string }
   const [sender, setSender] = useState<string | null>(null)
   const from = useSender(channel, provider, sender)
   return (
-    <section aria-labelledby="step-test">
-      <h2 id="step-test">2. Send a test (optional)</h2>
+    <DetailSection id="step-test" title="2. Send a test (optional)">
       <p className="muted">
         The email above with its subject marked [Test]. Not a delivery: no unsubscribe link, nothing counted or stored.
       </p>
@@ -222,12 +260,14 @@ function TestStep({ variantId, channel }: { variantId: number; channel: string }
         <RecipientPicker label="Show it as (optional)" onChoose={setAs} />
       )}
       <ProviderFields channel={channel} provider={provider} setProvider={setProvider} sender={sender} setSender={setSender} />
-      <Button
-        onPress={() => test.mutate({ to: to.trim(), provider, from_address: from, recipient_id: as?.id ?? null })}
-        isDisabled={test.isPending || !to.trim()}
-      >
-        {test.isPending ? 'Sending the test…' : 'Send a test'}
-      </Button>
+      <div>
+        <Button
+          onPress={() => test.mutate({ to: to.trim(), provider, from_address: from, recipient_id: as?.id ?? null })}
+          isDisabled={test.isPending || !to.trim()}
+        >
+          {test.isPending ? 'Sending the test…' : 'Send a test'}
+        </Button>
+      </div>
       {test.error != null && <p role="alert">No test sent: {refused(test.error, 'send a test')}</p>}
       {test.data &&
         (test.data.success ? (
@@ -237,7 +277,7 @@ function TestStep({ variantId, channel }: { variantId: number; channel: string }
         ) : (
           <p role="alert">No test sent: {test.data.message}</p>
         ))}
-    </section>
+    </DetailSection>
   )
 }
 
@@ -296,53 +336,61 @@ function PlanStep({
   }
 
   return (
-    <section aria-labelledby="step-plan">
-      <h2 id="step-plan">3. Plan the send</h2>
+    <DetailSection id="step-plan" title="3. Plan the send">
       <p className="muted">Planning freezes the email as it is now; later edits need a new send.</p>
-      <form onSubmit={submit}>
+      <form onSubmit={submit} className="card-rows">
         <TextField value={name} onChange={setName}>
           <Label>Name of the send</Label>
           <Input />
         </TextField>
-        <Choice
-          label="Audience"
-          options={[
-            { id: '', name: 'Choose an audience group' },
-            ...(groups.data?.items ?? []).map((g) => ({ id: String(g.id), name: g.name })),
-          ]}
-          selected={groupId}
-          onChange={setGroupId}
-        />
-        {groupId && <Reachable groupId={Number(groupId)} channel={channel} />}
+        {/* The reach sits under its audience (render 25). */}
+        <div>
+          <Choice
+            label="Audience"
+            options={[
+              { id: '', name: 'Choose an audience group' },
+              ...(groups.data?.items ?? []).map((g) => ({ id: String(g.id), name: g.name })),
+            ]}
+            selected={groupId}
+            onChange={setGroupId}
+          />
+          {groupId && <Reachable groupId={Number(groupId)} channel={channel} />}
+        </div>
         <ProviderFields channel={channel} provider={provider} setProvider={setProvider} sender={sender} setSender={setSender} />
-        <Choice
-          label="When"
-          options={[
-            { id: 'now', name: 'When I send it' },
-            { id: 'at', name: 'At a time' },
-          ]}
-          selected={timing}
-          onChange={(value) => {
-            setTiming(value)
-            if (value === 'at' && !at) setAt(tomorrowAtNine())
-          }}
-        />
-        {timing === 'at' && (
-          <TextField value={at} onChange={setAt} type="datetime-local">
-            <Label>Send at</Label>
-            <Input />
-          </TextField>
-        )}
-        <Checkbox isSelected={skip} onChange={setSkip}>
-          Don't send to someone who would get no content record
-        </Checkbox>
-        <Button type="submit" isDisabled={plan.isPending}>
-          {plan.isPending ? 'Planning…' : 'Plan the send'}
-        </Button>
+        <div className="field-pair">
+          <Choice
+            label="When"
+            options={[
+              { id: 'now', name: 'When I send it' },
+              { id: 'at', name: 'At a time' },
+            ]}
+            selected={timing}
+            onChange={(value) => {
+              setTiming(value)
+              if (value === 'at' && !at) setAt(tomorrowAtNine())
+            }}
+          />
+          {timing === 'at' && (
+            <TextField value={at} onChange={setAt} type="datetime-local">
+              <Label>Send at</Label>
+              <Input />
+            </TextField>
+          )}
+        </div>
+        <div>
+          <Checkbox isSelected={skip} onChange={setSkip}>
+            Don't send to someone who would get no content record
+          </Checkbox>
+        </div>
+        <div>
+          <Button type="submit" isDisabled={plan.isPending}>
+            {plan.isPending ? 'Planning…' : 'Plan the send'}
+          </Button>
+        </div>
         {missing.length > 0 && <p role="alert">Still needed: {missing.join(', ')}.</p>}
         {plan.error != null && <p role="alert">Not planned: {refused(plan.error, 'plan a send')}</p>}
       </form>
-    </section>
+    </DetailSection>
   )
 }
 
@@ -384,17 +432,18 @@ function SendStep({ sendId, campaignId, onAnother }: { sendId: number; campaignI
   const now = useRecipientsNow(sendId)
   const fire = useFireSend(sendId, campaignId)
   return (
-    <section aria-labelledby="step-send">
-      <h2 id="step-send">4. Send</h2>
+    <DetailSection id="step-send" title="4. Send">
       <ScreenState query={now}>
         {now.data &&
           (() => {
             const n = now.data
             const links = (
-              <p>
-                <Link to={`/deliveries/${sendId}`}>The delivery</Link> ·{' '}
-                <Link to={`/campaigns/${campaignId}`}>The campaign's results</Link> ·{' '}
-                <Button onPress={onAnother}>Plan another send</Button>
+              <p className="btnrow">
+                <Link to={`/deliveries/${sendId}`}>The delivery</Link>
+                <Link to={`/campaigns/${campaignId}`}>The campaign's results</Link>
+                <Button className="btn-plain" onPress={onAnother}>
+                  Plan another send
+                </Button>
               </p>
             )
             const done = fire.data?.status ?? (n.status !== 'draft' && n.status !== 'scheduled' ? n.status : null)
@@ -425,17 +474,26 @@ function SendStep({ sendId, campaignId, onAnother }: { sendId: number; campaignI
                   </p>
                 )}
                 {n.reaches_real_inboxes && (
-                  <p role="note">Real email: it reaches real inboxes and cannot be called back.</p>
+                  <p role="note" className="notice">
+                    <AlertTriangle size={16} strokeWidth={1.75} aria-hidden="true" className="notice-icon" />
+                    Real email: it reaches real inboxes and cannot be called back.
+                  </p>
                 )}
-                <Button onPress={() => fire.mutate()} isDisabled={fire.isPending || n.recipients === 0}>
-                  {fire.isPending ? 'Sending…' : label}
-                </Button>
                 {fire.error != null && <p role="alert">Not sent: {refused(fire.error, 'send')}</p>}
-                {links}
+                <div className="btnrow">
+                  <Button
+                    className="btn-primary"
+                    onPress={() => fire.mutate()}
+                    isDisabled={fire.isPending || n.recipients === 0}
+                  >
+                    {fire.isPending ? 'Sending…' : label}
+                  </Button>
+                  {links}
+                </div>
               </>
             )
           })()}
       </ScreenState>
-    </section>
+    </DetailSection>
   )
 }
