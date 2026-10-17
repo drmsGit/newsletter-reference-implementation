@@ -35,15 +35,15 @@ function open() {
   renderWithProviders(<CategoryGraph />)
 }
 
-describe('the category graph (task-359)', () => {
-  it('puts main categories inside and the rest outside, bigger for more picks and signal', () => {
+describe('the category graph (task-359; tidied 2026-10-17, as Obsidian draws one)', () => {
+  it('puts main categories inside and the rest outside, small dots that grow with picks', () => {
     const place = layout(GRAPH.nodes)
-    const distance = (id: number) => Math.hypot(place.get(id)!.x - 450, place.get(id)!.y - 310)
-    expect(distance(1)).toBeCloseTo(150, 0)
-    expect(distance(3)).toBeCloseTo(150, 0)
+    const distance = (id: number) => Math.hypot(place.get(id)!.x - 600, place.get(id)!.y - 300)
+    expect(distance(1)).toBeCloseTo(160, 0)
+    expect(distance(3)).toBeCloseTo(160, 0)
     expect(distance(2)).toBeGreaterThan(200)
-    expect(place.get(1)!.r).toBe(16 + 3 * 4 + 10 * 0.4)
-    expect(place.get(3)!.r).toBe(16)
+    expect(place.get(1)!.r).toBe(10)   // the most picked
+    expect(place.get(3)!.r).toBe(4)    // never picked
   })
 
   it('draws each category as a button that says its figures and trend in words', async () => {
@@ -53,30 +53,47 @@ describe('the category graph (task-359)', () => {
     expect(screen.getByRole('button', { name: /^Family: .*\(falling\)/ })).toBeInTheDocument()
   })
 
-  it('marks a rising or falling category with an arrow, so colour is not the only cue (task-392 item 1)', async () => {
+  it('shows no names or symbols until a dot is hovered, then its name, its links and its neighbours', async () => {
     open()
-    const label = async (name: RegExp) => (await screen.findByRole('button', { name })).querySelector('text')!
-    expect((await label(/^Beach:/)).textContent).toBe('Beach ▲')
-    expect((await label(/^Family:/)).textContent).toBe('Family ▼')
-    expect((await label(/^City:/)).textContent).toBe('City')
-    // Said once, in words, by the button's name; the arrow is for the eye.
-    expect((await label(/^Beach:/)).querySelector('tspan')).toHaveAttribute('aria-hidden', 'true')
+    const beach = await screen.findByRole('button', { name: /^Beach:/ })
+    const drawing = beach.closest('svg')!
+    expect(drawing.querySelectorAll('text')).toHaveLength(0)
+    expect(drawing.textContent).not.toMatch(/[▲▼]/)
+    fireEvent.mouseEnter(beach)
+    expect([...drawing.querySelectorAll('text')].map((t) => t.textContent)).toEqual(['Beach'])
+    expect(drawing.querySelector('.graph-edge')).toHaveClass('graph-edge--lit')
+    expect(screen.getByRole('button', { name: /^Family:/ })).not.toHaveClass('graph-node--faded')
+    expect(screen.getByRole('button', { name: /^City:/ })).toHaveClass('graph-node--faded')
+    fireEvent.mouseLeave(beach)
+    expect(drawing.querySelectorAll('text')).toHaveLength(0)
   })
 
-  it("opens a category's records and their figures from the drawing by keyboard", async () => {
+  it('does on keyboard focus what it does on hover', async () => {
+    open()
+    const family = await screen.findByRole('button', { name: /^Family:/ })
+    fireEvent.focus(family)
+    expect([...family.closest('svg')!.querySelectorAll('text')].map((t) => t.textContent)).toEqual(['Family'])
+  })
+
+  it("shows a chosen category's details below the drawing, every figure in a table", async () => {
     open()
     fireEvent.keyDown(await screen.findByRole('button', { name: /^Beach:/ }), { key: 'Enter' })
-    const panel = await screen.findByRole('complementary', { name: 'Selected category' })
-    const records = await within(panel).findByRole('grid', { name: 'Records in Beach' })
+    const details = await screen.findByRole('region', { name: 'Beach' })
+    const figures = await within(details).findByRole('grid', { name: 'Figures of Beach' })
+    expect(within(figures).getByText('rising')).toBeInTheDocument()
+    expect(within(within(details).getByRole('grid', { name: 'Relations of Beach' })).getByText('Family')).toBeInTheDocument()
+    const records = within(details).getByRole('grid', { name: 'Records in Beach' })
     expect(within(records).getByText('Lisbon beaches')).toBeInTheDocument()
     expect(within(records).getByText('25 %')).toBeInTheDocument()
-    expect(within(panel).getByText('Family')).toBeInTheDocument()
+    // Below the drawing, not beside it.
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument()
+    expect(details.compareDocumentPosition(screen.getByRole('group', { name: 'Category graph' }))
+      & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy()
   })
 
-  it('lists the same figures in a table', async () => {
+  it('keeps no list of every category', async () => {
     open()
-    const table = await screen.findByRole('grid', { name: 'Categories in the graph' })
-    const beach = within(table).getByText('Beach').closest('[role="row"]') as HTMLElement
-    expect(within(beach).getByText('rising')).toBeInTheDocument()
+    await screen.findByRole('button', { name: /^Beach:/ })
+    expect(screen.queryByRole('grid', { name: 'Categories in the graph' })).not.toBeInTheDocument()
   })
 })
