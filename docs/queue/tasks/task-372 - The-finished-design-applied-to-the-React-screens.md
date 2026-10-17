@@ -1,10 +1,11 @@
 ---
 id: TASK-372
 title: The finished design applied to the React screens
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-11 20:44'
-updated_date: '2026-10-17 10:41'
+updated_date: '2026-10-17 12:14'
 labels:
   - frontend
 dependencies: []
@@ -19,6 +20,12 @@ ordinal: 201100
 
 **Before starting.** The user brings the final design in; read docs/design/ then. Scope: the screens of the demo flow first (campaigns, variant editor, content, slot settings, preview, deliveries and results, settings). Keyboard defects noted in task notes are collected here.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Order (docs/design/HANDOFF.md section 10): 1. tokens and global CSS; 2. the shell (three columns, collapsible navigation with Lucide icons, the avatar); 3. approvals; 4. one demo screen at a time (campaigns, editor, content, slot settings, preview, deliveries and results, settings), each with its open layout decision asked first. Decided 2026-10-17 with Diede: one commit per step after its tests and a live look; comfortable density only (compact recorded for later); dark and increased contrast follow the system, no switch; icons are Lucide (ISC); narrow widths per the handoff proposal (details under the list below about 1,100 px, a collapsed navigation bar on top below 800 px), checked, not designed; current evergreen browsers; the draft copy for the details placeholder and counts.
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
@@ -44,4 +51,12 @@ In scope for this task: (a) the AI prompts get their own Settings entry, General
 Not in this task: (b) search on every list that can grow is TASK-390, because the paged lists need a search parameter on the server; build a search box here only on a list that already searches (Campaigns, Content, Audiences, Recipients). (d) dragging is TASK-391, and only on the preview sheet's module list. The editor's module stack stays non-draggable: the Variant Editor interview (2026-09-25) rejects dragging there and VariantEditor.tsx says so. An earlier answer in the review proposed dragging on the stack; that was wrong and is corrected.
 
 2026-10-17, Diede (design review), correction to (a) above: the AI prompts are a list of records, drilled into like the brand profiles. Column 2 lists the four AI tasks (no New button, no search: they are the platform's own); each record's page holds only that task's model, output mode and prompt with its versions (render 44). The AI provider, the default model, the key status and the limits stay in General, because they are global and cannot be a record in that list (render 33). This replaces the earlier line that the provider moved with the prompts. HANDOFF section 9, decision 23; canvas version 52.
+
+2026-10-17, progress (Claude). Steps 1 to 4 are built and pushed, one commit each: aded12e (tokens and global controls), 08ac739 (the shell: navigation column, icon rail, initials avatar), ff2cbfb (approvals as list and details), 1b17fba (campaigns as list and details).
+
+Campaigns (render 20; decisions 15 and 22): the list is column 2 with New campaign in its header, the search box (label as placeholder, still the field name) and the pager at the foot; a row opens the campaign in column 3 and keeps the search in the address. New campaign is a dialog (render 45). The results are two tables in one card, delivery then engagement, the whole campaign row drawn apart. Same reads, writes and request bodies as before. Kept on purpose against the render: the New blank variant card keeps its name field, because without it the server names every blank variant Variant A. Not added: an n shortcut for New campaign (Audiences has one; not decided for campaigns).
+
+Codex doc-33 (commit dcdade9 on codex/regression-tests): in the approvals split a chosen option and a typed reason carried over to the next request when it was cached. Fixed in fea49fa by keying Decide by the request; the same carry-over in the campaigns split (the blank variant name) is keyed by the campaign. Codex tests landed with the fix, plus one for campaigns; each fails without its key.
+
+Next: the variant editor (render 21 to 23), with open decisions 13 (drawn with the navigation collapsed) and 11 (the system and human cue) to ask first.
 <!-- SECTION:NOTES:END -->
