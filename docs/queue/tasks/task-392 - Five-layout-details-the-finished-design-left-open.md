@@ -4,7 +4,7 @@ title: Small details the finished design left open
 status: To Do
 assignee: []
 created_date: '2026-10-17 13:31'
-updated_date: '2026-10-17 19:13'
+updated_date: '2026-10-17 19:32'
 labels:
   - frontend
 dependencies: []
@@ -55,7 +55,7 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 - [ ] #1 The category graph uses v2 tokens for its circles, after a choice of which tokens carry rising and falling
 - [x] #2 Slot settings categories are option rows as in render 23
 - [x] #3 A catalogue field's hide switch and Change in catalogue share one line as in render 21
-- [ ] #4 Performance on the record page uses fact rows
+- [x] #4 Performance on the record page uses fact rows
 - [x] #5 The Duplicate button and its pulldown share a baseline
 - [ ] #6 The rich-text hint promises only what the email renders, or the renderer formats italic and bullet lines as the hint says
 - [x] #7 The image picker's cards show their whole thumbnail and title, without overlapping the rows or the filters
@@ -109,4 +109,6 @@ Check items 1 to 5 against their renders at 1,440 px in the browser pane, light 
 2026-10-17: item 2 fixed: .react-aria-CheckboxGroup > .react-aria-Checkbox are option rows (index.css, after the radio rows), .option-pair puts few short choices side by side (the draft's channels, render 27). The groups in SlotSettings, AudienceRules and ContentDraft (three) had className categories only, which drops React Aria's default class, so they name react-aria-CheckboxGroup too. RoleDetail's permission-group is left as it is: Roles is undrawn (HANDOFF:309). CSS only, no unit test possible. Live: slot Für Sie ausgewählt (Familienherbst): 26 full-width 36 px rows, the four ticked tinted with the accent border, Tab puts the ring on the row, ticks unchanged; record 156: Email and Push side by side, 351 px each.
 
 2026-10-17: item 3 fixed: CatalogueField takes hideSwitch and renders a .field-foot (switch or Back to the catalogue value on the left, Change in catalogue as btn-plain at the right); index.css .field-foot. Tests in CatalogueModule.test.tsx (switch and link share the foot; Back and link share it), mutation-checked on the link style and the switch placement; the task-261 typing test still passes. Live on Familienherbst, Hero Banner: switch at the left, link at the right edge on each hideable field; Link alone at the right.
+
+2026-10-17: item 4 fixed: ContentFigures' Performance renders Fact rows in a fact-list, and figureColumns are numeric (so the category detail and graph tables right-align too). Test in ContentFigures.test.tsx, mutation-checked on a fact and a column. Live on record 98: facts at the card inset, figure headers and cells right-aligned. Left for later, not in this item: dl.facts is still used at ContentDetail.tsx:173 and :422, DecisionSlotDetail.tsx:163, Translations.tsx:41, CategoryGraph.tsx:168 and ImageField.tsx:299.
 <!-- SECTION:NOTES:END -->
