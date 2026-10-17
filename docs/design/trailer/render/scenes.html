@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Trailer scenes</title>
+<style>
+:root {
+  --linen: #fcf8f2; --card: #ffffff; --sidebar: #f3ecdf; --text: #1f1b16; --muted: #62594e; --line: #e4daca;
+  --petrol: #1a5d74; --pink: #f4bebb; --selected: #dceaef;
+  --dbg: #14110f; --dcard: #1e1b18; --dside: #191614; --dtext: #f4eee6; --dmuted: #8a7f70; --dline: #36302a; --dacc: #6fc3dd;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #000; }
+body { width: 1920px; height: 1080px; overflow: hidden; font-family: var(--font); }
+#stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #000; }
+.scene { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; }
+.light { background: var(--linen); color: var(--text); }
+.dark { background: var(--dbg); color: var(--dtext); }
+.black { background: #000; color: var(--dtext); }
+.abs { position: absolute; }
+.layer { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+.layer img { display: block; width: 1440px; height: auto; border-radius: 10px; }
+.layer.shadow img { box-shadow: 0 0 0 1px rgba(0,0,0,.10), 0 24px 70px rgba(40,30,20,.28); }
+.ph { width: 1440px; height: 810px; background: #e9e2d6; color: #62594e; font: 40px var(--font); display: flex; align-items: center; justify-content: center; border-radius: 10px; }
+#cap { position: absolute; left: 0; right: 0; bottom: 46px; text-align: center; padding: 0 150px; pointer-events: none; z-index: 50; }
+#cap span { display: inline-block; background: rgba(0,0,0,.80); color: #fff; font-size: 46px; line-height: 1.25; padding: 10px 28px; border-radius: 8px; white-space: pre-line; }
+.tag { position: absolute; font-size: 26px; color: var(--muted); letter-spacing: .02em; }
+.big { font-weight: 650; letter-spacing: -.01em; }
+.card { background: var(--card); border: 2px solid var(--line); border-radius: 22px; }
+.chip { display: inline-block; border: 2px solid var(--line); background: var(--card); border-radius: 999px; padding: 6px 18px; font-size: 26px; }
+/* developer window */
+.win { position: absolute; background: var(--dcard); border: 2px solid var(--dline); border-radius: 18px; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+.win .bar { height: 50px; background: #24201c; display: flex; align-items: center; padding: 0 20px; gap: 10px; color: var(--dmuted); font-size: 22px; }
+.dot { width: 14px; height: 14px; border-radius: 50%; background: #4a423a; }
+.tree { position: absolute; left: 0; top: 50px; bottom: 0; width: 330px; background: var(--dside); border-right: 2px solid var(--dline); padding: 18px 20px; font: 23px/1.65 var(--mono); color: var(--dmuted); overflow: hidden; }
+.tree .on { color: var(--dacc); }
+.tree .new { color: #e8b45a; }
+.code { position: absolute; font: 24px/1.5 var(--mono); color: var(--dtext); white-space: pre; overflow: hidden; }
+.code .ln { display: inline-block; width: 52px; color: #5f564b; text-align: right; margin-right: 22px; user-select: none; }
+.k { color: #6fc3dd; } .s { color: #e8b45a; } .c { color: #8a7f70; font-style: italic; } .n { color: #c9a0dc; } .d { color: #e8b45a; }
+.add { background: rgba(80,160,100,.22); display: inline-block; width: 100%; } .del { background: rgba(190,70,60,.22); display: inline-block; width: 100%; }
+.hlrow { background: rgba(111,195,221,.18); outline: 2px solid rgba(111,195,221,.5); border-radius: 4px; }
+.term { position: absolute; left: 0; right: 0; bottom: 0; background: #100e0c; border-top: 2px solid var(--dline); padding: 16px 26px; font: 23px/1.55 var(--mono); color: #cfc6b8; overflow: hidden; white-space: pre; }
+.prompt { color: var(--dacc); }
+.tab { display: inline-block; padding: 8px 20px; font: 22px var(--mono); color: var(--dmuted); border-right: 2px solid var(--dline); }
+.tab.on { color: var(--dtext); background: var(--dcard); }
+</style>
+</head>
+<body>
+<div id="stage"><div id="cap"></div></div>
+<script src="lib.js"></script>
+<script src="scenes-a.js"></script>
+<script src="scenes-b.js"></script>
+<script src="scenes-c.js"></script>
+<script src="scenes-d.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

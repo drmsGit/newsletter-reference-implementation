@@ -7,6 +7,7 @@ score; the narration is ducked music, the effects are not.
 Writes mix.wav, music.wav (music and effects), narration.wav and placed.json (for build_player.py).
 """
 import json
+import os
 import sys
 import wave
 from pathlib import Path
@@ -99,7 +100,10 @@ def pan(x, p):
 for t, gain in ((3.0, 0.7), (5.8, 0.7), (8.6, 0.8), (23.5, 0.6), (64.0, 0.9), (179.0, 0.8), (191.0, 0.8), (203.0, 0.8),
                 (215.0, 0.8), (221.0, 0.8), (266.0, 1.0)):
     put(sfx, t, hit, gain)                                           # hook, "Powerful", the title, the file drops, the third line
-for i, t in enumerate([36.0, 40.5, 44.5, 52.0, 54.5, 57.0, 59.5, 108.0, 113.5, 120.5, 130.0, 153.0] + [252.3 + k for k in range(10)]):
+DEFAULT_TICKS = [36.0, 40.5, 44.5, 52.0, 54.5, 57.0, 59.5, 108.0, 113.5, 120.5, 130.0, 153.0] + [252.3 + k for k in range(10)]
+# TICKS_JSON: {"ticks": [seconds, ...]} written by the frame project (render/ticks.mjs), one tick per press and cut on screen
+TICKS = json.loads(Path(os.environ["TICKS_JSON"]).read_text(encoding="utf-8"))["ticks"] if os.environ.get("TICKS_JSON") else DEFAULT_TICKS
+for i, t in enumerate(TICKS):
     put(sfx, t, pan(tick, -0.4 if i % 2 else 0.4), 0.7)               # plugs, doorways, previews, Approve, Release, the montage cuts
 for t, gain in ((157.0, 0.45), (159.0, 0.6), (161.0, 0.8)):
     put(sfx, t, tick, gain)                                          # the signal comes back

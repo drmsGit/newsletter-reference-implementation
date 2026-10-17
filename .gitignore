@@ -51,3 +51,11 @@ docs/design/presentation/
 docs/design/ux-audit-2026-10-17/screenshots/43-users.*
 docs/design/ux-audit-2026-10-17/screenshots/44-user-detail.*
 docs/design/ux-audit-2026-10-17/screenshots/45-new-user.*
+
+# The trailer's render project: dependencies, captures and generated frames and video stay local and can be
+# regenerated; the listening-test and audition output was made on personal-use credits (2026-10-17).
+docs/design/trailer/render/node_modules/
+docs/design/trailer/render/captures/
+docs/design/trailer/render/out/
+docs/design/trailer/animatic/eleven-test/
+docs/design/trailer/animatic/voice-audition/

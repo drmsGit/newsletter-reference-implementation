@@ -1,0 +1,613 @@
+{
+ "fps": 24,
+ "size": [
+  1920,
+  1080
+ ],
+ "total": 286,
+ "name": "Omnichannel Orchestration Reference",
+ "scenes": [
+  {
+   "id": "S01",
+   "start": 0,
+   "end": 14,
+   "title": "The question"
+  },
+  {
+   "id": "S02",
+   "start": 14,
+   "end": 30,
+   "title": "Two ends of the market"
+  },
+  {
+   "id": "S03",
+   "start": 30,
+   "end": 50,
+   "title": "The owned core"
+  },
+  {
+   "id": "S03b",
+   "start": 50,
+   "end": 64,
+   "title": "Other systems reach the core"
+  },
+  {
+   "id": "S04",
+   "start": 64,
+   "end": 74,
+   "title": "The title"
+  },
+  {
+   "id": "S05",
+   "start": 74,
+   "end": 82,
+   "title": "Content"
+  },
+  {
+   "id": "S06",
+   "start": 82,
+   "end": 92,
+   "title": "A campaign points to it"
+  },
+  {
+   "id": "S07",
+   "start": 92,
+   "end": 112,
+   "title": "One slot, three readers, three picks"
+  },
+  {
+   "id": "S08",
+   "start": 112,
+   "end": 134,
+   "title": "AI proposes, a person decides"
+  },
+  {
+   "id": "S09",
+   "start": 134,
+   "end": 144,
+   "title": "The send is planned first"
+  },
+  {
+   "id": "S10",
+   "start": 144,
+   "end": 156,
+   "title": "Exactly what each person got"
+  },
+  {
+   "id": "S11",
+   "start": 156,
+   "end": 164,
+   "title": "The signal comes back"
+  },
+  {
+   "id": "S12",
+   "start": 164,
+   "end": 176,
+   "title": "Behind the screens"
+  },
+  {
+   "id": "S13",
+   "start": 176,
+   "end": 188,
+   "title": "Drop a content block"
+  },
+  {
+   "id": "S14",
+   "start": 188,
+   "end": 200,
+   "title": "Drop a decision strategy"
+  },
+  {
+   "id": "S15",
+   "start": 200,
+   "end": 212,
+   "title": "Drop an AI task"
+  },
+  {
+   "id": "S16",
+   "start": 212,
+   "end": 228,
+   "title": "Swap the delivery provider"
+  },
+  {
+   "id": "S16b",
+   "start": 228,
+   "end": 240,
+   "title": "The reasons stay with the code"
+  },
+  {
+   "id": "S17",
+   "start": 240,
+   "end": 252,
+   "title": "Email and push"
+  },
+  {
+   "id": "S18",
+   "start": 252,
+   "end": 262,
+   "title": "Everything else, in one breath"
+  },
+  {
+   "id": "S19",
+   "start": 262,
+   "end": 268,
+   "title": "The three lines"
+  },
+  {
+   "id": "S20",
+   "start": 268,
+   "end": 286,
+   "title": "Title and call to action"
+  }
+ ],
+ "voice": {
+  "S01": {
+   "start": 1.2,
+   "dur": 8.31
+  },
+  "S02": {
+   "start": 14.6,
+   "dur": 11.84
+  },
+  "S03": {
+   "start": 30.6,
+   "dur": 15.0
+  },
+  "S03b": {
+   "start": 50.6,
+   "dur": 10.82
+  },
+  "S04": {
+   "start": 65.5,
+   "dur": 4.27
+  },
+  "S05": {
+   "start": 74.6,
+   "dur": 6.97
+  },
+  "S06": {
+   "start": 82.6,
+   "dur": 7.71
+  },
+  "S07": {
+   "start": 92.6,
+   "dur": 13.42
+  },
+  "S08": {
+   "start": 112.8,
+   "dur": 19.68
+  },
+  "S09": {
+   "start": 134.6,
+   "dur": 7.76
+  },
+  "S10": {
+   "start": 144.6,
+   "dur": 7.71
+  },
+  "S11": {
+   "start": 156.6,
+   "dur": 5.29
+  },
+  "S12": {
+   "start": 164.6,
+   "dur": 9.47
+  },
+  "S13": {
+   "start": 176.6,
+   "dur": 5.39
+  },
+  "S14": {
+   "start": 188.6,
+   "dur": 5.76
+  },
+  "S15": {
+   "start": 200.6,
+   "dur": 8.03
+  },
+  "S16": {
+   "start": 212.6,
+   "dur": 13.14
+  },
+  "S16b": {
+   "start": 228.6,
+   "dur": 9.15
+  },
+  "S17": {
+   "start": 240.6,
+   "dur": 6.87
+  },
+  "S18": {
+   "start": 252.3,
+   "dur": 7.15
+  },
+  "S19": {
+   "start": 262.4,
+   "dur": 4.85
+  },
+  "S20": {
+   "start": 268.8,
+   "dur": 4.97
+  }
+ },
+ "parts": {
+  "S08": [
+   {
+    "start": 112.8,
+    "dur": 2.0897732426303857
+   },
+   {
+    "start": 120.0,
+    "dur": 2.1826530612244897
+   },
+   {
+    "start": 128.3,
+    "dur": 4.179569160997732
+   }
+  ],
+  "S19": [
+   {
+    "start": 262.4,
+    "dur": 1.021655328798186
+   },
+   {
+    "start": 264.2,
+    "dur": 1.1145351473922902
+   },
+   {
+    "start": 266.0,
+    "dur": 1.2538548752834466
+   }
+  ]
+ },
+ "cues": [
+  {
+   "s": 1.2,
+   "e": 2.04,
+   "t": "One campaign."
+  },
+  {
+   "s": 2.09,
+   "e": 4.45,
+   "t": "A hundred and twenty-three readers."
+  },
+  {
+   "s": 4.5,
+   "e": 6.99,
+   "t": "Three hundred and sixty-nine choices."
+  },
+  {
+   "s": 7.04,
+   "e": 9.46,
+   "t": "Could you say why each one was made?"
+  },
+  {
+   "s": 14.6,
+   "e": 18.18,
+   "t": "Most companies end up choosing between two things."
+  },
+  {
+   "s": 18.23,
+   "e": 21.23,
+   "t": "A tool that's easy, until they outgrow it."
+  },
+  {
+   "s": 21.28,
+   "e": 26.39,
+   "t": "And a system that's powerful, until they try to change it, or leave it."
+  },
+  {
+   "s": 30.6,
+   "e": 35.72,
+   "t": "But AI has changed what a company, or its agency, can build for itself."
+  },
+  {
+   "s": 35.77,
+   "e": 40.6,
+   "t": "So what if it kept the core, its content, its campaigns, its rules,"
+  },
+  {
+   "s": 40.65,
+   "e": 45.55,
+   "t": "its consent, and everything around it were a part you could replace?"
+  },
+  {
+   "s": 50.6,
+   "e": 54.18,
+   "t": "A CRM, a shop, a warehouse, an analytics tool:"
+  },
+  {
+   "s": 54.23,
+   "e": 57.74,
+   "t": "other systems reach the core through the API,"
+  },
+  {
+   "s": 57.79,
+   "e": 61.37,
+   "t": "each with its own key and its own permissions."
+  },
+  {
+   "s": 65.5,
+   "e": 69.72,
+   "t": "This is a reference for building a communication system you control."
+  },
+  {
+   "s": 74.6,
+   "e": 76.8,
+   "t": "A manager starts with content."
+  },
+  {
+   "s": 76.85,
+   "e": 81.52,
+   "t": "Written once, kept in one place, and scored by what it's about."
+  },
+  {
+   "s": 82.6,
+   "e": 85.91,
+   "t": "A campaign doesn't copy it; it points to it."
+  },
+  {
+   "s": 85.96,
+   "e": 90.26,
+   "t": "When one headline has to change, only that email changes."
+  },
+  {
+   "s": 92.6,
+   "e": 95.41,
+   "t": "Now one email with a slot in the middle."
+  },
+  {
+   "s": 95.46,
+   "e": 100.19,
+   "t": "The slot picks for each reader, from content a person marked ready."
+  },
+  {
+   "s": 100.24,
+   "e": 103.69,
+   "t": "Same email, three readers, three different picks."
+  },
+  {
+   "s": 103.74,
+   "e": 105.97,
+   "t": "And every pick can be explained."
+  },
+  {
+   "s": 112.8,
+   "e": 114.84,
+   "t": "AI can suggest and draft."
+  },
+  {
+   "s": 120.0,
+   "e": 122.13,
+   "t": "A person decides what goes out."
+  },
+  {
+   "s": 128.3,
+   "e": 132.43,
+   "t": "Even when a machine asks to send, someone has to say yes."
+  },
+  {
+   "s": 134.6,
+   "e": 137.87,
+   "t": "Before anything leaves, the system plans the send,"
+  },
+  {
+   "s": 137.92,
+   "e": 142.31,
+   "t": "shows how many people it can reach, and freezes what they will get."
+  },
+  {
+   "s": 144.6,
+   "e": 147.42,
+   "t": "Afterwards, open any reader's message:"
+  },
+  {
+   "s": 147.47,
+   "e": 152.26,
+   "t": "the content they received, and the reason each piece was picked."
+  },
+  {
+   "s": 156.6,
+   "e": 160.21,
+   "t": "Their clicks come back as signals that fade with time,"
+  },
+  {
+   "s": 160.26,
+   "e": 161.84,
+   "t": "and shape the next pick."
+  },
+  {
+   "s": 164.6,
+   "e": 168.23,
+   "t": "Behind the screens, a developer keeps it growing,"
+  },
+  {
+   "s": 168.28,
+   "e": 170.64,
+   "t": "by hand or with an AI assistant."
+  },
+  {
+   "s": 170.69,
+   "e": 174.02,
+   "t": "Not by asking a vendor, but by adding a file."
+  },
+  {
+   "s": 176.6,
+   "e": 178.07,
+   "t": "A new content block:"
+  },
+  {
+   "s": 178.12,
+   "e": 180.04,
+   "t": "a manifest and a template."
+  },
+  {
+   "s": 180.09,
+   "e": 181.94,
+   "t": "It appears in the editor."
+  },
+  {
+   "s": 188.6,
+   "e": 191.06,
+   "t": "A new way to decide who sees what:"
+  },
+  {
+   "s": 191.11,
+   "e": 194.31,
+   "t": "one file, written by whoever knows the data."
+  },
+  {
+   "s": 200.6,
+   "e": 201.54,
+   "t": "A new AI task."
+  },
+  {
+   "s": 201.59,
+   "e": 208.58,
+   "t": "The developer defines what it may read and return; the wording of the prompt belongs to the manager."
+  },
+  {
+   "s": 212.6,
+   "e": 216.66,
+   "t": "Even the delivery provider is a part, not a foundation."
+  },
+  {
+   "s": 216.71,
+   "e": 219.27,
+   "t": "Email or push, any sending service:"
+  },
+  {
+   "s": 219.32,
+   "e": 223.6,
+   "t": "a file and a few lines, and the company changes who sends,"
+  },
+  {
+   "s": 223.65,
+   "e": 225.69,
+   "t": "without touching a campaign."
+  },
+  {
+   "s": 228.6,
+   "e": 230.58,
+   "t": "The reason stays with the code."
+  },
+  {
+   "s": 230.63,
+   "e": 233.26,
+   "t": "Files point to the decisions behind them,"
+  },
+  {
+   "s": 233.31,
+   "e": 237.7,
+   "t": "including the rules for working with AI, all in the same repository."
+  },
+  {
+   "s": 240.6,
+   "e": 241.45,
+   "t": "One campaign:"
+  },
+  {
+   "s": 241.5,
+   "e": 245.48,
+   "t": "an email for some readers, a push notification for others,"
+  },
+  {
+   "s": 245.53,
+   "e": 247.42,
+   "t": "each shaped for its channel."
+  },
+  {
+   "s": 252.3,
+   "e": 253.04,
+   "t": "Audiences."
+  },
+  {
+   "s": 253.09,
+   "e": 253.6,
+   "t": "Brands."
+  },
+  {
+   "s": 253.65,
+   "e": 254.08,
+   "t": "Roles."
+  },
+  {
+   "s": 254.13,
+   "e": 254.71,
+   "t": "Consent."
+  },
+  {
+   "s": 254.76,
+   "e": 256.7,
+   "t": "A record of who did what."
+  },
+  {
+   "s": 256.75,
+   "e": 259.4,
+   "t": "All in one place, all of it yours."
+  },
+  {
+   "s": 262.4,
+   "e": 263.37,
+   "t": "See what it does."
+  },
+  {
+   "s": 264.2,
+   "e": 265.26,
+   "t": "Change it with a file."
+  },
+  {
+   "s": 266.0,
+   "e": 267.2,
+   "t": "Keep the core."
+  },
+  {
+   "s": 268.8,
+   "e": 271.59,
+   "t": "Building a communication system you control."
+  },
+  {
+   "s": 271.64,
+   "e": 273.72,
+   "t": "Always adapting to your business."
+  }
+ ],
+ "code": {
+  "storage/modules/email/quote.json": {
+   "lang": "json",
+   "text": "{\n  \"label\": \"Quote\",\n  \"channel\": \"email\",\n  \"description\": \"A short quotation, set apart, and who said it. Typed into the block.\",\n  \"cms\": false,\n  \"variables\": [\n    {\n      \"name\": \"text\",\n      \"required\": true\n    },\n    {\n      \"name\": \"heading\",\n      \"required\": false\n    }\n  ]\n}"
+  },
+  "storage/modules/email/quote.mjml": {
+   "lang": "xml",
+   "text": "<mjml>\n  <mj-head>\n    <mj-include path=\"./_attributes.mjml\" />\n  </mj-head>\n  <mj-body width=\"600px\">\n    <!-- Quote: a short quotation, set apart, and who said it. -->\n    <mj-section>\n      <mj-column border-left=\"4px solid {{ profile.colour_text or '#1a1a1a' }}\" padding=\"0 12px 0 20px\">\n        <mj-text font-size=\"20px\" line-height=\"1.4\" padding=\"0 0 8px 0\" css-class=\"module-quote\">{{ text }}</mj-text>\n        <mj-raw>{% if heading %}</mj-raw>\n        <mj-text font-size=\"14px\" padding=\"0\">{{ heading }}</mj-text>\n        <mj-raw>{% endif %}</mj-raw>\n      </mj-column>\n    </mj-section>\n  </mj-body>\n</mjml>"
+  },
+  "backend/app/decision/strategies/recency_boost.py": {
+   "lang": "python",
+   "text": "from datetime import datetime, timezone\n\nfrom sqlalchemy.orm import Session\n\nfrom app.campaigns.db_models import DecisionSlotDB\nfrom app.content.service import get_latest_version_for_content\nfrom app.decision.strategies.base import (\n    ConfigField, DecisionStrategy, StrategyMeta, StrategyResult, best_per_record, candidate_query,\n    sending_brand_id,\n)\nfrom app.insight.signals import operational_signals_for_recipient\n\nDEFAULT_CONFIG = {\n    \"content_score_weight\": 1,\n    \"preference_score_weight\": 10,\n    \"recency_weight\": 20,\n}\nRECENT_DAYS = 30\n\n\nclass RecencyBoostStrategy(DecisionStrategy):\n\n    @property\n    def meta(self) -> StrategyMeta:\n        return StrategyMeta(\n            name=\"recency_boost\",\n            label=\"Recency boost\",\n            description=(\n                \"Like Recipient Top Score, plus a bonus for content updated in \"\n                \"the last 30 days: up to recency_weight points, falling to zero \"\n                \"over the month.\"\n            ),\n            requires_recipient=True,\n            candidate_filter_fields=[\n                ConfigField(\n                    name=\"category_ids\",\n                    type=\"list[int]\",\n                    default=[],\n                    description=\"Restrict candidates to these category IDs (empty = all).\",\n                ),\n            ],\n            config_fields=[\n                ConfigField(name=\"content_score_weight\", type=\"number\",\n                            default=DEFAULT_CONFIG[\"content_score_weight\"],\n                            description=\"Weight applied to the content's own category score.\"),\n                ConfigField(name=\"preference_score_weight\", type=\"number\",\n                            default=DEFAULT_CONFIG[\"preference_score_weight\"],\n                            description=\"Weight applied to the recipient's preference score.\"),\n                ConfigField(name=\"recency_weight\", type=\"number\",\n                            default=DEFAULT_CONFIG[\"recency_weight\"],\n                            description=\"Most points a brand-new record can add.\"),\n            ],\n        )\n\n    def rank(\n        self,\n        db: Session,\n        slot: DecisionSlotDB,\n        recipient_id: int | None = None,\n        *,\n        limit: int = 1,\n        exclude: frozenset[int] = frozenset(),\n    ) -> list[StrategyResult]:\n        if recipient_id is None:\n            return []\n\n        candidate_filter = slot.candidate_filter or {}\n        category_ids = candidate_filter.get(\"category_ids\", [])\n        brand_id = sending_brand_id(db, slot)\n        config = {**DEFAULT_CONFIG, **(slot.strategy_config or {})}\n        signals = operational_signals_for_recipient(db, recipient_id)\n        now = datetime.now(timezone.utc)\n\n        def bonus(updated_at) -> float:\n            age_days = max((now - updated_at).total_seconds() / 86400, 0)\n            return config[\"recency_weight\"] * max(0.0, 1 - age_days / RECENT_DAYS)\n\n        rows = [\n            (record, content_score, signals[category_id])\n            for (record, content_score, category_id) in candidate_query(db, slot, brand_id=brand_id).all()\n            if category_id in signals\n        ]\n        rows.sort(\n            key=lambda r: (r[1] * config[\"content_score_weight\"]\n                           + r[2] * config[\"preference_score_weight\"]\n                           + bonus(r[0].updated_at)),\n            reverse=True,\n        )\n\n        picks = []\n        for record, content_score, preference_score in best_per_record(\n                rows, lambda row: row[0].id, exclude, limit):\n            combined = (content_score * config[\"content_score_weight\"]\n                        + preference_score * config[\"preference_score_weight\"]\n                        + bonus(record.updated_at))\n            latest_version = get_latest_version_for_content(\n                db=db, content_record_id=record.id, brand_id=brand_id\n            )\n            picks.append(StrategyResult(\n                content_record_id=record.id,\n                content_version_id=latest_version.id if latest_version else None,\n                score=float(combined),\n                reason=(f\"recency_boost: recipient={recipient_id}, category_ids={category_ids}, \"\n                        f\"content_score={content_score}×{config['content_score_weight']} + \"\n                        f\"preference_score={preference_score}×{config['preference_score_weight']} + \"\n                        f\"recency={bonus(record.updated_at):.1f} = {combined:.1f}\"),\n            ))\n        return picks"
+  },
+  "backend/app/ai/tasks/headline_polish.py": {
+   "lang": "python",
+   "text": "\"\"\"Task: suggest sharper headlines for one content record.\n\nThe dev-owned scaffold only: it declares what the task reads, what shape it\nreturns, and what it costs at worst. The prompt itself is not here: it lives in\nsettings, owned and versioned by the manager (ADR-140 §4).\n\nPII: the model sees the record's own text and nothing about any recipient.\n\"\"\"\n\nfrom sqlalchemy.orm import Session\n\nfrom app.ai.tasks.base import TaskMeta\nfrom app.content.db_models import ContentRecordDB\n\nTASK_KEY = \"headline_polish\"\nMAX_OUTPUT_TOKENS = 300\n\nDEFAULT_PROMPT = \"\"\"You suggest sharper headlines for one piece of newsletter content.\n\nSuggest 3 headlines for the content below, in the language the content is\nwritten in. At most 60 characters each.\n\nReturn exactly 3 options in this format, nothing else:\n\n1. HEADLINE: <headline>\n2. HEADLINE: <headline>\n3. HEADLINE: <headline>\n\nThe content:\n{content}\n\"\"\"\n\nMETA = TaskMeta(\n    key=TASK_KEY,\n    label=\"Headline polish\",\n    description=(\n        \"Suggests three sharper headlines for a content record, from that \"\n        \"record's own text. The manager picks one; nothing is applied \"\n        \"automatically.\"\n    ),\n    default_prompt=DEFAULT_PROMPT,\n    max_output_tokens=MAX_OUTPUT_TOKENS,\n)\n\n\ndef gather_inputs(db: Session, content_record_id: int) -> str:\n    \"\"\"The task's declared input: the record's title and description.\"\"\"\n    record = db.query(ContentRecordDB).filter(ContentRecordDB.id == content_record_id).first()\n    return f\"{record.title}\\n{record.description or ''}\" if record else \"\""
+  },
+  "backend/app/delivery/providers/example_mail.py": {
+   "lang": "python",
+   "text": "\"\"\"An example email adapter: the shape of a provider, not a vendor.\n\nThrowaway, for the trailer's pre-production check. It sends nothing: it logs\nwhat it was handed, as the mock does, and declares that it carries email only.\nA real adapter calls its vendor's API in `send` (see resend.py).\n\"\"\"\n\nimport logging\nimport uuid\n\nfrom app.delivery.providers.base import DeliveryProvider, SendResult\nfrom app.rendering.renderers.base import RenderedArtifact\n\nlogger = logging.getLogger(__name__)\n\n\nclass ExampleMailProvider(DeliveryProvider):\n\n    channels = frozenset({\"email\"})\n    click_content_attribution = False\n    reaches_real_inboxes = False\n\n    def __init__(self, from_address: str | None = None):\n        self.from_address = from_address\n\n    def send(self, address: str, artifact: RenderedArtifact) -> SendResult:\n        logger.info(\n            \"example_mail send: to=%s subject=%s bytes=%d\",\n            address, (artifact.envelope or {}).get(\"subject\"), len(artifact.body or \"\"),\n        )\n        return SendResult(\n            success=True,\n            provider_message_id=f\"example-{uuid.uuid4()}\",\n            message=\"accepted\",\n        )"
+  },
+  "backend/app/delivery/providers/factory.py": {
+   "lang": "diff",
+   "text": "@@ -7,6 +7,8 @@ message about a malformed request, which is a poor way to find out somebody\n configured a push send with an email provider.\n \"\"\"\n \n+from app.delivery.providers.example_mail import ExampleMailProvider\n+from app.delivery.providers.example_push import ExamplePushProvider\n from app.delivery.providers.mock import MockProvider\n from app.delivery.providers.resend import ResendProvider\n \n@@ -25,6 +27,10 @@ def get_provider(provider_name: str, from_address: str | None = None,\n         # A per-send verified sender overrides the RESEND_FROM env default;\n         # None keeps the adapter's env fallback (mock ignores it entirely).\n         provider = ResendProvider(from_address=from_address)\n+    elif provider_name == \"example_mail\":\n+        provider = ExampleMailProvider(from_address=from_address)\n+    elif provider_name == \"example_push\":\n+        provider = ExamplePushProvider()\n     else:\n         raise ValueError(f\"Unsupported provider: {provider_name}\")\n \n@@ -42,6 +48,8 @@ def get_provider(provider_name: str, from_address: str | None = None,\n PROVIDER_LABELS = {\n     \"mock\": \"mock (nothing is sent)\",\n     \"resend\": \"resend (real)\",\n+    \"example_mail\": \"example_mail (nothing is sent)\",\n+    \"example_push\": \"example_push (nothing is sent)\",\n }\n #: Which adapters need a sender address. A push has no from-address, so\n #: offering the field is noise; a letter would need a return address, which is\n@@ -66,6 +74,8 @@ def providers_for_channel(channel: str) -> list[dict]:\n             # ADR-182 point 4: without it, clicks credit no category.\n             \"click_content_attribution\": cls.click_content_attribution,\n         }\n-        for name, cls in ((\"mock\", MockProvider), (\"resend\", ResendProvider))\n+        for name, cls in ((\"mock\", MockProvider), (\"resend\", ResendProvider),\n+                          (\"example_mail\", ExampleMailProvider),\n+                          (\"example_push\", ExamplePushProvider))\n         if cls().supports(channel)\n     ]"
+  },
+  "backend/app/delivery/providers/example_push.py": {
+   "lang": "python",
+   "text": "\"\"\"An example push adapter: the shape of a provider, not a vendor.\n\nThrowaway, for the trailer's pre-production check. It sends nothing: it logs\nwhat it was handed, as the mock does, and declares that it carries push only.\nA real adapter calls its vendor's API in `send` (see resend.py).\n\"\"\"\n\nimport json\nimport logging\nimport uuid\n\nfrom app.delivery.providers.base import DeliveryProvider, SendResult\nfrom app.rendering.renderers.base import RenderedArtifact\n\nlogger = logging.getLogger(__name__)\n\n\nclass ExamplePushProvider(DeliveryProvider):\n\n    channels = frozenset({\"push\"})\n    click_content_attribution = False\n    reaches_real_inboxes = False\n\n    def send(self, address: str, artifact: RenderedArtifact) -> SendResult:\n        logger.info(\n            \"example_push send: to=%s fields=%s\",\n            address, json.dumps(artifact.fields or {}, ensure_ascii=False),\n        )\n        return SendResult(\n            success=True,\n            provider_message_id=f\"example-push-{uuid.uuid4()}\",\n            message=\"accepted\",\n        )"
+  }
+ },
+ "files": {
+  "factory_head": "\"\"\"Which adapter carries which channel — ADR-161 point 1 plus ADR-101.\n\nThe channel is part of the question now, not an assumption. Before push, every\nsend was email and `get_provider(\"resend\")` could only mean one thing; asking\nResend to deliver a notification would have failed at the vendor with a\nmessage about a malformed request, which is a poor way to find out somebody\nconfigured a push send with an email provider.\n\"\"\"\n\nfrom app.delivery.providers.mock import MockProvider\nfrom app.delivery.providers.resend import ResendProvider\n",
+  "top_score_head": "from sqlalchemy.orm import Session\n\nfrom app.campaigns.db_models import DecisionSlotDB\nfrom app.content.db_models import ContentCategoryAssignmentDB, ContentRecordDB\nfrom app.content.service import get_latest_version_for_content\nfrom app.decision.strategies.base import (\n    ConfigField, DecisionStrategy, StrategyMeta, StrategyResult, best_per_record, candidate_query,\n    sending_brand_id,\n)\n\n\nclass TopScoreStrategy(DecisionStrategy):\n\n    @property\n    def meta(self) -> StrategyMeta:\n        return StrategyMeta(\n            name=\"top_score\",\n            label=\"Top Score\",\n            description=(\n                \"Selects the highest-scored content record across all \"\n                \"candidates in the allowed categories. No recipient context needed.\"\n            ),\n            requires_recipient=False,\n            candidate_filter_fields=[\n                ConfigField(\n                    name=\"category_ids\",\n                    type=\"list[int]\",\n                    default=[],\n                    description=\"Restrict candidates to these category IDs (empty = all).\",\n                ),\n            ],\n            config_fields=[],\n        )\n\n    def rank(\n        self,\n        db: Session,\n        slot: DecisionSlotDB,\n        recipient_id: int | None = None,\n        *,\n        limit: int = 1,\n        exclude: frozenset[int] = frozenset(),\n    ) -> list[StrategyResult]:\n        candidate_filter = slot.candidate_filter or {}\n        category_ids = candidate_filter.get(\"category_ids\", [])\n\n        # Resolved once and reused: it filters the candidates below AND scopes\n        # the version lookup further down, which must agree with it. Two calls",
+  "adr101_name": "ADR-101 — Provider Capabilities Are Explicit.md",
+  "adr101_text": "---\ntype: adr\nstatus: accepted\ntopic:\n  - architecture\n  - provider\ncreated: 2026-06-01\nmodified: 2026-09-12\nsource:\n  - interview-2026-06-01\ndepends_on:\n  - \"[[ADR-100 — Provider Layer as Send and Feedback Adapter]]\"\n\nNot all providers offer the same delivery and tracking capabilities.\n\n## Decision\n\nProvider capabilities must be explicitly defined.\n\nCore capabilities:",
+  "adr143_name": "ADR-143 — AI-Assisted Development Boundary.md",
+  "adr143_text": "**1. Mode C is ADR-140's philosophy pointed at the repo: the AI's output is a proposal, never a deployment.**"
+ }
+}
