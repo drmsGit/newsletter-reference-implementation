@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Decision history</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="{{themeClass}} root app" style="min-height: {{minH}}px">
+
+<div style="flex: 0 0 232px; display: flex">
+<dc-import name="V2Nav" theme="{{theme}}" contrast="{{contrast}}" active="Approvals" min-h="{{minH}}" hint-size="232px,900px"></dc-import>
+</div>
+
+<section class="col-wide" aria-label="Decision history" style="min-height: {{minH}}px; border-left: 1px solid var(--brand-line)">
+<header class="list-head">
+<a href="#" class="back"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 2.5L4 6l3.5 3.5"></path></svg>Waiting for a decision</a>
+<h1 class="ts-large" style="margin: 4px 0 0">Decision history</h1>
+</header>
+<div class="filters" role="group" aria-label="Filters">
+<button class="btn pulldown" type="button" aria-label="Action: Any action"><span class="pd-label">Action</span><span>Any action</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button>
+<button class="btn pulldown" type="button" aria-label="Requested by: Anyone"><span class="pd-label">Requested by</span><span>Anyone</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button>
+</div>
+<div class="dtable-wrap"><table class="dtable" aria-label="Decided requests">
+<thead><tr><th>Request</th><th>Summary</th><th>Outcome</th><th>Requested by</th><th>Decided by</th><th>Ended</th><th>Reason</th></tr></thead>
+<tbody>
+<tr><td class="nw"><a href="#">Send campaign</a></td><td>October coffee letter, Variant A to Single-origin lovers</td>
+<td style="white-space: nowrap"><span class="chip chip-ok"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5l2.5 2.5 4.5-5.5"></path></svg>Approved</span> <a href="#">Sent</a></td>
+<td>Scheduler (integration)</td><td>Maria Hartmann</td><td class="nw">17 Oct 2026, 09:12</td><td>—</td></tr>
+<tr><td class="nw"><a href="#">Send campaign</a></td><td>Cold-brew launch, Variant B to Everyone on email</td>
+<td style="white-space: nowrap"><span class="chip chip-bad"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 3l6 6M9 3l-6 6"></path></svg>Rejected</span></td>
+<td>Jonas Weber (person)</td><td>Maria Hartmann</td><td class="nw">12 Oct 2026, 16:02</td><td>Audience still includes the wholesale list.</td></tr>
+<tr><td class="nw"><a href="#">Send campaign</a></td><td>Roastery open day, Variant A to Roastery open day guests</td>
+<td style="white-space: nowrap"><span class="chip chip-ok"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5l2.5 2.5 4.5-5.5"></path></svg>Approved</span> <a href="#">Sent</a></td>
+<td>Anke Voss (person)</td><td>Maria Hartmann</td><td class="nw">28 Sep 2026, 08:00</td><td>—</td></tr>
+<tr><td class="nw"><a href="#">Send campaign</a></td><td>Spring blend story, Variant A to Everyone on email</td>
+<td style="white-space: nowrap"><span class="chip"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4.5"></circle><path d="M3.5 3.5l5 5"></path></svg>Expired</span></td>
+<td>Scheduler (integration)</td><td>—</td><td class="nw">02 Oct 2026, 10:18</td><td>No decision before the deadline.</td></tr>
+</tbody></table></div>
+<div style="flex: 1"></div>
+<div class="list-foot"><span></span><span style="display: flex; align-items: center; gap: 2px"><span class="ts-cap" style="margin-right: 4px">1–50 of 63</span><button class="btn btn-plain btn-sm" type="button" disabled>Newer</button><button class="btn btn-plain btn-sm" type="button">Older</button></span></div>
+</section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"minH":{"editor":"int","default":760,"min":600,"max":3000},"$preview":{"width":1440,"height":760}}'>
+class Component extends DCLogic {
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+const minH = parseInt(this.props.minH ?? 760, 10) || 600;
+return {
+themeClass: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : ''),
+theme,
+contrast,
+minH
+};
+}
+}
+</script>
+</body>
+</html>

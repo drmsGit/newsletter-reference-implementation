@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Categories</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="{{themeClass}} root app" style="min-height: {{minH}}px">
+
+<div style="flex: 0 0 232px; display: flex">
+<dc-import name="V2Nav" theme="{{theme}}" contrast="{{contrast}}" active="Content" min-h="{{minH}}" hint-size="232px,900px"></dc-import>
+</div>
+
+<section class="col-list" aria-label="Categories" style="min-height: {{minH}}px">
+<header class="list-head" style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px"><h1 class="ts-large" style="margin: 0">Content</h1></header>
+<div class="list-tools">
+<div class="seg" role="tablist" aria-label="Content"><button type="button" role="tab" aria-selected="false">Records</button><button type="button" role="tab" aria-selected="true">Categories</button><button type="button" role="tab" aria-selected="false">Graph</button></div>
+<p class="ts-cap" style="margin: 0">The categories content is sorted into, and what a recipient’s interests are counted in. They are shared by every brand: a change here reaches all of them.</p>
+</div>
+
+<form class="list-form" aria-label="Create a category">
+<label class="lbl" for="nc" style="margin: 0">New category</label>
+<input id="nc" class="field" type="text">
+<div class="row">
+<button class="select-btn" type="button" style="width: auto; min-width: 130px" aria-label="Type: Main"><span><span class="muted">Type</span>&nbsp; Main</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button>
+<button class="btn btn-primary" type="button" disabled>Create</button>
+</div>
+</form>
+
+<div class="list" role="group" aria-label="Categories">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+<a href="#" class="item" aria-current="{{r.current}}">
+<span class="clip ts-strong">{{r.name}}</span>
+<span class="ts-cap" style="display: flex; justify-content: space-between; gap: 12px"><span>{{r.kind}}</span><span style="white-space: nowrap">{{r.subs}}</span></span>
+</a>
+</sc-for>
+</div>
+</section>
+
+<div class="col-detail" style="min-height: {{minH}}px">
+<div class="detail-scroll">
+
+<header class="detail-head">
+<a href="#" class="back"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 2.5L4 6l3.5 3.5"></path></svg>Categories</a>
+<h2 class="ts-title" style="margin: 4px 0 0">Single origin</h2>
+</header>
+
+<section aria-labelledby="nt-h">
+<h3 id="nt-h" class="ts-head group-title">Name and type</h3>
+<form class="group">
+<div class="frow"><label class="lbl" for="cn" style="margin: 0">Name</label><input id="cn" class="field" type="text" value="Single origin"></div>
+<div class="frow"><label class="lbl" for="ct" style="margin: 0">Type</label><button id="ct" class="select-btn" type="button"><span>Sub</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button><div class="help" style="margin: 0">Shared by every brand: a new name shows everywhere.</div></div>
+<div class="frow"><div><button class="btn" type="button" disabled>Save</button></div></div>
+</form>
+</section>
+
+<section aria-labelledby="ws-h">
+<h3 id="ws-h" class="ts-head group-title">Where it sits</h3>
+<div class="group">
+<div class="frow"><div class="ts-strong">Under</div>
+<ul class="numlist" style="margin: 0 -16px"><li><a href="#" style="flex: 1">Coffee</a><button class="btn btn-plain btn-sm" type="button">Remove link</button></li></ul></div>
+<div class="frow"><div class="btnrow" style="align-items: flex-end"><div style="flex: 1 1 200px"><label class="lbl" for="pu" style="margin: 0 0 4px">Put it under</label><button id="pu" class="select-btn" type="button"><span class="muted">Choose a category</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div><button class="btn" type="button" disabled>Add</button></div></div>
+<div class="frow"><div class="ts-strong">Subcategories</div><div class="muted">None.</div></div>
+<div class="frow"><div class="btnrow" style="align-items: flex-end"><div style="flex: 1 1 200px"><label class="lbl" for="sc" style="margin: 0 0 4px">Add a subcategory</label><button id="sc" class="select-btn" type="button"><span class="muted">Choose a category</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div><button class="btn" type="button" disabled>Add</button></div></div>
+</div>
+</section>
+
+<section aria-labelledby="rc-h">
+<h3 id="rc-h" class="ts-head group-title">This brand’s records in it</h3>
+<div class="group"><div class="dtable-wrap"><table class="dtable" aria-label="Records in this category">
+<thead><tr><th>Record</th><th class="num">Fit (1–10)</th><th class="num">Sent in</th><th class="num">Clicks</th><th class="num">Share of clicks</th></tr></thead>
+<tbody>
+<tr><td><a href="#">Ethiopia Guji, washed</a></td><td class="num">9</td><td class="num">14</td><td class="num">1,204</td><td class="num">31 %</td></tr>
+<tr><td><a href="#">Ethiopia Guji, natural</a></td><td class="num">8</td><td class="num">6</td><td class="num">388</td><td class="num">10 %</td></tr>
+<tr><td><a href="#">Kenya Kiambu, natural</a></td><td class="num">7</td><td class="num">9</td><td class="num">702</td><td class="num">18 %</td></tr>
+<tr><td><a href="#">Colombia Huila, honey</a></td><td class="num">—</td><td class="num">0</td><td class="num">0</td><td class="num">Not sent yet</td></tr>
+</tbody></table></div></div>
+</section>
+
+<section aria-labelledby="sg-h">
+<h3 id="sg-h" class="ts-head group-title">Signal</h3>
+<div class="group"><dl style="margin: 0">
+<div class="fact"><dt>Updates to interests</dt><dd>1,862</dd></div>
+<div class="fact"><dt>Total</dt><dd>+4,310</dd></div>
+<div class="fact"><dt>Average</dt><dd>+2.3</dd></div>
+</dl></div>
+</section>
+
+<section aria-labelledby="dl-h">
+<h3 id="dl-h" class="ts-head group-title">Delete</h3>
+<div class="group" style="padding: 12px 16px; display: flex; flex-direction: column; gap: 10px">
+<div><button class="btn" type="button" style="color: var(--brand-danger)">Delete category…</button></div>
+<div class="muted">Asks “Delete Single origin for every brand?” with Delete Single origin and Keep it. If records or links remain: “Single origin still has records or links to other categories. Deleting it removes those too, for every brand.” with Delete it with them and Keep it.</div>
+</div>
+</section>
+
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"minH":{"editor":"int","default":1280,"min":900,"max":6000},"$preview":{"width":1440,"height":1280}}'>
+class Component extends DCLogic {
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+const minH = parseInt(this.props.minH ?? 1280, 10) || 900;
+const raw = [
+['Coffee', 'Main', '3 subcategories'],
+['Equipment', 'Main', '2 subcategories'],
+['Gifts', 'Main', '0 subcategories'],
+['Brewing', 'Sub · under Coffee', '0 subcategories'],
+['Cold brew', 'Sub · under Coffee', '0 subcategories'],
+['Single origin', 'Sub · under Coffee', '0 subcategories'],
+['Grinders', 'Sub · under Equipment', '0 subcategories'],
+['Kettles', 'Sub · under Equipment', '0 subcategories']
+];
+const rows = raw.map((r) => ({ name: r[0], kind: r[1], subs: r[2], current: r[0] === 'Single origin' ? 'true' : 'false' }));
+return {
+themeClass: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : ''),
+theme,
+contrast,
+minH,
+rows
+};
+}
+}
+</script>
+</body>
+</html>

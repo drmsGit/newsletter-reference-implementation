@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+</style>
+</helmet>
+<div class="{{themeClass}} root app" style="min-height: {{minH}}px">
+
+<div style="flex: 0 0 232px; display: flex">
+<dc-import name="V2Nav" theme="{{theme}}" contrast="{{contrast}}" active="Settings" min-h="{{minH}}" hint-size="232px,900px"></dc-import>
+</div>
+
+<section class="col-list" aria-label="Settings" style="min-height: {{minH}}px">
+<header class="list-head"><h1 class="ts-large" style="margin: 0">Settings</h1></header>
+<nav aria-label="Settings" class="list" style="flex: 0 0 auto">
+<sc-for list="{{menu}}" as="m" hint-placeholder-count="7">
+<a href="#" class="item" aria-current="{{m.current}}"><span class="ts-strong">{{m.label}}</span></a>
+</sc-for>
+</nav>
+
+<sc-if value="{{isProfile}}" hint-placeholder-val="{{false}}">
+<div style="border-top: 1px solid var(--brand-line); margin: 8px 0 0"></div>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px 4px"><h2 class="ts-head" style="margin: 0">Brand profiles</h2><button class="btn btn-sm btn-primary" type="button">New profile</button></div>
+<div class="list" role="group" aria-label="Brand profiles">
+<a href="#" class="item" aria-current="true"><span class="clip ts-strong">Nordlicht, English</span><span class="ts-cap">Default · en · marketing</span><span class="ts-cap" style="color: var(--brand-success)">Complete</span></a>
+<a href="#" class="item" aria-current="false"><span class="clip ts-strong">Nordlicht, Deutsch</span><span class="ts-cap">de · marketing</span><span class="ts-cap" style="color: var(--brand-success)">Complete</span></a>
+<a href="#" class="item" aria-current="false"><span class="clip ts-strong">Order confirmations</span><span class="ts-cap">en · transactional</span><span class="ts-cap" style="color: var(--brand-human)">Missing: Imprint link, Privacy link</span></a>
+</div>
+</sc-if>
+
+<sc-if value="{{isUsers}}" hint-placeholder-val="{{false}}">
+<div style="border-top: 1px solid var(--brand-line); margin: 8px 0 0"></div>
+<div style="padding: 12px 20px 4px"><h2 class="ts-head" style="margin: 0">Users</h2><div class="ts-cap">Everyone with an account, and what they may do. Deactivating someone signs them out at once.</div></div>
+<div style="padding: 8px 8px 0"><button class="btn" type="button" style="width: 100%; justify-content: space-between"><span>New user</span><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 2.5L8 6l-3.5 3.5"></path></svg></button></div>
+<div class="list" role="group" aria-label="Users">
+<a href="#" class="item" aria-current="false"><span class="clip ts-strong">Maria Hartmann <span class="muted" style="font-weight: 400">· you</span></span><span class="clip ts-cap">m.hartmann@nordlicht-kaffee.example</span><span class="ts-cap">Manager · last sign-in 17 Oct 2026, 08:44</span></a>
+<a href="#" class="item" aria-current="true"><span class="clip ts-strong">Jonas Weber</span><span class="clip ts-cap">jonas.weber@nordlicht-kaffee.example</span><span class="ts-cap">Editor · last sign-in 16 Oct 2026, 17:10</span></a>
+<a href="#" class="item" aria-current="false"><span class="clip ts-strong">Anke Voss <span class="muted" style="font-weight: 400">· external</span></span><span class="clip ts-cap">anke.voss@example.test</span><span class="ts-cap">Editor on Nordlicht Kaffee · Never</span></a>
+<a href="#" class="item" aria-current="false"><span class="clip ts-strong">Robin Approver <span class="muted" style="font-weight: 400">· deactivated</span></span><span class="clip ts-cap">robin@nordlicht-kaffee.example</span><span class="ts-cap">No role · last sign-in 02 Sep 2026, 09:12</span></a>
+</div>
+</sc-if>
+
+<sc-if value="{{isIntegrations}}" hint-placeholder-val="{{false}}">
+<div style="border-top: 1px solid var(--brand-line); margin: 8px 0 0"></div>
+<div style="padding: 12px 20px 4px"><h2 class="ts-head" style="margin: 0">Integrations</h2><div class="ts-cap">Other systems that call this platform, each with its own keys and what it may do.</div></div>
+<form class="list-form" aria-label="New integration">
+<label class="lbl" for="ni" style="margin: 0">New integration</label>
+<input id="ni" class="field" type="text">
+<label class="lbl" for="nw" style="margin: 0">What it is for</label>
+<input id="nw" class="field" type="text">
+<div class="row"><button class="btn btn-primary" type="button" disabled>Create</button></div>
+</form>
+<div class="list" role="group" aria-label="Integrations">
+<a href="#" class="item" aria-current="true"><span class="clip ts-strong">Scheduler</span><span class="ts-cap">Active · 1 live key, one expiring soon</span><span class="clip ts-cap">send, view</span></a>
+<a href="#" class="item" aria-current="false"><span class="clip ts-strong">CRM sync</span><span class="ts-cap">Active · 2 live keys</span><span class="clip ts-cap">view</span></a>
+<a href="#" class="item" aria-current="false"><span class="clip ts-strong">Old export</span><span class="ts-cap">Deactivated · 0 live keys</span><span class="clip ts-cap">Nothing yet</span></a>
+</div>
+</sc-if>
+</section>
+
+<div class="col-detail" style="min-height: {{minH}}px">
+<div class="detail-scroll">
+
+<!-- ================= General ================= -->
+<sc-if value="{{isGeneral}}" hint-placeholder-val="{{true}}">
+<header class="detail-head"><h2 class="ts-title" style="margin: 0">General</h2><div class="ts-cap" style="margin-top: 2px">Changes take effect for the whole deployment, and each one is recorded in the audit log.</div></header>
+
+<section aria-labelledby="g1">
+<h3 id="g1" class="ts-head group-title">Sending</h3>
+<div class="group">
+<form class="frow"><label class="lbl" for="cap" style="margin: 0">Most recipients one send may reach</label><div class="btnrow" style="flex-wrap: nowrap"><input id="cap" class="field" type="text" value="5000" style="max-width: 160px"><button class="btn" type="button">Save send cap</button></div></form>
+<div class="frow" style="padding: 0"><dl style="margin: 0"><div class="fact"><dt>Channel: Email</dt><dd>available</dd></div><div class="fact"><dt>Channel: Push</dt><dd>switched off</dd></div></dl></div>
+<div class="dtable-wrap" style="border-top: 1px solid var(--brand-line)"><table class="dtable" aria-label="Delivery providers">
+<thead><tr><th>Provider</th><th>Channels</th><th>Clicks credit content</th></tr></thead>
+<tbody><tr><td>Example provider</td><td>Email</td><td>yes</td></tr><tr><td>Scheduler test provider</td><td>Email</td><td>no — counted, not credited</td></tr></tbody></table></div>
+</div>
+</section>
+
+<section aria-labelledby="g2">
+<h3 id="g2" class="ts-head group-title">Sign-in sessions</h3>
+<form class="group">
+<div class="frow"><label class="lbl" for="h1" style="margin: 0">A sign-in lasts at most (hours, 1 to 72)</label><input id="h1" class="field" type="text" value="12" style="max-width: 160px"></div>
+<div class="frow"><label class="lbl" for="m1" style="margin: 0">Signed out after no activity for (minutes, 5 to 480)</label><input id="m1" class="field" type="text" value="60" style="max-width: 160px"><div class="help" style="margin: 0">Shorter values sign out anyone past them at once. A longer lifetime applies to sign-ins after the change.</div></div>
+<div class="frow"><div><button class="btn" type="button">Save sign-in lengths</button></div></div>
+</form>
+</section>
+
+<section aria-labelledby="g3">
+<h3 id="g3" class="ts-head group-title">Signals</h3>
+<form class="group">
+<div class="frow"><div class="btnrow"><div style="flex: 1 1 200px"><label class="lbl" for="wm" style="margin: 0 0 4px">Weight for manual (default 3)</label><input id="wm" class="field" type="text"></div><div style="flex: 1 1 200px"><label class="lbl" for="hm" style="margin: 0 0 4px">Half-life in days for manual (default 90)</label><input id="hm" class="field" type="text"></div></div></div>
+<div class="frow"><div class="btnrow"><div style="flex: 1 1 200px"><label class="lbl" for="wc" style="margin: 0 0 4px">Weight for click (default 1)</label><input id="wc" class="field" type="text" value="1.5"></div><div style="flex: 1 1 200px"><label class="lbl" for="hc2" style="margin: 0 0 4px">Half-life in days for click (default 30)</label><input id="hc2" class="field" type="text"></div></div></div>
+<div class="frow"><div class="muted">open and unsubscribe follow in the same pairs.</div></div>
+<div class="frow"><div><button class="btn" type="button">Save signal tuning</button></div></div>
+</form>
+</section>
+
+<section aria-labelledby="g4">
+<h3 id="g4" class="ts-head group-title">AI</h3>
+<div class="group">
+<div class="frow"><div class="btnrow" style="align-items: flex-end"><div style="flex: 1 1 200px"><label class="lbl" for="ap" style="margin: 0 0 4px">AI provider</label><button id="ap" class="select-btn" type="button"><span>Example AI provider</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div><button class="btn" type="button">Save provider</button></div></div>
+<div class="frow" style="padding: 0"><dl style="margin: 0">
+<div class="fact"><dt>Default model</dt><dd>example-model-1 (set by the deployment)</dd></div>
+<div class="fact"><dt>API key configured</dt><dd>yes</dd></div>
+<div class="fact"><dt>Tokens used</dt><dd>412,000 of 1,000,000 (41%) since 01 Oct 2026</dd></div>
+<div class="fact"><dt>Warning at</dt><dd>800,000 tokens</dd></div>
+<div class="fact"><dt>Spent</dt><dd>$12.40 of a $50 budget</dd></div>
+</dl></div>
+<form class="frow" style="border-top: 1px solid var(--brand-line)"><div class="btnrow"><div style="flex: 1 1 140px"><label class="lbl" for="wt" style="margin: 0 0 4px">Warn at (tokens)</label><input id="wt" class="field" type="text" value="800000"></div><div style="flex: 1 1 140px"><label class="lbl" for="st" style="margin: 0 0 4px">Stop at (tokens)</label><input id="st" class="field" type="text" value="1000000"></div><div style="flex: 1 1 140px"><label class="lbl" for="bu" style="margin: 0 0 4px">Budget (USD)</label><input id="bu" class="field" type="text" value="50"></div></div><div><button class="btn" type="button">Save AI budget</button></div></form>
+<div class="frow"><div class="btnrow" style="align-items: flex-end"><div style="flex: 1 1 200px"><label class="lbl" for="bp" style="margin: 0 0 4px">The token budget refills</label><button id="bp" class="select-btn" type="button"><span>Every month</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div><button class="btn" type="button">Save budget period</button></div><div class="help" style="margin: 0">Periods start at midnight UTC on the first day.</div></div>
+</div>
+
+<div class="group" style="margin-top: 12px">
+<div class="frow"><h4 class="ts-strong" style="margin: 0">Content draft</h4><div class="muted">Drafts the text fields of a content record from a source text.</div></div>
+<div class="frow"><div class="btnrow" style="align-items: flex-end"><div style="flex: 1 1 200px"><label class="lbl" for="m2" style="margin: 0 0 4px">Model for Content draft</label><button id="m2" class="select-btn" type="button"><span>the default (example-model-1)</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div><button class="btn" type="button">Save model</button></div></div>
+<div class="frow"><div class="btnrow" style="align-items: flex-end"><div style="flex: 1 1 200px"><label class="lbl" for="o2" style="margin: 0 0 4px">Output of Content draft</label><button id="o2" class="select-btn" type="button"><span>applied directly</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div><button class="btn" type="button">Save output mode</button></div></div>
+<div class="frow" style="padding: 0"><dl style="margin: 0"><div class="fact"><dt>Prompt</dt><dd>version 2 of 2</dd></div></dl></div>
+<div class="frow"><label class="lbl" for="pr" style="margin: 0">Prompt for Content draft</label><textarea id="pr" class="field" rows="5">You write short, plain marketing copy for a coffee roaster…</textarea><div><button class="btn" type="button">Publish as version 3</button></div></div>
+<div class="frow"><details><summary>The live prompt</summary><div class="muted" style="margin-top: 6px">Published versions: v1 (01 Sep 2026), v2 (22 Sep 2026)</div></details></div>
+</div>
+<p class="ts-cap" style="margin: 8px 16px 0">The same block repeats for Content translation, Subject &amp; preheader and Variant from a topic.</p>
+</section>
+</sc-if>
+
+<!-- ================= Brand profile ================= -->
+<sc-if value="{{isProfile}}" hint-placeholder-val="{{false}}">
+<header class="detail-head">
+<a href="#" class="back"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 2.5L4 6l3.5 3.5"></path></svg>Brand profiles</a>
+<h2 class="ts-title" style="margin: 4px 0 0">Nordlicht, English</h2>
+<div class="ts-cap" style="margin-top: 2px">Default profile · marketing · en</div>
+</header>
+
+<section aria-label="Profile"><div class="group">
+<div class="frow"><label class="lbl" for="pn" style="margin: 0">Name (required)</label><input id="pn" class="field" type="text" value="Nordlicht, English"></div>
+<div class="frow"><label class="lbl" for="pl" style="margin: 0">Language (required)</label><input id="pl" class="field" type="text" value="en"><div class="help" style="margin: 0">The language its texts are in, such as en or de. One profile per language.</div></div>
+<div class="frow"><label class="lbl" for="pk" style="margin: 0">Kind</label><button id="pk" class="select-btn" type="button"><span>Marketing: needs an opt-in</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div>
+</div></section>
+
+<section aria-labelledby="p1">
+<h3 id="p1" class="ts-head group-title">Legal details</h3>
+<div class="group">
+<div class="frow"><label class="lbl" for="lc" style="margin: 0">Legal company name (required to send)</label><input id="lc" class="field" type="text" value="Nordlicht Kaffee GmbH"></div>
+<div class="frow"><label class="lbl" for="la" style="margin: 0">Address (required to send)</label><textarea id="la" class="field" rows="2">Musterstrasse 1&#10;12345 Berlin</textarea></div>
+<div class="frow"><label class="lbl" for="li" style="margin: 0">Imprint link (required to send)</label><input id="li" class="field" type="url" value="https://nordlicht-kaffee.example/imprint"><div class="help" style="margin: 0">A full address starting with https://.</div></div>
+<div class="frow"><label class="lbl" for="lp" style="margin: 0">Privacy link (required to send)</label><input id="lp" class="field" type="url" value="https://nordlicht-kaffee.example/privacy"></div>
+</div>
+</section>
+
+<section aria-labelledby="p2">
+<h3 id="p2" class="ts-head group-title">Unsubscribe</h3>
+<div class="group"><div class="frow"><label class="lbl" for="uw" style="margin: 0">Unsubscribe wording (required to send)</label><input id="uw" class="field" type="text" value="Unsubscribe"></div></div>
+</section>
+
+<section aria-labelledby="p3">
+<h3 id="p3" class="ts-head group-title">Link tracking</h3>
+<div class="group">
+<div class="frow"><label class="lbl" for="us" style="margin: 0">UTM source</label><input id="us" class="field" type="text" value="newsletter"></div>
+<div class="frow"><label class="lbl" for="um" style="margin: 0">UTM medium</label><input id="um" class="field" type="text" value="email"></div>
+<div class="frow"><label class="lbl" for="up" style="margin: 0">Further link parameters</label><input id="up" class="field" type="text"></div>
+</div>
+</section>
+
+<section aria-labelledby="p4">
+<h3 id="p4" class="ts-head group-title">Look</h3>
+<div class="group">
+<div class="frow"><label class="lbl" for="lk1" style="margin: 0">Text colour</label><div class="btnrow" style="flex-wrap: nowrap"><span class="ph-img" style="width: 28px; height: 28px; flex: none; background: #1f1b16; border-radius: 6px"></span><input id="lk1" class="field" type="text" value="#1f1b16"></div><div class="help" style="margin: 0">A colour as #rgb or #rrggbb, for example #1a5db0.</div></div>
+<div class="frow"><label class="lbl" for="lk2" style="margin: 0">Button colour</label><div class="btnrow" style="flex-wrap: nowrap"><span class="ph-img" style="width: 28px; height: 28px; flex: none; background: #1a5d74; border-radius: 6px"></span><input id="lk2" class="field" type="text" value="#1a5d74"></div></div>
+<div class="frow"><label class="lbl" for="lk3" style="margin: 0">Font</label><input id="lk3" class="field" type="text" value="Georgia, serif"><div class="help" style="margin: 0">A font list with a safe fallback, for example Georgia, serif.</div></div>
+<div class="frow"><label class="lbl" for="lk4" style="margin: 0">Headline size</label><input id="lk4" class="field" type="text" value="22px"><div class="help" style="margin: 0">With its unit, for example 16px.</div></div>
+<div class="frow"><div class="muted">Body text colour, Button text colour, Hero background, Body text size and Button corner radius follow in the same form.</div></div>
+</div>
+</section>
+
+<section aria-labelledby="p5">
+<h3 id="p5" class="ts-head group-title">Header</h3>
+<div class="group">
+<div class="frow"><div class="ts-strong">Logo</div><div class="btnrow" style="flex-wrap: nowrap"><div class="ph-img" style="width: 72px; height: 54px; flex: none">Logo</div><div style="flex: 1; min-width: 0"><div class="clip">nordlicht-logo.png</div><div class="ts-cap">Nordlicht Kaffee logo</div></div><button class="btn btn-sm" type="button">Change image…</button><button class="btn btn-plain btn-sm" type="button">Remove</button></div></div>
+<div class="frow"><label class="lbl" for="hl1" style="margin: 0">Logo links to</label><input id="hl1" class="field" type="url" value="https://nordlicht-kaffee.example"></div>
+<div class="frow"><label class="lbl" for="hl2" style="margin: 0">Menu links</label><textarea id="hl2" class="field" rows="3">Shop | https://nordlicht-kaffee.example/shop&#10;Journal | https://nordlicht-kaffee.example/journal</textarea><div class="help" style="margin: 0">One link per line, written Label | https://address, in the order they should appear.</div></div>
+</div>
+</section>
+
+<section aria-labelledby="p6">
+<h3 id="p6" class="ts-head group-title">Footer</h3>
+<div class="group">
+<div class="frow"><label class="lbl" for="fl1" style="margin: 0">Footer links</label><textarea id="fl1" class="field" rows="2">Contact | https://nordlicht-kaffee.example/contact</textarea></div>
+<div class="frow"><label class="lbl" for="fl2" style="margin: 0">Service hotline</label><input id="fl2" class="field" type="text" value="+49 30 1234567"></div>
+<div class="frow"><label class="lbl" for="fl3" style="margin: 0">Footer text</label><textarea id="fl3" class="field" rows="2">You receive this email because you subscribed on our website.</textarea></div>
+</div>
+</section>
+
+<section aria-label="Save"><div class="group"><div class="frow"><div class="btnrow"><button class="btn btn-primary" type="button" disabled>Save</button><span class="muted">Saved.</span></div></div></div></section>
+
+<section aria-labelledby="pa">
+<h3 id="pa" class="ts-head group-title">Profile actions</h3>
+<div class="group"><div class="frow"><div class="btnrow"><button class="btn" type="button">Duplicate</button><button class="btn" type="button">Make default</button><button class="btn" type="button" style="color: var(--brand-danger)">Delete…</button></div><div class="help" style="margin: 0">Make default and Delete are hidden on the default profile. Delete asks “Variants using it will move to the default profile.” with Delete {name} and Keep it. With unsaved edits: “Save or undo your changes first; these act on the stored profile.”</div></div></div>
+</section>
+</sc-if>
+
+<!-- ================= User ================= -->
+<sc-if value="{{isUsers}}" hint-placeholder-val="{{false}}">
+<header class="detail-head">
+<a href="#" class="back"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 2.5L4 6l3.5 3.5"></path></svg>Users</a>
+<h2 class="ts-title" style="margin: 4px 0 0">Jonas Weber</h2>
+</header>
+<section aria-label="Person"><div class="group"><dl style="margin: 0">
+<div class="fact"><dt>Email</dt><dd>jonas.weber@nordlicht-kaffee.example</dd></div>
+<div class="fact"><dt>Account</dt><dd>Active</dd></div>
+<div class="fact"><dt>Last sign-in</dt><dd>16 Oct 2026, 17:10</dd></div>
+<div class="fact"><dt>Signed in now</dt><dd>1 session</dd></div>
+</dl></div></section>
+<section aria-labelledby="u1">
+<h3 id="u1" class="ts-head group-title">Access</h3>
+<div class="group">
+<ul class="numlist" aria-label="Roles"><li><span style="flex: 1">editor</span><button class="btn btn-plain btn-sm" type="button">Remove</button></li><li><span style="flex: 1">approver on Nordlicht Kaffee (Austria)</span><button class="btn btn-plain btn-sm" type="button">Remove</button></li></ul>
+<div class="frow" style="border-top: 1px solid var(--brand-line)"><div class="btnrow" style="align-items: flex-end"><div style="flex: 1 1 180px"><label class="lbl" for="gr" style="margin: 0 0 4px">Give a role</label><button id="gr" class="select-btn" type="button"><span class="muted">Choose a role</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div><div style="flex: 1 1 180px"><label class="lbl" for="ob" style="margin: 0 0 4px">On brand</label><button id="ob" class="select-btn" type="button"><span>The default brand</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div><button class="btn" type="button" disabled>Give</button></div></div>
+</div>
+</section>
+<section aria-labelledby="u2">
+<h3 id="u2" class="ts-head group-title">Sign-in</h3>
+<div class="group"><div class="frow"><div><button class="btn" type="button" style="color: var(--brand-danger)">Deactivate (signs them out now)</button></div><div class="help" style="margin: 0">On your own account this reads “This is you. Someone else who manages users can deactivate your account.” A deactivated user shows Reactivate.</div></div></div>
+</section>
+</sc-if>
+
+<!-- ================= Integration ================= -->
+<sc-if value="{{isIntegrations}}" hint-placeholder-val="{{false}}">
+<header class="detail-head">
+<a href="#" class="back"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 2.5L4 6l3.5 3.5"></path></svg>Integrations</a>
+<h2 class="ts-title" style="margin: 4px 0 0">Scheduler</h2>
+<div class="ts-cap" style="margin-top: 2px">Fires the weekly digest send.</div>
+</header>
+<section aria-labelledby="i1">
+<h3 id="i1" class="ts-head group-title">Keys</h3>
+<div class="group">
+<ul class="numlist" aria-label="Live keys"><li><span style="flex: 1"><span class="mono">k_4f9a2c</span> <span class="ts-strong">Production</span> · issued 02 Sep 2026 · last used 17 Oct 2026, 06:00 · expires 01 Nov 2026 (soon)</span><button class="btn btn-plain btn-sm" type="button">Revoke</button></li></ul>
+<form class="frow" style="border-top: 1px solid var(--brand-line)"><div class="btnrow" style="align-items: flex-end"><div style="flex: 1 1 200px"><label class="lbl" for="kl" style="margin: 0 0 4px">New key’s label</label><input id="kl" class="field" type="text"></div><div style="flex: 1 1 200px"><label class="lbl" for="ke" style="margin: 0 0 4px">Expires after (days, empty for never)</label><input id="ke" class="field" type="text" value="90"></div><button class="btn" type="button">Issue a key</button></div></form>
+</div>
+</section>
+<section aria-labelledby="i2">
+<h3 id="i2" class="ts-head group-title">What it may do</h3>
+<div class="group">
+<div class="frow"><div class="muted">Tick what its keys may do, per brand. Each tick is saved at once. You can only allow what you may do yourself.</div></div>
+<div class="dtable-wrap" style="border-top: 1px solid var(--brand-line)"><table class="dtable" aria-label="What it may do">
+<thead><tr><th>Permission</th><th>Nordlicht Kaffee</th><th>Nordlicht Kaffee (Austria)</th></tr></thead>
+<tbody>
+<tr><td><span class="mono">view</span><div class="ts-cap">Read everything in the brand</div></td><td><input type="checkbox" checked disabled aria-label="view on Nordlicht Kaffee"></td><td><input type="checkbox" checked disabled aria-label="view on Nordlicht Kaffee (Austria)"></td></tr>
+<tr><td><span class="mono">send</span><div class="ts-cap">Plan and send a variant</div></td><td><input type="checkbox" checked aria-label="send on Nordlicht Kaffee"></td><td><input type="checkbox" aria-label="send on Nordlicht Kaffee (Austria)"></td></tr>
+<tr><td><span class="mono">edit_content</span><div class="ts-cap">Change content records</div></td><td><input type="checkbox" aria-label="edit_content on Nordlicht Kaffee"></td><td><input type="checkbox" aria-label="edit_content on Nordlicht Kaffee (Austria)"></td></tr>
+</tbody></table></div>
+</div>
+</section>
+<section aria-labelledby="i3">
+<h3 id="i3" class="ts-head group-title">Sending without a person</h3>
+<form class="group">
+<div class="frow"><div class="muted">A send it fires to at most this many recipients goes out at once; a bigger one waits for a person in Approvals. 0: every send waits.</div></div>
+<div class="frow"><label class="lbl" for="ur" style="margin: 0">Recipients per send, unattended</label><div class="btnrow" style="flex-wrap: nowrap"><input id="ur" class="field" type="text" value="500" style="max-width: 160px"><button class="btn" type="button" disabled>Save</button></div></div>
+</form>
+</section>
+<section aria-label="Deactivate"><div class="group"><div class="frow"><div><button class="btn" type="button" style="color: var(--brand-danger)">Deactivate Scheduler</button></div></div></div></section>
+</sc-if>
+
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"part":{"editor":"enum","default":"general","options":["general","profile","users","integrations"]},"minH":{"editor":"int","default":1980,"min":900,"max":6000},"$preview":{"width":1440,"height":1980}}'>
+class Component extends DCLogic {
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+const part = this.props.part ?? 'general';
+const minH = parseInt(this.props.minH ?? 1980, 10) || 900;
+const label = { general: 'General', profile: 'Brand profiles', users: 'Users', integrations: 'Integrations' };
+const names = ['General', 'Brand profiles', 'Personalisation', 'Users', 'Roles', 'Integrations', 'Brands'];
+const menu = names.map((n) => ({ label: n, current: n === label[part] ? 'page' : 'false' }));
+return {
+themeClass: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : ''),
+theme,
+contrast,
+minH,
+menu,
+isGeneral: part === 'general',
+isProfile: part === 'profile',
+isUsers: part === 'users',
+isIntegrations: part === 'integrations'
+};
+}
+}
+</script>
+</body>
+</html>

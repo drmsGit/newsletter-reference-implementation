@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Monitoring</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="{{themeClass}} root app" style="min-height: {{minH}}px">
+
+<div style="flex: 0 0 232px; display: flex">
+<dc-import name="V2Nav" theme="{{theme}}" contrast="{{contrast}}" active="Monitoring" min-h="{{minH}}" hint-size="232px,900px"></dc-import>
+</div>
+
+<section class="col-wide" aria-label="Monitoring" style="min-height: {{minH}}px; border-left: 1px solid var(--brand-line)">
+<header class="list-head"><h1 class="ts-large" style="margin: 0">Monitoring</h1><div class="ts-cap" style="margin-top: 2px">Where are my campaigns? Open a row to go to its campaign.</div></header>
+<div class="dtable-wrap"><table class="dtable" aria-label="Campaign states">
+<thead><tr><th>Campaign</th><th>State</th><th>Variants</th><th>Next scheduled</th><th>Last sent</th></tr></thead>
+<tbody>
+<tr><td class="nw"><a href="#">October coffee letter</a></td>
+<td style="white-space: nowrap"><span class="chip chip-run"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4.5" opacity=".35"></circle><path d="M6 1.5a4.5 4.5 0 0 1 4.5 4.5"></path></svg>In flight</span> <span class="chip chip-bad"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 3l6 6M9 3l-6 6"></path></svg>with failures</span></td>
+<td>Variant A (email): sending; Variant B (email): scheduled</td><td class="nw">18 Oct 2026, 09:00</td><td class="nw">17 Oct 2026, 09:00</td></tr>
+<tr><td class="nw"><a href="#">Cold-brew launch</a></td>
+<td style="white-space: nowrap"><span class="chip chip-run"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4.5" opacity=".35"></circle><path d="M6 1.5a4.5 4.5 0 0 1 4.5 4.5"></path></svg>In flight</span></td>
+<td>Variant A (email): send planned</td><td class="nw">19 Oct 2026, 08:00</td><td class="nw">12 Oct 2026, 16:40</td></tr>
+<tr><td class="nw"><a href="#">Winter roast preview</a></td>
+<td style="white-space: nowrap"><span class="chip"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="3" cy="6" r=".6"></circle><circle cx="6" cy="6" r=".6"></circle><circle cx="9" cy="6" r=".6"></circle></svg>In preparation</span></td>
+<td>Variant A (email): approved, not planned; Variant B (email): composing</td><td class="nw">—</td><td class="nw">—</td></tr>
+<tr><td class="nw"><a href="#">Wholesale price update</a></td>
+<td style="white-space: nowrap"><span class="chip"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="3" cy="6" r=".6"></circle><circle cx="6" cy="6" r=".6"></circle><circle cx="9" cy="6" r=".6"></circle></svg>In preparation</span></td>
+<td>—</td><td class="nw">—</td><td class="nw">—</td></tr>
+<tr><td class="nw"><a href="#">Roastery open day</a></td>
+<td style="white-space: nowrap"><span class="chip chip-ok"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5l2.5 2.5 4.5-5.5"></path></svg>Sent</span></td>
+<td>Variant A (email): sent</td><td class="nw">—</td><td class="nw">28 Sep 2026, 08:00</td></tr>
+<tr><td class="nw"><a href="#">Gift subscriptions</a></td>
+<td style="white-space: nowrap"><span class="chip chip-ok"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5l2.5 2.5 4.5-5.5"></path></svg>Sent</span> <span class="chip chip-bad"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 3l6 6M9 3l-6 6"></path></svg>with failures</span></td>
+<td>Variant A (email): sent</td><td class="nw">—</td><td class="nw">19 Sep 2026, 11:31</td></tr>
+</tbody></table></div>
+<div style="flex: 1"></div>
+<div class="list-foot"><span class="ts-cap">No counts here: figures are on each campaign.</span><span style="display: flex; align-items: center; gap: 2px"><span class="ts-cap" style="margin-right: 4px">1–50 of 132</span><button class="btn btn-plain btn-sm" type="button" disabled>Newer</button><button class="btn btn-plain btn-sm" type="button">Older</button></span></div>
+</section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"minH":{"editor":"int","default":760,"min":600,"max":3000},"$preview":{"width":1440,"height":760}}'>
+class Component extends DCLogic {
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+const minH = parseInt(this.props.minH ?? 760, 10) || 600;
+return {
+themeClass: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : ''),
+theme,
+contrast,
+minH
+};
+}
+}
+</script>
+</body>
+</html>

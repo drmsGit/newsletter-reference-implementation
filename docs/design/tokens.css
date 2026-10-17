@@ -1,0 +1,156 @@
+/*
+ * Manager app design tokens, v2 (three columns, Apple criteria). APPROVED 2026-10-12.
+ * See DESIGN.md in this folder, "Update 2026-10-12", for what is settled and what is open.
+ * The same values live in frontend/src/index.css; change both together.
+ *
+ * Keeps the nine existing --brand-* names and their meaning. The names added below were
+ * proposed in v1 or are new in v2 (marked). The app has one palette per install.
+ *
+ * The palette (2026-10-17): Linen #fcf8f2 is the ground, Petrol #1a5d74 the one action colour,
+ * Pale Pink #f4bebb the "you are here" marker in the navigation. Pale pink is also the hue of the
+ * failed tint, so it is never a status and never a surface. Every other value is derived from
+ * those three and checked: text 4.5:1, field borders and the focus ring 3:1, in all four modes.
+ *
+ * Fonts: the system font (SF Pro on Apple devices) and the system monospace. No font files
+ * are hosted and none are loaded from a CDN (ADR-171).
+ *
+ * Themes: light is the default. Dark: <html data-theme="dark"> (no switch exists in the app yet).
+ * Increased contrast follows the person's system setting (prefers-contrast: more).
+ * Contrast of every text and control pair was computed from these hex values (DESIGN.md).
+ */
+
+:root {
+  /* The nine existing tokens */
+  --brand-fg: #1f1b16;
+  --brand-bg: #fcf8f2; /* the ground, Linen: details column and page */
+  --brand-muted: #62594e;
+  --brand-line: #e4daca; /* hairlines */
+  --brand-accent: #1a5d74; /* the one action colour: primary action, links, nav icons */
+  --brand-danger: #b3261e;
+  --brand-font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --brand-radius: 6px; /* controls */
+  --brand-space: 8px;
+
+  /* Surfaces and borders */
+  --brand-surface: #ffffff; /* cards, the list column */
+  --brand-surface-2: #f6f1e8; /* hover, wells, disabled */
+  --brand-line-strong: #857a6c; /* field borders, 3:1 on every surface */
+  --brand-accent-fg: #ffffff;
+  --brand-focus: #1a5d74;
+  --brand-sidebar: #f3ecdf; /* new in v2: the navigation column */
+  --brand-selected: #dceaef; /* new in v2: selected row */
+  --brand-highlight: #f4bebb; /* new in v2: "you are here", the selected navigation item only */
+
+  /* Waiting on a person (pending) */
+  --brand-human: #7a4a00;
+  --brand-human-bg: #fff0d6;
+
+  /* Status */
+  --brand-success: #1d6b34;
+  --brand-success-bg: #e1f4e6;
+  --brand-info: #0a5eb0; /* running */
+  --brand-info-bg: #e3effb;
+  --brand-danger-bg: #fde8e6;
+
+  /* Type, shape, size */
+  --brand-font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --brand-radius-panel: 10px; /* cards and selected rows */
+  --brand-radius-chip: 999px; /* capsule */
+  --brand-shadow: 0 0.5px 1px rgb(0 0 0 / 0.12); /* new in v2: the hairline under a push button */
+  --brand-control-height-sm: 24px; /* new in v2 */
+  --brand-control-height: 28px;
+  --brand-control-height-lg: 36px; /* new in v2: the one decision action */
+
+  /*
+   * Initials avatar (2026-10-13). The hue comes from the name, never from chance
+   * (HANDOFF.md, "Initials avatar"): hash the name, hue = hash mod 360, set it as
+   * --avatar-hue on the element. Only the saturation and lightness belong to the
+   * theme, so the initials stay readable on every hue (lowest 5.65 : 1).
+   *   background: hsl(var(--avatar-hue) var(--brand-avatar-bg-s) var(--brand-avatar-bg-l))
+   *   initials:   hsl(var(--avatar-hue) var(--brand-avatar-fg-s) var(--brand-avatar-fg-l))
+   */
+  --brand-avatar-bg-s: 50%;
+  --brand-avatar-bg-l: 90%;
+  --brand-avatar-fg-s: 60%;
+  --brand-avatar-fg-l: 24%;
+}
+
+:root[data-theme="dark"] {
+  --brand-fg: #f4eee6;
+  --brand-bg: #14110f;
+  --brand-muted: #b0a79b;
+  --brand-line: #3a342d;
+  --brand-accent: #6fc3dd;
+  --brand-danger: #ff8d85;
+
+  --brand-surface: #1e1b18;
+  --brand-surface-2: #2a2622;
+  --brand-line-strong: #8f857a;
+  --brand-accent-fg: #0b2530;
+  --brand-focus: #6fc3dd;
+  --brand-sidebar: #191614;
+  --brand-selected: #19424f;
+  --brand-highlight: #613534;
+
+  --brand-human: #ffc970;
+  --brand-human-bg: #3a2a0c;
+
+  --brand-success: #7dd99a;
+  --brand-success-bg: #12301c;
+  --brand-info: #7db9ff;
+  --brand-info-bg: #14304f;
+  --brand-danger-bg: #3f1b18;
+
+  --brand-shadow: 0 0 0 0.5px rgb(255 255 255 / 0.08);
+
+  --brand-avatar-bg-s: 32%;
+  --brand-avatar-bg-l: 24%;
+  --brand-avatar-fg-s: 70%;
+  --brand-avatar-fg-l: 86%;
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --brand-bg: #ffffff;
+    --brand-sidebar: #f3ecdf;
+    --brand-surface-2: #ece4d6;
+    --brand-selected: #bfd8e0;
+    --brand-highlight: #efa9a5;
+    --brand-line: #8a7f70;
+    --brand-line-strong: #3d362d;
+    --brand-fg: #000000;
+    --brand-muted: #3f382f;
+    --brand-accent: #0e4558;
+    --brand-focus: #0e4558;
+    --brand-human: #5e3a00;
+    --brand-success: #14532a;
+    --brand-info: #07468a;
+    --brand-danger: #8e1a13;
+    --brand-avatar-bg-l: 86%;
+    --brand-avatar-fg-s: 70%;
+    --brand-avatar-fg-l: 16%;
+  }
+
+  :root[data-theme="dark"] {
+    --brand-bg: #000000;
+    --brand-surface: #0d0b0a;
+    --brand-sidebar: #0d0b0a;
+    --brand-surface-2: #201c18;
+    --brand-selected: #1a5a70;
+    --brand-highlight: #7a3f3d;
+    --brand-line: #9c9387;
+    --brand-line-strong: #cfc6ba;
+    --brand-fg: #ffffff;
+    --brand-muted: #d8d0c4;
+    --brand-accent: #8fd4ea;
+    --brand-accent-fg: #000000;
+    --brand-focus: #8fd4ea;
+    --brand-human: #ffd98a;
+    --brand-success: #a5e4bb;
+    --brand-info: #a8d1ff;
+    --brand-danger: #ffb4ad;
+    --brand-avatar-bg-l: 16%;
+    --brand-avatar-fg-s: 80%;
+    --brand-avatar-fg-l: 92%;
+  }
+}

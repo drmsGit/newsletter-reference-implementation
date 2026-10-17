@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Preview sheet</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="{{themeClass}} root" style="position: relative; height: 900px; overflow: hidden">
+
+<div aria-hidden="true"><dc-import name="V2Editor" theme="{{theme}}" contrast="{{contrast}}" min-h="900" hint-size="100%,900px"></dc-import></div>
+<div class="scrim"></div>
+
+<div class="sheet" role="dialog" aria-label="Preview of Variant A" style="position: absolute; left: 96px; right: 96px; top: 40px; bottom: 40px; display: flex; flex-direction: column">
+
+<header style="display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--brand-line)">
+<h2 class="ts-title" style="margin: 0">Preview of Variant A</h2>
+<button class="btn" type="button">Close</button>
+</header>
+
+<div style="padding: 16px 24px 8px; display: flex; flex-direction: column; gap: 12px">
+<p class="muted" style="margin: 0; max-width: 720px">A preview shows what is saved now, unpublished edits included. A test send shows what will actually be sent.</p>
+<div class="btnrow"><span class="chip"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="4" r="2"></circle><path d="M2.5 10c.5-1.8 1.8-2.6 3.5-2.6s3 .8 3.5 2.6"></path></svg>For anke.voss@example.test.</span><button class="btn btn-sm" type="button">Generic preview</button></div>
+</div>
+
+<div style="flex: 1; min-height: 0; display: flex; gap: 24px; padding: 8px 24px 24px">
+
+<div style="flex: 0 0 320px; min-width: 0">
+<h3 class="ts-head group-title" style="padding: 0 0 6px">Modules</h3>
+<ul class="group numlist" aria-label="Module states">
+<li><span style="flex: 1">Hero · picked</span></li>
+<li><span style="flex: 1">Editorial · typed in</span></li>
+<li><span style="flex: 1">Image left · the generic pick — this recipient has no pick of their own yet</span></li>
+<li><span style="flex: 1">Image right · shows unpublished edits — a send still uses the published version</span></li>
+<li><span style="flex: 1">Call to action · typed in · empty: Button label</span></li>
+</ul>
+</div>
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<h3 class="ts-head group-title" style="padding: 0 0 6px">Rendered email: Variant A</h3>
+<div style="flex: 1; min-height: 0; overflow: hidden; background: var(--brand-surface-2); border: 1px solid var(--brand-line); border-radius: 10px; padding: 20px; display: flex; justify-content: center">
+<div class="mail" style="width: 560px">
+<div style="padding: 16px 24px; border-bottom: 1px solid #e4daca; display: flex; align-items: center; justify-content: space-between"><div class="sk" style="width: 96px; height: 14px; background: #1a5d74"></div><div style="display: flex; gap: 12px"><div class="sk" style="width: 40px"></div><div class="sk" style="width: 40px"></div></div></div>
+<div class="ph-img" style="margin: 16px 24px 0; height: 150px; border-radius: 4px; background: #eee6d8; color: #62594e">Hero image</div>
+<div style="padding: 16px 24px"><div style="font-size: 22px; line-height: 28px; font-weight: 700">Ethiopia Guji is back</div><div style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px"><div class="sk" style="background: #ddd2c0"></div><div class="sk" style="width: 88%; background: #ddd2c0"></div><div class="sk" style="width: 70%; background: #ddd2c0"></div></div></div>
+<div style="padding: 0 24px 16px; display: flex; gap: 16px"><div class="ph-img" style="width: 160px; height: 100px; border-radius: 4px; background: #eee6d8; color: #62594e; flex: none">Image</div><div style="flex: 1; display: flex; flex-direction: column; gap: 6px; padding-top: 6px"><div style="font-weight: 600">Kenya Kiambu, natural</div><div class="sk" style="background: #ddd2c0"></div><div class="sk" style="width: 80%; background: #ddd2c0"></div></div></div>
+<div style="padding: 0 24px 20px"><div style="display: inline-block; background: #1a5d74; color: #fff; padding: 8px 16px; border-radius: 4px; font-weight: 600">&nbsp;</div></div>
+<div style="padding: 12px 24px; background: #f6f1e8; font-size: 12px; line-height: 16px; color: #62594e">Example Coffee GmbH, Musterstrasse 1, Berlin. Imprint · Privacy · Unsubscribe</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+return {
+themeClass: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : ''),
+theme,
+contrast
+};
+}
+}
+</script>
+</body>
+</html>

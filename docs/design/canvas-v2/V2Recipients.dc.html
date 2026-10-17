@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Recipients</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="{{themeClass}} root app" style="min-height: {{minH}}px">
+
+<div style="flex: 0 0 232px; display: flex">
+<dc-import name="V2Nav" theme="{{theme}}" contrast="{{contrast}}" active="Recipients" min-h="{{minH}}" hint-size="232px,900px"></dc-import>
+</div>
+
+<section class="col-list" aria-label="Recipients" style="min-height: {{minH}}px">
+<header class="list-head"><h1 class="ts-large" style="margin: 0">Recipients</h1></header>
+<form class="search" role="search"><input class="field" type="text" aria-label="Find a recipient by identifier or address" placeholder="Find a recipient by identifier or address"><button class="btn" type="button">Search</button></form>
+<div class="list" role="group" aria-label="Recipients">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+<a href="#" class="item" aria-current="{{r.current}}">
+<span class="clip ts-strong">{{r.id}}</span>
+<span class="ts-cap" style="display: flex; justify-content: space-between; gap: 12px"><span>Reachable on {{r.ch}}</span><span style="white-space: nowrap">{{r.lang}} · {{r.status}}</span></span>
+</a>
+</sc-for>
+</div>
+<div class="list-foot"><span></span><span style="display: flex; align-items: center; gap: 2px"><span class="ts-cap" style="margin-right: 4px">1–50 of 4,812</span><button class="btn btn-plain btn-sm" type="button" disabled>Newer</button><button class="btn btn-plain btn-sm" type="button">Older</button></span></div>
+</section>
+
+<div class="col-detail" style="min-height: {{minH}}px">
+<div class="detail-scroll">
+
+<header class="detail-head">
+<a href="#" class="back"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 2.5L4 6l3.5 3.5"></path></svg>Recipients</a>
+<h2 class="ts-title" style="margin: 4px 0 0">anke.voss@example.test</h2>
+<div class="ts-cap" style="margin-top: 2px">Read-only: the CRM owns this person. This page shows why they were chosen and what they were sent.</div>
+</header>
+
+<section aria-labelledby="r1">
+<h3 id="r1" class="ts-head group-title">Consent</h3>
+<div class="ts-cap" style="margin: 0 16px 6px">This brand, per channel and purpose.</div>
+<div class="group"><div class="dtable-wrap"><table class="dtable" aria-label="Consent"><tbody>
+<tr><td>Email</td><td>marketing</td><td>granted</td><td>Website form</td><td class="nw">03 Mar 2026, 10:12</td></tr>
+<tr><td>Push</td><td>marketing</td><td>Not asked</td><td>—</td><td class="nw">—</td></tr>
+</tbody></table></div></div>
+</section>
+
+<section aria-labelledby="r2">
+<h3 id="r2" class="ts-head group-title">Audience groups</h3>
+<div class="ts-cap" style="margin: 0 16px 6px">The groups that touch them, and why they are in or out.</div>
+<div class="group">
+<div class="frow"><div class="btnrow" style="align-items: flex-end"><div style="flex: 0 1 240px"><label class="lbl" for="rch" style="margin: 0 0 4px">Channel</label><button id="rch" class="select-btn" type="button"><span>Email</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div></div></div>
+<div class="dtable-wrap" style="border-top: 1px solid var(--brand-line)"><table class="dtable" aria-label="Audience groups"><tbody>
+<tr><td><a href="#">Single-origin lovers</a></td><td>In</td><td>Matched rule “Nature and wellness readers” · Added by hand</td></tr>
+<tr><td><a href="#">Wholesale accounts</a></td><td>Out</td><td>Removed by exclusion “Wholesale accounts”</td></tr>
+</tbody></table></div>
+<div class="frow" style="border-top: 1px solid var(--brand-line)"><div class="muted">As of now: a send works this out again when it goes out.</div></div>
+</div>
+</section>
+
+<section aria-labelledby="r3">
+<h3 id="r3" class="ts-head group-title">Deliveries</h3>
+<div class="ts-cap" style="margin: 0 16px 6px">What this brand sent them, newest first.</div>
+<div class="group"><div class="dtable-wrap"><table class="dtable" aria-label="Deliveries"><tbody>
+<tr><td><a href="#">October coffee letter</a></td><td>Email</td><td>sent</td><td>—</td><td class="nw">18 Oct 2026, 09:00</td></tr>
+<tr><td><a href="#">Cold-brew launch</a></td><td>Email</td><td>sent</td><td>—</td><td class="nw">12 Oct 2026, 16:40</td></tr>
+<tr><td><a href="#">Roastery open day</a></td><td>Email</td><td>excluded</td><td>frequency</td><td class="nw">28 Sep 2026, 08:00</td></tr>
+</tbody></table></div></div>
+</section>
+
+<section aria-labelledby="r4">
+<h3 id="r4" class="ts-head group-title">Decisions</h3>
+<div class="ts-cap" style="margin: 0 16px 6px">What decision slots picked for them, newest first.</div>
+<div class="group"><div class="dtable-wrap"><table class="dtable" aria-label="Decisions"><tbody>
+<tr><td><a href="#">Ethiopia Guji, washed</a> · version 3</td><td class="num">9.7</td><td>Highest interest score</td><td class="nw">18 Oct 2026, 09:01</td></tr>
+<tr><td><a href="#">Kenya Kiambu, natural</a> · version 2</td><td class="num">7.2</td><td>Highest interest score</td><td class="nw">12 Oct 2026, 16:41</td></tr>
+</tbody></table></div></div>
+</section>
+
+<section aria-labelledby="r5">
+<h3 id="r5" class="ts-head group-title">Interests</h3>
+<div class="ts-cap" style="margin: 0 16px 6px">Their interest profile, one per person across brands.</div>
+<div class="group"><div class="dtable-wrap"><table class="dtable" aria-label="Interests"><tbody>
+<tr><td>Single origin</td><td class="num">8.4</td></tr>
+<tr><td>Cold brew</td><td class="num">3.1</td></tr>
+</tbody></table></div></div>
+</section>
+
+<section aria-labelledby="r6">
+<h3 id="r6" class="ts-head group-title">Consent history</h3>
+<div class="ts-cap" style="margin: 0 16px 6px">Every brand, each event labelled with its brand.</div>
+<div class="group"><div class="dtable-wrap"><table class="dtable" aria-label="Consent history"><tbody>
+<tr><td>Nordlicht Kaffee</td><td>Email</td><td>marketing</td><td>granted</td><td>Website form</td><td class="nw">03 Mar 2026, 10:12</td></tr>
+<tr><td>Brand 4</td><td>Email</td><td>marketing</td><td>withdrawn</td><td>Unsubscribe link</td><td class="nw">19 Jan 2026, 08:30</td></tr>
+</tbody></table></div></div>
+</section>
+
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"minH":{"editor":"int","default":1120,"min":900,"max":6000},"$preview":{"width":1440,"height":1120}}'>
+class Component extends DCLogic {
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+const minH = parseInt(this.props.minH ?? 1120, 10) || 900;
+const raw = [
+['anke.voss@example.test', 'Email', 'de', 'active'],
+['kim.lee@example.test', 'Email', 'en', 'active'],
+['jonas.weber@example.test', 'Email', 'de', 'active'],
+['#48213', '—', '—', 'inactive'],
+['support@example.test', 'Email', 'en', 'active'],
+['m.hartmann@nordlicht-kaffee.example', 'Email, Push', 'de', 'active'],
+['anna+news@example.test', 'Email', 'fr', 'active']
+];
+const rows = raw.map((r, i) => ({ id: r[0], ch: r[1], lang: r[2], status: r[3], current: i === 0 ? 'true' : 'false' }));
+return {
+themeClass: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : ''),
+theme,
+contrast,
+minH,
+rows
+};
+}
+}
+</script>
+</body>
+</html>

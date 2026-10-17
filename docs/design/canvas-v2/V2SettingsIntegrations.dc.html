@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings, integrations</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<dc-import name="V2Settings" theme="{{theme}}" contrast="{{contrast}}" part="integrations" min-h="840" hint-size="100%,840px"></dc-import>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"$preview":{"width":1440,"height":840}}'>
+class Component extends DCLogic {
+renderVals() {
+return { theme: this.props.theme ?? 'light', contrast: this.props.contrast ?? 'normal' };
+}
+}
+</script>
+</body>
+</html>

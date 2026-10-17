@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Approvals</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="{{themeClass}} root app">
+
+<div style="flex: 0 0 {{navW}}px; display: flex">
+<dc-import name="V2Nav" theme="{{theme}}" contrast="{{contrast}}" collapsed="{{collapsed}}" active="Approvals" on-toggle="{{toggleNav}}" min-h="900" hint-size="{{navW}}px,900px"></dc-import>
+</div>
+
+<section class="col-list" aria-label="Approvals" style="min-height: 900px">
+
+<header class="list-head">
+<h1 class="ts-large" style="margin: 0">Approvals</h1>
+<div class="ts-cap" style="margin-top: 2px">7 waiting for a decision</div>
+</header>
+
+<div class="filters" role="group" aria-label="Filters">
+<button class="btn pulldown" type="button"><span class="pd-label">Action</span><span>All</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button>
+<button class="btn pulldown" type="button"><span class="pd-label">Requested by</span><span>All</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button>
+</div>
+
+<div class="list" role="group" aria-label="Requests waiting for a decision">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="7">
+<a href="#" class="item" aria-current="{{r.current}}">
+<span class="clip ts-strong">{{r.label}}</span>
+<span class="clip muted">{{r.summary}}</span>
+<span class="ts-cap" style="display: flex; justify-content: space-between; gap: 12px"><span class="clip">{{r.who}}</span><span style="white-space: nowrap; flex: none">{{r.expires}}</span></span>
+<sc-if value="{{r.hasFlag}}" hint-placeholder-val="{{false}}"><span class="ts-cap" style="display: flex; align-items: center; gap: 5px; color: var(--brand-human)"><svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M7 2L13 12H1z M7 6v3 M7 10.5v.5"></path></svg>{{r.flag}}</span></sc-if>
+</a>
+</sc-for>
+</div>
+
+<div class="list-foot">
+<a href="#" class="btn btn-plain btn-sm"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="5.5"></circle><path d="M7 4v3l2 1.2"></path></svg>Decision history</a>
+<span style="display: flex; align-items: center; gap: 2px"><span class="ts-cap" style="margin-right: 4px">1–7 of 7</span><button class="btn btn-plain btn-sm" type="button" disabled>Newer</button><button class="btn btn-plain btn-sm" type="button" disabled>Older</button></span>
+</div>
+
+</section>
+
+<div style="flex: 999 1 480px; min-width: 0">
+<dc-import name="V2Detail" theme="{{theme}}" contrast="{{contrast}}" state="{{state}}" min-h="900" hint-size="100%,900px"></dc-import>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"state":{"editor":"enum","default":"waiting","options":["waiting","options","withdraw","cannot","busy","decided","error"]},"collapsed":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+isOn(v) { return v === true || v === 'true'; }
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+const state = this.props.state ?? 'waiting';
+const st = this.state || {};
+const collapsed = st.collapsed !== undefined ? st.collapsed : this.isOn(this.props.collapsed);
+const selectedBy = { waiting: 1, cannot: 1, busy: 1, decided: 1, error: 1, options: 5, withdraw: 3 };
+const sel = selectedBy[state] ?? 1;
+const raw = [
+{ id: 1, label: 'Send a campaign', summary: 'October coffee letter to 1,204 planned recipients', who: 'Jonas Weber (person)', expires: 'Expires 14 Oct, 18:00', flag: '' },
+{ id: 2, label: 'Mark content ready', summary: 'Winter roast preview, version 3', who: 'Anke Voss (person)', expires: 'No deadline', flag: '' },
+{ id: 3, label: 'Send a campaign', summary: 'Cold-brew launch to 8,930 planned recipients', who: 'Scheduler (integration)', expires: 'Expires 15 Oct, 09:00', flag: 'No longer allowed; approving withdraws it' },
+{ id: 4, label: 'Send a campaign', summary: 'Wholesale price update to 312 planned recipients', who: 'Anke Voss (person)', expires: 'Expires 14 Oct, 12:00', flag: '' },
+{ id: 5, label: 'Apply an AI-suggested subject', summary: 'October coffee letter, 3 suggestions', who: 'Jonas Weber (person)', expires: 'No deadline', flag: '' },
+{ id: 6, label: 'Mark content ready', summary: 'Spring blend story, version 1', who: 'Anke Voss (person)', expires: 'No deadline', flag: '' },
+{ id: 7, label: 'Send a campaign', summary: 'Roastery open day to 2,470 planned recipients', who: 'Jonas Weber (person)', expires: 'Expires 16 Oct, 08:00', flag: '' }
+];
+const rows = raw.map((r) => ({ ...r, hasFlag: r.flag !== '', current: r.id === sel ? 'true' : 'false' }));
+return {
+themeClass: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : ''),
+theme,
+contrast,
+state,
+collapsed,
+navW: collapsed ? 56 : 232,
+toggleNav: () => {
+const cur = (this.state && this.state.collapsed !== undefined) ? this.state.collapsed : this.isOn(this.props.collapsed);
+this.setState({ collapsed: !cur });
+},
+rows
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Navigation column</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<nav aria-label="Main" class="{{cls}}" style="min-height: {{minH}}px; width: {{width}}px">
+
+<div class="nav-top">
+<sc-if value="{{expanded}}" hint-placeholder-val="{{true}}"><span class="nav-name">Omnichannel Orchestration Reference</span></sc-if>
+<button class="btn btn-plain btn-neutral btn-icon" type="button" aria-label="{{toggleLabel}}" onClick="{{onToggle}}"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.25 2.75h9.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5h-9.5a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5z M6 2.75v10.5"></path></svg></button>
+</div>
+
+<sc-if value="{{expanded}}" hint-placeholder-val="{{true}}">
+<button class="btn brand-btn" type="button"><span style="display: flex; flex-direction: column; align-items: flex-start; line-height: 15px"><span class="ts-cap" style="font-size: 11px">Brand</span><span>Nordlicht Kaffee</span></span><svg width="12" height="14" viewBox="0 0 12 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5.5L6 2.5l3 3M3 8.5l3 3 3-3"></path></svg></button>
+</sc-if>
+<sc-if value="{{collapsed}}" hint-placeholder-val="{{false}}">
+<button class="brand-tile avatar avatar--square" type="button" aria-label="Brand: Nordlicht Kaffee" style="background: {{avatar.bg}}; color: {{avatar.fg}}">{{avatar.initials}}</button>
+</sc-if>
+
+<div class="nav-list">
+<sc-for list="{{items}}" as="n" hint-placeholder-count="8">
+<a href="#" class="nav-item" aria-current="{{n.current}}"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{n.d}}"></path></svg><span class="nav-label">{{n.label}}</span></a>
+</sc-for>
+<div class="nav-gap"></div>
+<a href="#" class="nav-item" aria-current="{{settings.current}}"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{settings.d}}"></path></svg><span class="nav-label">Settings</span></a>
+</div>
+
+<div class="nav-foot">
+<span class="avatar" role="img" aria-label="{{me.name}}" title="{{me.email}}" style="background: {{me.bg}}; color: {{me.fg}}; margin-bottom: 4px">{{me.initials}}</span>
+<sc-if value="{{expanded}}" hint-placeholder-val="{{true}}">
+<div><button class="btn btn-plain btn-sm" type="button" style="padding: 0">Sign out</button></div>
+</sc-if>
+<sc-if value="{{collapsed}}" hint-placeholder-val="{{false}}">
+<button class="btn btn-plain btn-neutral btn-icon" type="button" aria-label="Sign out"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 2.75h-3a1.5 1.5 0 0 0-1.5 1.5v7.5a1.5 1.5 0 0 0 1.5 1.5h3 M10 5l3 3-3 3 M13 8H6"></path></svg></button>
+</sc-if>
+</div>
+
+</nav>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"collapsed":{"editor":"boolean","default":false},"active":{"editor":"enum","default":"Approvals","options":["Approvals","Campaigns","Monitoring","Content","Audiences","Recipients","Deliveries","Decision slots","Settings"]},"minH":{"editor":"int","default":900,"min":0,"max":3000},"onToggle":{"editor":null},"$preview":{"width":232,"height":900}}'>
+class Component extends DCLogic {
+/* The initials avatar rule (docs/design/HANDOFF.md): FNV-1a over the name's UTF-16 code units, hue = hash mod 360. */
+avatarFor(name, theme, contrast) {
+const norm = String(name).trim().normalize('NFC').toLowerCase();
+let h = 0x811c9dc5;
+for (let i = 0; i < norm.length; i++) { h ^= norm.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+const hue = h % 360;
+const raw = String(name).trim();
+const isEmail = /^[^\s@]+@[^\s@]+$/.test(raw);
+const words = (isEmail ? raw.split('@')[0].split('+')[0].split(/[._-]+/) : raw.split(/\s+/)).filter(Boolean);
+const initials = (words.length > 1 ? words[0][0] + words[words.length - 1][0] : words[0].slice(0, 1)).toUpperCase();
+const hc = contrast === 'more';
+const p = theme === 'dark' ? (hc ? [32, 16, 80, 92] : [32, 24, 70, 86]) : (hc ? [50, 86, 70, 16] : [50, 90, 60, 24]);
+return { hue, initials, bg: 'hsl(' + hue + ' ' + p[0] + '% ' + p[1] + '%)', fg: 'hsl(' + hue + ' ' + p[2] + '% ' + p[3] + '%)' };
+}
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+const collapsed = this.props.collapsed === true || this.props.collapsed === 'true';
+const active = this.props.active ?? 'Approvals';
+const minH = parseInt(this.props.minH ?? 900, 10) || 0;
+const defs = [
+{ label: 'Approvals', d: 'M1.75 8a6.25 6.25 0 1 0 12.5 0a6.25 6.25 0 1 0 -12.5 0 M5.3 8.3l1.9 1.9 3.6-4.1' },
+{ label: 'Campaigns', d: 'M14 2L2 6.6l4.6 1.9L8.4 14z M14 2L6.6 8.5' },
+{ label: 'Monitoring', d: 'M1.5 8h2.8l1.6-4.5 2.8 9 1.8-4.5h3.5' },
+{ label: 'Content', d: 'M4.25 1.75H9L13 5.75V13a1.25 1.25 0 0 1-1.25 1.25h-7.5A1.25 1.25 0 0 1 3 13V3a1.25 1.25 0 0 1 1.25-1.25z M9 1.75V5.75h4 M5.5 8.75h5 M5.5 11.25h3.2' },
+{ label: 'Audiences', d: 'M6 7.5a2.5 2.5 0 1 0 0-5a2.5 2.5 0 0 0 0 5z M1.5 13.5c.4-2.4 2.2-3.8 4.5-3.8s4.1 1.4 4.5 3.8 M11 7a2 2 0 1 0 0-4 M11.2 9.8c1.9.1 3.1 1.3 3.5 3.4' },
+{ label: 'Recipients', d: 'M1.75 8a6.25 6.25 0 1 0 12.5 0a6.25 6.25 0 1 0 -12.5 0 M8 8.2a2 2 0 1 0 0-4a2 2 0 0 0 0 4z M3.9 12.8c.9-1.7 2.4-2.5 4.1-2.5s3.2.8 4.1 2.5' },
+{ label: 'Deliveries', d: 'M3.25 3h9.5a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5h-9.5a1.5 1.5 0 0 1-1.5-1.5v-7A1.5 1.5 0 0 1 3.25 3z M2 4.5l6 4.2 6-4.2' },
+{ label: 'Decision slots', d: 'M2 5h1.75 M7.25 5H14 M2 11h6.75 M12.25 11H14 M3.75 5a1.75 1.75 0 1 0 3.5 0a1.75 1.75 0 1 0 -3.5 0 M8.75 11a1.75 1.75 0 1 0 3.5 0a1.75 1.75 0 1 0 -3.5 0' }
+];
+const items = defs.map((n) => ({ ...n, current: n.label === active ? 'page' : 'false' }));
+const settings = {
+current: active === 'Settings' ? 'page' : 'false',
+d: 'M3 8a5 5 0 1 0 10 0a5 5 0 1 0 -10 0 M5.9 8a2.1 2.1 0 1 0 4.2 0a2.1 2.1 0 1 0 -4.2 0 M8 1.5V3 M8 13v1.5 M1.5 8H3 M13 8h1.5 M3.4 3.4l1.1 1.1 M11.5 11.5l1.1 1.1 M12.6 3.4l-1.1 1.1 M4.5 11.5l-1.1 1.1'
+};
+return {
+cls: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : '') + ' root col-nav' + (collapsed ? ' is-collapsed' : ''),
+minH,
+width: collapsed ? 56 : 232,
+collapsed,
+expanded: !collapsed,
+toggleLabel: collapsed ? 'Show sidebar' : 'Hide sidebar',
+onToggle: this.props.onToggle ?? (() => {}),
+items,
+settings,
+avatar: this.avatarFor('Nordlicht Kaffee', theme, contrast),
+/* The signed-in person: the display name when there is one, the email when not. The email stays as the hover text. */
+me: { ...this.avatarFor('Maria Hartmann', theme, contrast), name: 'Maria Hartmann', email: 'm.hartmann@nordlicht-kaffee.example' }
+};
+}
+}
+</script>
+</body>
+</html>

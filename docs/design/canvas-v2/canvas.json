@@ -1,0 +1,513 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "ApprovalsContrast.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "title": "Approvals, increased contrast",
+      "w": 1440,
+      "x": 3040,
+      "y": 0
+    },
+    "ApprovalsDark.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "title": "Approvals, dark",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "Main.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "title": "Approvals, waiting for a decision",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "Review.dc.html": {
+      "h": 900,
+      "title": "Review pane (component)",
+      "w": 760,
+      "x": 1360,
+      "y": 1400
+    },
+    "States.dc.html": {
+      "h": 3000,
+      "title": "States",
+      "w": 1280,
+      "x": 0,
+      "y": 1400
+    },
+    "V2Approvals.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "page": "v2",
+      "title": "Approvals, three columns",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "V2ApprovalsDark.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "page": "v2",
+      "title": "Approvals, dark",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "V2ApprovalsCollapsed.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "page": "v2",
+      "title": "Approvals, navigation collapsed",
+      "w": 1440,
+      "x": 3040,
+      "y": 0
+    },
+    "V2Foundations.dc.html": {
+      "h": 4200,
+      "page": "v2",
+      "title": "Foundation",
+      "w": 1280,
+      "x": 0,
+      "y": 1400
+    },
+    "V2Components.dc.html": {
+      "h": 2780,
+      "page": "v2",
+      "title": "Components",
+      "w": 1280,
+      "x": 1360,
+      "y": 1400
+    },
+    "V2Patterns.dc.html": {
+      "h": 1860,
+      "page": "v2",
+      "title": "Screen patterns",
+      "w": 1440,
+      "x": 2720,
+      "y": 1400
+    },
+    "V2DetailStates.dc.html": {
+      "h": 2700,
+      "page": "v2",
+      "title": "Approvals, states",
+      "w": 1280,
+      "x": 0,
+      "y": 6000
+    },
+    "V2Nav.dc.html": {
+      "h": 900,
+      "page": "v2",
+      "title": "Navigation column (component)",
+      "w": 232,
+      "x": 1360,
+      "y": 6000
+    },
+    "V2Detail.dc.html": {
+      "h": 900,
+      "page": "v2",
+      "title": "Details column (component)",
+      "w": 760,
+      "x": 1672,
+      "y": 6000
+    },
+    "V2Campaigns.dc.html": {
+      "expand": "fill",
+      "h": 1840,
+      "page": "v2",
+      "title": "Campaigns: list and campaign",
+      "w": 1440,
+      "x": 0,
+      "y": 9200
+    },
+    "V2Editor.dc.html": {
+      "expand": "fill",
+      "h": 1540,
+      "page": "v2",
+      "title": "Variant editor",
+      "w": 1440,
+      "x": 1520,
+      "y": 9200
+    },
+    "V2EditorPicker.dc.html": {
+      "expand": "fill",
+      "h": 1300,
+      "page": "v2",
+      "title": "Variant editor: choosing a record",
+      "w": 1440,
+      "x": 3040,
+      "y": 9200
+    },
+    "V2EditorSlot.dc.html": {
+      "expand": "fill",
+      "h": 1620,
+      "page": "v2",
+      "title": "Variant editor: decision slot settings",
+      "w": 1440,
+      "x": 0,
+      "y": 11200
+    },
+    "V2PreviewSheet.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "page": "v2",
+      "title": "Preview sheet",
+      "w": 1440,
+      "x": 1520,
+      "y": 11200
+    },
+    "V2Send.dc.html": {
+      "expand": "fill",
+      "h": 1380,
+      "page": "v2",
+      "title": "Send a variant: plan",
+      "w": 1440,
+      "x": 3040,
+      "y": 11200
+    },
+    "V2SendReady.dc.html": {
+      "expand": "fill",
+      "h": 1100,
+      "page": "v2",
+      "title": "Send a variant: ready to send",
+      "w": 1440,
+      "x": 0,
+      "y": 12980
+    },
+    "V2Content.dc.html": {
+      "expand": "fill",
+      "h": 2760,
+      "page": "v2",
+      "title": "Content: list and record",
+      "w": 1440,
+      "x": 0,
+      "y": 14740
+    },
+    "V2Categories.dc.html": {
+      "expand": "fill",
+      "h": 1280,
+      "page": "v2",
+      "title": "Content: categories",
+      "w": 1440,
+      "x": 1520,
+      "y": 14740
+    },
+    "V2ImageSheet.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "page": "v2",
+      "title": "Choose an image (sheet)",
+      "w": 1440,
+      "x": 3040,
+      "y": 14740
+    },
+    "V2Deliveries.dc.html": {
+      "expand": "fill",
+      "h": 880,
+      "page": "v2",
+      "title": "Deliveries: list and send",
+      "w": 1440,
+      "x": 0,
+      "y": 18160
+    },
+    "V2DeliveriesStranded.dc.html": {
+      "expand": "fill",
+      "h": 1020,
+      "page": "v2",
+      "title": "Deliveries: stranded send",
+      "w": 1440,
+      "x": 1520,
+      "y": 18160
+    },
+    "V2DeliveryAsSent.dc.html": {
+      "expand": "fill",
+      "h": 1180,
+      "page": "v2",
+      "title": "Deliveries: as sent",
+      "w": 1440,
+      "x": 3040,
+      "y": 18160
+    },
+    "V2DecisionSlots.dc.html": {
+      "expand": "fill",
+      "h": 1240,
+      "page": "v2",
+      "title": "Decision slots",
+      "w": 1440,
+      "x": 0,
+      "y": 19500
+    },
+    "V2Monitoring.dc.html": {
+      "expand": "fill",
+      "h": 760,
+      "page": "v2",
+      "title": "Monitoring (wide table)",
+      "w": 1440,
+      "x": 1520,
+      "y": 19500
+    },
+    "V2ApprovalsHistory.dc.html": {
+      "expand": "fill",
+      "h": 760,
+      "page": "v2",
+      "title": "Decision history (wide table)",
+      "w": 1440,
+      "x": 3040,
+      "y": 19500
+    },
+    "V2Audiences.dc.html": {
+      "expand": "fill",
+      "h": 2740,
+      "page": "v2",
+      "title": "Audiences: list and editor",
+      "w": 1440,
+      "x": 0,
+      "y": 21400
+    },
+    "V2Recipients.dc.html": {
+      "expand": "fill",
+      "h": 1120,
+      "page": "v2",
+      "title": "Recipients: list and person",
+      "w": 1440,
+      "x": 1520,
+      "y": 21400
+    },
+    "V2Settings.dc.html": {
+      "expand": "fill",
+      "h": 1980,
+      "page": "v2",
+      "title": "Settings: general",
+      "w": 1440,
+      "x": 0,
+      "y": 24800
+    },
+    "V2SettingsProfile.dc.html": {
+      "expand": "fill",
+      "h": 2600,
+      "page": "v2",
+      "title": "Settings: brand profile",
+      "w": 1440,
+      "x": 1520,
+      "y": 24800
+    },
+    "V2SettingsUsers.dc.html": {
+      "expand": "fill",
+      "h": 800,
+      "page": "v2",
+      "title": "Settings: users",
+      "w": 1440,
+      "x": 3040,
+      "y": 24800
+    },
+    "V2SettingsIntegrations.dc.html": {
+      "expand": "fill",
+      "h": 840,
+      "page": "v2",
+      "title": "Settings: integrations",
+      "w": 1440,
+      "x": 0,
+      "y": 27560
+    },
+    "V2SignIn.dc.html": {
+      "expand": "fill",
+      "h": 640,
+      "page": "v2",
+      "title": "Sign in: address",
+      "w": 1440,
+      "x": 1520,
+      "y": 27560
+    },
+    "V2SignIn2.dc.html": {
+      "expand": "fill",
+      "h": 640,
+      "page": "v2",
+      "title": "Sign in: code",
+      "w": 1440,
+      "x": 3040,
+      "y": 27560
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-10-12T21:30:00Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "page": "v2",
+    "view": "canvas"
+  },
+  "notes": {
+    "note-60jg3q": {
+      "maxH": 43,
+      "text": "i like the border and the subtile highlights",
+      "w": 138,
+      "x": 68,
+      "y": 114
+    },
+    "note-l4gurh": {
+      "maxH": 266,
+      "text": "do a consequent 3 col structure\nnow it's 5 parts: (1) nav (2) header \"approvals\" (3) list (4) content (5) decision. it's too much\n\nWhy not (1) nav (2) header+list (3) editing/details pane. No line between heading and filter/list, pull the light grey background in (3) to the top (instead of keeping that white line) put the decide part on the same grey background (it belongs to (3)) Move \"Decision History\" where it belongs at the bottom of (2)",
+      "w": 199,
+      "x": 308,
+      "y": 726
+    },
+    "note-ncbx5d": {
+      "text": "move below list next to \"older\"",
+      "w": 240,
+      "x": 1222,
+      "y": 39
+    },
+    "note-ybeosi": {
+      "maxH": 266,
+      "text": "keep texts on the same indent",
+      "w": 199,
+      "x": 674,
+      "y": 900
+    },
+    "t1": {
+      "kind": "title1",
+      "maxW": 4480,
+      "text": "Approvals",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "t2": {
+      "kind": "title1",
+      "maxW": 2120,
+      "text": "States",
+      "w": 240,
+      "x": 0,
+      "y": 1100
+    },
+    "v2t1": {
+      "kind": "title1",
+      "maxW": 4480,
+      "page": "v2",
+      "text": "Screens",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "v2t2": {
+      "kind": "title1",
+      "maxW": 4160,
+      "page": "v2",
+      "text": "Foundation and components",
+      "w": 240,
+      "x": 0,
+      "y": 1100
+    },
+    "v2t3": {
+      "kind": "title1",
+      "maxW": 2432,
+      "page": "v2",
+      "text": "States and parts",
+      "w": 240,
+      "x": 0,
+      "y": 5700
+    },
+    "v2t4": {
+      "kind": "title1",
+      "maxW": 4480,
+      "page": "v2",
+      "text": "Campaign flow",
+      "w": 240,
+      "x": 0,
+      "y": 8900
+    },
+    "v2t5": {
+      "kind": "title1",
+      "maxW": 4480,
+      "page": "v2",
+      "text": "Content",
+      "w": 240,
+      "x": 0,
+      "y": 14440
+    },
+    "v2t6": {
+      "kind": "title1",
+      "maxW": 4480,
+      "page": "v2",
+      "text": "Deliveries, decisions and monitoring",
+      "w": 240,
+      "x": 0,
+      "y": 17860
+    },
+    "v2t7": {
+      "kind": "title1",
+      "maxW": 4480,
+      "page": "v2",
+      "text": "Audiences and people",
+      "w": 240,
+      "x": 0,
+      "y": 21100
+    },
+    "v2t8": {
+      "kind": "title1",
+      "maxW": 4480,
+      "page": "v2",
+      "text": "Settings and sign-in",
+      "w": 240,
+      "x": 0,
+      "y": 24500
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "ApprovalsDark.dc.html",
+    "ApprovalsContrast.dc.html",
+    "States.dc.html",
+    "Review.dc.html",
+    "V2Approvals.dc.html",
+    "V2ApprovalsDark.dc.html",
+    "V2ApprovalsCollapsed.dc.html",
+    "V2Foundations.dc.html",
+    "V2Components.dc.html",
+    "V2Patterns.dc.html",
+    "V2DetailStates.dc.html",
+    "V2Nav.dc.html",
+    "V2Detail.dc.html",
+    "V2Campaigns.dc.html",
+    "V2Editor.dc.html",
+    "V2EditorPicker.dc.html",
+    "V2EditorSlot.dc.html",
+    "V2PreviewSheet.dc.html",
+    "V2Send.dc.html",
+    "V2SendReady.dc.html",
+    "V2Content.dc.html",
+    "V2Categories.dc.html",
+    "V2ImageSheet.dc.html",
+    "V2Deliveries.dc.html",
+    "V2DeliveriesStranded.dc.html",
+    "V2DeliveryAsSent.dc.html",
+    "V2DecisionSlots.dc.html",
+    "V2Monitoring.dc.html",
+    "V2ApprovalsHistory.dc.html",
+    "V2Audiences.dc.html",
+    "V2Recipients.dc.html",
+    "V2Settings.dc.html",
+    "V2SettingsProfile.dc.html",
+    "V2SettingsUsers.dc.html",
+    "V2SettingsIntegrations.dc.html",
+    "V2SignIn.dc.html",
+    "V2SignIn2.dc.html"
+  ],
+  "pages": [
+    {
+      "id": "v1",
+      "name": "First draft"
+    },
+    {
+      "id": "v2",
+      "name": "Three columns"
+    }
+  ],
+  "title": "Approvals redesign"
+}

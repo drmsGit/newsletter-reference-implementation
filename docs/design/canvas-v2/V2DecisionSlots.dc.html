@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Decision slots</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="{{themeClass}} root app" style="min-height: {{minH}}px">
+
+<div style="flex: 0 0 232px; display: flex">
+<dc-import name="V2Nav" theme="{{theme}}" contrast="{{contrast}}" active="Decision slots" min-h="{{minH}}" hint-size="232px,900px"></dc-import>
+</div>
+
+<section class="col-list" aria-label="Decision slots" style="min-height: {{minH}}px">
+<header class="list-head"><h1 class="ts-large" style="margin: 0">Decision slots</h1><div class="ts-cap" style="margin-top: 2px">Read-only: slots are configured on their variant.</div></header>
+<div class="list" role="group" aria-label="Decision slots">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="6">
+<a href="#" class="item" aria-current="{{r.current}}">
+<span class="clip ts-strong">{{r.slot}}</span>
+<span class="clip muted">{{r.cv}}</span>
+<span class="ts-cap" style="display: flex; justify-content: space-between; gap: 12px"><span>{{r.strategy}}</span><span style="white-space: nowrap">{{r.picks}} picks</span></span>
+</a>
+</sc-for>
+</div>
+<div class="list-foot"><span></span><span style="display: flex; align-items: center; gap: 2px"><span class="ts-cap" style="margin-right: 4px">1–50 of 61</span><button class="btn btn-plain btn-sm" type="button" disabled>Newer</button><button class="btn btn-plain btn-sm" type="button">Older</button></span></div>
+</section>
+
+<div class="col-detail" style="min-height: {{minH}}px">
+<div class="detail-scroll">
+
+<header class="detail-head">
+<a href="#" class="back"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 2.5L4 6l3.5 3.5"></path></svg>Decision slots</a>
+<h2 class="ts-title" style="margin: 4px 0 0">Feature pick</h2>
+</header>
+
+<section aria-label="The slot"><div class="group"><dl style="margin: 0">
+<div class="fact"><dt>Campaign</dt><dd><a href="#">October coffee letter</a></dd></div>
+<div class="fact"><dt>Variant</dt><dd>Variant A</dd></div>
+<div class="fact"><dt>Decision type</dt><dd>content</dd></div>
+<div class="fact"><dt>Strategy</dt><dd>top_score</dd></div>
+<div class="fact"><dt>Shows up to</dt><dd>3</dd></div>
+</dl></div></section>
+
+<section aria-labelledby="wc-h">
+<h3 id="wc-h" class="ts-head group-title">What it chooses from</h3>
+<div class="group">
+<div class="frow"><div>14 active content records in categories #3, #7. This strategy picks per recipient, so one person may be offered fewer.</div></div>
+<div class="frow"><div class="ts-strong">Candidate filter</div><div class="muted">None set.</div></div>
+<div class="frow"><div class="ts-strong">Strategy settings</div>
+<dl style="margin: 0 -16px"><div class="fact"><dt>recency_days</dt><dd>30</dd></div></dl></div>
+</div>
+</section>
+
+<section aria-labelledby="wp-h">
+<h3 id="wp-h" class="ts-head group-title">What it has picked</h3>
+<div class="group"><dl style="margin: 0">
+<div class="fact"><dt>Picks made</dt><dd>1,198</dd></div>
+<div class="fact"><dt>Distinct recipients</dt><dd>1,198</dd></div>
+<div class="fact"><dt>Distinct content</dt><dd>3</dd></div>
+<div class="fact"><dt>Score (min / avg / max)</dt><dd>2.1 / 6.8 / 9.7</dd></div>
+<div class="fact"><dt>Last pick</dt><dd>18 Oct 2026, 09:01</dd></div>
+</dl></div>
+
+<div class="group" style="margin-top: 12px">
+<div class="ts-strong" style="padding: 10px 16px 0">Top content</div>
+<div class="dtable-wrap"><table class="dtable" aria-label="Top content">
+<thead><tr><th>Content</th><th>Version</th><th class="num">Picks</th><th class="num">Share</th></tr></thead>
+<tbody>
+<tr><td><a href="#">Ethiopia Guji, washed</a></td><td>3</td><td class="num">702</td><td class="num">59 %</td></tr>
+<tr><td><a href="#">Kenya Kiambu, natural</a></td><td>2</td><td class="num">355</td><td class="num">30 %</td></tr>
+<tr><td><a href="#">Colombia Huila, honey</a></td><td>1</td><td class="num">141</td><td class="num">12 %</td></tr>
+</tbody></table></div>
+</div>
+
+<div class="group" style="margin-top: 12px">
+<div class="ts-strong" style="padding: 10px 16px 0">Reasons given</div>
+<ul class="numlist"><li><span style="flex: 1">Highest interest score — 1,096</span></li><li><span style="flex: 1">No reason given — 102</span></li></ul>
+</div>
+
+<div class="group" style="margin-top: 12px">
+<div class="ts-strong" style="padding: 10px 16px 0">Latest picks</div>
+<div class="dtable-wrap"><table class="dtable" aria-label="Latest picks">
+<thead><tr><th>When</th><th>Recipient</th><th>Content</th><th class="num">Score</th><th>Reason</th></tr></thead>
+<tbody>
+<tr><td class="nw">18 Oct 2026, 09:01</td><td>#48990</td><td>Ethiopia Guji, washed</td><td class="num">9.7</td><td>Highest interest score</td></tr>
+<tr><td class="nw">18 Oct 2026, 09:01</td><td>#48989</td><td>Kenya Kiambu, natural</td><td class="num">7.2</td><td>Highest interest score</td></tr>
+<tr><td class="nw">18 Oct 2026, 09:00</td><td>Everyone</td><td>Colombia Huila, honey</td><td class="num">2.1</td><td>No reason given</td></tr>
+</tbody></table></div>
+</div>
+</section>
+
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"minH":{"editor":"int","default":1240,"min":900,"max":6000},"$preview":{"width":1440,"height":1240}}'>
+class Component extends DCLogic {
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+const minH = parseInt(this.props.minH ?? 1240, 10) || 900;
+const raw = [
+['Feature pick', 'October coffee letter / Variant A', 'top_score', '1,198'],
+['Feature pick', 'Cold-brew launch / Variant A', 'top_score', '2,310'],
+['Second look', 'Cold-brew launch / Variant B', 'recent_first', '120'],
+['Gift idea', 'Gift subscriptions / Variant A', 'top_score', '910'],
+['Feature pick', 'Roastery open day / Variant A', 'top_score', '3,874']
+];
+const rows = raw.map((r, i) => ({ slot: r[0], cv: r[1], strategy: r[2], picks: r[3], current: i === 0 ? 'true' : 'false' }));
+return {
+themeClass: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : ''),
+theme,
+contrast,
+minH,
+rows
+};
+}
+}
+</script>
+</body>
+</html>

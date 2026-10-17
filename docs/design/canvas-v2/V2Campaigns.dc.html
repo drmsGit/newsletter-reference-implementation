@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Campaigns</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="{{themeClass}} root app" style="min-height: 1840px">
+
+<div style="flex: 0 0 232px; display: flex">
+<dc-import name="V2Nav" theme="{{theme}}" contrast="{{contrast}}" active="Campaigns" min-h="1840" hint-size="232px,1840px"></dc-import>
+</div>
+
+<section class="col-list" aria-label="Campaigns" style="min-height: 1840px">
+<header class="list-head"><h1 class="ts-large" style="margin: 0">Campaigns</h1></header>
+
+<form class="list-form" aria-label="New campaign">
+<label class="lbl" for="nc" style="margin: 0">New campaign</label>
+<input id="nc" class="field" type="text">
+<div class="row">
+<button class="select-btn" type="button" style="width: auto; min-width: 150px" aria-label="Channel: Email"><span><span class="muted">Channel</span>&nbsp; Email</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button>
+<button class="btn btn-primary" type="button" disabled>Create campaign</button>
+</div>
+</form>
+
+<form class="search" role="search"><input class="field" type="text" aria-label="Find a campaign by name" placeholder="Find a campaign by name"><button class="btn" type="button">Search</button></form>
+
+<div class="list" role="group" aria-label="Campaigns">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+<a href="#" class="item" aria-current="{{r.current}}">
+<span class="clip ts-strong">{{r.name}}</span>
+<span class="ts-cap" style="display: flex; justify-content: space-between; gap: 12px"><span>{{r.status}}</span><span style="white-space: nowrap">{{r.updated}}</span></span>
+</a>
+</sc-for>
+</div>
+
+<div class="list-foot"><span></span><span style="display: flex; align-items: center; gap: 2px"><span class="ts-cap" style="margin-right: 4px">1–50 of 132</span><button class="btn btn-plain btn-sm" type="button" disabled>Newer</button><button class="btn btn-plain btn-sm" type="button">Older</button></span></div>
+</section>
+
+<div class="col-detail" style="min-height: 1840px">
+<div class="detail-scroll">
+
+<header class="detail-head">
+<h2 class="ts-title" style="margin: 0">October coffee letter</h2>
+</header>
+
+<section aria-label="Campaign facts"><div class="group"><dl style="margin: 0">
+<div class="fact"><dt>Status</dt><dd>Draft</dd></div>
+<div class="fact"><dt>Variants</dt><dd>2</dd></div>
+<div class="fact"><dt>Updated</dt><dd>14 Oct 2026, 08:12</dd></div>
+</dl></div></section>
+
+<details class="dsc" open>
+<summary><svg class="chev" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 2.5L8 6l-3.5 3.5"></path></svg><h3 class="ts-head" style="margin: 0">Results</h3></summary>
+<div class="group">
+<div class="dtable-wrap"><table class="dtable" aria-label="Results by variant, delivery">
+<thead><tr><th>Variant</th><th class="num">Recipients</th><th class="num">Sent</th><th class="num">Delivered</th><th class="num">Failed</th><th class="num">Excluded</th><th class="num">Bounced</th><th class="num">Complaints</th></tr></thead>
+<tbody>
+<tr class="is-total"><td class="nw">Whole campaign</td><td class="num">1,204</td><td class="num">1,198</td><td class="num">1,171</td><td class="num">12</td><td class="num" style="white-space: normal; min-width: 120px">14<div class="ts-cap">consent 9, suppression 5</div></td><td class="num">8</td><td class="num">1</td></tr>
+<tr><td class="nw">Variant A (email)</td><td class="num">602</td><td class="num">599</td><td class="num">588</td><td class="num">5</td><td class="num" style="white-space: normal; min-width: 120px">7<div class="ts-cap">consent 5, suppression 2</div></td><td class="num">3</td><td class="num">0</td></tr>
+<tr><td class="nw">Variant B (email)</td><td class="num">602</td><td class="num">599</td><td class="num">583</td><td class="num">7</td><td class="num" style="white-space: normal; min-width: 120px">7<div class="ts-cap">consent 4, suppression 3</div></td><td class="num">5</td><td class="num">1</td></tr>
+</tbody></table></div>
+<div class="dtable-wrap" style="border-top: 1px solid var(--brand-line)"><table class="dtable" aria-label="Results by variant, engagement">
+<thead><tr><th>Variant</th><th class="num">Clicks</th><th class="num">Unique clickers</th><th class="num">Click rate</th><th class="num">Unsubscribes</th></tr></thead>
+<tbody>
+<tr class="is-total"><td class="nw">Whole campaign</td><td class="num">412</td><td class="num">301</td><td class="num">25.1 %</td><td class="num">6</td></tr>
+<tr><td class="nw">Variant A (email)</td><td class="num">231</td><td class="num">170</td><td class="num">28.4 %</td><td class="num">2</td></tr>
+<tr><td class="nw">Variant B (email)</td><td class="num">181</td><td class="num">131</td><td class="num">21.9 %</td><td class="num">4</td></tr>
+</tbody></table></div>
+</div>
+<p class="ts-cap" style="margin: 8px 16px 0">Counted per delivery. Click rate is unique clickers over sent. Opens are not counted.</p>
+</details>
+
+<section aria-labelledby="va">
+<h3 id="va" class="ts-head group-title">Variant A</h3>
+<div class="group">
+<dl style="margin: 0">
+<div class="fact"><dt>Channel</dt><dd>Email</dd></div>
+<div class="fact"><dt>Status</dt><dd>Sent</dd></div>
+<div class="fact"><dt>subject</dt><dd>Three origins that beat the autumn grey</dd></div>
+<div class="fact"><dt>preheader</dt><dd>Ethiopia, Kenya and Colombia, roasted this week</dd></div>
+<div class="fact"><dt>Modules</dt><dd>5 of 8</dd></div>
+</dl>
+<div class="frow" style="border-top: 1px solid var(--brand-line)"><div class="btnrow"><a href="#" class="btn">Edit Variant A</a><a href="#" class="btn">Send Variant A…</a><button class="btn btn-plain" type="button">Duplicate this variant</button></div></div>
+</div>
+
+<div class="group" style="margin-top: 12px">
+<div class="ts-strong" style="padding: 10px 16px 0">Modules of Variant A</div>
+<div class="dtable-wrap"><table class="dtable" aria-label="Modules of Variant A">
+<thead><tr><th>Position</th><th>Module</th><th>Content</th><th>Overridden here</th></tr></thead>
+<tbody>
+<tr><td class="num" style="text-align: left">1</td><td>hero</td><td><a href="#">Ethiopia Guji, washed</a></td><td>headline by Jonas Weber</td></tr>
+<tr><td class="num" style="text-align: left">2</td><td>editorial</td><td>Typed in the module</td><td>—</td></tr>
+<tr><td class="num" style="text-align: left">3</td><td>img_left</td><td><a href="#">Slot: Feature pick</a></td><td>—</td></tr>
+<tr><td class="num" style="text-align: left">4</td><td>cta (not on this channel)</td><td>Typed in the module</td><td>—</td></tr>
+</tbody></table></div>
+</div>
+
+<div class="group" style="margin-top: 12px">
+<div class="ts-strong" style="padding: 10px 16px 0">Decision slots</div>
+<div class="dtable-wrap"><table class="dtable" aria-label="Decision slots of Variant A">
+<thead><tr><th>Slot</th><th>Strategy</th><th class="num">Picks made</th><th class="num">Distinct content</th></tr></thead>
+<tbody><tr><td><a href="#">Feature pick</a></td><td>top_score</td><td class="num">1,198</td><td class="num">3</td></tr></tbody></table></div>
+</div>
+</section>
+
+<section aria-labelledby="vb">
+<h3 id="vb" class="ts-head group-title">Variant B</h3>
+<div class="group">
+<dl style="margin: 0">
+<div class="fact"><dt>Channel</dt><dd>Email</dd></div>
+<div class="fact"><dt>Status</dt><dd>Sent</dd></div>
+<div class="fact"><dt>subject</dt><dd>Your October coffee, roasted this week</dd></div>
+<div class="fact"><dt>preheader</dt><dd>—</dd></div>
+<div class="fact"><dt>Modules</dt><dd>4 of 8</dd></div>
+</dl>
+<div class="frow" style="border-top: 1px solid var(--brand-line)"><div class="btnrow"><a href="#" class="btn">Edit Variant B</a><a href="#" class="btn">Send Variant B…</a><button class="btn btn-plain" type="button">Duplicate this variant</button></div></div>
+</div>
+<div class="group" style="margin-top: 12px">
+<div class="ts-strong" style="padding: 10px 16px 0">Modules of Variant B</div>
+<div class="dtable-wrap"><table class="dtable" aria-label="Modules of Variant B">
+<thead><tr><th>Position</th><th>Module</th><th>Content</th><th>Overridden here</th></tr></thead>
+<tbody>
+<tr><td class="num" style="text-align: left">1</td><td>hero</td><td><a href="#">Kenya Kiambu, natural</a></td><td>—</td></tr>
+<tr><td class="num" style="text-align: left">2</td><td>editorial</td><td>Typed in the module</td><td>—</td></tr>
+<tr><td class="num" style="text-align: left">3</td><td>single_stack</td><td><a href="#">Colombia Huila, honey</a></td><td>—</td></tr>
+</tbody></table></div>
+</div>
+</section>
+
+<section aria-labelledby="nb">
+<h3 id="nb" class="ts-head group-title">New blank variant</h3>
+<div class="group" style="padding: 16px"><form class="btnrow" style="align-items: flex-end">
+<div style="flex: 1 1 200px"><label class="lbl" for="nbv">Channel</label><button id="nbv" class="select-btn" type="button"><span>Email</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div>
+<button class="btn btn-primary" type="button">Create blank variant</button>
+</form></div>
+</section>
+
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"$preview":{"width":1440,"height":1840}}'>
+class Component extends DCLogic {
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+const raw = [
+['October coffee letter', 'Draft', '14 Oct 2026, 08:12'],
+['Cold-brew launch', 'Sent', '12 Oct 2026, 16:40'],
+['Wholesale price update', '—', '11 Oct 2026, 09:05'],
+['Winter roast preview', 'Draft', '09 Oct 2026, 14:22'],
+['Spring blend story', '—', '02 Oct 2026, 10:18'],
+['Roastery open day', 'Sent', '28 Sep 2026, 08:00'],
+['Gift subscriptions', 'Sent', '19 Sep 2026, 11:31'],
+['Autumn guide', 'Draft', '12 Sep 2026, 17:02']
+];
+const rows = raw.map((r, i) => ({ name: r[0], status: r[1], updated: r[2], current: i === 0 ? 'true' : 'false' }));
+return {
+themeClass: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : ''),
+theme,
+contrast,
+rows
+};
+}
+}
+</script>
+</body>
+</html>

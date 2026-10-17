@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Foundation</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.sec{display:flex;flex-direction:column;gap:20px}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding-bottom:12px;border-bottom:1px solid var(--brand-line)}
+.tbl{display:grid;gap:0}
+.tr{display:grid;gap:16px;align-items:center;padding:8px 0;border-bottom:1px solid var(--brand-line)}
+.sw{width:36px;height:28px;border-radius:6px;border:1px solid var(--brand-line-strong);box-sizing:border-box}
+.guide{position:absolute;top:0;bottom:0;width:0;border-left:1px dashed var(--brand-accent)}
+.blk{display:flex;flex-direction:column;justify-content:center;gap:2px;padding:0 12px;box-sizing:border-box}
+</style>
+</helmet>
+<div class="{{themeClass}} root" style="width: 1280px; min-height: 4200px; box-sizing: border-box; padding: 64px; display: flex; flex-direction: column; gap: 64px">
+
+<header style="display: flex; flex-direction: column; gap: 12px; max-width: 760px">
+<div class="ts-cap" style="text-transform: uppercase; letter-spacing: .06em; font-weight: 500">Manager app · foundation v2 · proposal, values not final</div>
+<h1 class="ts-large" style="margin: 0; font-size: 34px; line-height: 40px">Three columns, one indent.</h1>
+<p style="margin: 0" class="muted">Every screen is the same three full-height columns: navigation, a header with its list, and the details. The look follows Apple’s desktop conventions: the system font, hairlines instead of boxes, white cards on a warm linen ground, and one accent colour, petrol, for what you can act on. Nothing here changes what a screen contains.</p>
+</header>
+
+<section class="sec" aria-label="Layout">
+<div class="sec-h"><h2 class="ts-title" style="margin: 0">Layout</h2><span class="ts-cap">All widths in CSS px</span></div>
+<div style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 48px; align-items: start">
+<div style="display: flex; flex-direction: column; gap: 20px">
+<div>
+<div class="ts-cap" style="margin-bottom: 6px">Navigation expanded · to scale 1 : 2</div>
+<div style="display: flex; height: 200px; border: 1px solid var(--brand-line-strong); border-radius: 8px; overflow: hidden; background: var(--brand-bg)">
+<div class="blk" style="width: 116px; background: var(--brand-sidebar); border-right: 1px solid var(--brand-line)"><span class="ts-strong">1 Navigation</span><span class="ts-cap">232</span></div>
+<div class="blk" style="width: 190px; background: var(--brand-surface); border-right: 1px solid var(--brand-line)"><span class="ts-strong">2 Header + list</span><span class="ts-cap">380 · min 300</span></div>
+<div class="blk" style="flex: 1"><span class="ts-strong">3 Details</span><span class="ts-cap">flexible · min 480</span></div>
+</div>
+</div>
+<div>
+<div class="ts-cap" style="margin-bottom: 6px">Navigation collapsed to icons</div>
+<div style="display: flex; height: 200px; border: 1px solid var(--brand-line-strong); border-radius: 8px; overflow: hidden; background: var(--brand-bg)">
+<div class="blk" style="width: 28px; padding: 0 4px; align-items: center; background: var(--brand-sidebar); border-right: 1px solid var(--brand-line)"><span class="ts-cap">56</span></div>
+<div class="blk" style="width: 190px; background: var(--brand-surface); border-right: 1px solid var(--brand-line)"><span class="ts-strong">2 Header + list</span><span class="ts-cap">380</span></div>
+<div class="blk" style="flex: 1"><span class="ts-strong">3 Details</span><span class="ts-cap">takes the freed width</span></div>
+</div>
+</div>
+</div>
+<div class="tbl">
+<div class="tr" style="grid-template-columns: 120px minmax(0, 1fr); padding-top: 0"><span class="ts-strong">Navigation</span><span>One flat level, 28 px rows. Icon rail at 56 px. The toggle is always the first control.</span></div>
+<div class="tr" style="grid-template-columns: 120px minmax(0, 1fr)"><span class="ts-strong">Header + list</span><span>Large title, count and filters sit on the list’s own surface, with no rule between them. Paging and the screen’s history link sit at the foot of the list.</span></div>
+<div class="tr" style="grid-template-columns: 120px minmax(0, 1fr)"><span class="ts-strong">Details</span><span>The linen ground from the very top. Groups are white cards. The action group is docked at the bottom on the same ground, with a soft fade instead of a line.</span></div>
+<div class="tr" style="grid-template-columns: 120px minmax(0, 1fr)"><span class="ts-strong">Narrow widths</span><span>Below about 1,100 px the details wrap under the list. At phone width one column at a time.</span></div>
+<div class="tr" style="grid-template-columns: 120px minmax(0, 1fr); border-bottom: 0"><span class="ts-strong">Every column</span><span>Runs from top to bottom and scrolls on its own.</span></div>
+</div>
+</div>
+</section>
+
+<section class="sec" aria-label="The indent rule">
+<div class="sec-h"><h2 class="ts-title" style="margin: 0">The indent rule</h2><span class="ts-cap">Text in a column starts on one vertical line</span></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px; align-items: start">
+
+<div>
+<div class="ts-cap" style="margin-bottom: 6px">List column · text at 20</div>
+<div style="position: relative; background: var(--brand-surface); border: 1px solid var(--brand-line); border-radius: 8px; padding: 16px 8px; height: 168px; box-sizing: border-box">
+<div class="guide" style="left: 20px"></div>
+<div style="padding: 0 12px 8px"><div class="ts-large" style="font-size: 22px; line-height: 28px">Approvals</div></div>
+<div style="padding: 8px 12px; border-radius: 10px; background: var(--brand-selected)"><div class="ts-strong">Send a campaign</div><div class="muted">October coffee letter</div></div>
+<div style="padding: 8px 12px"><div class="ts-strong">Mark content ready</div></div>
+<div class="ts-cap" style="position: absolute; right: 12px; bottom: 8px">8 inset + 12 padding</div>
+</div>
+</div>
+
+<div>
+<div class="ts-cap" style="margin-bottom: 6px">Details column · text at 40</div>
+<div style="position: relative; background: var(--brand-bg); border: 1px solid var(--brand-line); border-radius: 8px; padding: 16px 24px; height: 168px; box-sizing: border-box">
+<div class="guide" style="left: 40px"></div>
+<div style="padding: 0 16px"><div class="ts-title">Send a campaign</div></div>
+<div style="padding: 6px 16px 4px"><div class="ts-head">Before you decide</div></div>
+<div class="group" style="padding: 8px 16px"><div>This will send for real.</div></div>
+<div class="ts-cap" style="position: absolute; right: 12px; bottom: 8px">24 inset + 16 padding</div>
+</div>
+</div>
+
+</div>
+</section>
+
+<section class="sec" aria-label="Colour">
+<div class="sec-h"><h2 class="ts-title" style="margin: 0">Colour</h2><span class="ts-cap">Custom properties · light, dark · increased contrast overrides the same names</span></div>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: start">
+<div class="tbl">
+<sc-for list="{{tokens}}" as="t" hint-placeholder-count="20">
+<div class="tr" style="grid-template-columns: 40px 40px minmax(0, 1fr)">
+<div class="sw" style="background: {{t.light}}"></div>
+<div class="sw" style="background: {{t.dark}}"></div>
+<div style="display: flex; flex-direction: column"><span class="ts-mono" style="font-weight: 500">{{t.name}}</span><span class="ts-cap">{{t.role}} · <span class="ts-mono">{{t.light}}</span></span></div>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; flex-direction: column; gap: 16px">
+<div class="ts-head">Contrast, computed from the hex values</div>
+<div class="tbl">
+<div class="tr" style="grid-template-columns: minmax(0, 1fr) 64px 64px; padding-top: 0"><span class="ts-cap">Pair</span><span class="ts-cap" style="text-align: right">Light</span><span class="ts-cap" style="text-align: right">Dark</span></div>
+<sc-for list="{{pairs}}" as="p" hint-placeholder-count="18">
+<div class="tr" style="grid-template-columns: minmax(0, 1fr) 64px 64px; padding: 5px 0"><span>{{p.label}}</span><span class="ts-mono" style="text-align: right">{{p.l}}</span><span class="ts-mono" style="text-align: right">{{p.d}}</span></div>
+</sc-for>
+</div>
+<p class="ts-cap" style="margin: 0">The palette is Linen (the ground), Petrol (the one action colour) and Pale Pink, used only as the selected navigation item: pale pink is also the hue of the failed tint, so it is never a status or a surface. Text needs 4.5 : 1. Field borders and the focus ring need 3 : 1. Every pair above passes, and so do the increased-contrast sets. Colour is never the only signal: every status carries a glyph and a word.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<span class="chip chip-wait"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4.5"></circle><path d="M6 3v3l2 1"></path></svg>Pending</span>
+<span class="chip chip-ok"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5l2.5 2.5 4.5-5.5"></path></svg>Approved</span>
+<span class="chip chip-run"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4.5" opacity=".35"></circle><path d="M6 1.5a4.5 4.5 0 0 1 4.5 4.5"></path></svg>Running</span>
+<span class="chip chip-bad"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 3l6 6M9 3l-6 6"></path></svg>Failed</span>
+<span class="chip"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M2.5 6h7"></path></svg>Expired</span>
+</div>
+</div>
+</div>
+</section>
+
+<section class="sec" aria-label="Initials avatar">
+<div class="sec-h"><h2 class="ts-title" style="margin: 0">Initials avatar</h2><span class="ts-cap">Colour from the name · the same name is the same colour on every device and every reload</span></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px; align-items: start">
+
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div class="ts-head">The rule</div>
+<ol style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px">
+<li><span class="ts-strong">Take the name as shown.</span> A person’s display name or a brand’s name; the email only when there is no name. Trim it, normalise it to NFC, lower-case it.</li>
+<li><span class="ts-strong">Hash it.</span> FNV-1a, 32 bit, over the name’s UTF-16 code units: start at <span class="ts-mono">0x811c9dc5</span>; for each unit, xor it in, multiply by <span class="ts-mono">0x01000193</span>, keep 32 bits.</li>
+<li><span class="ts-strong">Hue = hash mod 360.</span> No random number and nothing stored: the colour is a function of the name.</li>
+<li><span class="ts-strong">Colour it.</span> Background <span class="ts-mono">hsl(hue S L)</span> and initials <span class="ts-mono">hsl(hue S L)</span>, with the saturation and lightness of the active theme (table).</li>
+<li><span class="ts-strong">Initials.</span> The first letter of the first word and of the last word, upper case. One word gives one letter. For an email, take the part before the @, drop anything after a +, split it on dots, underscores and hyphens, and use the same two letters.</li>
+</ol>
+<p class="ts-cap" style="margin: 0">The colour is decoration, never the signal: the initials carry the identity, so two names with near hues cost nothing. Avatar hues overlap the status colours, so an avatar is always a circle or a rounded square with letters, never a capsule with a glyph and a word. People are circles; a brand is a rounded square. The signed-in person’s avatar stands in the navigation, above Sign out, where the email was; the email is its hover text and the avatar’s name is the display name.</p>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div class="ts-head">Per theme, and the lowest contrast over all 360 hues</div>
+<div class="tbl">
+<div class="tr" style="grid-template-columns: 110px minmax(0, 1fr) minmax(0, 1fr) 64px; padding-top: 0"><span class="ts-cap">Theme</span><span class="ts-cap">Background</span><span class="ts-cap">Initials</span><span class="ts-cap" style="text-align: right">Lowest</span></div>
+<div class="tr" style="grid-template-columns: 110px minmax(0, 1fr) minmax(0, 1fr) 64px"><span>Light</span><span class="ts-mono">50% · 90%</span><span class="ts-mono">60% · 24%</span><span class="ts-mono" style="text-align: right">5.65</span></div>
+<div class="tr" style="grid-template-columns: 110px minmax(0, 1fr) minmax(0, 1fr) 64px"><span>Dark</span><span class="ts-mono">32% · 24%</span><span class="ts-mono">70% · 86%</span><span class="ts-mono" style="text-align: right">7.30</span></div>
+<div class="tr" style="grid-template-columns: 110px minmax(0, 1fr) minmax(0, 1fr) 64px"><span>Light, more contrast</span><span class="ts-mono">50% · 86%</span><span class="ts-mono">70% · 16%</span><span class="ts-mono" style="text-align: right">8.29</span></div>
+<div class="tr" style="grid-template-columns: 110px minmax(0, 1fr) minmax(0, 1fr) 64px; border-bottom: 0"><span>Dark, more contrast</span><span class="ts-mono">32% · 16%</span><span class="ts-mono">80% · 92%</span><span class="ts-mono" style="text-align: right">11.72</span></div>
+</div>
+<p class="ts-cap" style="margin: 0">Saturation · lightness, as percentages. Text needs 4.5 : 1; the lowest value in every theme is at hue 60, the yellows. Tokens: <span class="ts-mono">--brand-avatar-bg-s</span>, <span class="ts-mono">-bg-l</span>, <span class="ts-mono">-fg-s</span>, <span class="ts-mono">-fg-l</span>.</p>
+<div class="ts-head" style="margin-top: 8px">Samples</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px">
+<sc-for list="{{avatars}}" as="a" hint-placeholder-count="6">
+<div style="display: flex; align-items: center; gap: 10px"><span class="{{a.cls}}" role="img" aria-label="{{a.name}}" style="background: {{a.bg}}; color: {{a.fg}}">{{a.initials}}</span><span style="display: flex; flex-direction: column"><span class="ts-strong">{{a.name}}</span><span class="ts-cap ts-mono">hue {{a.hue}}</span></span></div>
+</sc-for>
+</div>
+</div>
+
+</div>
+
+<div>
+<div class="ts-head" style="margin-bottom: 10px">The whole wheel, every 10 degrees, the same two letters</div>
+<div style="display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 10px 8px">
+<sc-for list="{{hueStrip}}" as="s" hint-placeholder-count="36">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 4px"><span class="avatar" aria-hidden="true" style="background: {{s.bg}}; color: {{s.fg}}">AB</span><span class="ts-cap ts-mono" style="font-size: 11px">{{s.hue}}</span></div>
+</sc-for>
+</div>
+</div>
+</section>
+
+<section class="sec" aria-label="Type">
+<div class="sec-h"><h2 class="ts-title" style="margin: 0">Type</h2><span class="ts-cap">System font: SF Pro on Apple devices · ui-monospace for ids and counts · no hosted font files</span></div>
+<div class="tbl">
+<sc-for list="{{scale}}" as="s" hint-placeholder-count="7">
+<div class="tr" style="grid-template-columns: 120px 120px minmax(0, 1fr) 280px">
+<span class="ts-strong">{{s.name}}</span>
+<span class="ts-mono muted">{{s.spec}}</span>
+<span class="{{s.cls}}" style="color: var(--brand-fg)">{{s.sample}}</span>
+<span class="ts-cap">{{s.use}}</span>
+</div>
+</sc-for>
+</div>
+<p class="ts-cap" style="margin: 0; max-width: 760px">Sizes follow macOS text styles (Large Title 26/32, Title 1 22/26, Headline 13). Two judgement calls: body leading is 18 rather than 16 because warning texts run to several lines, and the caption floor is 12 rather than Apple’s 10 so secondary text stays readable on a laptop. Weights used: 400, 500, 600, 700. Tabular figures on for counts and times.</p>
+</section>
+
+<section class="sec" aria-label="Size and space">
+<div class="sec-h"><h2 class="ts-title" style="margin: 0">Size, space and shape</h2><span class="ts-cap">4 px grid</span></div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 48px; align-items: start">
+
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div class="ts-head">Controls</div>
+<div style="display: flex; align-items: center; gap: 12px"><button class="btn btn-sm" type="button">Small</button><span class="ts-cap">24 · in dense rows</span></div>
+<div style="display: flex; align-items: center; gap: 12px"><button class="btn" type="button">Default</button><span class="ts-cap">28 · desktop default</span></div>
+<div style="display: flex; align-items: center; gap: 12px"><button class="btn btn-lg btn-primary" type="button">Large</button><span class="ts-cap">36 · the decision</span></div>
+<p class="ts-cap" style="margin: 0">Apple’s desktop default is 28 and its floor is 20. Large is used only for the one action a screen exists for. Space between neighbouring controls: 8 (12 when they carry a border).</p>
+<div class="ts-head" style="margin-top: 8px">Rows</div>
+<div class="ts-cap">List item, three lines: 76 (94 with a flag line) · nav item: 28 · fact row: 34 (36 with a status chip) · group row: 38 · brand switcher: 40</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div class="ts-head">Space</div>
+<div style="display: flex; align-items: flex-end; gap: 12px">
+<sc-for list="{{space}}" as="s" hint-placeholder-count="7">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 6px"><div style="width: {{s}}px; height: {{s}}px; background: var(--brand-accent); border-radius: 2px"></div><span class="ts-mono">{{s}}</span></div>
+</sc-for>
+</div>
+<div class="tbl">
+<div class="tr" style="grid-template-columns: 1fr auto; padding-top: 0"><span>Column header</span><span class="ts-mono muted">20 · 20 · 8</span></div>
+<div class="tr" style="grid-template-columns: 1fr auto"><span>List inset, row padding</span><span class="ts-mono muted">8 · 12</span></div>
+<div class="tr" style="grid-template-columns: 1fr auto"><span>Details inset, card padding</span><span class="ts-mono muted">24 · 16</span></div>
+<div class="tr" style="grid-template-columns: 1fr auto"><span>Gap between groups</span><span class="ts-mono muted">20</span></div>
+<div class="tr" style="grid-template-columns: 1fr auto; border-bottom: 0"><span>Navigation inset</span><span class="ts-mono muted">12 · 8</span></div>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 14px">
+<div class="ts-head">Shape and lines</div>
+<div style="display: flex; gap: 14px; align-items: center">
+<div style="width: 56px; height: 36px; border: 1px solid var(--brand-line-strong); border-radius: 6px"></div>
+<div style="width: 56px; height: 36px; border: 1px solid var(--brand-line-strong); border-radius: 10px"></div>
+<div style="width: 56px; height: 24px; border: 1px solid var(--brand-line-strong); border-radius: 999px"></div>
+</div>
+<div class="ts-cap">Control 6 · card and selection 10 · chip capsule</div>
+<div class="tbl">
+<div class="tr" style="grid-template-columns: 1fr auto; padding-top: 0"><span>Hairline</span><span class="ts-mono muted">1 · line</span></div>
+<div class="tr" style="grid-template-columns: 1fr auto"><span>Field border</span><span class="ts-mono muted">1 · line-strong</span></div>
+<div class="tr" style="grid-template-columns: 1fr auto"><span>Button shadow</span><span class="ts-mono muted">0.5 · hairline</span></div>
+<div class="tr" style="grid-template-columns: 1fr auto"><span>Focus ring</span><span class="ts-mono muted">2 · offset 2</span></div>
+<div class="tr" style="grid-template-columns: 1fr auto; border-bottom: 0"><span>Icons</span><span class="ts-mono muted">16 · stroke 1.5</span></div>
+</div>
+<div style="display: flex; align-items: center; gap: 12px; margin-top: 4px"><button class="btn is-focus" type="button">Focused</button><span class="ts-cap">Keyboard focus only</span></div>
+<p class="ts-cap" style="margin: 0">No blur or translucent surfaces: columns are opaque, so Reduce Transparency changes nothing. The only motion is a spinner, and it stops under Reduce Motion.</p>
+</div>
+
+</div>
+</section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"$preview":{"width":1280,"height":4200}}'>
+class Component extends DCLogic {
+/* The initials avatar rule (docs/design/HANDOFF.md): FNV-1a over the name's UTF-16 code units, hue = hash mod 360. */
+avatarFor(name, theme, contrast) {
+const norm = String(name).trim().normalize('NFC').toLowerCase();
+let h = 0x811c9dc5;
+for (let i = 0; i < norm.length; i++) { h ^= norm.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+const hue = h % 360;
+const raw = String(name).trim();
+const isEmail = /^[^\s@]+@[^\s@]+$/.test(raw);
+const words = (isEmail ? raw.split('@')[0].split('+')[0].split(/[._-]+/) : raw.split(/\s+/)).filter(Boolean);
+const initials = (words.length > 1 ? words[0][0] + words[words.length - 1][0] : words[0].slice(0, 1)).toUpperCase();
+return { name, hue, initials, ...this.avatarColours(hue, theme, contrast) };
+}
+avatarColours(hue, theme, contrast) {
+const hc = contrast === 'more';
+const p = theme === 'dark' ? (hc ? [32, 16, 80, 92] : [32, 24, 70, 86]) : (hc ? [50, 86, 70, 16] : [50, 90, 60, 24]);
+return { bg: 'hsl(' + hue + ' ' + p[0] + '% ' + p[1] + '%)', fg: 'hsl(' + hue + ' ' + p[2] + '% ' + p[3] + '%)' };
+}
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+const avatars = [
+['Maria Hartmann', 'avatar'],
+['Jonas Weber', 'avatar'],
+['Anke Voss', 'avatar'],
+['Robin Approver', 'avatar'],
+['Nordlicht Kaffee', 'avatar avatar--square'],
+['Acme Agency', 'avatar avatar--square'],
+['kim.lee@example.test', 'avatar']
+].map((x) => ({ ...this.avatarFor(x[0], theme, contrast), cls: x[1] }));
+const hueStrip = Array.from({ length: 36 }, (_, i) => ({ hue: i * 10, ...this.avatarColours(i * 10, theme, contrast) }));
+const tokens = [
+{ name: '--brand-bg', role: 'Details column, page', light: '#FCF8F2', dark: '#14110F' },
+{ name: '--brand-surface', role: 'Cards, list column', light: '#FFFFFF', dark: '#1E1B18' },
+{ name: '--brand-sidebar', role: 'Navigation column', light: '#F3ECDF', dark: '#191614' },
+{ name: '--brand-surface-2', role: 'Hover, wells, disabled', light: '#F6F1E8', dark: '#2A2622' },
+{ name: '--brand-selected', role: 'Selected row', light: '#DCEAEF', dark: '#19424F' },
+{ name: '--brand-highlight', role: 'You are here: selected navigation item', light: '#F4BEBB', dark: '#613534' },
+{ name: '--brand-line', role: 'Hairlines', light: '#E4DACA', dark: '#3A342D' },
+{ name: '--brand-line-strong', role: 'Field borders', light: '#857A6C', dark: '#8F857A' },
+{ name: '--brand-fg', role: 'Text', light: '#1F1B16', dark: '#F4EEE6' },
+{ name: '--brand-muted', role: 'Secondary text', light: '#62594E', dark: '#B0A79B' },
+{ name: '--brand-accent', role: 'Primary action, links, nav icons', light: '#1A5D74', dark: '#6FC3DD' },
+{ name: '--brand-accent-fg', role: 'Text on accent', light: '#FFFFFF', dark: '#0B2530' },
+{ name: '--brand-focus', role: 'Focus ring', light: '#1A5D74', dark: '#6FC3DD' },
+{ name: '--brand-human', role: 'Waiting on a person', light: '#7A4A00', dark: '#FFC970' },
+{ name: '--brand-human-bg', role: 'Waiting, tint', light: '#FFF0D6', dark: '#3A2A0C' },
+{ name: '--brand-success', role: 'Approved', light: '#1D6B34', dark: '#7DD99A' },
+{ name: '--brand-success-bg', role: 'Approved, tint', light: '#E1F4E6', dark: '#12301C' },
+{ name: '--brand-info', role: 'Running', light: '#0A5EB0', dark: '#7DB9FF' },
+{ name: '--brand-info-bg', role: 'Running, tint', light: '#E3EFFB', dark: '#14304F' },
+{ name: '--brand-danger', role: 'Failed, destructive', light: '#B3261E', dark: '#FF8D85' },
+{ name: '--brand-danger-bg', role: 'Failed, tint', light: '#FDE8E6', dark: '#3F1B18' }
+];
+const pairs = [
+{ label: 'Text on page', l: '16.2', d: '16.3' },
+{ label: 'Text on card', l: '17.1', d: '14.9' },
+{ label: 'Secondary text on page', l: '6.5', d: '7.9' },
+{ label: 'Secondary text on card', l: '6.9', d: '7.2' },
+{ label: 'Secondary text on sidebar', l: '5.8', d: '7.6' },
+{ label: 'Secondary text on selected row', l: '5.6', d: '4.6' },
+{ label: 'Link on card', l: '7.3', d: '8.6' },
+{ label: 'Link on page', l: '6.9', d: '9.4' },
+{ label: 'Primary button label', l: '7.3', d: '8.0' },
+{ label: 'Pending chip', l: '6.7', d: '9.1' },
+{ label: 'Approved chip', l: '5.7', d: '8.4' },
+{ label: 'Running chip', l: '5.6', d: '6.6' },
+{ label: 'Failed chip', l: '5.6', d: '6.8' },
+{ label: 'Reject label on card', l: '6.5', d: '7.7' },
+{ label: 'Field border on card (3 : 1)', l: '4.2', d: '4.7' },
+{ label: 'Field border on page (3 : 1)', l: '4.0', d: '5.2' },
+{ label: 'Focus ring on page (3 : 1)', l: '6.9', d: '9.4' },
+{ label: 'Focus ring on selected row (3 : 1)', l: '6.0', d: '5.4' },
+{ label: 'Nav icon on the highlight (3 : 1)', l: '4.5', d: '5.1' }
+];
+const scale = [
+{ name: 'Large title', spec: '26 / 32 · 700', cls: 'ts-large', sample: 'Approvals', use: 'Column header, once per screen' },
+{ name: 'Title', spec: '22 / 28 · 600', cls: 'ts-title', sample: 'Send a campaign', use: 'Heading of the details' },
+{ name: 'Headline', spec: '15 / 20 · 600', cls: 'ts-head', sample: 'Before you decide', use: 'Group titles' },
+{ name: 'Body', spec: '13 / 18 · 400', cls: 'ts-body', sample: 'This will send for real through the provider.', use: 'Default text' },
+{ name: 'Strong', spec: '13 / 18 · 600', cls: 'ts-strong', sample: 'Mark content ready', use: 'List item titles, selected nav item' },
+{ name: 'Caption', spec: '12 / 16 · 400', cls: 'ts-cap', sample: 'Expires 14 Oct, 18:00', use: 'Meta, help text, counts' },
+{ name: 'Mono', spec: '12 / 16 · ui-monospace', cls: 'ts-mono', sample: 'r_20418 · v12 → v13', use: 'Ids and codes a person copies' }
+];
+return {
+themeClass: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : ''),
+tokens,
+pairs,
+scale,
+avatars,
+hueStrip,
+space: [4, 8, 12, 16, 20, 24, 32]
+};
+}
+}
+</script>
+</body>
+</html>

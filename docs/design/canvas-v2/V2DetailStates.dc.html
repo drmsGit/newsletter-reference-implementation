@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Approvals, states</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.lab{margin:0 0 8px;font-size:12px;line-height:16px;font-weight:600;color:var(--brand-muted)}
+.frame{border:1px solid var(--brand-line);border-radius:10px;overflow:hidden;background:var(--brand-bg)}
+</style>
+</helmet>
+<div class="{{themeClass}} root" style="width: 1280px; min-height: 2700px; box-sizing: border-box; padding: 48px; display: flex; flex-direction: column; gap: 48px">
+
+<section aria-label="List column states" style="display: flex; flex-direction: column; gap: 16px">
+<h2 class="ts-title" style="margin: 0">List column</h2>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; align-items: start">
+<div><h3 class="lab">Nothing waiting</h3><div class="frame" style="background: var(--brand-surface)"><div role="status" style="padding: 20px; color: var(--brand-muted)">Nothing is waiting for a decision.</div></div></div>
+<div><h3 class="lab">Filters match nothing</h3><div class="frame" style="background: var(--brand-surface)"><div role="status" style="padding: 20px; color: var(--brand-muted)">No request matches these filters.</div></div></div>
+<div><h3 class="lab">Loading</h3><div class="frame" style="background: var(--brand-surface)"><div role="status" style="padding: 20px; color: var(--brand-muted)">Loading…</div></div></div>
+<div><h3 class="lab">Could not load</h3><div role="alert" class="notice notice-alert"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="5.5"></circle><path d="M5 5l4 4M9 5l-4 4"></path></svg><span>Could not load this. The server may be unavailable.</span></div></div>
+</div>
+</section>
+
+<section aria-label="Details column states" style="display: flex; flex-direction: column; gap: 16px">
+<h2 class="ts-title" style="margin: 0">Details column</h2>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; align-items: start">
+<div><h3 class="lab">Cannot decide</h3><div class="frame"><dc-import name="V2Detail" state="cannot" theme="{{theme}}" contrast="{{contrast}}" min-h="0" hint-size="100%,380px"></dc-import></div></div>
+<div><h3 class="lab">Requester no longer allowed</h3><div class="frame"><dc-import name="V2Detail" state="withdraw" theme="{{theme}}" contrast="{{contrast}}" min-h="0" hint-size="100%,880px"></dc-import></div></div>
+<div><h3 class="lab">Pick one option</h3><div class="frame"><dc-import name="V2Detail" state="options" theme="{{theme}}" contrast="{{contrast}}" min-h="0" hint-size="100%,760px"></dc-import></div></div>
+<div><h3 class="lab">Approving</h3><div class="frame"><dc-import name="V2Detail" state="busy" theme="{{theme}}" contrast="{{contrast}}" min-h="0" hint-size="100%,720px"></dc-import></div></div>
+<div><h3 class="lab">Already decided</h3><div class="frame"><dc-import name="V2Detail" state="decided" theme="{{theme}}" contrast="{{contrast}}" min-h="0" hint-size="100%,520px"></dc-import></div></div>
+<div><h3 class="lab">Could not load</h3><div class="frame"><dc-import name="V2Detail" state="error" theme="{{theme}}" contrast="{{contrast}}" min-h="0" hint-size="100%,100px"></dc-import></div></div>
+</div>
+</section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"$preview":{"width":1280,"height":2700}}'>
+class Component extends DCLogic {
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+return {
+themeClass: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : ''),
+theme,
+contrast
+};
+}
+}
+</script>
+</body>
+</html>

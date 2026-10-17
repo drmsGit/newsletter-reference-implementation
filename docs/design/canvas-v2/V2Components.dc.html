@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Components</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.sec{display:flex;flex-direction:column;gap:16px;min-width:0}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding-bottom:10px;border-bottom:1px solid var(--brand-line)}
+.spec-h{font-size:12px;line-height:16px;font-weight:500;color:var(--brand-muted);margin:0 0 6px}
+.cell{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.on-card{background:var(--brand-surface);border:1px solid var(--brand-line);border-radius:10px;padding:16px;box-sizing:border-box}
+.menu-i{display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:6px}
+</style>
+</helmet>
+<div class="{{themeClass}} root" style="width: 1280px; min-height: 2780px; box-sizing: border-box; padding: 64px; display: flex; flex-direction: column; gap: 56px">
+
+<header style="display: flex; flex-direction: column; gap: 12px; max-width: 760px">
+<div class="ts-cap" style="text-transform: uppercase; letter-spacing: .06em; font-weight: 500">Manager app · component library v2 · built on React Aria</div>
+<h1 class="ts-large" style="margin: 0; font-size: 34px; line-height: 40px">Components</h1>
+<p style="margin: 0" class="muted">Each component below is a class in <span class="ts-mono">ui.css</span> and works with the foundation tokens. React Aria supplies behaviour and accessibility; this page defines the look and every state: default, hover, pressed, keyboard focus, disabled, invalid and busy where they apply.</p>
+</header>
+
+<section class="sec" aria-label="Buttons">
+<div class="sec-h"><h2 class="ts-title" style="margin: 0">Button</h2><span class="ts-cap">One prominent button per view · the destructive one is never primary</span></div>
+<div style="display: grid; grid-template-columns: 120px repeat(5, minmax(0, 1fr)); gap: 14px 16px; align-items: center">
+<span></span><span class="spec-h" style="margin: 0">Default</span><span class="spec-h" style="margin: 0">Hover</span><span class="spec-h" style="margin: 0">Pressed</span><span class="spec-h" style="margin: 0">Keyboard focus</span><span class="spec-h" style="margin: 0">Disabled</span>
+<sc-for list="{{buttonRows}}" as="r" hint-placeholder-count="4">
+<span class="ts-strong">{{r.name}}</span>
+<sc-for list="{{r.cells}}" as="c" hint-placeholder-count="5">
+<div><button type="button" class="{{c.cls}}" disabled="{{c.disabled}}">{{c.label}}</button></div>
+</sc-for>
+</sc-for>
+</div>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; align-items: start">
+<div class="cell"><div class="spec-h">Sizes</div><div style="display: flex; align-items: center; gap: 8px"><button class="btn btn-sm" type="button">24</button><button class="btn" type="button">28</button><button class="btn btn-lg" type="button">36</button></div></div>
+<div class="cell"><div class="spec-h">Busy · large</div><button class="btn btn-lg btn-primary" type="button" disabled="{{yes}}" aria-busy="true"><svg class="spin" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="5.5" opacity=".3"></circle><path d="M7 1.5a5.5 5.5 0 0 1 5.5 5.5"></path></svg>Approving…</button></div>
+<div class="cell"><div class="spec-h">Icon only</div><div style="display: flex; gap: 8px"><button class="btn btn-icon" type="button" aria-label="Hide sidebar"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.25 2.75h9.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5h-9.5a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5z M6 2.75v10.5"></path></svg></button><button class="btn btn-plain btn-neutral btn-icon" type="button" aria-label="Hide sidebar"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.25 2.75h9.5a1.5 1.5 0 0 1 1.5 1.5v7.5a1.5 1.5 0 0 1-1.5 1.5h-9.5a1.5 1.5 0 0 1-1.5-1.5v-7.5a1.5 1.5 0 0 1 1.5-1.5z M6 2.75v10.5"></path></svg></button></div></div>
+<div class="cell"><div class="spec-h">Link as button · leading icon</div><a href="#" class="btn btn-plain btn-sm"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="5.5"></circle><path d="M7 4v3l2 1.2"></path></svg>Decision history</a></div>
+</div>
+</section>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 56px 56px; align-items: start">
+
+<section class="sec" aria-label="Pull-down and menu">
+<div class="sec-h"><h2 class="ts-title" style="margin: 0">Filter pull-down and menu</h2></div>
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+<div class="cell"><div class="spec-h">Closed</div><button class="btn pulldown" type="button"><span class="pd-label">Action</span><span>All</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div>
+<div class="cell"><div class="spec-h">Hover</div><button class="btn pulldown is-hover" type="button"><span class="pd-label">Action</span><span>All</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div>
+<div class="cell"><div class="spec-h">Keyboard focus</div><button class="btn pulldown is-focus" type="button"><span class="pd-label">Action</span><span>All</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div>
+</div>
+<div class="cell"><div class="spec-h">Open · a list of this brand’s values</div>
+<div class="group" style="width: 240px; padding: 4px; box-shadow: 0 6px 20px rgba(0,0,0,.14)" role="listbox" aria-label="Action">
+<div class="menu-i" role="option" aria-selected="true"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-accent)"><path d="M2.5 6.5l2.5 2.5 4.5-5.5"></path></svg>All</div>
+<div class="menu-i" role="option" aria-selected="false" style="background: var(--brand-selected)"><span style="width: 12px; flex: none"></span>Send a campaign</div>
+<div class="menu-i" role="option" aria-selected="false"><span style="width: 12px; flex: none"></span>Mark content ready</div>
+<div class="menu-i" role="option" aria-selected="false"><span style="width: 12px; flex: none"></span>Apply an AI-suggested subject</div>
+</div>
+</div>
+</section>
+
+<section class="sec" aria-label="Fields">
+<div class="sec-h"><h2 class="ts-title" style="margin: 0">Text field and text area</h2></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 24px; align-items: start">
+<div><label class="lbl" for="c1">Label</label><input id="c1" class="field" type="text" value="Default"><div class="help">Help text sits under the field.</div></div>
+<div><label class="lbl" for="c2">Keyboard focus</label><input id="c2" class="field is-focus" type="text" value="Focused"></div>
+<div><label class="lbl" for="c3">Invalid</label><input id="c3" class="field" type="text" value="not-an-address" aria-invalid="true" aria-describedby="c3e"><div id="c3e" class="err"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4.5"></circle><path d="M6 3.5v3M6 8.2v.3"></path></svg>Enter a valid address.</div></div>
+<div><label class="lbl" for="c4">Disabled</label><input id="c4" class="field" type="text" value="Locked" disabled></div>
+<div style="grid-column: span 2"><label class="lbl" for="c5">Reason (optional; the requester sees it)</label><textarea id="c5" class="field" rows="2"></textarea></div>
+</div>
+</section>
+
+<section class="sec" aria-label="Choice and tabs">
+<div class="sec-h"><h2 class="ts-title" style="margin: 0">Option lists and tabs</h2></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 24px; align-items: start">
+<fieldset style="border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+<legend class="lbl" style="padding: 0">Choose one</legend>
+<label class="opt is-selected"><input type="radio" name="o" checked><span>Three origins that beat the autumn grey</span></label>
+<label class="opt"><input type="radio" name="o"><span>Autumn in three cups</span></label>
+<label class="opt" style="color: var(--brand-muted); background: var(--brand-surface-2); cursor: not-allowed"><input type="radio" name="o" disabled><span>Not available</span></label>
+</fieldset>
+<fieldset style="border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+<legend class="lbl" style="padding: 0">Choose any</legend>
+<label class="opt is-selected"><input type="checkbox" checked><span>Email</span></label>
+<label class="opt"><input type="checkbox"><span>Letter shop</span></label>
+</fieldset>
+<div class="cell" style="grid-column: span 2"><div class="spec-h">Tabs · segmented control</div><div class="seg" role="tablist" aria-label="Details"><button type="button" role="tab" aria-selected="true">Content</button><button type="button" role="tab" aria-selected="false">Preview</button></div></div>
+</div>
+</section>
+
+<section class="sec" aria-label="Status chip">
+<div class="sec-h"><h2 class="ts-title" style="margin: 0">Status chip</h2><span class="ts-cap">Glyph, word and colour together</span></div>
+<div style="display: flex; flex-wrap: wrap; gap: 10px">
+<span class="chip chip-wait"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4.5"></circle><path d="M6 3v3l2 1"></path></svg>Pending</span>
+<span class="chip chip-ok"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5l2.5 2.5 4.5-5.5"></path></svg>Approved</span>
+<span class="chip chip-run"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4.5" opacity=".35"></circle><path d="M6 1.5a4.5 4.5 0 0 1 4.5 4.5"></path></svg>Running</span>
+<span class="chip chip-bad"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 3l6 6M9 3l-6 6"></path></svg>Failed</span>
+<span class="chip"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M2.5 6h7"></path></svg>Expired</span>
+</div>
+<div class="sec-h" style="margin-top: 16px"><h2 class="ts-title" style="margin: 0">Icons</h2><span class="ts-cap">16 px, stroke 1.5 · placeholders</span></div>
+<div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px 8px">
+<sc-for list="{{icons}}" as="i" hint-placeholder-count="10">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 6px"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="var(--brand-accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{i.d}}"></path></svg><span class="ts-cap" style="text-align: center">{{i.label}}</span></div>
+</sc-for>
+</div>
+<p class="ts-cap" style="margin: 0">SF Symbols are licensed for Apple platforms only, so these are drawn stand-ins in the same weight. Swap in the chosen set later; sizes stay.</p>
+</section>
+
+<section class="sec" aria-label="Initials avatar">
+<div class="sec-h"><h2 class="ts-title" style="margin: 0">Initials avatar</h2><span class="ts-cap">Colour from the name</span></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px">
+<sc-for list="{{avatars}}" as="a" hint-placeholder-count="6">
+<div style="display: flex; align-items: center; gap: 10px"><span class="{{a.cls}}" role="img" aria-label="{{a.name}}" style="background: {{a.bg}}; color: {{a.fg}}">{{a.initials}}</span><span style="display: flex; flex-direction: column"><span class="ts-strong">{{a.name}}</span><span class="ts-cap ts-mono">hue {{a.hue}}</span></span></div>
+</sc-for>
+</div>
+<div style="display: flex; align-items: center; gap: 10px"><span class="avatar avatar-sm" role="img" aria-label="Maria Hartmann, small" style="background: {{small.bg}}; color: {{small.fg}}">{{small.initials}}</span><span class="avatar" role="img" aria-label="Maria Hartmann" style="background: {{small.bg}}; color: {{small.fg}}">{{small.initials}}</span><span class="ts-cap">24 and 32 px · people are circles, a brand is a rounded square</span></div>
+<p class="ts-cap" style="margin: 0">The signed-in person’s avatar replaces the email above Sign out in the navigation; the last specimen shows a person with no display name, whose email is used. The same name is the same colour on every device and every reload. The rule is on the Foundation board.</p>
+</section>
+
+</div>
+
+<section class="sec" aria-label="Navigation">
+<div class="sec-h"><h2 class="ts-title" style="margin: 0">Navigation column</h2><span class="ts-cap">One flat level · the toggle collapses it to icons</span></div>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; align-items: start">
+<div class="cell" style="grid-column: span 2"><div class="spec-h">Item states · default, hover, selected, keyboard focus</div>
+<div style="background: var(--brand-sidebar); border: 1px solid var(--brand-line); border-radius: 10px; padding: 12px; width: 232px; box-sizing: border-box; display: flex; flex-direction: column; gap: 2px">
+<a href="#" class="nav-item" aria-current="false"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2L2 6.6l4.6 1.9L8.4 14z M14 2L6.6 8.5"></path></svg><span class="nav-label">Campaigns</span></a>
+<a href="#" class="nav-item is-hover" aria-current="false"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 8h2.8l1.6-4.5 2.8 9 1.8-4.5h3.5"></path></svg><span class="nav-label">Monitoring</span></a>
+<a href="#" class="nav-item" aria-current="page"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.75 8a6.25 6.25 0 1 0 12.5 0a6.25 6.25 0 1 0 -12.5 0 M5.3 8.3l1.9 1.9 3.6-4.1"></path></svg><span class="nav-label">Approvals</span></a>
+<a href="#" class="nav-item is-focus" aria-current="false"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.25 3h9.5a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5h-9.5a1.5 1.5 0 0 1-1.5-1.5v-7A1.5 1.5 0 0 1 3.25 3z M2 4.5l6 4.2 6-4.2"></path></svg><span class="nav-label">Deliveries</span></a>
+</div></div>
+<div class="cell"><div class="spec-h">Collapsed rail</div>
+<div class="col-nav is-collapsed" style="width: 56px; flex: none; border: 1px solid var(--brand-line); border-radius: 10px; min-height: 0; padding-top: 8px; padding-bottom: 8px; gap: 2px">
+<a href="#" class="nav-item" aria-current="false"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2L2 6.6l4.6 1.9L8.4 14z M14 2L6.6 8.5"></path></svg><span class="nav-label">Campaigns</span></a>
+<a href="#" class="nav-item" aria-current="page"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.75 8a6.25 6.25 0 1 0 12.5 0a6.25 6.25 0 1 0 -12.5 0 M5.3 8.3l1.9 1.9 3.6-4.1"></path></svg><span class="nav-label">Approvals</span></a>
+<a href="#" class="nav-item" aria-current="false"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 8h2.8l1.6-4.5 2.8 9 1.8-4.5h3.5"></path></svg><span class="nav-label">Monitoring</span></a>
+</div></div>
+<div class="cell"><div class="spec-h">Brand switcher · expanded, collapsed</div>
+<button class="btn brand-btn" type="button" style="width: 208px; margin: 0"><span style="display: flex; flex-direction: column; align-items: flex-start; line-height: 15px"><span class="ts-cap" style="font-size: 11px">Brand</span><span>Nordlicht Kaffee</span></span><svg width="12" height="14" viewBox="0 0 12 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5.5L6 2.5l3 3M3 8.5l3 3 3-3"></path></svg></button>
+<button class="brand-tile avatar avatar--square" type="button" aria-label="Brand: Nordlicht Kaffee" style="margin: 0; background: {{brandTile.bg}}; color: {{brandTile.fg}}">{{brandTile.initials}}</button></div>
+</div>
+</section>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 56px; align-items: start">
+
+<section class="sec" aria-label="List item and foot">
+<div class="sec-h"><h2 class="ts-title" style="margin: 0">List item and list foot</h2></div>
+<div style="background: var(--brand-surface); border: 1px solid var(--brand-line); border-radius: 10px; overflow: hidden">
+<div class="list" style="padding-top: 8px">
+<a href="#" class="item" aria-current="false"><span class="clip ts-strong">Default</span><span class="clip muted">Summary of the request</span><span class="ts-cap" style="display: flex; justify-content: space-between"><span>Jonas Weber (person)</span><span>No deadline</span></span></a>
+<a href="#" class="item is-hover" aria-current="false"><span class="clip ts-strong">Hover</span><span class="clip muted">Summary of the request</span><span class="ts-cap" style="display: flex; justify-content: space-between"><span>Anke Voss (person)</span><span>Expires 14 Oct, 12:00</span></span></a>
+<a href="#" class="item" aria-current="true"><span class="clip ts-strong">Selected</span><span class="clip muted">Summary of the request</span><span class="ts-cap" style="display: flex; justify-content: space-between"><span>Jonas Weber (person)</span><span>Expires 14 Oct, 18:00</span></span></a>
+<a href="#" class="item is-focus" aria-current="false"><span class="clip ts-strong">Keyboard focus</span><span class="clip muted">Summary of the request</span><span class="ts-cap" style="display: flex; justify-content: space-between"><span>Anke Voss (person)</span><span>No deadline</span></span><span class="ts-cap" style="display: flex; align-items: center; gap: 5px; color: var(--brand-human)"><svg width="12" height="12" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex: none"><path d="M7 2L13 12H1z M7 6v3 M7 10.5v.5"></path></svg>With a flag</span></a>
+</div>
+<div class="list-foot"><a href="#" class="btn btn-plain btn-sm">History link</a><span style="display: flex; align-items: center; gap: 2px"><span class="ts-cap" style="margin-right: 4px">1–50 of 132</span><button class="btn btn-plain btn-sm" type="button" disabled>Newer</button><button class="btn btn-plain btn-sm" type="button">Older</button></span></div>
+</div>
+</section>
+
+<section class="sec" aria-label="Group card, notices and the action group">
+<div class="sec-h"><h2 class="ts-title" style="margin: 0">Group card, notices and the action group</h2></div>
+<div style="background: var(--brand-bg); border: 1px solid var(--brand-line); border-radius: 10px; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px">
+<div>
+<h3 class="ts-head group-title">Group title</h3>
+<div class="group">
+<dl style="margin: 0">
+<div class="fact"><dt>Label</dt><dd>Value in a fact row</dd></div>
+<div class="fact"><dt>Requested</dt><dd>14 Oct 2026, 08:12</dd></div>
+<div class="fact"><dt>Status</dt><dd><span class="chip chip-wait">Pending</span></dd></div>
+</dl>
+</div>
+</div>
+<div class="group"><div class="notice"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" class="muted"><circle cx="7" cy="7" r="5.5"></circle><path d="M7 6.5v3.5M7 4v.5"></path></svg><div><div class="ts-strong">Quiet status line</div><div class="muted">Plain information, no action needed.</div></div></div></div>
+<div class="group"><div class="notice"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-human)"><path d="M7 2L13 12H1z M7 6v3 M7 10.5v.5"></path></svg><span>A warning row. It is shown, never enforced.</span></div></div>
+<div role="alert" class="notice notice-alert"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="5.5"></circle><path d="M5 5l4 4M9 5l-4 4"></path></svg><span>Alert: something failed and needs attention.</span></div>
+<div>
+<h3 class="ts-head group-title">Action group</h3>
+<div class="group" style="padding: 16px; display: flex; flex-direction: column; gap: 14px">
+<div><label class="lbl" for="c6">Reason (optional)</label><textarea id="c6" class="field" rows="2"></textarea></div>
+<div style="display: flex; gap: 12px"><button class="btn btn-lg btn-primary" type="button">Primary action</button><button class="btn btn-lg btn-destructive" type="button">Destructive</button></div>
+</div>
+</div>
+</div>
+</section>
+
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"$preview":{"width":1280,"height":2780}}'>
+class Component extends DCLogic {
+/* The initials avatar rule (docs/design/HANDOFF.md): FNV-1a over the name's UTF-16 code units, hue = hash mod 360. */
+avatarFor(name, theme, contrast) {
+const norm = String(name).trim().normalize('NFC').toLowerCase();
+let h = 0x811c9dc5;
+for (let i = 0; i < norm.length; i++) { h ^= norm.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+const hue = h % 360;
+const raw = String(name).trim();
+const isEmail = /^[^\s@]+@[^\s@]+$/.test(raw);
+const words = (isEmail ? raw.split('@')[0].split('+')[0].split(/[._-]+/) : raw.split(/\s+/)).filter(Boolean);
+const initials = (words.length > 1 ? words[0][0] + words[words.length - 1][0] : words[0].slice(0, 1)).toUpperCase();
+const hc = contrast === 'more';
+const p = theme === 'dark' ? (hc ? [32, 16, 80, 92] : [32, 24, 70, 86]) : (hc ? [50, 86, 70, 16] : [50, 90, 60, 24]);
+return { name, hue, initials, bg: 'hsl(' + hue + ' ' + p[0] + '% ' + p[1] + '%)', fg: 'hsl(' + hue + ' ' + p[2] + '% ' + p[3] + '%)' };
+}
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+const avatars = [
+['Maria Hartmann', 'avatar'],
+['Jonas Weber', 'avatar'],
+['Anke Voss', 'avatar'],
+['Robin Approver', 'avatar'],
+['Nordlicht Kaffee', 'avatar avatar--square'],
+['Acme Agency', 'avatar avatar--square'],
+['kim.lee@example.test', 'avatar']
+].map((x) => ({ ...this.avatarFor(x[0], theme, contrast), cls: x[1] }));
+const states = [
+{ cls: '', disabled: false },
+{ cls: 'is-hover', disabled: false },
+{ cls: 'is-pressed', disabled: false },
+{ cls: 'is-focus', disabled: false },
+{ cls: 'is-disabled', disabled: true }
+];
+const variants = [
+{ name: 'Primary', cls: 'btn-primary', label: 'Approve and run' },
+{ name: 'Secondary', cls: '', label: 'Newer' },
+{ name: 'Destructive', cls: 'btn-destructive', label: 'Reject' },
+{ name: 'Plain', cls: 'btn-plain', label: 'Sign out' }
+];
+const buttonRows = variants.map((v) => ({
+name: v.name,
+cells: states.map((s) => ({ cls: ('btn ' + v.cls + ' ' + s.cls).replace(/\s+/g, ' ').trim(), label: v.label, disabled: s.disabled }))
+}));
+const icons = [
+{ label: 'Approvals', d: 'M1.75 8a6.25 6.25 0 1 0 12.5 0a6.25 6.25 0 1 0 -12.5 0 M5.3 8.3l1.9 1.9 3.6-4.1' },
+{ label: 'Campaigns', d: 'M14 2L2 6.6l4.6 1.9L8.4 14z M14 2L6.6 8.5' },
+{ label: 'Monitoring', d: 'M1.5 8h2.8l1.6-4.5 2.8 9 1.8-4.5h3.5' },
+{ label: 'Content', d: 'M4.25 1.75H9L13 5.75V13a1.25 1.25 0 0 1-1.25 1.25h-7.5A1.25 1.25 0 0 1 3 13V3a1.25 1.25 0 0 1 1.25-1.25z M9 1.75V5.75h4 M5.5 8.75h5 M5.5 11.25h3.2' },
+{ label: 'Audiences', d: 'M6 7.5a2.5 2.5 0 1 0 0-5a2.5 2.5 0 0 0 0 5z M1.5 13.5c.4-2.4 2.2-3.8 4.5-3.8s4.1 1.4 4.5 3.8 M11 7a2 2 0 1 0 0-4 M11.2 9.8c1.9.1 3.1 1.3 3.5 3.4' },
+{ label: 'Recipients', d: 'M1.75 8a6.25 6.25 0 1 0 12.5 0a6.25 6.25 0 1 0 -12.5 0 M8 8.2a2 2 0 1 0 0-4a2 2 0 0 0 0 4z M3.9 12.8c.9-1.7 2.4-2.5 4.1-2.5s3.2.8 4.1 2.5' },
+{ label: 'Deliveries', d: 'M3.25 3h9.5a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5h-9.5a1.5 1.5 0 0 1-1.5-1.5v-7A1.5 1.5 0 0 1 3.25 3z M2 4.5l6 4.2 6-4.2' },
+{ label: 'Decision slots', d: 'M2 5h1.75 M7.25 5H14 M2 11h6.75 M12.25 11H14 M3.75 5a1.75 1.75 0 1 0 3.5 0a1.75 1.75 0 1 0 -3.5 0 M8.75 11a1.75 1.75 0 1 0 3.5 0a1.75 1.75 0 1 0 -3.5 0' },
+{ label: 'Settings', d: 'M3 8a5 5 0 1 0 10 0a5 5 0 1 0 -10 0 M5.9 8a2.1 2.1 0 1 0 4.2 0a2.1 2.1 0 1 0 -4.2 0 M8 1.5V3 M8 13v1.5 M1.5 8H3 M13 8h1.5 M3.4 3.4l1.1 1.1 M11.5 11.5l1.1 1.1 M12.6 3.4l-1.1 1.1 M4.5 11.5l-1.1 1.1' },
+{ label: 'History', d: 'M1.75 8a6.25 6.25 0 1 0 12.5 0a6.25 6.25 0 1 0 -12.5 0 M8 4.5V8l2.4 1.4' }
+];
+return {
+themeClass: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : ''),
+buttonRows,
+icons,
+avatars,
+small: this.avatarFor('Maria Hartmann', theme, contrast),
+brandTile: this.avatarFor('Nordlicht Kaffee', theme, contrast),
+yes: true
+};
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Details column</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="{{cls}}" style="min-height: {{minH}}px">
+
+<div class="detail-scroll">
+
+<sc-if value="{{isError}}" hint-placeholder-val="{{false}}">
+<div role="alert" class="notice notice-alert"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="5.5"></circle><path d="M5 5l4 4M9 5l-4 4"></path></svg><span>Could not load this. The server may be unavailable.</span></div>
+</sc-if>
+
+<sc-if value="{{showBody}}" hint-placeholder-val="{{true}}">
+
+<header class="detail-head">
+<h2 class="ts-title" style="margin: 0">{{label}}</h2>
+<p class="muted" style="margin: 4px 0 0">{{summary}}</p>
+</header>
+
+<sc-if value="{{isCannot}}" hint-placeholder-val="{{false}}">
+<div class="group"><div class="notice"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" class="muted"><circle cx="7" cy="7" r="5.5"></circle><path d="M7 6.5v3.5M7 4v.5"></path></svg><div><div class="ts-strong">You cannot decide this request.</div><div class="muted">You requested this, and “Send a campaign” has to be decided by somebody else.</div></div></div></div>
+</sc-if>
+
+<sc-if value="{{isWithdraw}}" hint-placeholder-val="{{false}}">
+<div class="group"><div class="notice"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" class="muted"><circle cx="7" cy="7" r="5.5"></circle><path d="M7 6.5v3.5M7 4v.5"></path></svg><div>The requester is no longer allowed to make this request. Approving it withdraws it, and nothing runs.</div></div></div>
+</sc-if>
+
+<sc-if value="{{hasWarnings}}" hint-placeholder-val="{{true}}">
+<section aria-labelledby="warn-h">
+<h3 id="warn-h" class="ts-head group-title">Before you decide</h3>
+<div class="group">
+<sc-for list="{{warnings}}" as="w" hint-placeholder-count="2">
+<div class="group-row notice" style="padding: 10px 16px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-human)"><path d="M7 2L13 12H1z M7 6v3 M7 10.5v.5"></path></svg><span>{{w.text}}</span></div>
+</sc-for>
+</div>
+</section>
+</sc-if>
+
+<section aria-label="Request details">
+<div class="group">
+<dl style="margin: 0">
+<div class="fact"><dt>Status</dt><dd>
+<sc-if value="{{isDecided}}" hint-placeholder-val="{{false}}"><span class="chip chip-ok"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5l2.5 2.5 4.5-5.5"></path></svg>Approved</span></sc-if>
+<sc-if value="{{isPending}}" hint-placeholder-val="{{true}}"><span class="chip chip-wait"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4.5"></circle><path d="M6 3v3l2 1"></path></svg>Pending</span></sc-if>
+</dd></div>
+<div class="fact"><dt>Requested by</dt><dd>{{requestedBy}}</dd></div>
+<div class="fact"><dt>Requested</dt><dd>{{requested}}</dd></div>
+<div class="fact"><dt>Expires</dt><dd>{{expires}}</dd></div>
+<sc-if value="{{isDecided}}" hint-placeholder-val="{{false}}">
+<div class="fact"><dt>Decided</dt><dd>{{decided}}</dd></div>
+<div class="fact"><dt>Reason given</dt><dd>{{reasonGiven}}</dd></div>
+</sc-if>
+<sc-for list="{{rows}}" as="f" hint-placeholder-count="5">
+<div class="fact"><dt>{{f.k}}</dt><dd>{{f.v}}</dd></div>
+</sc-for>
+</dl>
+</div>
+</section>
+
+</sc-if>
+</div>
+
+<sc-if value="{{showDecide}}" hint-placeholder-val="{{true}}">
+<section aria-labelledby="decide-h" class="decide">
+<h3 id="decide-h" class="ts-head group-title">Decide</h3>
+<div class="group" style="padding: 16px; display: flex; flex-direction: column; gap: 14px">
+
+<sc-if value="{{isOptions}}" hint-placeholder-val="{{false}}">
+<fieldset style="border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+<legend class="lbl" style="padding: 0">Choose one</legend>
+<sc-for list="{{options}}" as="o" hint-placeholder-count="3">
+<label class="opt"><input type="radio" name="choice"><span>{{o.text}}</span></label>
+</sc-for>
+</fieldset>
+</sc-if>
+
+<div><label class="lbl" for="reason">Reason (optional; the requester sees it)</label><textarea id="reason" class="field" rows="2" disabled="{{isBusy}}"></textarea></div>
+
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<button class="btn btn-lg btn-primary" type="button" disabled="{{approveDisabled}}" aria-busy="{{isBusy}}"><sc-if value="{{isBusy}}" hint-placeholder-val="{{false}}"><svg class="spin" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="5.5" opacity=".3"></circle><path d="M7 1.5a5.5 5.5 0 0 1 5.5 5.5"></path></svg></sc-if>{{approveLabel}}</button>
+<button class="btn btn-lg btn-destructive" type="button" disabled="{{isBusy}}">Reject</button>
+<sc-if value="{{isOptions}}" hint-placeholder-val="{{false}}"><span class="ts-cap">Choose an option to approve.</span></sc-if>
+</div>
+
+</div>
+</section>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"state":{"editor":"enum","default":"waiting","options":["waiting","options","withdraw","cannot","busy","decided","error"]},"minH":{"editor":"int","default":900,"min":0,"max":3000},"$preview":{"width":760,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+const state = this.props.state ?? 'waiting';
+const minH = parseInt(this.props.minH ?? 900, 10) || 0;
+
+const sendRows = (audience, status) => [
+{ k: 'Send', v: 'October coffee letter, first send' },
+{ k: 'Status', v: status },
+{ k: 'Provider', v: 'Example provider' },
+{ k: 'From', v: 'news@nordlicht-kaffee.example' },
+{ k: 'Audience', v: audience }
+];
+const warnForSend = [
+{ text: 'This will send for real through Example provider.' },
+{ text: 'The audience is re-resolved at send time, so the number shown is not necessarily what will be mailed.' }
+];
+
+let d = {
+label: 'Send a campaign',
+summary: 'October coffee letter to 1,204 planned recipients',
+requestedBy: 'person',
+requested: '14 Oct 2026, 08:12',
+expires: '14 Oct 2026, 18:00',
+decided: '',
+reasonGiven: '',
+rows: sendRows('1,204 planned recipients', 'Planned'),
+warnings: warnForSend,
+options: []
+};
+if (state === 'withdraw') {
+d = {
+...d,
+summary: 'Cold-brew launch to 8,930 planned recipients',
+requestedBy: 'integration',
+expires: '15 Oct 2026, 09:00',
+rows: [
+{ k: 'Send', v: 'Cold-brew launch, first send' },
+{ k: 'Status', v: 'Planned' },
+{ k: 'Provider', v: 'Example provider' },
+{ k: 'From', v: 'news@nordlicht-kaffee.example' },
+{ k: 'Audience', v: '8,930 planned recipients' }
+],
+warnings: [
+...warnForSend,
+{ text: 'Held for its size: it would mail 8,930 recipients, above this integration’s unattended limit of 5,000.' }
+]
+};
+}
+if (state === 'options') {
+d = {
+...d,
+label: 'Apply an AI-suggested subject',
+summary: 'October coffee letter, 3 suggestions',
+rows: [
+{ k: 'Campaign', v: 'October coffee letter' },
+{ k: 'Current subject', v: 'Our October roasts are here' }
+],
+warnings: [],
+options: [
+{ text: 'Three origins that beat the autumn grey' },
+{ text: 'Your October coffee, roasted this week' },
+{ text: 'Autumn in three cups' }
+]
+};
+}
+if (state === 'decided') {
+d = {
+...d,
+decided: '14 Oct 2026, 08:31',
+reasonGiven: 'Checked the audience and the schedule.',
+rows: sendRows('1,204 planned recipients', 'Sent'),
+warnings: []
+};
+}
+
+const isError = state === 'error';
+const isCannot = state === 'cannot';
+const isWithdraw = state === 'withdraw';
+const isOptions = state === 'options';
+const isBusy = state === 'busy';
+const isDecided = state === 'decided';
+
+return {
+cls: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : '') + ' root col-detail',
+minH,
+...d,
+isError,
+isCannot,
+isWithdraw,
+isOptions,
+isBusy,
+isDecided,
+isPending: !isDecided,
+showBody: !isError,
+hasWarnings: !isError && !isDecided && d.warnings.length > 0,
+showDecide: !isError && !isCannot && !isDecided,
+approveDisabled: isBusy || isOptions,
+approveLabel: isBusy ? 'Approving…' : 'Approve and run'
+};
+}
+}
+</script>
+</body>
+</html>

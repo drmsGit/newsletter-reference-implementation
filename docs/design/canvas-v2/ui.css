@@ -1,0 +1,249 @@
+/*
+ * Manager app, design foundation and component library, v2 (three columns).
+ * PROPOSAL, NOT FINAL. Token names follow docs/design/tokens.css (--brand-*).
+ * New names in v2: --brand-sidebar, --brand-selected, --brand-shadow, --brand-control-height-sm/-lg.
+ * System font only (SF Pro on Apple devices, ui-monospace for ids). No hosted font files (ADR-171).
+ * Themes: .t-light, .t-dark. Increased contrast: add .hc to the root element.
+ */
+
+/* ---------- foundation: colour ---------- */
+.t-light{--brand-bg:#FCF8F2;--brand-surface:#FFFFFF;--brand-sidebar:#F3ECDF;--brand-surface-2:#F6F1E8;--brand-selected:#DCEAEF;--brand-highlight:#F4BEBB;--brand-line:#E4DACA;--brand-line-strong:#857A6C;--brand-fg:#1F1B16;--brand-muted:#62594E;--brand-accent:#1A5D74;--brand-accent-fg:#FFFFFF;--brand-focus:#1A5D74;--brand-human:#7A4A00;--brand-human-bg:#FFF0D6;--brand-success:#1D6B34;--brand-success-bg:#E1F4E6;--brand-info:#0A5EB0;--brand-info-bg:#E3EFFB;--brand-danger:#B3261E;--brand-danger-bg:#FDE8E6;--brand-shadow:0 .5px 1px rgba(0,0,0,.12);--brand-avatar-bg-s:50%;--brand-avatar-bg-l:90%;--brand-avatar-fg-s:60%;--brand-avatar-fg-l:24%}
+.t-dark{--brand-bg:#14110F;--brand-surface:#1E1B18;--brand-sidebar:#191614;--brand-surface-2:#2A2622;--brand-selected:#19424F;--brand-highlight:#613534;--brand-line:#3A342D;--brand-line-strong:#8F857A;--brand-fg:#F4EEE6;--brand-muted:#B0A79B;--brand-accent:#6FC3DD;--brand-accent-fg:#0B2530;--brand-focus:#6FC3DD;--brand-human:#FFC970;--brand-human-bg:#3A2A0C;--brand-success:#7DD99A;--brand-success-bg:#12301C;--brand-info:#7DB9FF;--brand-info-bg:#14304F;--brand-danger:#FF8D85;--brand-danger-bg:#3F1B18;--brand-shadow:0 0 0 .5px rgba(255,255,255,.08);--brand-avatar-bg-s:32%;--brand-avatar-bg-l:24%;--brand-avatar-fg-s:70%;--brand-avatar-fg-l:86%}
+.t-light.hc{--brand-bg:#FFFFFF;--brand-sidebar:#F3ECDF;--brand-surface-2:#ECE4D6;--brand-selected:#BFD8E0;--brand-highlight:#EFA9A5;--brand-line:#8A7F70;--brand-line-strong:#3D362D;--brand-fg:#000000;--brand-muted:#3F382F;--brand-accent:#0E4558;--brand-focus:#0E4558;--brand-human:#5E3A00;--brand-success:#14532A;--brand-info:#07468A;--brand-danger:#8E1A13;--brand-avatar-bg-l:86%;--brand-avatar-fg-s:70%;--brand-avatar-fg-l:16%}
+.t-dark.hc{--brand-bg:#000000;--brand-surface:#0D0B0A;--brand-sidebar:#0D0B0A;--brand-surface-2:#201C18;--brand-selected:#1A5A70;--brand-highlight:#7A3F3D;--brand-line:#9C9387;--brand-line-strong:#CFC6BA;--brand-fg:#FFFFFF;--brand-muted:#D8D0C4;--brand-accent:#8FD4EA;--brand-accent-fg:#000000;--brand-focus:#8FD4EA;--brand-human:#FFD98A;--brand-success:#A5E4BB;--brand-info:#A8D1FF;--brand-danger:#FFB4AD;--brand-avatar-bg-l:16%;--brand-avatar-fg-s:80%;--brand-avatar-fg-l:92%}
+
+/* ---------- foundation: type, shape, size ---------- */
+.root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:13px;line-height:18px;color:var(--brand-fg);background:var(--brand-bg);-webkit-font-smoothing:antialiased;--brand-radius:6px;--brand-radius-panel:10px;--brand-radius-chip:999px;--brand-space:8px;--brand-control-height-sm:24px;--brand-control-height:28px;--brand-control-height-lg:36px}
+.ts-large{font-size:26px;line-height:32px;font-weight:700}
+.ts-title{font-size:22px;line-height:28px;font-weight:600}
+.ts-head{font-size:15px;line-height:20px;font-weight:600}
+.ts-body{font-size:13px;line-height:18px;font-weight:400}
+.ts-strong{font-size:13px;line-height:18px;font-weight:600}
+.ts-cap{font-size:12px;line-height:16px;font-weight:400;color:var(--brand-muted)}
+.ts-mono{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12px;line-height:16px}
+.muted{color:var(--brand-muted)}
+.clip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- focus ---------- */
+a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-visible,.is-focus{outline:2px solid var(--brand-focus);outline-offset:2px}
+.item:focus-visible,.nav-item:focus-visible{outline-offset:-2px}
+
+/* ---------- layout: three columns ---------- */
+.app{display:flex;flex-wrap:wrap;align-items:stretch;min-height:900px}
+.col-nav{flex:0 0 232px;box-sizing:border-box;background:var(--brand-sidebar);border-right:1px solid var(--brand-line);display:flex;flex-direction:column;padding:12px 12px 16px}
+.col-nav.is-collapsed{flex-basis:56px;padding-left:8px;padding-right:8px;align-items:center}
+.col-list{flex:0 1 380px;min-width:300px;box-sizing:border-box;background:var(--brand-surface);border-right:1px solid var(--brand-line);display:flex;flex-direction:column}
+.col-detail{flex:999 1 480px;min-width:0;box-sizing:border-box;background:var(--brand-bg);display:flex;flex-direction:column}
+
+/* ---------- button ---------- */
+.btn{font:inherit;font-weight:500;height:var(--brand-control-height);padding:0 12px;border-radius:var(--brand-radius);border:1px solid var(--brand-line);background:var(--brand-surface);color:var(--brand-fg);box-shadow:var(--brand-shadow);display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;white-space:nowrap;box-sizing:border-box;text-decoration:none}
+.btn:hover,.btn.is-hover{background:var(--brand-surface-2)}
+.btn:active,.btn.is-pressed{background:var(--brand-line)}
+.btn:disabled,.btn.is-disabled{color:var(--brand-muted);background:var(--brand-surface-2);box-shadow:none;cursor:not-allowed}
+.btn-sm{height:var(--brand-control-height-sm);padding:0 8px}
+.btn-lg{height:var(--brand-control-height-lg);padding:0 16px;border-radius:8px}
+.btn-icon{width:var(--brand-control-height);padding:0}
+.btn-primary{background:var(--brand-accent);border-color:var(--brand-accent);color:var(--brand-accent-fg);box-shadow:none}
+.btn-primary:hover,.btn-primary.is-hover{background:var(--brand-accent);filter:brightness(1.1)}
+.btn-primary:active,.btn-primary.is-pressed{background:var(--brand-accent);filter:brightness(.9)}
+.btn-primary:disabled,.btn-primary.is-disabled{background:var(--brand-surface-2);border-color:var(--brand-line);color:var(--brand-muted);filter:none}
+.btn-primary[aria-busy="true"]:disabled{background:var(--brand-accent);border-color:var(--brand-accent);color:var(--brand-accent-fg);opacity:.75}
+.btn-destructive{color:var(--brand-danger)}
+.btn-plain{background:transparent;border-color:transparent;box-shadow:none;color:var(--brand-accent)}
+.btn-plain:hover,.btn-plain.is-hover{background:var(--brand-surface-2)}
+.btn-plain.btn-neutral{color:var(--brand-fg)}
+.btn svg{flex:none}
+.spin{animation:ui-spin .9s linear infinite}
+@keyframes ui-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.spin{animation:none}}
+
+/* ---------- pull-down (filter) ---------- */
+.pulldown{padding:0 8px 0 11px}
+.pulldown .pd-label{color:var(--brand-muted);font-weight:400}
+
+/* ---------- field ---------- */
+.field{font:inherit;height:var(--brand-control-height);box-sizing:border-box;width:100%;padding:0 8px;border-radius:var(--brand-radius);border:1px solid var(--brand-line-strong);background:var(--brand-surface);color:var(--brand-fg)}
+textarea.field{height:auto;min-height:64px;padding:6px 8px;resize:vertical}
+.field[aria-invalid="true"],.field.is-invalid{border-color:var(--brand-danger);box-shadow:inset 0 0 0 1px var(--brand-danger)}
+.field:disabled{background:var(--brand-surface-2);color:var(--brand-muted);cursor:not-allowed}
+.lbl{display:block;font-weight:500;margin-bottom:4px}
+.help{font-size:12px;line-height:16px;color:var(--brand-muted);margin-top:4px}
+.err{display:flex;align-items:center;gap:6px;font-size:12px;line-height:16px;color:var(--brand-danger);margin-top:4px}
+
+/* ---------- choice / checkbox rows ---------- */
+.opt{display:flex;align-items:center;gap:10px;min-height:36px;padding:0 12px;border:1px solid var(--brand-line);border-radius:8px;background:var(--brand-surface);cursor:pointer;box-sizing:border-box}
+.opt:hover{background:var(--brand-surface-2)}
+.opt.is-selected{border-color:var(--brand-accent);background:var(--brand-selected)}
+.opt input{margin:0;accent-color:var(--brand-accent)}
+
+/* ---------- segmented control / tabs ---------- */
+.seg{display:inline-flex;padding:2px;gap:2px;border-radius:8px;background:var(--brand-surface-2);border:1px solid var(--brand-line)}
+.seg button{font:inherit;font-weight:500;height:24px;padding:0 12px;border:0;border-radius:6px;background:transparent;color:var(--brand-fg);cursor:pointer}
+.seg button[aria-selected="true"]{background:var(--brand-surface);box-shadow:var(--brand-shadow)}
+
+/* ---------- status chip ---------- */
+.chip{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 8px;border-radius:var(--brand-radius-chip);font-size:12px;line-height:16px;font-weight:500;background:var(--brand-surface-2);color:var(--brand-muted);white-space:nowrap;box-sizing:border-box}
+.chip-wait{background:var(--brand-human-bg);color:var(--brand-human)}
+.chip-ok{background:var(--brand-success-bg);color:var(--brand-success)}
+.chip-run{background:var(--brand-info-bg);color:var(--brand-info)}
+.chip-bad{background:var(--brand-danger-bg);color:var(--brand-danger)}
+.hc .chip{box-shadow:inset 0 0 0 1px currentColor}
+
+/* ---------- navigation (column 1) ---------- */
+.nav-top{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:40px;margin:0 0 4px 8px}
+.col-nav.is-collapsed .nav-top{margin:0 0 4px;justify-content:center}
+.nav-name{font-weight:600;font-size:12px;line-height:15px}
+.nav-list{display:flex;flex-direction:column;gap:2px;width:100%}
+.nav-item{display:flex;align-items:center;gap:8px;height:var(--brand-control-height);padding:0 8px;border-radius:var(--brand-radius);color:var(--brand-fg);text-decoration:none;font-weight:500;box-sizing:border-box}
+.nav-item svg{flex:none;color:var(--brand-accent)}
+.nav-item:hover,.nav-item.is-hover{background:var(--brand-line)}
+.nav-item[aria-current="page"]{background:var(--brand-highlight);font-weight:600}
+.col-nav.is-collapsed .nav-item{width:40px;height:32px;padding:0;justify-content:center}
+.col-nav.is-collapsed .nav-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.nav-gap{height:12px}
+.nav-foot{margin-top:auto;padding:12px 0 0 8px;display:flex;flex-direction:column;gap:2px;border-top:1px solid var(--brand-line);width:100%;box-sizing:border-box}
+.col-nav.is-collapsed .nav-foot{padding-left:0;align-items:center}
+.brand-btn{width:100%;justify-content:space-between;height:40px;margin:4px 0 12px}
+.brand-tile{width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;background:var(--brand-selected);color:var(--brand-accent);font-weight:600;border:0;cursor:pointer;margin:4px 0 12px}
+
+/* ---------- list (column 2) ---------- */
+.list-head{padding:20px 20px 8px}
+.filters{display:flex;flex-wrap:wrap;gap:8px;padding:8px 8px 12px}
+.list{flex:1;padding:0 8px 8px;display:flex;flex-direction:column}
+.item{position:relative;display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:var(--brand-radius-panel);color:var(--brand-fg);text-decoration:none}
+.item + .item::before{content:"";position:absolute;top:0;left:12px;right:12px;height:1px;background:var(--brand-line)}
+.item:hover,.item.is-hover{background:var(--brand-surface-2)}
+.item[aria-current="true"]{background:var(--brand-selected)}
+.item[aria-current="true"]::before,.item[aria-current="true"] + .item::before{display:none}
+.list-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 8px;padding:8px 12px 8px 11px;border-top:1px solid var(--brand-line);background:var(--brand-surface)}
+
+/* ---------- details (column 3) ---------- */
+.detail-scroll{flex:1;padding:24px 24px 24px;display:flex;flex-direction:column;gap:20px}
+.detail-head{padding:0 16px}
+.group{background:var(--brand-surface);border:1px solid var(--brand-line);border-radius:var(--brand-radius-panel);overflow:hidden}
+.group-title{margin:0 0 6px;padding:0 16px}
+.group-row{position:relative;padding:10px 16px}
+.group-row + .group-row::before,.fact + .fact::before{content:"";position:absolute;top:0;left:16px;right:0;height:1px;background:var(--brand-line)}
+.fact{position:relative;display:grid;grid-template-columns:132px minmax(0,1fr);gap:0 16px;align-items:baseline;padding:8px 16px}
+.fact dt{margin:0;font-size:12px;line-height:16px;color:var(--brand-muted)}
+.fact dd{margin:0;font-variant-numeric:tabular-nums}
+.decide{position:sticky;bottom:0;background:var(--brand-bg);padding:0 24px 20px}
+.decide::before{content:"";position:absolute;left:0;right:0;top:-24px;height:24px;background:linear-gradient(to bottom,transparent,var(--brand-bg));pointer-events:none}
+
+/* ---------- initials avatar ----------
+ * The colour comes from the name, never from chance: hash the name to a hue
+ * (docs/design/HANDOFF.md, "Initials avatar"), set it as --avatar-hue on the
+ * element, and this rule does the rest. The saturation and lightness belong to
+ * the theme, so light, dark and increased contrast each keep the initials
+ * readable on every hue (computed over all 360, lowest 5.65 : 1).
+ * People are circles; a brand is a rounded square (.avatar--square). The
+ * canvas boards set background and color inline from the same numbers,
+ * because their runtime does not set custom properties. */
+.avatar{display:inline-flex;align-items:center;justify-content:center;flex:none;width:var(--avatar-size,32px);height:var(--avatar-size,32px);border-radius:50%;font-weight:600;font-size:13px;line-height:1;letter-spacing:0;user-select:none;background:hsl(var(--avatar-hue,210) var(--brand-avatar-bg-s) var(--brand-avatar-bg-l));color:hsl(var(--avatar-hue,210) var(--brand-avatar-fg-s) var(--brand-avatar-fg-l))}
+.avatar--square{border-radius:8px}
+.avatar-sm{--avatar-size:24px;font-size:11px}
+
+/* ---------- notice ---------- */
+.notice{display:flex;align-items:flex-start;gap:10px;padding:10px 16px}
+.notice svg{flex:none;margin-top:2px}
+.notice-alert{border-radius:var(--brand-radius-panel);background:var(--brand-danger-bg);color:var(--brand-danger);padding:12px 16px}
+
+/* ======================================================================
+ * Added 2026-10-17 for the demo-flow screens (campaigns, editor, content,
+ * deliveries and the rest). Same tokens, no new colours.
+ * ====================================================================== */
+
+/* ---------- list column: back link, search, segmented header ---------- */
+.back{display:inline-flex;align-items:center;gap:4px;color:var(--brand-accent);text-decoration:none;font-weight:500;font-size:12px;line-height:16px}
+.back:hover{text-decoration:underline}
+.search{display:flex;gap:6px;padding:0 8px 8px}
+.search .field{flex:1;min-width:0}
+.list-tools{display:flex;flex-direction:column;gap:8px;padding:0 8px 12px}
+.list-tools .seg{align-self:flex-start}
+.list-form{display:flex;flex-direction:column;gap:8px;padding:4px 8px 12px}
+.list-form .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* ---------- a select that is a field: label above, control below ---------- */
+.select-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;height:var(--brand-control-height);padding:0 8px 0 10px;border-radius:var(--brand-radius);border:1px solid var(--brand-line-strong);background:var(--brand-surface);color:var(--brand-fg);font:inherit;text-align:left;cursor:pointer;box-sizing:border-box}
+.select-btn svg{flex:none;color:var(--brand-muted)}
+.select-btn:disabled{background:var(--brand-surface-2);color:var(--brand-muted);cursor:not-allowed}
+
+/* ---------- data table inside a group card ---------- */
+.dtable-wrap{overflow-x:auto}
+.dtable{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.dtable th{font-size:12px;line-height:16px;font-weight:500;color:var(--brand-muted);text-align:left;padding:8px 16px;border-bottom:1px solid var(--brand-line);white-space:nowrap}
+.dtable td{padding:8px 16px;border-bottom:1px solid var(--brand-line);vertical-align:top}
+.dtable tbody tr:last-child td{border-bottom:0}
+.dtable .num{text-align:right;white-space:nowrap}
+.dtable .nw{white-space:nowrap}
+.dtable tr.is-total td{font-weight:600;background:var(--brand-surface-2)}
+.dtable a{color:var(--brand-accent);text-decoration:none;font-weight:500}
+
+/* ---------- switch ---------- */
+.switch{display:inline-flex;align-items:center;gap:10px;cursor:pointer}
+.switch input{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.switch .track{width:36px;height:20px;border-radius:10px;background:var(--brand-line-strong);position:relative;flex:none}
+.switch .track::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--brand-surface)}
+.switch input:checked + .track{background:var(--brand-accent)}
+.switch input:checked + .track::after{left:18px;background:var(--brand-accent-fg)}
+.switch input:focus-visible + .track{outline:2px solid var(--brand-focus);outline-offset:2px}
+
+/* ---------- collapsible section ---------- */
+.dsc > summary{list-style:none;display:flex;align-items:center;gap:6px;cursor:pointer;padding:0 16px;margin:0 0 6px}
+.dsc > summary::-webkit-details-marker{display:none}
+.dsc > summary .chev{flex:none;color:var(--brand-muted);transition:transform .15s}
+.dsc[open] > summary .chev{transform:rotate(90deg)}
+@media (prefers-reduced-motion: reduce){.dsc > summary .chev{transition:none}}
+
+/* ---------- list rows with their own controls (module stack) ---------- */
+.item-top{display:flex;align-items:center;gap:4px;min-width:0}
+.item-top .ttl{flex:1;min-width:0;font-weight:600}
+.item-sub{display:flex;align-items:center;gap:8px;min-width:0}
+.item-acts{display:flex;align-items:center;gap:2px;margin-top:4px}
+
+/* ---------- sheet (a modal over the screen) ---------- */
+.scrim{position:absolute;inset:0;background:rgba(20,17,15,.45)}
+.sheet{background:var(--brand-surface);border-radius:14px;border:1px solid var(--brand-line);box-shadow:0 20px 60px rgba(0,0,0,.28);box-sizing:border-box}
+
+/* ---------- placeholder blocks for rendered email and images ---------- */
+.sk{height:8px;border-radius:4px;background:var(--brand-line)}
+.ph-img{background:var(--brand-surface-2);border:1px solid var(--brand-line);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--brand-muted);font-size:12px}
+.mail{background:#fff;color:#1d1d1f;border:1px solid var(--brand-line);border-radius:8px;overflow:hidden;box-sizing:border-box}
+
+/* ---------- field rows in a card ---------- */
+.frow{position:relative;padding:12px 16px;display:flex;flex-direction:column;gap:6px}
+.frow + .frow::before{content:"";position:absolute;top:0;left:16px;right:0;height:1px;background:var(--brand-line)}
+.frow .help{margin-top:0}
+.btnrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+
+/* a row's own select button (module stack, list rows that hold controls) */
+.selbtn{font:inherit;font-weight:600;color:var(--brand-fg);background:none;border:0;padding:0;text-align:left;cursor:pointer;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.selbtn:focus-visible{outline:2px solid var(--brand-focus);outline-offset:2px;border-radius:4px}
+.btn-icon.btn-sm{width:var(--brand-control-height-sm);padding:0}
+.quiet{display:flex;align-items:flex-start;gap:10px;padding:10px 16px}
+.quiet svg{flex:none;margin-top:2px}
+.numlist{margin:0;padding:0;list-style:none;display:flex;flex-direction:column}
+.numlist > li{position:relative;display:flex;align-items:flex-start;gap:12px;padding:10px 16px}
+.numlist > li + li::before{content:"";position:absolute;top:0;left:16px;right:0;height:1px;background:var(--brand-line)}
+.numlist .n{flex:none;width:18px;color:var(--brand-muted);font-variant-numeric:tabular-nums}
+
+/* plain anchors inside the app take the accent, not the browser blue */
+.root a:not([class]){color:var(--brand-accent);text-underline-offset:2px}
+.root a:not([class]):focus-visible{outline:2px solid var(--brand-focus);outline-offset:2px;border-radius:2px}
+.btn-plain:disabled{background:transparent}
+
+/* the aria-current of a sub-menu link is "page"; a list row's is "true" — same look */
+.item[aria-current="page"]{background:var(--brand-selected)}
+.item[aria-current="page"]::before,.item[aria-current="page"] + .item::before{display:none}
+
+/* wide-table exception: one column in place of list + details (Monitoring, Decision history) */
+.col-wide{flex:999 1 480px;min-width:0;box-sizing:border-box;background:var(--brand-surface);display:flex;flex-direction:column}
+.col-wide .dtable-wrap{padding:0 8px}
+.col-wide .dtable th:first-child,.col-wide .dtable td:first-child{padding-left:12px}
+
+/* text in the list column sits on the column's one indent (20px); controls keep the 8px edge */
+.list-form > .lbl{padding:0 12px}
+.list-tools > p{padding:0 12px}
+/* native checkboxes and radios take the accent */
+.root input[type="checkbox"],.root input[type="radio"]{accent-color:var(--brand-accent)}

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Audiences</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.rule{display:flex;align-items:flex-start;gap:12px;padding:10px 16px;position:relative}
+.rule + .rule::before{content:"";position:absolute;top:0;left:16px;right:0;height:1px;background:var(--brand-line)}
+.rule .body{flex:1;min-width:0}
+.subform{background:var(--brand-surface-2);border-top:1px solid var(--brand-line);border-bottom:1px solid var(--brand-line)}
+.arith td{text-align:right;white-space:nowrap}
+.arith th{font-size:13px;line-height:18px;font-weight:400;color:var(--brand-fg);text-align:left;padding:8px 16px;border-bottom:1px solid var(--brand-line)}
+.arith tr:last-child th,.arith tr:last-child td{border-bottom:0}
+.arith tr.is-total th,.arith tr.is-total td{font-weight:600;background:var(--brand-surface-2)}
+.wide-dt .fact{grid-template-columns:230px minmax(0,1fr)}
+</style>
+</helmet>
+<div class="{{themeClass}} root app" style="min-height: {{minH}}px">
+
+<div style="flex: 0 0 232px; display: flex">
+<dc-import name="V2Nav" theme="{{theme}}" contrast="{{contrast}}" active="Audiences" min-h="{{minH}}" hint-size="232px,900px"></dc-import>
+</div>
+
+<section class="col-list" aria-label="Audiences" style="min-height: {{minH}}px">
+<header class="list-head"><h1 class="ts-large" style="margin: 0">Audiences</h1></header>
+<div class="list-tools"><div class="btnrow"><button class="btn btn-primary" type="button">New audience</button><button class="btn" type="button">Suggest from campaign</button></div></div>
+<form class="search" role="search"><input class="field" type="text" aria-label="Find an audience by name" placeholder="Find an audience by name"><button class="btn" type="button">Search</button></form>
+<div class="list" role="group" aria-label="Audience groups">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="6">
+<a href="#" class="item" aria-current="{{r.current}}">
+<span class="clip ts-strong">{{r.name}}</span>
+<span class="clip muted">{{r.desc}}</span>
+<span class="ts-cap">{{r.updated}}</span>
+</a>
+</sc-for>
+</div>
+</section>
+
+<div class="col-detail" style="min-height: {{minH}}px">
+<div class="detail-scroll">
+
+<header class="detail-head">
+<a href="#" class="back"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 2.5L4 6l3.5 3.5"></path></svg>Audiences</a>
+<h2 class="ts-title" style="margin: 4px 0 0">Single-origin lovers</h2>
+</header>
+
+<section aria-label="Name and description"><div class="group">
+<div class="frow"><label class="lbl" for="an" style="margin: 0">Name</label><input id="an" class="field" type="text" value="Single-origin lovers"></div>
+<div class="frow"><label class="lbl" for="ad" style="margin: 0">Description</label><input id="ad" class="field" type="text" value="Interested in single origins, German or English readers"></div>
+<div class="frow" style="padding: 0"><dl style="margin: 0"><div class="fact"><dt>Created</dt><dd>02 Oct 2026, 10:14</dd></div><div class="fact"><dt>Updated</dt><dd>14 Oct 2026, 08:30</dd></div></dl></div>
+<div class="frow" style="border-top: 1px solid var(--brand-line)"><div class="btnrow"><button class="btn btn-sm" type="button">Recalculate from campaign</button></div><div class="help" style="margin: 0">Brings the suggested rules up to date with the campaign’s content: new topics are added, dropped ones removed, the rest kept as you set them. Your own rules stay.</div></div>
+<div class="frow" style="border-top: 1px solid var(--brand-line)"><div class="btnrow" style="align-items: flex-end"><div style="flex: 0 1 240px"><label class="lbl" for="ach" style="margin: 0 0 4px">Channel</label><button id="ach" class="select-btn" type="button"><span>Email</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div></div><div class="help" style="margin: 0">Every number and mark on this page is for this channel.</div></div>
+</div></section>
+
+<section aria-labelledby="wi-h">
+<h3 id="wi-h" class="ts-head group-title">Who’s in</h3>
+<div class="group">
+<div class="rule"><div class="body"><span class="ts-strong">Nature and wellness readers</span> <span class="chip" style="margin-left: 4px">Suggested</span><div class="muted">Language de or fr · Status active · Nature ≥ 5 or Wellness ≥ 3 · Clicked in a send of Cold-brew launch in the last 90 days</div></div><button class="btn btn-sm" type="button">Edit</button><button class="btn btn-plain btn-sm" type="button">Remove rule</button></div>
+
+<form class="subform" aria-label="Nature and wellness readers">
+<div class="frow"><fieldset style="border: 0; margin: 0; padding: 0; min-width: 0"><legend class="lbl" style="padding: 0; margin-bottom: 6px">Language</legend><div class="btnrow"><label class="opt is-selected"><input type="checkbox" checked><span>de</span></label><label class="opt is-selected"><input type="checkbox" checked><span>fr</span></label><label class="opt"><input type="checkbox"><span>en</span></label></div></fieldset></div>
+<div class="frow"><fieldset style="border: 0; margin: 0; padding: 0; min-width: 0"><legend class="lbl" style="padding: 0; margin-bottom: 6px">Status</legend><div class="btnrow"><label class="opt is-selected"><input type="checkbox" checked><span>active</span></label><label class="opt"><input type="checkbox"><span>inactive</span></label></div></fieldset></div>
+<div class="frow"><div class="ts-strong">Category interest <span class="muted" style="font-weight: 400">— any one is enough</span></div>
+<div class="btnrow" style="flex-wrap: nowrap; align-items: flex-end"><div style="flex: 1 1 220px"><label class="lbl" for="rc1" style="margin: 0 0 4px">Category</label><button id="rc1" class="select-btn" type="button"><span>Nature</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div><div style="flex: 0 1 140px"><label class="lbl" for="rm1" style="margin: 0 0 4px">Minimum score</label><input id="rm1" class="field" type="text" value="5.0"></div><button class="btn btn-plain btn-sm" type="button">Remove this category</button></div>
+<div class="help" style="margin: 0">How strong their interest in this category must be; above 0.</div>
+<div><button class="btn btn-sm" type="button">Add a category</button></div></div>
+<div class="frow"><div class="ts-strong">What they did with a mailing</div>
+<div class="btnrow" style="align-items: flex-end"><div style="flex: 1 1 160px"><label class="lbl" for="e1" style="margin: 0 0 4px">What happened</label><button id="e1" class="select-btn" type="button"><span>Clicked in it</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div><div style="flex: 1 1 200px"><label class="lbl" for="e2" style="margin: 0 0 4px">Which mailing</label><button id="e2" class="select-btn" type="button"><span>Any send of a campaign</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div><div style="flex: 1 1 160px"><label class="lbl" for="e3" style="margin: 0 0 4px">When</label><button id="e3" class="select-btn" type="button"><span>In the last … days</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div></div>
+<div class="btnrow" style="align-items: flex-end"><div style="flex: 1 1 200px"><label class="lbl" for="e4" style="margin: 0 0 4px">Campaign</label><button id="e4" class="select-btn" type="button"><span>Cold-brew launch</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div><div style="flex: 0 1 120px"><label class="lbl" for="e5" style="margin: 0 0 4px">Days</label><input id="e5" class="field" type="text" value="90"></div><button class="btn btn-plain btn-sm" type="button">Remove engagement</button></div>
+<div class="help" style="margin: 0">To reach people who did not click, include who received it and leave out who clicked.</div></div>
+<div class="frow"><label class="lbl" for="rn" style="margin: 0">Rule name</label><input id="rn" class="field" type="text" value="Nature and wellness readers"></div>
+<div class="frow"><div class="btnrow"><button class="btn btn-primary" type="button">Save rule</button><button class="btn btn-plain" type="button">Cancel</button></div></div>
+</form>
+
+<div class="rule"><div class="body"><span class="ts-strong">Everyone who clicked in October</span><div class="muted">Clicked in any send in the last 30 days</div></div><button class="btn btn-sm" type="button">Edit</button><button class="btn btn-plain btn-sm" type="button">Remove rule</button></div>
+<div class="frow" style="border-top: 1px solid var(--brand-line)"><div><button class="btn btn-sm" type="button">Add a rule</button></div></div>
+</div>
+</section>
+
+<section aria-labelledby="lo-h">
+<h3 id="lo-h" class="ts-head group-title">Leave out</h3>
+<div class="group">
+<div class="frow"><div class="muted">Leaves these people out even if a rule or a hand-add includes them. People who opted out are never sent to anyway: that’s consent, not this list.</div><div class="muted">To reach people who did not click, include who received it and leave out who clicked.</div></div>
+<div class="rule" style="border-top: 1px solid var(--brand-line)"><div class="body"><span class="ts-strong">Wholesale accounts</span><div class="muted">Status inactive · Language en</div></div><button class="btn btn-sm" type="button">Edit</button><button class="btn btn-plain btn-sm" type="button">Remove rule</button></div>
+<div class="frow" style="border-top: 1px solid var(--brand-line)"><div><button class="btn btn-sm" type="button">Add a rule</button></div></div>
+</div>
+</section>
+
+<section aria-labelledby="ah-h">
+<h3 id="ah-h" class="ts-head group-title">Added by hand</h3>
+<div class="group">
+<div class="dtable-wrap"><table class="dtable" aria-label="People added by hand">
+<thead><tr><th>Person</th><th>Reason</th><th>Added by</th><th>Added</th><th>On Email</th><th><span class="sr-only">Actions</span></th></tr></thead>
+<tbody>
+<tr><td><a href="#">anke.voss@example.test</a></td><td>Asked at the roastery open day</td><td>Jonas Weber</td><td class="nw">11 Oct 2026, 09:20</td><td></td><td><button class="btn btn-plain btn-sm" type="button">Remove</button></td></tr>
+<tr><td><a href="#">kim.lee@example.test</a></td><td>—</td><td>Maria Hartmann</td><td class="nw">12 Oct 2026, 15:02</td><td>Left out by “Wholesale accounts”</td><td><button class="btn btn-plain btn-sm" type="button">Remove</button></td></tr>
+</tbody></table></div>
+<div class="frow" style="border-top: 1px solid var(--brand-line)"><label class="lbl" for="ap" style="margin: 0">Add a person (identifier or address)</label><div class="btnrow" style="flex-wrap: nowrap"><input id="ap" class="field" type="text"><button class="btn" type="button">Paste people</button></div></div>
+</div>
+</section>
+
+<section aria-labelledby="wr-h">
+<h3 id="wr-h" class="ts-head group-title">Who a send reaches</h3>
+<div class="group">
+<div class="dtable-wrap"><table class="dtable arith" aria-label="How the audience on Email is arrived at">
+<tbody>
+<tr><th scope="row">Match the rules</th><td>1,244</td></tr>
+<tr><th scope="row">Not agreed to Email</th><td>−58</td></tr>
+<tr><th scope="row">Added by hand</th><td>+2</td></tr>
+<tr><th scope="row">Removed by exclusion segments</th><td>−44 <span class="muted">(1 of them added by hand)</span></td></tr>
+<tr><th scope="row">Added by hand, not agreed to Email</th><td>−0</td></tr>
+<tr class="is-total"><th scope="row">In the audience</th><td>1,144</td></tr>
+</tbody></table></div>
+<div class="frow" style="border-top: 1px solid var(--brand-line)"><div class="muted">As of now: a send works this out again when it goes out.</div></div>
+<div class="frow" style="padding: 0; border-top: 1px solid var(--brand-line)"><dl class="wide-dt" style="margin: 0"><div class="fact"><dt>Reachable on Email</dt><dd>1,104</dd></div><div class="fact"><dt>Not reachable: addressability</dt><dd>31</dd></div><div class="fact"><dt>Not reachable: suppression</dt><dd>9</dd></div></dl></div>
+<form class="frow" role="search" style="border-top: 1px solid var(--brand-line)"><div class="btnrow" style="flex-wrap: nowrap"><input class="field" type="text" aria-label="Find a recipient (identifier or address)" placeholder="Find a recipient (identifier or address)"><button class="btn" type="button">Search</button></div></form>
+<div class="dtable-wrap" style="border-top: 1px solid var(--brand-line)"><table class="dtable" aria-label="Reachable on Email">
+<thead><tr><th>Recipient</th><th>Address</th><th>Language</th></tr></thead>
+<tbody>
+<tr><td>#48213</td><td>anke.voss@example.test</td><td>de</td></tr>
+<tr><td>#48214</td><td>kim.lee@example.test</td><td>en</td></tr>
+<tr><td>#48990</td><td>—</td><td>fr</td></tr>
+</tbody></table></div>
+<div class="frow" style="border-top: 1px solid var(--brand-line)"><div class="ts-cap">Showing 20 of 1,104. Search to find someone.</div></div>
+</div>
+</section>
+
+<section aria-labelledby="dl-h">
+<h3 id="dl-h" class="ts-head group-title">Delete</h3>
+<div class="group"><div class="frow"><div><button class="btn" type="button" style="color: var(--brand-danger)">Delete audience</button></div><div class="help" style="margin: 0">Asks “Delete “Single-origin lovers”?”: Its rules and the people added by hand go with it. This cannot be undone. Used by a send? The server’s “Used by …” text shows and Delete is disabled.</div></div></div>
+</section>
+
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"minH":{"editor":"int","default":2740,"min":900,"max":6000},"$preview":{"width":1440,"height":2740}}'>
+class Component extends DCLogic {
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+const minH = parseInt(this.props.minH ?? 2740, 10) || 900;
+const raw = [
+['Single-origin lovers', 'Interested in single origins, German or English readers', '14 Oct 2026, 08:30'],
+['Everyone on email', '—', '10 Oct 2026, 11:00'],
+['Cold-brew launch, clickers', 'From the Cold-brew launch campaign', '09 Oct 2026, 16:12'],
+['Wholesale accounts', 'Shops and cafés', '02 Oct 2026, 10:14'],
+['Roastery open day guests', '—', '28 Sep 2026, 08:05']
+];
+const rows = raw.map((r, i) => ({ name: r[0], desc: r[1], updated: r[2], current: i === 0 ? 'true' : 'false' }));
+return {
+themeClass: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : ''),
+theme,
+contrast,
+minH,
+rows
+};
+}
+}
+</script>
+</body>
+</html>

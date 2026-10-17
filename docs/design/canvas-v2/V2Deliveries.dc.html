@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Deliveries</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="{{themeClass}} root app" style="min-height: {{minH}}px">
+
+<div style="flex: 0 0 232px; display: flex">
+<dc-import name="V2Nav" theme="{{theme}}" contrast="{{contrast}}" active="Deliveries" min-h="{{minH}}" hint-size="232px,900px"></dc-import>
+</div>
+
+<section class="col-list" aria-label="Deliveries" style="min-height: {{minH}}px">
+<header class="list-head"><h1 class="ts-large" style="margin: 0">Deliveries</h1></header>
+<div class="list" role="group" aria-label="Sends">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+<a href="#" class="item" aria-current="{{r.current}}">
+<span class="clip ts-strong">{{r.name}}</span>
+<span class="clip muted">{{r.cv}}</span>
+<span class="ts-cap" style="display: flex; justify-content: space-between; gap: 12px"><span>{{r.status}} · {{r.counts}}</span><span style="white-space: nowrap">{{r.when}}</span></span>
+</a>
+</sc-for>
+</div>
+<div class="list-foot"><span class="ts-cap">Sent / failed / excluded</span><span style="display: flex; align-items: center; gap: 2px"><span class="ts-cap" style="margin-right: 4px">1–50 of 88</span><button class="btn btn-plain btn-sm" type="button" disabled>Newer</button><button class="btn btn-plain btn-sm" type="button">Older</button></span></div>
+</section>
+
+<div class="col-detail" style="min-height: {{minH}}px">
+<div class="detail-scroll">
+
+<header class="detail-head"><h2 class="ts-title" style="margin: 0">{{title}}</h2></header>
+
+<sc-if value="{{isStranded}}" hint-placeholder-val="{{true}}">
+<section aria-labelledby="st-h">
+<h3 id="st-h" class="ts-head group-title">This send looks stranded</h3>
+<div class="group" style="border-color: var(--brand-human)">
+<div class="quiet"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-human)"><path d="M7 2L13 12H1z M7 6v3 M7 10.5v.5"></path></svg><span>It is still marked sending, but nothing has happened since 14 Oct 2026, 09:12. The process sending it may have stopped. Releasing it marks it failed so it can be retried: a retry skips everyone already sent to, marks the person in flight as uncertain (never sent again), and sends the rest.</span></div>
+<div class="frow" style="border-top: 1px solid var(--brand-line)"><div><button class="btn" type="button">Release this send</button></div></div>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{isDraft}}" hint-placeholder-val="{{false}}">
+<section aria-label="Not sent yet"><div class="group"><div class="frow"><div class="btnrow" style="justify-content: space-between"><span class="ts-strong">Not sent yet.</span><a href="#" class="btn btn-sm">Continue on the send screen</a></div></div></div></section>
+</sc-if>
+
+<section aria-label="The send"><div class="group"><dl style="margin: 0">
+<div class="fact"><dt>Status</dt><dd>{{status}}</dd></div>
+<div class="fact"><dt>Audience</dt><dd>Single-origin lovers</dd></div>
+<div class="fact"><dt>Provider</dt><dd>Example provider</dd></div>
+<div class="fact"><dt>From</dt><dd>news@nordlicht-kaffee.example</dd></div>
+<div class="fact"><dt>Scheduled</dt><dd>18 Oct 2026, 09:00</dd></div>
+<div class="fact"><dt>Recipients</dt><dd>1,204</dd></div>
+<div class="fact"><dt>Sent</dt><dd>1,198</dd></div>
+<div class="fact"><dt>Failed</dt><dd>0</dd></div>
+<div class="fact"><dt>Excluded</dt><dd>6</dd></div>
+<div class="fact"><dt>Excluded: consent</dt><dd>4</dd></div>
+<div class="fact"><dt>Excluded: suppression</dt><dd>2</dd></div>
+</dl></div></section>
+
+<section aria-labelledby="rc-h">
+<h3 id="rc-h" class="ts-head group-title">Recipients</h3>
+<div class="group">
+<form class="frow" role="search"><div class="btnrow" style="flex-wrap: nowrap"><input class="field" type="text" aria-label="Find a recipient (identifier or address)" placeholder="Find a recipient (identifier or address)"><button class="btn" type="button">Search</button></div></form>
+<div class="dtable-wrap" style="border-top: 1px solid var(--brand-line)"><table class="dtable" aria-label="Recipients of this send">
+<thead><tr><th>Recipient</th><th>Status</th><th>Not sent because</th><th>Sent</th><th>What they got</th></tr></thead>
+<tbody>
+<tr><td>anke.voss@example.test</td><td>sent</td><td>—</td><td class="nw">18 Oct 2026, 09:00</td><td><a href="#">As sent</a></td></tr>
+<tr><td>kim.lee@example.test</td><td>sent</td><td>—</td><td class="nw">18 Oct 2026, 09:00</td><td><a href="#">As sent</a></td></tr>
+<tr><td>#48213</td><td>excluded</td><td>consent</td><td class="nw">—</td><td>—</td></tr>
+<tr><td>support@example.test</td><td>excluded</td><td>suppression</td><td class="nw">—</td><td>—</td></tr>
+<tr><td>jonas.weber@example.test</td><td>sent</td><td>—</td><td class="nw">18 Oct 2026, 09:01</td><td><a href="#">As sent</a></td></tr>
+</tbody></table></div>
+<div class="frow" style="border-top: 1px solid var(--brand-line)"><div class="ts-cap">Showing 20 of 1,204. Search to find someone.</div></div>
+</div>
+</section>
+
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"state":{"editor":"enum","default":"sent","options":["sent","stranded","draft"]},"minH":{"editor":"int","default":880,"min":900,"max":6000},"$preview":{"width":1440,"height":880}}'>
+class Component extends DCLogic {
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+const state = this.props.state ?? 'sent';
+const minH = parseInt(this.props.minH ?? 880, 10) || 900;
+const raw = [
+['October coffee letter', 'October coffee letter / Variant A', state === 'stranded' ? 'sending' : (state === 'draft' ? 'draft' : 'sent'), '1,198 / 0 / 6', '18 Oct 2026, 09:00'],
+['Cold-brew launch', 'Cold-brew launch / Variant A', 'sent', '2,310 / 4 / 12', '12 Oct 2026, 16:40'],
+['Cold-brew launch, test group', 'Cold-brew launch / Variant B', 'sent', '120 / 0 / 0', '11 Oct 2026, 10:00'],
+['Roastery open day', 'Roastery open day / Variant A', 'sent', '3,874 / 0 / 41', '28 Sep 2026, 08:00'],
+['Gift subscriptions', 'Gift subscriptions / Variant A', 'sent', '910 / 2 / 7', '19 Sep 2026, 11:31'],
+['Autumn guide', '—', 'draft', '0 / 0 / 0', '12 Sep 2026, 17:02']
+];
+const rows = raw.map((r, i) => ({ name: r[0], cv: r[1], status: r[2], counts: r[3], when: r[4], current: i === 0 ? 'true' : 'false' }));
+return {
+themeClass: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : ''),
+theme,
+contrast,
+minH,
+rows,
+title: 'October coffee letter',
+status: state === 'stranded' ? 'sending' : (state === 'draft' ? 'draft' : 'sent'),
+isStranded: state === 'stranded',
+isDraft: state === 'draft'
+};
+}
+}
+</script>
+</body>
+</html>

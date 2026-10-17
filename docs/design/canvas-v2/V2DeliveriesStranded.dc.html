@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Deliveries, stranded send</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<dc-import name="V2Deliveries" theme="{{theme}}" contrast="{{contrast}}" state="stranded" min-h="1020" hint-size="100%,1020px"></dc-import>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"$preview":{"width":1440,"height":1020}}'>
+class Component extends DCLogic {
+renderVals() {
+return { theme: this.props.theme ?? 'light', contrast: this.props.contrast ?? 'normal' };
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Screen patterns</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.sk{height:8px;border-radius:4px;background:var(--brand-line)}
+.wf-h{font-weight:600;font-size:12px;line-height:16px}
+.wf-card{background:var(--brand-surface);border:1px solid var(--brand-line);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;box-sizing:border-box}
+.rule{display:flex;flex-direction:column;gap:4px;padding-top:12px;border-top:2px solid var(--brand-fg)}
+</style>
+</helmet>
+<div class="{{themeClass}} root" style="width: 1440px; min-height: 1860px; box-sizing: border-box; padding: 64px; display: flex; flex-direction: column; gap: 48px">
+
+<header style="display: flex; flex-direction: column; gap: 12px; max-width: 800px">
+<div class="ts-cap" style="text-transform: uppercase; letter-spacing: .06em; font-weight: 500">Manager app · screen patterns v2 · wireframes</div>
+<h1 class="ts-large" style="margin: 0; font-size: 34px; line-height: 40px">Every screen is a list and its details.</h1>
+<p style="margin: 0" class="muted">Same three columns, same places. These wireframes show where each screen’s parts go. They carry region names only: what a screen contains stays with the interview records and ADRs.</p>
+</header>
+
+<section aria-label="Rules" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px">
+<div class="rule"><span class="ts-strong">Navigation is column 1</span><span class="ts-cap">Always there, collapses to an icon rail when the screen needs the width.</span></div>
+<div class="rule"><span class="ts-strong">The header lives in the list</span><span class="ts-cap">Title, count and filters on the list’s own surface. No separate top bar.</span></div>
+<div class="rule"><span class="ts-strong">Parts that share a function share a place</span><span class="ts-cap">Paging and the history link sit at the foot of the list they belong to.</span></div>
+<div class="rule"><span class="ts-strong">Actions live in the details</span><span class="ts-cap">Docked at the bottom of column 3, on the same ground, as one group.</span></div>
+</section>
+
+<section aria-label="Patterns" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px 32px; align-items: start">
+<sc-for list="{{patterns}}" as="p" hint-placeholder-count="5">
+<figure style="margin: 0; display: flex; flex-direction: column; gap: 10px">
+<figcaption style="display: flex; flex-direction: column; gap: 2px"><span class="ts-head">{{p.name}}</span><span class="ts-cap">{{p.mapping}}</span></figcaption>
+<div style="display: flex; height: 360px; border: 1px solid var(--brand-line-strong); border-radius: 10px; overflow: hidden; background: var(--brand-bg)">
+
+<div style="width: {{p.navW}}px; flex: none; box-sizing: border-box; background: var(--brand-sidebar); border-right: 1px solid var(--brand-line); padding: 10px 8px; display: flex; flex-direction: column; gap: 8px; align-items: {{p.navAlign}}">
+<div style="width: 14px; height: 14px; border: 1.5px solid var(--brand-muted); border-radius: 3px"></div>
+<sc-for list="{{p.navItems}}" as="n" hint-placeholder-count="6">
+<div style="display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 4px; background: {{n.bg}}"><div style="width: 10px; height: 10px; border-radius: 3px; background: var(--brand-accent); flex: none"></div><sc-if value="{{p.navOpen}}" hint-placeholder-val="{{true}}"><div class="sk" style="width: 44px"></div></sc-if></div>
+</sc-for>
+</div>
+
+<div style="width: 220px; flex: none; box-sizing: border-box; background: var(--brand-surface); border-right: 1px solid var(--brand-line); display: flex; flex-direction: column">
+<div style="padding: 14px 12px 6px"><div class="ts-head" style="font-size: 16px; line-height: 20px; font-weight: 700">{{p.listTitle}}</div></div>
+<sc-if value="{{p.hasFilters}}" hint-placeholder-val="{{true}}"><div style="display: flex; gap: 6px; padding: 4px 8px 8px"><div style="height: 18px; width: 64px; border: 1px solid var(--brand-line-strong); border-radius: 5px"></div><div style="height: 18px; width: 80px; border: 1px solid var(--brand-line-strong); border-radius: 5px"></div></div></sc-if>
+<div style="flex: 1; padding: 0 6px; display: flex; flex-direction: column; gap: 2px">
+<sc-for list="{{p.rows}}" as="r" hint-placeholder-count="4">
+<div style="padding: 7px 8px; border-radius: 8px; background: {{r.bg}}; display: flex; flex-direction: column; gap: 5px"><span class="wf-h">{{r.label}}</span><div class="sk" style="width: {{r.w}}px"></div></div>
+</sc-for>
+</div>
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border-top: 1px solid var(--brand-line)"><span style="font-size: 11px; line-height: 14px; color: var(--brand-accent); font-weight: 500">{{p.footLeft}}</span><span style="font-size: 11px; line-height: 14px; color: var(--brand-muted)">{{p.footRight}}</span></div>
+</div>
+
+<div style="flex: 1; min-width: 0; background: var(--brand-bg); display: flex; flex-direction: column; padding: 14px 14px 0; gap: 10px">
+<sc-for list="{{p.groups}}" as="g" hint-placeholder-count="2">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span class="wf-h" style="padding-left: 10px">{{g.title}}</span>
+<div class="wf-card" style="height: {{g.h}}px"><div class="sk" style="width: 70%"></div><div class="sk" style="width: 50%"></div><div class="sk" style="width: 60%"></div></div>
+</div>
+</sc-for>
+<div style="flex: 1"></div>
+<sc-if value="{{p.hasDock}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 4px; padding-bottom: 12px">
+<span class="wf-h" style="padding-left: 10px">{{p.dockTitle}}</span>
+<div class="wf-card" style="flex-direction: row; align-items: center; gap: 8px"><div style="height: 20px; padding: 0 10px; border-radius: 5px; background: var(--brand-accent); color: var(--brand-accent-fg); font-size: 11px; line-height: 20px; font-weight: 500">{{p.dockPrimary}}</div><div style="height: 20px; padding: 0 10px; border-radius: 5px; border: 1px solid var(--brand-line); color: var(--brand-danger); font-size: 11px; line-height: 18px; font-weight: 500; box-sizing: border-box">{{p.dockSecondary}}</div></div>
+</div>
+</sc-if>
+</div>
+
+</div>
+<div class="ts-cap">{{p.note}}</div>
+</figure>
+</sc-for>
+</section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"$preview":{"width":1440,"height":1860}}'>
+class Component extends DCLogic {
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+const nav = (open, active) => [0, 1, 2, 3, 4, 5].map((i) => ({ bg: i === active ? 'var(--brand-highlight)' : 'transparent' }));
+const rows = (labels, w) => labels.map((l, i) => ({ label: l, w: w[i % w.length], bg: i === 0 ? 'var(--brand-selected)' : 'transparent' }));
+const patterns = [
+{
+name: 'Approvals',
+mapping: 'List of approvals · details and the decision',
+navW: 96, navOpen: true, navAlign: 'stretch', navItems: nav(true, 0),
+listTitle: 'Approvals', hasFilters: true,
+rows: rows(['Request', 'Request', 'Request', 'Request'], [120, 150, 100, 130]),
+footLeft: 'Decision history', footRight: 'Newer · Older',
+groups: [{ title: 'Request', h: 52 }, { title: 'Before you decide', h: 52 }, { title: 'Details', h: 60 }],
+hasDock: true, dockTitle: 'Decide', dockPrimary: 'Approve and run', dockSecondary: 'Reject',
+note: 'The decision history belongs to the list, so its link moves to the list foot beside the pager.'
+},
+{
+name: 'Campaigns',
+mapping: 'List of campaigns · details on variant and channels',
+navW: 96, navOpen: true, navAlign: 'stretch', navItems: nav(true, 1),
+listTitle: 'Campaigns', hasFilters: false,
+rows: rows(['Campaign', 'Campaign', 'Campaign', 'Campaign'], [110, 140, 90, 120]),
+footLeft: '', footRight: 'Newer · Older',
+groups: [{ title: 'Variant', h: 80 }, { title: 'Channels', h: 80 }],
+hasDock: false, dockTitle: '', dockPrimary: '', dockSecondary: '',
+note: 'Opening the variant editor moves into the editor pattern below.'
+},
+{
+name: 'Editor',
+mapping: 'List of modules · content selection and preview',
+navW: 36, navOpen: false, navAlign: 'center', navItems: nav(false, 1),
+listTitle: 'Modules', hasFilters: false,
+rows: rows(['Module', 'Module', 'Module', 'Module'], [100, 130, 80, 110]),
+footLeft: '', footRight: '',
+groups: [{ title: 'Content selection', h: 78 }, { title: 'Preview', h: 120 }],
+hasDock: false, dockTitle: '', dockPrimary: '', dockSecondary: '',
+note: 'Navigation starts collapsed here to give the preview room. At very wide windows the preview can take its own fourth column.'
+},
+{
+name: 'Audience',
+mapping: 'List of audiences · selection rules',
+navW: 96, navOpen: true, navAlign: 'stretch', navItems: nav(true, 4),
+listTitle: 'Audiences', hasFilters: false,
+rows: rows(['Audience', 'Audience', 'Audience', 'Audience'], [110, 90, 130, 100]),
+footLeft: '', footRight: 'Newer · Older',
+groups: [{ title: 'Selection rules', h: 130 }],
+hasDock: false, dockTitle: '', dockPrimary: '', dockSecondary: '',
+note: ''
+},
+{
+name: 'Settings',
+mapping: 'Sub menus · details',
+navW: 96, navOpen: true, navAlign: 'stretch', navItems: nav(true, 5),
+listTitle: 'Settings', hasFilters: false,
+rows: rows(['General', 'Brand profiles'], [90, 120]),
+footLeft: '', footRight: '',
+groups: [{ title: 'General', h: 120 }],
+hasDock: false, dockTitle: '', dockPrimary: '', dockSecondary: '',
+note: 'The sub menus take the place of the list. Brand profiles lists its profiles inside the details.'
+}
+];
+return {
+themeClass: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : ''),
+patterns
+};
+}
+}
+</script>
+</body>
+</html>

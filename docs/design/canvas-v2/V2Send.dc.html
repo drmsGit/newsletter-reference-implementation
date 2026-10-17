@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Send a variant</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="{{themeClass}} root app" style="min-height: {{minH}}px">
+
+<div style="flex: 0 0 232px; display: flex">
+<dc-import name="V2Nav" theme="{{theme}}" contrast="{{contrast}}" active="Campaigns" min-h="{{minH}}" hint-size="232px,900px"></dc-import>
+</div>
+
+<section class="col-list" aria-label="Sends" style="min-height: {{minH}}px">
+<header class="list-head">
+<a href="#" class="back"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 2.5L4 6l3.5 3.5"></path></svg>Campaign</a>
+<h1 class="ts-large" style="margin: 4px 0 0">Send Variant A</h1>
+<div class="ts-cap" style="margin-top: 2px">October coffee letter · email</div>
+</header>
+<h2 class="ts-head" style="margin: 8px 20px 4px">Planned and not sent yet</h2>
+<div class="list" role="group" aria-label="Planned and not sent yet">
+<div class="item" aria-current="{{r1}}"><span class="item-top"><span class="ttl clip">Cold-brew launch — scheduled for 18 Oct 2026, 09:00</span></span><span class="item-sub"><button class="btn btn-sm" type="button">Continue</button></span></div>
+<div class="item" aria-current="false"><span class="item-top"><span class="ttl clip">October coffee letter, second send — planned 14 Oct 2026, 08:40</span></span><span class="item-sub"><button class="btn btn-sm" type="button">Continue</button></span></div>
+</div>
+</section>
+
+<div class="col-detail" style="min-height: {{minH}}px">
+<div class="detail-scroll">
+
+<section aria-labelledby="s1">
+<h3 id="s1" class="ts-head group-title">1. What goes out</h3>
+<div class="group">
+<div class="frow"><div class="muted">As it would be frozen now. It is frozen when you plan the send.</div><div>Subject: <span class="ts-strong">Three origins that beat the autumn grey</span></div></div>
+<div class="frow" style="background: var(--brand-surface-2)">
+<div class="mail" style="max-width: 520px; width: 100%; margin: 0 auto; height: 300px; overflow: hidden">
+<div style="padding: 14px 24px; border-bottom: 1px solid #e4daca"><div class="sk" style="width: 96px; height: 14px; background: #1a5d74"></div></div>
+<div class="ph-img" style="margin: 14px 24px 0; height: 110px; border-radius: 4px; background: #eee6d8; color: #62594e">Hero image</div>
+<div style="padding: 14px 24px"><div style="font-size: 20px; line-height: 26px; font-weight: 700">Ethiopia Guji is back</div><div style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px"><div class="sk" style="background: #ddd2c0"></div><div class="sk" style="width: 85%; background: #ddd2c0"></div></div></div>
+</div>
+</div>
+</div>
+</section>
+
+<section aria-labelledby="s2">
+<h3 id="s2" class="ts-head group-title">2. Send a test (optional)</h3>
+<div class="group">
+<div class="frow"><div class="muted">The email above with its subject marked [Test]. Not a delivery: no unsubscribe link, nothing counted or stored.</div></div>
+<div class="frow"><label class="lbl" for="ta" style="margin: 0">Test address</label><input id="ta" class="field" type="email" value="maria@nordlicht-kaffee.example"></div>
+<div class="frow"><label class="lbl" for="sa" style="margin: 0">Show it as (optional)</label><input id="sa" class="field" type="text" value=""></div>
+<div class="frow"><div class="btnrow" style="align-items: flex-end"><div style="flex: 1 1 200px"><label class="lbl" for="pv" style="margin: 0 0 4px">Provider</label><button id="pv" class="select-btn" type="button"><span>Example provider</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div><div style="flex: 1 1 200px"><label class="lbl" for="sd" style="margin: 0 0 4px">Sender address</label><input id="sd" class="field" type="email" value="news@nordlicht-kaffee.example"></div></div></div>
+<div class="frow"><div><button class="btn" type="button">Send a test</button></div></div>
+</div>
+</section>
+
+<sc-if value="{{isPlan}}" hint-placeholder-val="{{true}}">
+<section aria-labelledby="s3">
+<h3 id="s3" class="ts-head group-title">3. Plan the send</h3>
+<div class="group">
+<div class="frow"><div class="muted">Planning freezes the email as it is now; later edits need a new send.</div></div>
+<div class="frow"><label class="lbl" for="ns" style="margin: 0">Name of the send</label><input id="ns" class="field" type="text" value="October coffee letter"></div>
+<div class="frow"><label class="lbl" for="au" style="margin: 0">Audience</label><button id="au" class="select-btn" type="button"><span>Single-origin lovers</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button><div class="help" style="margin: 0">1,180 of 1,204 in this group can be reached on email now.</div></div>
+<div class="frow"><div class="btnrow" style="align-items: flex-end"><div style="flex: 1 1 200px"><label class="lbl" for="pv2" style="margin: 0 0 4px">Provider</label><button id="pv2" class="select-btn" type="button"><span>Example provider</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div><div style="flex: 1 1 200px"><label class="lbl" for="sd2" style="margin: 0 0 4px">Sender address</label><input id="sd2" class="field" type="email" value="news@nordlicht-kaffee.example"></div></div></div>
+<div class="frow"><div class="btnrow" style="align-items: flex-end"><div style="flex: 1 1 200px"><label class="lbl" for="wh" style="margin: 0 0 4px">When</label><button id="wh" class="select-btn" type="button"><span>At a time</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div><div style="flex: 1 1 200px"><label class="lbl" for="at" style="margin: 0 0 4px">Send at</label><input id="at" class="field" type="text" value="18 Oct 2026, 09:00"></div></div></div>
+<div class="frow"><label class="opt"><input type="checkbox"><span>Don’t send to someone who would get no content record</span></label></div>
+<div class="frow"><div><button class="btn btn-lg btn-primary" type="button">Plan the send</button></div></div>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{isReady}}" hint-placeholder-val="{{false}}">
+<div style="flex: 1"></div>
+<section aria-labelledby="s4" class="decide" style="padding: 0 0 20px; background: transparent">
+<h3 id="s4" class="ts-head group-title">4. Send</h3>
+<div class="group" style="padding: 16px; display: flex; flex-direction: column; gap: 12px">
+<div>Goes to 1,180 recipients as of now, through Example provider, from news@nordlicht-kaffee.example.</div>
+<div class="muted">Scheduled for 18 Oct 2026, 09:00; it goes out then, or now if you send it.</div>
+<div class="quiet" style="padding: 0"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-human)"><path d="M7 2L13 12H1z M7 6v3 M7 10.5v.5"></path></svg><span>Real email: it reaches real inboxes and cannot be called back.</span></div>
+<div class="btnrow"><button class="btn btn-lg btn-primary" type="button">Send real email to 1,180 people</button><a href="#" class="btn btn-plain">The delivery</a><a href="#" class="btn btn-plain">The campaign’s results</a><button class="btn btn-plain" type="button">Plan another send</button></div>
+</div>
+</section>
+</sc-if>
+
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"step":{"editor":"enum","default":"plan","options":["plan","ready"]},"minH":{"editor":"int","default":1380,"min":900,"max":6000},"$preview":{"width":1440,"height":1380}}'>
+class Component extends DCLogic {
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+const step = this.props.step ?? 'plan';
+const minH = parseInt(this.props.minH ?? 1380, 10) || 900;
+return {
+themeClass: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : ''),
+theme,
+contrast,
+minH,
+isPlan: step === 'plan',
+isReady: step === 'ready',
+r1: step === 'ready' ? 'true' : 'false'
+};
+}
+}
+</script>
+</body>
+</html>

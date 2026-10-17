@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Content</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="{{themeClass}} root app" style="min-height: 2760px">
+
+<div style="flex: 0 0 232px; display: flex">
+<dc-import name="V2Nav" theme="{{theme}}" contrast="{{contrast}}" active="Content" min-h="2760" hint-size="232px,900px"></dc-import>
+</div>
+
+<section class="col-list" aria-label="Content records" style="min-height: 2760px">
+<header class="list-head" style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px"><h1 class="ts-large" style="margin: 0">Content</h1><button class="btn btn-primary" type="button" style="margin-top: 2px">New record</button></header>
+<div class="list-tools">
+<div class="seg" role="tablist" aria-label="Content"><button type="button" role="tab" aria-selected="true">Records</button><button type="button" role="tab" aria-selected="false">Categories</button><button type="button" role="tab" aria-selected="false">Graph</button></div>
+</div>
+<form class="search" role="search"><input class="field" type="text" aria-label="Find content by title or description" placeholder="Find content by title or description"><button class="btn" type="button">Search</button></form>
+<div class="filters" role="group" aria-label="Filters">
+<button class="btn pulldown" type="button" aria-label="Status: Any status"><span class="pd-label">Status</span><span>Any status</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button>
+<button class="btn pulldown" type="button" aria-label="Category: Any category"><span class="pd-label">Category</span><span>Any category</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button>
+<button class="btn pulldown" type="button" aria-label="Ready for: Ready for any channel"><span class="pd-label">Ready for</span><span>Any channel</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button>
+</div>
+
+<div class="list" role="group" aria-label="Content records">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="9">
+<a href="#" class="item" aria-current="{{r.current}}">
+<span class="clip ts-strong">{{r.title}}</span>
+<span class="clip muted">{{r.desc}}</span>
+<span class="ts-cap">{{r.status}}</span>
+</a>
+</sc-for>
+</div>
+<div class="list-foot"><span></span><span style="display: flex; align-items: center; gap: 2px"><span class="ts-cap" style="margin-right: 4px">1–50 of 214</span><button class="btn btn-plain btn-sm" type="button" disabled>Newer</button><button class="btn btn-plain btn-sm" type="button">Older</button></span></div>
+</section>
+
+<div class="col-detail" style="min-height: 2760px">
+<div class="detail-scroll">
+
+<header class="detail-head"><h2 class="ts-title" style="margin: 0">Ethiopia Guji, washed</h2></header>
+
+<section aria-label="Record status"><div class="group">
+<div class="frow"><div class="btnrow" style="justify-content: space-between"><span class="ts-strong">Active</span><button class="btn btn-sm" type="button">Deactivate</button></div></div>
+<div class="frow"><label class="switch"><input type="checkbox" role="switch" checked><span class="track"></span><span>Machine ready</span></label><div class="help" style="margin: 0">May a decision slot pick this without a person choosing it.</div></div>
+<div class="frow"><div class="btnrow" style="align-items: flex-end"><div style="flex: 1 1 200px"><label class="lbl" for="dup" style="margin: 0 0 4px">Duplicate into</label><button id="dup" class="select-btn" type="button"><span>Nordlicht Kaffee (Austria)</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div><button class="btn" type="button">Duplicate</button></div></div>
+</div></section>
+
+<section aria-label="Publication"><div class="group">
+<div class="frow"><div class="btnrow" style="justify-content: space-between"><span style="display: inline-flex; align-items: center; gap: 8px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-human); flex: none"><path d="M7 2L13 12H1z M7 6v3 M7 10.5v.5"></path></svg>Changed since version 3 was published — sends still use version 3.</span><button class="btn btn-sm" type="button">Publish</button></div></div>
+<div class="frow"><div class="muted">Edits here change this record for 3 unsent campaigns. Sends use the published version. <a href="#">Where it is used</a></div></div>
+</div></section>
+
+<section aria-labelledby="d-h">
+<h3 id="d-h" class="ts-head group-title">Details</h3>
+<div class="group">
+<div class="frow"><label class="lbl" for="tt" style="margin: 0">Title (required)</label><input id="tt" class="field" type="text" value="Ethiopia Guji, washed"></div>
+<div class="frow"><label class="lbl" for="ds" style="margin: 0">Description</label><input id="ds" class="field" type="text" value="Washed, floral, bright."></div>
+<div class="frow"><label class="lbl" for="lg" style="margin: 0">Language</label><button id="lg" class="select-btn" type="button"><span>English</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div>
+</div>
+</section>
+
+<section aria-labelledby="ai-h">
+<h3 id="ai-h" class="ts-head group-title">Draft with AI</h3>
+<div class="group">
+<div class="frow"><label class="lbl" for="src" style="margin: 0">Source</label><textarea id="src" class="field" rows="4"></textarea><div class="help" style="margin: 0">Paste the content or write a brief — not anyone’s personal details: the text goes to the model provider and is not kept here. 0 of 12,000 characters.</div></div>
+<fieldset class="frow" style="border: 0; margin: 0; min-width: 0"><legend class="lbl" style="padding: 0; margin-bottom: 6px">Draft the text fields for</legend>
+<div class="btnrow"><label class="opt is-selected" style="flex: 1 1 140px"><input type="checkbox" checked><span>Email</span></label><label class="opt is-selected" style="flex: 1 1 140px"><input type="checkbox" checked><span>Push</span></label></div></fieldset>
+<div class="frow"><div><button class="btn" type="button">Draft with AI</button></div></div>
+</div>
+</section>
+
+<section aria-labelledby="tr-h">
+<h3 id="tr-h" class="ts-head group-title">Translations</h3>
+<div class="group">
+<div class="frow"><div class="ts-strong">Translations of this record</div><div>German: <a href="#">Äthiopien Guji, gewaschen</a></div></div>
+<div class="frow"><div class="btnrow" style="align-items: flex-end"><div style="flex: 1 1 200px"><label class="lbl" for="tl" style="margin: 0 0 4px">Translate into</label><button id="tl" class="select-btn" type="button"><span>French</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div><button class="btn" type="button">Translate with AI</button></div></div>
+</div>
+</section>
+
+<details class="dsc" open>
+<summary><svg class="chev" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 2.5L8 6l-3.5 3.5"></path></svg><h3 class="ts-head" style="margin: 0">Email</h3></summary>
+<div class="group">
+<div class="frow"><label class="switch"><input type="checkbox" role="switch" checked><span class="track"></span><span>Ready for Email</span></label><div class="help" style="margin: 0">Marked ready by Jonas Weber · 12 Oct 2026, 10:15</div></div>
+<div class="frow"><label class="lbl" for="hl" style="margin: 0">Headline</label><input id="hl" class="field" type="text" value="Ethiopia Guji, washed"></div>
+<div class="frow"><label class="lbl" for="bd" style="margin: 0">Body</label><textarea id="bd" class="field" rows="3">Washed, floral, bright. Roasted on Monday.</textarea><div class="help" style="margin: 0">**bold**, *italic*, [link](https://…), and a line starting with - for a bullet.</div></div>
+<div class="frow"><div class="ts-strong">Image</div><div class="btnrow" style="flex-wrap: nowrap"><div class="ph-img" style="width: 72px; height: 54px; flex: none">Image</div><div style="flex: 1; min-width: 0"><div class="clip">guji-washed-1200x800.jpg</div><div class="ts-cap">Cup of washed Ethiopian coffee on a wooden table</div></div><button class="btn btn-sm" type="button">Change image…</button><button class="btn btn-plain btn-sm" type="button">Remove</button></div></div>
+<div class="frow"><label class="lbl" for="bl" style="margin: 0">Button label</label><input id="bl" class="field" type="text" value="Shop the origins"></div>
+<div class="frow"><label class="lbl" for="bu" style="margin: 0">Button link</label><input id="bu" class="field" type="url" value="https://example.test/shop/ethiopia-guji"></div>
+</div>
+</details>
+
+<details class="dsc">
+<summary><svg class="chev" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 2.5L8 6l-3.5 3.5"></path></svg><h3 class="ts-head" style="margin: 0">Push</h3></summary>
+</details>
+
+<section aria-labelledby="pf-h">
+<h3 id="pf-h" class="ts-head group-title">Performance</h3>
+<div class="group">
+<dl style="margin: 0">
+<div class="fact"><dt>Sent in</dt><dd>14 deliveries, 9 of them picked by a personalised block</dd></div>
+<div class="fact"><dt>Clicks on it</dt><dd>1,204, from 14 deliveries</dd></div>
+<div class="fact"><dt>Share of clicks</dt><dd>31 % of the 3,880 clicks in the emails that carried it</dd></div>
+</dl>
+<div class="dtable-wrap" style="border-top: 1px solid var(--brand-line)"><table class="dtable" aria-label="By campaign">
+<thead><tr><th>Campaign</th><th class="num">Sent in</th><th class="num">Clicks</th><th class="num">Share of clicks</th></tr></thead>
+<tbody>
+<tr><td>October coffee letter</td><td class="num">2</td><td class="num">412</td><td class="num">34 %</td></tr>
+<tr><td>Cold-brew launch</td><td class="num">1</td><td class="num">96</td><td class="num">22 %</td></tr>
+</tbody></table></div>
+</div>
+</section>
+
+<section aria-labelledby="ct-h">
+<h3 id="ct-h" class="ts-head group-title">Categories</h3>
+<div class="group">
+<div class="frow"><div class="muted">Categories build each recipient’s interest profile. For finding content, facets will follow.</div></div>
+<div class="frow"><div class="btnrow" style="justify-content: space-between"><span class="ts-strong">Origin guides</span><span class="btnrow"><button class="select-btn" type="button" style="width: 96px" aria-label="Score for Origin guides"><span>9</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button><button class="btn btn-plain btn-sm" type="button">Remove</button></span></div></div>
+<div class="frow"><div class="btnrow" style="justify-content: space-between"><span class="ts-strong">Fruity</span><span class="btnrow"><button class="select-btn" type="button" style="width: 96px" aria-label="Score for Fruity"><span>6</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button><button class="btn btn-plain btn-sm" type="button">Remove</button></span></div></div>
+<div class="frow"><div class="btnrow" style="align-items: flex-end"><div style="flex: 1 1 200px"><label class="lbl" for="ac" style="margin: 0 0 4px">Add a category</label><button id="ac" class="select-btn" type="button"><span class="muted">Choose a category</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div><div style="width: 96px"><label class="lbl" for="sc" style="margin: 0 0 4px">Score</label><button id="sc" class="select-btn" type="button"><span>10</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div><button class="btn" type="button" disabled>Add</button></div><div class="help" style="margin: 0">1 = barely in the category, 10 = squarely in it.</div></div>
+</div>
+</section>
+
+<section aria-labelledby="pv-h">
+<h3 id="pv-h" class="ts-head group-title">Published versions</h3>
+<div class="group">
+<details class="frow"><summary class="ts-strong" style="cursor: pointer">Version 3 · Jonas Weber · 12 Oct 2026, 10:15</summary><dl style="margin: 8px 0 0"><div class="fact" style="padding-left: 0; padding-right: 0"><dt>Headline</dt><dd>Ethiopia Guji, washed</dd></div></dl></details>
+<details class="frow"><summary class="ts-strong" style="cursor: pointer">Version 2 · Anke Voss · 02 Oct 2026, 09:02</summary></details>
+<details class="frow"><summary class="ts-strong" style="cursor: pointer">Version 1 · Anke Voss · 21 Sep 2026, 16:40</summary></details>
+</div>
+</section>
+
+<section aria-labelledby="ui-h">
+<h3 id="ui-h" class="ts-head group-title">Used in</h3>
+<div class="group">
+<div class="frow"><div><a href="#">October coffee letter</a>: <a href="#">Variant A</a> (email, sent), <a href="#">Variant B</a> (email, composing)</div><div><a href="#">Cold-brew launch</a>: <a href="#">Variant A</a> (email, scheduled)</div><div class="ts-cap" style="margin-top: 4px">Showing 2 of 2 campaigns.</div><div class="muted">A decision slot that may pick this record when it sends is not listed.</div></div>
+</div>
+</section>
+
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"$preview":{"width":1440,"height":2760}}'>
+class Component extends DCLogic {
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+const raw = [
+['Ethiopia Guji, washed', 'Washed, floral, bright.', 'active'],
+['Ethiopia Guji, natural', 'Naturally processed, berry and wine.', 'active'],
+['Kenya Kiambu, natural', 'Juicy, blackcurrant, long finish.', 'active'],
+['Colombia Huila, honey', '—', 'active'],
+['Cold-brew starter kit', 'Everything for a first batch.', 'active'],
+['Brewing guide: pour-over', 'A step-by-step guide.', 'active'],
+['Winter roast announcement', '—', 'inactive'],
+['Gift subscription', 'Three months of coffee, delivered.', 'active'],
+['Roastery open day', 'Come and see the roaster.', 'inactive']
+];
+const rows = raw.map((r, i) => ({ title: r[0], desc: r[1], status: r[2], current: i === 0 ? 'true' : 'false' }));
+return {
+themeClass: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : ''),
+theme,
+contrast,
+rows
+};
+}
+}
+</script>
+</body>
+</html>

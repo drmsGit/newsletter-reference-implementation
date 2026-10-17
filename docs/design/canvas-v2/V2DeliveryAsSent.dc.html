@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>As sent</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="{{themeClass}} root app" style="min-height: {{minH}}px">
+
+<div style="flex: 0 0 232px; display: flex">
+<dc-import name="V2Nav" theme="{{theme}}" contrast="{{contrast}}" active="Deliveries" min-h="{{minH}}" hint-size="232px,900px"></dc-import>
+</div>
+
+<section class="col-list" aria-label="Deliveries" style="min-height: {{minH}}px">
+<header class="list-head"><h1 class="ts-large" style="margin: 0">Deliveries</h1></header>
+<div class="list" role="group" aria-label="Sends">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="6">
+<a href="#" class="item" aria-current="{{r.current}}">
+<span class="clip ts-strong">{{r.name}}</span>
+<span class="clip muted">{{r.cv}}</span>
+<span class="ts-cap" style="display: flex; justify-content: space-between; gap: 12px"><span>{{r.status}} · {{r.counts}}</span><span style="white-space: nowrap">{{r.when}}</span></span>
+</a>
+</sc-for>
+</div>
+</section>
+
+<div class="col-detail" style="min-height: {{minH}}px">
+<div class="detail-scroll">
+
+<header class="detail-head">
+<a href="#" class="back"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 2.5L4 6l3.5 3.5"></path></svg>The send</a>
+<h2 class="ts-title" style="margin: 4px 0 0">As sent</h2>
+<div class="ts-cap" style="margin-top: 2px">anke.voss@example.test · October coffee letter</div>
+</header>
+
+<section aria-label="Templates changed"><div class="group"><div class="quiet"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-human)"><path d="M7 2L13 12H1z M7 6v3 M7 10.5v.5"></path></svg><span>The templates have changed since this was sent. The content below is exactly what was sent; the layout is today’s.</span></div></div></section>
+
+<section aria-label="Envelope"><div class="group"><dl style="margin: 0">
+<div class="fact"><dt>Channel</dt><dd>Email</dd></div>
+<div class="fact"><dt>Sent</dt><dd>18 Oct 2026, 09:00</dd></div>
+<div class="fact"><dt>subject</dt><dd>Three origins that beat the autumn grey</dd></div>
+<div class="fact"><dt>preheader</dt><dd>Ethiopia, Kenya and Colombia, roasted this week</dd></div>
+</dl></div></section>
+
+<section aria-labelledby="ms-h">
+<h3 id="ms-h" class="ts-head group-title">Message</h3>
+<div class="group" style="background: var(--brand-surface-2); padding: 20px; display: flex; justify-content: center">
+<div class="mail" role="img" aria-label="The message as sent" style="width: 560px; height: 380px">
+<div style="padding: 16px 24px; border-bottom: 1px solid #e4daca"><div class="sk" style="width: 96px; height: 14px; background: #1a5d74"></div></div>
+<div class="ph-img" style="margin: 16px 24px 0; height: 130px; border-radius: 4px; background: #eee6d8; color: #62594e">Hero image</div>
+<div style="padding: 16px 24px"><div style="font-size: 22px; line-height: 28px; font-weight: 700">Ethiopia Guji is back</div><div style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px"><div class="sk" style="background: #ddd2c0"></div><div class="sk" style="width: 88%; background: #ddd2c0"></div><div class="sk" style="width: 70%; background: #ddd2c0"></div></div></div>
+</div>
+</div>
+<p class="ts-cap" style="margin: 6px 16px 0">Shown in a sandboxed frame, full width, 40 rem high: no scripts, no referrer.</p>
+</section>
+
+<section aria-labelledby="fl-h">
+<h3 id="fl-h" class="ts-head group-title">Fields</h3>
+<div class="group"><dl style="margin: 0">
+<div class="fact"><dt>hero_headline</dt><dd>Ethiopia Guji is back</dd></div>
+<div class="fact"><dt>cta_label</dt><dd>Shop the origins</dd></div>
+</dl></div>
+</section>
+
+<section aria-labelledby="mo-h">
+<h3 id="mo-h" class="ts-head group-title">Modules</h3>
+<div class="group"><div class="dtable-wrap"><table class="dtable" aria-label="Modules in this message">
+<thead><tr><th>Module</th><th>Kind</th><th>Content record</th><th>Version</th></tr></thead>
+<tbody>
+<tr><td>hero</td><td>record</td><td>#412</td><td>#3</td></tr>
+<tr><td>editorial</td><td>typed</td><td>—</td><td>—</td></tr>
+<tr><td>img_left</td><td>slot (pick 2)</td><td>#388</td><td>#2</td></tr>
+<tr><td>cta</td><td>typed</td><td>—</td><td>—</td></tr>
+</tbody></table></div></div>
+</section>
+
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"minH":{"editor":"int","default":1180,"min":900,"max":6000},"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+const minH = parseInt(this.props.minH ?? 1180, 10) || 900;
+const raw = [
+['October coffee letter', 'October coffee letter / Variant A', 'sent', '1,198 / 0 / 6', '18 Oct 2026, 09:00'],
+['Cold-brew launch', 'Cold-brew launch / Variant A', 'sent', '2,310 / 4 / 12', '12 Oct 2026, 16:40'],
+['Roastery open day', 'Roastery open day / Variant A', 'sent', '3,874 / 0 / 41', '28 Sep 2026, 08:00']
+];
+const rows = raw.map((r, i) => ({ name: r[0], cv: r[1], status: r[2], counts: r[3], when: r[4], current: i === 0 ? 'true' : 'false' }));
+return {
+themeClass: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : ''),
+theme,
+contrast,
+minH,
+rows
+};
+}
+}
+</script>
+</body>
+</html>

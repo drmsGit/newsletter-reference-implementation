@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Variant editor</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="{{themeClass}} root app" style="min-height: {{minH}}px">
+
+<div style="flex: 0 0 56px; display: flex">
+<dc-import name="V2Nav" theme="{{theme}}" contrast="{{contrast}}" collapsed="{{yes}}" active="Campaigns" min-h="{{minH}}" hint-size="56px,900px"></dc-import>
+</div>
+
+<section class="col-list" aria-label="Modules" style="min-height: {{minH}}px">
+<header class="list-head">
+<a href="#" class="back"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 2.5L4 6l3.5 3.5"></path></svg>October coffee letter</a>
+<h1 class="ts-large" style="margin: 4px 0 0">Modules</h1>
+</header>
+
+<div class="list" role="group" aria-label="Modules of Variant A" style="padding-top: 4px">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="5">
+<div class="item" aria-current="{{r.current}}">
+<span class="item-top">
+<button class="selbtn" type="button">{{r.label}}</button>
+<button class="btn btn-plain btn-icon btn-sm btn-neutral" type="button" aria-label="Move {{r.label}} up" disabled="{{r.first}}"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12.5v-9M4.5 7L8 3.5 11.5 7"></path></svg></button>
+<button class="btn btn-plain btn-icon btn-sm btn-neutral" type="button" aria-label="Move {{r.label}} down" disabled="{{r.last}}"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3.5v9M4.5 9L8 12.5 11.5 9"></path></svg></button>
+<button class="btn btn-plain btn-sm" type="button">Remove</button>
+</span>
+<span class="item-sub">
+<sc-if value="{{r.isRecord}}" hint-placeholder-val="{{false}}"><span class="chip"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 1.5v5M3.5 6.5h5M6 6.5v4"></path></svg>Record</span></sc-if>
+<sc-if value="{{r.isSlot}}" hint-placeholder-val="{{false}}"><span class="chip"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="6" r="4.5"></circle><path d="M6 1.5a4.5 4.5 0 0 1 0 9z" fill="currentColor"></path></svg>Slot</span></sc-if>
+<sc-if value="{{r.isTyped}}" hint-placeholder-val="{{false}}"><span class="chip"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9.5l.6-2.4L8 2.2l1.8 1.8-4.9 4.9z"></path></svg>Typed in</span></sc-if>
+<span class="ts-cap clip">{{r.binding}}</span>
+</span>
+</div>
+</sc-for>
+</div>
+
+<div class="list-foot" style="flex-direction: column; align-items: stretch; gap: 6px; padding: 12px 12px 12px 8px">
+<label class="lbl" for="addm" style="margin: 0 0 0 3px">Add a module</label>
+<div class="btnrow" style="flex-wrap: nowrap"><button id="addm" class="select-btn" type="button"><span>Editorial</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button><button class="btn" type="button">Add</button></div>
+</div>
+</section>
+
+<div class="col-detail" style="min-height: {{minH}}px">
+<div class="detail-scroll">
+
+<header class="detail-head">
+<h2 class="ts-title" style="margin: 0">Variant A</h2>
+<p class="muted" style="margin: 4px 0 0">Email · Draft · <a href="#">Send…</a></p>
+</header>
+
+<section aria-labelledby="bp-h">
+<h3 id="bp-h" class="ts-head group-title">Brand profile</h3>
+<div class="group frow"><button class="select-btn" type="button" aria-label="Brand profile"><span>Nordlicht default (default) · en</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div>
+</section>
+
+<section aria-labelledby="pv-h">
+<h3 id="pv-h" class="ts-head group-title">Preview</h3>
+<div class="group frow"><div class="btnrow" style="justify-content: space-between"><span>Nothing to flag.</span><button class="btn" type="button">Open preview</button></div></div>
+</section>
+
+<section aria-labelledby="env-h">
+<h3 id="env-h" class="ts-head group-title">Envelope</h3>
+<div class="group">
+<div class="frow"><div class="btnrow" style="justify-content: space-between"><label class="lbl" for="subj" style="margin: 0">Subject (required)</label><button class="btn btn-plain btn-sm" type="button">Personalise…</button></div><input id="subj" class="field" type="text" value="Three origins that beat the autumn grey"></div>
+<div class="frow"><div class="btnrow" style="justify-content: space-between"><label class="lbl" for="pre" style="margin: 0">Preheader</label><button class="btn btn-plain btn-sm" type="button">Personalise…</button></div><input id="pre" class="field" type="text" value="Ethiopia, Kenya and Colombia, roasted this week"></div>
+<div class="frow"><div class="btnrow" style="justify-content: space-between"><span class="ts-strong">AI suggestions</span><button class="btn btn-sm" type="button">Suggest with AI</button></div>
+<div class="quiet" style="padding: 4px 0 0"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-human)"><path d="M7 2L13 12H1z M7 6v3 M7 10.5v.5"></path></svg><span>Suggestions can be wrong. Check the subject before you use it.</span></div>
+<div class="ts-strong" style="margin-top: 6px">Suggested subjects</div>
+<ol class="numlist" style="margin: 0 -16px">
+<li><span class="n">1</span><span style="flex: 1; min-width: 0"><span class="ts-strong">Your October coffee, roasted this week</span> — Three origins, one box</span><button class="btn btn-sm" type="button">Use this</button></li>
+<li><span class="n">2</span><span style="flex: 1; min-width: 0"><span class="ts-strong">Autumn in three cups</span> — Ethiopia, Kenya, Colombia</span><button class="btn btn-sm" type="button">Use this</button></li>
+</ol>
+<div class="ts-cap">1,240 tokens · Example provider · prompt v3</div></div>
+</div>
+</section>
+
+<sc-if value="{{isRecord}}" hint-placeholder-val="{{true}}">
+<section aria-labelledby="m1-h">
+<h3 id="m1-h" class="ts-head group-title">Hero</h3>
+<div class="group">
+<div class="frow"><div class="btnrow" style="justify-content: space-between"><span>Fields from <a href="#" style="font-weight: 600; text-decoration: none">“Ethiopia Guji, washed”</a>.</span><button class="btn btn-sm" type="button">Use another record</button></div></div>
+<div class="frow"><div class="btnrow" style="justify-content: space-between"><span style="display: inline-flex; align-items: center; gap: 8px"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-human); flex: none"><path d="M7 2L13 12H1z M7 6v3 M7 10.5v.5"></path></svg>Changed since version 3 was published — sends still use version 3.</span><button class="btn btn-sm" type="button">Publish</button></div></div>
+<div class="frow"><label class="lbl" for="h1" style="margin: 0">Heading</label><input id="h1" class="field" type="text" value=""></div>
+<div class="frow"><label class="lbl" for="hl" style="margin: 0">Headline — overridden here</label><input id="hl" class="field" type="text" value="Ethiopia Guji is back">
+<div class="help" style="margin: 0">Catalogue: Ethiopia Guji, washed</div>
+<div class="btnrow"><button class="btn btn-sm" type="button">Back to the catalogue value</button><button class="btn btn-plain btn-sm" type="button">Change Headline in catalogue</button></div></div>
+<div class="frow"><label class="lbl" for="bd" style="margin: 0">Body</label><textarea id="bd" class="field" rows="3">Washed, floral, bright. Roasted on Monday.</textarea>
+<div class="help" style="margin: 0">**bold**, *italic*, [link](https://…), and a line starting with - for a bullet.</div>
+<div class="btnrow" style="justify-content: space-between"><label class="switch"><input type="checkbox" role="switch"><span class="track"></span><span>Hide Body in this module</span></label><button class="btn btn-plain btn-sm" type="button">Change Body in catalogue</button></div></div>
+<div class="frow"><div class="btnrow" style="justify-content: space-between"><span><span class="ts-strong">Image</span>&nbsp; <span class="muted">Hidden in this module</span></span><label class="switch"><input type="checkbox" role="switch" checked aria-label="Hide Image in this module"><span class="track"></span></label></div></div>
+<div class="frow"><label class="lbl" for="bl" style="margin: 0">Button label</label><input id="bl" class="field" type="text" value="Shop the origins">
+<div class="btnrow" style="justify-content: space-between"><label class="switch"><input type="checkbox" role="switch"><span class="track"></span><span>Hide Button label in this module</span></label><button class="btn btn-plain btn-sm" type="button">Change Button label in catalogue</button></div></div>
+<div class="frow"><label class="lbl" for="why" style="margin: 0">Why overridden (optional)</label><button id="why" class="select-btn" type="button"><span>No reason given</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button>
+<div><button class="btn" type="button">Reset all overrides on this module</button></div></div>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{isPicker}}" hint-placeholder-val="{{false}}">
+<section aria-labelledby="m2-h">
+<h3 id="m2-h" class="ts-head group-title">Hero</h3>
+<div class="group">
+<div class="frow"><div class="btnrow" style="justify-content: space-between"><span>Fields from <a href="#" style="font-weight: 600; text-decoration: none">“Ethiopia Guji, washed”</a>.</span><button class="btn btn-sm" type="button">Keep this record</button></div></div>
+<div class="frow"><label class="lbl" for="find" style="margin: 0">Find a record by title or description</label><input id="find" class="field" type="text" value="guji"></div>
+<div class="frow"><div class="btnrow" style="justify-content: space-between"><button class="btn pulldown" type="button" aria-label="Category: Any category"><span class="pd-label">Category</span><span>Any category</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button><label class="switch"><input type="checkbox" role="switch"><span class="track"></span><span>Show records not ready for Email</span></label></div></div>
+<div class="frow" style="padding-bottom: 4px"><div class="ts-strong">Records to use</div></div>
+<ul class="numlist" aria-label="Records to use">
+<li style="color: var(--brand-muted)"><span style="flex: 1"><span class="ts-strong">Ethiopia Guji, washed</span> · this module’s record<div class="ts-cap">Washed, floral, bright.</div></span></li>
+<li><span style="flex: 1"><button class="selbtn" type="button" style="display: block">Ethiopia Guji, natural</button><div class="ts-cap">Naturally processed, berry and wine.</div><div class="ts-cap">Not published yet</div></span></li>
+<li><span style="flex: 1"><button class="selbtn" type="button" style="display: block">Guji Highland Blend</button><div class="ts-cap">A house blend from the Guji highlands.</div><div class="ts-cap">Not ready for Email · Lacks image for this module</div></span></li>
+<li><span style="flex: 1"><button class="selbtn" type="button" style="display: block">Guji brewing guide</button><div class="ts-cap">How to brew a washed Ethiopian.</div><div class="ts-cap">Already in this variant</div></span></li>
+</ul>
+</div>
+<p class="ts-cap" style="margin: 8px 16px 0">Showing 4 of 24. Type or choose a category to narrow them.</p>
+</section>
+</sc-if>
+
+<sc-if value="{{isSlot}}" hint-placeholder-val="{{false}}">
+<section aria-labelledby="m3-h">
+<h3 id="m3-h" class="ts-head group-title">Image left</h3>
+<div class="group">
+<div class="frow"><label class="lbl" for="sh" style="margin: 0">Section heading</label><input id="sh" class="field" type="text" value="This week’s pick"></div>
+<div class="frow"><div class="ts-strong">Fields shown in this module</div>
+<label class="switch"><input type="checkbox" role="switch"><span class="track"></span><span>Hide Image in this module</span></label>
+<label class="switch"><input type="checkbox" role="switch"><span class="track"></span><span>Hide Body in this module</span></label></div>
+<div class="frow"><div>Filled per recipient by a decision slot. <a href="#">See what it has picked</a></div></div>
+<div class="frow"><label class="lbl" for="strat" style="margin: 0">Strategy</label><button id="strat" class="select-btn" type="button"><span>top_score</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button>
+<div class="help" style="margin: 0">Picks the content with the highest score for each recipient.</div>
+<div role="status">Would choose between 12 active content records now. It picks per recipient, so one person may be offered fewer.</div></div>
+<div class="frow"><label class="lbl" for="up" style="margin: 0">Show up to</label><button id="up" class="select-btn" type="button"><span>3 picks</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div>
+<fieldset class="frow" style="border: 0; margin: 0; min-width: 0"><legend class="lbl" style="padding: 0; margin-bottom: 6px">Categories (none ticked: every category)</legend>
+<label class="opt is-selected"><input type="checkbox" checked><span>Origin guides</span></label>
+<label class="opt"><input type="checkbox"><span>Brewing</span></label>
+<label class="opt"><input type="checkbox"><span>Equipment</span></label></fieldset>
+<div class="frow"><label class="lbl" for="ms" style="margin: 0">min score</label><input id="ms" class="field" type="text" value="0.4"></div>
+<div class="frow"><label class="lbl" for="rd" style="margin: 0">recency days</label><input id="rd" class="field" type="text" value="abc" aria-invalid="true" aria-describedby="rde"><div id="rde" class="err" style="margin: 0"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4.5"></circle><path d="M6 3.5v3M6 8.2v.3"></path></svg>Enter a number.</div></div>
+<div class="frow"><div class="muted">A slot is never overridden: one pinned value would replace every personal pick.</div><div><button class="btn" type="button">Use one content record instead</button></div></div>
+</div>
+</section>
+</sc-if>
+
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"mode":{"editor":"enum","default":"record","options":["record","picker","slot"]},"minH":{"editor":"int","default":1540,"min":900,"max":6000},"$preview":{"width":1440,"height":1540}}'>
+class Component extends DCLogic {
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+const mode = this.props.mode ?? 'record';
+const minH = parseInt(this.props.minH ?? 1540, 10) || 900;
+const sel = mode === 'slot' ? 2 : 0;
+const defs = [
+{ label: 'Hero', kind: 'record', binding: '“Ethiopia Guji, washed”' },
+{ label: 'Editorial', kind: 'typed', binding: 'typed in' },
+{ label: 'Image left', kind: 'slot', binding: 'slot “Feature pick”' },
+{ label: 'Image right', kind: 'record', binding: '“Kenya Kiambu, natural”' },
+{ label: 'Call to action', kind: 'typed', binding: 'typed in' }
+];
+const rows = defs.map((d, i) => ({
+label: d.label,
+binding: d.binding,
+isRecord: d.kind === 'record',
+isSlot: d.kind === 'slot',
+isTyped: d.kind === 'typed',
+current: i === sel ? 'true' : 'false',
+first: i === 0,
+last: i === defs.length - 1
+}));
+return {
+themeClass: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : ''),
+theme,
+contrast,
+minH,
+yes: true,
+isRecord: mode === 'record',
+isPicker: mode === 'picker',
+isSlot: mode === 'slot',
+rows
+};
+}
+}
+</script>
+</body>
+</html>

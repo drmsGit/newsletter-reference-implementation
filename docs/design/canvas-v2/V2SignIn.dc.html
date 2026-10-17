@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sign in</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div class="{{themeClass}} root" style="min-height: {{minH}}px; display: flex; align-items: center; justify-content: center; padding: 48px 16px; box-sizing: border-box">
+<main style="width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 20px">
+<h1 class="ts-large" style="margin: 0; text-align: center">Omnichannel Orchestration Reference</h1>
+
+<sc-if value="{{isOne}}" hint-placeholder-val="{{true}}">
+<form class="group" style="padding: 20px; display: flex; flex-direction: column; gap: 16px" aria-label="Sign in">
+<div><label class="lbl" for="em">Email address</label><input id="em" class="field" type="email" value="m.hartmann@nordlicht-kaffee.example" autocomplete="email"></div>
+<button class="btn btn-lg btn-primary" type="button" style="width: 100%; justify-content: center">Send me a code</button>
+</form>
+</sc-if>
+
+<sc-if value="{{isTwo}}" hint-placeholder-val="{{false}}">
+<form class="group" style="padding: 20px; display: flex; flex-direction: column; gap: 16px" aria-label="Sign in">
+<p style="margin: 0">If that address belongs to an active account, a sign-in code is on its way. Enter it below.</p>
+<div><label class="lbl" for="cd">Sign-in code</label><input id="cd" class="field is-invalid" aria-invalid="true" type="text" inputmode="numeric" value="123456" autocomplete="one-time-code"><div class="err" role="alert"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="6" cy="6" r="4.5"></circle><path d="M6 3.6v3 M6 8.2v.2"></path></svg>That code is not valid or has expired.</div></div>
+<button class="btn btn-lg btn-primary" type="button" style="width: 100%; justify-content: center">Sign in</button>
+<button class="btn btn-plain" type="button" style="align-self: center">Use a different address</button>
+</form>
+</sc-if>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"step":{"editor":"enum","default":"1","options":["1","2"]},"minH":{"editor":"int","default":640,"min":500,"max":1200},"$preview":{"width":1440,"height":640}}'>
+class Component extends DCLogic {
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+const step = String(this.props.step ?? '1');
+const minH = parseInt(this.props.minH ?? 640, 10) || 500;
+return {
+themeClass: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : ''),
+minH,
+isOne: step === '1',
+isTwo: step === '2'
+};
+}
+}
+</script>
+</body>
+</html>

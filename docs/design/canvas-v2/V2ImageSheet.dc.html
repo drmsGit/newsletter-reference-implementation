@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Image sheet</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ui.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.igrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;padding:12px 16px}
+.itile{display:flex;flex-direction:column;gap:4px;border:1px solid var(--brand-line);border-radius:8px;padding:6px;background:var(--brand-surface);cursor:pointer;font:inherit;color:var(--brand-fg);text-align:left}
+.itile[aria-pressed="true"]{border-color:var(--brand-accent);background:var(--brand-selected);box-shadow:inset 0 0 0 1px var(--brand-accent)}
+.itile .ph-img{height:84px}
+</style>
+</helmet>
+<div class="{{themeClass}} root" style="position: relative; height: 900px; overflow: hidden">
+
+<div aria-hidden="true"><dc-import name="V2Content" theme="{{theme}}" contrast="{{contrast}}" min-h="900" hint-size="100%,900px"></dc-import></div>
+<div class="scrim"></div>
+
+<div class="sheet" role="dialog" aria-label="Choose an image: Image" style="position: absolute; left: 96px; right: 96px; top: 40px; bottom: 40px; display: flex; flex-direction: column">
+
+<header style="display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--brand-line)">
+<h2 class="ts-title" style="margin: 0">Choose an image: Image</h2>
+<button class="btn" type="button">Close</button>
+</header>
+
+<div style="padding: 12px 24px 0"><div class="seg" role="tablist" aria-label="Where the image comes from"><button type="button" role="tab" aria-selected="true">Library</button><button type="button" role="tab" aria-selected="false">Upload new</button><button type="button" role="tab" aria-selected="false">Web address</button></div></div>
+
+<div style="flex: 1; min-height: 0; display: flex; gap: 24px; padding: 12px 24px 24px">
+
+<div style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+<div class="btnrow" style="align-items: flex-end">
+<div style="flex: 0 1 220px"><label class="lbl" for="br" style="margin: 0 0 4px">Brand</label><button id="br" class="select-btn" type="button"><span>Nordlicht Kaffee</span><svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5L5 1.5l3 3M2 7.5l3 3 3-3"></path></svg></button></div>
+<div style="flex: 1 1 200px"><label class="lbl" for="sq" style="margin: 0 0 4px">Search (optional)</label><input id="sq" class="field" type="text"></div>
+</div>
+<div class="group" style="flex: 1; min-height: 0; overflow: auto" role="group" aria-label="Images">
+<div class="igrid">
+<button class="itile" type="button" aria-pressed="true"><span class="ph-img">Image</span><span class="clip ts-strong">guji-washed-1200x800.jpg</span><span class="ts-cap">1200 × 800</span></button>
+<button class="itile" type="button" aria-pressed="false"><span class="ph-img">Image</span><span class="clip ts-strong">guji-natural-1200x800.jpg</span><span class="ts-cap">1200 × 800</span></button>
+<button class="itile" type="button" aria-pressed="false"><span class="ph-img">Image</span><span class="clip ts-strong">kiambu-field-1600x900.jpg</span><span class="ts-cap">1600 × 900</span></button>
+<button class="itile" type="button" aria-pressed="false"><span class="ph-img">Image</span><span class="clip ts-strong">huila-honey-1200x800.jpg</span><span class="ts-cap">1200 × 800</span></button>
+<button class="itile" type="button" aria-pressed="false"><span class="ph-img">Image</span><span class="clip ts-strong">cold-brew-1000x1000.jpg</span><span class="ts-cap">1000 × 1000</span></button>
+<button class="itile" type="button" aria-pressed="false"><span class="ph-img">Image</span><span class="clip ts-strong">roastery-1800x1200.jpg</span><span class="ts-cap">1800 × 1200</span></button>
+<button class="itile" type="button" aria-pressed="false"><span class="ph-img">Image</span><span class="clip ts-strong">gift-box-1200x800.jpg</span><span class="ts-cap">1200 × 800</span></button>
+<button class="itile" type="button" aria-pressed="false"><span class="ph-img">Image</span><span class="clip ts-strong">open-day-1600x900.jpg</span><span class="ts-cap">1600 × 900</span></button>
+</div>
+<div style="padding: 0 16px 14px"><button class="btn btn-sm" type="button">Load more</button></div>
+</div>
+</div>
+
+<aside aria-label="Selected image" style="flex: 0 0 300px; min-width: 0; display: flex; flex-direction: column; gap: 12px; overflow: auto">
+<div class="ph-img" style="height: 170px">Preview</div>
+<div class="group"><dl style="margin: 0">
+<div class="fact"><dt>Name</dt><dd>guji-washed-1200x800.jpg</dd></div>
+<div class="fact"><dt>Size</dt><dd>1200 × 800</dd></div>
+<div class="fact"><dt>Brand</dt><dd>Nordlicht Kaffee</dd></div>
+</dl></div>
+<div><button class="btn btn-primary" type="button">Use this image</button></div>
+<div class="muted">An image of another brand shows Copy into Nordlicht Kaffee and use instead.</div>
+<details class="dsc"><summary><svg class="chev" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 2.5L8 6l-3.5 3.5"></path></svg><span class="ts-strong">More: alt text, replace, hide</span></summary></details>
+</aside>
+
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","default":"light","options":["light","dark"]},"contrast":{"editor":"enum","default":"normal","options":["normal","more"]},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+const theme = this.props.theme ?? 'light';
+const contrast = this.props.contrast ?? 'normal';
+return {
+themeClass: (theme === 'dark' ? 't-dark' : 't-light') + (contrast === 'more' ? ' hc' : ''),
+theme,
+contrast
+};
+}
+}
+</script>
+</body>
+</html>
