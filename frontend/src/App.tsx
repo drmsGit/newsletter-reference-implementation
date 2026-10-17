@@ -8,7 +8,7 @@ import CampaignDetail from './screens/CampaignDetail'
 import { CampaignsSplit, NoCampaignOpen } from './screens/Campaigns'
 import Content from './screens/Content'
 import RecipientDetail from './screens/RecipientDetail'
-import Recipients from './screens/Recipients'
+import { NoRecipientOpen, RecipientsSplit } from './screens/Recipients'
 import DecisionSlotDetail from './screens/DecisionSlotDetail'
 import { DecisionSlotsSplit, NoSlotOpen } from './screens/DecisionSlots'
 import ContentDetail from './screens/ContentDetail'
@@ -114,8 +114,10 @@ export default function App() {
           <Route path="/audiences" element={<NoAudienceOpen />} />
           <Route path="/audiences/:id" element={<AudienceDetail />} />
         </Route>
-        <Route path="/recipients" element={<Recipients />} />
-        <Route path="/recipients/:id" element={<RecipientDetail />} />
+        <Route element={<RecipientsSplit />}>
+          <Route path="/recipients" element={<NoRecipientOpen />} />
+          <Route path="/recipients/:id" element={<RecipientDetail />} />
+        </Route>
         <Route element={<DecisionSlotsSplit />}>
           <Route path="/decision-slots" element={<NoSlotOpen />} />
           <Route path="/decision-slots/:id" element={<DecisionSlotDetail />} />

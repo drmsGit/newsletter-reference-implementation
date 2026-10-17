@@ -20,24 +20,24 @@ export default function RecipientDetail() {
   const { id } = useParams()
   const activity = useRecipientActivity(Number(id))
   return (
-    <>
-      <p>
-        <Link to="/recipients">← Recipients</Link>
-      </p>
-      <ScreenState query={activity}>
-        {activity.data && <Person activity={activity.data} />}
-      </ScreenState>
-    </>
+    // Column 3 of the recipients (task-372, render 38).
+    <div className="detail">
+      <div className="detail-scroll">
+        <ScreenState query={activity}>{activity.data && <Person activity={activity.data} />}</ScreenState>
+      </div>
+    </div>
   )
 }
 
 function Person({ activity: a }: { activity: Activity }) {
   return (
     <>
-      <h1>{a.external_id}</h1>
-      <p className="muted">
-        Read-only: the CRM owns this person. This page shows why they were chosen and what they were sent.
-      </p>
+      <div className="detail-head">
+        <h2>{a.external_id}</h2>
+        <p className="muted">
+          Read-only: the CRM owns this person. This page shows why they were chosen and what they were sent.
+        </p>
+      </div>
       <Section title="Consent" note="This brand, per channel and purpose.">
         <table>
           <tbody>
@@ -89,7 +89,7 @@ function Person({ activity: a }: { activity: Activity }) {
                     <Link to={`/content/${d.content_record_id}`}>{d.content_title}</Link>
                     {d.content_version != null && <span className="muted"> · version {d.content_version}</span>}
                   </td>
-                  <td>{d.score ?? ''}</td>
+                  <td className="num">{d.score ?? ''}</td>
                   <td>{d.reason ?? ''}</td>
                   <td className="muted">{formatDate(d.created_at)}</td>
                 </tr>
@@ -107,7 +107,7 @@ function Person({ activity: a }: { activity: Activity }) {
               {a.preferences.map((p) => (
                 <tr key={p.category_id}>
                   <td>{p.category_name}</td>
-                  <td>{p.score}</td>
+                  <td className="num">{p.score}</td>
                 </tr>
               ))}
             </tbody>
@@ -134,13 +134,18 @@ function Person({ activity: a }: { activity: Activity }) {
   )
 }
 
+/** A part of the page: its title and what it covers on the ground, its rows in a card. */
 function Section({ title, note, children }: { title: string; note: string; children: React.ReactNode }) {
   const id = `section-${title.toLowerCase().replace(/\W+/g, '-')}`
   return (
-    <section aria-labelledby={id}>
-      <h2 id={id}>{title}</h2>
-      <p className="muted">{note}</p>
-      {children}
+    <section aria-labelledby={id} className="detail-section person-section">
+      <div>
+        <h3 id={id} className="group-title">
+          {title}
+        </h3>
+        <p className="muted section-note">{note}</p>
+      </div>
+      <div className="group card-rows">{children}</div>
     </section>
   )
 }
@@ -166,16 +171,18 @@ function Groups({ recipientId }: { recipientId: number }) {
   return (
     <Section title="Audience groups" note="The groups that touch them, and why they are in or out.">
       {channels.length > 1 && (
-        <Choice
-          label="Channel"
-          options={channels.map((c) => ({ id: c, name: c }))}
-          selected={channel}
-          onChange={(next) => {
-            const updated = new URLSearchParams(params)
-            updated.set('channel', next)
-            setParams(updated)
-          }}
-        />
+        <div>
+          <Choice
+            label="Channel"
+            options={channels.map((c) => ({ id: c, name: c }))}
+            selected={channel}
+            onChange={(next) => {
+              const updated = new URLSearchParams(params)
+              updated.set('channel', next)
+              setParams(updated)
+            }}
+          />
+        </div>
       )}
       <ScreenState query={groups}>
         {groups.data && groups.data.items.length === 0 ? (

@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router'
 
-import Recipients from './Recipients'
+import Recipients, { NoRecipientOpen, RecipientsSplit } from './Recipients'
 import RecipientDetail from './RecipientDetail'
 import { jsonResponse, page, renderWithProviders, stubFetch } from '../test-utils'
 
@@ -133,5 +133,43 @@ describe('one person: why did they get this (task-292)', () => {
     expect(within(decisions).getByText('top_score')).toBeInTheDocument()
     expect(within(await section('Interests')).getByText('Beach')).toBeInTheDocument()
     expect(within(await section('Consent history')).getByText('Acme')).toBeInTheDocument()
+  })
+})
+
+describe('the people beside the open one (task-372)', () => {
+  it("opens another person with the list's search and page, not the open person's channel", async () => {
+    const BEN = { ...ANNA, id: 8, external_id: 'crm-ben' }
+    const { handlers, asked } = server()
+    stubFetch({
+      ...handlers,
+      'GET /recipients/': (request: Request) => {
+        asked.push(new URL(request.url).searchParams)
+        return jsonResponse(page([ANNA, BEN]))
+      },
+      'GET /recipients/8/activity': () => jsonResponse({ ...ACTIVITY, recipient_id: 8, external_id: 'crm-ben' }),
+      'GET /recipients/8/audience-groups': (request: Request) => {
+        asked.push(new URL(request.url).searchParams)
+        return jsonResponse(page([]))
+      },
+    } as never)
+    renderWithProviders(
+      <Routes>
+        <Route element={<RecipientsSplit />}>
+          <Route path="/recipients" element={<NoRecipientOpen />} />
+          <Route path="/recipients/:id" element={<RecipientDetail />} />
+        </Route>
+      </Routes>,
+      { route: '/recipients/7?q=crm&offset=50&channel=push' },
+    )
+    await screen.findByRole('heading', { name: 'crm-anna', level: 2 })
+    fireEvent.click(await screen.findByText('crm-ben'))
+    await screen.findByRole('heading', { name: 'crm-ben', level: 2 })
+    const row = within(screen.getByRole('grid', { name: 'Recipients' })).getByRole('row', { name: /crm-ben/ })
+    expect(row).toHaveAttribute('aria-selected', 'true')
+    // The list kept its search and page throughout; the new person starts on the first channel.
+    const lists = asked.filter((p) => !p.has('channel'))
+    expect(lists.length).toBeGreaterThan(0)
+    expect(lists.every((p) => p.get('q') === 'crm' && p.get('offset') === '50')).toBe(true)
+    await waitFor(() => expect(asked.at(-1)?.get('channel')).toBe('email'))
   })
 })

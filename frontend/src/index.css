@@ -1637,6 +1637,14 @@ table.working tr.row-total th, table.working tr.row-total td { font-weight: 600;
 .card-rows > .search-compact .react-aria-TextField { flex: 1; min-width: 0; margin: 0; }
 .preview-frame--message { height: 40rem; }
 
+/* --- recipients (render 38) -------------------------------------------------- */
+.person-section { gap: 8px; }
+.section-note { margin: 2px 0 0; padding: 0 16px; font-size: 12px; line-height: 16px; }
+.card-rows > table { padding: 0; }
+.group table th:first-child, .group table td:first-child { padding-left: 16px; }
+.group table th:last-child, .group table td:last-child { padding-right: 16px; }
+table td.num { text-align: right; }
+
 /* A link that is a button (Edit, Send): the button's look, the link's meaning. */
 a.btn-link {
   display: inline-flex;
