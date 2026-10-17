@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-11 20:44'
-updated_date: '2026-10-17 13:05'
+updated_date: '2026-10-17 13:14'
 labels:
   - frontend
 dependencies: []
@@ -85,4 +85,6 @@ Next: decision slots (render 32) and the preview sheet (24, decision 16 decided)
 2026-10-17, step 12 built and pushed: recipients as list and details (render 38), no open decision. Next: monitoring and the decision history (renders 39, 40), with open decision 14 (one wide table in place of list and details) to ask first; then settings (33 to 36, 44; decision 23 to confirm) and sign-in (41, 42).
 
 2026-10-17, Diede: decision 14, Monitoring and the decision history stay one wide table each, as drawn. Step 13 built and pushed. Rejected stays a neutral chip (as on the request page since step 3), where render 40 draws it red. Next: settings (renders 33 to 36, 44), with decision 23 (the provider and limits stay in General, AI prompts a list of records) to confirm; then sign-in (41, 42).
+
+2026-10-17, Diede: decision 23 confirmed, the AI provider stays in General with the limits. Step 14a built and pushed: the settings menu with General beside it, General as cards, AI prompts as its own part (/settings/ai-prompts, list and details). Next: 14b brand profiles and personalisation as drill-ins, then 14c users, roles, integrations and brands (render 35, 36; roles and personalisation follow users), then sign-in.
 <!-- SECTION:NOTES:END -->
