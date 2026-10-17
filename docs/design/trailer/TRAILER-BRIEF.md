@@ -45,7 +45,7 @@ One idea, three supports. Each support answers a client complaint that the playb
 
 | Support | The complaint it answers | What the film shows |
 |---|---|---|
-| **See what it does.** | "I can't see what the system is doing, or why." | Per-reader picks that can be explained. Exactly what each reader received. Who was left out and why. |
+| **See what it does.** | "I can't see what the system is doing, or why." | Per-reader picks that can be explained. Exactly what each reader received, and the reason each piece was picked. |
 | **Change it with a file.** | "Anything complex needs developers." | A content block, a strategy, an AI task and a provider added as files. The manager app changes in answer. |
 | **Keep the core.** | "Standards don't fit my workflow." | The company's content, campaigns, rules and consent in the middle. Delivery, AI and channels as parts that can be replaced. |
 
@@ -95,7 +95,7 @@ About 380 spoken words, roughly 2:45 of speech, so more than a third of the film
 
 Verified present or absent on a fresh scratch reset ([[PREPRODUCTION-CHECKS]], section 6).
 
-- The unsubscribe link in "As sent" points at `http://localhost:8000/unsubscribe/<token>` (`PUBLIC_BASE_URL` is unset). Still present. Redraw it with a neutral demo address.
+- The unsubscribe link in "As sent" points at `http://localhost:8000/unsubscribe/<token>` (`PUBLIC_BASE_URL` is unset). Still present. Crop the row, or redraw it with a neutral demo address; the film never speaks of it (unsubscription is not built yet).
 - "As sent" shows two notices about changed templates only when the template folder changed after the send. After a fresh reset they are gone; any change in `storage/modules/email/`, a drop included, brings them back. Capture "As sent" before the first drop. S10 comes before S13 in the film, so the story order is already right.
 - The demo AI is a mock ("Mock subject 1 — Mock preheader 1", provenance `mock-1`), and on a fresh reset it does not run at all until a prompt is published in Settings. The caution line "Suggestions can be wrong. Check the subject before you use it." and the words "Example provider" exist only in the design canvases, not in the app. A frame that shows believable suggestions is a drawing and is marked as one in the shot notes.
 - Approvals is empty after a reset. The seed script (`backend/scripts/seed_pending_actions.py`) makes only "Send a prepared campaign" requests, from the integration "Acme Agency (demo)", and needs a planned draft send first.
@@ -151,7 +151,7 @@ The positioning rule is that a claim must be demonstrable in the repository ([[P
 | A decision slot picks per reader, from content a person has marked ready and published, and the pick is explainable | [[ADR-083 — Personalization Happens Inside Variants Through Decision Slots]], [[ADR-084 — Decision Slots May Resolve One or Multiple Content Records]], [[ADR-085 — Decision Resolution Should Be Optionally Explainable]], [[ADR-127 — Decision Execution May Use Recipient Context]] | Built: up to five picks per slot, ranked, the empty-send floor. Not built: minimum items and fallback content. The app does not use the word "approved": the rule is active, machine ready, marked ready for the channel, with a published version. Every pick has a reason, but never say "the best pick": most reasons read "tied … ordered randomly". In the demo most readers share the first two picks and differ in the third. |
 | AI suggests, a person decides | [[ADR-081 — AI Ranks Within Governed Candidate Sets]], [[ADR-082 — AI May Recommend but Not Publish]], [[ADR-140 — AI Capability Layer]], [[ADR-141 — In-App Assistive AI Actions]] | The demo AI is the mock; the one real adapter is a US vendor's. Never "EU-hosted" or "GDPR-friendly AI". |
 | When a machine asks to send, a person approves | [[ADR-142 — Autonomous Workflows and the Automation Boundary]] (the approval boundary only), [[ADR-166 — Inbound Machine Callers Are Authenticated Principals]], [[ADR-168 — The Manager SPA Authenticates With Its Session Cookie]] | Only the approvals inbox is built. Autonomous workflows are not. |
-| A send is planned first and records who was left out and why | [[ADR-163 — Per-Channel Consent and Addressability]], [[ADR-086 — Decision Slots Fail Gracefully]], [[ADR-191 — Unsubscribe Is a Per-Message Token, a Confirm Page and One-Click]] | Never "GDPR compliant": the adopter takes the liability, the platform supplies mechanisms. The code records the stage that excluded someone, but the demo has no exclusions, so the film does not draw one. |
+| A send is planned first and frozen: what goes out, and how many it reaches, are fixed before it is pressed | [[ADR-183 — A Snapshot Freezes the Composition and Every Delivery Records What It Got]], [[ADR-005 — Separate Snapshot State from Recipient Delivery Artifact]] | Never "GDPR compliant": the adopter takes the liability, the platform supplies mechanisms. Say nothing about who is left out or about unsubscribing: unsubscription is not built yet (Diede, 2026-10-17), and the demo has no exclusions to draw. |
 | Open a reader's message and see the content they received | [[ADR-183 — A Snapshot Freezes the Composition and Every Delivery Records What It Got]], [[ADR-005 — Separate Snapshot State from Recipient Delivery Artifact]] | Say "content". The app itself notes that the layout is today's. [[ADR-062 — Snapshot Stores Final Render State]] is superseded by ADR-183: never say the snapshot stores the final HTML. |
 | A stranded send is flagged and a person releases it | [[ADR-192 — A Stranded Send Is Flagged, and a Person Releases It]] | |
 | Clicks come back as signals that fade with time and shape the next pick | [[ADR-110 — Insight Layer Transforms Events Into Signals]], [[ADR-111 — Decision Layer Consumes Signals, Not Raw Events]], [[ADR-112 — Signals Use Time-Based Decay]], [[ADR-132 — Signal Layer Implementation Event-Sourced Contributions with Decay-on-Read]] | Clicks only. Opens are not counted and are never shown as a rate. |
@@ -172,6 +172,7 @@ The positioning rule is that a claim must be demonstrable in the repository ([[P
 - **Paid social, letter, SMS.** Not built.
 - **A phone receiving a push.** Push goes only through the mock provider; there is no device delivery.
 - **Open rates.** Opens are not counted.
+- **Unsubscribing, opt-out, "leaves out whoever said no", counts excluded for consent or suppression.** Unsubscription is not built yet (Diede, 2026-10-17), and the demo has no excluded reader. Crop the Unsubscribes column and its footnote on the Results card, and the unsubscribe row of the envelope on "As sent".
 - **"Byte for byte", "exactly what was sent" for the layout.** The content is exact; the layout is today's.
 - **"Real email" on the mock provider.** The button reads "Send to N".
 - **Hosted, SaaS, "try it".** It is a local proof of concept.
@@ -211,7 +212,7 @@ What the pre-production checks changed, each of which would otherwise read as a 
 - **The hook's numbers held, the picks did not.** 123, 369 and 15 are identical after every reset, but the individual picks reshuffle, because tied candidates are ordered at random. Any frame that shows what a named reader got is read after the final reset.
 - **"From content a person approved" became "marked ready".** The app does not use the word "approved".
 - **The AI scene is two modes, not one flow.** "Use this" in the editor and a request in Approvals cannot be the same suggestion. The film shows the default mode, then a different request in Approvals (S08).
-- **The demo has no exclusions.** The consent and suppression counts the send scene was built on do not exist, so the send and "As sent" scenes no longer claim to show them (S09, S10).
+- **The demo has no exclusions, and unsubscription is not built yet.** The consent and suppression counts the send scene was built on do not exist, and Diede has decided (2026-10-17) that the film makes no claim about unsubscribing, so the send and "As sent" scenes no longer claim to show them (S09, S10), and the Results card is cropped around its Unsubscribes column (S11).
 - **A new block needs a page reload.** The film shows the reload (S13).
 
 ## 14. Deliverables of the film
@@ -245,15 +246,16 @@ Run on 2026-10-17, on a scratch database and a throwaway worktree, never on the 
 5. **A first-person ending only** (script B) if a full recording is not made: the last line, in Diede's voice, over narrator A.
 6. **The address on the end card** stays open until a website or repository exists.
 7. **The hook's numbers.** They held across two resets, but they are the live demo's and the hook is re-read from the final reset.
-8. **The demo seed.** Adding opted-out and suppressed readers and making the unsubscribe stick is a change to the project's demo data, not to the film (the checks propose it as a project follow-up; nothing is decided). Until it is done, S09 and S10 draw only what the demo has. If it is done, the "who was left out and why" shot comes back, and the narration of S09 and S10 can return to its first wording (see the end of this section).
-9. **The attribution of the quote block** has no field of its own. The film either shows the block with "Heading", or adds one more file (`storage/fields.json`) to the scene.
+8. **Exclusions and unsubscribing. Decided by Diede, 2026-10-17: unsubscription is not built yet, so the film makes no claim about it.** S09 and S10 draw only what the demo has and never speak of readers left out; S11 crops the Unsubscribes column and its footnote. Fixing the demo seed (opted-out and suppressed readers, an unsubscribe that sticks) is a change to the project's demo data, not to the film, and does **not** bring the "who was left out and why" shot back: that waits until unsubscription is built. The first wording of S09 and S10 is kept at the end of this section for that day.
+9. **The attribution of the quote block** has no field of its own. The film leaves "Heading" empty in the frame and gives the quote no author (S13). Adding one more file (`storage/fields.json`) to the scene, so that an "Attribution" field exists, stays open as an alternative.
+10. **The word "consent" in S03 and S18.** "Its content, its campaigns, its rules, its consent" (S03) and "Audiences. Brands. Roles. Consent." (S18) stay for now: consent records and the send-time consent gate exist. If "unsubscription is not built yet" is to be read strictly, drop the word in both scripts (S03 "its content, its campaigns, its rules"; S18 "Audiences. Brands. Roles. A record of who did what."). Not decided.
 
 ### Choices made when the checks were applied
 
 These are Claude's, made on 2026-10-17 after the checks and not yet reviewed by Diede. Each can be reversed in the storyboard and the narration.
 
 1. **S08 uses the default AI mode, then a different request in Approvals.** Shot 1 is "Suggest with AI" with "Use this" and the real provenance line (`… · mock-1 · prompt v1`); shot 2 is the seeded "Send a prepared campaign" request from "Acme Agency (demo)", "Approve and run". The narration is unchanged and stays true. The alternative, the held AI request "Use an AI-suggested subject line" with a pick-one inside Approvals, is described in the storyboard. The suggestion text on screen is drawn in believable German and the frame is marked as a drawing; the provenance line stays as the app writes it.
-2. **S09 and S10 no longer talk about exclusions.** The demo has none, so the picture cannot show them. S09 now says the system plans the send, shows how many people it reaches and freezes what they will get; S10 says the reader's message shows what they received and why each piece was picked. The first wording was: S09 "… leaves out whoever said no, and tells you who and why." S10 "… and the reason anyone was left out."
+2. **S09 and S10 no longer talk about exclusions.** The demo has none, so the picture cannot show them. S09 now says the system plans the send, shows how many people it reaches and freezes what they will get; S10 says the reader's message shows what they received and why each piece was picked. The first wording was: S09 "… leaves out whoever said no, and tells you who and why." S10 "… and the reason anyone was left out." It does not come back until unsubscription is built (decision 8).
 3. **S07 says "marked ready", not "approved".**
 
 ## 17. Sources

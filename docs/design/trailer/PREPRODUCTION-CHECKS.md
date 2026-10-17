@@ -378,6 +378,17 @@ These are real defects or gaps found while checking. None was changed here.
 4. **Choosing a different strategy on a slot with settings fails** unless the new strategy declares the same keys: the editor sends only the strategy name (`frontend/src/screens/SlotSettings.tsx`).
 5. **`seed_pending_actions.py` closes with the stale path `/ui/approvals`.**
 
+## 10. Decision of 2026-10-17: unsubscription is not built yet
+
+Diede decided, after reading these results, that the film makes no claim about unsubscribing. That settles the question section 1.3 left open: the missing exclusions are not a demo gap to fill before filming, they are a feature that is not there yet. Applied to the committed files the same day:
+
+- **[[STORYBOARD]]:** S09 loses ADR-163 and ADR-191 from its evidence and says outright that the scene never speaks of consent, suppression, opt-out, unsubscribing or readers left out (and that fixing the demo seed does not bring the first narration back); S10 crops or redraws the envelope's `list_unsubscribe` row and never speaks of it; S11 crops the Unsubscribes column and the card's footnote and draws the click curve only; S13 leaves the optional "Heading" field empty so the quote block's mislabel never shows, and notes the editor banners a frame will carry.
+- **[[TRAILER-BRIEF]]:** the "See what it does" support no longer lists "who was left out and why"; the claim ledger row for the send becomes "planned first and frozen" with ADR-183 and ADR-005; a new "never say" bullet covers unsubscribing, opt-out and exclusion counts; section 16, decision 8 now reads as decided, decision 9 follows S13, and a new decision 10 records that the word "consent" in S03 and S18 stays for now and is open.
+- **`storyboard.html`:** the seven changed rows of the visual board were patched to match the storyboard, row by row (it has no generator in the repository, so a later regeneration must start from the storyboard text).
+- **[[VOICEOVER]]:** unchanged. The S09 and S10 lines of 2026-10-17 already say nothing about readers left out. S03 and S18 still say "consent" until decision 10 is made.
+
+S14 needed no change: the committed scene already has the file declare the slot's two weights, the page reload, and "show the file and the list entry, never a result".
+
 ## Appendix: exact file contents of the drops
 
 All of these are throwaway. They were created in a git worktree, uncommitted, and removed with it. Copies of every file, including the first version of the strategy, are in the shared notes folder under `preproduction-drops/`. The two labels were briefly edited during the refresh tests ("Quote" to "Quote (edited)", "Headline polish" to "Headline polish (edited)"); the contents below are the first-written ones.
