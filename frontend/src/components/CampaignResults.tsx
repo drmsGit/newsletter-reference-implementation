@@ -1,7 +1,8 @@
-import { ChevronDown } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
+import { Button } from 'react-aria-components'
 
 import { useCampaignResults, type VariantResults } from '../api/resources'
-import DataTable, { type DataColumn } from './DataTable'
 
 /**
  * How the campaign went — the one KPI view (task-58, ADR-196).
@@ -13,11 +14,16 @@ import DataTable, { type DataColumn } from './DataTable'
  * and it folds away, since the campaign page is also where the campaign is
  * built. Comparing campaigns is the analytics tool's job, not this page's.
  *
- * Twelve figures do not fit one table beside a list, so they are two
- * (task-372, decision 15): what reached people, then what they did with it.
+ * One table, its figures in two groups, Delivery and Engagement, each half
+ * open from the start (Diede, 2026-10-18; it replaces task-372 decision 15's
+ * two tables): a group shows its key figures, and a problem figure (failed,
+ * bounced, complaints) whenever it is not zero, so a problem never hides;
+ * opening a group shows every figure in it. The variant column stays put
+ * when the table is wider than the card.
  */
 export default function CampaignResults({ campaignId }: { campaignId: number }) {
   const results = useCampaignResults(campaignId)
+  const [open, setOpen] = useState<Record<Group, boolean>>({ delivery: false, engagement: false })
   if (results.isError) return <p role="alert">The results could not be loaded.</p>
   const data = results.data
   if (!data || !data.campaign || data.variants.length === 0) return null
@@ -25,6 +31,12 @@ export default function CampaignResults({ campaignId }: { campaignId: number }) 
   const whole: Row = { ...data.campaign, id: 0, name: 'Whole campaign', channel: '' }
   const rows: Row[] = [whole, ...data.variants]
   const since = new Date(data.unsubscribes_counted_since).toLocaleDateString(undefined, { dateStyle: 'medium' })
+  const shown = (column: Column) =>
+    open[column.group] || column.key || (column.problem != null && rows.some((r) => (column.problem!(r) ?? 0) > 0))
+  const groups = (['delivery', 'engagement'] as const).map((group) => {
+    const all = COLUMNS.filter((c) => c.group === group)
+    return { group, visible: all.filter(shown), folded: all.length - all.filter(shown).length }
+  })
 
   return (
     <details open className="results">
@@ -32,22 +44,45 @@ export default function CampaignResults({ campaignId }: { campaignId: number }) 
         <ChevronDown size={16} strokeWidth={1.75} aria-hidden="true" className="results-chevron" />
         <h3>Results</h3>
       </summary>
-      {/* Two tables in one card (task-372, decision 15): delivery, then engagement. */}
       <div className="group results-card">
-        <DataTable
-          label="Delivery by variant"
-          columns={delivery}
-          items={rows}
-          emptyMessage="Nothing sent yet."
-          rowClassName={(r) => (r.id === 0 ? 'row-total' : undefined)}
-        />
-        <DataTable
-          label="Engagement by variant"
-          columns={engagement}
-          items={rows}
-          emptyMessage="Nothing sent yet."
-          rowClassName={(r) => (r.id === 0 ? 'row-total' : undefined)}
-        />
+        <table className="results-table" aria-label="Results by variant">
+          <thead>
+            <tr className="results-groups">
+              <td className="results-variant" aria-hidden="true" />
+              {groups.map(({ group, visible, folded }) => (
+                <th key={group} scope="colgroup" colSpan={visible.length}
+                  className={group === 'engagement' ? 'results-group results-sep' : 'results-group'}>
+                  <Button className="results-toggle" aria-expanded={open[group]}
+                    onPress={() => setOpen({ ...open, [group]: !open[group] })}>
+                    {open[group] ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
+                    {GROUP_NAME[group]}
+                    {!open[group] && folded > 0 && <span className="results-folded" aria-hidden="true">+{folded}</span>}
+                  </Button>
+                </th>
+              ))}
+            </tr>
+            <tr>
+              <th scope="col" className="results-variant">Variant</th>
+              {groups.flatMap(({ group, visible }) =>
+                visible.map((c, index) => (
+                  <th key={c.name} scope="col" className={cell(group, index)}>{c.name}</th>
+                )),
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id} className={r.id === 0 ? 'row-total' : undefined}>
+                <th scope="row" className="results-variant">{r.channel ? `${r.name} (${r.channel})` : r.name}</th>
+                {groups.flatMap(({ group, visible }) =>
+                  visible.map((c, index) => (
+                    <td key={c.name} className={cell(group, index)}>{c.render(r)}</td>
+                  )),
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
       <p className="muted results-note">
         Counted per delivery. Click rate is unique clickers over sent. Opens are not counted.
@@ -58,6 +93,23 @@ export default function CampaignResults({ campaignId }: { campaignId: number }) 
 }
 
 type Row = VariantResults
+type Group = 'delivery' | 'engagement'
+type Column = {
+  name: string
+  group: Group
+  render: (row: Row) => ReactNode
+  /** Shown while the group is half open. */
+  key?: boolean
+  /** A count that means something went wrong: shown, though folded, when not zero. */
+  problem?: (row: Row) => number | null | undefined
+}
+
+const GROUP_NAME: Record<Group, string> = { delivery: 'Delivery', engagement: 'Engagement' }
+
+/** A figure's cell: right-aligned, the engagement group set off by a line. */
+function cell(group: Group, index: number) {
+  return group === 'engagement' && index === 0 ? 'num results-sep' : 'num'
+}
 
 function count(value: number | null | undefined) {
   return value == null ? '—' : value.toLocaleString()
@@ -79,28 +131,17 @@ function excluded(row: Row) {
   )
 }
 
-const variant: DataColumn<Row> = {
-  key: 'name',
-  header: 'Variant',
-  isRowHeader: true,
-  render: (r) => (r.channel ? `${r.name} (${r.channel})` : r.name),
-}
-
-const delivery: DataColumn<Row>[] = [
-  variant,
-  { key: 'recipients', header: 'Recipients', numeric: true, render: (r) => count(r.recipients) },
-  { key: 'sent', header: 'Sent', numeric: true, render: (r) => count(r.sent) },
-  { key: 'delivered', header: 'Delivered', numeric: true, render: (r) => count(r.delivered) },
-  { key: 'failed', header: 'Failed', numeric: true, render: (r) => count(r.failed) },
-  { key: 'excluded', header: 'Excluded', numeric: true, render: excluded },
-  { key: 'bounced', header: 'Bounced', numeric: true, render: (r) => count(r.bounced) },
-  { key: 'complaints', header: 'Complaints', numeric: true, render: (r) => count(r.complaints) },
-]
-
-const engagement: DataColumn<Row>[] = [
-  variant,
-  { key: 'clicks', header: 'Clicks', numeric: true, render: (r) => count(r.clicks_total) },
-  { key: 'clickers', header: 'Unique clickers', numeric: true, render: (r) => count(r.unique_clickers) },
-  { key: 'rate', header: 'Click rate', numeric: true, render: (r) => percent(r.click_rate) },
-  { key: 'unsubscribes', header: 'Unsubscribes', numeric: true, render: (r) => count(r.unsubscribes) },
+/** In order; the key figures are the ones a group shows half open (Diede, 2026-10-18). */
+const COLUMNS: Column[] = [
+  { name: 'Recipients', group: 'delivery', render: (r) => count(r.recipients) },
+  { name: 'Sent', group: 'delivery', key: true, render: (r) => count(r.sent) },
+  { name: 'Delivered', group: 'delivery', key: true, render: (r) => count(r.delivered) },
+  { name: 'Failed', group: 'delivery', problem: (r) => r.failed, render: (r) => count(r.failed) },
+  { name: 'Excluded', group: 'delivery', render: excluded },
+  { name: 'Bounced', group: 'delivery', problem: (r) => r.bounced, render: (r) => count(r.bounced) },
+  { name: 'Complaints', group: 'delivery', problem: (r) => r.complaints, render: (r) => count(r.complaints) },
+  { name: 'Click rate', group: 'engagement', key: true, render: (r) => percent(r.click_rate) },
+  { name: 'Clicks', group: 'engagement', render: (r) => count(r.clicks_total) },
+  { name: 'Unique clickers', group: 'engagement', render: (r) => count(r.unique_clickers) },
+  { name: 'Unsubscribes', group: 'engagement', key: true, render: (r) => count(r.unsubscribes) },
 ]

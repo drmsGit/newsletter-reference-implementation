@@ -307,37 +307,57 @@ describe('creating', () => {
 })
 
 describe('the results section (task-58)', () => {
-  it('shows the whole campaign and each variant that sent, as the server counts them', async () => {
+  const RESULTS = {
+    campaign: figures(),
+    variants: [
+      { id: 3, name: 'Variant A', channel: 'email', ...figures() },
+      { id: 4, name: 'Push', channel: 'push', ...figures({ delivered: null, click_rate: null }) },
+    ],
+    unsubscribes_counted_since: '2026-10-12T00:00:00Z',
+    unsubscribes_partial: true,
+  }
+  const headers = (table: HTMLElement) =>
+    [...table.querySelectorAll('thead tr:last-child th')].map((th) => th.textContent)
+
+  it('shows the whole campaign and each variant in one table, both groups half open (2026-10-18)', async () => {
     stubFetch({
       'GET /campaigns/1/composition': () => jsonResponse(COMPOSITION),
-      'GET /campaigns/1/results': () => jsonResponse({
-        campaign: figures(),
-        variants: [
-          { id: 3, name: 'Variant A', channel: 'email', ...figures() },
-          { id: 4, name: 'Push', channel: 'push', ...figures({ delivered: null, click_rate: null }) },
-        ],
-        unsubscribes_counted_since: '2026-10-12T00:00:00Z',
-        unsubscribes_partial: true,
-      }),
+      'GET /campaigns/1/results': () => jsonResponse(RESULTS),
     })
     renderDetail()
-    // Two tables (task-372, decision 15): delivery, then engagement, each with the whole campaign on top.
-    const delivery = await screen.findByRole('grid', { name: 'Delivery by variant' })
-    const rows = within(delivery).getAllByRole('row')
-    expect(rows[1]).toHaveTextContent('Whole campaign')
-    expect(rows[1]).toHaveClass('row-total')
-    expect(rows[2]).not.toHaveClass('row-total')
-    expect(within(rows[1]).getByText('consent 1')).toBeInTheDocument()
-    expect(rows[2]).toHaveTextContent('Variant A (email)')
-    // Push reports no deliveries.
-    expect(within(rows[3]).getAllByText('—')).toHaveLength(1)
-    const engagement = screen.getByRole('grid', { name: 'Engagement by variant' })
-    const used = within(engagement).getAllByRole('row')
-    expect(used[1]).toHaveTextContent('Whole campaign')
-    expect(used[1]).toHaveTextContent('37.5 %')
-    // With nothing delivered there is no rate.
-    expect(within(used[3]).getAllByText('—')).toHaveLength(1)
+    const table = await screen.findByRole('table', { name: 'Results by variant' })
+    // The key figures of each group, and a problem figure that is not zero
+    // (Failed and Bounced are 1 here; Complaints is 0 and stays folded).
+    expect(headers(table)).toEqual(['Variant', 'Sent', 'Delivered', 'Failed', 'Bounced', 'Click rate', 'Unsubscribes'])
+    const rows = within(table).getAllByRole('row').slice(2)
+    expect(rows[0]).toHaveTextContent('Whole campaign')
+    expect(rows[0]).toHaveClass('row-total')
+    expect(rows[1]).not.toHaveClass('row-total')
+    expect(within(rows[1]).getByRole('rowheader')).toHaveTextContent('Variant A (email)')
+    expect(rows[0]).toHaveTextContent('37.5 %')
+    // Push reports no deliveries, so no delivered count and no rate.
+    expect(within(rows[2]).getAllByText('—')).toHaveLength(2)
     expect(screen.getByText(/Unsubscribes made before .* are not counted/)).toBeInTheDocument()
+  })
+
+  it('opens a group to every figure in it, and folds it again', async () => {
+    stubFetch({
+      'GET /campaigns/1/composition': () => jsonResponse(COMPOSITION),
+      'GET /campaigns/1/results': () => jsonResponse(RESULTS),
+    })
+    renderDetail()
+    const table = await screen.findByRole('table', { name: 'Results by variant' })
+    const delivery = within(table).getByRole('button', { name: /Delivery/ })
+    expect(delivery).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(delivery)
+    expect(delivery).toHaveAttribute('aria-expanded', 'true')
+    expect(headers(table)).toEqual(['Variant', 'Recipients', 'Sent', 'Delivered', 'Failed', 'Excluded', 'Bounced',
+      'Complaints', 'Click rate', 'Unsubscribes'])
+    expect(within(table).getAllByRole('row')[2]).toHaveTextContent('consent 1')
+    fireEvent.click(within(table).getByRole('button', { name: /Engagement/ }))
+    expect(headers(table).slice(-4)).toEqual(['Click rate', 'Clicks', 'Unique clickers', 'Unsubscribes'])
+    fireEvent.click(delivery)
+    expect(headers(table)).not.toContain('Recipients')
   })
 
   it('has no section while nothing has gone out', async () => {
@@ -348,7 +368,7 @@ describe('the results section (task-58)', () => {
     renderDetail()
     expect(await screen.findByRole('heading', { name: 'Spring' })).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByText('Results')).not.toBeInTheDocument())
-    expect(screen.queryByRole('grid', { name: 'Delivery by variant' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: 'Results by variant' })).not.toBeInTheDocument()
   })
 
   it('leaves out the partial note when every send is counted in full', async () => {
@@ -360,7 +380,7 @@ describe('the results section (task-58)', () => {
       }),
     })
     renderDetail()
-    await screen.findByRole('grid', { name: 'Delivery by variant' })
+    await screen.findByRole('table', { name: 'Results by variant' })
     expect(screen.getByText(/Opens are not counted\./)).toBeInTheDocument()
     expect(screen.queryByText(/Unsubscribes made before/)).not.toBeInTheDocument()
   })

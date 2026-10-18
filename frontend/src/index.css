@@ -1571,8 +1571,22 @@ table.working tr.row-total th, table.working tr.row-total td { font-weight: 600;
 .group .react-aria-Table { margin: 0; }
 .group .react-aria-Table th:first-child, .group .react-aria-Table td:first-child { padding-left: 16px; }
 .group .react-aria-Table th:last-child, .group .react-aria-Table td:last-child { padding-right: 16px; }
-.results-card .react-aria-Table + .react-aria-Table { border-top: 1px solid var(--brand-line); }
-.results-card .react-aria-Table + .react-aria-Table th { padding-top: 12px; }
+/* The results as one table, its two groups half open (Diede, 2026-10-18). */
+.results-table th, .results-table td { white-space: nowrap; }
+.results-table .num { text-align: right; }
+.results-table thead tr:last-child th:not(.results-variant) { text-align: right; }
+.results-variant { position: sticky; left: 0; z-index: 1; background: var(--brand-surface); text-align: left; }
+.results-table .row-total .results-variant { background: var(--brand-surface-2); }
+.results-table tbody th.results-variant { font-size: inherit; line-height: inherit; color: inherit; font-weight: inherit; white-space: nowrap; }
+.results-table .row-total th, .results-table .row-total td { font-weight: 600; background: var(--brand-surface-2); }
+.results-table th:first-child, .results-table td:first-child { padding-left: 16px; }
+.results-table th:last-child, .results-table td:last-child { padding-right: 16px; }
+.results-groups th, .results-groups td { border-bottom: 0; padding-bottom: 0; }
+.results-group { text-align: left; }
+.results-sep { border-left: 1px solid var(--brand-line); }
+button.results-toggle { height: 24px; padding: 0 6px; margin-left: -6px; gap: 4px; border: 0; box-shadow: none; background: transparent; color: var(--brand-muted); font-size: 12px; }
+button.results-toggle[data-hovered] { background: var(--brand-surface-2); }
+.results-folded { color: var(--brand-muted); font-variant-numeric: tabular-nums; }
 
 /* The results fold away: a chevron, not the browser's triangle. */
 .results > summary {
