@@ -74,31 +74,37 @@ function CreateForm({ onCancel }: { onCancel: () => void }) {
 }
 
 /**
- * "Suggest an audience…" on a campaign's page (2026-10-18): the same
- * suggestion as Audiences' "Suggest from campaign", for this campaign, asked
- * first because it makes a group. It closes, then opens the new group.
+ * "Suggest an audience…" on a variant (ADR-188 addendum 2026-10-18): the
+ * topics of this variant's content, each rule limited to its language, so a
+ * German and an English variant each get their own readers. Asked first
+ * because it makes a group; it closes, then opens the new group.
  */
-export function SuggestForCampaign({ campaignId }: { campaignId: number }) {
+export function SuggestForVariant({ variantId, variantName, language }: {
+  variantId: number
+  variantName: string
+  language: string | null | undefined
+}) {
   const [open, setOpen] = useState(false)
   const suggest = useSuggestAudience()
   const navigate = useNavigate()
+  const heading = `suggest-audience-${variantId}`
   return (
     <>
       <Button onPress={() => setOpen(true)}>Suggest an audience…</Button>
       <ModalOverlay isOpen={open} onOpenChange={setOpen} isDismissable className="preview-overlay">
         <Modal className="create-modal">
-          <Dialog aria-labelledby={`suggest-audience-${campaignId}`}>
-            <Heading slot="title" id={`suggest-audience-${campaignId}`}>Suggest an audience</Heading>
+          <Dialog aria-labelledby={heading}>
+            <Heading slot="title" id={heading}>Suggest an audience for {variantName}</Heading>
             <p className="muted">
-              A new audience with one rule per main topic of this campaign&apos;s content. You can change or remove each
-              one.
+              A new audience with one rule per main topic of this variant&apos;s content
+              {language ? <>, each limited to readers whose language is {language}</> : null}. You can change or remove each one.
             </p>
             {suggest.isError && <p role="alert">{refusal(suggest.error, 'create an audience')}</p>}
             <DialogActions onCancel={() => setOpen(false)}>
               <Button
                 isDisabled={suggest.isPending}
                 onPress={() =>
-                  suggest.mutate(campaignId, {
+                  suggest.mutate({ variant_id: variantId }, {
                     onSuccess: (group) => {
                       setOpen(false)
                       navigate(`/audiences/${group.id}`)
@@ -135,7 +141,8 @@ export function SuggestFromCampaign() {
           <Dialog aria-label="Suggest an audience from a campaign">
             <Heading slot="title">Suggest an audience from a campaign</Heading>
             <p className="muted">
-              One rule per main topic of the campaign&apos;s content. You can change or remove each one.
+              One rule per main topic of the campaign&apos;s content, across all its variants, with no language. You
+              can change or remove each one. For one language, suggest from a variant on the campaign&apos;s page.
             </p>
             <TextField value={q} onChange={setQ} autoFocus>
               <Label>Campaign</Label>
@@ -146,7 +153,7 @@ export function SuggestFromCampaign() {
                 <li key={c.id}>
                   <Button
                     isDisabled={suggest.isPending}
-                    onPress={() => suggest.mutate(c.id, { onSuccess: (group) => { setOpen(false); navigate(`/audiences/${group.id}`) } })}
+                    onPress={() => suggest.mutate({ campaign_id: c.id }, { onSuccess: (group) => { setOpen(false); navigate(`/audiences/${group.id}`) } })}
                   >
                     {c.name}
                   </Button>

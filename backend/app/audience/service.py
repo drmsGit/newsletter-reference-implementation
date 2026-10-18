@@ -404,7 +404,7 @@ def get_group(db: Session, group_id: int, *, brand_id: int) -> AudienceGroupDB |
 
 def create_group(
     db: Session, name: str, brand_id: int, description: str | None = None,
-    source_campaign_id: int | None = None,
+    source_campaign_id: int | None = None, source_variant_id: int | None = None,
 ) -> AudienceGroupDB:
     """A group belongs to a brand. **It deliberately does not belong to a
     channel**, and that was considered on 2026-09-18 rather than overlooked.
@@ -425,7 +425,7 @@ def create_group(
     """
     group = AudienceGroupDB(
         name=name, brand_id=brand_id, description=description,
-        source_campaign_id=source_campaign_id,
+        source_campaign_id=source_campaign_id, source_variant_id=source_variant_id,
     )
     db.add(group)
     try:
@@ -1346,10 +1346,12 @@ def _brand_of_campaign(db: Session, campaign_id: int) -> int:
 def campaign_category_scores(db: Session, campaign_id: int) -> list[dict]:
     """Category weights across **every variant** of the campaign, whatever its
     channel — decided 2026-09-18 after the user asked whether suggestion should
-    check channels.
+    check channels. Since 2026-10-18 this is Audiences' campaign-wide entry
+    only; a variant's suggestion reads that variant (ADR-188 addendum
+    2026-10-18, `content_category_scores`).
 
     Kept channel-blind because [[ADR-160 — Channel Model and Composition]]
-    point 7 makes the campaign the *topic* and the channel a delivery
+    point 4 makes the campaign the *topic* and the channel a delivery
     preference: a push variant of a hiking campaign is still about hiking, so
     the audience it suggests is a hiking audience. The per-channel truth is
     delivered where it changes a decision — the resolved count on the send
@@ -1369,6 +1371,15 @@ def campaign_category_scores(db: Session, campaign_id: int) -> list[dict]:
     from app.content.db_models import ContentCategoryAssignmentDB, CategoryDB
 
     variant_ids = [v.id for v in db.query(VariantDB.id).filter(VariantDB.campaign_id == campaign_id).all()]
+    return content_category_scores(db, variant_ids)
+
+
+def content_category_scores(db: Session, variant_ids: list[int]) -> list[dict]:
+    """The categories these variants' content is about, ranked (the body of
+    `campaign_category_scores`, by variant since ADR-188's addendum 2026-10-18)."""
+    from app.campaigns.db_models import ModuleInstanceDB, DecisionSlotDB, DecisionResolutionDB
+    from app.content.db_models import ContentCategoryAssignmentDB, CategoryDB
+
     if not variant_ids:
         return []
 
@@ -1414,6 +1425,36 @@ def campaign_category_scores(db: Session, campaign_id: int) -> list[dict]:
     return ranked
 
 
+def _suggestions(ranked: list[dict], language: str | None, max_categories: int) -> list[dict]:
+    """One include rule per top category; with a language, the language sits
+    inside each rule, so it narrows (AND within a rule, ADR-188 point 1)."""
+    suggestions = []
+    for row in ranked[:max_categories]:
+        # One category per suggested rule, so a recalculation stays per category.
+        criteria = {"categories": [{"category_id": row["category_id"], "min_score": DEFAULT_SUGGESTION_MIN_SCORE}]}
+        label = f"Interested in {row['category_name']}"
+        if language:
+            criteria["language"] = [language]
+            label = f"{label} · {language}"
+        suggestions.append({"label": label, "criteria": criteria, "content_score": row["content_score"]})
+    return suggestions
+
+
+def suggest_include_blocks_for_variant(db: Session, variant_id: int, language: str | None,
+                                       max_categories: int = 5) -> list[dict]:
+    """A variant's suggestion (ADR-188 addendum 2026-10-18): the top categories
+    of that variant's content only, each rule limited to its language. The
+    channel stays out, as for the campaign: consent decides it at send time."""
+    return _suggestions(content_category_scores(db, [variant_id]), language, max_categories)
+
+
+def _variant_language(db: Session, variant, brand_id: int) -> str | None:
+    """The language of the profile a variant uses: its own, or the brand's default."""
+    from app.brand_profiles.service import profile_of_variant
+
+    return profile_of_variant(db, variant, brand_id).language or None
+
+
 def suggest_include_blocks_for_campaign(db: Session, campaign_id: int, max_categories: int = 5) -> list[dict]:
     """Proposed (not yet persisted) include blocks for a campaign: one per top
     category its content covers, each with a default min-score.
@@ -1431,16 +1472,7 @@ def suggest_include_blocks_for_campaign(db: Session, campaign_id: int, max_categ
     because a count is exactly the thing ADR-176 point 5 forbids being
     channel-less: whoever builds the screen asks `count_for_criteria` with the
     channel in hand, which is one call and cannot be wrong by default."""
-    suggestions = []
-    for row in campaign_category_scores(db, campaign_id)[:max_categories]:
-        # One category per suggested rule, so a recalculation stays per category.
-        criteria = {"categories": [{"category_id": row["category_id"], "min_score": DEFAULT_SUGGESTION_MIN_SCORE}]}
-        suggestions.append({
-            "label": f"Interested in {row['category_name']}",
-            "criteria": criteria,
-            "content_score": row["content_score"],
-        })
-    return suggestions
+    return _suggestions(campaign_category_scores(db, campaign_id), None, max_categories)
 
 
 def create_suggested_group_for_campaign(
@@ -1459,7 +1491,39 @@ def create_suggested_group_for_campaign(
     if _brand_of_campaign(db, campaign_id) != brand_id:
         raise ValueError(f"Campaign {campaign_id} not found")
 
-    base_name = f"{campaign_name} — suggested audience"
+    return _suggested_group(
+        db, f"{campaign_name} — suggested audience",
+        f"System-suggested from campaign #{campaign_id} content categories.",
+        suggest_include_blocks_for_campaign(db, campaign_id),
+        brand_id=brand_id, source_campaign_id=campaign_id,
+    )
+
+
+def create_suggested_group_for_variant(db: Session, variant_id: int, *, brand_id: int) -> AudienceGroupDB:
+    """A new group from one variant (ADR-188 addendum 2026-10-18): that
+    variant's topics, each rule in the language of the profile it uses. It
+    remembers the variant, so Recalculate follows it. Another brand's variant
+    answers as absent, as a campaign does (task-241)."""
+    from app.campaigns.db_models import CampaignDB, VariantDB
+
+    variant = db.get(VariantDB, variant_id)
+    campaign = db.get(CampaignDB, variant.campaign_id) if variant else None
+    if campaign is None or campaign.brand_id != brand_id:
+        raise LookupError(f"Variant {variant_id} not found")
+    language = _variant_language(db, variant, brand_id)
+    return _suggested_group(
+        db, f"{campaign.name} · {variant.name} — suggested audience",
+        f"System-suggested from variant {variant.name} of campaign #{campaign.id}: its content categories"
+        + (f", in {language}." if language else "."),
+        suggest_include_blocks_for_variant(db, variant.id, language),
+        brand_id=brand_id, source_campaign_id=campaign.id, source_variant_id=variant.id,
+    )
+
+
+def _suggested_group(db: Session, base_name: str, description: str, suggestions: list[dict], *,
+                     brand_id: int, source_campaign_id: int, source_variant_id: int | None = None) -> AudienceGroupDB:
+    """A new group named after its source, free in its brand, seeded with the
+    suggested include rules, each badged as the system's proposal."""
     name = base_name
     suffix = 2
     # Scoped to the brand, because the constraint is (brand_id, lower(name)).
@@ -1482,14 +1546,9 @@ def create_suggested_group_for_campaign(
         if len(name) > 255:
             name = f"{base_name[:240].rstrip()} ({suffix})"
 
-    group = create_group(
-        db,
-        name,
-        brand_id,
-        description=f"System-suggested from campaign #{campaign_id} content categories.",
-        source_campaign_id=campaign_id,
-    )
-    for suggestion in suggest_include_blocks_for_campaign(db, campaign_id):
+    group = create_group(db, name, brand_id, description=description,
+                         source_campaign_id=source_campaign_id, source_variant_id=source_variant_id)
+    for suggestion in suggestions:
         add_block(
             db,
             group_id=group.id,
@@ -1525,7 +1584,14 @@ def recalculate_suggested_blocks(
     if not group or not group.source_campaign_id:
         return None
 
-    desired = suggest_include_blocks_for_campaign(db, group.source_campaign_id)
+    if group.source_variant_id is not None:
+        from app.campaigns.db_models import VariantDB
+
+        variant = db.get(VariantDB, group.source_variant_id)
+        desired = suggest_include_blocks_for_variant(
+            db, variant.id, _variant_language(db, variant, brand_id)) if variant else []
+    else:
+        desired = suggest_include_blocks_for_campaign(db, group.source_campaign_id)
     desired_by_cat = {_suggested_category(s["criteria"]): s for s in desired}
 
     existing_suggested = [

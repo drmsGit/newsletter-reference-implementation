@@ -2,7 +2,7 @@ from datetime import datetime
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 class AudienceGroup(BaseModel):
@@ -15,6 +15,8 @@ class AudienceGroup(BaseModel):
     # one (task-208). It is what makes Recalculate meaningful, and the link
     # back to the campaign.
     source_campaign_id: int | None = None
+    # The variant it was suggested from, when it was (ADR-188 addendum 2026-10-18).
+    source_variant_id: int | None = None
 
 
 class AudienceGroupListed(AudienceGroup):
@@ -224,4 +226,13 @@ class BulkAddResult(BaseModel):
 
 
 class SuggestedAudienceRequest(BaseModel):
-    campaign_id: int
+    """Exactly one source: a campaign (its topics, every variant, no language)
+    or a variant (its topics in its language; ADR-188 addendum 2026-10-18)."""
+    campaign_id: int | None = None
+    variant_id: int | None = None
+
+    @model_validator(mode="after")
+    def one_source(self):
+        if (self.campaign_id is None) == (self.variant_id is None):
+            raise ValueError("name exactly one of campaign_id and variant_id")
+        return self

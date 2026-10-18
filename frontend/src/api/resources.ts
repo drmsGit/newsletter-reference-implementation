@@ -534,8 +534,10 @@ export function useCreateAudience() {
 export function useSuggestAudience() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (campaignId: number) =>
-      read(api.POST('/api/audience-groups/suggested', { body: { campaign_id: campaignId } })),
+    // A variant's topics in its language, or a campaign's across every variant
+    // with no language (ADR-188 addendum 2026-10-18).
+    mutationFn: (source: { campaign_id: number } | { variant_id: number }) =>
+      read(api.POST('/api/audience-groups/suggested', { body: source })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [...keys.audienceGroups, 'page'] }),
   })
 }

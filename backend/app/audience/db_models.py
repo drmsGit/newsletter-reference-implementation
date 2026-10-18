@@ -18,6 +18,9 @@ class AudienceGroupDB(Base):
     # Lets "Recalculate" re-derive the suggested blocks from that campaign's
     # current content after its slots/content change. Null for hand-made groups.
     source_campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=True)
+    # Set when it was suggested from one variant (ADR-188 addendum 2026-10-18):
+    # its topics and its language; Recalculate follows the variant then.
+    source_variant_id = Column(Integer, ForeignKey("variants.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime(timezone=True),

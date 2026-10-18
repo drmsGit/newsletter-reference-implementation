@@ -163,13 +163,14 @@ describe('a campaign in detail', () => {
     renderDetail()
     const card = (await screen.findByRole('heading', { name: 'Variant A' })).closest('section')!
     const actions = [...card.querySelectorAll('.group-actions .btnrow > *')].map((a) => a.textContent)
-    expect(actions).toEqual(['Edit Variant A', 'Preview', 'Send Variant A…', 'Duplicate this variant'])
+    expect(actions).toEqual(['Edit Variant A', 'Preview', 'Send Variant A…', 'Suggest an audience…', 'Duplicate this variant'])
     fireEvent.click(within(card).getByRole('button', { name: 'Preview' }))
     const sheet = await screen.findByRole('dialog', { name: 'Preview of Variant A' })
     expect(await within(sheet).findByTitle('Rendered email: Variant A')).toBeInTheDocument()
   })
 
-  it('suggests an audience from this campaign, after asking, and opens it', async () => {
+  it("suggests an audience per variant, in the variant's language, after asking, and opens it", async () => {
+    // ADR-188 addendum 2026-10-18: a variant's topics in its language, not the campaign's.
     const writes: Request[] = []
     stubFetch({
       'GET /campaigns/1/composition': () => jsonResponse(COMPOSITION),
@@ -183,13 +184,15 @@ describe('a campaign in detail', () => {
       </Routes>,
       { route: '/campaigns/1' },
     )
-    fireEvent.click(await screen.findByRole('button', { name: 'Suggest an audience…' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Suggest an audience' })
+    const card = (await screen.findByRole('heading', { name: 'Variant A' })).closest('section')!
+    expect(screen.getAllByRole('button', { name: /Suggest an audience/ })).toHaveLength(1)
+    fireEvent.click(within(card).getByRole('button', { name: 'Suggest an audience…' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Suggest an audience for Variant A' })
+    expect(dialog).toHaveTextContent(/each limited to readers whose language is en/)
     expect(writes).toHaveLength(0)
     fireEvent.click(within(dialog).getByRole('button', { name: 'Suggest' }))
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(await screen.findByRole('heading', { name: 'Audience page' })).toBeInTheDocument()
-    expect(await writes[0].json()).toEqual({ campaign_id: 1 })
+    expect(await writes[0].json()).toEqual({ variant_id: 3 })
   })
 
   it('duplicates with an empty body, so the server picks the mode, then re-reads', async () => {

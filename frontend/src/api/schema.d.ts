@@ -2411,8 +2411,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * A suggested audience from a campaign's content categories
-         * @description One editable include block per top category of the campaign's content. The campaign must be in the working brand (404 otherwise).
+         * A suggested audience from a variant's or a campaign's content categories
+         * @description One editable include block per top category of the content. From a variant (variant_id): that variant's content, each block limited to its profile's language (ADR-188 addendum 2026-10-18). From a campaign (campaign_id): every variant, no language. Exactly one of the two; it must be in the working brand (404 otherwise).
          */
         post: operations["create_suggested_audience_api_audience_groups_suggested_post"];
         delete?: never;
@@ -3570,6 +3570,8 @@ export interface components {
             updated_at: string;
             /** Source Campaign Id */
             source_campaign_id?: number | null;
+            /** Source Variant Id */
+            source_variant_id?: number | null;
         };
         /** AudienceGroupCreate */
         AudienceGroupCreate: {
@@ -3606,6 +3608,8 @@ export interface components {
             updated_at: string;
             /** Source Campaign Id */
             source_campaign_id?: number | null;
+            /** Source Variant Id */
+            source_variant_id?: number | null;
             /** Pinned Count */
             pinned_count: number;
             /** Recipient Count */
@@ -7843,10 +7847,16 @@ export interface components {
             /** Pending Action Id */
             pending_action_id?: number | null;
         };
-        /** SuggestedAudienceRequest */
+        /**
+         * SuggestedAudienceRequest
+         * @description Exactly one source: a campaign (its topics, every variant, no language)
+         *     or a variant (its topics in its language; ADR-188 addendum 2026-10-18).
+         */
         SuggestedAudienceRequest: {
             /** Campaign Id */
-            campaign_id: number;
+            campaign_id?: number | null;
+            /** Variant Id */
+            variant_id?: number | null;
         };
         /** SuggestionOption */
         SuggestionOption: {

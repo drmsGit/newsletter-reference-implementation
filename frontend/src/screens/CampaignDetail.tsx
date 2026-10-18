@@ -15,7 +15,7 @@ import DataTable from '../components/DataTable'
 import Fact from '../components/Fact'
 import NameAndChannel from '../components/NameAndChannel'
 import ScreenState from '../components/ScreenState'
-import { SuggestForCampaign } from './AudienceCreate'
+import { SuggestForVariant } from './AudienceCreate'
 import { formatDate } from './Campaigns'
 import { PreviewSheet } from './Preview'
 
@@ -29,8 +29,9 @@ import { PreviewSheet } from './Preview'
  * so there is one place those rules live.
  *
  * Its writes: Duplicate, the primary way a variant comes into being (Variant
- * Editor interview Q5.1), a blank variant, and Suggest an audience, which
- * makes a group from the campaign's content (2026-10-18). Modules, overrides
+ * Editor interview Q5.1), a blank variant, and a variant's Suggest an
+ * audience, which makes a group from its content in its language (ADR-188
+ * addendum 2026-10-18). Modules, overrides
  * and slots are edited in the editor; a variant here is a summary with Edit,
  * Preview and Send (2026-10-18: the module table went, to keep the page short).
  *
@@ -50,20 +51,11 @@ export default function CampaignDetail() {
               <div className="detail-head">
                 <h2>{composition.data.campaign.name}</h2>
               </div>
-              <div className="group">
-                <dl className="fact-list">
-                  <Fact label="Status">{composition.data.campaign.status}</Fact>
-                  <Fact label="Variants">{composition.data.variants.length}</Fact>
-                  <Fact label="Updated">{formatDate(composition.data.campaign.updated_at)}</Fact>
-                </dl>
-                {/* From this campaign's content (Manager Workflow 4.1), here as well
-                    as on Audiences (2026-10-18). */}
-                <div className="group-actions">
-                  <p className="btnrow">
-                    <SuggestForCampaign campaignId={id} />
-                  </p>
-                </div>
-              </div>
+              <dl className="group fact-list">
+                <Fact label="Status">{composition.data.campaign.status}</Fact>
+                <Fact label="Variants">{composition.data.variants.length}</Fact>
+                <Fact label="Updated">{formatDate(composition.data.campaign.updated_at)}</Fact>
+              </dl>
               <CampaignResults campaignId={id} />
               {composition.data.variants.map((composed) => (
                 <VariantSection key={composed.variant.id} campaignId={id} composed={composed}
@@ -156,6 +148,9 @@ function VariantSection({
             <Link className="btn-link" to={`/campaigns/${campaignId}/variants/${variant.id}/send`}>
               Send {variant.name}…
             </Link>
+            {/* Per variant: its topics in its language (ADR-188 addendum 2026-10-18). */}
+            <SuggestForVariant variantId={variant.id} variantName={variant.name}
+              language={composed.brand_profile?.language} />
             <Button
               className="btn-plain"
               isDisabled={duplicate.isPending}

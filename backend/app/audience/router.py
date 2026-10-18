@@ -541,10 +541,12 @@ def bulk_add_by_criteria(
     "/suggested",
     response_model=AudienceGroup,
     status_code=201,
-    summary="A suggested audience from a campaign's content categories",
+    summary="A suggested audience from a variant's or a campaign's content categories",
     description=(
-        "One editable include block per top category of the campaign's content. "
-        "The campaign must be in the working brand (404 otherwise)."
+        "One editable include block per top category of the content. From a variant "
+        "(variant_id): that variant's content, each block limited to its profile's language "
+        "(ADR-188 addendum 2026-10-18). From a campaign (campaign_id): every variant, no "
+        "language. Exactly one of the two; it must be in the working brand (404 otherwise)."
     ),
 )
 def create_suggested_audience(
@@ -554,6 +556,17 @@ def create_suggested_audience(
     brand_id: int = Depends(working_brand),
 ):
     from app.campaigns.service import get_campaign
+
+    if payload.variant_id is not None:
+        # A variant's topics in its language (ADR-188 addendum 2026-10-18).
+        try:
+            group = service.create_suggested_group_for_variant(db, payload.variant_id, brand_id=brand_id)
+        except LookupError:
+            raise HTTPException(status_code=404, detail=f"Variant {payload.variant_id} not found")
+        record_write(request, db, audit.AUDIENCE_GROUP_CREATED, group.id,
+                     {"name": group.name, "source_campaign_id": group.source_campaign_id,
+                      "source_variant_id": group.source_variant_id})
+        return group
 
     campaign = get_campaign(db, payload.campaign_id, brand_id=brand_id)
     if campaign is None:
