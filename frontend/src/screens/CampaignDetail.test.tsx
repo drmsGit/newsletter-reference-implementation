@@ -138,7 +138,7 @@ describe('the campaign list', () => {
 })
 
 describe('a campaign in detail', () => {
-  it("shows each module's source, the envelope and the limit as the server gives them", async () => {
+  it('sums a variant up, the envelope and the limit as the server gives them, with no module table', async () => {
     stubFetch({
       'GET /campaigns/1/composition': () => jsonResponse(COMPOSITION),
       'GET /campaigns/1/results': () => jsonResponse(NO_RESULTS),
@@ -146,14 +146,50 @@ describe('a campaign in detail', () => {
     renderDetail()
 
     expect(await screen.findByText('Spring is here')).toBeInTheDocument()
-    // The record's title, not its id (2026-10-04).
-    expect(screen.getByRole('link', { name: 'Lisbon in spring' })).toHaveAttribute('href', '/content/42')
-    expect(screen.getByRole('link', { name: 'Slot: Top pick' })).toHaveAttribute('href', '/decision-slots/5')
-    expect(screen.getByRole('link', { name: 'Top pick' })).toHaveAttribute('href', '/decision-slots/5')
-    expect(screen.getByText('Typed in the module')).toBeInTheDocument()
-    // The fields, not just that there is an override (task-262).
-    expect(screen.getByText('headline_medium by sam')).toBeInTheDocument()
     expect(screen.getByText('3 of 10')).toBeInTheDocument()
+    // A summary is enough on the campaign (2026-10-18): the modules are the editor's.
+    expect(screen.queryByRole('grid', { name: 'Modules of Variant A' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Top pick' })).toHaveAttribute('href', '/decision-slots/5')
+  })
+
+  it('offers Edit, Preview and Send, and previews the variant in its sheet', async () => {
+    stubFetch({
+      'GET /campaigns/1/composition': () => jsonResponse(COMPOSITION),
+      'GET /campaigns/1/results': () => jsonResponse(NO_RESULTS),
+      'GET /modules': () => jsonResponse([]),
+      'GET /rendering/variants/3': () =>
+        jsonResponse({ variant_id: 3, channel: 'email', role: 'html', artifact_body: '<p>Hi</p>', fields: {}, modules: [] }),
+    })
+    renderDetail()
+    const card = (await screen.findByRole('heading', { name: 'Variant A' })).closest('section')!
+    const actions = [...card.querySelectorAll('.group-actions .btnrow > *')].map((a) => a.textContent)
+    expect(actions).toEqual(['Edit Variant A', 'Preview', 'Send Variant A…', 'Duplicate this variant'])
+    fireEvent.click(within(card).getByRole('button', { name: 'Preview' }))
+    const sheet = await screen.findByRole('dialog', { name: 'Preview of Variant A' })
+    expect(await within(sheet).findByTitle('Rendered email: Variant A')).toBeInTheDocument()
+  })
+
+  it('suggests an audience from this campaign, after asking, and opens it', async () => {
+    const writes: Request[] = []
+    stubFetch({
+      'GET /campaigns/1/composition': () => jsonResponse(COMPOSITION),
+      'GET /campaigns/1/results': () => jsonResponse(NO_RESULTS),
+      'POST /api/audience-groups/suggested': (r) => (writes.push(r.clone()), jsonResponse({ id: 21, name: 'Suggested' }, 201)),
+    })
+    renderWithProviders(
+      <Routes>
+        <Route path="/campaigns/:id" element={<CampaignDetail />} />
+        <Route path="/audiences/:id" element={<h1>Audience page</h1>} />
+      </Routes>,
+      { route: '/campaigns/1' },
+    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Suggest an audience…' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Suggest an audience' })
+    expect(writes).toHaveLength(0)
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Suggest' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(await screen.findByRole('heading', { name: 'Audience page' })).toBeInTheDocument()
+    expect(await writes[0].json()).toEqual({ campaign_id: 1 })
   })
 
   it('duplicates with an empty body, so the server picks the mode, then re-reads', async () => {

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Button } from 'react-aria-components'
 import { Link, useNavigate, useParams } from 'react-router'
 
@@ -5,16 +6,18 @@ import {
   useComposition,
   useCreateVariant,
   useDuplicateVariant,
-  type ComposedModule,
+  useModuleManifests,
   type ComposedVariant,
 } from '../api/resources'
 import { HttpError } from '../api/session'
 import CampaignResults from '../components/CampaignResults'
-import DataTable, { type DataColumn } from '../components/DataTable'
+import DataTable from '../components/DataTable'
 import Fact from '../components/Fact'
 import NameAndChannel from '../components/NameAndChannel'
 import ScreenState from '../components/ScreenState'
+import { SuggestForCampaign } from './AudienceCreate'
 import { formatDate } from './Campaigns'
+import { PreviewSheet } from './Preview'
 
 /**
  * One campaign, variant by variant (inventory B11).
@@ -25,9 +28,11 @@ import { formatDate } from './Campaigns'
  * envelope. **This screen derives none of it.** It shows the server's answers,
  * so there is one place those rules live.
  *
- * The one write is Duplicate, the primary way a variant comes into being
- * (Variant Editor interview Q5.1). Editing modules, overrides and slots comes
- * with the rest of the write surface.
+ * Its writes: Duplicate, the primary way a variant comes into being (Variant
+ * Editor interview Q5.1), a blank variant, and Suggest an audience, which
+ * makes a group from the campaign's content (2026-10-18). Modules, overrides
+ * and slots are edited in the editor; a variant here is a summary with Edit,
+ * Preview and Send (2026-10-18: the module table went, to keep the page short).
  *
  * Column 3 of the campaigns screen (task-372, render 20): the list sits
  * beside it, so there is no way back to draw; each part is a card.
@@ -45,14 +50,24 @@ export default function CampaignDetail() {
               <div className="detail-head">
                 <h2>{composition.data.campaign.name}</h2>
               </div>
-              <dl className="group fact-list">
-                <Fact label="Status">{composition.data.campaign.status}</Fact>
-                <Fact label="Variants">{composition.data.variants.length}</Fact>
-                <Fact label="Updated">{formatDate(composition.data.campaign.updated_at)}</Fact>
-              </dl>
+              <div className="group">
+                <dl className="fact-list">
+                  <Fact label="Status">{composition.data.campaign.status}</Fact>
+                  <Fact label="Variants">{composition.data.variants.length}</Fact>
+                  <Fact label="Updated">{formatDate(composition.data.campaign.updated_at)}</Fact>
+                </dl>
+                {/* From this campaign's content (Manager Workflow 4.1), here as well
+                    as on Audiences (2026-10-18). */}
+                <div className="group-actions">
+                  <p className="btnrow">
+                    <SuggestForCampaign campaignId={id} />
+                  </p>
+                </div>
+              </div>
               <CampaignResults campaignId={id} />
               {composition.data.variants.map((composed) => (
-                <VariantSection key={composed.variant.id} campaignId={id} composed={composed} />
+                <VariantSection key={composed.variant.id} campaignId={id} composed={composed}
+                  stamp={composition.dataUpdatedAt} />
               ))}
               {/* Keyed by the campaign: a name typed here belongs to this campaign,
                   not the next one opened beside the list. */}
@@ -98,61 +113,15 @@ function BlankVariant({ campaignId }: { campaignId: number }) {
 function VariantSection({
   campaignId,
   composed,
+  stamp,
 }: {
   campaignId: number
   composed: ComposedVariant
+  stamp: number
 }) {
   const duplicate = useDuplicateVariant(campaignId)
   const { variant } = composed
-  const slotNames = new Map(composed.decision_slots.map((s) => [s.id, s.name]))
   const envelope = composed.envelope_modules[0]?.module_data ?? {}
-
-  const columns: DataColumn<ComposedModule>[] = [
-    { key: 'position', header: 'Position', render: (m) => m.position },
-    {
-      key: 'type',
-      header: 'Module',
-      isRowHeader: true,
-      render: (m) => (m.known ? m.module_type : `${m.module_type} (not on this channel)`),
-    },
-    {
-      key: 'source',
-      header: 'Content',
-      /**
-       * Where the module's content comes from, in the three ways a module can
-       * have it: bound to a record, filled by a decision slot per recipient, or
-       * typed into the module itself.
-       */
-      render: (m) =>
-        m.content_record_id != null ? (
-          <Link to={`/content/${m.content_record_id}`}>
-            {m.content_record_title ?? `Record #${m.content_record_id}`}
-          </Link>
-        ) : m.decision_slot_id != null ? (
-          <Link to={`/decision-slots/${m.decision_slot_id}`}>
-            Slot: {slotNames.get(m.decision_slot_id) ?? `#${m.decision_slot_id}`}
-          </Link>
-        ) : (
-          'Typed in the module'
-        ),
-    },
-    {
-      key: 'override',
-      header: 'Overridden here',
-      /**
-       * Which fields this module overrides, not just that it has an override
-       * (task-262): a module with one overridden headline still takes its body
-       * from the catalogue, and a catalogue edit to that body is not an
-       * override. Every other field is the catalogue's.
-       */
-      render: (m) => {
-        const fields = Object.keys(m.active_override?.field_overrides ?? {})
-        if (!m.active_override || fields.length === 0) return '—'
-        const by = m.active_override.overridden_by ? ` by ${m.active_override.overridden_by}` : ''
-        return `${fields.join(', ')}${by}`
-      },
-    },
-  ]
 
   return (
     <section aria-labelledby={`variant-${variant.id}`} className="detail-section">
@@ -183,6 +152,7 @@ function VariantSection({
             <Link className="btn-link" to={`/campaigns/${campaignId}/variants/${variant.id}`}>
               Edit {variant.name}
             </Link>
+            <VariantPreview variant={variant} stamp={stamp} />
             <Link className="btn-link" to={`/campaigns/${campaignId}/variants/${variant.id}/send`}>
               Send {variant.name}…
             </Link>
@@ -218,16 +188,6 @@ function VariantSection({
         </div>
       </div>
 
-      <div className="group table-card">
-        <h4 className="table-card__title">Modules of {variant.name}</h4>
-        <DataTable
-          label={`Modules of ${variant.name}`}
-          columns={columns}
-          items={composed.modules}
-          emptyMessage="This variant has no modules yet."
-        />
-      </div>
-
       {composed.decision_slots.length > 0 && (
         <div className="group table-card">
           <h4 className="table-card__title">Decision slots</h4>
@@ -252,3 +212,33 @@ function VariantSection({
     </section>
   )
 }
+
+/**
+ * A variant's Preview on the campaign page (2026-10-18): the editor's preview
+ * sheet, so the email can be looked at without opening the editor. A summary
+ * stands in for the module table; the modules are the editor's.
+ */
+function VariantPreview({ variant, stamp }: { variant: ComposedVariant['variant']; stamp: number }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Button onPress={() => setOpen(true)}>Preview</Button>
+      {open && <OpenPreview variant={variant} stamp={stamp} onClose={() => setOpen(false)} />}
+    </>
+  )
+}
+
+/** Mounted only while open: the manifests and the render are read then, not for every variant up front. */
+function OpenPreview({ variant, stamp, onClose }: {
+  variant: ComposedVariant['variant']
+  stamp: number
+  onClose: () => void
+}) {
+  const manifests = useModuleManifests(variant.channel)
+  const byName = new Map((manifests.data ?? []).map((m) => [m.name, m]))
+  return (
+    <PreviewSheet variantId={variant.id} variantName={variant.name} stamp={stamp} byName={byName}
+      isOpen onOpenChange={(next) => !next && onClose()} />
+  )
+}
+

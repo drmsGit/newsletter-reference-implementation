@@ -74,6 +74,49 @@ function CreateForm({ onCancel }: { onCancel: () => void }) {
 }
 
 /**
+ * "Suggest an audience…" on a campaign's page (2026-10-18): the same
+ * suggestion as Audiences' "Suggest from campaign", for this campaign, asked
+ * first because it makes a group. It closes, then opens the new group.
+ */
+export function SuggestForCampaign({ campaignId }: { campaignId: number }) {
+  const [open, setOpen] = useState(false)
+  const suggest = useSuggestAudience()
+  const navigate = useNavigate()
+  return (
+    <>
+      <Button onPress={() => setOpen(true)}>Suggest an audience…</Button>
+      <ModalOverlay isOpen={open} onOpenChange={setOpen} isDismissable className="preview-overlay">
+        <Modal className="create-modal">
+          <Dialog aria-labelledby={`suggest-audience-${campaignId}`}>
+            <Heading slot="title" id={`suggest-audience-${campaignId}`}>Suggest an audience</Heading>
+            <p className="muted">
+              A new audience with one rule per main topic of this campaign&apos;s content. You can change or remove each
+              one.
+            </p>
+            {suggest.isError && <p role="alert">{refusal(suggest.error, 'create an audience')}</p>}
+            <DialogActions onCancel={() => setOpen(false)}>
+              <Button
+                isDisabled={suggest.isPending}
+                onPress={() =>
+                  suggest.mutate(campaignId, {
+                    onSuccess: (group) => {
+                      setOpen(false)
+                      navigate(`/audiences/${group.id}`)
+                    },
+                  })
+                }
+              >
+                {suggest.isPending ? 'Suggesting…' : 'Suggest'}
+              </Button>
+            </DialogActions>
+          </Dialog>
+        </Modal>
+      </ModalOverlay>
+    </>
+  )
+}
+
+/**
  * "Suggest from campaign" (Manager Workflow 4.1): a new group with one
  * include rule per top category of the campaign's content, each badged as
  * suggested and editable like any other.
