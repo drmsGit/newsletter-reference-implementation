@@ -18,6 +18,7 @@ depends_on:
   - "[[ADR-132 — Signal Layer Implementation Event-Sourced Contributions with Decay-on-Read]]"
   - "[[ADR-055 — Separate Delivery Execution from Engagement Events]]"
   - "[[ADR-056 — Engagement Events as Foundation for Automation]]"
+  - "[[ADR-160 — Channel Model and Composition]]"
 enables:
   - "[[ADR-169 — Operational Flows Are Sequenced Variants, Not a Canvas]]"
 ---
@@ -163,6 +164,37 @@ This section applies point 1 to category interest. It is not a new rule. The use
 
 Nothing here changes the Decision section above.
 
+## Addendum 2026-10-18 — a suggested audience is made per variant: its topics and its language
+
+**What prompted it.** The system can suggest an audience from content. Two buttons do this: "Suggest from campaign" on Audiences, and, since 2026-10-18, "Suggest an audience…" on a campaign's page. Both build one include rule per top category of the *campaign's* content. They read every variant, whatever its channel. The code is `campaign_category_scores` and `suggest_include_blocks_for_campaign` in `backend/app/audience/service.py`.
+
+That was a choice of 2026-09-18. The user had asked whether a suggestion should check channels. The answer cited the principle of [[ADR-160 — Channel Model and Composition]] point 4: the campaign is the topic, and the channel is a delivery preference. The choice was recorded in the code's docstrings, not in a Decision.
+
+On 2026-10-18 the user raised a gap. An English variant and a German variant of one campaign suggest the same audience. Yet each should reach readers of its own language. Two variants can also carry different content. The business decision on multilingual newsletters already says each language is its own variant, sent to an audience filtered by language (P2-F2, `docs/playbook-strategy.md` §5). The suggestion did not follow it.
+
+The user decided the following on 2026-10-18, in a session.
+
+**1. A suggestion is made for one variant.** The entry point is each variant on the campaign page ("Suggest an audience…"). "Suggest from campaign" on Audiences stays campaign-wide for now. It takes topics from every variant, sets no language, and says so.
+
+**2. Its topics come from that variant's content only.** That means the modules bound to content records and the resolved picks of its decision slots. Ranking is as today: the top five categories, the same default minimum score, one include rule per category.
+
+**3. Every suggested rule carries the variant's language.** The language is the language of the variant's brand profile ([[ADR-194 — Brand Profiles Carry an Email's Look, Texts and Legal Details]] point 6: one profile per language). It goes into each rule as its language field. It must sit inside each topic rule because of point 1: fields combine with AND inside a rule, and include rules combine with OR. "Interested in Hiking AND language is de" is one rule. A separate rule "language is de" would add every reader of that language.
+
+**4. The channel stays out of the suggestion, as before.** The group resolves against each channel's consent at send time ([[ADR-163 — Per-Channel Consent and Addressability]]). Its counts are asked with the channel in hand ([[ADR-176 — A Negative Decision Outranks a Positive One]] point 5). A push variant's suggestion is its topics and its language.
+
+**5. A suggested group remembers its source variant.** A new nullable reference sits beside its source campaign. Recalculating its suggested rules follows the variant when one is recorded: its topics and its language. Otherwise it follows the campaign.
+
+**6. What this revises.** It revises the 2026-09-18 choice that a suggestion reads every variant of the campaign. ADR-160's principle stands for the model: there is no channel layer, and the campaign is the topic. A suggestion is about who receives one variant. That is the variant's content, in its language.
+
+**Consequences.**
+
+- *Positive:* a German variant and an English variant get audiences in their own language. A variant whose content differs gets its own topics.
+- *Negative:* two variants of one campaign may get two near-identical groups. The manager deletes one or reuses it.
+- *Negative:* the suggestion is per variant, while the entry on Audiences stays campaign-wide until it is changed.
+- *Negative:* a migration adds the source-variant column.
+
+Nothing here changes the Decision section above.
+
 ## Related ADRs
 
 ### Depends On
@@ -172,6 +204,7 @@ Nothing here changes the Decision section above.
 - [[ADR-132 — Signal Layer Implementation Event-Sourced Contributions with Decay-on-Read]]
 - [[ADR-055 — Separate Delivery Execution from Engagement Events]]
 - [[ADR-056 — Engagement Events as Foundation for Automation]]
+- [[ADR-160 — Channel Model and Composition]]
 
 ### Enables
 - [[ADR-169 — Operational Flows Are Sequenced Variants, Not a Canvas]]
